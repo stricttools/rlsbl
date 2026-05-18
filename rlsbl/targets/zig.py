@@ -160,13 +160,14 @@ class ZigTarget(BaseTarget):
     def get_project_init_hint(self):
         return 'Run "zig init" first, or create a build.zig.zon manually'
 
-    def dev_install_command(self, project_dir, *, venv=False):
-        if venv:
-            # Zig has no per-project venv concept; deps come via build.zig.zon.
-            return None
+    def dev_install_command(self, project_dir):
         return {
-            "tool": "zig",
-            "purpose": "for zig build install",
-            "args": ["build", "install"],
-            "uninstall_args_template": None,
+            "global": {
+                "tool": "zig",
+                "purpose": "for zig build install",
+                "args": ["build", "install"],
+                "uninstall_args_template": None,
+            },
+            # Zig has no per-project venv concept; deps come via build.zig.zon.
+            "venv": None,
         }

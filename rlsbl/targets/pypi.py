@@ -330,19 +330,20 @@ class PypiTarget(BaseTarget):
     def get_project_init_hint(self):
         return 'Run "uv init" first'
 
-    def dev_install_command(self, project_dir, *, venv=False):
-        if venv:
+    def dev_install_command(self, project_dir):
+        return {
+            "global": {
+                "tool": "uv",
+                "purpose": "for editable Python install",
+                "args": ["tool", "install", "-e", "."],
+                "uninstall_args_template": ["tool", "uninstall", "{name}"],
+            },
             # Local mode: sync the project's .venv with declared dependencies.
             # `uv sync` is idempotent; there is no symmetric uninstall.
-            return {
+            "venv": {
                 "tool": "uv",
                 "purpose": "for syncing the project venv",
                 "args": ["sync"],
                 "uninstall_args_template": None,
-            }
-        return {
-            "tool": "uv",
-            "purpose": "for editable Python install",
-            "args": ["tool", "install", "-e", "."],
-            "uninstall_args_template": ["tool", "uninstall", "{name}"],
+            },
         }

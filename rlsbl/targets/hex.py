@@ -138,14 +138,15 @@ class HexTarget(BaseTarget):
     def get_project_init_hint(self):
         return 'Run "mix new <project_name>" first'
 
-    def dev_install_command(self, project_dir, *, venv=False):
+    def dev_install_command(self, project_dir):
         # Elixir/Mix has no real distinction between a "global" install and a
         # local one: dependencies live in `deps/` next to mix.exs and are
         # compiled into `_build/`. `mix deps.get` fetches deps for both modes.
         # There is no portable equivalent of `pip uninstall` or `npm unlink`.
-        return {
+        spec = {
             "tool": "mix",
             "purpose": "for fetching Hex dependencies",
             "args": ["deps.get"],
             "uninstall_args_template": None,
         }
+        return {"global": spec, "venv": spec}

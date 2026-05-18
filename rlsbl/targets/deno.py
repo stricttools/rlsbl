@@ -194,19 +194,20 @@ class DenoTarget(BaseTarget):
     def get_project_init_hint(self):
         return 'Run "deno init" first'
 
-    def dev_install_command(self, project_dir, *, venv=False):
-        if venv:
+    def dev_install_command(self, project_dir):
+        return {
+            # Global mode: install as a CLI via `deno install`. Uninstall via name.
+            "global": {
+                "tool": "deno",
+                "purpose": "for deno install",
+                "args": ["install"],
+                "uninstall_args_template": ["uninstall", "{name}"],
+            },
             # Local mode: prime the per-DENO_DIR module cache. No uninstall.
-            return {
+            "venv": {
                 "tool": "deno",
                 "purpose": "for caching Deno modules",
                 "args": ["cache", "."],
                 "uninstall_args_template": None,
-            }
-        # Global mode: install as a CLI via `deno install`. Uninstall via name.
-        return {
-            "tool": "deno",
-            "purpose": "for deno install",
-            "args": ["install"],
-            "uninstall_args_template": ["uninstall", "{name}"],
+            },
         }

@@ -222,20 +222,21 @@ class NpmTarget(BaseTarget):
     def get_project_init_hint(self):
         return 'Run "npm init" first'
 
-    def dev_install_command(self, project_dir, *, venv=False):
-        if venv:
+    def dev_install_command(self, project_dir):
+        return {
+            "global": {
+                "tool": "npm",
+                "purpose": "for npm link",
+                "args": ["link"],
+                # `npm unlink` inside the package directory removes the global symlink.
+                "uninstall_args_template": ["unlink"],
+            },
             # Local mode: install dependencies into node_modules without creating
             # a global symlink. There is no clean automated uninstall.
-            return {
+            "venv": {
                 "tool": "npm",
                 "purpose": "for npm install",
                 "args": ["install"],
                 "uninstall_args_template": None,
-            }
-        return {
-            "tool": "npm",
-            "purpose": "for npm link",
-            "args": ["link"],
-            # `npm unlink` inside the package directory removes the global symlink.
-            "uninstall_args_template": ["unlink"],
+            },
         }
