@@ -20,13 +20,32 @@ def _get_release_branches():
     """Return the configured release-branch list.
 
     Reads ``release_branches`` from ``.rlsbl/config.json`` if present;
-    falls back to ``["main", "master"]``.
+    falls back to ``["main", "master"]`` when the key is absent.
+
+    Raises :class:`ValueError` if the key is present but malformed
+    (empty list or non-list value). An empty list would silently
+    disable the manual-release-push warning, which is almost never
+    what the user wants; require explicit removal of the key instead.
     """
     config = read_project_config()
-    branches = config.get("release_branches")
-    if isinstance(branches, list) and branches:
-        return [str(b) for b in branches]
-    return list(DEFAULT_RELEASE_BRANCHES)
+    if "release_branches" not in config:
+        return list(DEFAULT_RELEASE_BRANCHES)
+    branches = config["release_branches"]
+    if not isinstance(branches, list):
+        raise ValueError(
+            "release_branches in .rlsbl/config.json must be a list of "
+            f"branch names; got {type(branches).__name__}. "
+            "Remove the key to use the default (main, master)."
+        )
+    if not branches:
+        raise ValueError(
+            "release_branches in .rlsbl/config.json is an empty list, "
+            "which is not a valid value (it would disable the "
+            "manual-release-push warning entirely). "
+            "Remove the key to use the default (main, master), or list "
+            "at least one branch name."
+        )
+    return [str(b) for b in branches]
 
 
 def _warn_if_manual_release_push(stdin_lines):

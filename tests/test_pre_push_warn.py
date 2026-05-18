@@ -286,14 +286,36 @@ class TestGetReleaseBranches:
         )
         assert _get_release_branches() == ["trunk", "stable"]
 
-    def test_empty_list_falls_back_to_default(self, tmp_project):
+    def test_empty_list_raises(self, tmp_project):
+        """An empty list would silently disable the warning entirely.
+        Treat it as a configuration error: the user should remove the key
+        to opt back into the default, or list at least one branch.
+        """
         (tmp_project / ".rlsbl").mkdir()
         (tmp_project / ".rlsbl" / "config.json").write_text(
             json.dumps({"release_branches": []})
         )
-        # An empty list would silently disable the warning entirely --
-        # treat it as "not set" and use the default.
-        assert _get_release_branches() == ["main", "master"]
+        with pytest.raises(ValueError) as excinfo:
+            _get_release_branches()
+        msg = str(excinfo.value)
+        assert ".rlsbl/config.json" in msg
+        assert "release_branches" in msg
+        assert "empty list" in msg
+        # Suggests the recovery path
+        assert "Remove the key" in msg or "remove the key" in msg
+
+    def test_non_list_raises(self, tmp_project):
+        """A non-list value (string, dict, int) is also a configuration error."""
+        (tmp_project / ".rlsbl").mkdir()
+        (tmp_project / ".rlsbl" / "config.json").write_text(
+            json.dumps({"release_branches": "main"})
+        )
+        with pytest.raises(ValueError) as excinfo:
+            _get_release_branches()
+        msg = str(excinfo.value)
+        assert ".rlsbl/config.json" in msg
+        assert "release_branches" in msg
+        assert "list" in msg
 
 
 class TestWarnHelperDirect:
