@@ -2,7 +2,7 @@
 
 # Changelog
 
-## Unreleased
+## 0.33.0
 
 ### Features
 
