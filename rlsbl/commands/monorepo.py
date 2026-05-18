@@ -21,8 +21,13 @@ def _cmd_init(flags):
     save_workspace(".", [])
     print("Initialized monorepo workspace in .rlsbl-monorepo/")
 
+    rel_ws_file = os.path.join(WORKSPACE_DIR, WORKSPACE_FILE)
+    if flags.get("no-commit"):
+        print(f"Skipped commit (--no-commit). Run `safegit commit -- {rel_ws_file}` manually.")
+        return
+
     # Auto-commit workspace.toml
-    commit_files("monorepo: init workspace", [os.path.join(WORKSPACE_DIR, WORKSPACE_FILE)], allow_failure=True)
+    commit_files("monorepo: init workspace", [rel_ws_file], allow_failure=True)
 
 
 def _cmd_add(args, flags):
@@ -106,9 +111,14 @@ def _cmd_add(args, flags):
     save_workspace(root, projects)
     print(f"Added project '{name}' at {path}")
 
-    # Commit workspace.toml
+    no_commit = bool(flags.get("no-commit"))
     ws_file = os.path.join(WORKSPACE_DIR, WORKSPACE_FILE)
-    commit_files(f"monorepo: add {name}", [ws_file], allow_failure=True)
+
+    if no_commit:
+        print(f"Skipped commit (--no-commit). Run `safegit commit -- {ws_file}` manually.")
+    else:
+        # Commit workspace.toml
+        commit_files(f"monorepo: add {name}", [ws_file], allow_failure=True)
 
     # Auto-scaffold if not already scaffolded
     project_rlsbl = os.path.join(path, ".rlsbl", "config.json")
@@ -118,6 +128,8 @@ def _cmd_add(args, flags):
             cmd = [sys.executable, "-m", "rlsbl", "scaffold"]
             if explicit_target:
                 cmd.extend(["--target", explicit_target])
+            if no_commit:
+                cmd.append("--no-commit")
             subprocess.run(
                 cmd,
                 cwd=path,
@@ -128,8 +140,11 @@ def _cmd_add(args, flags):
 
     # Sync CI workflows
     try:
+        sync_cmd = [sys.executable, "-m", "rlsbl", "monorepo", "sync"]
+        if no_commit:
+            sync_cmd.append("--no-commit")
         subprocess.run(
-            [sys.executable, "-m", "rlsbl", "monorepo", "sync"],
+            sync_cmd,
             cwd=root,
             check=False,
         )
@@ -585,7 +600,11 @@ def _cmd_sync(flags):
     # Auto-commit
     all_files = written_files + deleted_files
     if all_files:
-        commit_files("monorepo: sync CI workflows", all_files, allow_failure=True)
+        if flags.get("no-commit"):
+            quoted = " ".join(all_files)
+            print(f"Skipped commit (--no-commit). Run `safegit commit -- {quoted}` manually.")
+        else:
+            commit_files("monorepo: sync CI workflows", all_files, allow_failure=True)
 
     wf_count = len(written_files) - 1  # subtract router(s)
     if projects_with_publish:

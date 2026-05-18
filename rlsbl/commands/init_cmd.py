@@ -857,19 +857,25 @@ def _print_private_summary():
     print("  Go:     go get github.com/owner/repo@vX.Y.Z")
 
 
-def _trigger_monorepo_sync():
+def _trigger_monorepo_sync(no_commit=False):
     """If the current directory is inside a monorepo workspace, run sync.
 
     Uses a subprocess so that sys.exit() calls inside sync don't kill scaffold.
     Failures are silently ignored -- sync is best-effort after scaffold.
+
+    When ``no_commit`` is True, propagates ``--no-commit`` to the sync call so
+    a single user invocation with ``--no-commit`` produces zero commits.
     """
     from ..workspace import find_workspace_root
 
     ws_root = find_workspace_root(".")
     if ws_root:
         try:
+            cmd = [sys.executable, "-m", "rlsbl", "monorepo", "sync"]
+            if no_commit:
+                cmd.append("--no-commit")
             subprocess.run(
-                [sys.executable, "-m", "rlsbl", "monorepo", "sync"],
+                cmd,
                 cwd=ws_root,
                 check=False,
             )
@@ -974,7 +980,7 @@ def run_cmd(registry, args, flags):
             _print_private_summary()
 
         # If inside a monorepo, sync root CI workflows
-        _trigger_monorepo_sync()
+        _trigger_monorepo_sync(no_commit=bool(flags.get("no-commit")))
     finally:
         release_lock()
 
@@ -1418,6 +1424,6 @@ def run_cmd_multi(registries_list, args, flags):
                 print(f"  {i}. {step}")
 
         # If inside a monorepo, sync root CI workflows
-        _trigger_monorepo_sync()
+        _trigger_monorepo_sync(no_commit=bool(flags.get("no-commit")))
     finally:
         release_lock()

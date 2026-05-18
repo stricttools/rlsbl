@@ -503,9 +503,10 @@ mono = app.group("monorepo", help="Manage monorepo workspaces with multiple inde
 
 
 @mono.command(name="init", help="Create a new monorepo workspace by generating the .rlsbl-monorepo directory and an empty workspace.toml configuration file at the current directory. This must be run at the repository root before adding individual projects with the add subcommand. Each workspace tracks multiple independently-versioned projects that share a single git repository.")
-def cmd_mono_init():
+@strictcli.flag(name="no-commit", type=bool, help="Skip auto-commit of workspace.toml")
+def cmd_mono_init(no_commit):
     from .commands.monorepo import _cmd_init
-    _cmd_init({})
+    _cmd_init({"no-commit": no_commit})
 
 
 @mono.command(name="add", help="Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Optionally set a display name, target registry for publishing, glob patterns for change detection, a subtree remote URL for split publishing, inter-project dependencies, and a library flag to mark shared code packages.")
@@ -515,8 +516,9 @@ def cmd_mono_init():
 @strictcli.flag(name="subtree-remote", type=str, help="Subtree remote URL", default="")
 @strictcli.flag(name="depends-on", type=str, help="Comma-separated dependency project names", default="")
 @strictcli.flag(name="library", type=str, help="Mark as library (true/false)", default="")
+@strictcli.flag(name="no-commit", type=bool, help="Skip auto-commit of workspace.toml and suppress commits from auto-triggered scaffold/sync")
 @strictcli.arg(name="path", help="Path to the project directory")
-def cmd_mono_add(name, target, watch, subtree_remote, depends_on, library, path):
+def cmd_mono_add(name, target, watch, subtree_remote, depends_on, library, no_commit, path):
     flags = {}
     if name:
         flags["name"] = name
@@ -530,6 +532,8 @@ def cmd_mono_add(name, target, watch, subtree_remote, depends_on, library, path)
         flags["depends-on"] = depends_on
     if library:
         flags["library"] = library
+    if no_commit:
+        flags["no-commit"] = True
     from .commands.monorepo import _cmd_add
     _cmd_add([path], flags)
 
@@ -548,9 +552,10 @@ def cmd_mono_list():
 
 
 @mono.command(name="sync", help="Copy and merge CI workflow files from each project's individual scaffold into the shared .github/workflows directory at the repository root. This ensures that every project in the workspace has its publish and test pipelines properly configured as GitHub Actions workflows, even when projects use different target registries or have custom workflow steps.")
-def cmd_mono_sync():
+@strictcli.flag(name="no-commit", type=bool, help="Skip auto-commit of synced workflow files")
+def cmd_mono_sync(no_commit):
     from .commands.monorepo import _cmd_sync
-    _cmd_sync({})
+    _cmd_sync({"no-commit": no_commit})
 
 
 @mono.command(name="status", help="Show the current version, last release tag, and number of unreleased commits for every project in the monorepo workspace. Provides a quick overview of which projects have pending changes and are ready for their next release. Projects with zero unreleased commits are shown as up-to-date.")
