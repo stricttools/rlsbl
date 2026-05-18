@@ -60,18 +60,20 @@ def generate_version_section(version: str, entries: list[ChangelogEntry]) -> str
     return "\n".join(parts)
 
 
-def generate_version_file(changes_dir: str, version: str) -> str:
-    """Read the JSONL file for a version, generate markdown, write .md alongside it.
+def generate_version_file(changes_dir: str, version: str, write_to_disk: bool = True) -> str:
+    """Read the JSONL file for a version, generate markdown, optionally write .md alongside it.
 
-    Returns the generated markdown text.
+    Returns the generated markdown text. When write_to_disk is False, computes the
+    markdown without touching the filesystem (used to preview content before pre-checks).
     """
     jsonl_path = os.path.join(changes_dir, f"{version}.jsonl")
     entries = parse_jsonl(jsonl_path)
     md = generate_version_section(version, entries)
 
-    md_path = os.path.join(changes_dir, f"{version}.md")
-    with open(md_path, "w", encoding="utf-8") as f:
-        f.write(md)
+    if write_to_disk:
+        md_path = os.path.join(changes_dir, f"{version}.md")
+        with open(md_path, "w", encoding="utf-8") as f:
+            f.write(md)
 
     return md
 
@@ -97,15 +99,19 @@ def _read_changelog_format(project_path: str) -> str:
     return fmt
 
 
-def generate_changelog(project_path: str) -> str:
+def generate_changelog(project_path: str, *, write_to_disk: bool = True) -> str:
     """Generate the complete CHANGELOG.md from .rlsbl/changes/ JSONL files.
 
     1. Reads changelog_format from config (only "grouped" supported).
     2. Reads unreleased.jsonl (if non-empty) for an Unreleased section.
     3. Reads all versioned JSONL files sorted newest-first.
-    4. Generates per-version .md files alongside the JSONL files.
-    5. Writes CHANGELOG.md at project root.
+    4. Generates per-version .md files alongside the JSONL files (when write_to_disk).
+    5. Writes CHANGELOG.md at project root (when write_to_disk).
     6. Returns the generated content.
+
+    When write_to_disk is False, computes and returns the markdown content without
+    modifying the filesystem. This lets callers preview the changelog before
+    pre-release checks run, so an aborted release leaves a clean working tree.
     """
     _read_changelog_format(project_path)
 
@@ -119,14 +125,15 @@ def generate_changelog(project_path: str) -> str:
 
     # Versioned entries (newest first)
     for version, jsonl_path in list_versioned_files(changes_dir):
-        md = generate_version_file(changes_dir, version)
+        md = generate_version_file(changes_dir, version, write_to_disk=write_to_disk)
         sections.append(md)
 
     body = "\n".join(sections)
     content = f"{_HEADER_COMMENT}\n\n# Changelog\n\n{body}"
 
-    changelog_path = os.path.join(project_path, "CHANGELOG.md")
-    with open(changelog_path, "w", encoding="utf-8") as f:
-        f.write(content)
+    if write_to_disk:
+        changelog_path = os.path.join(project_path, "CHANGELOG.md")
+        with open(changelog_path, "w", encoding="utf-8") as f:
+            f.write(content)
 
     return content
