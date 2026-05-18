@@ -4,11 +4,57 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 
-from .files import read_unreleased
+from .files import list_versioned_files, read_unreleased
 from .resolve import resolve_hash, resolve_hashes
-from .schema import ChangelogEntry, validate_schema
+from .schema import ChangelogEntry, parse_jsonl, validate_schema
+from ..config import get_changelog_validation_config
 from ..utils import commit_files
+
+
+# Defaults applied when batch_limits keys are absent or malformed.
+_BATCH_LIMITS_DEFAULTS = {
+    "max_commits_per_entry": 5,
+    "max_entries_per_commit": 2,
+    "exclusions": [],
+}
+
+
+def _get_batch_limits_config() -> dict:
+    """Return the resolved batch_limits config with defaults applied.
+
+    Reads the raw ``batch_limits`` section via
+    :func:`get_changelog_validation_config` and guarantees that all three
+    expected keys are present with sane types:
+
+    - ``max_commits_per_entry`` (int)
+    - ``max_entries_per_commit`` (int)
+    - ``exclusions`` (list)
+
+    If any key is missing or has the wrong type, the default is used and a
+    warning is emitted on stderr.
+    """
+    raw = get_changelog_validation_config() or {}
+    resolved: dict = {}
+
+    for key, default in _BATCH_LIMITS_DEFAULTS.items():
+        if key not in raw:
+            resolved[key] = default
+            continue
+        value = raw[key]
+        if not isinstance(value, type(default)) or isinstance(value, bool) and not isinstance(default, bool):
+            # bool is a subclass of int, so guard against accidental bool-as-int
+            print(
+                f"warning: batch_limits.{key} has wrong type "
+                f"({type(value).__name__}); using default {default!r}",
+                file=sys.stderr,
+            )
+            resolved[key] = default
+        else:
+            resolved[key] = value
+
+    return resolved
 
 
 def _git_log_hashes(range_spec: str) -> list[str]:
@@ -340,12 +386,113 @@ def check_schema(entries: list[ChangelogEntry]) -> tuple[bool, list[str]]:
     return (len(details) == 0, details)
 
 
+def check_batch_size_commits(
+    entries: list[ChangelogEntry],
+    config: dict,
+    version: str = "unreleased",
+) -> tuple[bool, list[str]]:
+    """Check that no entry has more commits than ``max_commits_per_entry``.
+
+    ``config`` is the resolved batch_limits config (see
+    :func:`_get_batch_limits_config`). Per-entry exclusions (matched by
+    ``version`` + 1-based line number) silence the check for those entries.
+    """
+    max_commits = config.get("max_commits_per_entry", _BATCH_LIMITS_DEFAULTS["max_commits_per_entry"])
+    exclusions = config.get("exclusions", [])
+
+    exempted_entries: set[tuple[str, int]] = set()
+    for excl in exclusions:
+        if not isinstance(excl, dict):
+            continue
+        for entry_ref in excl.get("entries", []) or []:
+            if not isinstance(entry_ref, dict):
+                continue
+            v = entry_ref.get("version")
+            ln = entry_ref.get("line")
+            if v is not None and isinstance(ln, int):
+                exempted_entries.add((v, ln))
+
+    details: list[str] = []
+    for i, entry in enumerate(entries):
+        line_num = i + 1
+        if (version, line_num) in exempted_entries:
+            continue
+        if len(entry.commits) > max_commits:
+            short_commits = ", ".join(c[:7] for c in entry.commits)
+            details.append(
+                f"{version}.jsonl line {line_num}: {len(entry.commits)} commits "
+                f"(max: {max_commits}) [{short_commits}]"
+            )
+    return (len(details) == 0, details)
+
+
+def check_batch_size_entries(
+    entries_by_version: dict[str, list[ChangelogEntry]],
+    config: dict,
+) -> tuple[bool, list[str]]:
+    """Check that no commit appears in more than ``max_entries_per_commit`` entries.
+
+    ``entries_by_version`` maps version label (e.g. ``"unreleased"`` or
+    ``"0.32.0"``) to its entry list, so the check spans across ALL JSONL
+    files, not just unreleased. Per-commit exclusions in ``config``
+    silence specific hashes.
+    """
+    max_entries = config.get("max_entries_per_commit", _BATCH_LIMITS_DEFAULTS["max_entries_per_commit"])
+    exclusions = config.get("exclusions", [])
+
+    exempted_commits: set[str] = set()
+    for excl in exclusions:
+        if not isinstance(excl, dict):
+            continue
+        for commit in excl.get("commits", []) or []:
+            if isinstance(commit, str):
+                exempted_commits.add(commit)
+
+    appearances: dict[str, list[tuple[str, int]]] = {}
+    for version, entries in entries_by_version.items():
+        for i, entry in enumerate(entries):
+            for commit in entry.commits:
+                appearances.setdefault(commit, []).append((version, i + 1))
+
+    details: list[str] = []
+    for commit in sorted(appearances):
+        locations = appearances[commit]
+        if commit in exempted_commits:
+            continue
+        if len(locations) > max_entries:
+            loc_str = ", ".join(f"{v}.jsonl:{ln}" for v, ln in locations)
+            details.append(
+                f"commit {commit[:7]}: appears in {len(locations)} entries "
+                f"(max: {max_entries}) [{loc_str}]"
+            )
+    return (len(details) == 0, details)
+
+
+def _read_all_versioned_entries(changes_dir: str) -> dict[str, list[ChangelogEntry]]:
+    """Read entries from unreleased.jsonl AND every x.y.z.jsonl in changes_dir.
+
+    Returns a mapping ``{version_label: entries}`` where ``version_label`` is
+    ``"unreleased"`` or the bare semver string (e.g. ``"0.32.0"``).
+    Files that fail to parse are skipped silently -- other checks surface
+    such errors separately.
+    """
+    result: dict[str, list[ChangelogEntry]] = {
+        "unreleased": read_unreleased(changes_dir),
+    }
+    for version, path in list_versioned_files(changes_dir):
+        try:
+            result[version] = parse_jsonl(path)
+        except (ValueError, OSError):
+            continue
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Combined validation
 # ---------------------------------------------------------------------------
 
 def validate_unreleased(changes_dir: str, tag_glob: str | None = None) -> dict:
-    """Run all 5 validation checks on unreleased.jsonl.
+    """Run all 7 validation checks on unreleased.jsonl.
 
     Returns a dict with:
     - check names as keys, (passed, details) tuples as values
@@ -355,8 +502,16 @@ def validate_unreleased(changes_dir: str, tag_glob: str | None = None) -> dict:
     skips full revalidation. When tag_glob is set, uses it directly as
     the glob pattern for monorepo tag discovery (e.g. ``mylib@v*`` or
     ``go/v*``).
+
+    The two batch_limits checks (``batch_size_commits`` and
+    ``batch_size_entries``) read configuration from
+    ``.rlsbl/config.json`` via :func:`_get_batch_limits_config`. The
+    cross-version ``batch_size_entries`` check reads every
+    ``x.y.z.jsonl`` file in ``changes_dir`` so it can detect commits
+    that appear in too many entries across versions.
     """
     entries = read_unreleased(changes_dir)
+    batch_config = _get_batch_limits_config()
 
     # Check cache
     if _is_cache_valid(changes_dir):
@@ -372,6 +527,8 @@ def validate_unreleased(changes_dir: str, tag_glob: str | None = None) -> dict:
                     "coverage": (True, []),
                     "no_orphans": (True, []),
                     "schema": (True, []),
+                    "batch_size_commits": (True, []),
+                    "batch_size_entries": (True, []),
                 },
             }
         # Cache is valid but HEAD moved: only validate new entries
@@ -379,12 +536,16 @@ def validate_unreleased(changes_dir: str, tag_glob: str | None = None) -> dict:
         # determine which entries are new without more metadata, run full
         # validation but update cache on success.
 
+    entries_by_version = _read_all_versioned_entries(changes_dir)
+
     checks = {
         "hashes_resolve": check_hashes_resolve(entries),
         "in_range": check_in_range(entries, tag_glob),
         "coverage": check_coverage(entries, tag_glob),
         "no_orphans": check_no_orphans(entries),
         "schema": check_schema(entries),
+        "batch_size_commits": check_batch_size_commits(entries, batch_config, version="unreleased"),
+        "batch_size_entries": check_batch_size_entries(entries_by_version, batch_config),
     }
 
     overall = all(passed for passed, _ in checks.values())
