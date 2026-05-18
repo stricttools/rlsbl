@@ -36,13 +36,14 @@ def _install_single(project_dir, flags):
     for entry in targets:
         name = entry.name
         target = TARGETS.get(name)
-        spec = (
-            target.dev_install_command(project_dir, venv=venv)
+        modes = (
+            target.dev_install_command(project_dir)
             if target is not None
-            else None
+            else {"global": None, "venv": None}
         )
+        spec = modes.get("venv" if venv else "global")
         if spec is None:
-            if venv and target is not None and target.dev_install_command(project_dir, venv=False) is not None:
+            if venv and modes.get("global") is not None:
                 # Global install exists for this target but venv mode does not.
                 print(f"Skipping {name}: --venv not supported for this target")
             else:
