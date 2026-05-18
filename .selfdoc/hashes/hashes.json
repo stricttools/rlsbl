@@ -92,7 +92,7 @@
     "description": "9de4edacdac0f017922ff741350398e29220fc137e3fea9e014f41c8802c19d7"
   },
   "configuration.md": {
-    "content": "3f0608842772f21b3341f55dc24146381cba964de61c8d91dfacb356df8a990d",
+    "content": "b813264f05943e6872b122810b294971c79f350bf0a722cc6bafa5749679c65d",
     "description": "3014308e9e0bf5cac06ed58f0bc67c1305fda4a04d60e5046cd43fcd7d27be7c"
   },
   "gen-index.md": {
@@ -120,7 +120,7 @@
     "description": "ad82329430edeac2813cd4838be4a5af36db544ca16ba4b974f498dfbeef4f25"
   },
   "rlsbl-changelog-generate.md": {
-    "content": "02338514265ca25c60561ad44ef8ac0e590ab7dda881290c4a3af424f2b84f3d",
+    "content": "4aea4f273f3ea42fb61da1ec27e69fed0287b05fc6933b5c437dc90301267b28",
     "description": "82386c667e1edc18a9acd7cfb021dc6442ade54c7e52e2ace653b9863ec6df8f"
   },
   "rlsbl-changelog-resolve.md": {
@@ -228,7 +228,7 @@
     "description": "3986cc1a1eea514370088defbef1995f475b122eb4308ac714adf6d25427b0cd"
   },
   "rlsbl-config.md": {
-    "content": "aaddcf182dc0ee7834d5a147df43b9ac20c64dbb361dae0bc2cb07b04f9ef880",
+    "content": "28569a65ec51af92676a20f7db997c17d8fafd23d0e22cd4d1df0a4ae1f92849",
     "description": "947f02a805bd372b14e5a024ffb9badc281c37c2b3bb5f19f6df129b5c918afa"
   },
   "rlsbl-dep_rewrite.md": {
