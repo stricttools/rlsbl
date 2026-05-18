@@ -1,6 +1,6 @@
 ---
 title: rlsbl.action_versions
-description: "Centralized loader for pinned GitHub Actions versions, providing a single source of truth that every rlsbl-scaffolded workflow consumes so action"
+description: "Pinned GitHub Actions version loader: single source of truth read from action_versions.toml so workflow upgrades happen in one place."
 generated: true
 nav_group: "API Reference"
 nav_order: 3

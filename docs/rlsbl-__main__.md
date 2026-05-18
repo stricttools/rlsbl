@@ -1,6 +1,6 @@
 ---
 title: rlsbl.__main__
-description: "Entry point that lets users invoke the CLI as `python -m rlsbl`, mirroring the behavior of the installed `rlsbl` console script for convenience in"
+description: "Module entry point so users can run the CLI as python -m rlsbl, dispatching to the same main() as the installed rlsbl script."
 generated: true
 nav_group: "API Reference"
 nav_order: 2

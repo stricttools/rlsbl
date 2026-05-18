@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.docs
-description: "Docs target -- thin wrapper delegating to the selfdoc CLI so rlsbl can detect, build, and deploy selfdoc documentation sites without duplicating any of"
+description: "Docs release target that delegates entirely to the selfdoc CLI, detecting selfdoc.json projects and routing build and deploy through selfdoc."
 generated: true
 nav_group: "API Reference"
 nav_order: 55

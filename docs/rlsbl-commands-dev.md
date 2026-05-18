@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.dev
-description: "Developer utilities for locally installing rlsbl-managed projects in editable mode, dispatching to each detected target's native install command (uv"
+description: "Developer install commands that wire each detected target into its native editable mode (uv tool install, npm link, go install, and others)."
 generated: true
 nav_group: "API Reference"
 nav_order: 15

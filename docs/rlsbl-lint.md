@@ -1,6 +1,6 @@
 ---
 title: rlsbl.lint
-description: "Multi-language library boundary linter that detects accidental external exposure of internal symbols across Python, Go, and npm libraries to keep public"
+description: "Library boundary linter spanning Python, Go, and npm that flags accidental external exposure of internal symbols so public APIs stay deliberate."
 generated: true
 nav_group: "API Reference"
 nav_order: 36

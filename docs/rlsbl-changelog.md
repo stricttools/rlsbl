@@ -1,6 +1,6 @@
 ---
 title: rlsbl.changelog
-description: "JSONL-based structured changelog for rlsbl, storing one append-only entry per commit so coverage, validation, and CHANGELOG.md generation all derive"
+description: "Append-only JSONL changelog package, with one entry per commit driving coverage, validation, and CHANGELOG.md generation from one source."
 generated: true
 nav_group: "API Reference"
 nav_order: 4

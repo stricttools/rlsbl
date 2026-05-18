@@ -1,6 +1,6 @@
 ---
 title: rlsbl
-description: "rlsbl: Release orchestration and project scaffolding for npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, and more, automating version bumps,"
+description: "Top-level rlsbl package: CLI entry point, command registration via strictcli, and the public API surface for release orchestration."
 generated: true
 nav_group: "API Reference"
 nav_order: 1

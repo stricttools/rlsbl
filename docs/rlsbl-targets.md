@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets
-description: "Release target discovery and registry that maps ecosystem identifiers (npm, pypi, go, cargo, deno, zig, swift, hex, docker, maven, plain) to their"
+description: "Release target registry and detection: maps ecosystem ids (npm, pypi, go, cargo, deno, zig, swift, hex, docker, maven, plain) to classes."
 generated: true
 nav_group: "API Reference"
 nav_order: 50

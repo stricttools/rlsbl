@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands
-description: "API reference for the rlsbl.commands module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Subcommand handlers for the rlsbl CLI, with one module per verb (release, scaffold, status, watch, undo, etc.) under a flat namespace."
 generated: true
 nav_group: "API Reference"
 nav_order: 10

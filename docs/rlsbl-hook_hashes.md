@@ -1,6 +1,6 @@
 ---
 title: rlsbl.hook_hashes
-description: "Known pre-push hook content hashes used to safely regenerate `.git/hooks/pre-push` only when its current content matches a previously-shipped rlsbl"
+description: "Known content hashes of past pre-push hook versions, so rlsbl can safely overwrite stale hooks without clobbering user-customized scripts."
 generated: true
 nav_group: "API Reference"
 nav_order: 35
