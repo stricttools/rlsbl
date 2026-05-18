@@ -516,7 +516,10 @@ def run_cmd(registry, args, flags):
     # Pre-release checks all passed; now safe to materialize CHANGELOG.md and
     # per-version .md files on disk. The version-bump commit below includes
     # CHANGELOG.md, so it must exist before commit_files() runs.
-    generate_changelog(version_dir)
+    # Pass version_override so the section heading is "## X.Y.Z" from the
+    # start; finalize_version() below renames unreleased.jsonl in place, and
+    # no further changelog regeneration is needed.
+    generate_changelog(version_dir, version_override=new_version)
 
     try:
         _run_release_mutating(
@@ -719,16 +722,13 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
         elif not needs_commit:
             log("No changes to commit")
 
-        # Finalize JSONL changelog: rename unreleased.jsonl to x.y.z.jsonl
+        # Finalize JSONL changelog: rename unreleased.jsonl to x.y.z.jsonl.
+        # CHANGELOG.md already has the correct "## X.Y.Z" heading because the
+        # earlier generate_changelog() call (above acquire_lock) was passed
+        # version_override=new_version, so no regeneration is needed here.
         changes_dir = get_changes_dir(version_dir)
         finalize_version(changes_dir, new_version)
         log(f"Finalized JSONL changelog for {new_version}")
-        # Regenerate CHANGELOG.md so version headings reflect the finalized
-        # version (e.g. "## 0.25.0") instead of "## Unreleased"
-        generate_changelog(version_dir)
-        changelog_path = os.path.join(version_dir, "CHANGELOG.md")
-        changelog_entry = extract_changelog_entry(changelog_path, new_version)
-        log("Regenerated CHANGELOG.md with version heading")
         # Commit the finalized JSONL file and the new empty unreleased.jsonl
         jsonl_finalized = os.path.normpath(os.path.join(changes_dir, f"{new_version}.jsonl"))
         jsonl_unreleased = os.path.normpath(os.path.join(changes_dir, "unreleased.jsonl"))
