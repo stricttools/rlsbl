@@ -1,0 +1,14 @@
+{"commits":["e80bb898b17d91e48125b9e88c3f44eb3142dd03"],"user_facing":true,"description":"**Release flow no longer crashes when extracting the changelog entry.** Fixed a regression introduced in v0.34.0 where the in-memory preview of `generate_changelog` used `## Unreleased` as the heading but entry extraction looked for `## X.Y.Z`, returning None and crashing later in GitHub Release notes generation. The preview call now passes `version_override=new_version` so the heading matches.","type":"fix"}
+{"commits":["ae09b6f5c554bfc410b95fb429d3f5747bd54fd6"],"user_facing":false}
+{"commits":["0232f2bf8463f53f4e24b595a88b08edd6bd1210"],"user_facing":false}
+{"commits":["011d468494b31654e2ede61b92ba49b8be13e2dd"],"user_facing":false}
+{"commits":["50911dbd6fe5f4c3e47772769b40c871f7cd1d30"],"user_facing":false}
+{"commits":["029d4a08394672b9af321af07aba5c26b2a3dca8"],"user_facing":false}
+{"commits":["b2b4a5ba12676c4bf79a1fbc862028a5c158e57b"],"user_facing":false}
+{"commits":["0e97e7b1b6725c6cdeb39c65ad9909c1ad63a81e"],"user_facing":true,"description":"**`max_entries_per_commit` default raised from 2 to 5.** The previous default 2 was too strict and contradicted the documented practice that one commit can appear in multiple JSONL entries (e.g., fix + feature). Default now matches the existing `max_commits_per_entry` default of 5.","type":"fix"}
+{"commits":["e576e9349cfdf1c32e0ce1e8a0412b6888c1a960"],"user_facing":true,"description":"**`rlsbl release` warns about stale changelog entries in monorepo mode.** During finalization, entries referencing commits outside the unreleased range are flagged to stderr (warn-only; no entries stripped) so out-of-range entries don't silently carry into the next release cycle.","type":"feature"}
+{"commits":["0232f2bf8463f53f4e24b595a88b08edd6bd1210","50911dbd6fe5f4c3e47772769b40c871f7cd1d30","011d468494b31654e2ede61b92ba49b8be13e2dd"],"user_facing":true,"description":"**Template action versions now use `{{action \"name\"}}` placeholders.** GitHub Action versions in scaffold templates are resolved at scaffold time from `rlsbl/data/action_versions.toml`, eliminating duplication between the table and 60+ template references. Updates to action versions now require editing only the table.","type":"feature"}
+{"commits":["d593948818752a49e80c95cd0efea4e5a6e5ec84"],"user_facing":false}
+{"commits":["4d163e30e759712bb93112f2e42224081f515fcc","55679bd23792c4e77d4342c583232fa574067204","6755d30f5b5690c7feeb5ba9feb97bda04d9fe18","d0b61336955ae8d1eba70f13c2ae50d3c3580a05"],"user_facing":false}
+{"commits":["4cf4ad01ae08d7089aeed29a1c33d60231d72ae3","67d93c0d4f5e1faae343ab3f518e37d3f44c7cc7","7417947d82cf51d306e377e5c7eb972364edb99c","9f0b6348cd5c906fac2d75ee98d1b9f94199d6cb","9f2161217f887de57789705799a379564e6233dd"],"user_facing":false}
+{"commits":["b0e5248e584b677cb18fc0d6fdb3446d293305e0","e740c4da0b94c0a38ac256dcc683ce756b20a4ae","ef74f4ff87321ab1c47e07bd11efa3ba5bf22a84"],"user_facing":false}
