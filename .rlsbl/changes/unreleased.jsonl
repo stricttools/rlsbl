@@ -1,0 +1,1 @@
+{"commits":["3be68662121b3643c0d7fd83bf40874a8d52c6a9"],"user_facing":true,"description":"**PyPI publish error names both env vars.** When the PyPI publish credential is missing and no `token_var` override is configured, the error message now reads 'no PYPI_TOKEN or TWINE_PASSWORD' instead of hardcoding only PYPI_TOKEN.","type":"fix"}
