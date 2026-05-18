@@ -98,6 +98,22 @@ def get_publish_config(target_name):
     return target_config if isinstance(target_config, dict) else {}
 
 
+def get_changelog_validation_config():
+    """Read changelog validation config from .rlsbl/config.json.
+
+    Returns the batch_limits section as a dict like
+    {"max_commits_per_entry": 5, "max_entries_per_commit": 2,
+     "excluded_hashes": [...], "excluded_lines": [...]}.
+
+    Returns an empty dict if no config or malformed.
+    """
+    config = read_project_config()
+    batch_limits = config.get("batch_limits", {})
+    if not isinstance(batch_limits, dict):
+        return {}
+    return batch_limits
+
+
 def write_project_config(key, value):
     """Write or update a key in .rlsbl/config.json (creates dir if needed)."""
     os.makedirs(os.path.dirname(_project_config()), exist_ok=True)
