@@ -85,6 +85,9 @@ class TestStatusCommitsAheadStandalone:
         warning = warning_lines[0]
         assert "3 commits ahead of v1.0.0" in warning
         assert "rlsbl release" in warning
+        # The separator is an em-dash (U+2014), not a double hyphen.
+        assert "— run `rlsbl release`" in warning
+        assert "-- run `rlsbl release`" not in warning
 
     def test_singular_form_for_one_commit(self, mock_git_repo, capsys):
         """A single unreleased commit uses 'commit' (singular), not 'commits'."""

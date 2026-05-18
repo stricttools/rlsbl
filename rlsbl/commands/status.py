@@ -244,7 +244,7 @@ def run_cmd(registry, args, flags):
         plural = "commit" if commits_ahead == 1 else "commits"
         print(
             f"! {commits_ahead} {plural} ahead of {commits_ahead_tag} "
-            f"-- run `rlsbl release` or investigate"
+            f"— run `rlsbl release` or investigate"
         )
 
     # Monorepo awareness (detection already done above)
