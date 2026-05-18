@@ -301,3 +301,90 @@ class TestGenerateChangelog:
         content = generate_changelog(str(tmp_path))
         assert "## Unreleased" not in content
         assert "## 1.0.0" in content
+
+    def test_version_override_renames_unreleased_heading(self, tmp_path, monkeypatch):
+        """version_override replaces the 'Unreleased' heading when entries exist."""
+        monkeypatch.chdir(tmp_path)
+        self._setup_project(
+            tmp_path,
+            versions={
+                "1.0.0": [
+                    _jsonl_line(commits=["a"], user_facing=True, description="Old feat", type="feature"),
+                ],
+            },
+            unreleased_lines=[
+                _jsonl_line(commits=["x"], user_facing=True, description="WIP feat", type="feature"),
+            ],
+        )
+
+        content = generate_changelog(str(tmp_path), version_override="0.42.0")
+
+        # Heading was renamed
+        assert "## 0.42.0" in content
+        assert "## Unreleased" not in content
+        # Versioned section keeps its natural heading
+        assert "## 1.0.0" in content
+        # The unreleased entry's description appears under the new heading
+        pos_new = content.index("## 0.42.0")
+        pos_old = content.index("## 1.0.0")
+        assert pos_new < pos_old
+        assert content.index("- WIP feat") > pos_new
+        assert content.index("- WIP feat") < pos_old
+
+    def test_version_override_default_preserves_unreleased(self, tmp_path, monkeypatch):
+        """Without version_override, the heading remains 'Unreleased'."""
+        monkeypatch.chdir(tmp_path)
+        self._setup_project(
+            tmp_path,
+            unreleased_lines=[
+                _jsonl_line(commits=["x"], user_facing=True, description="WIP feat", type="feature"),
+            ],
+        )
+
+        content = generate_changelog(str(tmp_path))
+        assert "## Unreleased" in content
+        assert "## 0.42.0" not in content
+
+    def test_version_override_only_renames_unreleased_section(self, tmp_path, monkeypatch):
+        """version_override does not affect existing versioned section headings."""
+        monkeypatch.chdir(tmp_path)
+        self._setup_project(
+            tmp_path,
+            versions={
+                "1.0.0": [
+                    _jsonl_line(commits=["a"], user_facing=True, description="Feat one", type="feature"),
+                ],
+                "2.0.0": [
+                    _jsonl_line(commits=["b"], user_facing=True, description="Break two", type="breaking"),
+                ],
+            },
+            unreleased_lines=[
+                _jsonl_line(commits=["x"], user_facing=True, description="WIP", type="feature"),
+            ],
+        )
+
+        content = generate_changelog(str(tmp_path), version_override="3.0.0")
+
+        # New heading replaces Unreleased
+        assert "## 3.0.0" in content
+        assert "## Unreleased" not in content
+        # Existing versioned headings are untouched
+        assert "## 2.0.0" in content
+        assert "## 1.0.0" in content
+
+    def test_version_override_with_no_unreleased_entries_is_noop(self, tmp_path, monkeypatch):
+        """When unreleased.jsonl is empty, version_override has no effect."""
+        monkeypatch.chdir(tmp_path)
+        changes = tmp_path / ".rlsbl" / "changes"
+        changes.mkdir(parents=True)
+        (changes / "unreleased.jsonl").write_text("")
+        jsonl = changes / "1.0.0.jsonl"
+        jsonl.write_text(
+            _jsonl_line(commits=["a"], user_facing=True, description="Feat", type="feature") + "\n"
+        )
+
+        content = generate_changelog(str(tmp_path), version_override="9.9.9")
+        # No section heading for the override since there were no unreleased entries
+        assert "## 9.9.9" not in content
+        assert "## Unreleased" not in content
+        assert "## 1.0.0" in content

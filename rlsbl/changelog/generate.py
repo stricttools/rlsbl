@@ -99,7 +99,12 @@ def _read_changelog_format(project_path: str) -> str:
     return fmt
 
 
-def generate_changelog(project_path: str, *, write_to_disk: bool = True) -> str:
+def generate_changelog(
+    project_path: str,
+    *,
+    write_to_disk: bool = True,
+    version_override: str | None = None,
+) -> str:
     """Generate the complete CHANGELOG.md from .rlsbl/changes/ JSONL files.
 
     1. Reads changelog_format from config (only "grouped" supported).
@@ -112,6 +117,11 @@ def generate_changelog(project_path: str, *, write_to_disk: bool = True) -> str:
     When write_to_disk is False, computes and returns the markdown content without
     modifying the filesystem. This lets callers preview the changelog before
     pre-release checks run, so an aborted release leaves a clean working tree.
+
+    When version_override is provided AND unreleased entries exist, the section
+    heading is "## {version_override}" instead of "## Unreleased". Versioned
+    sections (from existing JSONL files) are unaffected. Default None preserves
+    the original behaviour exactly.
     """
     _read_changelog_format(project_path)
 
@@ -121,7 +131,8 @@ def generate_changelog(project_path: str, *, write_to_disk: bool = True) -> str:
     # Unreleased entries
     unreleased = read_unreleased(changes_dir)
     if unreleased:
-        sections.append(generate_version_section("Unreleased", unreleased))
+        heading = version_override if version_override else "Unreleased"
+        sections.append(generate_version_section(heading, unreleased))
 
     # Versioned entries (newest first)
     for version, jsonl_path in list_versioned_files(changes_dir):
