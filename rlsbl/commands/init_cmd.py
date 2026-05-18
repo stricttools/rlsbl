@@ -50,6 +50,12 @@ USER_OWNED = {
     "LICENSE",
     ".rlsbl/hooks/pre-checks.sh",
     ".rlsbl/changes/unreleased.jsonl",
+    # Custom workflow files: never created by scaffold, never touched on update.
+    # Users put extra jobs here to avoid three-way merge conflicts on ci.yml/publish.yml.
+    # The same paths work for both standalone projects and monorepo roots, since
+    # monorepo workflows live under .github/workflows/ regardless.
+    ".github/workflows/ci-custom.yml",
+    ".github/workflows/publish-custom.yml",
 }
 
 def file_hash(path):
@@ -686,6 +692,24 @@ def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnin
         print("Warnings:")
         for w in warnings:
             print(f"  {w}")
+
+    # Tip when ci.yml or publish.yml had a merge conflict: recommend the
+    # user-owned custom workflow file so they don't fight three-way merge.
+    _CUSTOM_WORKFLOW_TIP_PATHS = (
+        ".github/workflows/ci.yml",
+        ".github/workflows/publish.yml",
+    )
+    conflicted_workflow_paths = [
+        t for t, s in created
+        if t in _CUSTOM_WORKFLOW_TIP_PATHS and s.startswith("CONFLICTS")
+    ]
+    if conflicted_workflow_paths:
+        for cw in conflicted_workflow_paths:
+            custom = cw.replace(".yml", "-custom.yml")
+            print(
+                f"   Tip: to customize CI without conflicts, move your custom jobs to\n"
+                f"   {custom} (scaffold never touches this file)."
+            )
 
     # Helpful note when existing CI workflow is preserved
     ci_path = ".github/workflows/ci.yml"
