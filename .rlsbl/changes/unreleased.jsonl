@@ -1,1 +1,2 @@
 {"commits":["e80bb898b17d91e48125b9e88c3f44eb3142dd03"],"user_facing":true,"description":"**Release flow no longer crashes when extracting the changelog entry.** Fixed a regression introduced in v0.34.0 where the in-memory preview of `generate_changelog` used `## Unreleased` as the heading but entry extraction looked for `## X.Y.Z`, returning None and crashing later in GitHub Release notes generation. The preview call now passes `version_override=new_version` so the heading matches.","type":"fix"}
+{"commits":["ae09b6f5c554bfc410b95fb429d3f5747bd54fd6"],"user_facing":false}
