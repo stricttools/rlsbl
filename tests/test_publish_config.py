@@ -178,7 +178,51 @@ class TestPypiPublishConfig:
         with patch("rlsbl.targets.pypi.run") as mock_run:
             PypiTarget().publish(".", "1.0.0")
             mock_run.assert_not_called()
-        assert "no PYPI_TOKEN" in capsys.readouterr().out
+        assert "no PYPI_TOKEN or TWINE_PASSWORD" in capsys.readouterr().out
+
+    def test_token_var_override_missing_skip_message(
+        self, tmp_project, monkeypatch, capsys
+    ):
+        """When token_var is configured but unset, the skip message names it."""
+        _write_config(
+            tmp_project,
+            {"publish": {"pypi": {"token_var": "CUSTOM_PYPI"}}},
+        )
+        # PYPI_TOKEN/TWINE_PASSWORD must be irrelevant when token_var is set.
+        monkeypatch.setenv("PYPI_TOKEN", "should-not-be-used")
+        monkeypatch.setenv("TWINE_PASSWORD", "should-not-be-used")
+        _clear_token_env(monkeypatch, "CUSTOM_PYPI")
+        with patch("rlsbl.targets.pypi.run") as mock_run:
+            PypiTarget().publish(".", "1.0.0")
+            mock_run.assert_not_called()
+        out = capsys.readouterr().out
+        assert "no CUSTOM_PYPI" in out
+        assert "PYPI_TOKEN" not in out.replace("no CUSTOM_PYPI", "")
+        assert "TWINE_PASSWORD" not in out
+
+    def test_twine_only_publishes_no_skip_message(
+        self, tmp_project, monkeypatch, capsys
+    ):
+        """When PYPI_TOKEN is missing but TWINE_PASSWORD is set, publish proceeds."""
+        _clear_token_env(monkeypatch, "PYPI_TOKEN")
+        monkeypatch.setenv("TWINE_PASSWORD", "twine-secret")
+        with patch("rlsbl.targets.pypi.run") as mock_run:
+            PypiTarget().publish(".", "1.0.0")
+            assert mock_run.call_count == 2
+        out = capsys.readouterr().out
+        # No "Skipping" message should appear since TWINE_PASSWORD covers the gap.
+        assert "Skipping" not in out
+
+    def test_local_true_no_token_error_message_lists_both_vars(
+        self, tmp_project, monkeypatch, capsys
+    ):
+        """When local=true and both default vars are absent, the error names both."""
+        _write_config(tmp_project, {"publish": {"pypi": {"local": True}}})
+        _clear_token_env(monkeypatch, "PYPI_TOKEN", "TWINE_PASSWORD")
+        with pytest.raises(SystemExit):
+            PypiTarget().publish(".", "1.0.0")
+        err = capsys.readouterr().err
+        assert "PYPI_TOKEN or TWINE_PASSWORD" in err
 
     def test_token_var_override_ignores_twine(self, tmp_project, monkeypatch):
         """With token_var set, TWINE_PASSWORD is no longer consulted."""

@@ -298,15 +298,16 @@ class PypiTarget(BaseTarget):
         if token_var:
             token = os.environ.get(token_var)
             missing_msg = f"no {token_var}"
+            missing_var_label = token_var
         else:
             token = os.environ.get("PYPI_TOKEN") or os.environ.get("TWINE_PASSWORD")
-            missing_msg = "no PYPI_TOKEN"
+            missing_msg = "no PYPI_TOKEN or TWINE_PASSWORD"
+            missing_var_label = "PYPI_TOKEN or TWINE_PASSWORD"
 
         if not token:
             if pub_config.get("local") is True:
-                effective_var = token_var or "PYPI_TOKEN"
                 print(
-                    f"ERROR: {self.name} publish requested (local=true) but {effective_var} is not set.",
+                    f"ERROR: {self.name} publish requested (local=true) but {missing_var_label} is not set.",
                     file=sys.stderr,
                 )
                 sys.exit(1)
