@@ -1,9 +1,11 @@
 """Tests for the centralized GitHub Actions version table.
 
-Covers the loader (rlsbl.action_versions) and a consistency check that
-every ``uses: <action>@<version>`` line in shipped templates matches the
-version pinned in ``rlsbl/data/action_versions.toml``. Without this check,
-templates and the central table can silently drift apart.
+Covers the loader (rlsbl.action_versions) and a structural check that
+every ``{{action "..."}}`` placeholder in shipped templates resolves
+against ``rlsbl/data/action_versions.toml``. After Phase 3 of the
+template-action substitution work, templates no longer embed literal
+``name@version`` strings -- the placeholder is the only form -- so drift
+between templates and the table is impossible by construction.
 """
 
 from __future__ import annotations
@@ -25,17 +27,9 @@ TEMPLATES_ROOT = os.path.join(
     os.path.dirname(os.path.dirname(__file__)), "rlsbl", "templates"
 )
 
-# Matches a workflow ``uses:`` line. Captures the action name (everything
-# before the ``@``) and the version (everything after, until end of line or
-# whitespace/comment). Tolerates indentation and an optional list dash.
-_USES_RE = re.compile(
-    r"^\s*-?\s*uses:\s*([A-Za-z0-9_./-]+)@([A-Za-z0-9_./.-]+)\s*(?:#.*)?$"
-)
-
-# Local actions (e.g., ``./.github/workflows/foo.yml``) and templating
-# placeholders are skipped. Only third-party ``owner/name`` refs participate.
-def _is_third_party(action: str) -> bool:
-    return "/" in action and not action.startswith(".")
+# Matches the ``{{action "owner/name"}}`` placeholder. Captures the action
+# name only.
+_PLACEHOLDER_RE = re.compile(r'\{\{action\s+"([^"]+)"\}\}')
 
 
 class TestLoader:
@@ -81,11 +75,11 @@ class TestLoader:
         assert "foo/bar" not in get_all_versions()
 
 
-class TestTemplateConsistency:
-    """Every ``uses:`` reference in shipped templates must match the table.
-
-    This catches drift between templates and the central version table --
-    the original bug class that motivated Phase 2.
+class TestTemplatePlaceholders:
+    """Every ``{{action "..."}}`` placeholder in shipped templates must
+    resolve via :func:`format_action`. After Phase 3 templates contain no
+    literal ``name@version`` strings, so resolution at scaffold time is
+    the only way a version reaches a rendered workflow.
     """
 
     def _iter_template_files(self):
@@ -94,47 +88,29 @@ class TestTemplateConsistency:
                 if name.endswith(".tpl"):
                     yield os.path.join(root, name)
 
-    def _iter_uses(self):
+    def _iter_placeholders(self):
         for path in self._iter_template_files():
             with open(path) as f:
                 for lineno, line in enumerate(f, start=1):
-                    m = _USES_RE.match(line)
-                    if not m:
-                        continue
-                    action, version = m.group(1), m.group(2)
-                    if not _is_third_party(action):
-                        continue
-                    yield path, lineno, action, version
+                    for m in _PLACEHOLDER_RE.finditer(line):
+                        yield path, lineno, m.group(1)
 
-    def test_templates_match_table(self):
-        table = get_all_versions()
-        mismatches: list[str] = []
-        unpinned: list[str] = []
-        for path, lineno, action, version in self._iter_uses():
-            if action not in table:
-                unpinned.append(f"{path}:{lineno}: {action}@{version}")
-                continue
-            expected = table[action]
-            if version != expected:
-                mismatches.append(
-                    f"{path}:{lineno}: {action}@{version} "
-                    f"(expected {expected})"
-                )
-        msg_parts = []
-        if unpinned:
-            msg_parts.append(
-                "Actions used in templates but missing from "
-                "action_versions.toml:\n  " + "\n  ".join(unpinned)
-            )
-        if mismatches:
-            msg_parts.append(
-                "Actions whose template version disagrees with the table:\n  "
-                + "\n  ".join(mismatches)
-            )
-        assert not msg_parts, "\n\n".join(msg_parts)
+    def test_all_action_placeholders_resolve(self):
+        unresolved: list[str] = []
+        for path, lineno, action in self._iter_placeholders():
+            try:
+                format_action(action)
+            except UnknownActionError as exc:
+                unresolved.append(f"{path}:{lineno}: {action} ({exc})")
+        assert not unresolved, (
+            "Templates reference actions not in action_versions.toml:\n  "
+            + "\n  ".join(unresolved)
+        )
 
-    def test_at_least_one_uses_found(self):
-        # Guard: if the regex breaks, the consistency test would pass
-        # vacuously. This ensures the iterator actually finds references.
-        found = list(self._iter_uses())
-        assert len(found) > 10, "expected to find many uses: lines in templates"
+    def test_at_least_one_placeholder_found(self):
+        # Guard: if the regex breaks, test_all_action_placeholders_resolve
+        # would pass vacuously. Ensure the iterator actually finds many.
+        found = list(self._iter_placeholders())
+        assert len(found) > 10, (
+            "expected to find many {{action ...}} placeholders in templates"
+        )
