@@ -1,6 +1,6 @@
 ---
 title: rlsbl dev
-description: "Developer utilities for locally working with rlsbl projects, including editable installs that mirror the project's release target (pypi -> uv tool install "
+description: "Developer utilities for editable installs of rlsbl projects, mapping each target to its native install command (uv tool, npm link, etc)."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 5

@@ -1,6 +1,6 @@
 ---
 title: rlsbl check
-description: "Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects "
+description: "Query npm, PyPI, or other registries for package name availability. Accepts multiple names with a configurable per-check delay."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 2
