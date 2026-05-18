@@ -2,3 +2,4 @@
 {"commits":["6e1a7194e44b1a9f369452bece05fdbac45ca340"],"user_facing":false}
 {"commits":["c00a8d54f565f1cbaa867e53cd6d8ed35569c612","dc0849f4ec605b770a84192761c636438f6acbb9","8e25b6fa9c215a23d43c05e62c627630e135b9c6","a56a1ec1212031edc0a1a2f8d69b31dfd91d8586"],"user_facing":false}
 {"commits":["2ad67edbfb6432d6f809e40f6096af5640a27c5b"],"user_facing":true,"description":"**Configurable changelog batch-limits validation.** `rlsbl changelog validate` now checks that no entry has more than `max_commits_per_entry` (default 5) commits and that no commit appears in more than `max_entries_per_commit` (default 2) entries. Both limits configurable per project via the `batch_limits` section in `.rlsbl/config.json`. Known violations can be silenced via an `exclusions` list with a required `reason` field for audit purposes.","type":"feature"}
+{"commits":["73ba8fca0f894c00b907e6835c196fc286b53587","a9a7ef5204078fa7c0cc98a108ccc996194c1998"],"user_facing":false}
