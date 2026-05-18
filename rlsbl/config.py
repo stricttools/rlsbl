@@ -103,7 +103,12 @@ def get_changelog_validation_config():
 
     Returns the batch_limits section as a dict like
     {"max_commits_per_entry": 5, "max_entries_per_commit": 2,
-     "excluded_hashes": [...], "excluded_lines": [...]}.
+     "exclusions": [{"reason": "...", "commits": [...],
+                     "entries": [{"version": "...", "line": N}]}]}.
+
+    Each exclusion object has a required "reason" string for audit
+    purposes; "commits" and "entries" are optional lists silencing the
+    corresponding batch_size_commits and batch_size_entries violations.
 
     Returns an empty dict if no config or malformed.
     """
