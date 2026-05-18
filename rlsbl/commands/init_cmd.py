@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 
+from ..action_versions import format_action, UnknownActionError
 from ..config import read_deploy_config, should_tag, read_project_config, write_project_config
 from ..lock import acquire_lock, release_lock
 from ..targets import TARGETS, detect_targets
@@ -117,11 +118,38 @@ NEXT_STEPS = {
 }
 
 
-def process_template(template_content, vars_dict):
-    """Process a template string by replacing {{varName}} placeholders with values.
+def process_template(template_content, vars_dict, template_path=None):
+    """Process a template string with a two-pass substitution.
 
-    Returns (content, unreplaced) where unreplaced is a list of unmatched var names.
+    Pass 1 resolves ``{{action "owner/name"}}`` placeholders against the
+    central action-version table (rlsbl/data/action_versions.toml). An
+    unknown action raises :class:`UnknownActionError` immediately -- no
+    implicit defaults.
+
+    Pass 2 resolves the existing ``{{varName}}`` (and dotted ``{{a.b}}``)
+    placeholders against ``vars_dict``.
+
+    Returns ``(content, unreplaced)`` where ``unreplaced`` is the list of
+    variable names in pass 2 that had no entry in ``vars_dict``. Pass 1
+    misses raise instead of being collected.
     """
+
+    # Pass 1: action placeholders.
+    def action_replacer(match):
+        action_name = match.group(1)
+        try:
+            return format_action(action_name)
+        except UnknownActionError as exc:
+            ctx = f" in {template_path}" if template_path else ""
+            raise UnknownActionError(
+                f"Unknown action {action_name!r}{ctx}: {exc}"
+            ) from exc
+
+    content = re.sub(
+        r'\{\{action\s+"([^"]+)"\}\}', action_replacer, template_content
+    )
+
+    # Pass 2: variable placeholders (existing behavior).
     unreplaced = []
 
     def replacer(match):
@@ -131,7 +159,7 @@ def process_template(template_content, vars_dict):
         unreplaced.append(var_name)
         return match.group(0)
 
-    content = re.sub(r"\{\{(\w+(?:\.\w+)*)\}\}", replacer, template_content)
+    content = re.sub(r"\{\{(\w+(?:\.\w+)*)\}\}", replacer, content)
     return content, unreplaced
 
 
@@ -242,7 +270,7 @@ def plan_mappings(template_dir, mappings, vars_dict, force, update=False):
 
         with open(template_path, "r", encoding="utf-8") as f:
             raw = f.read()
-        theirs, unreplaced = process_template(raw, vars_dict)
+        theirs, unreplaced = process_template(raw, vars_dict, template_path=template_path)
 
         # --- User-owned files: never overwrite (even with --force),
         # except LICENSE gets its copyright year updated on --update.
@@ -1114,7 +1142,7 @@ def _generate_merged_publish(targets, template_vars):
                 per_target_vars[key[len(prefix):]] = value
 
         # Process template variables
-        content, _ = process_template(raw, per_target_vars)
+        content, _ = process_template(raw, per_target_vars, template_path=tpl_path)
         lines = content.splitlines(keepends=True)
 
         # Extract top-level permissions block
