@@ -636,8 +636,9 @@ def cmd_dev_install(all, include, exclude, uninstall, global_, venv):
         )
         sys.exit(2)
     _require_project_root()
-    # Global is the implicit default. --global is a no-op affirmation of the
-    # default; --venv flips into local/venv mode.
+    # Both flags default to False (not True) so strictcli's mutex check doesn't
+    # always fire when neither is passed. The user-visible default (no flags ->
+    # global mode) is preserved by deriving install_global from --venv only.
     install_global = not venv
     flags = {
         "all": all,
