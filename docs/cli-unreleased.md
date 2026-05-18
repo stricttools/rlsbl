@@ -1,6 +1,6 @@
 ---
 title: rlsbl unreleased
-description: "List commits between the latest release tag and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain"
+description: "List commits between the last release tag and HEAD and check each for changelog coverage. Outputs a plain text or JSON coverage report."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 19
