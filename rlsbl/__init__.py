@@ -589,6 +589,32 @@ def cmd_mono_lint():
 
 
 # ---------------------------------------------------------------------------
+# dev group
+# ---------------------------------------------------------------------------
+
+dev = app.group("dev", help="Developer utilities for locally working with rlsbl projects, including editable installs that mirror the project's release target (pypi -> uv tool install -e, npm -> npm link, go -> go install).")
+
+
+@dev.command(name="install", help="Locally install the project for development using the editable/symlinked install command appropriate for the detected target (pypi: uv tool install -e, npm: npm link, go: go install, cargo: cargo install --path .). In monorepo mode, requires --all, --include, or --exclude to select which projects to install. Use --uninstall to reverse a previous install.")
+@strictcli.flag(name="all", type=bool, help="In monorepo mode, install every project in the workspace")
+@strictcli.flag(name="include", type=str, help="In monorepo mode, comma-separated project names to include", default="")
+@strictcli.flag(name="exclude", type=str, help="In monorepo mode, comma-separated project names to exclude", default="")
+@strictcli.flag(name="uninstall", type=bool, help="Reverse a previous dev install (where supported by the target)")
+def cmd_dev_install(all, include, exclude, uninstall):
+    _require_project_root()
+    flags = {
+        "all": all,
+        "include": include or None,
+        "exclude": exclude or None,
+        "uninstall": uninstall,
+    }
+    from .commands.dev import run_install
+    rc = run_install(flags)
+    if rc:
+        sys.exit(rc)
+
+
+# ---------------------------------------------------------------------------
 # Variadic arg extraction
 # ---------------------------------------------------------------------------
 
