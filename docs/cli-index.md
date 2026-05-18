@@ -1,6 +1,6 @@
 ---
 title: rlsbl CLI Reference
-description: "Complete CLI reference for rlsbl — all available commands, subcommands, flags, arguments, and usage examples with detailed descriptions."
+description: "Complete CLI reference for rlsbl release orchestration: every command, group, flag, and argument for managing versions, changelogs, and CI."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 0
