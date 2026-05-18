@@ -1,4 +1,8 @@
 {
+  "ci-customization.md": {
+    "content": "0017b4176bab0b709a10431f48880737dfa56c63924c63268a47d0289965fd2d",
+    "description": "fb36d4f3ad2ffd1e3ef92b1d396c03843bcc08fa4ab1967c636358dd76c8a37d"
+  },
   "cli-changelog.md": {
     "content": "14e3c33b873a0babab0117eb8734868d0346b98280a20ff114943ef477a5fd59",
     "description": "a5eab75008a2ddd65896fe0fe2c90aa4a128a63de3fbdf38d7f7f245a365e3cf"
