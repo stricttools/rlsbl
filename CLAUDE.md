@@ -7,13 +7,15 @@ Built in Python 3.11+ (one dependency: tomlkit), also distributed as an npm wrap
 Key commands:
 
 - `rlsbl release [patch|minor|major]` -- bump version, tag, push, create GitHub Release
-- `rlsbl scaffold [--update|--force]` -- generate/update CI/CD workflows, hooks, changelog, license
+- `rlsbl scaffold [--update|--force]` -- generate/update CI/CD workflows, hooks, changelog, license. Supports `--dry-run` to preview changes without writing.
 - `rlsbl status` -- show version, branch, last tag, changelog coverage
 - `rlsbl watch <sha>` -- poll CI status for a commit
 - `rlsbl undo` -- revert the last release (delete tag, GH release, revert commit)
 - `rlsbl check <name> --target <r>` -- check name availability on npm/PyPI
-- `rlsbl config` -- show/migrate project configuration
+- `rlsbl dev install` -- locally install the project for development (editable). Defaults to `--global` (e.g. `uv tool install -e`, `npm link`, `go install`). Use `--venv` for the project's local environment, `--uninstall` to reverse. In monorepo mode, requires `--all`, `--include`, or `--exclude`. Supports pypi, npm, go, cargo, hex, deno, zig, swift targets.
 - `rlsbl discover` -- list rlsbl ecosystem projects via GitHub topics
+- `rlsbl monorepo {init,add,sync,...}` -- manage monorepo workspaces. Each subcommand supports `--no-commit` to skip its auto-commit.
+- `rlsbl changelog add` -- append a JSONL entry. Auto-commits; pass `--no-commit` to skip.
 
 ## Release workflow
 
@@ -31,5 +33,28 @@ This project uses [rlsbl](https://github.com/smm-h/rlsbl) for release orchestrat
 - No tokens or secrets in command-line arguments (use env vars or config files)
 - All file writes to shared state should be atomic (write to tmp, then rename)
 - External calls (APIs, CLI tools) must have timeouts and graceful fallbacks
-- Use `npm link` (npm) or `uv pip install -e .` (Python) for local development
+- Use `rlsbl dev install` for local editable installs (it picks the right tool per target: `uv tool install -e` for pypi, `npm link` for npm, `go install` for go, etc.)
 - CI runs smoke tests on every push; manual testing for UI/UX changes
+
+## Configuration
+
+`.rlsbl/config.json` holds per-project settings. Notable keys:
+
+- `publish` -- per-target publish configuration (e.g. `publish.pypi`, `publish.npm`, `publish.docker`). Each entry can set:
+    - `local` (bool) -- whether to publish from the developer machine; when `false`, the local publish step is skipped and CI handles it.
+    - `token_var` -- name of the env var holding the publish token (used by pypi, npm, hex, deno, maven, etc.)
+    - `username_var` / `password_var` -- name of the env vars for username/password auth (used by docker)
+- `release_branches` -- list of branch names that trigger the manual-release-push warning. Defaults to `["main", "master"]` when the key is absent. An empty list is now an error -- either remove the key or list at least one branch.
+
+## CI customization
+
+Add custom GitHub Actions jobs via the user-owned `.github/workflows/ci-custom.yml` and `publish-custom.yml` files. Scaffold never touches them, so they survive `scaffold --update`'s three-way merge. See `docs/ci-customization.md` for the pattern.
+
+## Pre-push hook
+
+`.git/hooks/pre-push` runs `rlsbl pre-push-check`, which:
+
+- enforces JSONL commit coverage for every pushed commit (hard error -- blocks the push)
+- warns when a push targets a release branch but did not originate from `rlsbl release` / `rlsbl undo`
+
+The release/undo commands set `RLSBL_RELEASE_PUSH=1` in the push environment so the hook recognises legitimate release pushes and suppresses the warning. Users should not set this env var directly -- it is an internal contract between rlsbl and its own git hook.
