@@ -328,3 +328,11 @@ class PypiTarget(BaseTarget):
 
     def get_project_init_hint(self):
         return 'Run "uv init" first'
+
+    def dev_install_command(self, project_dir):
+        return {
+            "tool": "uv",
+            "purpose": "for editable Python install",
+            "args": ["tool", "install", "-e", "."],
+            "uninstall_args_template": ["tool", "uninstall", "{name}"],
+        }

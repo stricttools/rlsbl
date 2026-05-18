@@ -221,3 +221,12 @@ class NpmTarget(BaseTarget):
 
     def get_project_init_hint(self):
         return 'Run "npm init" first'
+
+    def dev_install_command(self, project_dir):
+        return {
+            "tool": "npm",
+            "purpose": "for npm link",
+            "args": ["link"],
+            # `npm unlink` inside the package directory removes the global symlink.
+            "uninstall_args_template": ["unlink"],
+        }

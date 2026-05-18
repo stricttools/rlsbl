@@ -212,3 +212,11 @@ class CargoTarget(BaseTarget):
 
     def get_project_init_hint(self):
         return 'Run "cargo init" or "cargo new <name>" first'
+
+    def dev_install_command(self, project_dir):
+        return {
+            "tool": "cargo",
+            "purpose": "for cargo install",
+            "args": ["install", "--path", "."],
+            "uninstall_args_template": ["uninstall", "{name}"],
+        }

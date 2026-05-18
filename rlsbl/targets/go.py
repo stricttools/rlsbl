@@ -344,3 +344,12 @@ class GoTarget(BaseTarget):
 
     def get_project_init_hint(self):
         return 'Run "go mod init <module-path>" first'
+
+    def dev_install_command(self, project_dir):
+        return {
+            "tool": "go",
+            "purpose": "for go install",
+            "args": ["install", "./..."],
+            # `go install` does not have a clean reverse; tell the user.
+            "uninstall_args_template": None,
+        }
