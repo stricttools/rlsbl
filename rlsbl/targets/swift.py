@@ -108,3 +108,15 @@ class SwiftTarget(BaseTarget):
 
     def get_project_init_hint(self):
         return 'Run "swift package init" first'
+
+    def dev_install_command(self, project_dir, *, venv=False):
+        if venv:
+            # Swift Package Manager has no per-project venv concept; deps live
+            # in .build/ which is populated as a side effect of `swift build`.
+            return None
+        return {
+            "tool": "swift",
+            "purpose": "for swift build",
+            "args": ["build"],
+            "uninstall_args_template": None,
+        }
