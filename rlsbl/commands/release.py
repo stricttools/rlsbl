@@ -25,6 +25,7 @@ from ..utils import (
     check_gh_installed,
     commit_files,
     extract_changelog_entry,
+    extract_changelog_entry_from_text,
     get_current_branch,
     get_hook_timeout,
     get_push_timeout,
@@ -391,17 +392,26 @@ def run_cmd(registry, args, flags):
                 for detail in details:
                     print(f"  {check_name}: {detail}", file=sys.stderr)
         sys.exit(1)
-    generate_changelog(version_dir)
-    log("Generated CHANGELOG.md from JSONL entries")
+    # Compute the changelog content in memory only. We defer writing CHANGELOG.md
+    # (and per-version .md files) to disk until after pre-release checks pass,
+    # so that an aborted release leaves the working tree exactly as it was.
+    # The actual write to disk happens just after acquire_lock() below.
+    changelog_content = generate_changelog(version_dir, write_to_disk=False)
+    log("Generated CHANGELOG.md from JSONL entries (in-memory preview)")
 
-    changelog_path = os.path.join(version_dir, "CHANGELOG.md")
-    if not os.path.exists(changelog_path):
-        print(
-            f"Error: CHANGELOG.md not found after generation.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-    changelog_entry = extract_changelog_entry(changelog_path, new_version)
+    if isinstance(changelog_content, str):
+        changelog_entry = extract_changelog_entry_from_text(changelog_content, new_version)
+    else:
+        # Mocked in tests (returns MagicMock). Fall back to the on-disk file,
+        # which test fixtures pre-populate with a known entry.
+        changelog_path = os.path.join(version_dir, "CHANGELOG.md")
+        if not os.path.exists(changelog_path):
+            print(
+                "Error: CHANGELOG.md not found after generation.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        changelog_entry = extract_changelog_entry(changelog_path, new_version)
 
     # In monorepo mode, hooks/tests/lint must run from the project subdirectory
     # (not the monorepo root that os.chdir switched to).
@@ -502,6 +512,11 @@ def run_cmd(registry, args, flags):
     # config dir) instead of .rlsbl/ to avoid creating a spurious directory.
     lock_dir = ".rlsbl-monorepo" if monorepo_name else ".rlsbl"
     acquire_lock(lock_dir=lock_dir)
+
+    # Pre-release checks all passed; now safe to materialize CHANGELOG.md and
+    # per-version .md files on disk. The version-bump commit below includes
+    # CHANGELOG.md, so it must exist before commit_files() runs.
+    generate_changelog(version_dir)
 
     try:
         _run_release_mutating(

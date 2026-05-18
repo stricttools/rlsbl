@@ -126,15 +126,12 @@ def push_if_needed(branch, env=None):
         run("git", ["push", "origin", branch], timeout=timeout, env=env)
 
 
-def extract_changelog_entry(changelog_path, version):
-    """Extract a changelog entry for a specific version.
+def extract_changelog_entry_from_text(content, version):
+    """Extract a changelog entry for a specific version from a markdown string.
 
     Looks for a heading like '## 1.2.3' and captures everything
     until the next heading or EOF.
     """
-    with open(changelog_path, "r", encoding="utf-8") as f:
-        content = f.read()
-
     escaped_version = re.escape(version)
     header_pattern = re.compile(r"^## " + escaped_version + r"\s*$", re.MULTILINE)
     match = header_pattern.search(content)
@@ -148,6 +145,17 @@ def extract_changelog_entry(changelog_path, version):
     end_idx = len(content) if next_heading_idx == -1 else next_heading_idx
     entry = content[start_idx:end_idx].strip()
     return entry or None
+
+
+def extract_changelog_entry(changelog_path, version):
+    """Extract a changelog entry for a specific version.
+
+    Looks for a heading like '## 1.2.3' and captures everything
+    until the next heading or EOF.
+    """
+    with open(changelog_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    return extract_changelog_entry_from_text(content, version)
 
 
 def check_gh_installed():
