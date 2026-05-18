@@ -6,6 +6,7 @@ import stat
 
 import pytest
 
+from conftest import run_git as _run_git, git_head as _git_head, make_commit as _make_commit
 from rlsbl.changelog.files import (
     append_entry,
     changes_dir_exists,
@@ -184,6 +185,98 @@ class TestFinalizeVersion:
 
         with pytest.raises(FileNotFoundError, match="unreleased.jsonl not found"):
             finalize_version(str(changes), "1.0.0")
+
+
+class TestFinalizeVersionStaleWarning:
+    """Tests for finalize_version's stale-entry warning (monorepo mode)."""
+
+    @pytest.fixture
+    def monorepo_repo(self, tmp_path, monkeypatch):
+        """Git repo with one pre-tag commit, a monorepo tag, and a post-tag commit."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+
+        _run_git(repo, "init", "-q")
+        _run_git(repo, "config", "user.email", "test@test.local")
+        _run_git(repo, "config", "user.name", "Test")
+
+        (repo / "README.md").write_text("# test\n")
+        _run_git(repo, "add", "README.md")
+        _run_git(repo, "commit", "-q", "-m", "initial")
+
+        pre_tag_sha = _git_head(repo)
+
+        _run_git(repo, "tag", "mylib@v0.1.0")
+
+        post_tag_sha = _make_commit(repo, "post.txt", "post-tag commit")
+
+        changes = repo / ".rlsbl" / "changes"
+        changes.mkdir(parents=True)
+
+        return repo, pre_tag_sha, post_tag_sha
+
+    def test_finalize_no_warnings_when_all_in_range(self, monorepo_repo, capsys):
+        """All entries reference in-range commits => no warnings."""
+        repo, _pre_tag_sha, post_tag_sha = monorepo_repo
+        changes = repo / ".rlsbl" / "changes"
+        unreleased = changes / "unreleased.jsonl"
+        unreleased.write_text(
+            json.dumps({"commits": [post_tag_sha], "user_facing": False}) + "\n"
+        )
+
+        finalize_version(str(changes), "0.2.0", tag_glob="mylib@v*")
+
+        captured = capsys.readouterr()
+        assert "warning" not in captured.err
+        # Rename still happened.
+        assert (changes / "0.2.0.jsonl").exists()
+        assert unreleased.exists()
+        assert unreleased.read_text() == ""
+
+    def test_finalize_warns_on_stale_entries(self, monorepo_repo, capsys):
+        """Entry referencing a pre-tag commit => warning printed, rename still happens."""
+        repo, pre_tag_sha, post_tag_sha = monorepo_repo
+        changes = repo / ".rlsbl" / "changes"
+        unreleased = changes / "unreleased.jsonl"
+        unreleased.write_text(
+            "\n".join(
+                [
+                    json.dumps({"commits": [post_tag_sha], "user_facing": False}),
+                    json.dumps({"commits": [pre_tag_sha], "user_facing": False}),
+                ]
+            )
+            + "\n"
+        )
+
+        finalize_version(str(changes), "0.2.0", tag_glob="mylib@v*")
+
+        captured = capsys.readouterr()
+        assert "warning" in captured.err
+        assert "line 2" in captured.err
+        assert pre_tag_sha in captured.err
+        # Line 1 references an in-range commit => not mentioned.
+        assert "line 1" not in captured.err
+        # Rename still happened.
+        assert (changes / "0.2.0.jsonl").exists()
+        assert unreleased.read_text() == ""
+
+    def test_finalize_no_warnings_without_tag_glob(self, monorepo_repo, capsys):
+        """Without tag_glob (non-monorepo case), no stale check runs."""
+        repo, pre_tag_sha, _post_tag_sha = monorepo_repo
+        changes = repo / ".rlsbl" / "changes"
+        unreleased = changes / "unreleased.jsonl"
+        # Even an entry with a pre-tag commit should not trigger a warning
+        # because we didn't pass tag_glob.
+        unreleased.write_text(
+            json.dumps({"commits": [pre_tag_sha], "user_facing": False}) + "\n"
+        )
+
+        finalize_version(str(changes), "0.2.0")
+
+        captured = capsys.readouterr()
+        assert "warning" not in captured.err
+        assert (changes / "0.2.0.jsonl").exists()
 
 
 class TestIsReadOnly:

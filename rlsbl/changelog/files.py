@@ -5,9 +5,10 @@ from __future__ import annotations
 import os
 import re
 import stat
+import sys
 import tempfile
 
-from .schema import ChangelogEntry, parse_jsonl, serialize_entry
+from .schema import ChangelogEntry, parse_entry, parse_jsonl, serialize_entry
 
 _VERSION_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)\.jsonl$")
 
@@ -80,15 +81,77 @@ def append_entry(changes_dir: str, entry: ChangelogEntry) -> None:
             os.unlink(tmp_path)
 
 
-def finalize_version(changes_dir: str, version: str) -> None:
+def _warn_stale_entries(src: str, tag_glob: str) -> None:
+    """Warn on stderr for entries in unreleased.jsonl referencing out-of-range commits.
+
+    In monorepo mode, an entry whose commits all sit before the project's last
+    tag is stale — typically left over from a sibling project's release. We
+    emit a warning per stale entry but do not strip them (warn-only).
+    """
+    # Local imports to avoid circular dependency at module load time.
+    from .resolve import resolve_hashes
+    from .validate import _git_log_hashes, _unreleased_range
+
+    range_spec = _unreleased_range(tag_glob)
+    in_range = set(_git_log_hashes(range_spec))
+
+    # Re-parse the file with line numbers, mirroring parse_jsonl's logic.
+    entries_with_lines: list[tuple[int, ChangelogEntry]] = []
+    with open(src, "r", encoding="utf-8") as f:
+        for line_num, line in enumerate(f, start=1):
+            stripped = line.strip()
+            if not stripped:
+                continue
+            try:
+                entries_with_lines.append((line_num, parse_entry(stripped)))
+            except ValueError:
+                # Schema/JSON errors are surfaced by validate; skip here.
+                continue
+
+    all_hashes: list[str] = []
+    for _, entry in entries_with_lines:
+        all_hashes.extend(entry.commits)
+    resolved = resolve_hashes(all_hashes)
+
+    for line_num, entry in entries_with_lines:
+        out_of_range: list[str] = []
+        for h in entry.commits:
+            full = resolved.get(h)
+            if full is None:
+                # Unresolved hashes are reported by other validation checks.
+                continue
+            if full not in in_range:
+                out_of_range.append(h)
+        if out_of_range:
+            joined = ", ".join(out_of_range)
+            print(
+                f"warning: unreleased.jsonl line {line_num} references "
+                f"out-of-range commit(s): {joined}",
+                file=sys.stderr,
+            )
+
+
+def finalize_version(
+    changes_dir: str,
+    version: str,
+    tag_glob: str | None = None,
+) -> None:
     """Rename unreleased.jsonl to x.y.z.jsonl and create a fresh unreleased.jsonl.
 
     Sets the versioned file read-only (chmod 0o444).
     Raises FileNotFoundError if unreleased.jsonl doesn't exist.
+
+    When ``tag_glob`` is provided (monorepo mode), inspects each entry in
+    ``unreleased.jsonl`` before the rename and warns on stderr for any whose
+    commits fall outside the current project's unreleased range. Warn-only:
+    the stale entries are not stripped.
     """
     src = os.path.join(changes_dir, "unreleased.jsonl")
     if not os.path.isfile(src):
         raise FileNotFoundError(f"unreleased.jsonl not found in {changes_dir}")
+
+    if tag_glob is not None:
+        _warn_stale_entries(src, tag_glob)
 
     dst = os.path.join(changes_dir, f"{version}.jsonl")
     os.rename(src, dst)
