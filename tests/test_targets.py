@@ -403,7 +403,10 @@ class TestPypiPublish:
         with patch.dict(os.environ, env, clear=True):
             target.publish(".", "2.0.0")
         captured = capsys.readouterr()
-        assert "Skipping local PyPI publish (no PYPI_TOKEN). CI will handle it." in captured.out
+        assert (
+            "Skipping local PyPI publish (no PYPI_TOKEN or TWINE_PASSWORD). "
+            "CI will handle it."
+        ) in captured.out
 
 
 class TestSwiftTarget:
