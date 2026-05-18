@@ -1,6 +1,6 @@
 ---
 title: rlsbl deploy
-description: "Run the configured deployment pipeline. Supports named deploy targets, a dry-run preview, and a --force flag to override branch rules."
+description: "Run the configured deployment pipeline for the project. Supports named deploy targets, dry-run preview of what would be deployed, and a --force flag to ove"
 generated: true
 nav_group: "CLI Reference"
 nav_order: 4

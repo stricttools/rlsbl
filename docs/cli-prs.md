@@ -1,6 +1,6 @@
 ---
 title: rlsbl prs
-description: "List open pull requests for the current repo via the GitHub CLI, showing number, title, author, and branch for a quick PR overview."
+description: "List all open pull requests for the current repository using the GitHub CLI. Shows PR number, title, author, and branch for a quick overview of pending wor"
 generated: true
 nav_group: "CLI Reference"
 nav_order: 12

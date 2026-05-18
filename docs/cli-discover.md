@@ -1,6 +1,6 @@
 ---
 title: rlsbl discover
-description: "Search GitHub for repositories tagged with the rlsbl topic and list them. Use --mine to filter results to only your own repositories."
+description: "Search GitHub for repositories tagged with the rlsbl topic and list them. Use --mine to filter results to only your own repositories. Requires the gh CLI t"
 generated: true
 nav_group: "CLI Reference"
 nav_order: 6

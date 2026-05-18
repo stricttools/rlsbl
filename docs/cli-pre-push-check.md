@@ -1,6 +1,6 @@
 ---
 title: rlsbl pre-push-check
-description: "Verify CHANGELOG.md has an entry for the current project version. Designed as a git pre-push hook so undocumented releases cannot ship."
+description: "Verify that CHANGELOG.md contains an entry matching the current project version. Designed to run as a git pre-push hook to prevent pushing releases without"
 generated: true
 nav_group: "CLI Reference"
 nav_order: 11
