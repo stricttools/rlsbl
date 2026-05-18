@@ -1,6 +1,6 @@
 ---
 title: rlsbl.hook_hashes
-description: "API reference for the rlsbl.hook_hashes module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Known pre-push hook content hashes used to safely regenerate `.git/hooks/pre-push` only when its current content matches a previously-shipped rlsbl"
 generated: true
 nav_group: "API Reference"
 nav_order: 35

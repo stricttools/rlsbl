@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.deno
-description: "API reference for the rlsbl.targets.deno module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Deno release target that manages version tracking in deno.json and scaffolds CI workflows for tag-based publishing to deno.land/x."
 generated: true
 nav_group: "API Reference"
 nav_order: 53

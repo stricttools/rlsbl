@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.edit_release
-description: "API reference for the rlsbl.commands.edit_release module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Edit-release command that updates existing GitHub Release notes by extracting the matching version section from CHANGELOG.md."
 generated: true
 nav_group: "API Reference"
 nav_order: 18

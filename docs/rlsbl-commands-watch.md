@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.watch
-description: "API reference for the rlsbl.commands.watch module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Watch command that polls GitHub Actions CI workflow runs for a given commit SHA and reports pass, fail, or in-progress status."
 generated: true
 nav_group: "API Reference"
 nav_order: 30

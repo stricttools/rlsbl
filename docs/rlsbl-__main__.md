@@ -1,6 +1,6 @@
 ---
 title: rlsbl.__main__
-description: "API reference for the rlsbl.__main__ module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Entry point that lets users invoke the CLI as `python -m rlsbl`, mirroring the behavior of the installed `rlsbl` console script for convenience in"
 generated: true
 nav_group: "API Reference"
 nav_order: 2

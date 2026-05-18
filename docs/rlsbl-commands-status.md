@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.status
-description: "API reference for the rlsbl.commands.status module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Status command that displays a project summary including current version, branch, last tag, and changelog coverage for unreleased work."
 generated: true
 nav_group: "API Reference"
 nav_order: 26

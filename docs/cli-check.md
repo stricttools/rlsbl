@@ -1,6 +1,6 @@
 ---
 title: rlsbl check
-description: "Reference for the rlsbl check command — usage, flags, arguments, and examples for the check subcommand of the rlsbl CLI."
+description: "Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and"
 generated: true
 nav_group: "CLI Reference"
 nav_order: 2

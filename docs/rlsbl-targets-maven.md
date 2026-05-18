@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.maven
-description: "API reference for the rlsbl.targets.maven module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Maven and Gradle release target supporting version management across pom.xml, build.gradle, build.gradle.kts, and gradle.properties files."
 generated: true
 nav_group: "API Reference"
 nav_order: 58

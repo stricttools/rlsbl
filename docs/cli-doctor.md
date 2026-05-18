@@ -1,6 +1,6 @@
 ---
 title: rlsbl doctor
-description: "Reference for the rlsbl doctor command — usage, flags, arguments, and examples for the doctor subcommand of the rlsbl CLI."
+description: "Run diagnostic checks on the project release state, including version consistency, tag alignment, changelog coverage, and config validity."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 7

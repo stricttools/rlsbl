@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.utils
-description: "API reference for the rlsbl.targets.utils module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Shared name-normalization utilities for release targets, handling package name canonicalization across different registry naming conventions."
 generated: true
 nav_group: "API Reference"
 nav_order: 66

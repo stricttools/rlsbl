@@ -1,6 +1,6 @@
 ---
 title: rlsbl.utils
-description: "API reference for the rlsbl.utils module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Git helpers, version bump logic, changelog section extraction, and other shared utilities used across all rlsbl commands and targets."
 generated: true
 nav_group: "API Reference"
 nav_order: 69

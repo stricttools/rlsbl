@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.base
-description: "API reference for the rlsbl.targets.base module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Base class for release targets providing shared defaults for version reading, writing, detection, scaffolding, and publish configuration."
 generated: true
 nav_group: "API Reference"
 nav_order: 51

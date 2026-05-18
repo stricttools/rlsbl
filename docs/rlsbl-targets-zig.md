@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.zig
-description: "API reference for the rlsbl.targets.zig module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Zig release target using a VERSION file as the source of truth with automatic build.zig.zon synchronization and cross-compilation CI setup."
 generated: true
 nav_group: "API Reference"
 nav_order: 67

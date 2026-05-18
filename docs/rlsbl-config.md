@@ -1,6 +1,6 @@
 ---
 title: rlsbl.config
-description: "API reference for the rlsbl.config module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Project configuration loading with layered precedence: CLI flags override project-level .rlsbl/config.json which overrides user-level defaults."
 generated: true
 nav_group: "API Reference"
 nav_order: 32

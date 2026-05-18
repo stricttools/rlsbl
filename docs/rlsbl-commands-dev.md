@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.dev
-description: "API reference for the rlsbl.commands.dev module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Developer utilities for locally installing rlsbl-managed projects in editable mode, dispatching to each detected target's native install command (uv"
 generated: true
 nav_group: "API Reference"
 nav_order: 15

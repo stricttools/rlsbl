@@ -1,6 +1,6 @@
 ---
 title: rlsbl.workspace
-description: "API reference for the rlsbl.workspace module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Workspace data layer for monorepo support handling discovery, loading, saving, and resolution of workspaces from workspace.toml config."
 generated: true
 nav_group: "API Reference"
 nav_order: 70

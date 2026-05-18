@@ -1,6 +1,6 @@
 ---
 title: rlsbl.npm_wrapper
-description: "API reference for the rlsbl.npm_wrapper module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Platform models and helpers for npm binary wrapper packages, providing job generation for publish workflows and scaffold template mappings."
 generated: true
 nav_group: "API Reference"
 nav_order: 48

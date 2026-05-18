@@ -1,6 +1,6 @@
 ---
 title: rlsbl
-description: "API reference for the rlsbl module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "rlsbl: Release orchestration and project scaffolding for npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, and more, automating version bumps,"
 generated: true
 nav_group: "API Reference"
 nav_order: 1

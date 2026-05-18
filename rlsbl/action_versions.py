@@ -1,4 +1,4 @@
-"""Centralized loader for pinned GitHub Actions versions.
+"""Centralized loader for pinned GitHub Actions versions, providing a single source of truth that every rlsbl-scaffolded workflow consumes so action upgrades happen in one place.
 
 Reads the version table from ``rlsbl/data/action_versions.toml`` and exposes
 helpers for resolving an action to its pinned ``name@version`` string. The

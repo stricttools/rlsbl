@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.record_gif
-description: "API reference for the rlsbl.commands.record_gif module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Record-gif command that captures a terminal demo GIF using vhs, suitable for embedding in README files and documentation pages."
 generated: true
 nav_group: "API Reference"
 nav_order: 24

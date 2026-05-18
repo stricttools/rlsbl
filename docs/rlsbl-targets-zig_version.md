@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.zig_version
-description: "API reference for the rlsbl.targets.zig_version module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Version management helpers for Zig projects, reading from a VERSION file and synchronizing the .version field in build.zig.zon on writes."
 generated: true
 nav_group: "API Reference"
 nav_order: 68

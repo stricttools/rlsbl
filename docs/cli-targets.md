@@ -1,6 +1,6 @@
 ---
 title: rlsbl targets
-description: "Reference for the rlsbl targets command — usage, flags, arguments, and examples for the targets subcommand of the rlsbl CLI."
+description: "List all release targets detected in the current project directory, showing which ecosystems (npm, PyPI, Go, Cargo, etc.) are active based on manifest"
 generated: true
 nav_group: "CLI Reference"
 nav_order: 17

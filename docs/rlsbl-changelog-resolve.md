@@ -1,6 +1,6 @@
 ---
 title: rlsbl.changelog.resolve
-description: "API reference for the rlsbl.changelog.resolve module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Resolve abbreviated git commit hashes in changelog entries to full SHA-1 hashes and validate they exist in the repository."
 generated: true
 nav_group: "API Reference"
 nav_order: 7

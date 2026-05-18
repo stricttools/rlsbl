@@ -1,6 +1,6 @@
 ---
 title: rlsbl pre-push-check
-description: "Reference for the rlsbl pre-push-check command — usage, flags, arguments, and examples for the pre-push-check subcommand of the rlsbl CLI."
+description: "Verify that CHANGELOG.md contains an entry matching the current project version. Designed to run as a git pre-push hook to prevent pushing releases"
 generated: true
 nav_group: "CLI Reference"
 nav_order: 11

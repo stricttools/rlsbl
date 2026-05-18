@@ -1,6 +1,6 @@
 ---
 title: rlsbl edit-release
-description: "Reference for the rlsbl edit-release command — usage, flags, arguments, and examples for the edit-release subcommand of the rlsbl CLI."
+description: "Sync the GitHub Release notes for a given version with the corresponding CHANGELOG.md entry. Defaults to the current version if none is specified."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 8

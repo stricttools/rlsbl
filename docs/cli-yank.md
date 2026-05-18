@@ -1,6 +1,6 @@
 ---
 title: rlsbl yank
-description: "Reference for the rlsbl yank command — usage, flags, arguments, and examples for the yank subcommand of the rlsbl CLI."
+description: "Mark a past release as deprecated (soft yank) or delete it (hard yank). Soft yank marks the GitHub Release as pre-release and prepends a deprecation"
 generated: true
 nav_group: "CLI Reference"
 nav_order: 21

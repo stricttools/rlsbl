@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.unreleased
-description: "API reference for the rlsbl.commands.unreleased module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Unreleased command that lists commits since the last tag and checks whether each one is covered by a corresponding changelog entry."
 generated: true
 nav_group: "API Reference"
 nav_order: 29

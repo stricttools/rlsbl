@@ -1,6 +1,6 @@
 ---
 title: rlsbl.lint.python_regex
-description: "API reference for the rlsbl.lint.python_regex module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Python linter using regex pattern matching as a fallback when tree-sitter is unavailable, providing the same checks via line patterns."
 generated: true
 nav_group: "API Reference"
 nav_order: 44

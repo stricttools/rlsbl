@@ -1,4 +1,4 @@
-"""Docs target -- thin wrapper delegating to the selfdoc CLI.
+"""Docs target -- thin wrapper delegating to the selfdoc CLI so rlsbl can detect, build, and deploy selfdoc documentation sites without duplicating any of selfdoc's logic.
 
 Detection is based on the presence of selfdoc.json in the project root.
 Build and deploy are delegated entirely to the `selfdoc` CLI tool.

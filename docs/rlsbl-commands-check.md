@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.check
-description: "API reference for the rlsbl.commands.check module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Check command to query package name availability across npm, PyPI, Go module proxy (pkg.go.dev), and GitHub repository namespaces."
 generated: true
 nav_group: "API Reference"
 nav_order: 12

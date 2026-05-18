@@ -1,6 +1,6 @@
 ---
 title: rlsbl.workspace_graph
-description: "API reference for the rlsbl.workspace_graph module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Dependency graph builder for monorepo workspaces that parses project manifests and provides topological sorting for ordered operations."
 generated: true
 nav_group: "API Reference"
 nav_order: 71

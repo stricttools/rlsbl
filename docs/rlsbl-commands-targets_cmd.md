@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.targets_cmd
-description: "API reference for the rlsbl.commands.targets_cmd module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Targets command that lists all available release targets (npm, PyPI, Go, Cargo, etc.) and shows their auto-detection status."
 generated: true
 nav_group: "API Reference"
 nav_order: 27

@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.doctor
-description: "API reference for the rlsbl.commands.doctor module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Doctor command that diagnoses common release state problems and offers interactive repairs for tags, versions, and config drift."
 generated: true
 nav_group: "API Reference"
 nav_order: 17

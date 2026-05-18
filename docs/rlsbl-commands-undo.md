@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.undo
-description: "API reference for the rlsbl.commands.undo module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Undo command that reverts the last release by deleting the GitHub Release, removing the git tag, and reverting the version bump commit."
 generated: true
 nav_group: "API Reference"
 nav_order: 28

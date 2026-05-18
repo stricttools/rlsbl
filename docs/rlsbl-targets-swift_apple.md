@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.swift_apple
-description: "API reference for the rlsbl.targets.swift_apple module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Swift Apple-platform release target requiring explicit config declaration, using a VERSION file for versioning and macOS-only CI runners."
 generated: true
 nav_group: "API Reference"
 nav_order: 65

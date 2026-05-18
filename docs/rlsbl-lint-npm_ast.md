@@ -1,6 +1,6 @@
 ---
 title: rlsbl.lint.npm_ast
-description: "API reference for the rlsbl.lint.npm_ast module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "JavaScript and TypeScript linter using tree-sitter AST parsing to detect library boundary violations such as forbidden imports and logging."
 generated: true
 nav_group: "API Reference"
 nav_order: 40

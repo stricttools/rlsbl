@@ -1,4 +1,4 @@
-"""Multi-language library boundary linter.
+"""Multi-language library boundary linter that detects accidental external exposure of internal symbols across Python, Go, and npm libraries to keep public APIs clean and intentional.
 
 Public API:
     lint_library(project_path) -> list[LintResult]

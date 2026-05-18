@@ -1,4 +1,4 @@
-"""Yank command that marks a past release as deprecated (soft) or deletes it (hard)."""
+"""Yank command that marks a past release as deprecated, either soft (flag as pre-release and prepend a deprecation notice) or hard (delete the GitHub release while preserving the git tag)."""
 
 import os
 import sys

@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.pre_push_check
-description: "API reference for the rlsbl.commands.pre_push_check module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Pre-push-check command that verifies CHANGELOG.md contains an entry for the current version before allowing a git push to proceed."
 generated: true
 nav_group: "API Reference"
 nav_order: 22

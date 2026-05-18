@@ -1,6 +1,6 @@
 ---
 title: rlsbl.changelog.schema
-description: "API reference for the rlsbl.changelog.schema module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "JSONL changelog entry schema providing the dataclass definition, JSON parsing, serialization, field validation, and type coercion."
 generated: true
 nav_group: "API Reference"
 nav_order: 8

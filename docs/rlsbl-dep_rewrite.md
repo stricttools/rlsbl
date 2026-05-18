@@ -1,6 +1,6 @@
 ---
 title: rlsbl.dep_rewrite
-description: "API reference for the rlsbl.dep_rewrite module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Path dependency detection and rewriting for PyPI packages, converting local file references in pyproject.toml to versioned constraints."
 generated: true
 nav_group: "API Reference"
 nav_order: 33

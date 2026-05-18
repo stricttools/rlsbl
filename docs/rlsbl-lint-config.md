@@ -1,6 +1,6 @@
 ---
 title: rlsbl.lint.config
-description: "API reference for the rlsbl.lint.config module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Lint configuration loading that reads per-project rule overrides and severity settings from .rlsbl/lint/ TOML configuration files."
 generated: true
 nav_group: "API Reference"
 nav_order: 37

@@ -1,6 +1,6 @@
 ---
 title: rlsbl.lint.result
-description: "API reference for the rlsbl.lint.result module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Lint result dataclass shared across all linter implementations, carrying severity, file location, rule identifier, and message text."
 generated: true
 nav_group: "API Reference"
 nav_order: 45

@@ -1,6 +1,6 @@
 ---
 title: rlsbl.lint.protocol
-description: "API reference for the rlsbl.lint.protocol module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Abstract protocol defining the interface that all per-language linters must implement for boundary violation detection and reporting."
 generated: true
 nav_group: "API Reference"
 nav_order: 42

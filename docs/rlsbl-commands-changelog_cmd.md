@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.changelog_cmd
-description: "API reference for the rlsbl.commands.changelog_cmd module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Changelog subcommands for adding new entries, validating existing ones, and generating Markdown changelogs from JSONL sources."
 generated: true
 nav_group: "API Reference"
 nav_order: 11

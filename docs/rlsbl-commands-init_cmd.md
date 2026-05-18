@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.init_cmd
-description: "API reference for the rlsbl.commands.init_cmd module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Init command that scaffolds release infrastructure from templates, creating CI workflows, hooks, changelog, and config files."
 generated: true
 nav_group: "API Reference"
 nav_order: 19

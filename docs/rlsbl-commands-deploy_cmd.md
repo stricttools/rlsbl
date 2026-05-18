@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.deploy_cmd
-description: "API reference for the rlsbl.commands.deploy_cmd module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Deploy command that orchestrates deployment to configured remote targets via SSH using the deploy primitives and config layer."
 generated: true
 nav_group: "API Reference"
 nav_order: 14

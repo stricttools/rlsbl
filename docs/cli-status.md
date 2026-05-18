@@ -1,6 +1,6 @@
 ---
 title: rlsbl status
-description: "Reference for the rlsbl status command — usage, flags, arguments, and examples for the status subcommand of the rlsbl CLI."
+description: "Display the current project version, branch, last release tag, unreleased commit count, and changelog coverage. Outputs plain text by default or"
 generated: true
 nav_group: "CLI Reference"
 nav_order: 16

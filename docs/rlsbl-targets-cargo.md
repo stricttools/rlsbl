@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.cargo
-description: "API reference for the rlsbl.targets.cargo module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Cargo (Rust) release target that uses tomlkit for round-trip Cargo.toml editing with hybrid publish support via CARGO_REGISTRY_TOKEN."
 generated: true
 nav_group: "API Reference"
 nav_order: 52

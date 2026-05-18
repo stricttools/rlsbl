@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.prs
-description: "API reference for the rlsbl.commands.prs module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "PRs command that lists open GitHub pull requests for the current repository to provide awareness of in-flight changes before releasing."
 generated: true
 nav_group: "API Reference"
 nav_order: 23

@@ -1,6 +1,6 @@
 ---
 title: rlsbl discover
-description: "Reference for the rlsbl discover command — usage, flags, arguments, and examples for the discover subcommand of the rlsbl CLI."
+description: "Search GitHub for repositories tagged with the rlsbl topic and list them. Use --mine to filter results to only your own repositories."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 6

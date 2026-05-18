@@ -1,6 +1,6 @@
 ---
 title: rlsbl.changelog
-description: "API reference for the rlsbl.changelog module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "JSONL-based structured changelog for rlsbl, storing one append-only entry per commit so coverage, validation, and CHANGELOG.md generation all derive"
 generated: true
 nav_group: "API Reference"
 nav_order: 4

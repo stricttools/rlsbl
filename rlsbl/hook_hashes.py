@@ -1,4 +1,4 @@
-"""Known pre-push hook content hashes for safe regeneration.
+"""Known pre-push hook content hashes used to safely regenerate `.git/hooks/pre-push` only when its current content matches a previously-shipped rlsbl version, never overwriting user customizations.
 
 rlsbl installs a `.git/hooks/pre-push` hook in scaffolded projects. The hook
 content has changed over time (older versions were 44-line standalone bash

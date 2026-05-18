@@ -1,6 +1,6 @@
 ---
 title: rlsbl.changelog.validate
-description: "API reference for the rlsbl.changelog.validate module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Validation engine for JSONL changelog entries with result caching, checking field constraints, hash integrity, and entry ordering."
 generated: true
 nav_group: "API Reference"
 nav_order: 9

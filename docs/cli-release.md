@@ -1,6 +1,6 @@
 ---
 title: rlsbl release
-description: "Reference for the rlsbl release command — usage, flags, arguments, and examples for the release subcommand of the rlsbl CLI."
+description: "Bump the project version, validate the changelog, commit, tag, push, and create a GitHub Release. Supports patch, minor, and major bumps with dry-run"
 generated: true
 nav_group: "CLI Reference"
 nav_order: 14

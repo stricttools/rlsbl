@@ -1,6 +1,6 @@
 ---
 title: rlsbl changelog
-description: "Reference for the rlsbl changelog command group — subcommands, flags, arguments, and usage details for the changelog group in the rlsbl CLI."
+description: "Structured changelog management using JSONL entries. Add, validate, and generate CHANGELOG.md from per-commit changelog entries stored in"
 generated: true
 nav_group: "CLI Reference"
 nav_order: 1

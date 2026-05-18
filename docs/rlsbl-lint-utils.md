@@ -1,6 +1,6 @@
 ---
 title: rlsbl.lint.utils
-description: "API reference for the rlsbl.lint.utils module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Shared file-walking utilities for linters providing recursive directory traversal with gitignore-aware filtering and extension matching."
 generated: true
 nav_group: "API Reference"
 nav_order: 46

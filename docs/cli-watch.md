@@ -1,6 +1,6 @@
 ---
 title: rlsbl watch
-description: "Reference for the rlsbl watch command — usage, flags, arguments, and examples for the watch subcommand of the rlsbl CLI."
+description: "Poll GitHub Actions CI workflow runs for a specific commit SHA and report pass or fail status. Defaults to HEAD if no SHA is provided."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 20

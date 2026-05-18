@@ -1,4 +1,4 @@
-"""Developer utilities for locally installing rlsbl projects for editable development."""
+"""Developer utilities for locally installing rlsbl-managed projects in editable mode, dispatching to each detected target's native install command (uv tool install, npm link, go install, and others)."""
 
 import os
 import subprocess

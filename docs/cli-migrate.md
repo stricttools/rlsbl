@@ -1,6 +1,6 @@
 ---
 title: rlsbl migrate
-description: "Reference for the rlsbl migrate command — usage, flags, arguments, and examples for the migrate subcommand of the rlsbl CLI."
+description: "Run pending configuration migrations to update .rlsbl config files to the latest schema. Use --dry-run to preview changes without applying, or --status"
 generated: true
 nav_group: "CLI Reference"
 nav_order: 9

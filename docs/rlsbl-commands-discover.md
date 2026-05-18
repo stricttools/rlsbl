@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.discover
-description: "API reference for the rlsbl.commands.discover module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Discover command that lists projects in the rlsbl ecosystem by querying GitHub for repositories tagged with the rlsbl topic."
 generated: true
 nav_group: "API Reference"
 nav_order: 16

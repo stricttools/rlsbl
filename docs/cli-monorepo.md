@@ -1,6 +1,6 @@
 ---
 title: rlsbl monorepo
-description: "Reference for the rlsbl monorepo command group — subcommands, flags, arguments, and usage details for the monorepo group in the rlsbl CLI."
+description: "Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name"
 generated: true
 nav_group: "CLI Reference"
 nav_order: 10
@@ -9,7 +9,7 @@ nav_order: 10
 
 # rlsbl monorepo
 
-Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs.
+Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Provides 10 monorepo subcommands and supports all 14 release targets in a single workspace.toml.
 
 ## monorepo init
 
@@ -94,4 +94,4 @@ Scan all projects in the monorepo workspace for intra-workspace dependencies tha
 
 ## monorepo lint
 
-Detect unregistered projects and stale workspace entries. Scans first-level directories for recognized project manifests and compares against workspace.toml. Exits non-zero if any issues are found.
+Detect unregistered projects and stale workspace entries in your monorepo. Scans first-level directories for recognized project manifests across all 14 supported targets (npm, PyPI, Go, Cargo, etc.) and compares against workspace.toml. Reports unregistered projects on disk and registered entries pointing to missing directories. Exits non-zero if issues are found, suitable for CI gating.

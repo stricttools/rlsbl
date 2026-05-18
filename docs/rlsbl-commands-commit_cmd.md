@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.commit_cmd
-description: "API reference for the rlsbl.commands.commit_cmd module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Implementation of the 'rlsbl commit' command, which stages one or more files and writes a commit whose trailer marks them as machine-generated so the"
 generated: true
 nav_group: "API Reference"
 nav_order: 13

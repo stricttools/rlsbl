@@ -1,6 +1,6 @@
 ---
 title: rlsbl.action_versions
-description: "API reference for the rlsbl.action_versions module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Centralized loader for pinned GitHub Actions versions, providing a single source of truth that every rlsbl-scaffolded workflow consumes so action"
 generated: true
 nav_group: "API Reference"
 nav_order: 3

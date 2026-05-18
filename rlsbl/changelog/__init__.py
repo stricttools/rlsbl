@@ -1,4 +1,4 @@
-"""JSONL-based structured changelog for rlsbl.
+"""JSONL-based structured changelog for rlsbl, storing one append-only entry per commit so coverage, validation, and CHANGELOG.md generation all derive from the same machine-readable source.
 
 Public API re-exported from submodules.
 """

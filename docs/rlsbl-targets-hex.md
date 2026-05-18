@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.hex
-description: "API reference for the rlsbl.targets.hex module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Hex (Elixir/Erlang) release target that manages version tracking in mix.exs and scaffolds CI workflows for publishing to hex.pm."
 generated: true
 nav_group: "API Reference"
 nav_order: 57

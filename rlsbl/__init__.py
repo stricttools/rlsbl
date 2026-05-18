@@ -1,4 +1,4 @@
-"""rlsbl: Release orchestration and project scaffolding for npm, PyPI, and Go."""
+"""rlsbl: Release orchestration and project scaffolding for npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, and more, automating version bumps, changelogs, tags, GitHub Releases, and CI/CD."""
 
 import os
 import subprocess

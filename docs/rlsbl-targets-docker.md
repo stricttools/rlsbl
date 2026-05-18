@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.docker
-description: "API reference for the rlsbl.targets.docker module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Docker release target using a VERSION file as source of truth, with opt-in activation via config and image publishing to a registry."
 generated: true
 nav_group: "API Reference"
 nav_order: 54

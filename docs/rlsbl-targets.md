@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets
-description: "API reference for the rlsbl.targets module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Release target discovery and registry that maps ecosystem identifiers (npm, pypi, go, cargo, deno, zig, swift, hex, docker, maven, plain) to their"
 generated: true
 nav_group: "API Reference"
 nav_order: 50

@@ -1,6 +1,6 @@
 ---
 title: rlsbl.tagging
-description: "API reference for the rlsbl.tagging module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Ecosystem keyword injection that adds the rlsbl tag to package manifests (package.json, pyproject.toml, etc.) and GitHub repository topics."
 generated: true
 nav_group: "API Reference"
 nav_order: 49

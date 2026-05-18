@@ -1,6 +1,6 @@
 ---
 title: rlsbl.changelog.files
-description: "API reference for the rlsbl.changelog.files module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "File management layer for JSONL changelog files including reading, writing, appending entries, and path resolution for .rlsbl directories."
 generated: true
 nav_group: "API Reference"
 nav_order: 5

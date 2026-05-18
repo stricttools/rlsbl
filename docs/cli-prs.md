@@ -1,6 +1,6 @@
 ---
 title: rlsbl prs
-description: "Reference for the rlsbl prs command — usage, flags, arguments, and examples for the prs subcommand of the rlsbl CLI."
+description: "List all open pull requests for the current repository using the GitHub CLI. Shows PR number, title, author, and branch for a quick overview of pending"
 generated: true
 nav_group: "CLI Reference"
 nav_order: 12

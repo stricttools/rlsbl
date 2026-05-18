@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.spec
-description: "API reference for the rlsbl.targets.spec module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Spec release target using version.json as the source of truth for specification projects where the tagged GitHub Release is the publication."
 generated: true
 nav_group: "API Reference"
 nav_order: 63

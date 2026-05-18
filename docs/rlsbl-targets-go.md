@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.go
-description: "API reference for the rlsbl.targets.go module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Go release target using a VERSION file as source of truth, with GoReleaser integration for binaries and module proxy notification for libs."
 generated: true
 nav_group: "API Reference"
 nav_order: 56

@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.pypi
-description: "API reference for the rlsbl.targets.pypi module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "PyPI release target that manages version tracking in pyproject.toml and scaffolds CI workflows for OIDC-based publishing to the PyPI index."
 generated: true
 nav_group: "API Reference"
 nav_order: 62

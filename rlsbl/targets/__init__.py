@@ -1,4 +1,4 @@
-"""Target discovery and registry."""
+"""Release target discovery and registry that maps ecosystem identifiers (npm, pypi, go, cargo, deno, zig, swift, hex, docker, maven, plain) to their corresponding target classes for version bumps and scaffolding."""
 
 import os
 import sys

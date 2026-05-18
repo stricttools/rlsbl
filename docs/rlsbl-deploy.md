@@ -1,6 +1,6 @@
 ---
 title: rlsbl.deploy
-description: "API reference for the rlsbl.deploy module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "SSH deployment primitives providing config validation, remote command execution, health checks, and automatic rollback on failure."
 generated: true
 nav_group: "API Reference"
 nav_order: 34

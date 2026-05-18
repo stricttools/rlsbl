@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.migrate
-description: "API reference for the rlsbl.commands.migrate module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Migrate command that runs configuration schema migrations via the external migrable tool to upgrade project config to newer formats."
 generated: true
 nav_group: "API Reference"
 nav_order: 20

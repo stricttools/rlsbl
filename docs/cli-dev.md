@@ -1,6 +1,6 @@
 ---
 title: rlsbl dev
-description: "Reference for the rlsbl dev command group — subcommands, flags, arguments, and usage details for the dev group in the rlsbl CLI."
+description: "Developer utilities for locally working with rlsbl projects, including editable installs that mirror the project's release target (pypi -> uv tool"
 generated: true
 nav_group: "CLI Reference"
 nav_order: 5
@@ -13,7 +13,7 @@ Developer utilities for locally working with rlsbl projects, including editable 
 
 ## dev install
 
-Locally install the project for development using the install command appropriate for the detected target. --global (default) installs as a system-wide tool/symlink (pypi: uv tool install -e, npm: npm link, go: go install, cargo: cargo install --path ., zig: zig build install, swift: swift build, deno: deno install, hex: mix deps.get). --venv installs into the project's local environment instead (pypi: uv sync, npm: npm install); targets without a venv concept are skipped with a clear message. In monorepo mode, requires --all, --include, or --exclude to select which projects to install. Use --uninstall to reverse a previous install.
+Install the project locally for development using the detected target's editable install command. --global (default) installs system-wide across 8 supported targets (pypi, npm, go, cargo, zig, swift, deno, hex), while --venv installs into the project's local environment instead. In monorepo mode, pair with --all, --include, or --exclude. Use --uninstall to reverse a previous install.
 
 ### Flags
 

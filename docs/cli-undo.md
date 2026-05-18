@@ -1,6 +1,6 @@
 ---
 title: rlsbl undo
-description: "Reference for the rlsbl undo command — usage, flags, arguments, and examples for the undo subcommand of the rlsbl CLI."
+description: "Revert the most recent release by deleting the GitHub Release, removing the git tag from local and remote, and reverting the version bump commit."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 18

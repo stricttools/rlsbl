@@ -1,6 +1,6 @@
 ---
 title: rlsbl.lint.python_ast
-description: "API reference for the rlsbl.lint.python_ast module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Python linter using tree-sitter AST parsing to detect library boundary violations including forbidden imports and stdout/logging usage."
 generated: true
 nav_group: "API Reference"
 nav_order: 43

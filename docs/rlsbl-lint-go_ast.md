@@ -1,6 +1,6 @@
 ---
 title: rlsbl.lint.go_ast
-description: "API reference for the rlsbl.lint.go_ast module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Go linter using tree-sitter AST parsing to detect library boundary violations including forbidden imports and stdout/logging usage."
 generated: true
 nav_group: "API Reference"
 nav_order: 38

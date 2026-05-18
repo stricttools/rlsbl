@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.protocol
-description: "API reference for the rlsbl.targets.protocol module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Release target protocol defining the formal interface that all target implementations must satisfy for detection, versioning, and scaffolding."
 generated: true
 nav_group: "API Reference"
 nav_order: 61

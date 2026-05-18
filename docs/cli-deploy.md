@@ -1,6 +1,6 @@
 ---
 title: rlsbl deploy
-description: "Reference for the rlsbl deploy command — usage, flags, arguments, and examples for the deploy subcommand of the rlsbl CLI."
+description: "Run the configured deployment pipeline for the project. Supports named deploy targets, dry-run preview of what would be deployed, and a --force flag to"
 generated: true
 nav_group: "CLI Reference"
 nav_order: 4

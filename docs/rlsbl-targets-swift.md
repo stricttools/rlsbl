@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.swift
-description: "API reference for the rlsbl.targets.swift module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Swift release target using a VERSION file as the source of truth, with tag-based publishing since SPM resolves packages by git tag directly."
 generated: true
 nav_group: "API Reference"
 nav_order: 64

@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.npm
-description: "API reference for the rlsbl.targets.npm module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "npm release target that manages version tracking in package.json and scaffolds CI workflows for automated publishing to the npm registry."
 generated: true
 nav_group: "API Reference"
 nav_order: 59

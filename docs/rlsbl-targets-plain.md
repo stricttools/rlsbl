@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.plain
-description: "API reference for the rlsbl.targets.plain module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Plain release target for projects with no build system, using a VERSION file for version tracking with tagging and GitHub Releases only."
 generated: true
 nav_group: "API Reference"
 nav_order: 60

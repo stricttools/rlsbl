@@ -1,6 +1,6 @@
 ---
 title: rlsbl unreleased
-description: "Reference for the rlsbl unreleased command — usage, flags, arguments, and examples for the unreleased subcommand of the rlsbl CLI."
+description: "List commits between the latest release tag and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain"
 generated: true
 nav_group: "CLI Reference"
 nav_order: 19

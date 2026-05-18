@@ -1,6 +1,6 @@
 ---
 title: rlsbl.lint
-description: "API reference for the rlsbl.lint module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Multi-language library boundary linter that detects accidental external exposure of internal symbols across Python, Go, and npm libraries to keep public"
 generated: true
 nav_group: "API Reference"
 nav_order: 36

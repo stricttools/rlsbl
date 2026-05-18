@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.yank
-description: "API reference for the rlsbl.commands.yank module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Yank command that marks a past release as deprecated, either soft (flag as pre-release and prepend a deprecation notice) or hard (delete the GitHub"
 generated: true
 nav_group: "API Reference"
 nav_order: 31

@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.monorepo
-description: "API reference for the rlsbl.commands.monorepo module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Monorepo workspace management commands for adding, removing, listing, and synchronizing projects in a multi-package repository."
 generated: true
 nav_group: "API Reference"
 nav_order: 21

@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.docs
-description: "API reference for the rlsbl.targets.docs module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Docs target -- thin wrapper delegating to the selfdoc CLI so rlsbl can detect, build, and deploy selfdoc documentation sites without duplicating any of"
 generated: true
 nav_group: "API Reference"
 nav_order: 55

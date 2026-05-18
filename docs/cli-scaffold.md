@@ -1,6 +1,6 @@
 ---
 title: rlsbl scaffold
-description: "Reference for the rlsbl scaffold command — usage, flags, arguments, and examples for the scaffold subcommand of the rlsbl CLI."
+description: "Generate or update CI/CD workflows, git hooks, changelog, and license files for the detected release target. Use --update for three-way merge preserving"
 generated: true
 nav_group: "CLI Reference"
 nav_order: 15

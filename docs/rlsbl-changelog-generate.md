@@ -1,6 +1,6 @@
 ---
 title: rlsbl.changelog.generate
-description: "API reference for the rlsbl.changelog.generate module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Generate a Markdown CHANGELOG.md from structured JSONL changelog entries, grouping them by version with configurable formatting."
 generated: true
 nav_group: "API Reference"
 nav_order: 6

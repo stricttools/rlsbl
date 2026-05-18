@@ -1,6 +1,6 @@
 ---
 title: rlsbl.lock
-description: "API reference for the rlsbl.lock module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Advisory file lock using fcntl.flock to prevent concurrent rlsbl operations from mutating project state in both regular and monorepo modes."
 generated: true
 nav_group: "API Reference"
 nav_order: 47
