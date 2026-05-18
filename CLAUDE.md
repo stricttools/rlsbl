@@ -47,7 +47,7 @@ This project uses [rlsbl](https://github.com/smm-h/rlsbl) for release orchestrat
 - `release_branches` -- list of branch names that trigger the manual-release-push warning. Defaults to `["main", "master"]` when the key is absent. An empty list is now an error -- either remove the key or list at least one branch.
 - `batch_limits` -- limits and exclusions for the `batch_size_commits` and `batch_size_entries` changelog validation checks. Both checks are blocking errors when they fail. Keys:
     - `max_commits_per_entry` (int, default `5`) -- maximum number of commit hashes allowed in a single JSONL entry. Larger batches usually indicate a missed split of mixed changes.
-    - `max_entries_per_commit` (int, default `2`) -- maximum number of JSONL entries (across all versioned files plus `unreleased.jsonl`) that may reference the same commit hash. A higher count almost always means a retroactive correction or an entry was duplicated by mistake.
+    - `max_entries_per_commit` (int, default `5`) -- maximum number of JSONL entries (across all versioned files plus `unreleased.jsonl`) that may reference the same commit hash. A higher count almost always means a retroactive correction or an entry was duplicated by mistake.
     - `exclusions` (list of dicts, default `[]`) -- per-violation silencers. Each exclusion must have a `reason` (string, mandatory audit trail) plus at least one of:
         - `commits` (list of hashes) -- exempted from `max_entries_per_commit`.
         - `entries` (list of `{version, line}` objects) -- exempted from `max_commits_per_entry`. `version` is the bare semver string (e.g. `"0.5.0"`) or `"unreleased"`; `line` is the 1-based line number inside that JSONL file.

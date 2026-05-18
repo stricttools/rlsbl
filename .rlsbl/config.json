@@ -1,11 +1,6 @@
 {
   "env_file": "~/Projects/.env",
   "batch_limits": {
-    "exclusions": [
-      {
-        "reason": "v0.32.0 commit 5faa531 legitimately spans three user-facing scaffold features/fixes (--dry-run, stale pre-push regeneration, conflict-marker exclusion); kept as separate JSONL entries for clarity",
-        "commits": ["5faa5310b9e45481c7b16ffb826e068250f53a01"]
-      }
-    ]
+    "exclusions": []
   }
 }

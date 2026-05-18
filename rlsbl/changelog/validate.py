@@ -16,7 +16,7 @@ from ..utils import commit_files
 # Defaults applied when batch_limits keys are absent or malformed.
 _BATCH_LIMITS_DEFAULTS = {
     "max_commits_per_entry": 5,
-    "max_entries_per_commit": 2,
+    "max_entries_per_commit": 5,
     "exclusions": [],
 }
 

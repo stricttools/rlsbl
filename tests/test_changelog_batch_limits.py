@@ -63,14 +63,14 @@ class TestGetBatchLimitsConfig:
     def test_defaults_when_no_config(self, git_repo):
         cfg = _get_batch_limits_config()
         assert cfg["max_commits_per_entry"] == 5
-        assert cfg["max_entries_per_commit"] == 2
+        assert cfg["max_entries_per_commit"] == 5
         assert cfg["exclusions"] == []
 
     def test_defaults_when_partial_config(self, git_repo):
         _write_config(git_repo, {"max_commits_per_entry": 7})
         cfg = _get_batch_limits_config()
         assert cfg["max_commits_per_entry"] == 7
-        assert cfg["max_entries_per_commit"] == 2
+        assert cfg["max_entries_per_commit"] == 5
         assert cfg["exclusions"] == []
 
     def test_full_override(self, git_repo):
@@ -176,40 +176,46 @@ class TestCheckBatchSizeCommits:
 # ---------------------------------------------------------------------------
 
 class TestCheckBatchSizeEntries:
-    def test_commit_in_two_entries_passes_default(self, git_repo):
+    def test_commit_in_five_entries_passes_default(self, git_repo):
         commit = "a" * 40
         entries_by_version = {
             "unreleased": [
                 ChangelogEntry(commits=[commit], user_facing=False),
                 ChangelogEntry(commits=[commit], user_facing=False),
+                ChangelogEntry(commits=[commit], user_facing=False),
+                ChangelogEntry(commits=[commit], user_facing=False),
+                ChangelogEntry(commits=[commit], user_facing=False),
             ],
         }
-        cfg = {"max_entries_per_commit": 2, "exclusions": []}
+        cfg = {"max_entries_per_commit": 5, "exclusions": []}
         passed, details = check_batch_size_entries(entries_by_version, cfg)
         assert passed is True
 
-    def test_commit_in_three_entries_fails_default(self, git_repo):
+    def test_commit_in_six_entries_fails_default(self, git_repo):
         commit = "b" * 40
         entries_by_version = {
             "unreleased": [
                 ChangelogEntry(commits=[commit], user_facing=False),
                 ChangelogEntry(commits=[commit], user_facing=False),
                 ChangelogEntry(commits=[commit], user_facing=False),
+                ChangelogEntry(commits=[commit], user_facing=False),
+                ChangelogEntry(commits=[commit], user_facing=False),
+                ChangelogEntry(commits=[commit], user_facing=False),
             ],
         }
-        cfg = {"max_entries_per_commit": 2, "exclusions": []}
+        cfg = {"max_entries_per_commit": 5, "exclusions": []}
         passed, details = check_batch_size_entries(entries_by_version, cfg)
         assert passed is False
-        assert "3 entries" in details[0]
-        assert "max: 2" in details[0]
+        assert "6 entries" in details[0]
+        assert "max: 5" in details[0]
 
     def test_exclusion_silences_commit_violation(self, git_repo):
         commit = "c" * 40
         entries_by_version = {
-            "unreleased": [ChangelogEntry(commits=[commit], user_facing=False)] * 5,
+            "unreleased": [ChangelogEntry(commits=[commit], user_facing=False)] * 8,
         }
         cfg = {
-            "max_entries_per_commit": 2,
+            "max_entries_per_commit": 5,
             "exclusions": [{"reason": "retroactive", "commits": [commit]}],
         }
         passed, details = check_batch_size_entries(entries_by_version, cfg)
@@ -217,30 +223,33 @@ class TestCheckBatchSizeEntries:
         assert details == []
 
     def test_cross_version_check_passes_at_max(self, git_repo):
-        """Commit in unreleased line 1 AND 0.32.0 line 18 = 2 appearances, max 2 => pass."""
+        """Commit appearing 5 times across versions (4 in 0.32.0 + 1 unreleased), max 5 => pass."""
         commit = "d" * 40
         filler = [
             ChangelogEntry(commits=[f"{i:040d}"], user_facing=False) for i in range(17)
         ]
         entries_by_version = {
             "unreleased": [ChangelogEntry(commits=[commit], user_facing=False)],
-            "0.32.0": filler + [ChangelogEntry(commits=[commit], user_facing=False)],
+            "0.32.0": filler + [ChangelogEntry(commits=[commit], user_facing=False)] * 4,
         }
-        cfg = {"max_entries_per_commit": 2, "exclusions": []}
+        cfg = {"max_entries_per_commit": 5, "exclusions": []}
         passed, details = check_batch_size_entries(entries_by_version, cfg)
         assert passed is True
 
     def test_cross_version_check_fails_above_max(self, git_repo):
-        """3 appearances across 2 versions, max 2 => fail; locations span versions."""
+        """6 appearances across 2 versions, max 5 => fail; locations span versions."""
         commit = "e" * 40
         entries_by_version = {
             "unreleased": [
                 ChangelogEntry(commits=[commit], user_facing=False),
                 ChangelogEntry(commits=[commit], user_facing=False),
+                ChangelogEntry(commits=[commit], user_facing=False),
+                ChangelogEntry(commits=[commit], user_facing=False),
+                ChangelogEntry(commits=[commit], user_facing=False),
             ],
             "0.32.0": [ChangelogEntry(commits=[commit], user_facing=False)],
         }
-        cfg = {"max_entries_per_commit": 2, "exclusions": []}
+        cfg = {"max_entries_per_commit": 5, "exclusions": []}
         passed, details = check_batch_size_entries(entries_by_version, cfg)
         assert passed is False
         # message lists both unreleased and 0.32.0 locations
@@ -249,7 +258,7 @@ class TestCheckBatchSizeEntries:
         assert "0.32.0.jsonl:1" in details[0]
 
     def test_empty_entries_passes(self, git_repo):
-        passed, details = check_batch_size_entries({}, {"max_entries_per_commit": 2, "exclusions": []})
+        passed, details = check_batch_size_entries({}, {"max_entries_per_commit": 5, "exclusions": []})
         assert passed is True
         assert details == []
 
@@ -292,17 +301,17 @@ class TestValidateUnreleasedIntegration:
         assert "6 commits" in details[0]
 
     def test_batch_size_entries_fails(self, git_repo):
-        """A single commit referenced by 3 unreleased entries exceeds default max=2."""
+        """A single commit referenced by 6 unreleased entries exceeds default max=5."""
         changes = str(git_repo / ".rlsbl" / "changes")
         sha = _make_commit(git_repo)
-        for _ in range(3):
+        for _ in range(6):
             append_entry(changes, ChangelogEntry(commits=[sha], user_facing=False))
 
         result = validate_unreleased(changes)
         assert result["passed"] is False
         passed, details = result["checks"]["batch_size_entries"]
         assert passed is False
-        assert "3 entries" in details[0]
+        assert "6 entries" in details[0]
 
     def test_cross_version_violation_detected(self, git_repo):
         """Commit appearing in both unreleased.jsonl and a frozen 0.32.0.jsonl
@@ -310,26 +319,23 @@ class TestValidateUnreleasedIntegration:
         changes = git_repo / ".rlsbl" / "changes"
         sha = _make_commit(git_repo)
 
-        # Pretend a past version included this commit twice already.
+        # Pretend a past version included this commit five times already.
         versioned = changes / "0.32.0.jsonl"
         versioned.write_text(
             "\n".join(
-                [
-                    json.dumps({"commits": [sha], "user_facing": False}),
-                    json.dumps({"commits": [sha], "user_facing": False}),
-                ]
+                [json.dumps({"commits": [sha], "user_facing": False})] * 5
             )
             + "\n"
         )
         os.chmod(versioned, 0o444)
 
-        # And unreleased references it once more (total 3 > max 2).
+        # And unreleased references it once more (total 6 > max 5).
         append_entry(str(changes), ChangelogEntry(commits=[sha], user_facing=False))
 
         result = validate_unreleased(str(changes))
         passed, details = result["checks"]["batch_size_entries"]
         assert passed is False
-        assert "3 entries" in details[0]
+        assert "6 entries" in details[0]
         assert "0.32.0.jsonl" in details[0]
         assert "unreleased.jsonl" in details[0]
 
@@ -338,13 +344,11 @@ class TestValidateUnreleasedIntegration:
         changes = git_repo / ".rlsbl" / "changes"
         sha = _make_commit(git_repo)
 
+        # Five appearances in the frozen version + one in unreleased = 6 > max 5.
         versioned = changes / "0.32.0.jsonl"
         versioned.write_text(
             "\n".join(
-                [
-                    json.dumps({"commits": [sha], "user_facing": False}),
-                    json.dumps({"commits": [sha], "user_facing": False}),
-                ]
+                [json.dumps({"commits": [sha], "user_facing": False})] * 5
             )
             + "\n"
         )
