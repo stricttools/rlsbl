@@ -1,6 +1,6 @@
 ---
 title: rlsbl watch
-description: "Poll GitHub Actions CI workflow runs for a specific commit SHA and report pass or fail status. Defaults to HEAD if no SHA is provided."
+description: "Poll GitHub Actions CI workflow runs for a specific commit SHA and report pass or fail status. Defaults to HEAD if no SHA is provided. Useful after rlsbl r"
 generated: true
 nav_group: "CLI Reference"
 nav_order: 20

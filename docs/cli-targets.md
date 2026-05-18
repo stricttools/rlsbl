@@ -1,6 +1,6 @@
 ---
 title: rlsbl targets
-description: "List release targets detected in the current project, indicating which ecosystems (npm, PyPI, Go, Cargo, etc.) are active by manifest."
+description: "List all release targets detected in the current project directory, showing which ecosystems (npm, PyPI, Go, Cargo, etc.) are active based on manifest file"
 generated: true
 nav_group: "CLI Reference"
 nav_order: 17

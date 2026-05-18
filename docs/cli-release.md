@@ -1,6 +1,6 @@
 ---
 title: rlsbl release
-description: "Bump the project version, validate the changelog, commit, tag, push, and create a GitHub Release. Supports patch, minor, and major bumps."
+description: "Bump the project version, validate the changelog, commit, tag, push, and create a GitHub Release. Supports patch, minor, and major bumps with dry-run previ"
 generated: true
 nav_group: "CLI Reference"
 nav_order: 14
