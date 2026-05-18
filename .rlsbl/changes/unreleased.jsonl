@@ -6,3 +6,4 @@
 {"commits":["029d4a08394672b9af321af07aba5c26b2a3dca8"],"user_facing":false}
 {"commits":["b2b4a5ba12676c4bf79a1fbc862028a5c158e57b"],"user_facing":false}
 {"commits":["0e97e7b1b6725c6cdeb39c65ad9909c1ad63a81e"],"user_facing":true,"description":"**`max_entries_per_commit` default raised from 2 to 5.** The previous default 2 was too strict and contradicted the documented practice that one commit can appear in multiple JSONL entries (e.g., fix + feature). Default now matches the existing `max_commits_per_entry` default of 5.","type":"fix"}
+{"commits":["e576e9349cfdf1c32e0ce1e8a0412b6888c1a960"],"user_facing":true,"description":"**`rlsbl release` warns about stale changelog entries in monorepo mode.** During finalization, entries referencing commits outside the unreleased range are flagged to stderr (warn-only; no entries stripped) so out-of-range entries don't silently carry into the next release cycle.","type":"feature"}
