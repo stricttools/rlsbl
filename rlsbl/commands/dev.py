@@ -9,48 +9,6 @@ from ..utils import require_tool
 from ..workspace import find_workspace_root, load_workspace
 
 
-# Per-target install/uninstall specs.
-#
-# Each spec is:
-#   tool:                       CLI tool that must be on PATH
-#   purpose:                    human-readable string for require_tool error msg
-#   args:                       argv passed to the tool for install
-#   uninstall_args_template:    argv list of templates passed to the tool for
-#                               uninstall. Each entry may contain '{name}',
-#                               which is replaced with the project's package
-#                               name (read via the target's read_name()), or
-#                               '{dir}' for the project directory basename.
-#                               None means uninstall is not supported.
-INSTALL_COMMANDS = {
-    "pypi": {
-        "tool": "uv",
-        "purpose": "for editable Python install",
-        "args": ["tool", "install", "-e", "."],
-        "uninstall_args_template": ["tool", "uninstall", "{name}"],
-    },
-    "npm": {
-        "tool": "npm",
-        "purpose": "for npm link",
-        "args": ["link"],
-        # `npm unlink` inside the package directory removes the global symlink.
-        "uninstall_args_template": ["unlink"],
-    },
-    "go": {
-        "tool": "go",
-        "purpose": "for go install",
-        "args": ["install", "./..."],
-        # `go install` does not have a clean reverse; tell the user.
-        "uninstall_args_template": None,
-    },
-    "cargo": {
-        "tool": "cargo",
-        "purpose": "for cargo install",
-        "args": ["install", "--path", "."],
-        "uninstall_args_template": ["uninstall", "{name}"],
-    },
-}
-
-
 def run_install(flags):
     """Entry point for `rlsbl dev install`.
 
@@ -76,7 +34,8 @@ def _install_single(project_dir, flags):
 
     for entry in targets:
         name = entry.name
-        spec = INSTALL_COMMANDS.get(name)
+        target = TARGETS.get(name)
+        spec = target.dev_install_command(project_dir) if target is not None else None
         if spec is None:
             print(f"Skipping {name}: install not yet supported for this target")
             continue
