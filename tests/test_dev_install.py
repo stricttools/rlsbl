@@ -171,7 +171,7 @@ def test_no_targets_returns_error(tmp_project, fake_run, all_tools_present, caps
 
 
 def test_unsupported_target_skipped(tmp_project, fake_run, all_tools_present, capsys):
-    # `docs` is a registered target but not in INSTALL_COMMANDS
+    # docs is a registered target with no dev_install_command override (inherits None from BaseTarget)
     os.makedirs(str(tmp_project / ".rlsbl"))
     with open(str(tmp_project / ".rlsbl" / "config.json"), "w") as f:
         json.dump({"targets": ["docs"]}, f)
