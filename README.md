@@ -113,6 +113,13 @@ Created files are committed automatically by default.
 
 **User-owned files** (CHANGELOG.md, LICENSE, hooks) are never overwritten, even with `--force`.
 
+**Customizing CI without conflicts:** Instead of editing `ci.yml` or `publish.yml` (which can produce merge conflicts on `--update`), put extra jobs in a separate workflow file scaffold never touches:
+
+- `.github/workflows/ci-custom.yml` -- runs alongside `ci.yml`
+- `.github/workflows/publish-custom.yml` -- runs alongside `publish.yml`
+
+See [docs/ci-customization.md](docs/ci-customization.md) for an example.
+
 **Runs config migrations** when `.rlsbl/config-schema.json` exists.
 
 ## Config management
