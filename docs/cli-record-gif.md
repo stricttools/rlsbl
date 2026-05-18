@@ -1,6 +1,6 @@
 ---
 title: rlsbl record-gif
-description: "Record an animated GIF demo of rlsbl commands with vhs, configurable for width, height, font size, and duration to produce reproducible demos."
+description: "Record an animated GIF demo of rlsbl commands using the vhs terminal recorder. Configurable width, height, font size, and duration for consistent, reproduc"
 generated: true
 nav_group: "CLI Reference"
 nav_order: 13

@@ -1,6 +1,6 @@
 ---
 title: rlsbl scaffold
-description: "Generate or three-way-merge CI workflows, git hooks, license, and changelog scaffolding for the detected release target ecosystem."
+description: "Generate or update CI/CD workflows, git hooks, changelog, and license files for the detected release target. Use --update for three-way merge preserving cu"
 generated: true
 nav_group: "CLI Reference"
 nav_order: 15

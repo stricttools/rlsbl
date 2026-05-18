@@ -1,6 +1,6 @@
 ---
 title: rlsbl undo
-description: "Roll back the most recent release: delete the GitHub Release, remove the v-tag locally and remotely, and revert the version-bump commit."
+description: "Revert the most recent release by deleting the GitHub Release, removing the git tag from local and remote, and reverting the version bump commit. Requires "
 generated: true
 nav_group: "CLI Reference"
 nav_order: 18

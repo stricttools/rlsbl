@@ -1,6 +1,6 @@
 ---
 title: rlsbl migrate
-description: "Run pending configuration migrations to bring .rlsbl config files up to the latest schema, with dry-run preview and pending-status output."
+description: "Run pending configuration migrations to update .rlsbl config files to the latest schema. Use --dry-run to preview changes without applying, or --status to "
 generated: true
 nav_group: "CLI Reference"
 nav_order: 9

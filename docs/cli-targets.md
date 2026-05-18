@@ -1,6 +1,6 @@
 ---
 title: rlsbl targets
-description: "List every release target detected in the current project directory based on manifest files such as package.json, pyproject.toml, and go.mod."
+description: "List all release targets detected in the current project directory, showing which ecosystems (npm, PyPI, Go, Cargo, etc.) are active based on manifest file"
 generated: true
 nav_group: "CLI Reference"
 nav_order: 17

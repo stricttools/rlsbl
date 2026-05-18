@@ -1,6 +1,6 @@
 ---
 title: rlsbl changelog
-description: "Manage structured JSONL changelog entries: add per-commit entries, validate them against schema and coverage, and generate CHANGELOG.md."
+description: "Structured changelog management using JSONL entries. Add, validate, and generate CHANGELOG.md from per-commit changelog entries stored in unreleased.jsonl "
 generated: true
 nav_group: "CLI Reference"
 nav_order: 1

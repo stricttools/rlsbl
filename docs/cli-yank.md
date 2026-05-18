@@ -1,6 +1,6 @@
 ---
 title: rlsbl yank
-description: "Deprecate a past release with a soft yank (pre-release flag plus notice) or fully delete it with a hard yank while preserving the git tag."
+description: "Mark a past release as deprecated (soft yank) or delete it (hard yank). Soft yank marks the GitHub Release as pre-release and prepends a deprecation notice"
 generated: true
 nav_group: "CLI Reference"
 nav_order: 21

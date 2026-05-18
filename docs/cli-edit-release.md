@@ -1,6 +1,6 @@
 ---
 title: rlsbl edit-release
-description: "Re-sync a published GitHub Release notes section with the matching version of CHANGELOG.md, defaulting to the project current version."
+description: "Sync the GitHub Release notes for a given version with the corresponding CHANGELOG.md entry. Defaults to the current version if none is specified. Use --dr"
 generated: true
 nav_group: "CLI Reference"
 nav_order: 8

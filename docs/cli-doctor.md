@@ -1,6 +1,6 @@
 ---
 title: rlsbl doctor
-description: "Run diagnostic checks on version consistency, tag alignment, JSONL coverage, and config validity; --fix attempts safe auto-repair where possible."
+description: "Run diagnostic checks on the project release state, including version consistency, tag alignment, changelog coverage, and config validity. Use --fix to aut"
 generated: true
 nav_group: "CLI Reference"
 nav_order: 7

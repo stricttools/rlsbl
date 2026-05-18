@@ -1,6 +1,6 @@
 ---
 title: rlsbl status
-description: "Show project version, branch, last tag, ahead count, and JSONL changelog coverage as either plain text or structured JSON for scripting."
+description: "Display the current project version, branch, last release tag, unreleased commit count, and changelog coverage. Outputs plain text by default or structured"
 generated: true
 nav_group: "CLI Reference"
 nav_order: 16
