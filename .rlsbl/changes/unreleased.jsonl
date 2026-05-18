@@ -5,3 +5,4 @@
 {"commits":["5ded1c4a2715744a77824c892d5ddb5ca9f5945e"],"user_facing":true,"description":"**`rlsbl release` no longer pollutes the working tree on abort.** Previously, when a pre-mutation check (selfdoc, tests, lint, hooks) failed, the regenerated `CHANGELOG.md` was left in the working tree and had to be manually reverted. The write is now deferred until after all pre-checks pass.","type":"fix"}
 {"commits":["e4bf49c367929488e06d146f2674df4a6e53e837","9a3efb0ee7cef641d014f42263e937447048da1e","746dcf43fe536bd7b3388231680dd4ba8e0aa73c"],"user_facing":false}
 {"commits":["fe9ab7f71319bd1cac6b87e32a5611494c02981f","c26041bfe55115e051b0915ca73074d591959110","18ecf67e42fe074baaad80f24449ce06bfe3788e"],"user_facing":false}
+{"commits":["30cf9f1e3935d8d47a4f01bb00c6a6bbf9ebab35"],"user_facing":false}
