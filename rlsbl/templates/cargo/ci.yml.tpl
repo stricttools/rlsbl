@@ -9,9 +9,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: {{action "actions/checkout"}}
       # rust-version: {{cargo.minRequiredRust}}
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: {{action "dtolnay/rust-toolchain"}}
       - run: cargo fmt --check
       - run: cargo clippy -- -D warnings
       - run: cargo test

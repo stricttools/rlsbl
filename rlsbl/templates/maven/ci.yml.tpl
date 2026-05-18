@@ -9,10 +9,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-java@v4
+      - uses: {{action "actions/checkout"}}
+      - uses: {{action "actions/setup-java"}}
         with:
           distribution: temurin
           java-version: "21"
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: {{action "gradle/actions/setup-gradle"}}
       - run: ./gradlew build

@@ -12,7 +12,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v7
+      - uses: {{action "actions/checkout"}}
+      - uses: {{action "astral-sh/setup-uv"}}
       - run: uv build
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: {{action "pypa/gh-action-pypi-publish"}}

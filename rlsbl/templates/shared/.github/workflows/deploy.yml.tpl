@@ -9,8 +9,8 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v5
+      - uses: {{action "actions/checkout"}}
+      - uses: {{action "actions/setup-python"}}
         with:
           python-version: '3.11'
       - run: pip install rlsbl

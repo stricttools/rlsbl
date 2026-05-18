@@ -9,9 +9,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v6
+      - uses: {{action "actions/checkout"}}
+      - uses: {{action "docker/setup-buildx-action"}}
+      - uses: {{action "docker/build-push-action"}}
         with:
           context: .
           push: false

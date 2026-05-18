@@ -9,9 +9,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: {{action "actions/checkout"}}
       # minimum_zig_version: {{zig.minRequiredZig}}
-      - uses: mlugg/setup-zig@v1
+      - uses: {{action "mlugg/setup-zig"}}
         with:
           version: {{zig.minRequiredZig}}
       - run: zig build

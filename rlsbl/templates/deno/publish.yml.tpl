@@ -11,8 +11,8 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v6
-      - uses: denoland/setup-deno@v2
+      - uses: {{action "actions/checkout"}}
+      - uses: {{action "denoland/setup-deno"}}
         with:
           deno-version: v2.x
       - run: deno publish

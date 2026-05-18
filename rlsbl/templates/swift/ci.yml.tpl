@@ -12,7 +12,7 @@ jobs:
         os: [macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v6
-      - uses: swift-actions/setup-swift@v2
+      - uses: {{action "actions/checkout"}}
+      - uses: {{action "swift-actions/setup-swift"}}
       - run: swift build
       - run: swift test

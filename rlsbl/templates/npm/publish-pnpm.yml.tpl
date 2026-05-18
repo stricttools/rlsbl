@@ -12,9 +12,9 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v6
+      - uses: {{action "actions/checkout"}}
+      - uses: {{action "pnpm/action-setup"}}
+      - uses: {{action "actions/setup-node"}}
         with:
           node-version: 24
           registry-url: {{registryUrl}}

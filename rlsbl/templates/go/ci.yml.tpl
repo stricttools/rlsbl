@@ -10,9 +10,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: {{action "actions/checkout"}}
       # go.mod: go {{go.minRequiredGo}}
-      - uses: actions/setup-go@v6
+      - uses: {{action "actions/setup-go"}}
         with:
           go-version-file: go.mod
       - run: go vet ./...

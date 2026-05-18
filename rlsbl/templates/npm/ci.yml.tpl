@@ -14,8 +14,8 @@ jobs:
         # engines.node: >= {{npm.minRequiredNode}}
         node-version: [20, 22, 24]
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: {{action "actions/checkout"}}
+      - uses: {{action "actions/setup-node"}}
         with:
           node-version: ${{ matrix.node-version }}
       - run: npm ci

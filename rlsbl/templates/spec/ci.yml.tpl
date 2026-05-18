@@ -9,6 +9,6 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: {{action "actions/checkout"}}
       - name: Validate spec
         run: echo "Add validation commands here"

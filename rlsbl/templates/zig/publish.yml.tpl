@@ -11,8 +11,8 @@ jobs:
   build-and-upload:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: mlugg/setup-zig@v1
+      - uses: {{action "actions/checkout"}}
+      - uses: {{action "mlugg/setup-zig"}}
         with:
           version: {{zig.minRequiredZig}}
 
