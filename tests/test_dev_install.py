@@ -223,3 +223,74 @@ def test_monorepo_empty_filter_errors(
     assert rc == 1
     captured = capsys.readouterr()
     assert "No projects matched" in captured.err
+
+
+# ---------------------------------------------------------------------------
+# Monorepo --uninstall propagation
+# ---------------------------------------------------------------------------
+
+
+def test_monorepo_uninstall_all(tmp_project, fake_run, all_tools_present, capsys):
+    """--all --uninstall runs the uninstall command for every supported project.
+
+    pypi -> `uv tool uninstall pyproj`
+    npm  -> `npm unlink`
+    go   -> skipped (uninstall_args_template is None)
+    """
+    _make_monorepo(tmp_project)
+    rc = run_install({"all": True, "uninstall": True})
+    assert rc == 0
+
+    cmds = [c["cmd"] for c in fake_run.calls]
+    assert ["uv", "tool", "uninstall", "pyproj"] in cmds
+    assert ["npm", "unlink"] in cmds
+    # go has no uninstall template -> no `go` command should be invoked.
+    assert not any(c[0] == "go" for c in cmds)
+    # Exactly two real uninstall commands (pypi + npm).
+    assert len(cmds) == 2
+
+    captured = capsys.readouterr()
+    # Each project's section header is printed.
+    assert "=== pyproj ===" in captured.out
+    assert "=== nodeproj ===" in captured.out
+    assert "=== goproj ===" in captured.out
+    # The skip message names go specifically.
+    assert "Skipping go uninstall" in captured.out
+
+
+def test_monorepo_uninstall_include(tmp_project, fake_run, all_tools_present, capsys):
+    """--include pyproj,nodeproj --uninstall only uninstalls those two."""
+    _make_monorepo(tmp_project)
+    rc = run_install({"include": "pyproj,nodeproj", "uninstall": True})
+    assert rc == 0
+
+    cmds = [c["cmd"] for c in fake_run.calls]
+    assert ["uv", "tool", "uninstall", "pyproj"] in cmds
+    assert ["npm", "unlink"] in cmds
+    assert len(cmds) == 2
+
+    captured = capsys.readouterr()
+    assert "=== pyproj ===" in captured.out
+    assert "=== nodeproj ===" in captured.out
+    # goproj was filtered out, no header and no skip message for it.
+    assert "=== goproj ===" not in captured.out
+    assert "Skipping go uninstall" not in captured.out
+
+
+def test_monorepo_uninstall_exclude(tmp_project, fake_run, all_tools_present, capsys):
+    """--exclude goproj --uninstall uninstalls pyproj and nodeproj, skipping goproj."""
+    _make_monorepo(tmp_project)
+    rc = run_install({"exclude": "goproj", "uninstall": True})
+    assert rc == 0
+
+    cmds = [c["cmd"] for c in fake_run.calls]
+    assert ["uv", "tool", "uninstall", "pyproj"] in cmds
+    assert ["npm", "unlink"] in cmds
+    assert len(cmds) == 2
+    # goproj is excluded entirely -- no go command, no header for it.
+    assert not any(c[0] == "go" for c in cmds)
+
+    captured = capsys.readouterr()
+    assert "=== pyproj ===" in captured.out
+    assert "=== nodeproj ===" in captured.out
+    assert "=== goproj ===" not in captured.out
