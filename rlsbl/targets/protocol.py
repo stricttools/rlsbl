@@ -94,11 +94,24 @@ class ReleaseTarget(Protocol):
 
     # --- Optional: Developer-mode local install ---
 
-    def dev_install_command(self, project_dir: str) -> dict | None:
-        """Return the spec for a local editable install of this target, or None.
+    def dev_install_command(self, project_dir: str, *, venv: bool = False) -> dict | None:
+        """Return the spec for a local install of this target, or None.
 
-        Used by `rlsbl dev install` to locally install/uninstall the project
-        for development (e.g. `uv tool install -e .`, `npm link`).
+        Used by `rlsbl dev install` to install/uninstall the project for local
+        development.
+
+        The `venv` keyword controls which install mode to return:
+
+            venv=False (default): return the global-install spec, where the
+                project is installed as a globally-available tool or symlink
+                (e.g. `uv tool install -e .`, `npm link`, `go install`).
+                Return None if the target has no global-install concept.
+
+            venv=True: return the local/venv-install spec, where dependencies
+                are fetched into the project's own environment without exposing
+                a global CLI (e.g. `uv sync`, `npm install`). Return None for
+                targets that have no separate local-environment concept (e.g.
+                Go, Cargo, Zig, Swift).
 
         Returns a spec dict like:
             {
@@ -115,9 +128,10 @@ class ReleaseTarget(Protocol):
                 to uninstall. Each entry may contain `{name}` (replaced with
                 the project's package name) or `{dir}` (replaced with the
                 project directory basename). None means uninstall is not
-                supported for this target.
+                supported for this mode of this target.
             purpose: human-readable string for the require_tool error message.
 
-        Return None if local editable install is not supported for this target.
+        Return None if the requested install mode is not supported for this
+        target.
         """
         return None

@@ -29,15 +29,24 @@ def _install_single(project_dir, flags):
         return 1
 
     uninstall = bool(flags.get("uninstall"))
+    venv = bool(flags.get("venv"))
     success = True
     any_handled = False
 
     for entry in targets:
         name = entry.name
         target = TARGETS.get(name)
-        spec = target.dev_install_command(project_dir) if target is not None else None
+        spec = (
+            target.dev_install_command(project_dir, venv=venv)
+            if target is not None
+            else None
+        )
         if spec is None:
-            print(f"Skipping {name}: install not yet supported for this target")
+            if venv and target is not None and target.dev_install_command(project_dir, venv=False) is not None:
+                # Global install exists for this target but venv mode does not.
+                print(f"Skipping {name}: --venv not supported for this target")
+            else:
+                print(f"Skipping {name}: install not yet supported for this target")
             continue
 
         tool_path = require_tool(spec["tool"], purpose=spec["purpose"], fatal=False)

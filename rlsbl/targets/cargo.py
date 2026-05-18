@@ -213,7 +213,11 @@ class CargoTarget(BaseTarget):
     def get_project_init_hint(self):
         return 'Run "cargo init" or "cargo new <name>" first'
 
-    def dev_install_command(self, project_dir):
+    def dev_install_command(self, project_dir, *, venv=False):
+        if venv:
+            # Cargo has no per-project venv concept; dependencies live in the
+            # global ~/.cargo registry cache. Nothing meaningful for --venv.
+            return None
         return {
             "tool": "cargo",
             "purpose": "for cargo install",

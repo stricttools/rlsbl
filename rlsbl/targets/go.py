@@ -345,7 +345,11 @@ class GoTarget(BaseTarget):
     def get_project_init_hint(self):
         return 'Run "go mod init <module-path>" first'
 
-    def dev_install_command(self, project_dir):
+    def dev_install_command(self, project_dir, *, venv=False):
+        if venv:
+            # Go has no per-project venv concept; modules are managed globally
+            # in GOPATH/pkg/mod. Nothing meaningful to do for --venv.
+            return None
         return {
             "tool": "go",
             "purpose": "for go install",

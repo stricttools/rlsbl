@@ -76,6 +76,11 @@ class BaseTarget:
     def publish(self, dir_path, version):
         pass
 
-    def dev_install_command(self, project_dir):
-        """Spec for local editable install via `rlsbl dev install`. None = unsupported."""
+    def dev_install_command(self, project_dir, *, venv=False):
+        """Spec for local install via `rlsbl dev install`. None = unsupported.
+
+        Subclasses override to return a spec dict. The `venv` keyword selects
+        between global-install mode (False, default) and local/venv mode (True).
+        See the protocol docstring for the spec format.
+        """
         return None

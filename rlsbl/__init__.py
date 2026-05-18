@@ -4,7 +4,28 @@ import os
 import subprocess
 import sys
 
+import keyword as _keyword
+
 import strictcli
+
+
+# Strictcli derives a Python parameter name from each flag name by stripping
+# leading dashes and replacing internal dashes with underscores. That breaks
+# for flags whose derived name collides with a Python reserved word
+# (e.g. `--global` -> `global`, which cannot be used as a function parameter).
+# Patch `_flag_param_name` to append a trailing underscore in that case, the
+# conventional PEP 8 workaround. Handlers can then declare `global_` etc.
+_orig_flag_param_name = strictcli._flag_param_name
+
+
+def _flag_param_name_with_kw_safety(flag_name):
+    name = _orig_flag_param_name(flag_name)
+    if _keyword.iskeyword(name):
+        return name + "_"
+    return name
+
+
+strictcli._flag_param_name = _flag_param_name_with_kw_safety
 
 
 def _detect_version():
@@ -600,18 +621,31 @@ def cmd_mono_lint():
 dev = app.group("dev", help="Developer utilities for locally working with rlsbl projects, including editable installs that mirror the project's release target (pypi -> uv tool install -e, npm -> npm link, go -> go install).")
 
 
-@dev.command(name="install", help="Locally install the project for development using the editable/symlinked install command appropriate for the detected target (pypi: uv tool install -e, npm: npm link, go: go install, cargo: cargo install --path .). In monorepo mode, requires --all, --include, or --exclude to select which projects to install. Use --uninstall to reverse a previous install.")
+@dev.command(name="install", help="Locally install the project for development using the install command appropriate for the detected target. --global (default) installs as a system-wide tool/symlink (pypi: uv tool install -e, npm: npm link, go: go install, cargo: cargo install --path ., zig: zig build install, swift: swift build, deno: deno install, hex: mix deps.get). --venv installs into the project's local environment instead (pypi: uv sync, npm: npm install); targets without a venv concept are skipped with a clear message. In monorepo mode, requires --all, --include, or --exclude to select which projects to install. Use --uninstall to reverse a previous install.")
 @strictcli.flag(name="all", type=bool, help="In monorepo mode, install every project in the workspace")
 @strictcli.flag(name="include", type=str, help="In monorepo mode, comma-separated project names to include", default="")
 @strictcli.flag(name="exclude", type=str, help="In monorepo mode, comma-separated project names to exclude", default="")
 @strictcli.flag(name="uninstall", type=bool, help="Reverse a previous dev install (where supported by the target)")
-def cmd_dev_install(all, include, exclude, uninstall):
+@strictcli.flag(name="global", type=bool, help="Install as a global tool/symlink. This is the default behavior when neither --global nor --venv is passed. Mutually exclusive with --venv.", default=False)
+@strictcli.flag(name="venv", type=bool, help="Install into the project's local environment only (e.g. uv sync, npm install). Mutually exclusive with --global.", default=False)
+def cmd_dev_install(all, include, exclude, uninstall, global_, venv):
+    if global_ and venv:
+        print(
+            "Error: --global and --venv are mutually exclusive.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
     _require_project_root()
+    # Global is the implicit default. --global is a no-op affirmation of the
+    # default; --venv flips into local/venv mode.
+    install_global = not venv
     flags = {
         "all": all,
         "include": include or None,
         "exclude": exclude or None,
         "uninstall": uninstall,
+        "global": install_global,
+        "venv": venv,
     }
     from .commands.dev import run_install
     rc = run_install(flags)
