@@ -91,3 +91,33 @@ class ReleaseTarget(Protocol):
     def publish(self, dir_path: str, version: str) -> None:
         """Post-push publish/deploy step. No-op by default."""
         pass
+
+    # --- Optional: Developer-mode local install ---
+
+    def dev_install_command(self, project_dir: str) -> dict | None:
+        """Return the spec for a local editable install of this target, or None.
+
+        Used by `rlsbl dev install` to locally install/uninstall the project
+        for development (e.g. `uv tool install -e .`, `npm link`).
+
+        Returns a spec dict like:
+            {
+                "tool": "uv",
+                "args": ["tool", "install", "-e", "."],
+                "uninstall_args_template": ["tool", "uninstall", "{name}"],
+                "purpose": "for editable Python install",
+            }
+
+        Fields:
+            tool: CLI tool that must be on PATH.
+            args: argv passed to the tool to install.
+            uninstall_args_template: argv list of templates passed to the tool
+                to uninstall. Each entry may contain `{name}` (replaced with
+                the project's package name) or `{dir}` (replaced with the
+                project directory basename). None means uninstall is not
+                supported for this target.
+            purpose: human-readable string for the require_tool error message.
+
+        Return None if local editable install is not supported for this target.
+        """
+        return None

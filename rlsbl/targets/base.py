@@ -75,3 +75,7 @@ class BaseTarget:
 
     def publish(self, dir_path, version):
         pass
+
+    def dev_install_command(self, project_dir):
+        """Spec for local editable install via `rlsbl dev install`. None = unsupported."""
+        return None
