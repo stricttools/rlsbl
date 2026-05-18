@@ -2,6 +2,12 @@
 
 # Changelog
 
+## 0.34.0
+
+### Features
+
+- **Configurable changelog batch-limits validation.** `rlsbl changelog validate` now checks that no entry has more than `max_commits_per_entry` (default 5) commits and that no commit appears in more than `max_entries_per_commit` (default 2) entries. Both limits configurable per project via the `batch_limits` section in `.rlsbl/config.json`. Known violations can be silenced via an `exclusions` list with a required `reason` field for audit purposes.
+
 ## 0.33.0
 
 ### Features
