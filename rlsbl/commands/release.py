@@ -396,7 +396,7 @@ def run_cmd(registry, args, flags):
     # (and per-version .md files) to disk until after pre-release checks pass,
     # so that an aborted release leaves the working tree exactly as it was.
     # The actual write to disk happens just after acquire_lock() below.
-    changelog_content = generate_changelog(version_dir, write_to_disk=False)
+    changelog_content = generate_changelog(version_dir, write_to_disk=False, version_override=new_version)
     log("Generated CHANGELOG.md from JSONL entries (in-memory preview)")
 
     if isinstance(changelog_content, str):
