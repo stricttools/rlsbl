@@ -551,6 +551,14 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                           pre_existing_dirty=None,
                           abs_project_dir=None):
     """Inner release logic that runs under the advisory lock (mutating phase)."""
+    # Snapshot dirty files BEFORE any version-bump writes. This captures
+    # everything dirtied by prior stages (generate_changelog, hooks, lint,
+    # --allow-dirty pre-existing files, etc.). Only files that become dirty
+    # AFTER this point — i.e. during the version bump — are candidates for
+    # the "unexpected modified files" abort.
+    baseline_output = run("git", ["status", "--porcelain"])
+    baseline_dirty = parse_porcelain_paths(baseline_output) if baseline_output else set()
+
     if commit_msg is None:
         commit_msg = tag
     if primary_path is None:
@@ -691,7 +699,11 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
         # (from e.g. concurrent processes) should trigger the abort.
         if pre_existing_dirty:
             expected_files |= pre_existing_dirty
-        unexpected = dirty_files - expected_files
+        # Subtract the baseline snapshot taken at the start of the mutating
+        # phase.  This covers files written by intermediate stages that ran
+        # BEFORE version-bump writes (generate_changelog, hooks, lint) which
+        # are not in files_to_commit or pre_existing_dirty.
+        unexpected = dirty_files - expected_files - baseline_dirty
         if unexpected:
             unexpected_list = ", ".join(sorted(unexpected))
             print(

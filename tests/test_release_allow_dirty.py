@@ -113,6 +113,7 @@ class TestReleaseAllowDirty(unittest.TestCase):
             "v1.0.0",         # git tag -l v1.0.0 (exists -> bump)
             "",               # git tag -l v1.0.1 (doesn't exist -> proceed)
             # _run_release_mutating phase:
+            porcelain_dirty,    # git status --porcelain (baseline snapshot)
             porcelain_recheck,  # git status --porcelain (re-check guard)
             "package.json",     # git diff --name-only -- package.json
             "M package.json",   # git status --porcelain -- package.json
@@ -167,6 +168,7 @@ class TestReleaseAllowDirty(unittest.TestCase):
             "v1.0.0",           # git tag -l v1.0.0 (exists -> bump)
             "",                 # git tag -l v1.0.1 (doesn't exist -> proceed)
             # _run_release_mutating phase:
+            porcelain_dirty,    # git status --porcelain (baseline snapshot)
             porcelain_recheck,  # git status --porcelain (re-check guard) -- has surprise.txt
         ]
 
