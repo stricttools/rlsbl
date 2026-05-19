@@ -10,6 +10,7 @@ from ..changelog import (
     changes_dir_exists,
     finalize_version,
     generate_changelog,
+    generate_version_file,
     get_changes_dir,
     validate_unreleased,
 )
@@ -729,6 +730,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
         changes_dir = get_changes_dir(version_dir)
         tag_glob = target.monorepo_tag_glob(monorepo_name, path=monorepo_project_path) if monorepo_name else None
         finalize_version(changes_dir, new_version, tag_glob=tag_glob)
+        generate_version_file(changes_dir, new_version)
         log(f"Finalized JSONL changelog for {new_version}")
         # Commit the finalized JSONL file and the new empty unreleased.jsonl
         jsonl_finalized = os.path.normpath(os.path.join(changes_dir, f"{new_version}.jsonl"))
