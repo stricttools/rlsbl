@@ -133,12 +133,13 @@ class TestMultiTargetRelease:
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
+    @patch("rlsbl.commands.release.generate_version_file")
     @patch("rlsbl.commands.release.finalize_version")
     @patch("rlsbl.commands.release.extract_changelog_entry", return_value="- Improvements")
     @patch("rlsbl.commands.release.get_changes_dir", return_value=".rlsbl/changes")
     @patch("rlsbl.commands.release._run_selfdoc_check", return_value=True)
     def test_secondary_targets_called_when_detected(
-        self, _selfdoc_check, _changes_dir, _extract, _finalize, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, _commit_files, mock_run, _push
+        self, _selfdoc_check, _changes_dir, _extract, _finalize, _gen_ver_file, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, _commit_files, mock_run, _push
     ):
         """When a secondary target (docs) is detected, its build/publish are called."""
         # Create selfdoc.json so docs target is detected
@@ -191,12 +192,13 @@ class TestMultiTargetRelease:
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
+    @patch("rlsbl.commands.release.generate_version_file")
     @patch("rlsbl.commands.release.finalize_version")
     @patch("rlsbl.commands.release.extract_changelog_entry", return_value="- Improvements")
     @patch("rlsbl.commands.release.get_changes_dir", return_value=".rlsbl/changes")
     @patch("rlsbl.commands.release._run_selfdoc_check", return_value=True)
     def test_secondary_target_failure_is_non_fatal(
-        self, _selfdoc_check, _changes_dir, _extract, _finalize, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, _commit_files, mock_run, _push
+        self, _selfdoc_check, _changes_dir, _extract, _finalize, _gen_ver_file, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, _commit_files, mock_run, _push
     ):
         """If a secondary target's build/publish raises, release still completes."""
         # Create selfdoc.json so docs target is detected

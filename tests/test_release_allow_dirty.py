@@ -85,11 +85,12 @@ class TestReleaseAllowDirty(unittest.TestCase):
     @patch("rlsbl.commands.release.read_deploy_config", return_value=([], []))
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
+    @patch("rlsbl.commands.release.generate_version_file")
     @patch("rlsbl.commands.release.finalize_version")
     @patch("rlsbl.commands.release.extract_changelog_entry", return_value="- Bugfix")
     @patch("rlsbl.commands.release.get_changes_dir", return_value=".rlsbl/changes")
     def test_allow_dirty_non_dry_run_passes_recheck(self, _changes_dir, _extract, _finalize,
-                                                     _validate, _gen_cl,
+                                                     _gen_ver_file, _validate, _gen_cl,
                                                      _deploy, _tag, _gh_inst,
                                                      _gh_auth, _clean, _branch,
                                                      _commit_files, mock_run, _push,
