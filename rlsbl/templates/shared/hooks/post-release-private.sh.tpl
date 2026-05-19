@@ -27,6 +27,27 @@ else
     exit 0
 fi
 
+# Read max asset size from config (default 2MB)
+max_size_mb=$(python3 -c "
+import json, pathlib
+c = pathlib.Path('.rlsbl/config.json')
+d = json.loads(c.read_text()) if c.exists() else {}
+print(d.get('max_asset_size_mb', 2))
+" 2>/dev/null || echo 2)
+
+# Check each file in dist/ against the size limit
+max_size_bytes=$((max_size_mb * 1024 * 1024))
+for f in dist/*; do
+    [ -f "$f" ] || continue
+    size=$(stat --format=%s "$f" 2>/dev/null || stat -f%z "$f" 2>/dev/null)
+    if [ "$size" -gt "$max_size_bytes" ]; then
+        size_mb=$((size / 1024 / 1024))
+        echo "Error: $f is ${size_mb}MB, exceeds max_asset_size_mb (${max_size_mb}MB)." >&2
+        echo "Set max_asset_size_mb in .rlsbl/config.json to increase the limit." >&2
+        exit 1
+    fi
+done
+
 # Upload artifacts to GitHub Release
 if ls dist/* 1>/dev/null 2>&1; then
     echo "Uploading artifacts to GitHub Release v$version..."
