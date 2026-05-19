@@ -151,14 +151,15 @@ class TestMultiTargetRelease:
         # 2. git rev-list --count HEAD..origin/main (0 commits behind)
         # 3. tag -l (current tag exists) -> "v1.0.0"
         # 4. tag -l (new tag doesn't exist) -> ""
-        # 5. git status --porcelain -> ""
-        # 6. git rev-parse HEAD (pre_release_sha capture) -> "pre123"
+        # 5. git status --porcelain (baseline snapshot) -> ""
+        # 6. git status --porcelain (re-check guard) -> ""
+        # 7. git rev-parse HEAD (pre_release_sha capture) -> "pre123"
         # commit_files is mocked separately (no git add/commit calls here)
-        # 7. git tag -> ""
-        # 8. git push origin tag -> ""
-        # 9. gh release create -> ""
-        # 10. git rev-parse HEAD (pushed_sha) -> "abc123"
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", "pre123", "", "", "", "abc123"]
+        # 8. git tag -> ""
+        # 9. git push origin tag -> ""
+        # 10. gh release create -> ""
+        # 11. git rev-parse HEAD (pushed_sha) -> "abc123"
+        mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", "pre123", "", "", "", "abc123"]
 
         # Mock the docs target's build and publish to track calls
         from rlsbl.targets import TARGETS
@@ -207,8 +208,8 @@ class TestMultiTargetRelease:
 
         # fetch + rev-list (remote-ahead check) + original mock sequence
         # commit_files is mocked separately (no git add/commit calls here)
-        # extra entry for git rev-parse HEAD (pre_release_sha capture)
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", "pre123", "", "", "", "abc123"]
+        # extra entries for baseline snapshot + git rev-parse HEAD (pre_release_sha capture)
+        mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", "pre123", "", "", "", "abc123"]
 
         from rlsbl.targets import TARGETS
         original_build = TARGETS["docs"].build
