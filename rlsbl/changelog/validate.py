@@ -1,4 +1,4 @@
-"""Validation engine for JSONL changelog entries with result caching, checking field constraints, hash integrity, and entry ordering."""
+"""Validates JSONL changelog entries against git history: hash resolution, range checking, commit coverage, orphan detection, and schema conformance."""
 
 from __future__ import annotations
 

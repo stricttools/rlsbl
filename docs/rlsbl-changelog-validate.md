@@ -1,6 +1,6 @@
 ---
 title: rlsbl.changelog.validate
-description: "Validation engine for JSONL changelog entries with result caching, checking field constraints, hash integrity, and entry ordering."
+description: "Validates JSONL changelog entries against git history: hash resolution, range checking, commit coverage, orphan detection, and schema conformance."
 generated: true
 nav_group: "API Reference"
 nav_order: 9
