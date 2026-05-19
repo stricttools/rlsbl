@@ -119,6 +119,22 @@ def get_changelog_validation_config():
     return batch_limits
 
 
+def get_max_asset_size_mb():
+    """Read max_asset_size_mb from .rlsbl/config.json.
+
+    Controls the maximum allowed size (in megabytes) for individual files
+    uploaded to GitHub Releases by the private post-release hook.  Files
+    exceeding this limit cause the hook to abort before uploading.
+
+    Returns an integer (default 2 if unset or missing).
+    """
+    config = read_project_config()
+    value = config.get("max_asset_size_mb", 2)
+    if isinstance(value, (int, float)) and value > 0:
+        return int(value)
+    return 2
+
+
 def write_project_config(key, value):
     """Write or update a key in .rlsbl/config.json (creates dir if needed)."""
     os.makedirs(os.path.dirname(_project_config()), exist_ok=True)
