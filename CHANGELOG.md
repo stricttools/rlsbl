@@ -2,6 +2,12 @@
 
 # Changelog
 
+## 0.36.0
+
+### Features
+
+- **New feature.** Asset size guard in private post-release hook -- checks files in `dist/` against `max_asset_size_mb` (default 2MB) before uploading to GitHub Releases.
+
 ## 0.35.1
 
 ### Features
