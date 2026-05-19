@@ -1,1 +1,2 @@
 {"commits":["c25b51169df4a81ee6918f9967f8dbf8480e6cc9","fb5e5079b8188abfbc7612ca98c3cfc90f9c026c","fdcf136f797c3031f2c3a1b0515c817fbdf02d09"],"user_facing":true,"description":"**New feature.** Asset size guard in private post-release hook -- checks files in `dist/` against `max_asset_size_mb` (default 2MB) before uploading to GitHub Releases.","type":"feature"}
+{"commits":["055ff2c5c9ed5763db5fe3ce9717e3402a2e95f2","69a8adc8d456256690c5ea4e068800ff0b350f4f"],"user_facing":false}
