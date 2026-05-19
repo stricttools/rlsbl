@@ -1,1 +1,2 @@
 {"commits":["b85098a9a9369423ae4f13541705089a1d8de3b9"],"user_facing":false}
+{"commits":["cbeddbce57a0fb7b3c929c612152932ca09f6f47","3093d2695c3c3ab2983c029fce6da3175fbe1e62","ff8f9c748a70109fffd14290cc794635bf01b438"],"user_facing":true,"description":"**Bug fix.** Release finalization now generates the per-version `.md` file alongside the JSONL.","type":"fix"}
