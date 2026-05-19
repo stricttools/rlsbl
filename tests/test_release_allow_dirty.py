@@ -115,13 +115,14 @@ class TestReleaseAllowDirty(unittest.TestCase):
             # _run_release_mutating phase:
             porcelain_dirty,    # git status --porcelain (baseline snapshot)
             porcelain_recheck,  # git status --porcelain (re-check guard)
-            "package.json",     # git diff --name-only -- package.json
-            "M package.json",   # git status --porcelain -- package.json
+            "package.json",     # git rev-parse HEAD (pre_release_sha)
+            # new_version != current_version, so has_staged_or_modified is short-circuited
             # commit_files is mocked separately (no git add/commit calls here)
-            "",                 # git tag v1.0.1
+            "M package.json",   # git tag v1.0.1
             "",                 # git push origin v1.0.1
+            "",                 # git rev-parse HEAD (pushed_sha)
             "",                 # gh release create ...
-            "abc123def",        # git rev-parse HEAD
+            "abc123def",        # (unconsumed -- side_effect has one extra entry)
         ]
 
         with patch("sys.stdout", new_callable=StringIO):

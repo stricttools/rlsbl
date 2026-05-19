@@ -157,8 +157,8 @@ class TestMultiTargetRelease:
         # commit_files is mocked separately (no git add/commit calls here)
         # 8. git tag -> ""
         # 9. git push origin tag -> ""
-        # 10. gh release create -> ""
-        # 11. git rev-parse HEAD (pushed_sha) -> "abc123"
+        # 10. git rev-parse HEAD (pushed_sha) -> ""
+        # 11. gh release create -> "abc123"
         mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", "pre123", "", "", "", "abc123"]
 
         # Mock the docs target's build and publish to track calls
@@ -206,9 +206,10 @@ class TestMultiTargetRelease:
         with open("selfdoc.json", "w") as f:
             json.dump({"language": "python"}, f)
 
-        # fetch + rev-list (remote-ahead check) + original mock sequence
-        # commit_files is mocked separately (no git add/commit calls here)
-        # extra entries for baseline snapshot + git rev-parse HEAD (pre_release_sha capture)
+        # Same mock sequence as test_secondary_targets_called_when_detected:
+        # 1. git fetch  2. git rev-list  3-4. tag -l x2  5. baseline snapshot
+        # 6. re-check guard  7. pre_release_sha  8. git tag  9. git push origin tag
+        # 10. pushed_sha  11. gh release create
         mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", "pre123", "", "", "", "abc123"]
 
         from rlsbl.targets import TARGETS
