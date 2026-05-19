@@ -45,3 +45,5 @@ Small. Reading config + grep for a marker in the hook file is ~20 lines in the r
 - `todo/unified-toml-config.md` -- config management overhaul; option (c) depends on this
 - `todo/scaffold-hook-regeneration.md` -- may overlap with the hook resync concern
 - `todo/.done/release-asset-size-guard.md` -- the companion asset size guard problem (split from the same original todo)
+
+**Blocked on:** Option (c) (config set triggers hook regeneration) depends on `todo/unified-toml-config.md` — specifically the `rlsbl config set` command that doesn't exist yet. Options (a) and (b) can proceed independently.
