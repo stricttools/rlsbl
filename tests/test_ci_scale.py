@@ -270,14 +270,14 @@ class TestPublishRouterScale:
     def test_syntactic_validity(self):
         """Generated publish router parses as valid YAML."""
         projects = _make_projects(PROJECT_COUNT)
-        content = _generate_publish_router(projects)
+        content = _generate_publish_router(projects, ".")
         parsed = _parse_workflow_yaml(content)
         assert isinstance(parsed, dict)
 
     def test_job_count(self):
         """Publish router has exactly 30 project jobs (no detect job)."""
         projects = _make_projects(PROJECT_COUNT)
-        content = _generate_publish_router(projects)
+        content = _generate_publish_router(projects, ".")
         parsed = _parse_workflow_yaml(content)
         jobs = parsed["jobs"]
         assert len(jobs) == PROJECT_COUNT
@@ -285,7 +285,7 @@ class TestPublishRouterScale:
     def test_no_duplicate_job_names(self):
         """All job names in publish router are unique."""
         projects = _make_projects(PROJECT_COUNT)
-        content = _generate_publish_router(projects)
+        content = _generate_publish_router(projects, ".")
         parsed = _parse_workflow_yaml(content)
         job_names = list(parsed["jobs"].keys())
         assert len(job_names) == len(set(job_names))
@@ -293,7 +293,7 @@ class TestPublishRouterScale:
     def test_tag_matching_conditions(self):
         """Each job has the correct startsWith tag condition."""
         projects = _make_projects(PROJECT_COUNT)
-        content = _generate_publish_router(projects)
+        content = _generate_publish_router(projects, ".")
         parsed = _parse_workflow_yaml(content)
         for proj in projects:
             name = proj["name"]
@@ -304,7 +304,7 @@ class TestPublishRouterScale:
     def test_workflow_call_references(self):
         """Each project job calls ./.github/workflows/{name}-publish.yml."""
         projects = _make_projects(PROJECT_COUNT)
-        content = _generate_publish_router(projects)
+        content = _generate_publish_router(projects, ".")
         parsed = _parse_workflow_yaml(content)
         for proj in projects:
             name = proj["name"]
@@ -314,7 +314,7 @@ class TestPublishRouterScale:
     def test_release_trigger(self):
         """Publish router triggers on release published events."""
         projects = _make_projects(PROJECT_COUNT)
-        content = _generate_publish_router(projects)
+        content = _generate_publish_router(projects, ".")
         parsed = _parse_workflow_yaml(content)
         # YAML parses bare 'on' as boolean True
         assert parsed[True] == {"release": {"types": ["published"]}}

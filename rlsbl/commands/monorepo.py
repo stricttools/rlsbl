@@ -399,14 +399,14 @@ def _generate_router(projects):
     return "\n".join(lines) + "\n"
 
 
-def _get_monorepo_tag_prefix(project):
+def _get_monorepo_tag_prefix(project, root):
     """Return the tag prefix for a monorepo project's publish router condition.
 
     Uses the target's monorepo_tag_glob to derive the prefix (glob minus
     trailing ``*``). For Go projects this yields ``go/v``, for others
     ``name@v``.
     """
-    target_entries = detect_targets(project["path"])
+    target_entries = detect_targets(os.path.join(root, project["path"]))
     if target_entries and target_entries[0].name in TARGETS:
         glob = TARGETS[target_entries[0].name].monorepo_tag_glob(
             project["name"], path=project["path"]
@@ -445,20 +445,20 @@ _PUBLISH_TARGET_REQUIREMENTS = {
 }
 
 
-def _get_publish_requirements(project):
+def _get_publish_requirements(project, root):
     """Return (secrets_inherit, permissions) for a project's publish job.
 
     Defaults to no secret inheritance and read-only contents when the target
     type is unknown -- explicit is better than guessing.
     """
-    target_entries = detect_targets(project["path"])
+    target_entries = detect_targets(os.path.join(root, project["path"]))
     if target_entries and target_entries[0].name in _PUBLISH_TARGET_REQUIREMENTS:
         req = _PUBLISH_TARGET_REQUIREMENTS[target_entries[0].name]
         return req["secrets_inherit"], req["permissions"]
     return False, {"contents": "read"}
 
 
-def _generate_publish_router(projects):
+def _generate_publish_router(projects, root):
     """Generate publish router content for projects with publish workflows.
 
     Each per-project job declares the permissions its reusable workflow
@@ -477,8 +477,8 @@ def _generate_publish_router(projects):
     lines.append("jobs:")
 
     for p in projects:
-        tag_prefix = _get_monorepo_tag_prefix(p)
-        secrets_inherit, permissions = _get_publish_requirements(p)
+        tag_prefix = _get_monorepo_tag_prefix(p, root)
+        secrets_inherit, permissions = _get_publish_requirements(p, root)
         lines.append(f"  {p['name']}:")
         lines.append(f"    if: startsWith(github.event.release.tag_name, '{tag_prefix}')")
         lines.append("    permissions:")
@@ -576,7 +576,7 @@ def _cmd_sync(flags):
         if os.path.isfile(publish_router_path):
             os.chmod(publish_router_path, 0o644)
         with open(publish_router_path, "w", encoding="utf-8") as f:
-            f.write(_generate_publish_router(projects_with_publish))
+            f.write(_generate_publish_router(projects_with_publish, root))
         os.chmod(publish_router_path, 0o444)
         written_files.append(publish_router_path)
 
@@ -617,7 +617,7 @@ def _cmd_sync(flags):
 
     # Warn about Swift projects without subtree_remote
     for proj in projects:
-        proj_targets = detect_targets(proj["path"])
+        proj_targets = detect_targets(os.path.join(root, proj["path"]))
         if any(te.name in ("swift", "swift-apple") for te in proj_targets):
             if not proj.get("subtree_remote"):
                 print(
@@ -647,13 +647,13 @@ def _cmd_status(flags):
         path = proj["path"]
 
         # Detect target
-        target_entries = detect_targets(path)
+        target_entries = detect_targets(os.path.join(root, path))
         target_name = target_entries[0].name if target_entries else "none"
 
         # Read version
         version = "?"
         if target_name != "none" and target_name in TARGETS:
-            target_path = target_entries[0].path if target_entries else path
+            target_path = target_entries[0].path if target_entries else os.path.join(root, path)
             try:
                 version = TARGETS[target_name].read_version(target_path)
             except Exception:
@@ -892,7 +892,7 @@ def _cmd_outdated(flags):
     for proj in projects:
         name = proj["name"]
         path = proj["path"]
-        target_entries = detect_targets(path)
+        target_entries = detect_targets(os.path.join(root, path))
         if target_entries and target_entries[0].name in TARGETS:
             project_version_info[name] = (target_entries[0].name, target_entries[0].path)
 

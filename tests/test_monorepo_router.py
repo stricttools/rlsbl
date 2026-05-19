@@ -42,15 +42,15 @@ class TestPublishRouterTopLevel:
     """Router triggers + structure remain stable."""
 
     def test_has_release_trigger(self):
-        content = _generate_publish_router([])
+        content = _generate_publish_router([], ".")
         assert "on:\n  release:\n    types: [published]" in content
 
     def test_has_router_name(self):
-        content = _generate_publish_router([])
+        content = _generate_publish_router([], ".")
         assert "name: Publish Router" in content
 
     def test_no_jobs_when_no_projects(self):
-        content = _generate_publish_router([])
+        content = _generate_publish_router([], ".")
         # 'jobs:' header is always emitted but no entries follow it
         assert "jobs:" in content
 
@@ -64,7 +64,7 @@ class TestPublishRouterPyPIOidc:
             str(tmp_project / "python"),
             {"pyproject.toml": '[project]\nname = "mypkg"\nversion = "0.1.0"\n'},
         )
-        content = _generate_publish_router([proj])
+        content = _generate_publish_router([proj], ".")
         assert "id-token: write" in content
         assert "contents: read" in content
 
@@ -74,7 +74,7 @@ class TestPublishRouterPyPIOidc:
             str(tmp_project / "python"),
             {"pyproject.toml": '[project]\nname = "mypkg"\nversion = "0.1.0"\n'},
         )
-        content = _generate_publish_router([proj])
+        content = _generate_publish_router([proj], ".")
         assert "secrets: inherit" not in content
 
 
@@ -87,7 +87,7 @@ class TestPublishRouterNpmSecrets:
             str(tmp_project / "node"),
             {"package.json": '{"name": "mylib", "version": "0.1.0"}'},
         )
-        content = _generate_publish_router([proj])
+        content = _generate_publish_router([proj], ".")
         assert "secrets: inherit" in content
 
     def test_npm_router_includes_id_token_for_provenance(self, tmp_project):
@@ -96,7 +96,7 @@ class TestPublishRouterNpmSecrets:
             str(tmp_project / "node"),
             {"package.json": '{"name": "mylib", "version": "0.1.0"}'},
         )
-        content = _generate_publish_router([proj])
+        content = _generate_publish_router([proj], ".")
         assert "id-token: write" in content
 
 
@@ -109,7 +109,7 @@ class TestPublishRouterGoContents:
             str(tmp_project / "go"),
             {"go.mod": "module example.com/mymod\n\ngo 1.21\n", "VERSION": "0.1.0\n"},
         )
-        content = _generate_publish_router([proj])
+        content = _generate_publish_router([proj], ".")
         assert "contents: write" in content
 
 
@@ -119,12 +119,12 @@ class TestUnknownTargetDefaults:
     def test_unknown_target_has_no_secrets_inherit(self):
         # No on-disk files -- detect_targets returns nothing
         proj = {"name": "ghost", "path": "/nonexistent/ghost"}
-        content = _generate_publish_router([proj])
+        content = _generate_publish_router([proj], ".")
         assert "secrets: inherit" not in content
 
     def test_unknown_target_has_read_permissions(self):
         proj = {"name": "ghost", "path": "/nonexistent/ghost"}
-        content = _generate_publish_router([proj])
+        content = _generate_publish_router([proj], ".")
         assert "contents: read" in content
 
 
@@ -137,7 +137,7 @@ class TestRouterJobStructure:
             str(tmp_project / "node"),
             {"package.json": '{"name": "mylib", "version": "0.1.0"}'},
         )
-        content = _generate_publish_router([proj])
+        content = _generate_publish_router([proj], ".")
         assert "uses: ./.github/workflows/mylib-publish.yml" in content
 
     def test_job_has_tag_prefix_condition(self, tmp_project):
@@ -146,7 +146,7 @@ class TestRouterJobStructure:
             str(tmp_project / "node"),
             {"package.json": '{"name": "mylib", "version": "0.1.0"}'},
         )
-        content = _generate_publish_router([proj])
+        content = _generate_publish_router([proj], ".")
         assert "if: startsWith(github.event.release.tag_name, 'mylib@v')" in content
 
     def test_permissions_block_appears_before_uses(self, tmp_project):
@@ -156,7 +156,7 @@ class TestRouterJobStructure:
             str(tmp_project / "node"),
             {"package.json": '{"name": "mylib", "version": "0.1.0"}'},
         )
-        content = _generate_publish_router([proj])
+        content = _generate_publish_router([proj], ".")
         perm_pos = content.index("permissions:")
         uses_pos = content.index("uses: ./.github/workflows/mylib-publish.yml")
         assert perm_pos < uses_pos
@@ -176,13 +176,13 @@ class TestGetPublishRequirements:
         for fname, contents in target_files.items():
             (proj_dir / fname).write_text(contents)
         proj = {"name": name, "path": str(proj_dir)}
-        inherit, perms = _get_publish_requirements(proj)
+        inherit, perms = _get_publish_requirements(proj, ".")
         assert inherit == expected_inherit
         assert isinstance(perms, dict)
         assert "contents" in perms
 
     def test_unknown_target_falls_back_to_read_only(self):
         proj = {"name": "ghost", "path": "/nonexistent/ghost"}
-        inherit, perms = _get_publish_requirements(proj)
+        inherit, perms = _get_publish_requirements(proj, ".")
         assert inherit is False
         assert perms == {"contents": "read"}

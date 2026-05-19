@@ -109,7 +109,7 @@ def cmd_validate(flags):
             )
             sys.exit(1)
         # Compute the tag glob via the target for correct format (path-based for Go)
-        target_entries = detect_targets(project["path"])
+        target_entries = detect_targets(os.path.join(monorepo_root, project["path"]))
         if target_entries:
             target = TARGETS[target_entries[0].name]
             tag_glob = target.monorepo_tag_glob(project["name"], path=project["path"])

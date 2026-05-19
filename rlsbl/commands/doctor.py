@@ -405,11 +405,11 @@ def _check_router_exists(root):
     return ("WARN", "ci-router.yml not found")
 
 
-def _check_project_targets(projects):
+def _check_project_targets(projects, root):
     """Check that each project has at least one detectable target."""
     missing = []
     for proj in projects:
-        targets = detect_targets(proj["path"])
+        targets = detect_targets(os.path.join(root, proj["path"]))
         if not targets:
             missing.append(proj["name"])
     if missing:
@@ -524,7 +524,7 @@ def run_cmd(registry, args, flags):
             mono_results["Synced workflows"] = _check_workflows_synced(
                 ws_root, projects
             )
-            mono_results["Project targets"] = _check_project_targets(projects)
+            mono_results["Project targets"] = _check_project_targets(projects, ws_root)
 
             mono_label_width = max(len(label) for label in mono_results)
             for label, (status, message) in mono_results.items():
