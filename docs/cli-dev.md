@@ -23,5 +23,5 @@ Install the project locally for development using the detected target's editable
 | `--include` |  | str |  |  | In monorepo mode, comma-separated project names to include |
 | `--exclude` |  | str |  |  | In monorepo mode, comma-separated project names to exclude |
 | `--uninstall` |  | bool |  |  | Reverse a previous dev install (where supported by the target) |
-| `--global` |  | bool | False |  | Install as a global tool/symlink. This is the default behavior when neither --global nor --venv is passed. Mutually exclusive with --venv. |
-| `--venv` |  | bool | False |  | Install into the project's local environment only (e.g. uv sync, npm install). Mutually exclusive with --global. |
+| `--global` |  | bool |  |  | Install as a global tool/symlink. This is the default behavior when neither --global nor --venv is passed. Mutually exclusive with --venv. |
+| `--venv` |  | bool |  |  | Install into the project's local environment only (e.g. uv sync, npm install). Mutually exclusive with --global. |
