@@ -3,12 +3,14 @@
 import copy
 import os
 import textwrap
+from unittest.mock import patch
 
 import pytest
 import yaml
 
 from rlsbl.commands.monorepo.publish_inline import (
     emit_workflow,
+    generate_inline_publish_router,
     inject_job_metadata,
     parse_publish_workflow,
     prefix_jobs,
@@ -520,3 +522,200 @@ class TestTransformProjectJobs:
             if "actions/setup-node" in s.get("uses", "")
         )
         assert setup_node_step["with"]["node-version-file"] == "packages/strictcli/.nvmrc"
+
+
+# ---------------------------------------------------------------------------
+# generate_inline_publish_router tests
+# ---------------------------------------------------------------------------
+
+PYPI_PUBLISH_WF = textwrap.dedent("""\
+    name: Publish
+
+    on:
+      release:
+        types: [published]
+
+    permissions:
+      contents: read
+      id-token: write
+
+    jobs:
+      pypi:
+        runs-on: ubuntu-latest
+        environment:
+          name: pypi
+          url: https://pypi.org/p/mypkg
+        steps:
+          - uses: actions/checkout@v6
+          - uses: actions/setup-python@v5
+            with:
+              python-version-file: .python-version
+          - run: uv build
+          - uses: pypa/gh-action-pypi-publish@release/v1
+""")
+
+NPM_PUBLISH_WF = textwrap.dedent("""\
+    name: Publish
+
+    on:
+      release:
+        types: [published]
+
+    jobs:
+      npm:
+        runs-on: ubuntu-latest
+        permissions:
+          contents: read
+          id-token: write
+        steps:
+          - uses: actions/checkout@v6
+          - uses: actions/setup-node@v4
+            with:
+              node-version-file: .nvmrc
+              registry-url: https://registry.npmjs.org
+          - run: npm publish
+            env:
+              NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+""")
+
+
+def _setup_publish_project(root, project_path, workflow_content):
+    """Create the publish workflow file for a project in *root*."""
+    wf_dir = os.path.join(root, project_path, ".github", "workflows")
+    os.makedirs(wf_dir, exist_ok=True)
+    wf_file = os.path.join(wf_dir, "publish.yml")
+    with open(wf_file, "w") as f:
+        f.write(workflow_content)
+
+
+class TestGenerateInlinePublishRouter:
+    def test_single_pypi_project(self, tmp_path):
+        root = str(tmp_path)
+        _setup_publish_project(root, "packages/mypkg", PYPI_PUBLISH_WF)
+
+        projects = [{"name": "mypkg", "path": "packages/mypkg"}]
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            return_value="mypkg@v",
+        ):
+            result = generate_inline_publish_router(projects, root)
+
+        parsed = yaml.safe_load(result)
+        assert len(parsed["jobs"]) == 1
+        assert "mypkg-pypi" in parsed["jobs"]
+
+    def test_multi_project_workspace(self, tmp_path):
+        root = str(tmp_path)
+        _setup_publish_project(root, "packages/mypkg", PYPI_PUBLISH_WF)
+        _setup_publish_project(root, "packages/mylib", NPM_PUBLISH_WF)
+
+        projects = [
+            {"name": "mypkg", "path": "packages/mypkg"},
+            {"name": "mylib", "path": "packages/mylib"},
+        ]
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            side_effect=lambda proj, _root: f"{proj['name']}@v",
+        ):
+            result = generate_inline_publish_router(projects, root)
+
+        parsed = yaml.safe_load(result)
+        assert len(parsed["jobs"]) == 2
+        assert "mypkg-pypi" in parsed["jobs"]
+        assert "mylib-npm" in parsed["jobs"]
+
+    def test_output_starts_with_header(self, tmp_path):
+        root = str(tmp_path)
+        _setup_publish_project(root, "packages/mypkg", PYPI_PUBLISH_WF)
+
+        projects = [{"name": "mypkg", "path": "packages/mypkg"}]
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            return_value="mypkg@v",
+        ):
+            result = generate_inline_publish_router(projects, root)
+
+        assert result.startswith("# DO NOT EDIT")
+
+    def test_output_is_valid_yaml(self, tmp_path):
+        root = str(tmp_path)
+        _setup_publish_project(root, "packages/mypkg", PYPI_PUBLISH_WF)
+
+        projects = [{"name": "mypkg", "path": "packages/mypkg"}]
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            return_value="mypkg@v",
+        ):
+            result = generate_inline_publish_router(projects, root)
+
+        parsed = yaml.safe_load(result)
+        assert isinstance(parsed, dict)
+        assert "name" in parsed
+        assert "on" in parsed
+        assert "jobs" in parsed
+
+    def test_jobs_have_correct_if_condition(self, tmp_path):
+        root = str(tmp_path)
+        _setup_publish_project(root, "packages/mypkg", PYPI_PUBLISH_WF)
+        _setup_publish_project(root, "packages/mylib", NPM_PUBLISH_WF)
+
+        projects = [
+            {"name": "mypkg", "path": "packages/mypkg"},
+            {"name": "mylib", "path": "packages/mylib"},
+        ]
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            side_effect=lambda proj, _root: f"{proj['name']}@v",
+        ):
+            result = generate_inline_publish_router(projects, root)
+
+        parsed = yaml.safe_load(result)
+        pypi_job = parsed["jobs"]["mypkg-pypi"]
+        npm_job = parsed["jobs"]["mylib-npm"]
+
+        assert pypi_job["if"] == "startsWith(github.event.release.tag_name, 'mypkg@v')"
+        assert npm_job["if"] == "startsWith(github.event.release.tag_name, 'mylib@v')"
+
+    def test_no_top_level_permissions(self, tmp_path):
+        root = str(tmp_path)
+        _setup_publish_project(root, "packages/mypkg", PYPI_PUBLISH_WF)
+
+        projects = [{"name": "mypkg", "path": "packages/mypkg"}]
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            return_value="mypkg@v",
+        ):
+            result = generate_inline_publish_router(projects, root)
+
+        parsed = yaml.safe_load(result)
+        assert "permissions" not in parsed
+
+    def test_workflow_structure(self, tmp_path):
+        root = str(tmp_path)
+        _setup_publish_project(root, "packages/mypkg", PYPI_PUBLISH_WF)
+
+        projects = [{"name": "mypkg", "path": "packages/mypkg"}]
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            return_value="mypkg@v",
+        ):
+            result = generate_inline_publish_router(projects, root)
+
+        parsed = yaml.safe_load(result)
+        assert parsed["name"] == "Publish Router"
+        assert parsed["on"] == {"release": {"types": ["published"]}}
+
+    def test_trailing_slash_stripped_from_path(self, tmp_path):
+        root = str(tmp_path)
+        _setup_publish_project(root, "packages/mypkg", PYPI_PUBLISH_WF)
+
+        projects = [{"name": "mypkg", "path": "packages/mypkg/"}]
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            return_value="mypkg@v",
+        ):
+            result = generate_inline_publish_router(projects, root)
+
+        parsed = yaml.safe_load(result)
+        job = parsed["jobs"]["mypkg-pypi"]
+        assert job["defaults"]["run"]["working-directory"] == "packages/mypkg"
