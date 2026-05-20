@@ -325,14 +325,30 @@ def _cmd_sync(flags):
     # Generate inline publish router (only if any project has publish.yml)
     publish_router_path = os.path.join(workflows_dir, "publish.yml")
     if projects_with_publish:
-        from .publish_inline import generate_inline_publish_router
+        from .publish_inline import (
+            compute_publish_hashes,
+            generate_inline_publish_router,
+            load_publish_cache,
+            save_publish_cache,
+            should_regenerate_router,
+        )
 
-        if os.path.isfile(publish_router_path):
-            os.chmod(publish_router_path, 0o644)
-        with open(publish_router_path, "w", encoding="utf-8") as f:
-            f.write(generate_inline_publish_router(projects_with_publish, root))
-        os.chmod(publish_router_path, 0o444)
-        written_files.append(publish_router_path)
+        monorepo_dir = os.path.join(root, ".rlsbl-monorepo")
+        current_hashes = compute_publish_hashes(projects, root)
+        cached_hashes = load_publish_cache(monorepo_dir)
+
+        if should_regenerate_router(cached_hashes, current_hashes, publish_router_path):
+            if os.path.isfile(publish_router_path):
+                os.chmod(publish_router_path, 0o644)
+            with open(publish_router_path, "w", encoding="utf-8") as f:
+                f.write(generate_inline_publish_router(projects_with_publish, root))
+            os.chmod(publish_router_path, 0o444)
+            written_files.append(publish_router_path)
+
+            cache_path = save_publish_cache(monorepo_dir, current_hashes)
+            written_files.append(cache_path)
+        else:
+            print("Publish router up to date, skipping regeneration")
 
     # Remove stale workflows
     stale_removed = 0

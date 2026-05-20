@@ -9,13 +9,17 @@ import pytest
 import yaml
 
 from rlsbl.commands.monorepo.publish_inline import (
+    compute_publish_hashes,
     emit_workflow,
     generate_inline_publish_router,
     inject_job_metadata,
+    load_publish_cache,
     parse_publish_workflow,
     prefix_jobs,
     resolve_permissions,
     rewrite_action_paths,
+    save_publish_cache,
+    should_regenerate_router,
     transform_project_jobs,
 )
 
@@ -719,3 +723,99 @@ class TestGenerateInlinePublishRouter:
         parsed = yaml.safe_load(result)
         job = parsed["jobs"]["mypkg-pypi"]
         assert job["defaults"]["run"]["working-directory"] == "packages/mypkg"
+
+
+# ---------------------------------------------------------------------------
+# Publish hash cache tests
+# ---------------------------------------------------------------------------
+
+
+class TestComputePublishHashes:
+    def test_hashes_for_mixed_projects(self, tmp_path):
+        root = str(tmp_path)
+        # Project with publish.yml
+        _setup_publish_project(root, "packages/mypkg", PYPI_PUBLISH_WF)
+        # Project without publish.yml (no workflow file created)
+        os.makedirs(os.path.join(root, "packages/noworkflow"), exist_ok=True)
+
+        projects = [
+            {"name": "mypkg", "path": "packages/mypkg"},
+            {"name": "noworkflow", "path": "packages/noworkflow"},
+        ]
+        result = compute_publish_hashes(projects, root)
+
+        assert "mypkg" in result
+        assert "noworkflow" in result
+        # mypkg should have a hex digest string
+        assert isinstance(result["mypkg"], str)
+        assert len(result["mypkg"]) == 64  # SHA256 hex is 64 chars
+        # noworkflow should be None
+        assert result["noworkflow"] is None
+
+
+class TestLoadSaveCache:
+    def test_round_trip(self, tmp_path):
+        monorepo_dir = str(tmp_path)
+        hashes = {"mypkg": "a1b2c3d4" * 8, "other": None}
+
+        save_publish_cache(monorepo_dir, hashes)
+        loaded = load_publish_cache(monorepo_dir)
+
+        assert loaded == hashes
+
+    def test_load_missing_returns_none(self, tmp_path):
+        assert load_publish_cache(str(tmp_path)) is None
+
+    def test_load_invalid_json_returns_none(self, tmp_path):
+        cache_file = os.path.join(str(tmp_path), "publish-cache.json")
+        with open(cache_file, "w") as f:
+            f.write("not valid json{{{")
+        assert load_publish_cache(str(tmp_path)) is None
+
+    def test_save_returns_path(self, tmp_path):
+        monorepo_dir = str(tmp_path)
+        path = save_publish_cache(monorepo_dir, {"x": "abc"})
+        assert path == os.path.join(monorepo_dir, "publish-cache.json")
+        assert os.path.isfile(path)
+
+
+class TestShouldRegenerateRouter:
+    def test_no_cache(self, tmp_path):
+        router = os.path.join(str(tmp_path), "publish.yml")
+        assert should_regenerate_router(None, {"a": "hash"}, router) is True
+
+    def test_changed_hash(self, tmp_path):
+        router = os.path.join(str(tmp_path), "publish.yml")
+        with open(router, "w") as f:
+            f.write("content")
+        cached = {"mypkg": "old_hash"}
+        current = {"mypkg": "new_hash"}
+        assert should_regenerate_router(cached, current, router) is True
+
+    def test_same_hashes_and_router_exists(self, tmp_path):
+        router = os.path.join(str(tmp_path), "publish.yml")
+        with open(router, "w") as f:
+            f.write("content")
+        hashes = {"mypkg": "same_hash", "other": None}
+        assert should_regenerate_router(hashes, hashes, router) is False
+
+    def test_missing_router(self, tmp_path):
+        router = os.path.join(str(tmp_path), "publish.yml")
+        hashes = {"mypkg": "same_hash"}
+        assert should_regenerate_router(hashes, hashes, router) is True
+
+    def test_project_added(self, tmp_path):
+        router = os.path.join(str(tmp_path), "publish.yml")
+        with open(router, "w") as f:
+            f.write("content")
+        cached = {"mypkg": "hash1"}
+        current = {"mypkg": "hash1", "newproject": "hash2"}
+        assert should_regenerate_router(cached, current, router) is True
+
+    def test_project_removed(self, tmp_path):
+        router = os.path.join(str(tmp_path), "publish.yml")
+        with open(router, "w") as f:
+            f.write("content")
+        cached = {"mypkg": "hash1", "removed": "hash2"}
+        current = {"mypkg": "hash1"}
+        assert should_regenerate_router(cached, current, router) is True
