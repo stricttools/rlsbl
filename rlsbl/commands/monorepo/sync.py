@@ -327,6 +327,10 @@ def _cmd_sync(flags):
     projects_with_ci = []
     projects_with_publish = []
 
+    # Pre-compute router paths so we can detect self-references
+    ci_router_output = os.path.realpath(os.path.join(workflows_dir, "ci-router.yml"))
+    publish_router_output = os.path.realpath(os.path.join(workflows_dir, "publish.yml"))
+
     for proj in projects:
         name = proj["name"]
         path = proj["path"]
@@ -340,6 +344,16 @@ def _cmd_sync(flags):
             if not os.path.isfile(src):
                 if wf_type == "ci":
                     print(f"Warning: {path} has no CI workflow ({src})", file=sys.stderr)
+                continue
+
+            # Skip if the source is a generated router (path="." self-reference)
+            src_real = os.path.realpath(src)
+            if src_real == ci_router_output or src_real == publish_router_output:
+                print(
+                    f"Warning: {name} {wf_type} workflow is the generated router itself "
+                    f"(path='{path}'), skipping",
+                    file=sys.stderr,
+                )
                 continue
 
             with open(src, "r", encoding="utf-8") as f:

@@ -654,3 +654,85 @@ class TestPackagesDirInjection:
         dest = mock_git_repo / ".github" / "workflows" / "mypylib-publish.yml"
         content = dest.read_text()
         assert "packages-dir: mypylib/dist/" in content
+
+
+class TestDotPathSelfReference:
+    """Bug fix: path='.' must not wrap the generated router as a source workflow."""
+
+    def test_publish_router_not_used_as_source(self, mock_git_repo, capsys):
+        """When path='.', the publish router at .github/workflows/publish.yml
+        must not be picked up as the project's publish workflow source."""
+        # Create a root-level project with CI workflow
+        wf_dir = os.path.join(str(mock_git_repo), ".github", "workflows")
+        os.makedirs(wf_dir, exist_ok=True)
+        with open(os.path.join(wf_dir, "ci.yml"), "w") as f:
+            f.write(CI_WORKFLOW)
+
+        # Create a real publish workflow that is NOT the router
+        with open(os.path.join(wf_dir, "publish.yml"), "w") as f:
+            f.write(PUBLISH_WORKFLOW)
+
+        # Also need a package.json at root for target detection
+        with open(os.path.join(str(mock_git_repo), "package.json"), "w") as f:
+            json.dump({"name": "rootpkg", "version": "0.1.0"}, f)
+
+        _cmd_init({})
+        from rlsbl.workspace import save_workspace
+        save_workspace(".", [{"path": ".", "name": "rootpkg"}])
+        subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
+        subprocess.run(
+            ["git", "commit", "-q", "-m", "setup"],
+            cwd=str(mock_git_repo), check=True,
+        )
+
+        # First sync: the real publish.yml is used as source, AND generates
+        # the publish router at the same path. After sync, publish.yml is the
+        # router (overwritten).
+        _cmd_sync({})
+        capsys.readouterr()  # discard first sync output
+
+        # Second sync: now publish.yml IS the router. It must be skipped.
+        _cmd_sync({})
+        captured = capsys.readouterr()
+
+        # The warning should fire for the publish workflow
+        assert "router itself" in captured.err
+        assert "rootpkg" in captured.err
+
+        # The rootpkg-publish.yml should NOT exist (or if it existed from
+        # the first sync, verify it does NOT contain the router header
+        # from the second sync wrapping the router)
+        dest = mock_git_repo / ".github" / "workflows" / "rootpkg-publish.yml"
+        if dest.exists():
+            content = dest.read_text()
+            # The content should be from the first sync (real publish.yml),
+            # not from the second sync wrapping the router
+            assert "Publish Router" not in content
+
+    def test_ci_router_not_used_as_source(self, mock_git_repo, capsys):
+        """When path='.', the CI router at .github/workflows/ci-router.yml
+        is never the source (it's ci-router.yml, not ci.yml), but test
+        the path='.' scenario still works for CI."""
+        wf_dir = os.path.join(str(mock_git_repo), ".github", "workflows")
+        os.makedirs(wf_dir, exist_ok=True)
+        with open(os.path.join(wf_dir, "ci.yml"), "w") as f:
+            f.write(CI_WORKFLOW)
+
+        with open(os.path.join(str(mock_git_repo), "package.json"), "w") as f:
+            json.dump({"name": "rootpkg", "version": "0.1.0"}, f)
+
+        _cmd_init({})
+        from rlsbl.workspace import save_workspace
+        save_workspace(".", [{"path": ".", "name": "rootpkg"}])
+        subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
+        subprocess.run(
+            ["git", "commit", "-q", "-m", "setup"],
+            cwd=str(mock_git_repo), check=True,
+        )
+
+        _cmd_sync({})
+        # CI workflow should be synced normally (ci.yml != ci-router.yml)
+        dest = mock_git_repo / ".github" / "workflows" / "rootpkg-ci.yml"
+        assert dest.exists()
+        content = dest.read_text()
+        assert "workflow_call" in content
