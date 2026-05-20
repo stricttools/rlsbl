@@ -1,6 +1,6 @@
 ---
 title: rlsbl.utils
-description: "Git helpers, version bump logic, changelog section extraction, and other shared utilities used across all rlsbl commands and targets."
+description: "Shared utilities: subprocess runner, git helpers, version bumping, changelog extraction, commit tooling, and GitHub API queries."
 generated: true
 nav_group: "API Reference"
 nav_order: 69

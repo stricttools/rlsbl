@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.monorepo
-description: "Monorepo workspace management commands for adding, removing, listing, and synchronizing projects in a multi-package repository."
+description: "Monorepo workspace management commands: init, add, remove, list, sync, status, outdated, release-order, check-names, and lint."
 generated: true
 nav_group: "API Reference"
 nav_order: 21

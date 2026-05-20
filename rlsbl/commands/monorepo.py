@@ -1,4 +1,4 @@
-"""Monorepo workspace management commands for adding, removing, listing, and synchronizing projects in a multi-package repository."""
+"""Monorepo workspace management commands: init, add, remove, list, sync, status, outdated, release-order, check-names, and lint."""
 
 import os
 import re

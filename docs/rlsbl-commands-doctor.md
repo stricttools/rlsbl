@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.doctor
-description: "Doctor command that diagnoses common release state problems and offers interactive repairs for tags, versions, and config drift."
+description: "Doctor command that diagnoses release state problems (versions, names, tags, branches, changelog, lint) and auto-repairs fixable issues."
 generated: true
 nav_group: "API Reference"
 nav_order: 17
