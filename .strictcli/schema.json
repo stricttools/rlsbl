@@ -1,0 +1,1172 @@
+{
+  "name": "rlsbl",
+  "version": "0.37.0",
+  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 14 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, and more). Ships 32 commands organized into 18 top-level commands and 3 command groups (changelog, monorepo, dev).",
+  "env_prefix": null,
+  "config": false,
+  "global_flags": [],
+  "commands": {
+    "release": {
+      "name": "release",
+      "help": "Bump the project version, validate the changelog, commit, tag, push, and create a GitHub Release. Supports patch, minor, and major bumps with dry-run preview and non-interactive mode for CI.",
+      "flags": [
+        {
+          "name": "target",
+          "type": "str",
+          "help": "Target a specific registry (auto-detected if omitted)",
+          "short": null,
+          "default": "",
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": null,
+          "hidden": false
+        },
+        {
+          "name": "dry-run",
+          "type": "bool",
+          "help": "Preview release without making changes",
+          "short": null,
+          "default": false,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": true,
+          "hidden": false
+        },
+        {
+          "name": "yes",
+          "type": "bool",
+          "help": "Non-interactive mode (skip confirmations)",
+          "short": null,
+          "default": false,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": true,
+          "hidden": false
+        },
+        {
+          "name": "quiet",
+          "type": "bool",
+          "help": "Suppress non-essential output",
+          "short": null,
+          "default": false,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": true,
+          "hidden": false
+        },
+        {
+          "name": "skip-remote-check",
+          "type": "bool",
+          "help": "Skip the remote-ahead check",
+          "short": null,
+          "default": false,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": true,
+          "hidden": false
+        },
+        {
+          "name": "skip-tests",
+          "type": "bool",
+          "help": "Skip built-in test execution",
+          "short": null,
+          "default": false,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": true,
+          "hidden": false
+        },
+        {
+          "name": "skip-lint",
+          "type": "bool",
+          "help": "Skip built-in library lint",
+          "short": null,
+          "default": false,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": true,
+          "hidden": false
+        },
+        {
+          "name": "skip-docs",
+          "type": "bool",
+          "help": "Skip selfdoc documentation check",
+          "short": null,
+          "default": false,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": true,
+          "hidden": false
+        },
+        {
+          "name": "allow-dirty",
+          "type": "bool",
+          "help": "Allow releasing with a dirty working tree",
+          "short": null,
+          "default": false,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": true,
+          "hidden": false
+        },
+        {
+          "name": "no-tag",
+          "type": "bool",
+          "help": "Disable ecosystem tagging for this invocation",
+          "short": null,
+          "default": false,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": true,
+          "hidden": false
+        }
+      ],
+      "args": [
+        {
+          "name": "bump",
+          "help": "Bump type: patch, minor, or major",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "passthrough": false
+    },
+    "status": {
+      "name": "status",
+      "help": "Display the current project version, branch, last release tag, unreleased commit count, and changelog coverage. Outputs plain text by default or structured JSON with the --json flag.",
+      "flags": [
+        {
+          "name": "target",
+          "type": "str",
+          "help": "Target a specific registry (auto-detected if omitted)",
+          "short": null,
+          "default": "",
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": null,
+          "hidden": false
+        },
+        {
+          "name": "json",
+          "type": "bool",
+          "help": "Output status as JSON",
+          "short": null,
+          "default": false,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": true,
+          "hidden": false
+        }
+      ],
+      "args": [],
+      "passthrough": false
+    },
+    "scaffold": {
+      "name": "scaffold",
+      "help": "Generate or update CI/CD workflows, git hooks, changelog, and license files for the detected release target. Use --update for three-way merge preserving customizations, or --force to overwrite all files.",
+      "flags": [
+        {
+          "name": "target",
+          "type": "str",
+          "help": "Target a specific registry (auto-detected if omitted)",
+          "short": null,
+          "default": "",
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": null,
+          "hidden": false
+        },
+        {
+          "name": "force",
+          "type": "bool",
+          "help": "Overwrite all files (ignore user customizations)",
+          "short": null,
+          "default": false,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": true,
+          "hidden": false
+        },
+        {
+          "name": "update",
+          "type": "bool",
+          "help": "Update scaffolding via three-way merge",
+          "short": null,
+          "default": false,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": true,
+          "hidden": false
+        },
+        {
+          "name": "private",
+          "type": "bool",
+          "help": "Scaffold for private repos (skip publish)",
+          "short": null,
+          "default": false,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": true,
+          "hidden": false
+        },
+        {
+          "name": "no-commit",
+          "type": "bool",
+          "help": "Skip auto-commit of scaffolded files",
+          "short": null,
+          "default": false,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": true,
+          "hidden": false
+        },
+        {
+          "name": "skip-shared",
+          "type": "bool",
+          "help": "Skip shared template processing",
+          "short": null,
+          "default": false,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": true,
+          "hidden": false
+        },
+        {
+          "name": "no-tag",
+          "type": "bool",
+          "help": "Disable ecosystem tagging for this invocation",
+          "short": null,
+          "default": false,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": true,
+          "hidden": false
+        },
+        {
+          "name": "dry-run",
+          "type": "bool",
+          "help": "Show planned changes without writing files or committing",
+          "short": null,
+          "default": false,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": true,
+          "hidden": false
+        }
+      ],
+      "args": [],
+      "passthrough": false
+    },
+    "check": {
+      "name": "check",
+      "help": "Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.",
+      "flags": [
+        {
+          "name": "target",
+          "type": "str",
+          "help": "Target registry (npm, pypi, or go)",
+          "short": null,
+          "default": null,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": null,
+          "hidden": false
+        },
+        {
+          "name": "delay",
+          "type": "str",
+          "help": "Delay between checks in ms",
+          "short": null,
+          "default": "200",
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": null,
+          "hidden": false
+        }
+      ],
+      "args": [],
+      "passthrough": false
+    },
+    "edit-release": {
+      "name": "edit-release",
+      "help": "Sync the GitHub Release notes for a given version with the corresponding CHANGELOG.md entry. Defaults to the current version if none is specified. Use --dry-run to preview changes without updating GitHub.",
+      "flags": [
+        {
+          "name": "dry-run",
+          "type": "bool",
+          "help": "Preview without making changes",
+          "short": null,
+          "default": false,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": true,
+          "hidden": false
+        }
+      ],
+      "args": [
+        {
+          "name": "version",
+          "help": "Version to update (defaults to current)",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "passthrough": false
+    },
+    "undo": {
+      "name": "undo",
+      "help": "Revert the most recent release by deleting the GitHub Release, removing the git tag from local and remote, and reverting the version bump commit. Requires a manual git push afterward to finalize.",
+      "flags": [
+        {
+          "name": "target",
+          "type": "str",
+          "help": "Target a specific registry",
+          "short": null,
+          "default": "",
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": null,
+          "hidden": false
+        },
+        {
+          "name": "yes",
+          "type": "bool",
+          "help": "Non-interactive mode (skip confirmations)",
+          "short": null,
+          "default": false,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": true,
+          "hidden": false
+        }
+      ],
+      "args": [],
+      "passthrough": false
+    },
+    "yank": {
+      "name": "yank",
+      "help": "Mark a past release as deprecated (soft yank) or delete it (hard yank). Soft yank marks the GitHub Release as pre-release and prepends a deprecation notice. Hard yank deletes the release entirely while preserving the git tag.",
+      "flags": [
+        {
+          "name": "reason",
+          "type": "str",
+          "help": "Why the version is being yanked",
+          "short": null,
+          "default": "",
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": null,
+          "hidden": false
+        },
+        {
+          "name": "use",
+          "type": "str",
+          "help": "Replacement version to recommend",
+          "short": null,
+          "default": "",
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": null,
+          "hidden": false
+        },
+        {
+          "name": "hard",
+          "type": "bool",
+          "help": "Delete the release instead of marking as pre-release",
+          "short": null,
+          "default": false,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": true,
+          "hidden": false
+        },
+        {
+          "name": "dry-run",
+          "type": "bool",
+          "help": "Preview without making changes",
+          "short": null,
+          "default": false,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": true,
+          "hidden": false
+        }
+      ],
+      "args": [
+        {
+          "name": "version",
+          "help": "Version to yank (e.g. 0.9.1 or v0.9.1)",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "passthrough": false
+    },
+    "discover": {
+      "name": "discover",
+      "help": "Search GitHub for repositories tagged with the rlsbl topic and list them. Use --mine to filter results to only your own repositories. Requires the gh CLI to be authenticated.",
+      "flags": [
+        {
+          "name": "mine",
+          "type": "bool",
+          "help": "Show only your own repositories",
+          "short": null,
+          "default": false,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": true,
+          "hidden": false
+        }
+      ],
+      "args": [],
+      "passthrough": false
+    },
+    "watch": {
+      "name": "watch",
+      "help": "Poll GitHub Actions CI workflow runs for a specific commit SHA and report pass or fail status. Defaults to HEAD if no SHA is provided. Useful after rlsbl release to monitor the publish pipeline.",
+      "flags": [
+        {
+          "name": "target",
+          "type": "str",
+          "help": "Target a specific registry",
+          "short": null,
+          "default": "",
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": null,
+          "hidden": false
+        }
+      ],
+      "args": [
+        {
+          "name": "sha",
+          "help": "Commit SHA to watch (defaults to HEAD)",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "passthrough": false
+    },
+    "pre-push-check": {
+      "name": "pre-push-check",
+      "help": "Verify that CHANGELOG.md contains an entry matching the current project version. Designed to run as a git pre-push hook to prevent pushing releases without documented changes.",
+      "flags": [],
+      "args": [],
+      "passthrough": false
+    },
+    "prs": {
+      "name": "prs",
+      "help": "List all open pull requests for the current repository using the GitHub CLI. Shows PR number, title, author, and branch for a quick overview of pending work.",
+      "flags": [],
+      "args": [],
+      "passthrough": false
+    },
+    "unreleased": {
+      "name": "unreleased",
+      "help": "List commits between the latest release tag and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain text or JSON to help prepare the next release.",
+      "flags": [
+        {
+          "name": "json",
+          "type": "bool",
+          "help": "Output as JSON",
+          "short": null,
+          "default": false,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": true,
+          "hidden": false
+        }
+      ],
+      "args": [],
+      "passthrough": false
+    },
+    "targets": {
+      "name": "targets",
+      "help": "List all release targets detected in the current project directory, showing which ecosystems (npm, PyPI, Go, Cargo, etc.) are active based on manifest files found.",
+      "flags": [],
+      "args": [],
+      "passthrough": false
+    },
+    "record-gif": {
+      "name": "record-gif",
+      "help": "Record an animated GIF demo of rlsbl commands using the vhs terminal recorder. Configurable width, height, font size, and duration for consistent, reproducible demo recordings.",
+      "flags": [
+        {
+          "name": "width",
+          "type": "str",
+          "help": "GIF width in pixels",
+          "short": null,
+          "default": "1200",
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": null,
+          "hidden": false
+        },
+        {
+          "name": "height",
+          "type": "str",
+          "help": "GIF height in pixels",
+          "short": null,
+          "default": "600",
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": null,
+          "hidden": false
+        },
+        {
+          "name": "font-size",
+          "type": "str",
+          "help": "Font size in pixels",
+          "short": null,
+          "default": "24",
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": null,
+          "hidden": false
+        },
+        {
+          "name": "duration",
+          "type": "str",
+          "help": "Duration in seconds",
+          "short": null,
+          "default": "10",
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": null,
+          "hidden": false
+        }
+      ],
+      "args": [],
+      "passthrough": false
+    },
+    "migrate": {
+      "name": "migrate",
+      "help": "Run pending configuration migrations to update .rlsbl config files to the latest schema. Use --dry-run to preview changes without applying, or --status to see which migrations are pending.",
+      "flags": [
+        {
+          "name": "dry-run",
+          "type": "bool",
+          "help": "Preview migrations without applying",
+          "short": null,
+          "default": false,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": true,
+          "hidden": false
+        },
+        {
+          "name": "status",
+          "type": "bool",
+          "help": "Show migration status",
+          "short": null,
+          "default": false,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": true,
+          "hidden": false
+        }
+      ],
+      "args": [],
+      "passthrough": false
+    },
+    "doctor": {
+      "name": "doctor",
+      "help": "Run diagnostic checks on the project release state, including version consistency, tag alignment, changelog coverage, and config validity. Use --fix to auto-repair issues where possible.",
+      "flags": [
+        {
+          "name": "fix",
+          "type": "bool",
+          "help": "Auto-fix issues where possible",
+          "short": null,
+          "default": false,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": true,
+          "hidden": false
+        },
+        {
+          "name": "check",
+          "type": "str",
+          "help": "Run a specific check by name",
+          "short": null,
+          "default": "",
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": null,
+          "hidden": false
+        }
+      ],
+      "args": [],
+      "passthrough": false
+    },
+    "deploy": {
+      "name": "deploy",
+      "help": "Run the configured deployment pipeline for the project. Supports named deploy targets, dry-run preview of what would be deployed, and a --force flag to override branch restrictions.",
+      "flags": [
+        {
+          "name": "target",
+          "type": "str",
+          "help": "Target a specific registry",
+          "short": null,
+          "default": "",
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": null,
+          "hidden": false
+        },
+        {
+          "name": "dry-run",
+          "type": "bool",
+          "help": "Show what would be deployed",
+          "short": null,
+          "default": false,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": true,
+          "hidden": false
+        },
+        {
+          "name": "force",
+          "type": "bool",
+          "help": "Override branch restrictions",
+          "short": null,
+          "default": false,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": true,
+          "hidden": false
+        }
+      ],
+      "args": [
+        {
+          "name": "target_name",
+          "help": "Deploy target name",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "passthrough": false
+    },
+    "commit": {
+      "name": "commit",
+      "help": "Commit one or more files with an Autogenerated trailer, marking the commit as machine-generated so it is automatically exempted from changelog coverage checks.",
+      "flags": [
+        {
+          "name": "message",
+          "type": "str",
+          "help": "Commit message",
+          "short": "m",
+          "default": null,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": null,
+          "hidden": false
+        }
+      ],
+      "args": [],
+      "passthrough": false
+    }
+  },
+  "groups": {
+    "changelog": {
+      "name": "changelog",
+      "help": "Structured changelog management using JSONL entries. Add, validate, and generate CHANGELOG.md from per-commit changelog entries stored in unreleased.jsonl for precise, auditable release notes.",
+      "commands": {
+        "add": {
+          "name": "add",
+          "help": "Append a structured changelog entry to the project's unreleased.jsonl file. Each entry includes a human-readable description, an entry type (feature, fix, or breaking), and optional commit hashes linking it to specific changes. The file is auto-committed unless --no-commit is passed. Use --no-user-facing to mark internal changes that should not appear in the published changelog.",
+          "flags": [
+            {
+              "name": "commits",
+              "type": "str",
+              "help": "Comma-separated commit hashes",
+              "short": null,
+              "default": "",
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": null,
+              "hidden": false
+            },
+            {
+              "name": "description",
+              "type": "str",
+              "help": "Entry description",
+              "short": null,
+              "default": "",
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": null,
+              "hidden": false
+            },
+            {
+              "name": "type",
+              "type": "str",
+              "help": "Entry type (feature, fix, breaking)",
+              "short": null,
+              "default": "",
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": null,
+              "hidden": false
+            },
+            {
+              "name": "no-user-facing",
+              "type": "bool",
+              "help": "Mark as non-user-facing",
+              "short": null,
+              "default": false,
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": true,
+              "hidden": false
+            },
+            {
+              "name": "no-commit",
+              "type": "bool",
+              "help": "Skip auto-commit of unreleased.jsonl",
+              "short": null,
+              "default": false,
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": true,
+              "hidden": false
+            }
+          ],
+          "args": [],
+          "passthrough": false
+        },
+        "validate": {
+          "name": "validate",
+          "help": "Parse and validate all entries in the project's unreleased.jsonl file. Checks each entry for schema conformance, verifies that required fields like description and type are present and well-formed, ensures entry types are one of the allowed values (feature, fix, breaking), and validates referential integrity of any attached commit hashes against the git history.",
+          "flags": [],
+          "args": [],
+          "passthrough": false
+        },
+        "generate": {
+          "name": "generate",
+          "help": "Compile all validated JSONL changelog entries into a formatted CHANGELOG.md file. Groups entries by type (features, fixes, breaking changes) under the appropriate version heading, preserving existing changelog content for previous releases. Use --dry-run to preview the generated Markdown output without writing to disk, which is useful for reviewing before committing.",
+          "flags": [
+            {
+              "name": "dry-run",
+              "type": "bool",
+              "help": "Preview without writing files",
+              "short": null,
+              "default": false,
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": true,
+              "hidden": false
+            },
+            {
+              "name": "no-commit",
+              "type": "bool",
+              "help": "Skip auto-commit of generated files",
+              "short": null,
+              "default": false,
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": true,
+              "hidden": false
+            }
+          ],
+          "args": [],
+          "passthrough": false
+        }
+      },
+      "groups": {},
+      "deprecated": {}
+    },
+    "monorepo": {
+      "name": "monorepo",
+      "help": "Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Provides 10 monorepo subcommands and supports all 14 release targets in a single workspace.toml.",
+      "commands": {
+        "init": {
+          "name": "init",
+          "help": "Create a new monorepo workspace by generating the .rlsbl-monorepo directory and an empty workspace.toml configuration file at the current directory. This must be run at the repository root before adding individual projects with the add subcommand. Each workspace tracks multiple independently-versioned projects that share a single git repository.",
+          "flags": [
+            {
+              "name": "no-commit",
+              "type": "bool",
+              "help": "Skip auto-commit of workspace.toml",
+              "short": null,
+              "default": false,
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": true,
+              "hidden": false
+            }
+          ],
+          "args": [],
+          "passthrough": false
+        },
+        "add": {
+          "name": "add",
+          "help": "Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Optionally set a display name, target registry for publishing, glob patterns for change detection, a subtree remote URL for split publishing, inter-project dependencies, and a library flag to mark shared code packages.",
+          "flags": [
+            {
+              "name": "name",
+              "type": "str",
+              "help": "Project name (defaults to directory name)",
+              "short": null,
+              "default": "",
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": null,
+              "hidden": false
+            },
+            {
+              "name": "target",
+              "type": "str",
+              "help": "Target registry",
+              "short": null,
+              "default": "",
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": null,
+              "hidden": false
+            },
+            {
+              "name": "watch",
+              "type": "str",
+              "help": "Comma-separated glob patterns to watch",
+              "short": null,
+              "default": "",
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": null,
+              "hidden": false
+            },
+            {
+              "name": "subtree-remote",
+              "type": "str",
+              "help": "Subtree remote URL",
+              "short": null,
+              "default": "",
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": null,
+              "hidden": false
+            },
+            {
+              "name": "depends-on",
+              "type": "str",
+              "help": "Comma-separated dependency project names",
+              "short": null,
+              "default": "",
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": null,
+              "hidden": false
+            },
+            {
+              "name": "library",
+              "type": "str",
+              "help": "Mark as library (true/false)",
+              "short": null,
+              "default": "",
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": null,
+              "hidden": false
+            },
+            {
+              "name": "no-commit",
+              "type": "bool",
+              "help": "Skip auto-commit of workspace.toml and suppress commits from auto-triggered scaffold/sync",
+              "short": null,
+              "default": false,
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": true,
+              "hidden": false
+            }
+          ],
+          "args": [
+            {
+              "name": "path",
+              "help": "Path to the project directory",
+              "required": true,
+              "variadic": false
+            }
+          ],
+          "passthrough": false
+        },
+        "remove": {
+          "name": "remove",
+          "help": "Unregister a project from the monorepo workspace.toml by its path. This removes the project entry from the workspace configuration file but does not delete any files, directories, or git history on disk. The project's code remains intact and can be re-added later with the add subcommand if needed.",
+          "flags": [],
+          "args": [
+            {
+              "name": "path",
+              "help": "Path to the project to remove",
+              "required": true,
+              "variadic": false
+            }
+          ],
+          "passthrough": false
+        },
+        "list": {
+          "name": "list",
+          "help": "Display all projects registered in the monorepo workspace.toml file. For each project, shows the project name, relative path from the repo root, target registry for publishing, and any configured options such as watch patterns, subtree remotes, inter-project dependencies, and whether the project is marked as a library.",
+          "flags": [],
+          "args": [],
+          "passthrough": false
+        },
+        "sync": {
+          "name": "sync",
+          "help": "Copy and merge CI workflow files from each project's individual scaffold into the shared .github/workflows directory at the repository root. This ensures that every project in the workspace has its publish and test pipelines properly configured as GitHub Actions workflows, even when projects use different target registries or have custom workflow steps.",
+          "flags": [
+            {
+              "name": "no-commit",
+              "type": "bool",
+              "help": "Skip auto-commit of synced workflow files",
+              "short": null,
+              "default": false,
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": true,
+              "hidden": false
+            }
+          ],
+          "args": [],
+          "passthrough": false
+        },
+        "status": {
+          "name": "status",
+          "help": "Show the current version, last release tag, and number of unreleased commits for every project in the monorepo workspace. Provides a quick overview of which projects have pending changes and are ready for their next release. Projects with zero unreleased commits are shown as up-to-date.",
+          "flags": [],
+          "args": [],
+          "passthrough": false
+        },
+        "check-names": {
+          "name": "check-names",
+          "help": "Check package name availability on a target registry for all projects in the monorepo workspace. Queries the registry API for each project name and reports whether it is available or already taken. Supports optional prefix and suffix arguments to test naming conventions like scoped packages, with a configurable delay between registry queries to avoid rate limiting.",
+          "flags": [
+            {
+              "name": "target",
+              "type": "str",
+              "help": "Target registry (npm, pypi, or go)",
+              "short": null,
+              "default": null,
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": null,
+              "hidden": false
+            },
+            {
+              "name": "prefix",
+              "type": "str",
+              "help": "Prefix to prepend to project names",
+              "short": null,
+              "default": "",
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": null,
+              "hidden": false
+            },
+            {
+              "name": "suffix",
+              "type": "str",
+              "help": "Suffix to append to project names",
+              "short": null,
+              "default": "",
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": null,
+              "hidden": false
+            },
+            {
+              "name": "delay",
+              "type": "str",
+              "help": "Delay between checks in ms",
+              "short": null,
+              "default": "200",
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": null,
+              "hidden": false
+            }
+          ],
+          "args": [],
+          "passthrough": false
+        },
+        "release-order": {
+          "name": "release-order",
+          "help": "Compute and display the topological release order for all projects in the monorepo workspace based on their declared depends-on relationships. Projects with no dependencies are listed first, followed by projects that depend on them, ensuring each project is released only after its dependencies. Detects and reports circular dependency errors.",
+          "flags": [],
+          "args": [],
+          "passthrough": false
+        },
+        "outdated": {
+          "name": "outdated",
+          "help": "Scan all projects in the monorepo workspace for intra-workspace dependencies that reference older versions than what is currently available in the workspace. Lists each outdated dependency with the referenced version and the latest available version, helping identify which downstream projects need a version bump after upstream releases.",
+          "flags": [],
+          "args": [],
+          "passthrough": false
+        },
+        "lint": {
+          "name": "lint",
+          "help": "Detect unregistered projects and stale workspace entries in your monorepo. Scans first-level directories for recognized project manifests across all 14 supported targets (npm, PyPI, Go, Cargo, etc.) and compares against workspace.toml. Reports unregistered projects on disk and registered entries pointing to missing directories. Exits non-zero if issues are found, suitable for CI gating.",
+          "flags": [],
+          "args": [],
+          "passthrough": false
+        }
+      },
+      "groups": {},
+      "deprecated": {}
+    },
+    "dev": {
+      "name": "dev",
+      "help": "Developer utilities for locally working with rlsbl projects, including editable installs that mirror the project's release target (pypi -> uv tool install -e, npm -> npm link, go -> go install).",
+      "commands": {
+        "install": {
+          "name": "install",
+          "help": "Install the project locally for development using the detected target's editable install command. --global (default) installs system-wide across 8 supported targets (pypi, npm, go, cargo, zig, swift, deno, hex), while --venv installs into the project's local environment instead. In monorepo mode, pair with --all, --include, or --exclude. Use --uninstall to reverse a previous install.",
+          "flags": [
+            {
+              "name": "all",
+              "type": "bool",
+              "help": "In monorepo mode, install every project in the workspace",
+              "short": null,
+              "default": false,
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": true,
+              "hidden": false
+            },
+            {
+              "name": "include",
+              "type": "str",
+              "help": "In monorepo mode, comma-separated project names to include",
+              "short": null,
+              "default": "",
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": null,
+              "hidden": false
+            },
+            {
+              "name": "exclude",
+              "type": "str",
+              "help": "In monorepo mode, comma-separated project names to exclude",
+              "short": null,
+              "default": "",
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": null,
+              "hidden": false
+            },
+            {
+              "name": "uninstall",
+              "type": "bool",
+              "help": "Reverse a previous dev install (where supported by the target)",
+              "short": null,
+              "default": false,
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": true,
+              "hidden": false
+            },
+            {
+              "name": "global",
+              "type": "bool",
+              "help": "Install as a global tool/symlink. This is the default behavior when neither --global nor --venv is passed. Mutually exclusive with --venv.",
+              "short": null,
+              "default": false,
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": true,
+              "hidden": false
+            },
+            {
+              "name": "venv",
+              "type": "bool",
+              "help": "Install into the project's local environment only (e.g. uv sync, npm install). Mutually exclusive with --global.",
+              "short": null,
+              "default": false,
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": true,
+              "hidden": false
+            }
+          ],
+          "args": [],
+          "passthrough": false
+        }
+      },
+      "groups": {},
+      "deprecated": {}
+    }
+  },
+  "deprecated": {}
+}
