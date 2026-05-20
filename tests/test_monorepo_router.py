@@ -1,188 +1,301 @@
-"""Tests for the monorepo publish router secrets/permissions generation.
+"""Tests for the monorepo inline publish router.
 
-The router invokes per-project publish workflows as local reusable workflows
-(``uses: ./.github/workflows/{name}-publish.yml``). Reusable workflows do
-NOT inherit secrets by default and CANNOT elevate the permissions they were
-given by the caller. The router therefore must:
-
-- Inject ``permissions:`` per called job, matching what the target needs
-  (e.g. PyPI/npm/deno need ``id-token: write`` for OIDC; Go/zig need
-  ``contents: write`` for goreleaser/asset uploads).
-- Add ``secrets: inherit`` only for targets whose publish step actually
-  reads org/repo secrets at runtime (npm/cargo/hex/maven/docker/zig).
-  PyPI uses OIDC -- adding ``secrets: inherit`` is unnecessary noise.
+The router inlines each sub-project's publish jobs directly into a single
+``publish.yml``.  Each job gets an ``if: startsWith(...)`` condition, its
+own ``permissions:`` block (resolved from workflow-level permissions), and
+a ``defaults.run.working-directory`` pointing to the sub-project.
 
 These tests pin the generated YAML contract so the contract cannot regress
-silently. Without this fix, the router produced jobs that failed at
-``startup_failure`` for OIDC targets and silently published with missing
-credentials for token-based targets.
+silently.
 """
 
 import os
+import textwrap
+from unittest.mock import patch
 
 import pytest
+import yaml
 
-from rlsbl.commands.monorepo import (
-    _generate_publish_router,
-    _get_publish_requirements,
-)
+from rlsbl.commands.monorepo.publish_inline import generate_inline_publish_router
 
 
-def _make_project(name, path, files):
-    """Materialize a project on disk so detect_targets finds the target."""
-    proj_dir = path
-    os.makedirs(proj_dir, exist_ok=True)
-    for fname, contents in files.items():
-        with open(os.path.join(proj_dir, fname), "w", encoding="utf-8") as f:
-            f.write(contents)
-    return {"name": name, "path": proj_dir}
+# ---------------------------------------------------------------------------
+# Workflow fixtures
+# ---------------------------------------------------------------------------
+
+PYPI_PUBLISH_WF = textwrap.dedent("""\
+    name: Publish
+
+    on:
+      release:
+        types: [published]
+
+    permissions:
+      contents: read
+      id-token: write
+
+    jobs:
+      publish:
+        runs-on: ubuntu-latest
+        environment:
+          name: pypi
+          url: https://pypi.org/p/mypkg
+        steps:
+          - uses: actions/checkout@v6
+          - uses: actions/setup-python@v5
+            with:
+              python-version-file: .python-version
+          - run: uv build
+          - uses: pypa/gh-action-pypi-publish@release/v1
+""")
+
+NPM_PUBLISH_WF = textwrap.dedent("""\
+    name: Publish
+
+    on:
+      release:
+        types: [published]
+
+    permissions:
+      contents: read
+      id-token: write
+
+    jobs:
+      publish:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v6
+          - uses: actions/setup-node@v4
+            with:
+              node-version-file: .nvmrc
+              registry-url: https://registry.npmjs.org
+          - run: npm publish
+            env:
+              NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+""")
+
+GO_PUBLISH_WF = textwrap.dedent("""\
+    name: Publish
+
+    on:
+      release:
+        types: [published]
+
+    permissions:
+      contents: write
+
+    jobs:
+      goreleaser:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v6
+          - uses: actions/setup-go@v5
+            with:
+              go-version-file: go.mod
+          - run: goreleaser release
+""")
+
+
+def _setup_project(root, path, workflow_content):
+    """Create a project directory with a publish workflow."""
+    wf_dir = os.path.join(root, path, ".github", "workflows")
+    os.makedirs(wf_dir, exist_ok=True)
+    with open(os.path.join(wf_dir, "publish.yml"), "w") as f:
+        f.write(workflow_content)
+
+
+def _mock_tag_prefix(proj, _root):
+    return f"{proj['name']}@v"
+
+
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
 
 
 class TestPublishRouterTopLevel:
     """Router triggers + structure remain stable."""
 
-    def test_has_release_trigger(self):
-        content = _generate_publish_router([], ".")
-        assert "on:\n  release:\n    types: [published]" in content
+    def test_has_release_trigger(self, tmp_path):
+        root = str(tmp_path)
+        _setup_project(root, "pkg", PYPI_PUBLISH_WF)
+        projects = [{"name": "pkg", "path": "pkg"}]
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            side_effect=_mock_tag_prefix,
+        ):
+            content = generate_inline_publish_router(projects, root)
+        parsed = yaml.safe_load(content)
+        assert parsed["on"] == {"release": {"types": ["published"]}}
 
-    def test_has_router_name(self):
-        content = _generate_publish_router([], ".")
-        assert "name: Publish Router" in content
+    def test_has_router_name(self, tmp_path):
+        root = str(tmp_path)
+        _setup_project(root, "pkg", PYPI_PUBLISH_WF)
+        projects = [{"name": "pkg", "path": "pkg"}]
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            side_effect=_mock_tag_prefix,
+        ):
+            content = generate_inline_publish_router(projects, root)
+        parsed = yaml.safe_load(content)
+        assert parsed["name"] == "Publish Router"
 
-    def test_no_jobs_when_no_projects(self):
-        content = _generate_publish_router([], ".")
-        # 'jobs:' header is always emitted but no entries follow it
-        assert "jobs:" in content
+    def test_no_top_level_permissions(self, tmp_path):
+        root = str(tmp_path)
+        _setup_project(root, "pkg", PYPI_PUBLISH_WF)
+        projects = [{"name": "pkg", "path": "pkg"}]
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            side_effect=_mock_tag_prefix,
+        ):
+            content = generate_inline_publish_router(projects, root)
+        parsed = yaml.safe_load(content)
+        assert "permissions" not in parsed
 
 
 class TestPublishRouterPyPIOidc:
-    """PyPI uses OIDC (no secrets) and requires id-token: write."""
+    """PyPI uses OIDC -- workflow permissions are pushed down to jobs."""
 
-    def test_pypi_router_includes_id_token_permission(self, tmp_project):
-        proj = _make_project(
-            "mypkg",
-            str(tmp_project / "python"),
-            {"pyproject.toml": '[project]\nname = "mypkg"\nversion = "0.1.0"\n'},
-        )
-        content = _generate_publish_router([proj], ".")
-        assert "id-token: write" in content
-        assert "contents: read" in content
-
-    def test_pypi_router_omits_secrets_inherit(self, tmp_project):
-        proj = _make_project(
-            "mypkg",
-            str(tmp_project / "python"),
-            {"pyproject.toml": '[project]\nname = "mypkg"\nversion = "0.1.0"\n'},
-        )
-        content = _generate_publish_router([proj], ".")
-        assert "secrets: inherit" not in content
+    def test_pypi_router_includes_id_token_permission(self, tmp_path):
+        root = str(tmp_path)
+        _setup_project(root, "python", PYPI_PUBLISH_WF)
+        projects = [{"name": "mypkg", "path": "python"}]
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            side_effect=_mock_tag_prefix,
+        ):
+            content = generate_inline_publish_router(projects, root)
+        parsed = yaml.safe_load(content)
+        job = parsed["jobs"]["mypkg-publish"]
+        assert job["permissions"]["id-token"] == "write"
+        assert job["permissions"]["contents"] == "read"
 
 
 class TestPublishRouterNpmSecrets:
-    """npm publish needs NPM_TOKEN at runtime -- secrets: inherit required."""
+    """npm publish needs NPM_TOKEN -- secrets are embedded in the inlined steps."""
 
-    def test_npm_router_includes_secrets_inherit(self, tmp_project):
-        proj = _make_project(
-            "mylib",
-            str(tmp_project / "node"),
-            {"package.json": '{"name": "mylib", "version": "0.1.0"}'},
-        )
-        content = _generate_publish_router([proj], ".")
-        assert "secrets: inherit" in content
+    def test_npm_router_includes_id_token_for_provenance(self, tmp_path):
+        root = str(tmp_path)
+        _setup_project(root, "node", NPM_PUBLISH_WF)
+        projects = [{"name": "mylib", "path": "node"}]
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            side_effect=_mock_tag_prefix,
+        ):
+            content = generate_inline_publish_router(projects, root)
+        parsed = yaml.safe_load(content)
+        job = parsed["jobs"]["mylib-publish"]
+        assert job["permissions"]["id-token"] == "write"
 
-    def test_npm_router_includes_id_token_for_provenance(self, tmp_project):
-        proj = _make_project(
-            "mylib",
-            str(tmp_project / "node"),
-            {"package.json": '{"name": "mylib", "version": "0.1.0"}'},
-        )
-        content = _generate_publish_router([proj], ".")
-        assert "id-token: write" in content
+    def test_npm_secrets_in_inlined_steps(self, tmp_path):
+        """NPM_TOKEN reference is preserved in inlined steps."""
+        root = str(tmp_path)
+        _setup_project(root, "node", NPM_PUBLISH_WF)
+        projects = [{"name": "mylib", "path": "node"}]
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            side_effect=_mock_tag_prefix,
+        ):
+            content = generate_inline_publish_router(projects, root)
+        assert "${{ secrets.NPM_TOKEN }}" in content
 
 
 class TestPublishRouterGoContents:
     """Go publish (goreleaser) needs contents: write to push assets."""
 
-    def test_go_router_includes_contents_write(self, tmp_project):
-        proj = _make_project(
-            "mymod",
-            str(tmp_project / "go"),
-            {"go.mod": "module example.com/mymod\n\ngo 1.21\n", "VERSION": "0.1.0\n"},
-        )
-        content = _generate_publish_router([proj], ".")
-        assert "contents: write" in content
-
-
-class TestUnknownTargetDefaults:
-    """Unknown / undetectable targets default to safe read-only contents and no secrets."""
-
-    def test_unknown_target_has_no_secrets_inherit(self):
-        # No on-disk files -- detect_targets returns nothing
-        proj = {"name": "ghost", "path": "/nonexistent/ghost"}
-        content = _generate_publish_router([proj], ".")
-        assert "secrets: inherit" not in content
-
-    def test_unknown_target_has_read_permissions(self):
-        proj = {"name": "ghost", "path": "/nonexistent/ghost"}
-        content = _generate_publish_router([proj], ".")
-        assert "contents: read" in content
+    def test_go_router_includes_contents_write(self, tmp_path):
+        root = str(tmp_path)
+        _setup_project(root, "go", GO_PUBLISH_WF)
+        projects = [{"name": "mymod", "path": "go"}]
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            side_effect=_mock_tag_prefix,
+        ):
+            content = generate_inline_publish_router(projects, root)
+        parsed = yaml.safe_load(content)
+        job = parsed["jobs"]["mymod-goreleaser"]
+        assert job["permissions"]["contents"] == "write"
 
 
 class TestRouterJobStructure:
-    """Each project gets a job with if/permissions/uses (and maybe secrets)."""
+    """Each project gets prefixed inlined jobs with if/permissions/working-directory."""
 
-    def test_job_has_uses_pointing_to_local_workflow(self, tmp_project):
-        proj = _make_project(
-            "mylib",
-            str(tmp_project / "node"),
-            {"package.json": '{"name": "mylib", "version": "0.1.0"}'},
+    def test_job_has_tag_prefix_condition(self, tmp_path):
+        root = str(tmp_path)
+        _setup_project(root, "node", NPM_PUBLISH_WF)
+        projects = [{"name": "mylib", "path": "node"}]
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            side_effect=_mock_tag_prefix,
+        ):
+            content = generate_inline_publish_router(projects, root)
+        parsed = yaml.safe_load(content)
+        job = parsed["jobs"]["mylib-publish"]
+        assert job["if"] == "startsWith(github.event.release.tag_name, 'mylib@v')"
+
+    def test_job_has_working_directory(self, tmp_path):
+        root = str(tmp_path)
+        _setup_project(root, "node", NPM_PUBLISH_WF)
+        projects = [{"name": "mylib", "path": "node"}]
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            side_effect=_mock_tag_prefix,
+        ):
+            content = generate_inline_publish_router(projects, root)
+        parsed = yaml.safe_load(content)
+        job = parsed["jobs"]["mylib-publish"]
+        assert job["defaults"]["run"]["working-directory"] == "node"
+
+    def test_pypi_publish_has_packages_dir(self, tmp_path):
+        root = str(tmp_path)
+        _setup_project(root, "python", PYPI_PUBLISH_WF)
+        projects = [{"name": "mypkg", "path": "python"}]
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            side_effect=_mock_tag_prefix,
+        ):
+            content = generate_inline_publish_router(projects, root)
+        parsed = yaml.safe_load(content)
+        job = parsed["jobs"]["mypkg-publish"]
+        pypi_step = next(
+            s for s in job["steps"]
+            if "pypa/gh-action-pypi-publish" in s.get("uses", "")
         )
-        content = _generate_publish_router([proj], ".")
-        assert "uses: ./.github/workflows/mylib-publish.yml" in content
+        assert pypi_step["with"]["packages-dir"] == "python/dist/"
 
-    def test_job_has_tag_prefix_condition(self, tmp_project):
-        proj = _make_project(
-            "mylib",
-            str(tmp_project / "node"),
-            {"package.json": '{"name": "mylib", "version": "0.1.0"}'},
-        )
-        content = _generate_publish_router([proj], ".")
-        assert "if: startsWith(github.event.release.tag_name, 'mylib@v')" in content
+    def test_permissions_block_on_each_job(self, tmp_path):
+        """Each inlined job has its own permissions (no top-level permissions)."""
+        root = str(tmp_path)
+        _setup_project(root, "node", NPM_PUBLISH_WF)
+        _setup_project(root, "python", PYPI_PUBLISH_WF)
+        projects = [
+            {"name": "mylib", "path": "node"},
+            {"name": "mypkg", "path": "python"},
+        ]
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            side_effect=_mock_tag_prefix,
+        ):
+            content = generate_inline_publish_router(projects, root)
+        parsed = yaml.safe_load(content)
+        assert "permissions" not in parsed
+        for job_name, job in parsed["jobs"].items():
+            assert "permissions" in job, f"Job {job_name} is missing permissions"
 
-    def test_permissions_block_appears_before_uses(self, tmp_project):
-        """Sanity: permissions block must be declared on the caller job, not after uses."""
-        proj = _make_project(
-            "mylib",
-            str(tmp_project / "node"),
-            {"package.json": '{"name": "mylib", "version": "0.1.0"}'},
-        )
-        content = _generate_publish_router([proj], ".")
-        perm_pos = content.index("permissions:")
-        uses_pos = content.index("uses: ./.github/workflows/mylib-publish.yml")
-        assert perm_pos < uses_pos
-
-
-class TestGetPublishRequirements:
-    """Direct unit tests for the requirements lookup helper."""
-
-    @pytest.mark.parametrize("target_files,name,expected_inherit", [
-        ({"package.json": '{"name": "x", "version": "0.0.1"}'}, "npm", True),
-        ({"pyproject.toml": '[project]\nname = "x"\nversion = "0.0.1"\n'}, "pypi", False),
-        ({"go.mod": "module x\n\ngo 1.21\n", "VERSION": "0.0.1\n"}, "go", True),
-    ])
-    def test_secrets_inherit_per_target(self, tmp_project, target_files, name, expected_inherit):
-        proj_dir = tmp_project / name
-        proj_dir.mkdir()
-        for fname, contents in target_files.items():
-            (proj_dir / fname).write_text(contents)
-        proj = {"name": name, "path": str(proj_dir)}
-        inherit, perms = _get_publish_requirements(proj, ".")
-        assert inherit == expected_inherit
-        assert isinstance(perms, dict)
-        assert "contents" in perms
-
-    def test_unknown_target_falls_back_to_read_only(self):
-        proj = {"name": "ghost", "path": "/nonexistent/ghost"}
-        inherit, perms = _get_publish_requirements(proj, ".")
-        assert inherit is False
-        assert perms == {"contents": "read"}
+    def test_multi_project_jobs_are_prefixed(self, tmp_path):
+        root = str(tmp_path)
+        _setup_project(root, "python", PYPI_PUBLISH_WF)
+        _setup_project(root, "node", NPM_PUBLISH_WF)
+        projects = [
+            {"name": "mypkg", "path": "python"},
+            {"name": "mylib", "path": "node"},
+        ]
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            side_effect=_mock_tag_prefix,
+        ):
+            content = generate_inline_publish_router(projects, root)
+        parsed = yaml.safe_load(content)
+        job_names = list(parsed["jobs"].keys())
+        assert "mypkg-publish" in job_names
+        assert "mylib-publish" in job_names

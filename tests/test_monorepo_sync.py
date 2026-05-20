@@ -13,7 +13,6 @@ from rlsbl.commands.monorepo import (
     _cmd_add,
     _cmd_sync,
     _generate_router,
-    _generate_publish_router,
     _inject_packages_dir,
     _rewrite_trigger,
     _rewrite_version_file_inputs,
@@ -204,10 +203,15 @@ class TestRouterGeneration:
         router = mock_git_repo / ".github" / "workflows" / "publish.yml"
         assert router.exists()
         content = router.read_text()
+        # Inline router has inlined jobs with tag prefix conditions
         assert "startsWith(github.event.release.tag_name, 'tooling@v')" in content
         assert "startsWith(github.event.release.tag_name, 'core@v')" in content
-        assert "uses: ./.github/workflows/tooling-publish.yml" in content
-        assert "uses: ./.github/workflows/core-publish.yml" in content
+        # Jobs are inlined (prefixed job keys), not reusable workflow calls
+        assert "tooling-publish:" in content
+        assert "core-publish:" in content
+        # No per-project publish wrappers should exist
+        assert not (mock_git_repo / ".github" / "workflows" / "tooling-publish.yml").exists()
+        assert not (mock_git_repo / ".github" / "workflows" / "core-publish.yml").exists()
 
 
 class TestStaleCleanup:
@@ -629,7 +633,7 @@ class TestPackagesDirInjection:
         assert result.count("packages-dir") == 1
 
     def test_integration_pypi_publish(self, mock_git_repo, capsys):
-        """Full sync injects packages-dir for PyPI publish workflow."""
+        """Full sync inlines publish jobs with packages-dir for PyPI."""
         proj_dir = os.path.join(str(mock_git_repo), "mypylib")
         os.makedirs(proj_dir, exist_ok=True)
         with open(os.path.join(proj_dir, "pyproject.toml"), "w") as f:
@@ -651,8 +655,11 @@ class TestPackagesDirInjection:
         )
 
         _cmd_sync({})
-        dest = mock_git_repo / ".github" / "workflows" / "mypylib-publish.yml"
-        content = dest.read_text()
+        # Per-project publish wrappers no longer exist
+        assert not (mock_git_repo / ".github" / "workflows" / "mypylib-publish.yml").exists()
+        # packages-dir is in the inline publish router
+        router = mock_git_repo / ".github" / "workflows" / "publish.yml"
+        content = router.read_text()
         assert "packages-dir: mypylib/dist/" in content
 
 
@@ -685,9 +692,8 @@ class TestDotPathSelfReference:
             cwd=str(mock_git_repo), check=True,
         )
 
-        # First sync: the real publish.yml is used as source, AND generates
-        # the publish router at the same path. After sync, publish.yml is the
-        # router (overwritten).
+        # First sync: the real publish.yml is used as source for the inline
+        # router, which overwrites publish.yml at the same path.
         _cmd_sync({})
         capsys.readouterr()  # discard first sync output
 
@@ -699,15 +705,8 @@ class TestDotPathSelfReference:
         assert "router itself" in captured.err
         assert "rootpkg" in captured.err
 
-        # The rootpkg-publish.yml should NOT exist (or if it existed from
-        # the first sync, verify it does NOT contain the router header
-        # from the second sync wrapping the router)
-        dest = mock_git_repo / ".github" / "workflows" / "rootpkg-publish.yml"
-        if dest.exists():
-            content = dest.read_text()
-            # The content should be from the first sync (real publish.yml),
-            # not from the second sync wrapping the router
-            assert "Publish Router" not in content
+        # Per-project publish wrappers are never generated in the inline flow
+        assert not (mock_git_repo / ".github" / "workflows" / "rootpkg-publish.yml").exists()
 
     def test_ci_router_not_used_as_source(self, mock_git_repo, capsys):
         """When path='.', the CI router at .github/workflows/ci-router.yml

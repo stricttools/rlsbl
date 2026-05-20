@@ -1,6 +1,6 @@
 """Tests for CI router generation at scale (30 projects).
 
-Validates that _generate_router and _generate_publish_router produce
+Validates that _generate_router and generate_inline_publish_router produce
 correct, parseable YAML when given large workspaces.
 
 GitHub Actions has a 256-job limit per workflow, so 30 (or even 100)
@@ -8,16 +8,22 @@ projects are well within limits. The dorny/paths-filter action has no
 documented limit on filter entries.
 """
 
+import os
 import re
+import textwrap
+from unittest.mock import patch
 
-from rlsbl.commands.monorepo import _generate_router, _generate_publish_router
+import yaml
+
+from rlsbl.commands.monorepo import _generate_router
+from rlsbl.commands.monorepo.publish_inline import generate_inline_publish_router
 
 
 def _parse_workflow_yaml(content):
     """Minimal parser for rlsbl-generated GitHub Actions YAML.
 
     Only handles the predictable structure emitted by _generate_router
-    and _generate_publish_router: top-level keys, jobs with 2-space
+    and generate_inline_publish_router: top-level keys, jobs with 2-space
     indented names, and job properties at 4-space indentation.
 
     Returns a dict where:
@@ -172,6 +178,25 @@ def _parse_inline(val):
 
 PROJECT_COUNT = 30
 
+_SIMPLE_PUBLISH_WF = textwrap.dedent("""\
+    name: Publish
+
+    on:
+      release:
+        types: [published]
+
+    permissions:
+      contents: read
+      id-token: write
+
+    jobs:
+      publish:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v6
+          - run: echo publish
+""")
+
 
 def _make_projects(count, *, watch=False):
     """Build a list of synthetic project dicts."""
@@ -182,6 +207,21 @@ def _make_projects(count, *, watch=False):
             proj["watch"] = [f"shared/lib-{i}/**"]
         projects.append(proj)
     return projects
+
+
+def _make_projects_on_disk(root, count):
+    """Build synthetic projects and create their publish workflow files on disk."""
+    projects = _make_projects(count)
+    for proj in projects:
+        wf_dir = os.path.join(root, proj["path"], ".github", "workflows")
+        os.makedirs(wf_dir, exist_ok=True)
+        with open(os.path.join(wf_dir, "publish.yml"), "w") as f:
+            f.write(_SIMPLE_PUBLISH_WF)
+    return projects
+
+
+def _mock_tag_prefix(proj, _root):
+    return f"{proj['name']}@v"
 
 
 class TestCIRouterScale:
@@ -265,56 +305,84 @@ class TestCIRouterScale:
 
 
 class TestPublishRouterScale:
-    """Publish router generation with 30 projects."""
+    """Inline publish router generation with 30 projects."""
 
-    def test_syntactic_validity(self):
-        """Generated publish router parses as valid YAML."""
-        projects = _make_projects(PROJECT_COUNT)
-        content = _generate_publish_router(projects, ".")
-        parsed = _parse_workflow_yaml(content)
+    def test_syntactic_validity(self, tmp_path):
+        """Generated inline publish router parses as valid YAML."""
+        root = str(tmp_path)
+        projects = _make_projects_on_disk(root, PROJECT_COUNT)
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            side_effect=_mock_tag_prefix,
+        ):
+            content = generate_inline_publish_router(projects, root)
+        parsed = yaml.safe_load(content)
         assert isinstance(parsed, dict)
 
-    def test_job_count(self):
-        """Publish router has exactly 30 project jobs (no detect job)."""
-        projects = _make_projects(PROJECT_COUNT)
-        content = _generate_publish_router(projects, ".")
-        parsed = _parse_workflow_yaml(content)
-        jobs = parsed["jobs"]
-        assert len(jobs) == PROJECT_COUNT
+    def test_job_count(self, tmp_path):
+        """Inline publish router has exactly 30 project jobs (1 per project)."""
+        root = str(tmp_path)
+        projects = _make_projects_on_disk(root, PROJECT_COUNT)
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            side_effect=_mock_tag_prefix,
+        ):
+            content = generate_inline_publish_router(projects, root)
+        parsed = yaml.safe_load(content)
+        assert len(parsed["jobs"]) == PROJECT_COUNT
 
-    def test_no_duplicate_job_names(self):
-        """All job names in publish router are unique."""
-        projects = _make_projects(PROJECT_COUNT)
-        content = _generate_publish_router(projects, ".")
-        parsed = _parse_workflow_yaml(content)
+    def test_no_duplicate_job_names(self, tmp_path):
+        """All job names in inline publish router are unique."""
+        root = str(tmp_path)
+        projects = _make_projects_on_disk(root, PROJECT_COUNT)
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            side_effect=_mock_tag_prefix,
+        ):
+            content = generate_inline_publish_router(projects, root)
+        parsed = yaml.safe_load(content)
         job_names = list(parsed["jobs"].keys())
         assert len(job_names) == len(set(job_names))
 
-    def test_tag_matching_conditions(self):
-        """Each job has the correct startsWith tag condition."""
-        projects = _make_projects(PROJECT_COUNT)
-        content = _generate_publish_router(projects, ".")
-        parsed = _parse_workflow_yaml(content)
+    def test_tag_matching_conditions(self, tmp_path):
+        """Each inlined job has the correct startsWith tag condition."""
+        root = str(tmp_path)
+        projects = _make_projects_on_disk(root, PROJECT_COUNT)
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            side_effect=_mock_tag_prefix,
+        ):
+            content = generate_inline_publish_router(projects, root)
+        parsed = yaml.safe_load(content)
         for proj in projects:
             name = proj["name"]
-            job = parsed["jobs"][name]
+            job_key = f"{name}-publish"
+            assert job_key in parsed["jobs"], f"Missing job {job_key}"
+            job = parsed["jobs"][job_key]
             expected = f"startsWith(github.event.release.tag_name, '{name}@v')"
             assert job["if"] == expected
 
-    def test_workflow_call_references(self):
-        """Each project job calls ./.github/workflows/{name}-publish.yml."""
-        projects = _make_projects(PROJECT_COUNT)
-        content = _generate_publish_router(projects, ".")
-        parsed = _parse_workflow_yaml(content)
-        for proj in projects:
-            name = proj["name"]
-            job = parsed["jobs"][name]
-            assert job["uses"] == f"./.github/workflows/{name}-publish.yml"
+    def test_all_jobs_have_permissions(self, tmp_path):
+        """Each inlined job has its own permissions block."""
+        root = str(tmp_path)
+        projects = _make_projects_on_disk(root, PROJECT_COUNT)
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            side_effect=_mock_tag_prefix,
+        ):
+            content = generate_inline_publish_router(projects, root)
+        parsed = yaml.safe_load(content)
+        for job_name, job in parsed["jobs"].items():
+            assert "permissions" in job, f"Job {job_name} missing permissions"
 
-    def test_release_trigger(self):
+    def test_release_trigger(self, tmp_path):
         """Publish router triggers on release published events."""
-        projects = _make_projects(PROJECT_COUNT)
-        content = _generate_publish_router(projects, ".")
-        parsed = _parse_workflow_yaml(content)
-        # YAML parses bare 'on' as boolean True
-        assert parsed[True] == {"release": {"types": ["published"]}}
+        root = str(tmp_path)
+        projects = _make_projects_on_disk(root, PROJECT_COUNT)
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            side_effect=_mock_tag_prefix,
+        ):
+            content = generate_inline_publish_router(projects, root)
+        parsed = yaml.safe_load(content)
+        assert parsed["on"] == {"release": {"types": ["published"]}}
