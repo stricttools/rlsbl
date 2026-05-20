@@ -2,3 +2,4 @@
 {"commits":["0598b9183a5d78a73bd778f589022d33275db338"],"user_facing":true,"description":"**New feature.** Auto-sync lockfiles during release. After version bump, rlsbl detects uv.lock, package-lock.json, and go.sum, runs the appropriate sync command, and includes modified lockfiles in the release commit.","type":"feature"}
 {"commits":["604ac3e63a7587b360522435280f252aabd9cfb3"],"user_facing":false}
 {"commits":["5512eebbcbec90c9d97d90a35792551836700ada"],"user_facing":false}
+{"commits":["38296916033a98780f43ed3de4472bbb553604a5","04cde49f0b208d12915b0dc1c35c3c99b1ae86f9","53bc03057033ff01d180585da6600fe4913a10d4"],"user_facing":false}
