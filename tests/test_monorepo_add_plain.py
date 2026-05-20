@@ -41,7 +41,7 @@ class TestAddTargetPlain:
             return original_run(cmd, *args, **kwargs)
 
         with patch("subprocess.run", side_effect=capture_run), \
-             patch("rlsbl.commands.monorepo.commit_files", return_value=True):
+             patch("rlsbl.commands.monorepo.commands.commit_files", return_value=True):
             _cmd_add(["mydir"], {"target": "plain"})
 
         scaffold_calls = [

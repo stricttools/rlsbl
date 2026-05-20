@@ -40,7 +40,7 @@ class TestMissingTarget:
 
 
 class TestBasicCheckNames:
-    @patch("rlsbl.commands.monorepo.time.sleep")
+    @patch("rlsbl.commands.monorepo.commands.time.sleep")
     @patch("rlsbl.commands.check._check_single_name")
     def test_checks_all_projects(self, mock_check, mock_sleep, mock_git_repo, capsys):
         """check-names should check each project name against the target registry."""
@@ -88,7 +88,7 @@ class TestBasicCheckNames:
 
 
 class TestPrefix:
-    @patch("rlsbl.commands.monorepo.time.sleep")
+    @patch("rlsbl.commands.monorepo.commands.time.sleep")
     @patch("rlsbl.commands.check._check_single_name")
     def test_prefix_transforms_names(self, mock_check, mock_sleep, mock_git_repo, capsys):
         """--prefix should be prepended to each project name."""
@@ -114,7 +114,7 @@ class TestPrefix:
 
 
 class TestSuffix:
-    @patch("rlsbl.commands.monorepo.time.sleep")
+    @patch("rlsbl.commands.monorepo.commands.time.sleep")
     @patch("rlsbl.commands.check._check_single_name")
     def test_suffix_transforms_names(self, mock_check, mock_sleep, mock_git_repo, capsys):
         """--suffix should be appended to each project name."""
@@ -139,7 +139,7 @@ class TestSuffix:
 
 
 class TestPrefixAndSuffix:
-    @patch("rlsbl.commands.monorepo.time.sleep")
+    @patch("rlsbl.commands.monorepo.commands.time.sleep")
     @patch("rlsbl.commands.check._check_single_name")
     def test_prefix_and_suffix_combined(self, mock_check, mock_sleep, mock_git_repo, capsys):
         """--prefix and --suffix should both be applied."""
@@ -160,7 +160,7 @@ class TestPrefixAndSuffix:
 
 
 class TestDelay:
-    @patch("rlsbl.commands.monorepo.time.sleep")
+    @patch("rlsbl.commands.monorepo.commands.time.sleep")
     @patch("rlsbl.commands.check._check_single_name")
     def test_delay_applied_between_names(self, mock_check, mock_sleep, mock_git_repo, capsys):
         """Delay should be applied between names, not after the last one."""
@@ -183,7 +183,7 @@ class TestDelay:
         assert mock_sleep.call_count == 2
         mock_sleep.assert_has_calls([call(0.5), call(0.5)])
 
-    @patch("rlsbl.commands.monorepo.time.sleep")
+    @patch("rlsbl.commands.monorepo.commands.time.sleep")
     @patch("rlsbl.commands.check._check_single_name")
     def test_default_delay_200ms(self, mock_check, mock_sleep, mock_git_repo, capsys):
         """Default delay should be 200ms when --delay is not provided."""
