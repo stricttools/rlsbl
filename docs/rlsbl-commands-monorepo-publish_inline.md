@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.monorepo.publish_inline
-description: "Inline publish logic for monorepo projects: workflow parsing and YAML emission."
+description: "Inline publish logic for monorepo projects: GitHub Actions workflow parsing, job extraction, trigger rewriting, and YAML emission."
 generated: true
 nav_group: "API Reference"
 nav_order: 23

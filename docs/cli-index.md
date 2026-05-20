@@ -1,6 +1,6 @@
 ---
 title: rlsbl CLI Reference
-description: "Complete CLI reference for rlsbl release orchestration: every command, group, flag, and argument for managing versions, changelogs, and CI."
+description: "Complete CLI reference for rlsbl: 32 commands across 18 top-level commands and 3 groups (changelog, monorepo, dev) for releases across 14 targets."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 0

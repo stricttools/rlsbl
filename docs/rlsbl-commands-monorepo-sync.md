@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.monorepo.sync
-description: "Monorepo sync command and all sync helpers: trigger rewriting, working-directory injection, router generation."
+description: "Monorepo sync command and helpers: trigger rewriting, working-directory injection, router workflow generation, and tag prefix configuration."
 generated: true
 nav_group: "API Reference"
 nav_order: 24
