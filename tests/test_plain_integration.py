@@ -153,16 +153,22 @@ class TestSyncSkipsPlain:
         assert not dest.exists(), "Plain project should not have a generated publish workflow"
 
     def test_npm_workflows_generated_normally(self, mock_git_repo, capsys):
-        """The npm project should still get its CI and publish workflows."""
+        """The npm project should still get its CI workflow and appear in the inline publish router."""
         self._setup_mixed_workspace(mock_git_repo)
         capsys.readouterr()
         from unittest.mock import patch
         with patch("rlsbl.utils.find_commit_tool", return_value="git"):
             _cmd_sync({})
         ci_dest = mock_git_repo / ".github" / "workflows" / "web-app-ci.yml"
-        pub_dest = mock_git_repo / ".github" / "workflows" / "web-app-publish.yml"
         assert ci_dest.exists(), "npm project should have a generated CI workflow"
-        assert pub_dest.exists(), "npm project should have a generated publish workflow"
+        # Per-project publish wrappers are no longer generated; publish jobs are
+        # inlined in publish.yml
+        pub_wrapper = mock_git_repo / ".github" / "workflows" / "web-app-publish.yml"
+        assert not pub_wrapper.exists(), "Per-project publish wrappers should not be generated"
+        router = mock_git_repo / ".github" / "workflows" / "publish.yml"
+        assert router.exists(), "Inline publish router should be generated"
+        content = router.read_text()
+        assert "web-app-" in content, "npm project jobs should be inlined in publish router"
 
     def test_plain_not_in_ci_router(self, mock_git_repo, capsys):
         """Plain project should not appear in the CI router."""
