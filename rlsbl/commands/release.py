@@ -2,6 +2,7 @@
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -232,6 +233,67 @@ def _run_selfdoc_check(flags, project_dir=None):
     print("Running selfdoc check...")
     subprocess.run(["selfdoc", "check"], cwd=project_dir, check=True)
     return True
+
+
+# Lockfile -> (tool name, sync command args)
+_LOCKFILE_SPECS = [
+    ("uv.lock", "uv", ["uv", "lock"]),
+    ("package-lock.json", "npm", ["npm", "install", "--package-lock-only"]),
+    ("go.sum", "go", ["go", "mod", "tidy"]),
+]
+
+_LOCKFILE_SYNC_TIMEOUT = 30
+
+
+def _sync_lockfiles(target_paths, files_to_commit, log):
+    """Re-sync lockfiles after version bumps so they stay consistent.
+
+    For each known lockfile found in a target directory, runs the
+    corresponding sync command. If the lockfile is modified, its path
+    is appended to files_to_commit so it is included in the release
+    commit and not flagged by the unexpected-files guard.
+
+    Missing tools and sync failures are warnings, not errors.
+    """
+    for _target_name, t_path in target_paths.items():
+        for lockfile, tool_name, sync_cmd in _LOCKFILE_SPECS:
+            lockfile_path = os.path.join(t_path, lockfile)
+            if not os.path.exists(lockfile_path):
+                continue
+
+            if shutil.which(tool_name) is None:
+                log(f"Warning: {tool_name} not found on PATH, skipping {lockfile} sync")
+                continue
+
+            # Record mtime before sync
+            try:
+                mtime_before = os.stat(lockfile_path).st_mtime_ns
+            except OSError:
+                mtime_before = None
+
+            try:
+                subprocess.run(
+                    sync_cmd,
+                    cwd=t_path,
+                    timeout=_LOCKFILE_SYNC_TIMEOUT,
+                    check=True,
+                    capture_output=True,
+                )
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
+                log(f"Warning: {lockfile} sync failed: {e}")
+                continue
+
+            # Check if lockfile was modified
+            try:
+                mtime_after = os.stat(lockfile_path).st_mtime_ns
+            except OSError:
+                continue
+
+            if mtime_before != mtime_after:
+                norm_path = os.path.normpath(lockfile_path)
+                if norm_path not in files_to_commit:
+                    files_to_commit.append(norm_path)
+                    log(f"Lockfile updated: {norm_path}")
 
 
 def run_cmd(registry, args, flags):
@@ -656,6 +718,9 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                         files_to_commit.append(pyproject_path)
         except Exception:
             pass
+
+    # Sync lockfiles after version bumps so they reflect the new version
+    _sync_lockfiles(target_paths, files_to_commit, log)
 
     # Update .rlsbl/version marker so it's included in the release commit
     rlsbl_version_marker = vpath(os.path.join(".rlsbl", "version"))
