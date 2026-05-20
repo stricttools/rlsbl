@@ -1,0 +1,4 @@
+{"commits":["233aac62bc9d06280caaf51b5c706b9a8a267e1e"],"user_facing":true,"description":"**Fix.** Monorepo target detection now resolves project paths relative to the monorepo root, not the current directory. Fixes changelog validation and status reporting when running from inside a sub-project.","type":"fix"}
+{"commits":["70772b7b033676807b9e354b5e184524ff07021e"],"user_facing":true,"description":"**Fix.** `uv build` and `uv publish` now run from the sub-project directory in monorepo mode, fixing build failures for PyPI targets.","type":"fix"}
+{"commits":["0be7add2cbf25fa504f045d64790a98c8ba3dc59","4647d337b3077f687a35bf20b00b30b516919ded","5dbe22d6c487c615b348f394688a84cae42a9569","8402609b160cdeef92152f9c15e72fe3932247dc","93f148bccfe5f336494825f9394750d3f65e2527"],"user_facing":false}
+{"commits":["a25a38c952386dbda5ecb41f1166e09e270a8655","c573c07d184e57bb972d455dbb1c9b979576251b"],"user_facing":false}
