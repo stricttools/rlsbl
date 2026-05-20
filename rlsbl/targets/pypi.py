@@ -237,7 +237,7 @@ class PypiTarget(BaseTarget):
 
         # No monorepo or no path deps -- build in place
         dist_dir = os.path.join(dir_path, "dist")
-        run("uv", ["build", "--out-dir", dist_dir], env=os.environ)
+        run("uv", ["build", "--out-dir", dist_dir], env=os.environ, cwd=dir_path)
 
     # Directories excluded when copying the project to a temp build dir
     _COPY_EXCLUDE = {".git", "__pycache__", ".rlsbl", ".rlsbl-monorepo", "dist"}
@@ -315,11 +315,11 @@ class PypiTarget(BaseTarget):
             return
 
         try:
-            run("uv", ["build"], env=os.environ)
+            run("uv", ["build"], env=os.environ, cwd=dir_path)
             run("uv", ["publish"], env={
                 **os.environ,
                 "UV_PUBLISH_TOKEN": token,
-            })
+            }, cwd=dir_path)
             print(f"Published to PyPI: {version}")
         except subprocess.CalledProcessError as exc:
             raise RuntimeError(f"PyPI publish failed: {exc}") from exc

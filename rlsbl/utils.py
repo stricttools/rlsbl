@@ -9,10 +9,10 @@ import sys
 import urllib.request
 
 
-def run(cmd, args=None, timeout=120, env=None):
+def run(cmd, args=None, timeout=120, env=None, cwd=None):
     """Run a command with args, return trimmed stdout. Raise on failure."""
     full_cmd = [cmd] + (args or [])
-    result = subprocess.run(full_cmd, capture_output=True, text=True, check=True, timeout=timeout, env=env)
+    result = subprocess.run(full_cmd, capture_output=True, text=True, check=True, timeout=timeout, env=env, cwd=cwd)
     return result.stdout.strip()
 
 

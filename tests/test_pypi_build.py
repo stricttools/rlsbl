@@ -78,8 +78,8 @@ class TestBuildNoMonorepo:
 
         calls = []
 
-        def fake_run(cmd, args=None, timeout=120, env=None):
-            calls.append((cmd, args))
+        def fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
+            calls.append((cmd, args, cwd))
             return ""
 
         monkeypatch.setattr("rlsbl.targets.pypi.run", fake_run)
@@ -87,10 +87,11 @@ class TestBuildNoMonorepo:
         target.build(str(proj), "1.0.0")
 
         assert len(calls) == 1
-        cmd, args = calls[0]
+        cmd, args, cwd = calls[0]
         assert cmd == "uv"
         assert args[0] == "build"
         assert "--out-dir" in args
+        assert cwd == str(proj)
 
     def test_no_path_deps_runs_uv_build(self, tmp_path, target, monkeypatch):
         """When workspace exists but project has no path deps, uv build runs in place."""
@@ -106,8 +107,8 @@ class TestBuildNoMonorepo:
 
         calls = []
 
-        def fake_run(cmd, args=None, timeout=120, env=None):
-            calls.append((cmd, args))
+        def fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
+            calls.append((cmd, args, cwd))
             return ""
 
         monkeypatch.setattr("rlsbl.targets.pypi.run", fake_run)
@@ -117,6 +118,7 @@ class TestBuildNoMonorepo:
         assert len(calls) == 1
         assert calls[0][0] == "uv"
         assert calls[0][1][0] == "build"
+        assert calls[0][2] == str(app_dir)
 
 
 class TestBuildWithPathDeps:
@@ -295,8 +297,8 @@ class TestBuildWithPathDeps:
 
         calls = []
 
-        def fake_run(cmd, args=None, timeout=120, env=None):
-            calls.append((cmd, args))
+        def fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
+            calls.append((cmd, args, cwd))
             return ""
 
         monkeypatch.setattr("rlsbl.targets.pypi.run", fake_run)
@@ -307,3 +309,4 @@ class TestBuildWithPathDeps:
         assert len(calls) == 1
         assert calls[0][0] == "uv"
         assert calls[0][1][0] == "build"
+        assert calls[0][2] == str(app_dir)
