@@ -3,3 +3,5 @@
 {"commits":["604ac3e63a7587b360522435280f252aabd9cfb3"],"user_facing":false}
 {"commits":["5512eebbcbec90c9d97d90a35792551836700ada"],"user_facing":false}
 {"commits":["38296916033a98780f43ed3de4472bbb553604a5","04cde49f0b208d12915b0dc1c35c3c99b1ae86f9","53bc03057033ff01d180585da6600fe4913a10d4"],"user_facing":false}
+{"commits":["11d8ba92ea4c840b8b0349fec499e8a39696b0dc"],"user_facing":true,"description":"**Fix.** Skip gitignored lockfiles during release lockfile sync. Previously, syncing a lockfile that was in .gitignore caused git add to fail and aborted the release.","type":"fix"}
+{"commits":["df7dd6d1f6ae4ecdb72a99e0a61a4b55a2c235b1","f5dc1b137149d3fe90e067bf272b54173bbfbf63"],"user_facing":false}
