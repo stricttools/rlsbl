@@ -2,7 +2,7 @@
 
 ## Context
 
-webpane apps need platform-specific packaging (.deb, .dmg, .msi, AppImage, Flatpak) for distribution. rlsbl should support a `desktop` target type that scaffolds packaging configs and produces platform artifacts at release time.
+wesktop apps need platform-specific packaging (.deb, .dmg, .msi, AppImage, Flatpak) for distribution. rlsbl should support a `desktop` target type that scaffolds packaging configs and produces platform artifacts at release time.
 
 ## Proposed design
 
@@ -34,7 +34,7 @@ A new target type `desktop` in `.rlsbl/config.json`, alongside the existing `pyp
 
 ### Desktop entry integration
 
-Integration with webpane's `create_entry()` for post-install desktop entry creation. The packaging configs should invoke this during the platform's post-install phase (e.g., `postinst` for .deb, `%post` for .rpm).
+Integration with wesktop's `create_entry()` for post-install desktop entry creation. The packaging configs should invoke this during the platform's post-install phase (e.g., `postinst` for .deb, `%post` for .rpm).
 
 ## Platforms
 
