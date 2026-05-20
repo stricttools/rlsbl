@@ -3,3 +3,4 @@
 {"commits":["c0029dc542f6da254c506fd3f1157817bcd0f7a2"],"user_facing":true,"description":"**Fix monorepo sync self-reference with `path=\".\"`.** Projects with `path=\".\"` no longer wrap the generated router as their own publish workflow.","type":"fix"}
 {"commits":["7a3d6c638efbbb91a107a2f35edcb5707335191c"],"user_facing":true,"description":"**Publish router hash cache.** `monorepo sync` now caches SHA256 hashes of per-project publish workflows in `.rlsbl-monorepo/publish-cache.json` and skips router regeneration when nothing changed.","type":"feature"}
 {"commits":["f5d4d104e0427c05c1fb7257be89d8f487d32148","5d0d034ef03c73b67dd78693533e0bf457e1e3a1","3daac9272067544d91badbaafbbf5edf237f9721"],"user_facing":false}
+{"commits":["bcc26901b75390366d0f87524b45e50a896c252e","c9f09aed602396d582c8a465ab9fef535b4581a0"],"user_facing":false}
