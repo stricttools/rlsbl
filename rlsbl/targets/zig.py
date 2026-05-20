@@ -126,7 +126,9 @@ class ZigTarget(BaseTarget):
         if npm_scope and not is_library:
             specs = load_platform_config(config or {})
             artifacts = build_artifacts(specs, name, _zig_archive_fn)
-            npm_publish_jobs = build_npm_publish_jobs(npm_scope, name, artifacts)
+            npm_publish_jobs = build_npm_publish_jobs(
+                npm_scope, name, artifacts, depends_on="build-and-upload"
+            )
 
         return {
             "name": name,

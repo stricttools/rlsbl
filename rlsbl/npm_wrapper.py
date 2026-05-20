@@ -95,6 +95,7 @@ def build_npm_publish_jobs(
     npm_scope: str,
     bin_command: str,
     artifacts: list[PlatformArtifact],
+    depends_on: str = "goreleaser",
 ) -> str:
     """Generate YAML for npm wrapper publish jobs in a publish workflow.
 
@@ -103,6 +104,10 @@ def build_npm_publish_jobs(
 
     ``artifacts`` provides the per-platform archive details (asset pattern,
     extract command, binary name) so this function is target-agnostic.
+
+    ``depends_on`` is the name of the job that must complete before
+    npm-publish runs (e.g. ``"goreleaser"`` for Go, ``"build-and-upload"``
+    for Zig).
     """
     # Build the extract step script
     extract_lines = []
@@ -142,7 +147,7 @@ def build_npm_publish_jobs(
     setup_node_action = format_action("actions/setup-node")
     return f"""
   npm-publish:
-    needs: [goreleaser]
+    needs: [{depends_on}]
     runs-on: ubuntu-latest
     steps:
       - uses: {checkout_action}
