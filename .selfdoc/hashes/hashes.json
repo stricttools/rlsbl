@@ -20,7 +20,7 @@
     "description": "ac13987a732aa07a48834762c64434eb653607e256a18bf66f707f90579433d0"
   },
   "cli-dev.md": {
-    "content": "fbd1b753269cf9ebc8681513ee554dab9a674ef531991e2290faa34797781b7d",
+    "content": "ac38a1397a1e68878c2ab84e537d05a46d9709da984da63be8ea9ce73a0a4007",
     "description": "ec1445ce6dec22b687f52d3aa412bfd03536daad1512d39ead756faafde3d395"
   },
   "cli-discover.md": {
@@ -36,7 +36,7 @@
     "description": "92c829699be90c4ea09e05c6e0ff3830b755bdd05be47a9427e51074cedcb831"
   },
   "cli-index.md": {
-    "content": "b3816eb10d4af7d54e4f1e4c63c4178643910799b03d781c4c9cbb3a0ecd6c93",
+    "content": "49628e5d28b71bb56bfdea8062eba189ad6908a32d140f360de3e5a8e917f12c",
     "description": "d12f88f476bbebcf58e2e683c1968fe0c1027053bc6855df9ada0c1d6a4f1886"
   },
   "cli-migrate.md": {
@@ -96,7 +96,7 @@
     "description": "b4c023d19e20e6d797111d8b59c6116e414c1dcd8ee9d1456db4fb121af65c67"
   },
   "gen-index.md": {
-    "content": "46e4cb203ed476e9dddd2076882f14f198d82747ce932a3992f7530b45ead815",
+    "content": "a069554263aa6435306467129de56ad395db343380744478d43f1a2b3ed02064",
     "description": "bb3cd9d34f014c0674a9285c25ee14b5b4abc5cf941f0d83594c301405e8f3b6"
   },
   "index.md": {
@@ -178,6 +178,18 @@
   "rlsbl-commands-migrate.md": {
     "content": "e9491cc81e5db4d8805bda9691cf789321146328c993576e2929b70992553f8b",
     "description": "36a8a7ab4fbb66028d91fee058eba7458c15d4ffa4c4da5600181e469864aba0"
+  },
+  "rlsbl-commands-monorepo-commands.md": {
+    "content": "2f6635193f6526725a35938ece8adad1400261d17f20b0b298a66161459ee600",
+    "description": "f6a7fec11afb78c5f24f2f242298ba7c0f379d3dc7504a62103711a86f6a035b"
+  },
+  "rlsbl-commands-monorepo-publish_inline.md": {
+    "content": "6f48e369a7b1d1f96356f7d3fefd5464c91e4c5a6c7c19555232b6a85d944575",
+    "description": "8b5fb07ec2355d9afaf9edf054499367372c39d96d5a29a5b32e559c3a81146e"
+  },
+  "rlsbl-commands-monorepo-sync.md": {
+    "content": "d935ea661989777299a803d1f4dd595c6b5d29343e91127437a1badee86688c5",
+    "description": "49851dba84d40284219a2415cd9bdca7a4100b7b25db8a48e34b5f4c880e1d61"
   },
   "rlsbl-commands-monorepo.md": {
     "content": "405c6492d396a2a89be2abf036b06c48e629af949395132ce971667950988b8d",
