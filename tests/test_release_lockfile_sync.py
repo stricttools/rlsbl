@@ -11,6 +11,29 @@ from rlsbl.commands.release import _sync_lockfiles
 _real_stat = os.stat
 
 
+def _make_subprocess_run_side_effect(sync_result=None, gitignored=False):
+    """Build a side_effect for subprocess.run that handles both sync and git check-ignore calls.
+
+    sync_result: value to return for the sync command (e.g. CompletedProcess), or
+                 an exception to raise.
+    gitignored: if True, git check-ignore returns 0 (file is ignored);
+                if False, returns 1 (file is NOT ignored).
+    """
+    if sync_result is None:
+        sync_result = subprocess.CompletedProcess(args=[], returncode=0)
+
+    def side_effect(cmd, **kwargs):
+        if cmd[0] == "git" and cmd[1] == "check-ignore":
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0 if gitignored else 1,
+            )
+        if isinstance(sync_result, Exception):
+            raise sync_result
+        return sync_result
+
+    return side_effect
+
+
 def _make_stat_interceptor(lockfile_name, mtime_before, mtime_after):
     """Return an os.stat side_effect function that fakes mtime_ns for a lockfile.
 
@@ -53,18 +76,18 @@ class TestSyncLockfiles:
 
         with (
             patch("rlsbl.commands.release.shutil.which", return_value="/usr/bin/uv"),
-            patch("rlsbl.commands.release.subprocess.run") as mock_run,
+            patch("rlsbl.commands.release.subprocess.run",
+                  side_effect=_make_subprocess_run_side_effect()) as mock_run,
             patch("rlsbl.commands.release.os.stat", side_effect=fake_stat),
         ):
-            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             _sync_lockfiles(target_paths, files_to_commit, log)
 
-        mock_run.assert_called_once_with(
-            ["uv", "lock"],
-            cwd=str(tmp_path),
-            timeout=30,
-            check=True,
-            capture_output=True,
+        # Sync command should have been called
+        sync_calls = [c for c in mock_run.call_args_list if c[0][0][0] != "git"]
+        assert len(sync_calls) == 1
+        assert sync_calls[0] == (
+            (["uv", "lock"],),
+            {"cwd": str(tmp_path), "timeout": 30, "check": True, "capture_output": True},
         )
 
         expected = os.path.normpath(os.path.join(str(tmp_path), "uv.lock"))
@@ -81,18 +104,17 @@ class TestSyncLockfiles:
 
         with (
             patch("rlsbl.commands.release.shutil.which", return_value="/usr/bin/npm"),
-            patch("rlsbl.commands.release.subprocess.run") as mock_run,
+            patch("rlsbl.commands.release.subprocess.run",
+                  side_effect=_make_subprocess_run_side_effect()) as mock_run,
             patch("rlsbl.commands.release.os.stat", side_effect=fake_stat),
         ):
-            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             _sync_lockfiles(target_paths, files_to_commit, log)
 
-        mock_run.assert_called_once_with(
-            ["npm", "install", "--package-lock-only"],
-            cwd=str(tmp_path),
-            timeout=30,
-            check=True,
-            capture_output=True,
+        sync_calls = [c for c in mock_run.call_args_list if c[0][0][0] != "git"]
+        assert len(sync_calls) == 1
+        assert sync_calls[0] == (
+            (["npm", "install", "--package-lock-only"],),
+            {"cwd": str(tmp_path), "timeout": 30, "check": True, "capture_output": True},
         )
 
         expected = os.path.normpath(os.path.join(str(tmp_path), "package-lock.json"))
@@ -109,18 +131,17 @@ class TestSyncLockfiles:
 
         with (
             patch("rlsbl.commands.release.shutil.which", return_value="/usr/bin/go"),
-            patch("rlsbl.commands.release.subprocess.run") as mock_run,
+            patch("rlsbl.commands.release.subprocess.run",
+                  side_effect=_make_subprocess_run_side_effect()) as mock_run,
             patch("rlsbl.commands.release.os.stat", side_effect=fake_stat),
         ):
-            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             _sync_lockfiles(target_paths, files_to_commit, log)
 
-        mock_run.assert_called_once_with(
-            ["go", "mod", "tidy"],
-            cwd=str(tmp_path),
-            timeout=30,
-            check=True,
-            capture_output=True,
+        sync_calls = [c for c in mock_run.call_args_list if c[0][0][0] != "git"]
+        assert len(sync_calls) == 1
+        assert sync_calls[0] == (
+            (["go", "mod", "tidy"],),
+            {"cwd": str(tmp_path), "timeout": 30, "check": True, "capture_output": True},
         )
 
         expected = os.path.normpath(os.path.join(str(tmp_path), "go.sum"))
@@ -159,7 +180,9 @@ class TestSyncLockfiles:
 
         with (
             patch("rlsbl.commands.release.shutil.which", return_value="/usr/bin/uv"),
-            patch("rlsbl.commands.release.subprocess.run", side_effect=subprocess.CalledProcessError(1, "uv lock")),
+            patch("rlsbl.commands.release.subprocess.run",
+                  side_effect=_make_subprocess_run_side_effect(
+                      sync_result=subprocess.CalledProcessError(1, "uv lock"))),
             patch("rlsbl.commands.release.os.stat", side_effect=fake_stat),
         ):
             _sync_lockfiles(target_paths, files_to_commit, log)
@@ -181,7 +204,9 @@ class TestSyncLockfiles:
 
         with (
             patch("rlsbl.commands.release.shutil.which", return_value="/usr/bin/uv"),
-            patch("rlsbl.commands.release.subprocess.run", side_effect=subprocess.TimeoutExpired("uv lock", 30)),
+            patch("rlsbl.commands.release.subprocess.run",
+                  side_effect=_make_subprocess_run_side_effect(
+                      sync_result=subprocess.TimeoutExpired("uv lock", 30))),
             patch("rlsbl.commands.release.os.stat", side_effect=fake_stat),
         ):
             _sync_lockfiles(target_paths, files_to_commit, log)
@@ -204,13 +229,15 @@ class TestSyncLockfiles:
 
         with (
             patch("rlsbl.commands.release.shutil.which", return_value="/usr/bin/uv"),
-            patch("rlsbl.commands.release.subprocess.run") as mock_run,
+            patch("rlsbl.commands.release.subprocess.run",
+                  side_effect=_make_subprocess_run_side_effect()) as mock_run,
             patch("rlsbl.commands.release.os.stat", side_effect=fake_stat),
         ):
-            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             _sync_lockfiles(target_paths, files_to_commit, log)
 
-        mock_run.assert_called_once()
+        # Only the sync command should be called (no check-ignore since mtime unchanged)
+        sync_calls = [c for c in mock_run.call_args_list if c[0][0][0] != "git"]
+        assert len(sync_calls) == 1
         assert files_to_commit == []
 
     def test_no_lockfile_is_noop(self, tmp_path):
@@ -265,13 +292,15 @@ class TestSyncLockfiles:
 
         with (
             patch("rlsbl.commands.release.shutil.which", return_value="/usr/bin/tool"),
-            patch("rlsbl.commands.release.subprocess.run") as mock_run,
+            patch("rlsbl.commands.release.subprocess.run",
+                  side_effect=_make_subprocess_run_side_effect()) as mock_run,
             patch("rlsbl.commands.release.os.stat", side_effect=fake_stat),
         ):
-            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             _sync_lockfiles(target_paths, files_to_commit, log)
 
-        assert mock_run.call_count == 2
+        # 2 sync commands + 2 git check-ignore calls
+        sync_calls = [c for c in mock_run.call_args_list if c[0][0][0] != "git"]
+        assert len(sync_calls) == 2
         assert len(files_to_commit) == 2
 
     def test_duplicate_path_not_added_twice(self, tmp_path):
@@ -286,10 +315,38 @@ class TestSyncLockfiles:
 
         with (
             patch("rlsbl.commands.release.shutil.which", return_value="/usr/bin/uv"),
-            patch("rlsbl.commands.release.subprocess.run") as mock_run,
+            patch("rlsbl.commands.release.subprocess.run",
+                  side_effect=_make_subprocess_run_side_effect()) as mock_run,
             patch("rlsbl.commands.release.os.stat", side_effect=fake_stat),
         ):
-            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             _sync_lockfiles(target_paths, files_to_commit, log)
 
         assert files_to_commit.count(norm_path) == 1
+
+    def test_gitignored_lockfile_skipped(self, tmp_path):
+        """When lockfile is gitignored, it is synced but not added to files_to_commit."""
+        (tmp_path / "uv.lock").write_text("content\n")
+        target_paths = {"pypi": str(tmp_path)}
+        files_to_commit = []
+        log = MagicMock()
+
+        fake_stat = _make_stat_interceptor("uv.lock", 100, 200)
+
+        with (
+            patch("rlsbl.commands.release.shutil.which", return_value="/usr/bin/uv"),
+            patch("rlsbl.commands.release.subprocess.run",
+                  side_effect=_make_subprocess_run_side_effect(gitignored=True)) as mock_run,
+            patch("rlsbl.commands.release.os.stat", side_effect=fake_stat),
+        ):
+            _sync_lockfiles(target_paths, files_to_commit, log)
+
+        # Sync command should still run (lockfile is updated locally)
+        sync_calls = [c for c in mock_run.call_args_list if c[0][0][0] != "git"]
+        assert len(sync_calls) == 1
+
+        # But lockfile should NOT be in files_to_commit
+        assert files_to_commit == []
+
+        # Warning should be logged
+        log_messages = [call[0][0] for call in log.call_args_list]
+        assert any("gitignored" in msg for msg in log_messages)

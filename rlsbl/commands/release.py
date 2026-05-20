@@ -291,9 +291,22 @@ def _sync_lockfiles(target_paths, files_to_commit, log):
 
             if mtime_before != mtime_after:
                 norm_path = os.path.normpath(lockfile_path)
+                # Skip gitignored lockfiles -- git add would fail
+                try:
+                    result = subprocess.run(
+                        ["git", "check-ignore", "-q", norm_path],
+                        cwd=t_path,
+                        capture_output=True,
+                    )
+                    if result.returncode == 0:
+                        # exit 0 means the file IS ignored
+                        log(f"Lockfile updated but gitignored, skipping: {lockfile}")
+                        continue
+                except Exception:
+                    pass  # check-ignore failure -- proceed cautiously
                 if norm_path not in files_to_commit:
                     files_to_commit.append(norm_path)
-                    log(f"Lockfile updated: {norm_path}")
+                    log(f"Lockfile updated: {lockfile}")
 
 
 def run_cmd(registry, args, flags):
