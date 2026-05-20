@@ -819,3 +819,368 @@ class TestShouldRegenerateRouter:
         cached = {"mypkg": "hash1", "removed": "hash2"}
         current = {"mypkg": "hash1"}
         assert should_regenerate_router(cached, current, router) is True
+
+
+# ---------------------------------------------------------------------------
+# Integration tests with realistic multi-target workflows
+# ---------------------------------------------------------------------------
+
+# PyPI + npm dual-target workflow (like strictcli)
+DUAL_TARGET_PYPI_NPM_WF = textwrap.dedent("""\
+    name: Publish
+    on:
+      release:
+        types: [published]
+    permissions:
+      contents: read
+      id-token: write
+    jobs:
+      pypi:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v6
+          - uses: astral-sh/setup-uv@v7
+          - run: uv build
+          - uses: pypa/gh-action-pypi-publish@release/v1
+      npm:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v6
+          - uses: actions/setup-node@v6
+            with:
+              node-version: 24
+              registry-url: https://registry.npmjs.org
+          - run: npm publish --provenance --access public
+            env:
+              NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+""")
+
+# Go project with npm wrapper (goreleaser + npm-publish with needs)
+GO_NPM_WRAPPER_WF = textwrap.dedent("""\
+    name: Publish
+    on:
+      release:
+        types: [published]
+    permissions:
+      contents: write
+    jobs:
+      goreleaser:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v6
+          - uses: actions/setup-go@v5
+            with:
+              go-version-file: go.mod
+          - uses: goreleaser/goreleaser-action@v6
+            with:
+              args: release --clean
+      npm-publish:
+        runs-on: ubuntu-latest
+        needs: [goreleaser]
+        steps:
+          - uses: actions/checkout@v6
+          - uses: actions/setup-node@v6
+            with:
+              node-version: 24
+              registry-url: https://registry.npmjs.org
+          - run: npm publish --provenance --access public
+            env:
+              NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+""")
+
+# Simple PyPI-only workflow (for multi-project test)
+SIMPLE_PYPI_WF = textwrap.dedent("""\
+    name: Publish
+    on:
+      release:
+        types: [published]
+    permissions:
+      contents: read
+      id-token: write
+    jobs:
+      pypi:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v6
+          - run: uv build
+          - uses: pypa/gh-action-pypi-publish@release/v1
+""")
+
+# Simple npm-only workflow
+SIMPLE_NPM_WF = textwrap.dedent("""\
+    name: Publish
+    on:
+      release:
+        types: [published]
+    jobs:
+      npm:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v6
+          - uses: actions/setup-node@v6
+            with:
+              node-version: 24
+              registry-url: https://registry.npmjs.org
+          - run: npm publish
+            env:
+              NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+""")
+
+# Simple Go-only workflow
+SIMPLE_GO_WF = textwrap.dedent("""\
+    name: Publish
+    on:
+      release:
+        types: [published]
+    permissions:
+      contents: write
+    jobs:
+      goreleaser:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v6
+          - uses: actions/setup-go@v5
+            with:
+              go-version-file: go.mod
+          - uses: goreleaser/goreleaser-action@v6
+""")
+
+
+class TestIntegrationRealWorkflows:
+    """End-to-end integration tests with realistic multi-target workspaces."""
+
+    def test_pypi_npm_dual_target(self, tmp_path):
+        """PyPI + npm dual-target project like strictcli."""
+        root = str(tmp_path)
+        _setup_publish_project(root, "python", DUAL_TARGET_PYPI_NPM_WF)
+
+        projects = [{"name": "strictcli", "path": "python"}]
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            return_value="strictcli@v",
+        ):
+            result = generate_inline_publish_router(projects, root)
+
+        parsed = yaml.safe_load(result)
+        jobs = parsed["jobs"]
+
+        # Correct job names
+        assert "strictcli-pypi" in jobs
+        assert "strictcli-npm" in jobs
+
+        # Both have correct if condition
+        expected_if = "startsWith(github.event.release.tag_name, 'strictcli@v')"
+        assert jobs["strictcli-pypi"]["if"] == expected_if
+        assert jobs["strictcli-npm"]["if"] == expected_if
+
+        # Both have working-directory
+        assert jobs["strictcli-pypi"]["defaults"]["run"]["working-directory"] == "python"
+        assert jobs["strictcli-npm"]["defaults"]["run"]["working-directory"] == "python"
+
+        # PyPI job has permissions pushed down from workflow level
+        assert jobs["strictcli-pypi"]["permissions"] == {
+            "contents": "read",
+            "id-token": "write",
+        }
+
+        # PyPI publish step has packages-dir
+        pypi_publish_step = next(
+            s
+            for s in jobs["strictcli-pypi"]["steps"]
+            if "pypa/gh-action-pypi-publish" in s.get("uses", "")
+        )
+        assert pypi_publish_step["with"]["packages-dir"] == "python/dist/"
+
+        # npm job preserves secrets (NOT filtered out -- works in non-reusable workflows)
+        npm_steps_yaml = yaml.dump(jobs["strictcli-npm"]["steps"])
+        assert "${{ secrets.NPM_TOKEN }}" in npm_steps_yaml
+
+        # No top-level permissions on the workflow
+        assert "permissions" not in parsed
+
+        # Starts with DO NOT EDIT header
+        assert result.startswith("# DO NOT EDIT")
+
+    def test_go_project_with_npm_wrapper(self, tmp_path):
+        """Go project with goreleaser + npm-publish (with needs dependency)."""
+        root = str(tmp_path)
+        _setup_publish_project(root, "packages/golib", GO_NPM_WRAPPER_WF)
+
+        projects = [{"name": "golib", "path": "packages/golib"}]
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            return_value="golib@v",
+        ):
+            result = generate_inline_publish_router(projects, root)
+
+        parsed = yaml.safe_load(result)
+        jobs = parsed["jobs"]
+
+        # Both jobs are prefixed
+        assert "golib-goreleaser" in jobs
+        assert "golib-npm-publish" in jobs
+
+        # needs: is rewritten to prefixed name
+        assert jobs["golib-npm-publish"]["needs"] == ["golib-goreleaser"]
+
+        # go-version-file is prefixed with project path
+        goreleaser_steps = jobs["golib-goreleaser"]["steps"]
+        setup_go_step = next(
+            s for s in goreleaser_steps if "actions/setup-go" in s.get("uses", "")
+        )
+        assert setup_go_step["with"]["go-version-file"] == "packages/golib/go.mod"
+
+    def test_multi_project_router(self, tmp_path):
+        """3-project workspace with pypi, npm, and go targets."""
+        root = str(tmp_path)
+        _setup_publish_project(root, "packages/pylib", SIMPLE_PYPI_WF)
+        _setup_publish_project(root, "packages/jslib", SIMPLE_NPM_WF)
+        _setup_publish_project(root, "packages/golib", GO_NPM_WRAPPER_WF)
+
+        projects = [
+            {"name": "pylib", "path": "packages/pylib"},
+            {"name": "jslib", "path": "packages/jslib"},
+            {"name": "golib", "path": "packages/golib"},
+        ]
+
+        def mock_tag_prefix(proj, _root):
+            return f"{proj['name']}@v"
+
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            side_effect=mock_tag_prefix,
+        ):
+            result = generate_inline_publish_router(projects, root)
+
+        parsed = yaml.safe_load(result)
+        assert isinstance(parsed, dict), "Output must be valid YAML"
+        jobs = parsed["jobs"]
+
+        # pylib has 1 job, jslib has 1 job, golib has 2 jobs = 4 total
+        assert len(jobs) == 4
+
+        # All expected jobs present
+        assert "pylib-pypi" in jobs
+        assert "jslib-npm" in jobs
+        assert "golib-goreleaser" in jobs
+        assert "golib-npm-publish" in jobs
+
+        # Each project's jobs have the correct startsWith prefix
+        assert "pylib@v" in jobs["pylib-pypi"]["if"]
+        assert "jslib@v" in jobs["jslib-npm"]["if"]
+        assert "golib@v" in jobs["golib-goreleaser"]["if"]
+        assert "golib@v" in jobs["golib-npm-publish"]["if"]
+
+        # No job name collisions: all keys are unique (dict enforces this,
+        # but verify the count matches expectations)
+        all_job_names = list(jobs.keys())
+        assert len(all_job_names) == len(set(all_job_names))
+
+        # Round-trip through yaml.safe_load confirms structural validity
+        re_parsed = yaml.safe_load(result)
+        assert re_parsed == parsed
+
+    def test_cache_skip_behavior(self, tmp_path):
+        """Hash cache causes sync to skip regeneration when nothing changed."""
+        root = str(tmp_path)
+
+        # Set up 2 projects with publish workflows
+        _setup_publish_project(root, "packages/alpha", SIMPLE_PYPI_WF)
+        _setup_publish_project(root, "packages/beta", SIMPLE_NPM_WF)
+
+        projects = [
+            {"name": "alpha", "path": "packages/alpha"},
+            {"name": "beta", "path": "packages/beta"},
+        ]
+
+        monorepo_dir = os.path.join(root, ".rlsbl-monorepo")
+        os.makedirs(monorepo_dir, exist_ok=True)
+
+        router_path = os.path.join(root, ".github", "workflows", "publish.yml")
+        os.makedirs(os.path.dirname(router_path), exist_ok=True)
+
+        def mock_tag_prefix(proj, _root):
+            return f"{proj['name']}@v"
+
+        # --- First run: no cache, generates router ---
+        hashes_1 = compute_publish_hashes(projects, root)
+        cached_1 = load_publish_cache(monorepo_dir)
+        assert cached_1 is None  # No cache yet
+        assert should_regenerate_router(cached_1, hashes_1, router_path) is True
+
+        # Generate and save
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            side_effect=mock_tag_prefix,
+        ):
+            router_content = generate_inline_publish_router(
+                [p for p in projects if hashes_1[p["name"]] is not None], root
+            )
+        with open(router_path, "w") as f:
+            f.write(router_content)
+        save_publish_cache(monorepo_dir, hashes_1)
+
+        # --- Second run: same hashes, should skip ---
+        hashes_2 = compute_publish_hashes(projects, root)
+        cached_2 = load_publish_cache(monorepo_dir)
+        assert cached_2 == hashes_1
+        assert should_regenerate_router(cached_2, hashes_2, router_path) is False
+
+        # --- Third run: modify one project's publish.yml ---
+        modified_wf = SIMPLE_PYPI_WF.replace("uv build", "uv build --wheel")
+        alpha_wf = os.path.join(
+            root, "packages/alpha", ".github", "workflows", "publish.yml"
+        )
+        with open(alpha_wf, "w") as f:
+            f.write(modified_wf)
+
+        hashes_3 = compute_publish_hashes(projects, root)
+        cached_3 = load_publish_cache(monorepo_dir)
+        assert hashes_3["alpha"] != cached_3["alpha"]
+        assert should_regenerate_router(cached_3, hashes_3, router_path) is True
+
+        # --- Fourth run: add a new project ---
+        _setup_publish_project(root, "packages/gamma", SIMPLE_GO_WF)
+        projects_extended = projects + [{"name": "gamma", "path": "packages/gamma"}]
+
+        # Save cache with current hashes first (simulate post-regen)
+        save_publish_cache(monorepo_dir, hashes_3)
+
+        hashes_4 = compute_publish_hashes(projects_extended, root)
+        cached_4 = load_publish_cache(monorepo_dir)
+        # New project means different keys
+        assert "gamma" in hashes_4
+        assert "gamma" not in cached_4
+        assert should_regenerate_router(cached_4, hashes_4, router_path) is True
+
+    def test_on_key_quoting_round_trip(self):
+        """Verify emit_workflow's quoting of 'on' (YAML boolean) round-trips correctly.
+
+        The YAML spec treats bare ``on`` as a boolean (True), so PyYAML's
+        SafeDumper quotes it as ``'on'`` when used as a mapping key.  GitHub
+        Actions accepts both ``on:`` and ``'on':`` so this is not a bug.
+        This test documents the behavior and confirms round-trip safety.
+        """
+        workflow = {
+            "name": "Publish Router",
+            "on": {"release": {"types": ["published"]}},
+            "jobs": {
+                "build": {
+                    "runs-on": "ubuntu-latest",
+                    "steps": [{"run": "echo hello"}],
+                }
+            },
+        }
+
+        emitted = emit_workflow(workflow)
+
+        # The emitted YAML should contain 'on' (quoted) since PyYAML treats
+        # bare on as a boolean keyword
+        assert "'on'" in emitted or "on:" in emitted
+
+        # Most importantly: round-trip preserves the key and its value
+        reloaded = yaml.safe_load(emitted)
+        assert "on" in reloaded
+        assert reloaded["on"] == {"release": {"types": ["published"]}}
+        assert reloaded["name"] == "Publish Router"
+        assert reloaded["jobs"] == workflow["jobs"]
