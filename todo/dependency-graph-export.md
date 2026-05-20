@@ -1,33 +1,81 @@
-# Dependency graph export and visualization
+# Dependency graph export
 
 ## Context
 
-`monorepo status` shows numeric dep/rdep counts in a table, but there's no way to see the actual graph structure. For a 41-package monorepo with layered architecture, understanding dependency flow is critical for architecture reviews, onboarding, and catching accidental coupling.
+`monorepo status` shows numeric dep/rdep counts in a table, but there's no way to see or export the actual graph structure. For large monorepos with layered architecture, understanding dependency flow is critical for architecture reviews, onboarding, and catching accidental coupling.
 
-## What we need
+## Decisions
 
-### Short term: text and data exports
+- **JSON default** output format (AI-first; LLMs parse JSON natively).
+- **DOT and text tree** available via `--format=dot` and `--format=text`.
+- **Web visualization schema**: purely future. Design JSON for current needs; don't over-engineer for a hypothetical web app.
+- **Output to stdout** (pipeable). `--output <file>` for file output.
 
-- **Plain text tree**: like `tree` output but for dependencies. Show each package with its deps indented below it. Useful in terminals and AI agent context.
-- **DOT format**: Graphviz-compatible `.dot` file. Renderable to SVG/PNG with `dot -Tsvg`. Standard format, widely supported.
-- **JSON export**: the full graph as a JSON adjacency list. Consumable by any tooling.
+## Command
 
-A command like `monorepo graph` with format flags (`--format=text|dot|json`).
+`monorepo graph [--format=json|dot|text] [--output <file>] [--root <package>] [--reverse <package>] [--depth N]`
 
-### Medium term: filtering and queries
+### Formats
 
-- Show the subgraph rooted at a specific package: "what does flow_order depend on, transitively?"
-- Show the reverse subgraph: "what would break if I changed models?"
-- Show only a specific layer or target type.
-- Highlight cycles (if any).
+**JSON (default):**
+```json
+{
+  "packages": {
+    "models": {
+      "deps": ["schema", "infra"],
+      "rdeps": ["marketplace_contract", "flow_order"],
+      "target": "dart",
+      "version": "1.2.0"
+    }
+  },
+  "edges": [
+    {"from": "models", "to": "schema", "type": "versioned", "constraint": "^1.0.0"}
+  ]
+}
+```
 
-### Long term: web visualization
+**DOT:**
+```dot
+digraph dependencies {
+    rankdir=TB;
+    node [shape=box, fontname="Helvetica", fontsize=10];
+    "models" -> "schema";
+    "models" -> "infra";
+    "marketplace_contract" -> "models";
+}
+```
 
-- Interactive graph in a browser. Nodes are packages, edges are dependencies.
-- Click a node to see its README, version, deps, rdeps.
-- Filter by layer, target type, or search.
-- This is a separate project (web app or static site), not part of the rlsbl CLI itself. rlsbl just generates the data (JSON) that the web app consumes.
+Conventions: `dot` layout engine, `rankdir=TB`, `shape=box`, clusters for architectural layers (if layer rules are configured), edge styles for dep types (solid=versioned, dashed=explicit).
 
-## Where it fits
+**Text tree:**
+```
+models
+  schema
+  infra
+marketplace_contract
+  models
+    schema
+    infra
+```
 
-`monorepo graph` as a new subcommand alongside `monorepo status`, `monorepo release-order`, `monorepo lint`.
+### Filtering
+
+- `--root <package>`: show only the subgraph reachable from this package (transitive deps).
+- `--reverse <package>`: show only packages that depend on this package (transitive rdeps, i.e., "what breaks if this changes?").
+- `--depth N`: limit traversal depth.
+
+### Implementation notes
+
+- Requires adding transitive traversal to `WorkspaceGraph` (currently only supports direct deps/rdeps). BFS/DFS over `dependencies()` / `dependents()`.
+- DOT output should use clusters for layers if `[layers]` config exists in workspace.toml.
+- For graphs with 40+ packages, `concentrate=true` in DOT reduces visual clutter. SVG output recommended (`dot -Tsvg`).
+
+## Affected files
+
+- `rlsbl/workspace_graph.py` -- add `transitive_deps(name)`, `transitive_rdeps(name)` methods
+- `rlsbl/commands/monorepo.py` -- new `_cmd_graph` subcommand
+- Possibly a new `rlsbl/graph_output.py` for format rendering (JSON, DOT, text)
+
+## Effort
+
+Medium. The graph traversal is straightforward. DOT rendering with clusters and styling is the main work.

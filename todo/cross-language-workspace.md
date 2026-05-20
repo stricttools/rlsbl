@@ -2,30 +2,64 @@
 
 ## Context
 
-Three monorepos now use rlsbl with mixed-language workspaces:
+Monorepos increasingly mix languages: Python + Go + JS SDKs, Swift + Kotlin + TypeScript + Python implementing the same spec, Dart + Python + data-only spec packages. rlsbl's workspace graph currently only parses `pyproject.toml` (Python) and `package.json` (npm) for intra-workspace dependencies. Other manifest formats are not parsed.
 
-- **WWW**: 48 Python packages + 1 Go service + 3 Go/JS/Python SDKs
-- **incantino**: Swift + Kotlin + TypeScript + Python, all implementing the same spec
-- **F**: 35 Dart packages + 1 Python package + 3 data-only spec packages + 1 Flutter app
+## Decisions
 
-rlsbl's workspace graph currently parses pyproject.toml (Python) and package.json (npm). It doesn't parse pubspec.yaml (Dart), Package.swift (Swift), build.gradle.kts (Kotlin), or Cargo.toml (Rust).
+- **Pluggable scanner interface first**, then add parsers incrementally.
+- **Dart + Python first** (immediate needs), then Cargo, Go, Swift, Kotlin.
+- **Pub workspace support**: new `resolution: workspace` pattern only. No legacy `path:` dep support.
+- **Cargo**: resolve `workspace = true` inheritance by reading root `[workspace.dependencies]`.
+- **Kotlin/Gradle**: parse `settings.gradle.kts` for module discovery + `build.gradle.kts` for dependency declarations.
+- **Cross-language edges** stay manual via `depends_on` in workspace.toml. Auto-detection across languages is not worth the complexity.
 
-## What we need
+## Implementation
 
-The workspace graph should discover intra-workspace dependencies from any manifest format rlsbl supports as a target. When a new target type is added (dart, swift, etc.), its manifest parser should be pluggable into the workspace graph's dependency detection.
+### Phase 1: pluggable scanner interface
 
-Current state:
-- pypi: reads pyproject.toml `dependencies` and `optional-dependencies` -- works
-- npm: reads package.json `dependencies`, `devDependencies`, `peerDependencies` -- works
-- go: not parsed for workspace deps
-- dart: not parsed (pubspec.yaml)
-- swift: not parsed (Package.swift)
-- spec: no manifest (uses workspace.toml `depends_on` only)
+Refactor `workspace_graph.py` to replace the hardcoded `_scan_pypi()` / `_scan_npm()` calls with a scanner registry:
 
-For cross-language deps (Python tooling reads Dart spec files, Swift app consumes a spec package), `depends_on` in workspace.toml is the only mechanism. This is fine -- cross-language deps can't be auto-detected from manifests.
+```python
+class WorkspaceScanner(Protocol):
+    def scan(self, project_dir: str, workspace_names: set[str]) -> list[Dependency]:
+        ...
 
-## Speculative: unified dependency graph across languages
+SCANNERS: list[WorkspaceScanner] = [
+    PypiScanner(),
+    NpmScanner(),
+]
+```
 
-In a workspace where Python tooling generates code consumed by Dart packages, the dep graph spans languages. Today these cross-language edges are manual (`depends_on`). Could rlsbl detect them? For example: Python reads files from `../sdui_spec/`, which is a workspace package -- that's a detectable dependency if rlsbl scans Python imports/file reads.
+The `WorkspaceGraph.__init__()` loop becomes:
+```python
+for scanner in SCANNERS:
+    found_deps.extend(scanner.scan(project_dir, workspace_names))
+```
 
-This is hard and probably not worth automating. Manual `depends_on` is sufficient for cross-language edges.
+### Phase 2: Dart scanner (pubspec.yaml)
+
+- Detect `resolution: workspace` in pubspec.yaml
+- When present, read `dependencies` section -- hosted deps whose names match workspace members are intra-workspace deps
+- Version constraints in the manifest are noted as `dep_type="versioned"` (same as pypi/npm)
+- Parser must understand pubspec.yaml YAML format (use PyYAML or ruamel.yaml)
+
+### Phase 3+: additional scanners
+
+Each as a separate release:
+
+| Scanner | Manifest | Dep detection |
+|---------|----------|---------------|
+| Cargo | `Cargo.toml` | Path deps (`path = "../sibling"`), workspace-inherited deps (`workspace = true` resolved from root `[workspace.dependencies]`) |
+| Go | `go.mod` | `require` directives matching workspace module paths |
+| Swift | `Package.swift` | `.package(path: "../sibling")` via regex (Swift source, not a data format) |
+| Kotlin | `settings.gradle.kts` for discovery, `build.gradle.kts` for deps | `project(":module")` references |
+
+## Affected files
+
+- `rlsbl/workspace_graph.py` -- refactor to scanner interface, existing pypi/npm scanners become `PypiScanner`/`NpmScanner`
+- New files per scanner: `rlsbl/scanners/dart.py`, `rlsbl/scanners/cargo.py`, etc. (or a `scanners/` directory)
+- `rlsbl/targets/utils.py` -- `normalize_pypi()` stays; each scanner handles its own normalization
+
+## Effort
+
+Phase 1 (interface refactor): small. Phase 2 (Dart): medium. Phase 3+ (each additional scanner): small per scanner.

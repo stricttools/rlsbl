@@ -2,33 +2,93 @@
 
 ## Context
 
-The F monorepo (~/Work/F) is a Flutter project with 41 Dart packages, 1 Python package, and 3 spec (data-only) packages. rlsbl currently supports pypi, npm, go, hex, cargo, and docker targets. Dart/Flutter is not supported.
+rlsbl needs to support Dart packages (libraries) and Flutter apps (iOS/Android) as target types. Dart packages use `pubspec.yaml` as their manifest. Flutter apps are Dart packages that additionally produce platform-specific binaries.
 
-Dart packages use `pubspec.yaml` as their manifest. Flutter apps are a special case of Dart packages that additionally produce iOS and Android binaries. The Flutter ecosystem uses `pub.dev` as its package registry (though these packages are internal and won't be published).
+## Decisions
 
-## What we need
+### Target types
 
-- A `dart` target type that rlsbl understands for version bumping, changelog validation, and release tagging.
-- A `flutter-ios` and `flutter-android` target type (or a single `flutter` target with sub-targets) for the app package, which has a separate release cadence per platform.
-- Version lives in `pubspec.yaml` under the `version:` field (format: `major.minor.patch+build`). The `+build` suffix is Flutter-specific (App Store / Play Store build number).
-- rlsbl should read and bump `pubspec.yaml` version during release, same as it reads `pyproject.toml` for Python or `package.json` for npm.
-- Changelog validation should work identically to other targets.
-- Tag format: `package_name@vX.Y.Z` (consistent with existing monorepo tag format).
+- **`dart` target**: for Dart/Flutter library packages. Reads/writes `pubspec.yaml` version field. Publish is a no-op by default (same as spec target). pub.dev publishing gated by `publish.dart.local` config.
+- **`flutter-ios` target**: for Flutter app iOS releases. Reads version from `pubspec.yaml`. Separate release lifecycle from Android.
+- **`flutter-android` target**: for Flutter app Android releases. Reads version from `pubspec.yaml`. Separate release lifecycle from iOS.
 
-## Flutter-specific concerns
+Separate per-platform targets because: platform-specific bugs need independent hotfixes, app store reviews are independent, native code changes (Kotlin/Swift) may affect only one platform.
 
-- iOS and Android releases may have different versions or build numbers. The App Store and Play Store are separate distribution channels with separate review processes.
-- The `+build` number in pubspec.yaml often increments independently of the semver version (e.g., `1.2.3+45` where 45 is the build number).
-- rlsbl may need to understand that a single `pubspec.yaml` produces two release artifacts (iOS build, Android build) with potentially different release cadences.
-- Shorebird (OTA code push) is another release mechanism that bypasses app stores. It's unclear if rlsbl should track Shorebird patches as releases.
+### Version management
 
-## Monorepo implications
+- All three targets read version from `pubspec.yaml` `version:` field.
+- **Shared semver** (`X.Y.Z`): an iOS-only hotfix bumps the shared version in pubspec.yaml. Android doesn't release that version, but the source version advances.
+- **Build number** (`+N`): configurable, off by default. CI manages build numbers at build time via `flutter build --build-number`. Opt-in config enables rlsbl auto-increment. When off, rlsbl does not read or write the `+N` suffix.
+- Tag format: `<name>-ios@vX.Y.Z`, `<name>-android@vX.Y.Z`, `<name>@vX.Y.Z` (for dart libraries).
 
-- The F monorepo has 35 Dart packages that are internal (never published to pub.dev). They still need version tracking, changelogs, and tags for internal consistency.
-- `pubspec.yaml` declares dependencies on sibling packages via `path:` references (e.g., `models: path: ../models`). rlsbl's workspace graph should parse these to build the dependency graph, similar to how it parses `pyproject.toml` path deps today.
+### Shorebird OTA support
 
-## Where to look
+Shorebird is in scope. Release types:
 
-- `rlsbl/targets/` -- where target-specific logic lives (pypi.py, npm.py, go.py, etc.)
-- `rlsbl/workspace_graph.py` -- where manifest parsing for dependency detection happens
-- `rlsbl/dep_rewrite.py` -- where path deps are rewritten to versioned deps for publishing
+- **`build` release**: bumps version, creates app store submission artifacts. Required when native code (Kotlin/Swift/Gradle/Xcode) changes.
+- **`ota` release**: Shorebird patch targeting an existing build release. Does not bump the semver version. Only valid when changes are Dart-only.
+
+Release type is specified explicitly: `rlsbl release build` or `rlsbl release ota`. rlsbl auto-detects which type is valid based on changed files since last build release:
+- Native file changes detected + user says `ota` -> error ("native changes require a build release")
+- Dart-only changes + user says `build` -> allowed (user may want a full release for non-code reasons)
+- No explicit flag -> error ("specify --build or --ota")
+
+### Publishing
+
+- `dart` target: publish is a no-op by default. pub.dev publishing available via config (`publish.dart.local = true`). Uses `dart pub publish --force`. First publish to pub.dev must be interactive (OIDC for subsequent CI publishes).
+- `flutter-ios` / `flutter-android`: publish means building the artifact. Actual app store upload is a post-release hook concern (Fastlane, Codemagic, etc.), not rlsbl's.
+
+### Workspace graph integration
+
+- Dart scanner (from cross-language-workspace todo) parses pubspec.yaml for intra-workspace deps.
+- Supports `resolution: workspace` pattern (Dart 3.6+). No legacy `path:` dep support.
+- The package name in `import 'package:foo/...'` always maps 1:1 to the `name:` field in pubspec.yaml (confirmed by research).
+
+## Implementation
+
+### dart target (`rlsbl/targets/dart.py`)
+
+- `detect()`: returns True if `pubspec.yaml` exists
+- `read_version()`: parses `pubspec.yaml`, extracts `version:` field, strips `+N` suffix (returns only `X.Y.Z`)
+- `write_version()`: updates `version:` field in pubspec.yaml. If build number management is enabled, increments `+N`. Otherwise preserves existing `+N` or omits it.
+- `publish()`: no-op unless `publish.dart.local = true`, then runs `dart pub publish --force`
+- `version_file()`: returns `"pubspec.yaml"`
+- `tag_format()`: returns `"v{version}"`
+- `monorepo_tag_format()`: returns `"{name}@v{version}"`
+
+### flutter-ios / flutter-android targets
+
+- Extend or wrap the dart target with platform-specific behavior.
+- `detect()`: returns True if `pubspec.yaml` exists AND contains Flutter-specific fields (e.g., `flutter:` section, `uses-material-design`)
+- `tag_format()`: returns `"{name}-ios@v{version}"` / `"{name}-android@v{version}"`
+- `publish()`: builds the platform artifact (`flutter build ios` / `flutter build apk`), but actual store upload is out of scope (hooks).
+- Release type validation: checks changed files to validate `build` vs `ota` flag.
+
+### Build number config
+
+In `.rlsbl/config.json`:
+```json
+{
+  "build_number": {
+    "enabled": false,
+    "strategy": "increment"
+  }
+}
+```
+
+When `enabled: true`, `write_version()` reads the current `+N`, increments it, and writes `X.Y.Z+N+1`. When `enabled: false`, the `+N` portion is not touched.
+
+## Affected files
+
+- New: `rlsbl/targets/dart.py`, `rlsbl/targets/flutter_ios.py`, `rlsbl/targets/flutter_android.py`
+- `rlsbl/targets/__init__.py` -- register new targets in TARGETS dict
+- `rlsbl/targets/protocol.py` -- may need a `release_type` concept (build vs ota)
+- `rlsbl/commands/release.py` -- support release type flags, changed-file detection for ota validation
+
+## Prerequisites
+
+- Cross-language workspace support (Dart scanner for pubspec.yaml)
+
+## Effort
+
+Large. Three target implementations, Shorebird integration, release type detection, build number management.

@@ -2,32 +2,96 @@
 
 ## Context
 
-In a monorepo with 41 packages, declared dependencies and actual imports can drift. A package might declare a dependency it doesn't use (dead dep), or import from a sibling it didn't declare (undeclared dep). Both are problems: dead deps create false coupling in the graph, undeclared deps create invisible coupling that breaks when packages are released independently.
+In a monorepo, declared dependencies and actual imports can drift. A package might declare a dependency it doesn't use (dead dep) or import from a sibling it didn't declare (undeclared dep). Both are problems: dead deps create false coupling in the graph, undeclared deps create invisible coupling that breaks when packages are released independently.
 
-Currently rlsbl reads manifests (pyproject.toml, package.json) to discover dependencies but never checks whether the code actually uses them.
+rlsbl reads manifests to discover dependencies but never checks whether code actually uses them.
 
-## What we need
+## Decisions
 
-For each package in the workspace, rlsbl should be able to answer:
+- **Internal to rlsbl, modularized** with a pluggable scanner interface. Not extracted to a separate project.
+- **Dart + Python first.** Other languages added incrementally via the scanner interface.
+- **Intentional unused-dep whitelist** in a separate config file (`.rlsbl-monorepo/dep-overrides.toml`), not in workspace.toml or package manifests.
+- **All checks are errors** (nonzero exit), via the unified strictcli check system.
+- **Reuse existing infrastructure**: tree-sitter parsers and regex patterns from `rlsbl/lint/` already extract imports. Refactor them to collect and return the full import set instead of only checking against a forbidden list.
 
-1. **Unused declared deps**: Package A declares B as a dependency, but no source file in A imports from B. This is a dead dependency that should be removed.
-2. **Undeclared imports**: A source file in package A imports from package C, but A does not declare C as a dependency. This is an invisible coupling that must be either declared or removed.
+## What the scanner detects
 
-This needs to work across languages:
+1. **Unused declared deps**: package A declares B as a dependency in its manifest, but no source file in A imports from B. Error unless whitelisted in dep-overrides.toml.
+2. **Undeclared imports**: a source file in package A imports from package C, but A does not declare C as a dependency. Always an error.
 
-- **Dart**: scan for `import 'package:foo/...'` and `export 'package:foo/...'` statements. The package name after `package:` maps to a sibling workspace package.
-- **Python**: scan for `import foo` and `from foo import ...` statements. Map module names to workspace package names (with normalization: hyphens, underscores).
-- **Spec/data packages**: these have no imports. But packages that consume them (e.g., sdui_schema reads from sdui_spec) need a way to declare this dependency. The `depends_on` field in workspace.toml handles this.
+## Scanner interface
 
-## When it should run
+```python
+class ImportScanner(Protocol):
+    def scan_imports(self, package_dir: str) -> set[str]:
+        """Return the set of external package names imported by source files in this directory."""
+        ...
+```
 
-- `monorepo lint` should include this check.
-- CI should fail on undeclared imports.
-- CI should warn on unused declared deps (warning, not error, because some deps are used at runtime via DI without explicit imports).
+### Dart scanner
+
+- Scan `.dart` files (including generated ones) for `import 'package:foo/...'` and `export 'package:foo/...'`.
+- The `foo` part maps 1:1 to the `name:` field in the dependency's pubspec.yaml (confirmed by research).
+- Relative imports (`import '../...'`) are always intra-package -- skip them.
+- `dart:` imports are SDK -- skip them.
+- Dev dependencies: distinguish `lib/` imports from `test/` imports. `test/` may import dev_dependencies.
+
+### Python scanner
+
+- Refactor `rlsbl/lint/python_ast.py` and `python_regex.py` to return the collected import set.
+- Use `ast.parse` to walk `Import` and `ImportFrom` nodes.
+- Skip relative imports (`level > 0` -- always intra-package).
+- Skip `if TYPE_CHECKING:` imports (typing-only, not runtime deps).
+- Include lazy imports (inside functions/methods) -- they are real runtime deps.
+- Handle `try: import foo; except ImportError: import bar` -- include both as conditional deps.
+- Handle `importlib.import_module('literal')` and `__import__('literal')` -- include when args are string literals, warn on dynamic args.
+- Map top-level import names to package names using pypi normalization (`normalize_pypi()`).
+- Exclude standard library modules (`sys.stdlib_module_names` on 3.10+).
+
+## Whitelist config
+
+`.rlsbl-monorepo/dep-overrides.toml`:
+```toml
+[[unused_allowed]]
+package = "app"
+dep = "auth"
+reason = "Wired via DI at runtime, no direct import"
+
+[[unused_allowed]]
+package = "app"
+dep = "analytics"
+reason = "Loaded dynamically via plugin registry"
+```
+
+`reason` is mandatory (audit trail).
+
+## Integration
+
+- Two check functions via strictcli check system:
+  - `@check(name="deps.unused", scope="workspace", fast=False, pure=True)`
+  - `@check(name="deps.undeclared", scope="workspace", fast=False, pure=True)`
+- Both should be included in `monorepo lint` / the workspace check group.
+- CI should fail on both.
 
 ## Edge cases
 
-- Dev dependencies: test files may import from packages that are only dev_dependencies. The scanner needs to distinguish `lib/` imports from `test/` imports.
-- Transitive imports: if A depends on B and B depends on C, A can technically import C's types through B's re-exports. But A should still declare C if it imports directly from C.
-- Code generation: generated files (e.g., Drift, Freezed, json_serializable) may produce imports that don't appear in hand-written source. The scanner should read all `.dart` files including generated ones.
-- DI/runtime deps: some dependencies are wired at runtime (e.g., `app/` depends on `auth/` for DI but may never directly import from it in lib/). These are legitimate declared-but-not-imported cases. The `depends_on` field in workspace.toml could be used to whitelist these.
+- **Code generation**: generated files (Drift, Freezed, json_serializable in Dart; dataclasses, pydantic in Python) may produce imports not visible in hand-written source. Scanner reads all source files including generated ones.
+- **Transitive imports**: if A depends on B and B re-exports C's types, A might use C's types without importing C directly. A should still declare C if it imports directly from C.
+- **Namespace packages** (Python): do not require `__init__.py` to identify packages. Scan for directories with `.py` files.
+- **Compiled extensions** (`.so`/`.pyd`): opaque to AST scanning. Rely on declared metadata.
+
+## Affected files
+
+- `rlsbl/lint/python_ast.py`, `rlsbl/lint/python_regex.py` -- refactor to return collected imports
+- New: `rlsbl/scanners/import_scanner.py` (interface), `rlsbl/scanners/dart_imports.py`, `rlsbl/scanners/python_imports.py`
+- New: config loader for `.rlsbl-monorepo/dep-overrides.toml`
+- Check registration in the appropriate module
+
+## Prerequisites
+
+- Cross-language workspace support (scanner interface)
+- Unified check system in strictcli
+
+## Effort
+
+Large. Dart scanner is greenfield. Python scanner refactors existing code. The whitelist config and check integration are medium.
