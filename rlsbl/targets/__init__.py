@@ -16,6 +16,8 @@ from .deno import DenoTarget
 from .cargo import CargoTarget
 from .dart import DartTarget
 from .docker import DockerTarget
+from .flutter_ios import FlutterIosTarget
+from .flutter_android import FlutterAndroidTarget
 from .maven import MavenTarget
 from .zig import ZigTarget
 from .plain import PlainTarget
@@ -43,6 +45,8 @@ TARGETS = {
     "cargo": CargoTarget(),
     "dart": DartTarget(),
     "docker": DockerTarget(),
+    "flutter-ios": FlutterIosTarget(),
+    "flutter-android": FlutterAndroidTarget(),
     "maven": MavenTarget(),
     "zig": ZigTarget(),
     "plain": PlainTarget(),
