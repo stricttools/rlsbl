@@ -1,0 +1,104 @@
+"""Release file reader and validator for file-based releases.
+
+Instead of passing bump type on the CLI, the user creates
+.rlsbl/releases/unreleased.toml describing the release.
+This module reads and validates that file's internal consistency.
+"""
+
+import os
+from dataclasses import dataclass, field
+
+import tomlkit
+
+
+VALID_BUMP_TYPES = ("patch", "minor", "major")
+
+VALID_TARGET_MODES = ("ota", "build")
+
+
+@dataclass
+class ReleaseConfig:
+    bump: str  # "patch", "minor", "major"
+    include: list[str]  # target names to release
+    exclude: list[str]  # target names to skip
+    targets: dict[str, dict] = field(default_factory=dict)  # per-target config
+
+
+def get_release_file_path(project_dir: str = ".") -> str:
+    """Return the path to .rlsbl/releases/unreleased.toml relative to project_dir."""
+    return os.path.join(project_dir, ".rlsbl", "releases", "unreleased.toml")
+
+
+def read_release_file(path: str) -> ReleaseConfig:
+    """Read and validate a release TOML file.
+
+    Raises FileNotFoundError if the file doesn't exist.
+    Raises ValueError for schema/validation failures.
+    """
+    with open(path, "r", encoding="utf-8") as f:
+        data = tomlkit.load(f)
+
+    # --- bump ---
+    if "bump" not in data:
+        raise ValueError("missing required field: bump")
+    bump = data["bump"]
+    if not isinstance(bump, str) or bump not in VALID_BUMP_TYPES:
+        raise ValueError(
+            f"invalid bump value: {bump!r} (must be one of {VALID_BUMP_TYPES})"
+        )
+
+    # --- include ---
+    if "include" not in data:
+        raise ValueError("missing required field: include")
+    include = data["include"]
+    if not isinstance(include, list) or not all(isinstance(s, str) for s in include):
+        raise ValueError("include must be a list of strings")
+
+    # --- exclude ---
+    if "exclude" not in data:
+        raise ValueError("missing required field: exclude")
+    exclude = data["exclude"]
+    if not isinstance(exclude, list) or not all(isinstance(s, str) for s in exclude):
+        raise ValueError("exclude must be a list of strings")
+
+    # --- include ∩ exclude must be empty ---
+    overlap = set(include) & set(exclude)
+    if overlap:
+        raise ValueError(
+            f"targets appear in both include and exclude: {sorted(overlap)}"
+        )
+
+    # --- targets section ---
+    targets_raw = data.get("targets", {})
+    targets = {}
+    if targets_raw:
+        if not isinstance(targets_raw, dict):
+            raise ValueError("targets must be a table of per-target configurations")
+        include_set = set(include)
+        for name, cfg in targets_raw.items():
+            if name not in include_set:
+                raise ValueError(
+                    f"target config for {name!r} but it is not in include"
+                )
+            if not isinstance(cfg, dict):
+                raise ValueError(f"target config for {name!r} must be a table")
+            # Validate known fields
+            for key, value in cfg.items():
+                if key == "mode":
+                    if value not in VALID_TARGET_MODES:
+                        raise ValueError(
+                            f"invalid mode for target {name!r}: {value!r} "
+                            f"(must be one of {VALID_TARGET_MODES})"
+                        )
+                else:
+                    raise ValueError(
+                        f"unknown field {key!r} in target config for {name!r}"
+                    )
+            targets[name] = dict(cfg)
+
+    return ReleaseConfig(
+        bump=bump,
+        include=list(include),
+        exclude=list(exclude),
+        targets=targets,
+    )
