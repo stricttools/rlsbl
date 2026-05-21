@@ -4,6 +4,7 @@ import json
 import os
 import sys
 from collections import namedtuple
+from typing import Protocol, runtime_checkable
 
 import tomlkit
 
@@ -11,6 +12,20 @@ from .targets.utils import normalize_pypi
 
 
 Dependency = namedtuple("Dependency", ["name", "dep_type", "constraint"])
+
+
+@runtime_checkable
+class WorkspaceScanner(Protocol):
+    """Protocol for pluggable workspace dependency scanners."""
+
+    def scan(self, project_dir: str, workspace_names: set[str]) -> list[Dependency]:
+        """Scan a project directory for intra-workspace dependencies.
+
+        project_dir: absolute path to the project directory.
+        workspace_names: set of all workspace project names (raw, unnormalized).
+        Returns a list of Dependency namedtuples for deps found within the workspace.
+        """
+        ...
 
 
 class CycleError(Exception):
@@ -57,81 +72,85 @@ def _parse_pypi_dep_name(dep_string):
     return name, False, constraint or ""
 
 
-def _scan_pypi(project_dir, workspace_names_normalized):
-    """Parse pyproject.toml and return intra-workspace Dependency list.
+class PypiScanner:
+    """Scan pyproject.toml for intra-workspace PyPI dependencies."""
 
-    workspace_names_normalized maps normalize_pypi(name) -> original name.
-    """
-    manifest = os.path.join(project_dir, "pyproject.toml")
-    if not os.path.isfile(manifest):
-        return []
+    def scan(self, project_dir: str, workspace_names: set[str]) -> list[Dependency]:
+        # Build normalized lookup internally: normalize_pypi(name) -> original name
+        pypi_normalized = {normalize_pypi(name): name for name in workspace_names}
 
-    try:
-        with open(manifest, "r", encoding="utf-8") as f:
-            data = tomlkit.parse(f.read())
-    except Exception as exc:
-        print(f"Warning: failed to parse {manifest}: {exc}", file=sys.stderr)
-        return []
+        manifest = os.path.join(project_dir, "pyproject.toml")
+        if not os.path.isfile(manifest):
+            return []
 
-    deps = []
-    project_section = data.get("project", {})
+        try:
+            with open(manifest, "r", encoding="utf-8") as f:
+                data = tomlkit.parse(f.read())
+        except Exception as exc:
+            print(f"Warning: failed to parse {manifest}: {exc}", file=sys.stderr)
+            return []
 
-    # Collect all dependency strings: main + optional
-    all_dep_strings = list(project_section.get("dependencies", []))
-    for group_deps in project_section.get("optional-dependencies", {}).values():
-        all_dep_strings.extend(group_deps)
+        deps = []
+        project_section = data.get("project", {})
 
-    for dep_str in all_dep_strings:
-        name, is_path, constraint = _parse_pypi_dep_name(dep_str)
-        if name is None:
-            continue
-        normalized = normalize_pypi(name)
-        if normalized in workspace_names_normalized:
-            dep_type = "path" if is_path else "versioned"
-            deps.append(Dependency(
-                name=workspace_names_normalized[normalized],
-                dep_type=dep_type,
-                constraint=constraint,
-            ))
+        # Collect all dependency strings: main + optional
+        all_dep_strings = list(project_section.get("dependencies", []))
+        for group_deps in project_section.get("optional-dependencies", {}).values():
+            all_dep_strings.extend(group_deps)
 
-    return deps
-
-
-def _scan_npm(project_dir, workspace_names):
-    """Parse package.json and return intra-workspace Dependency list.
-
-    workspace_names is a set of workspace project names (exact match).
-    """
-    manifest = os.path.join(project_dir, "package.json")
-    if not os.path.isfile(manifest):
-        return []
-
-    try:
-        with open(manifest, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except Exception as exc:
-        print(f"Warning: failed to parse {manifest}: {exc}", file=sys.stderr)
-        return []
-
-    deps = []
-    dep_sections = ["dependencies", "devDependencies", "peerDependencies"]
-
-    for section in dep_sections:
-        for name, version in data.get(section, {}).items():
-            if name not in workspace_names:
+        for dep_str in all_dep_strings:
+            name, is_path, constraint = _parse_pypi_dep_name(dep_str)
+            if name is None:
                 continue
-            if isinstance(version, str) and version.startswith("workspace:"):
-                dep_type = "workspace"
-                constraint = version
-            elif isinstance(version, str) and version.startswith("file:"):
-                dep_type = "path"
-                constraint = version
-            else:
-                dep_type = "versioned"
-                constraint = version if isinstance(version, str) else ""
-            deps.append(Dependency(name=name, dep_type=dep_type, constraint=constraint))
+            normalized = normalize_pypi(name)
+            if normalized in pypi_normalized:
+                dep_type = "path" if is_path else "versioned"
+                deps.append(Dependency(
+                    name=pypi_normalized[normalized],
+                    dep_type=dep_type,
+                    constraint=constraint,
+                ))
 
-    return deps
+        return deps
+
+
+class NpmScanner:
+    """Scan package.json for intra-workspace npm dependencies."""
+
+    def scan(self, project_dir: str, workspace_names: set[str]) -> list[Dependency]:
+        manifest = os.path.join(project_dir, "package.json")
+        if not os.path.isfile(manifest):
+            return []
+
+        try:
+            with open(manifest, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception as exc:
+            print(f"Warning: failed to parse {manifest}: {exc}", file=sys.stderr)
+            return []
+
+        deps = []
+        dep_sections = ["dependencies", "devDependencies", "peerDependencies"]
+
+        for section in dep_sections:
+            for name, version in data.get(section, {}).items():
+                if name not in workspace_names:
+                    continue
+                if isinstance(version, str) and version.startswith("workspace:"):
+                    dep_type = "workspace"
+                    constraint = version
+                elif isinstance(version, str) and version.startswith("file:"):
+                    dep_type = "path"
+                    constraint = version
+                else:
+                    dep_type = "versioned"
+                    constraint = version if isinstance(version, str) else ""
+                deps.append(Dependency(name=name, dep_type=dep_type, constraint=constraint))
+
+        return deps
+
+
+SCANNERS: list[WorkspaceScanner] = [PypiScanner(), NpmScanner()]
 
 
 class WorkspaceGraph:
@@ -152,18 +171,13 @@ class WorkspaceGraph:
             self._deps[name] = []
             self._rdeps[name] = []
 
-        # Build normalized PyPI lookup: normalize_pypi(name) -> original name
-        pypi_normalized = {}
-        for name in workspace_names:
-            pypi_normalized[normalize_pypi(name)] = name
-
         for proj in projects:
             name = proj["name"]
             project_dir = os.path.join(root, proj["path"])
 
             found_deps = []
-            found_deps.extend(_scan_pypi(project_dir, pypi_normalized))
-            found_deps.extend(_scan_npm(project_dir, workspace_names))
+            for scanner in SCANNERS:
+                found_deps.extend(scanner.scan(project_dir, workspace_names))
 
             # Explicit depends_on from workspace config
             for dep_name in proj.get("depends_on", []):
