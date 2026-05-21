@@ -47,42 +47,28 @@ def _extract_string(node):
     return text.strip("'\"")
 
 
-def _check_forbidden_imports(tree, filepath, config):
-    """Walk AST for import/require/export nodes."""
-    results = []
-    forbidden = frozenset(config.forbidden_imports)
+def _collect_all_imports(tree, filepath):
+    """Walk AST and collect all imported package names.
+
+    Returns a set of (package_name, file_path, line_number) tuples.
+    """
+    imports = set()
 
     def _walk(node):
         if node.type == "import_statement":
-            # import X from 'pkg'; import { X } from 'pkg'
             for child in node.children:
                 if child.type == "string":
                     pkg = _extract_string(child)
-                    if pkg in forbidden:
-                        results.append(LintResult(
-                            file=filepath,
-                            line=_node_line(node),
-                            rule="forbidden-import",
-                            severity="error",
-                            message=f"Library imports forbidden package '{pkg}'",
-                        ))
+                    imports.add((pkg, filepath, _node_line(node)))
             for child in node.children:
                 _walk(child)
             return
 
         if node.type == "export_statement":
-            # export { X } from 'pkg'
             for child in node.children:
                 if child.type == "string":
                     pkg = _extract_string(child)
-                    if pkg in forbidden:
-                        results.append(LintResult(
-                            file=filepath,
-                            line=_node_line(node),
-                            rule="forbidden-import",
-                            severity="error",
-                            message=f"Library imports forbidden package '{pkg}'",
-                        ))
+                    imports.add((pkg, filepath, _node_line(node)))
             for child in node.children:
                 _walk(child)
             return
@@ -100,14 +86,7 @@ def _check_forbidden_imports(tree, filepath, config):
                     for child in args.children:
                         if child.type == "string":
                             pkg = _extract_string(child)
-                            if pkg in forbidden:
-                                results.append(LintResult(
-                                    file=filepath,
-                                    line=_node_line(node),
-                                    rule="forbidden-import",
-                                    severity="error",
-                                    message=f"Library imports forbidden package '{pkg}'",
-                                ))
+                            imports.add((pkg, filepath, _node_line(node)))
                             break
 
                 # import('pkg') -- dynamic import
@@ -115,20 +94,32 @@ def _check_forbidden_imports(tree, filepath, config):
                     for child in args.children:
                         if child.type == "string":
                             pkg = _extract_string(child)
-                            if pkg in forbidden:
-                                results.append(LintResult(
-                                    file=filepath,
-                                    line=_node_line(node),
-                                    rule="forbidden-import",
-                                    severity="error",
-                                    message=f"Library imports forbidden package '{pkg}'",
-                                ))
+                            imports.add((pkg, filepath, _node_line(node)))
                             break
 
         for child in node.children:
             _walk(child)
 
     _walk(tree.root_node)
+    return imports
+
+
+def _check_forbidden_imports(tree, filepath, config):
+    """Walk AST for import/require/export nodes."""
+    results = []
+    forbidden = frozenset(config.forbidden_imports)
+    all_imports = _collect_all_imports(tree, filepath)
+
+    for pkg, fpath, line in all_imports:
+        if pkg in forbidden:
+            results.append(LintResult(
+                file=fpath,
+                line=line,
+                rule="forbidden-import",
+                severity="error",
+                message=f"Library imports forbidden package '{pkg}'",
+            ))
+
     return results
 
 
@@ -245,3 +236,25 @@ class NpmAstLinter:
                 results.extend(_check_stdout(tree, filepath, config))
 
         return results
+
+    def scan_imports(self, project_path: str) -> set[tuple[str, str, int]]:
+        """Collect all imported package names from JS/TS files.
+
+        Returns a set of (package_name, file_path, line_number) tuples.
+        """
+        all_imports: set[tuple[str, str, int]] = set()
+        for filepath in walk_source_files(project_path, _ALL_EXTENSIONS, []):
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    source = f.read()
+            except (OSError, UnicodeDecodeError):
+                continue
+
+            ext = os.path.splitext(filepath)[1]
+            lang = _lang_for_ext(ext)
+            parser = Parser(lang)
+            source_bytes = source.encode("utf-8")
+            tree = parser.parse(source_bytes)
+            all_imports.update(_collect_all_imports(tree, filepath))
+
+        return all_imports

@@ -24,57 +24,55 @@ def _node_line(node):
     return node.start_point[0] + 1
 
 
-def _check_forbidden_imports(tree, filepath, config):
-    """Walk AST for import_statement and import_from_statement nodes."""
-    results = []
-    forbidden = frozenset(config.forbidden_imports)
+def _collect_all_imports(tree, filepath):
+    """Walk AST and collect all imported top-level module names.
+
+    Returns a set of (package_name, file_path, line_number) tuples.
+    """
+    imports = set()
 
     def _walk(node):
         if node.type == "import_statement":
-            # import foo, bar, baz
             for child in node.children:
                 if child.type == "dotted_name":
                     module = child.text.decode("utf-8")
                     top_level = module.split(".")[0]
-                    if top_level in forbidden:
-                        results.append(LintResult(
-                            file=filepath,
-                            line=_node_line(node),
-                            rule="forbidden-import",
-                            severity="error",
-                            message=f"Library imports interface module '{top_level}'",
-                        ))
+                    imports.add((top_level, filepath, _node_line(node)))
                 elif child.type == "aliased_import":
                     name_node = child.child_by_field_name("name")
                     if name_node:
                         module = name_node.text.decode("utf-8")
                         top_level = module.split(".")[0]
-                        if top_level in forbidden:
-                            results.append(LintResult(
-                                file=filepath,
-                                line=_node_line(node),
-                                rule="forbidden-import",
-                                severity="error",
-                                message=f"Library imports interface module '{top_level}'",
-                            ))
+                        imports.add((top_level, filepath, _node_line(node)))
         elif node.type == "import_from_statement":
-            # from foo import bar
             module_node = child_by_field(node, "module_name")
             if module_node:
                 module = module_node.text.decode("utf-8")
                 top_level = module.split(".")[0]
-                if top_level in forbidden:
-                    results.append(LintResult(
-                        file=filepath,
-                        line=_node_line(node),
-                        rule="forbidden-import",
-                        severity="error",
-                        message=f"Library imports interface module '{top_level}'",
-                    ))
+                imports.add((top_level, filepath, _node_line(node)))
         for child in node.children:
             _walk(child)
 
     _walk(tree.root_node)
+    return imports
+
+
+def _check_forbidden_imports(tree, filepath, config):
+    """Walk AST for import_statement and import_from_statement nodes."""
+    results = []
+    forbidden = frozenset(config.forbidden_imports)
+    all_imports = _collect_all_imports(tree, filepath)
+
+    for pkg, fpath, line in all_imports:
+        if pkg in forbidden:
+            results.append(LintResult(
+                file=fpath,
+                line=line,
+                rule="forbidden-import",
+                severity="error",
+                message=f"Library imports interface module '{pkg}'",
+            ))
+
     return results
 
 
@@ -213,3 +211,23 @@ class PythonAstLinter:
                 results.extend(_check_stdout(tree, filepath, config))
 
         return results
+
+    def scan_imports(self, project_path: str) -> set[tuple[str, str, int]]:
+        """Collect all imported top-level module names from Python files.
+
+        Returns a set of (package_name, file_path, line_number) tuples.
+        """
+        all_imports: set[tuple[str, str, int]] = set()
+        parser = _make_parser()
+        for filepath in walk_source_files(project_path, (".py",), []):
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    source = f.read()
+            except (OSError, UnicodeDecodeError):
+                continue
+
+            source_bytes = source.encode("utf-8")
+            tree = parser.parse(source_bytes)
+            all_imports.update(_collect_all_imports(tree, filepath))
+
+        return all_imports

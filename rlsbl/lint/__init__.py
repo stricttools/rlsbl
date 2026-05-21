@@ -2,6 +2,7 @@
 
 Public API:
     lint_library(project_path) -> list[LintResult]
+    scan_imports(project_path) -> set[tuple[str, str, int]]
     LintResult  (namedtuple: file, line, rule, severity, message)
 """
 
@@ -14,7 +15,7 @@ from .config import (
 )
 from .result import LintResult
 
-__all__ = ["lint_library", "LintResult"]
+__all__ = ["lint_library", "scan_imports", "LintResult"]
 
 
 def _detect_languages(project_path: str) -> list[str]:
@@ -52,6 +53,21 @@ def _create_linter(language: str, parser_type: str):
     return None
 
 
+def _create_import_scanner(language: str):
+    """Create an AST-based import scanner for a language.
+
+    Import scanning always uses the AST parser (not regex) since it needs
+    accurate import extraction.
+    """
+    if language == "python":
+        from .python_ast import PythonAstLinter
+        return PythonAstLinter()
+    if language == "npm":
+        from .npm_ast import NpmAstLinter
+        return NpmAstLinter()
+    return None
+
+
 def lint_library(project_path: str) -> list[LintResult]:
     """Analyze a project for library boundary violations.
 
@@ -78,3 +94,29 @@ def lint_library(project_path: str) -> list[LintResult]:
             results.extend(linter.lint(project_path, config))
 
     return results
+
+
+def scan_imports(project_path: str) -> set[tuple[str, str, int]]:
+    """Collect all imports from source files in a project.
+
+    Detects languages present and uses AST-based scanners to extract
+    every import statement found.
+
+    Args:
+        project_path: path to the project root directory.
+
+    Returns a set of (package_name, file_path, line_number) tuples.
+    """
+    project_path = os.path.abspath(project_path)
+    languages = _detect_languages(project_path)
+
+    if not languages:
+        return set()
+
+    all_imports: set[tuple[str, str, int]] = set()
+    for language in languages:
+        scanner = _create_import_scanner(language)
+        if scanner is not None:
+            all_imports.update(scanner.scan_imports(project_path))
+
+    return all_imports
