@@ -250,6 +250,67 @@ class WorkspaceGraph:
         except CycleError:
             return True
 
+    def transitive_deps(self, name, depth=None):
+        """Return transitive dependency names in BFS discovery order.
+
+        Excludes the starting node. Optional *depth* limits traversal
+        (None = unlimited, 0 = empty list).  Raises KeyError if *name*
+        is not in the graph.
+        """
+        if name not in self._deps:
+            raise KeyError(name)
+        if depth is not None and depth <= 0:
+            return []
+        result = []
+        visited = {name}
+        # queue entries: (node_name, current_depth)
+        queue = []
+        for dep in self._deps[name]:
+            if dep.name not in visited:
+                visited.add(dep.name)
+                queue.append((dep.name, 1))
+                result.append(dep.name)
+        while queue:
+            current, d = queue.pop(0)
+            if depth is not None and d >= depth:
+                continue
+            for dep in self._deps.get(current, []):
+                if dep.name not in visited:
+                    visited.add(dep.name)
+                    queue.append((dep.name, d + 1))
+                    result.append(dep.name)
+        return result
+
+    def transitive_rdeps(self, name, depth=None):
+        """Return transitive reverse-dependency names in BFS discovery order.
+
+        Excludes the starting node. Optional *depth* limits traversal
+        (None = unlimited, 0 = empty list).  Raises KeyError if *name*
+        is not in the graph.
+        """
+        if name not in self._rdeps:
+            raise KeyError(name)
+        if depth is not None and depth <= 0:
+            return []
+        result = []
+        visited = {name}
+        queue = []
+        for rdep_name in self._rdeps[name]:
+            if rdep_name not in visited:
+                visited.add(rdep_name)
+                queue.append((rdep_name, 1))
+                result.append(rdep_name)
+        while queue:
+            current, d = queue.pop(0)
+            if depth is not None and d >= depth:
+                continue
+            for rdep_name in self._rdeps.get(current, []):
+                if rdep_name not in visited:
+                    visited.add(rdep_name)
+                    queue.append((rdep_name, d + 1))
+                    result.append(rdep_name)
+        return result
+
     def dep_count(self, project_name):
         """Return number of intra-workspace dependencies for a project."""
         return len(self._deps.get(project_name, []))
