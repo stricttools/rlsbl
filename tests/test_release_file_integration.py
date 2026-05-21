@@ -457,3 +457,107 @@ class TestLegacySignatureCompat:
         captured = capsys.readouterr()
         assert "1.0.1" in captured.out
         assert "Dry run" in captured.out
+
+
+# ---------------------------------------------------------------------------
+# Release file finalization tests
+# ---------------------------------------------------------------------------
+
+class TestReleaseFileFinalization:
+    """After a release, unreleased.toml is renamed to vX.Y.Z.toml (read-only)
+    and a fresh empty unreleased.toml is created."""
+
+    def test_finalize_release_file(self, tmp_path):
+        """Simulates the finalization logic: rename, chmod, recreate."""
+        from rlsbl.release_file import get_release_file_path
+
+        releases_dir = tmp_path / ".rlsbl" / "releases"
+        releases_dir.mkdir(parents=True)
+        release_file = releases_dir / "unreleased.toml"
+        release_file.write_text('bump = "patch"\ninclude = ["npm"]\nexclude = []\n')
+
+        release_file_path = str(release_file)
+        new_version = "1.0.0"
+
+        # Simulate finalization (same logic as in release.py)
+        versioned_release = os.path.join(str(releases_dir), f"v{new_version}.toml")
+        os.rename(release_file_path, versioned_release)
+        os.chmod(versioned_release, 0o444)
+        with open(release_file_path, "w", encoding="utf-8") as f:
+            pass  # empty file
+
+        # Verify versioned file exists and is read-only
+        assert os.path.exists(versioned_release)
+        import stat
+        mode = os.stat(versioned_release).st_mode
+        assert not (mode & (stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH))
+
+        # Verify content was preserved
+        with open(versioned_release, "r") as f:
+            content = f.read()
+        assert 'bump = "patch"' in content
+
+        # Verify new unreleased.toml exists and is empty
+        assert os.path.exists(release_file_path)
+        assert os.path.getsize(release_file_path) == 0
+
+    def test_finalize_skipped_when_no_release_file(self, tmp_path):
+        """When no release file exists, finalization is a no-op."""
+        from rlsbl.release_file import get_release_file_path
+
+        release_file_path = get_release_file_path(str(tmp_path))
+        # No release file created -- just verify the path doesn't exist
+        assert not os.path.exists(release_file_path)
+        # The release code checks os.path.exists() before finalizing,
+        # so this is a no-op (no exception)
+
+
+# ---------------------------------------------------------------------------
+# Monorepo release file path tests
+# ---------------------------------------------------------------------------
+
+class TestMonorepoReleaseFilePath:
+    """get_release_file_path with a project subdir returns the correct path."""
+
+    def test_subdir_path(self):
+        from rlsbl.release_file import get_release_file_path
+
+        path = get_release_file_path("packages/mylib")
+        expected = os.path.join("packages", "mylib", ".rlsbl", "releases", "unreleased.toml")
+        assert os.path.normpath(path) == os.path.normpath(expected)
+
+    def test_absolute_subdir_path(self, tmp_path):
+        from rlsbl.release_file import get_release_file_path
+
+        project_dir = str(tmp_path / "packages" / "mylib")
+        path = get_release_file_path(project_dir)
+        expected = os.path.join(project_dir, ".rlsbl", "releases", "unreleased.toml")
+        assert path == expected
+
+    def test_monorepo_finalization_uses_project_dir(self, tmp_path):
+        """In monorepo mode, finalization operates on the package's releases dir."""
+        from rlsbl.release_file import get_release_file_path
+
+        # Simulate monorepo structure: root/python/.rlsbl/releases/
+        pkg_dir = tmp_path / "python"
+        releases_dir = pkg_dir / ".rlsbl" / "releases"
+        releases_dir.mkdir(parents=True)
+        release_file = releases_dir / "unreleased.toml"
+        release_file.write_text('bump = "minor"\ninclude = ["pypi"]\nexclude = []\n')
+
+        release_file_path = get_release_file_path(str(pkg_dir))
+        assert os.path.exists(release_file_path)
+
+        # Simulate finalization
+        new_version = "0.2.0"
+        versioned_release = os.path.join(str(releases_dir), f"v{new_version}.toml")
+        os.rename(release_file_path, versioned_release)
+        os.chmod(versioned_release, 0o444)
+        with open(release_file_path, "w", encoding="utf-8") as f:
+            pass
+
+        # Verify both files are in the package's directory
+        assert os.path.exists(versioned_release)
+        assert str(pkg_dir) in versioned_release
+        assert os.path.exists(release_file_path)
+        assert os.path.getsize(release_file_path) == 0

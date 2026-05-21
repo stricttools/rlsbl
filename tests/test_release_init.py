@@ -186,3 +186,48 @@ class TestReleaseInitNoTargets:
     def test_errors_with_no_targets(self, tmp_path):
         with pytest.raises(SystemExit):
             _run_release_init(tmp_path, [])
+
+
+class TestReleaseInitMonorepo:
+    """In monorepo mode, release-init creates the file in the package directory."""
+
+    def test_creates_file_in_package_dir(self, tmp_path):
+        """When inside a monorepo package, release file goes in the package dir."""
+        from rlsbl.workspace import WORKSPACE_DIR, WORKSPACE_FILE
+
+        # Create monorepo structure
+        ws_dir = tmp_path / WORKSPACE_DIR
+        ws_dir.mkdir()
+        (ws_dir / WORKSPACE_FILE).write_text(
+            '[[projects]]\npath = "python"\nname = "mylib"\n'
+        )
+
+        # Create package directory with .rlsbl/ (scaffold creates this)
+        pkg_dir = tmp_path / "python"
+        pkg_dir.mkdir()
+        (pkg_dir / ".rlsbl").mkdir()
+
+        entries = [TargetEntry(name="pypi", path=str(pkg_dir))]
+
+        original_cwd = os.getcwd()
+        os.chdir(str(pkg_dir))
+        try:
+            with patch("rlsbl.targets.detect_targets", return_value=entries):
+                from rlsbl import cmd_release_init
+                cmd_release_init()
+        finally:
+            os.chdir(original_cwd)
+
+        # The release file should be in the package's directory, not the workspace root
+        release_path = pkg_dir / ".rlsbl" / "releases" / "unreleased.toml"
+        assert release_path.exists()
+
+        # Workspace root should NOT have a release file
+        root_release = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
+        assert not root_release.exists()
+
+        # Verify the content is valid
+        from rlsbl.release_file import read_release_file
+        cfg = read_release_file(str(release_path))
+        assert cfg.bump == "patch"
+        assert cfg.include == ["pypi"]

@@ -910,6 +910,27 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
         commit_files(f"chore: finalize changelog for {new_version}", finalize_files)
         log(f"Committed finalized changelog files")
 
+        # Finalize release file: rename unreleased.toml to vX.Y.Z.toml
+        # Only if the release file exists (backward compat with legacy path)
+        from ..release_file import get_release_file_path
+        release_file_path = get_release_file_path(version_dir)
+        if os.path.exists(release_file_path):
+            releases_dir = os.path.dirname(release_file_path)
+            versioned_release = os.path.normpath(
+                os.path.join(releases_dir, f"v{new_version}.toml")
+            )
+            os.rename(release_file_path, versioned_release)
+            os.chmod(versioned_release, 0o444)
+            # Create a fresh empty unreleased.toml
+            with open(release_file_path, "w", encoding="utf-8") as f:
+                pass  # empty file
+            release_finalize_files = [
+                os.path.normpath(versioned_release),
+                os.path.normpath(release_file_path),
+            ]
+            commit_files(f"chore: finalize release file for {new_version}", release_finalize_files)
+            log(f"Finalized release file for {new_version}")
+
         # Create local git tag
         run("git", ["tag", tag])
         log(f"Tagged: {tag}")

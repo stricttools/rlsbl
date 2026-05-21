@@ -176,8 +176,17 @@ def cmd_release(dry_run, yes, quiet, skip_remote_check, skip_tests, skip_lint, s
     _require_project_root()
 
     from .release_file import read_release_file, get_release_file_path
+    from .workspace import find_workspace_root, resolve_project
 
-    release_path = get_release_file_path(".")
+    # In monorepo mode, the release file lives in the package's directory
+    project_dir = "."
+    monorepo_root = find_workspace_root(".")
+    if monorepo_root:
+        project = resolve_project(monorepo_root, ".")
+        if project is not None:
+            project_dir = os.path.join(monorepo_root, project["path"])
+
+    release_path = get_release_file_path(project_dir)
     if not os.path.exists(release_path):
         print(
             "No release file found. Run `rlsbl release-init` to create one.",
@@ -215,13 +224,22 @@ def cmd_release_init(**_kwargs):
     _require_project_root()
     from .release_file import get_release_file_path
     from .targets import detect_targets, TargetEntry
+    from .workspace import find_workspace_root, resolve_project
 
-    release_path = get_release_file_path(".")
+    # In monorepo mode, create the release file in the package's directory
+    project_dir = "."
+    monorepo_root = find_workspace_root(".")
+    if monorepo_root:
+        project = resolve_project(monorepo_root, ".")
+        if project is not None:
+            project_dir = os.path.join(monorepo_root, project["path"])
+
+    release_path = get_release_file_path(project_dir)
     if os.path.exists(release_path):
         print(f"Error: {release_path} already exists.", file=sys.stderr)
         sys.exit(1)
 
-    entries = detect_targets(".")
+    entries = detect_targets(project_dir)
     if not entries:
         print("Error: no targets detected in the current directory.", file=sys.stderr)
         sys.exit(1)
