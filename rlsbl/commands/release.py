@@ -493,6 +493,11 @@ def run_cmd(registry, args, flags):
     # (not the monorepo root that os.chdir switched to).
     abs_project_dir = os.path.join(monorepo_root, monorepo_project_path) if monorepo_root else None
 
+    # Snapshot dirty files BEFORE any hooks run, so we can detect which files
+    # hooks create or modify (the diff between pre-hook and post-hook snapshots).
+    pre_hook_output = run("git", ["status", "--porcelain"])
+    pre_hook_dirty = parse_porcelain_paths(pre_hook_output) if pre_hook_output else set()
+
     # Run pre-checks hook if present
     pre_checks_script = os.path.join(version_dir, ".rlsbl", "hooks", "pre-checks.sh")
     if os.path.exists(pre_checks_script):
@@ -535,6 +540,12 @@ def run_cmd(registry, args, flags):
         except subprocess.TimeoutExpired:
             print(f"Error: pre-release hook timed out after {hook_timeout}s.", file=sys.stderr)
             sys.exit(1)
+
+    # Snapshot dirty files AFTER all hooks ran. Files in the diff are
+    # hook-generated and must be included in the release commit.
+    post_hook_output = run("git", ["status", "--porcelain"])
+    post_hook_dirty = parse_porcelain_paths(post_hook_output) if post_hook_output else set()
+    hook_generated = post_hook_dirty - pre_hook_dirty
 
     # Commit message: scoped in monorepo mode, plain tag otherwise
     commit_msg = f"{monorepo_name}: release v{new_version}" if monorepo_name else tag
@@ -611,6 +622,7 @@ def run_cmd(registry, args, flags):
             lock_dir=lock_dir,
             pre_existing_dirty=pre_existing_dirty,
             abs_project_dir=abs_project_dir,
+            hook_generated=hook_generated,
         )
     finally:
         release_lock()
@@ -624,7 +636,8 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                           primary_path=None, target_paths=None,
                           lock_dir=".rlsbl",
                           pre_existing_dirty=None,
-                          abs_project_dir=None):
+                          abs_project_dir=None,
+                          hook_generated=None):
     """Inner release logic that runs under the advisory lock (mutating phase)."""
     # Snapshot dirty files BEFORE any version-bump writes. This captures
     # everything dirtied by prior stages (generate_changelog, hooks, lint,
@@ -751,6 +764,13 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
     changelog_file = vpath("CHANGELOG.md")
     if changelog_file not in files_to_commit:
         files_to_commit.append(changelog_file)
+
+    # Include hook-generated files (created or modified by pre-checks/pre-release hooks)
+    if hook_generated:
+        for hf in sorted(hook_generated):
+            if hf not in files_to_commit:
+                files_to_commit.append(hf)
+                log(f"Including hook-generated file: {hf}")
 
     # Build step (no-op for npm/pypi/go targets)
     try:

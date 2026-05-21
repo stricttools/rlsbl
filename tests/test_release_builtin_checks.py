@@ -557,7 +557,7 @@ class TestTwoHookModel:
         )
         (hooks_dir / "pre-checks.sh").chmod(0o755)
 
-        mock_run.side_effect = ["", "0", "v1.0.0", ""]
+        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
 
         with (
             patch("rlsbl.commands.release._run_builtin_tests") as mock_tests,
@@ -609,7 +609,7 @@ class TestTwoHookModel:
         )
         (hooks_dir / "pre-release.sh").chmod(0o755)
 
-        mock_run.side_effect = ["", "0", "v1.0.0", ""]
+        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
 
         with (
             patch("rlsbl.commands.release._run_builtin_tests") as mock_tests,
@@ -657,7 +657,7 @@ class TestTwoHookModel:
         (hooks_dir / "pre-checks.sh").write_text("#!/bin/bash\nexit 1\n")
         (hooks_dir / "pre-checks.sh").chmod(0o755)
 
-        mock_run.side_effect = ["", "0", "v1.0.0", ""]
+        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
 
         with (
             patch("rlsbl.commands.release._run_builtin_tests") as mock_tests,
@@ -722,7 +722,7 @@ class TestFullFlowOrder:
         )
         (hooks_dir / "pre-release.sh").chmod(0o755)
 
-        mock_run.side_effect = ["", "0", "v1.0.0", ""]
+        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
 
         original_tests = _run_builtin_tests
         original_lint = _run_builtin_lint

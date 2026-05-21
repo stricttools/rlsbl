@@ -151,15 +151,17 @@ class TestMultiTargetRelease:
         # 2. git rev-list --count HEAD..origin/main (0 commits behind)
         # 3. tag -l (current tag exists) -> "v1.0.0"
         # 4. tag -l (new tag doesn't exist) -> ""
-        # 5. git status --porcelain (baseline snapshot) -> ""
-        # 6. git status --porcelain (re-check guard) -> ""
-        # 7. git rev-parse HEAD (pre_release_sha capture) -> "pre123"
+        # 5. git status --porcelain (pre-hook snapshot) -> ""
+        # 6. git status --porcelain (post-hook snapshot) -> ""
+        # 7. git status --porcelain (baseline snapshot) -> ""
+        # 8. git status --porcelain (re-check guard) -> ""
+        # 9. git rev-parse HEAD (pre_release_sha capture) -> "pre123"
         # commit_files is mocked separately (no git add/commit calls here)
-        # 8. git tag -> ""
-        # 9. git push origin tag -> ""
-        # 10. git rev-parse HEAD (pushed_sha) -> ""
-        # 11. gh release create -> "abc123"
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", "pre123", "", "", "", "abc123"]
+        # 10. git tag -> ""
+        # 11. git push origin tag -> ""
+        # 12. git rev-parse HEAD (pushed_sha) -> ""
+        # 13. gh release create -> "abc123"
+        mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", "", "", "pre123", "", "", "", "abc123"]
 
         # Mock the docs target's build and publish to track calls
         from rlsbl.targets import TARGETS
@@ -207,10 +209,11 @@ class TestMultiTargetRelease:
             json.dump({"language": "python"}, f)
 
         # Same mock sequence as test_secondary_targets_called_when_detected:
-        # 1. git fetch  2. git rev-list  3-4. tag -l x2  5. baseline snapshot
-        # 6. re-check guard  7. pre_release_sha  8. git tag  9. git push origin tag
-        # 10. pushed_sha  11. gh release create
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", "pre123", "", "", "", "abc123"]
+        # 1. git fetch  2. git rev-list  3-4. tag -l x2
+        # 5-6. pre/post-hook snapshots  7-8. baseline + re-check guard
+        # 9. pre_release_sha  10. git tag  11. git push origin tag
+        # 12. pushed_sha  13. gh release create
+        mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", "", "", "pre123", "", "", "", "abc123"]
 
         from rlsbl.targets import TARGETS
         original_build = TARGETS["docs"].build

@@ -91,7 +91,7 @@ class TestMonorepoRelease:
         # 2. git rev-list --count HEAD..origin/main -> 0
         # 3. git tag -l for current tag (tooling@v1.0.0) -> "" (first release)
         # 4. git tag -l for new tag (tooling@v1.0.0) -> "" (doesn't exist)
-        mock_run.side_effect = ["", "0", "", ""]
+        mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
             run_cmd("npm", ["patch"], {"dry-run": True, "quiet": False})
@@ -116,7 +116,7 @@ class TestMonorepoRelease:
         os.chdir(str(proj_dir))
 
         # First release (no existing tag)
-        mock_run.side_effect = ["", "0", "", ""]
+        mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
             run_cmd("npm", ["patch"], {"dry-run": True, "quiet": False})
@@ -147,7 +147,7 @@ class TestMonorepoRelease:
         # 2. git rev-list --count -> 0
         # 3. git tag -l tooling@v1.0.0 -> exists
         # 4. git tag -l tooling@v1.0.1 -> doesn't exist
-        mock_run.side_effect = ["", "0", "tooling@v1.0.0", ""]
+        mock_run.side_effect = ["", "0", "tooling@v1.0.0", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
             run_cmd("npm", ["patch"], {"dry-run": True, "quiet": False})
@@ -171,7 +171,7 @@ class TestMonorepoRelease:
         proj_dir = self._setup_monorepo(mock_git_repo, "tooling", "tooling")
         os.chdir(str(proj_dir))
 
-        mock_run.side_effect = ["", "0", "", ""]
+        mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
             run_cmd("npm", ["patch"], {"dry-run": True, "quiet": False})
@@ -247,7 +247,7 @@ class TestMonorepoRelease:
         # 2. git rev-list -> 0
         # 3. tag -l v2.0.0 -> exists
         # 4. tag -l v2.0.1 -> doesn't exist
-        mock_run.side_effect = ["", "0", "v2.0.0", ""]
+        mock_run.side_effect = ["", "0", "v2.0.0", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
             run_cmd("npm", ["patch"], {"dry-run": True, "quiet": False})
@@ -285,7 +285,7 @@ class TestMonorepoRelease:
 
         os.chdir(str(proj_dir))
 
-        mock_run.side_effect = ["", "0", "", ""]
+        mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
             run_cmd("npm", ["patch"], {"dry-run": True, "quiet": False})
@@ -321,7 +321,7 @@ class TestMonorepoRelease:
         os.chdir(str(proj_dir))
 
         # First release -- tag doesn't exist
-        mock_run.side_effect = ["", "0", "", ""]
+        mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
             run_cmd("npm", [], {"dry-run": True, "quiet": False})
@@ -388,7 +388,7 @@ class TestSubtreePublish:
         os.chdir(str(proj_dir))
 
         # First release: tag doesn't exist
-        mock_run.side_effect = ["", "0", "", ""]
+        mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
             run_cmd("npm", ["patch"], {"dry-run": True, "quiet": False})
@@ -415,7 +415,7 @@ class TestSubtreePublish:
         )
         os.chdir(str(proj_dir))
 
-        mock_run.side_effect = ["", "0", "", ""]
+        mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
             run_cmd("npm", ["patch"], {"dry-run": True, "quiet": False})

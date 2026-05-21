@@ -8,6 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from rlsbl.utils import get_hook_timeout
+from rlsbl.utils import run as real_run
 
 
 def _setup_project(tmp_path, hook_name, hook_body):
@@ -64,7 +65,7 @@ class TestPreReleaseHookOutput:
         """A successful hook is called via subprocess.run without capture_output."""
         _setup_project(tmp_project, "pre-release.sh", "#!/bin/bash\necho hello\n")
         # mock_run side effects: fetch, rev-list, tag -l current, tag -l bumped
-        mock_run.side_effect = ["", "0", "v1.0.0", ""]
+        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
 
         with patch("rlsbl.commands.release.subprocess") as mock_sp:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -109,7 +110,7 @@ class TestPreReleaseHookOutput:
     ):
         """A hook exiting with code 2 produces an error mentioning 'exited with code 2'."""
         _setup_project(tmp_project, "pre-release.sh", "#!/bin/bash\nexit 2\n")
-        mock_run.side_effect = ["", "0", "v1.0.0", ""]
+        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
 
         with patch("rlsbl.commands.release.subprocess") as mock_sp:
             mock_sp.run.side_effect = subprocess.CalledProcessError(2, "bash")
@@ -150,7 +151,7 @@ class TestPreReleaseHookOutput:
             patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}}),
             patch("rlsbl.commands.release.subprocess") as mock_sp,
         ):
-            mock_run.side_effect = ["", "0", "v1.0.0", ""]
+            mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
 
@@ -358,7 +359,7 @@ class TestHookTimeout:
         """When a pre-release hook times out, the error message includes the configured seconds."""
         monkeypatch.setenv("RLSBL_HOOK_TIMEOUT", "45")
         _setup_project(tmp_project, "pre-release.sh", "#!/bin/bash\nsleep 999\n")
-        mock_run.side_effect = ["", "0", "v1.0.0", ""]
+        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
 
         with patch("rlsbl.commands.release.subprocess") as mock_sp:
             mock_sp.run.side_effect = subprocess.TimeoutExpired("bash", 45)
@@ -402,7 +403,7 @@ class TestHookCwdStandalone:
     ):
         """In standalone mode, pre-checks hook subprocess.run gets cwd=None."""
         _setup_project(tmp_project, "pre-checks.sh", "#!/bin/bash\necho ok\n")
-        mock_run.side_effect = ["", "0", "v1.0.0", ""]
+        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
 
         with patch("rlsbl.commands.release.subprocess") as mock_sp:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -442,7 +443,7 @@ class TestHookCwdStandalone:
     ):
         """In standalone mode, pre-release hook subprocess.run gets cwd=None."""
         _setup_project(tmp_project, "pre-release.sh", "#!/bin/bash\necho ok\n")
-        mock_run.side_effect = ["", "0", "v1.0.0", ""]
+        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
 
         with patch("rlsbl.commands.release.subprocess") as mock_sp:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -567,7 +568,7 @@ class TestHookCwdMonorepo:
         # chdir to the python subproject (run_cmd detects monorepo from here)
         os.chdir(ns.python_dir)
 
-        mock_run.side_effect = ["", "0", "mypylib@v0.1.0", ""]
+        mock_run.side_effect = ["", "0", "mypylib@v0.1.0", "", "", ""]
 
         with patch("rlsbl.commands.release.subprocess") as mock_sp:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -628,7 +629,7 @@ class TestHookCwdMonorepo:
 
         os.chdir(ns.python_dir)
 
-        mock_run.side_effect = ["", "0", "mypylib@v0.1.0", ""]
+        mock_run.side_effect = ["", "0", "mypylib@v0.1.0", "", "", ""]
 
         with patch("rlsbl.commands.release.subprocess") as mock_sp:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -731,3 +732,345 @@ class TestHookCwdMonorepo:
             script_path = post_release_calls[0][0][0][1]
             assert os.path.isabs(script_path)
             assert script_path.endswith(".rlsbl/hooks/post-release.sh")
+
+
+def _git(repo, *args):
+    """Run a git command in the given repo directory."""
+    subprocess.run(
+        ["git"] + list(args),
+        cwd=str(repo),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
+def _git_head(repo):
+    """Return the HEAD commit SHA."""
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=str(repo),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.strip()
+
+
+def _git_show_files(repo, ref="HEAD"):
+    """Return set of files changed in a commit."""
+    result = subprocess.run(
+        ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", ref],
+        cwd=str(repo),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return set(result.stdout.strip().splitlines())
+
+
+def _setup_releasable_project_with_hook(repo, hook_name, hook_body):
+    """Create a git repo with a tagged v1.0.0 release, an unreleased commit,
+    and a hook script. Returns the repo path."""
+    _git(repo, "init", "-q", "-b", "main")
+    _git(repo, "config", "user.email", "test@test.local")
+    _git(repo, "config", "user.name", "Test")
+
+    # Initial release: package.json @ 1.0.0
+    (repo / "package.json").write_text(
+        json.dumps({"name": "test-pkg", "version": "1.0.0"}, indent=2) + "\n"
+    )
+    (repo / "CHANGELOG.md").write_text(
+        "# Changelog\n\n## 1.0.0\n\n- Initial release.\n"
+    )
+    changes_dir = repo / ".rlsbl" / "changes"
+    changes_dir.mkdir(parents=True)
+    (changes_dir / "unreleased.jsonl").write_text("")
+    _git(repo, "add", "package.json", "CHANGELOG.md", ".rlsbl/changes/unreleased.jsonl")
+    _git(repo, "commit", "-q", "-m", "initial")
+    _git(repo, "tag", "v1.0.0")
+
+    # Make an unreleased feature commit
+    (repo / "feature.txt").write_text("new feature\n")
+    _git(repo, "add", "feature.txt")
+    _git(repo, "commit", "-q", "-m", "add feature")
+    feature_sha = _git_head(repo)
+
+    # Cover it with a JSONL entry
+    entry = {
+        "commits": [feature_sha],
+        "user_facing": True,
+        "description": "**Add feature.** New feature.",
+        "type": "feature",
+    }
+    (changes_dir / "unreleased.jsonl").write_text(json.dumps(entry) + "\n")
+    _git(repo, "add", ".rlsbl/changes/unreleased.jsonl")
+    _git(
+        repo, "commit", "-q", "-m", "changelog: add feature entry",
+        "--trailer", "Autogenerated: true",
+    )
+
+    # Install the hook
+    hooks_dir = repo / ".rlsbl" / "hooks"
+    hooks_dir.mkdir(parents=True, exist_ok=True)
+    hook = hooks_dir / hook_name
+    hook.write_text(hook_body)
+    hook.chmod(0o755)
+    _git(repo, "add", f".rlsbl/hooks/{hook_name}")
+    _git(repo, "commit", "-q", "-m", f"add {hook_name}")
+
+    # Cover the hook commit
+    hook_sha = _git_head(repo)
+    with open(changes_dir / "unreleased.jsonl", "a") as f:
+        f.write(json.dumps({"commits": [hook_sha], "user_facing": False}) + "\n")
+    _git(repo, "add", ".rlsbl/changes/unreleased.jsonl")
+    _git(
+        repo, "commit", "-q", "-m", "changelog: cover hook commit",
+        "--trailer", "Autogenerated: true",
+    )
+
+
+def _fake_run_intercepting_remote(cmd, args=None, timeout=120, env=None):
+    """Intercept gh and git-push calls; let everything else through."""
+    if cmd == "gh":
+        return ""
+    if cmd == "git" and args and args[0] == "push":
+        return ""
+    return real_run(cmd, args=args, timeout=timeout, env=env)
+
+
+class TestHookGeneratedFiles:
+    """Tests that files created or modified by pre-release hooks are
+    included in the release commit."""
+
+    def test_hook_modified_file_included_in_commit(self, tmp_project, capsys):
+        """A pre-release hook that modifies an existing tracked file should
+        have that file included in the release commit."""
+        # Create a tracked file that the hook will modify
+        _setup_releasable_project_with_hook(
+            tmp_project,
+            "pre-release.sh",
+            "#!/bin/bash\necho 'updated by hook' > schema.json\n",
+        )
+        # Create and commit schema.json so the hook modifies a tracked file
+        (tmp_project / "schema.json").write_text("original\n")
+        _git(tmp_project, "add", "schema.json")
+        _git(tmp_project, "commit", "-q", "-m", "add schema.json")
+        schema_sha = _git_head(tmp_project)
+        changes_dir = tmp_project / ".rlsbl" / "changes"
+        with open(changes_dir / "unreleased.jsonl", "a") as f:
+            f.write(json.dumps({"commits": [schema_sha], "user_facing": False}) + "\n")
+        _git(tmp_project, "add", ".rlsbl/changes/unreleased.jsonl")
+        _git(
+            tmp_project, "commit", "-q", "-m", "changelog: cover schema commit",
+            "--trailer", "Autogenerated: true",
+        )
+
+        from rlsbl.commands.release import run_cmd
+
+        with (
+            patch("rlsbl.commands.release.check_gh_installed", return_value=True),
+            patch("rlsbl.commands.release.check_gh_auth", return_value=True),
+            patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.run", side_effect=_fake_run_intercepting_remote),
+        ):
+            run_cmd("npm", ["patch"], {"yes": True, "skip-remote-check": True})
+
+        # Verify the release commit includes schema.json
+        # The release commit is HEAD~1 (before the finalize commit)
+        result = subprocess.run(
+            ["git", "log", "--oneline", "-5"],
+            cwd=str(tmp_project),
+            capture_output=True, text=True, check=True,
+        )
+        # Find the release commit (message is "v1.0.1")
+        release_sha = None
+        for line in result.stdout.strip().splitlines():
+            if "v1.0.1" in line and "finalize" not in line:
+                release_sha = line.split()[0]
+                break
+        assert release_sha is not None, (
+            f"could not find release commit in log:\n{result.stdout}"
+        )
+
+        files_in_release_commit = _git_show_files(tmp_project, release_sha)
+        assert "schema.json" in files_in_release_commit, (
+            f"schema.json should be in the release commit, got: {files_in_release_commit}"
+        )
+
+        captured = capsys.readouterr()
+        assert "Including hook-generated file: schema.json" in captured.out
+
+    def test_hook_created_new_file_included_in_commit(self, tmp_project, capsys):
+        """A pre-checks hook that creates a new untracked file should have
+        that file included in the release commit."""
+        _setup_releasable_project_with_hook(
+            tmp_project,
+            "pre-checks.sh",
+            "#!/bin/bash\necho 'generated' > generated_output.txt\n",
+        )
+
+        from rlsbl.commands.release import run_cmd
+
+        with (
+            patch("rlsbl.commands.release.check_gh_installed", return_value=True),
+            patch("rlsbl.commands.release.check_gh_auth", return_value=True),
+            patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.run", side_effect=_fake_run_intercepting_remote),
+        ):
+            run_cmd("npm", ["patch"], {"yes": True, "skip-remote-check": True})
+
+        # Find the release commit
+        result = subprocess.run(
+            ["git", "log", "--oneline", "-5"],
+            cwd=str(tmp_project),
+            capture_output=True, text=True, check=True,
+        )
+        release_sha = None
+        for line in result.stdout.strip().splitlines():
+            if "v1.0.1" in line and "finalize" not in line:
+                release_sha = line.split()[0]
+                break
+        assert release_sha is not None, (
+            f"could not find release commit in log:\n{result.stdout}"
+        )
+
+        files_in_release_commit = _git_show_files(tmp_project, release_sha)
+        assert "generated_output.txt" in files_in_release_commit, (
+            f"generated_output.txt should be in the release commit, got: {files_in_release_commit}"
+        )
+
+        captured = capsys.readouterr()
+        assert "Including hook-generated file: generated_output.txt" in captured.out
+
+    def test_no_hooks_no_extra_files(self, tmp_project):
+        """When no hooks exist, no extra hook-generated files are included."""
+        # Set up a project WITHOUT any hooks
+        _git(tmp_project, "init", "-q", "-b", "main")
+        _git(tmp_project, "config", "user.email", "test@test.local")
+        _git(tmp_project, "config", "user.name", "Test")
+
+        (tmp_project / "package.json").write_text(
+            json.dumps({"name": "test-pkg", "version": "1.0.0"}, indent=2) + "\n"
+        )
+        (tmp_project / "CHANGELOG.md").write_text(
+            "# Changelog\n\n## 1.0.0\n\n- Initial release.\n"
+        )
+        changes_dir = tmp_project / ".rlsbl" / "changes"
+        changes_dir.mkdir(parents=True)
+        (changes_dir / "unreleased.jsonl").write_text("")
+        _git(tmp_project, "add", "package.json", "CHANGELOG.md", ".rlsbl/changes/unreleased.jsonl")
+        _git(tmp_project, "commit", "-q", "-m", "initial")
+        _git(tmp_project, "tag", "v1.0.0")
+
+        (tmp_project / "feature.txt").write_text("new feature\n")
+        _git(tmp_project, "add", "feature.txt")
+        _git(tmp_project, "commit", "-q", "-m", "add feature")
+        feature_sha = _git_head(tmp_project)
+        entry = {
+            "commits": [feature_sha],
+            "user_facing": True,
+            "description": "**Feature.** Something new.",
+            "type": "feature",
+        }
+        (changes_dir / "unreleased.jsonl").write_text(json.dumps(entry) + "\n")
+        _git(tmp_project, "add", ".rlsbl/changes/unreleased.jsonl")
+        _git(
+            tmp_project, "commit", "-q", "-m", "changelog: add feature",
+            "--trailer", "Autogenerated: true",
+        )
+
+        from rlsbl.commands.release import run_cmd
+
+        with (
+            patch("rlsbl.commands.release.check_gh_installed", return_value=True),
+            patch("rlsbl.commands.release.check_gh_auth", return_value=True),
+            patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.run", side_effect=_fake_run_intercepting_remote),
+        ):
+            run_cmd("npm", ["patch"], {"yes": True, "quiet": True, "skip-remote-check": True})
+
+        # Verify that the release completed
+        pkg = json.loads((tmp_project / "package.json").read_text())
+        assert pkg["version"] == "1.0.1"
+
+        # Verify no unexpected files snuck into the release commit
+        result = subprocess.run(
+            ["git", "log", "--oneline", "-5"],
+            cwd=str(tmp_project),
+            capture_output=True, text=True, check=True,
+        )
+        release_sha = None
+        for line in result.stdout.strip().splitlines():
+            if "v1.0.1" in line and "finalize" not in line:
+                release_sha = line.split()[0]
+                break
+        assert release_sha is not None
+
+        files_in_release_commit = _git_show_files(tmp_project, release_sha)
+        # Only expected files: package.json, CHANGELOG.md, .rlsbl/version
+        for f in files_in_release_commit:
+            assert f in (
+                "package.json", "CHANGELOG.md", ".rlsbl/version",
+            ), f"unexpected file in release commit: {f}"
+
+    def test_pre_existing_dirty_file_not_included(self, tmp_project):
+        """A file that was dirty BEFORE hooks ran should NOT be treated as
+        hook-generated, even if it's still dirty after hooks complete."""
+        _setup_releasable_project_with_hook(
+            tmp_project,
+            "pre-release.sh",
+            "#!/bin/bash\necho 'hook ran'\n",  # Hook does NOT touch the dirty file
+        )
+
+        # Create and commit a file, then dirty it before release
+        (tmp_project / "notes.txt").write_text("original\n")
+        _git(tmp_project, "add", "notes.txt")
+        _git(tmp_project, "commit", "-q", "-m", "add notes")
+        notes_sha = _git_head(tmp_project)
+        changes_dir = tmp_project / ".rlsbl" / "changes"
+        with open(changes_dir / "unreleased.jsonl", "a") as f:
+            f.write(json.dumps({"commits": [notes_sha], "user_facing": False}) + "\n")
+        _git(tmp_project, "add", ".rlsbl/changes/unreleased.jsonl")
+        _git(
+            tmp_project, "commit", "-q", "-m", "changelog: cover notes commit",
+            "--trailer", "Autogenerated: true",
+        )
+
+        # Dirty the file BEFORE the release starts
+        (tmp_project / "notes.txt").write_text("modified before release\n")
+
+        from rlsbl.commands.release import run_cmd
+
+        with (
+            patch("rlsbl.commands.release.check_gh_installed", return_value=True),
+            patch("rlsbl.commands.release.check_gh_auth", return_value=True),
+            patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.run", side_effect=_fake_run_intercepting_remote),
+        ):
+            run_cmd(
+                "npm", ["patch"],
+                {"yes": True, "quiet": True, "skip-remote-check": True, "allow-dirty": True},
+            )
+
+        # Verify the release completed
+        pkg = json.loads((tmp_project / "package.json").read_text())
+        assert pkg["version"] == "1.0.1"
+
+        # notes.txt should NOT be in the release commit (it was pre-existing dirty)
+        result = subprocess.run(
+            ["git", "log", "--oneline", "-5"],
+            cwd=str(tmp_project),
+            capture_output=True, text=True, check=True,
+        )
+        release_sha = None
+        for line in result.stdout.strip().splitlines():
+            if "v1.0.1" in line and "finalize" not in line:
+                release_sha = line.split()[0]
+                break
+        assert release_sha is not None
+
+        files_in_release_commit = _git_show_files(tmp_project, release_sha)
+        assert "notes.txt" not in files_in_release_commit, (
+            "notes.txt was dirty before hooks and should NOT be in the release commit"
+        )

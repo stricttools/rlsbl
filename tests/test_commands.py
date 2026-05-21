@@ -681,7 +681,9 @@ class TestRelease(unittest.TestCase):
         # 2. git rev-list --count HEAD..origin/main (0 commits behind)
         # 3. tag -l for current version (exists -> bump)
         # 4. tag -l for bumped version (doesn't exist -> proceed)
-        mock_run.side_effect = ["", "0", "v1.0.0", ""]
+        # 5. git status --porcelain (pre-hook snapshot)
+        # 6. git status --porcelain (post-hook snapshot)
+        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
 
         from rlsbl.commands.release import run_cmd
 
@@ -749,6 +751,8 @@ class TestRelease(unittest.TestCase):
             subprocess.CalledProcessError(1, "git"),  # git fetch fails
             "v1.0.0",  # tag -l for current version (exists)
             "",         # tag -l for bumped version (doesn't exist)
+            "",         # git status --porcelain (pre-hook snapshot)
+            "",         # git status --porcelain (post-hook snapshot)
         ]
 
         # Should reach dry-run exit without aborting
@@ -771,6 +775,8 @@ class TestRelease(unittest.TestCase):
         mock_run.side_effect = [
             "v1.0.0",  # tag -l for current version (exists)
             "",         # tag -l for bumped version (doesn't exist)
+            "",         # git status --porcelain (pre-hook snapshot)
+            "",         # git status --porcelain (post-hook snapshot)
         ]
 
         with patch("sys.stdout", new_callable=StringIO):
@@ -833,6 +839,9 @@ class TestReleaseCommitTrailers(unittest.TestCase):
             "0",              # git rev-list --count HEAD..origin/main
             "v1.0.0",         # git tag -l v1.0.0 (exists -> bump)
             "",               # git tag -l v1.0.1 (doesn't exist)
+            "",               # git status --porcelain (pre-hook snapshot)
+            "",               # git status --porcelain (post-hook snapshot)
+            "",               # git status --porcelain (baseline_dirty in _run_release_mutating)
             "",               # git status --porcelain (re-check guard)
             "package.json",   # git diff --name-only -- package.json
             "M package.json", # git status --porcelain -- package.json
@@ -881,6 +890,9 @@ class TestReleaseCommitTrailers(unittest.TestCase):
             "0",              # git rev-list --count HEAD..origin/main
             "v1.0.0",         # git tag -l v1.0.0 (exists -> bump)
             "",               # git tag -l v1.0.1 (doesn't exist)
+            "",               # git status --porcelain (pre-hook snapshot)
+            "",               # git status --porcelain (post-hook snapshot)
+            "",               # git status --porcelain (baseline_dirty in _run_release_mutating)
             "",               # git status --porcelain (re-check guard)
             "package.json",   # git diff --name-only -- package.json
             "M package.json", # git status --porcelain -- package.json

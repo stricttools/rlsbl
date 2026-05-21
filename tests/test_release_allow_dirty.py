@@ -62,7 +62,9 @@ class TestReleaseAllowDirty(unittest.TestCase):
         # 3. git rev-list --count HEAD..origin/main
         # 4. tag -l for current version (exists -> bump)
         # 5. tag -l for bumped version (doesn't exist -> proceed)
-        mock_run.side_effect = [" M notes.txt", "", "0", "v1.0.0", ""]
+        # 6. git status --porcelain (pre-hook snapshot)
+        # 7. git status --porcelain (post-hook snapshot)
+        mock_run.side_effect = [" M notes.txt", "", "0", "v1.0.0", "", " M notes.txt", " M notes.txt"]
 
         with patch("sys.stdout", new_callable=StringIO):
             # Should not raise SystemExit
@@ -107,11 +109,13 @@ class TestReleaseAllowDirty(unittest.TestCase):
 
         mock_run.side_effect = [
             # run_cmd phase:
-            porcelain_dirty,  # git status --porcelain (capture pre-existing dirty)
-            "",               # git fetch origin --quiet
-            "0",              # git rev-list --count HEAD..origin/main
-            "v1.0.0",         # git tag -l v1.0.0 (exists -> bump)
-            "",               # git tag -l v1.0.1 (doesn't exist -> proceed)
+            porcelain_dirty,    # git status --porcelain (capture pre-existing dirty)
+            "",                 # git fetch origin --quiet
+            "0",                # git rev-list --count HEAD..origin/main
+            "v1.0.0",           # git tag -l v1.0.0 (exists -> bump)
+            "",                 # git tag -l v1.0.1 (doesn't exist -> proceed)
+            porcelain_dirty,    # git status --porcelain (pre-hook snapshot)
+            porcelain_dirty,    # git status --porcelain (post-hook snapshot)
             # _run_release_mutating phase:
             porcelain_dirty,    # git status --porcelain (baseline snapshot)
             porcelain_recheck,  # git status --porcelain (re-check guard)
@@ -168,6 +172,8 @@ class TestReleaseAllowDirty(unittest.TestCase):
             "0",                # git rev-list --count HEAD..origin/main
             "v1.0.0",           # git tag -l v1.0.0 (exists -> bump)
             "",                 # git tag -l v1.0.1 (doesn't exist -> proceed)
+            porcelain_dirty,    # git status --porcelain (pre-hook snapshot)
+            porcelain_dirty,    # git status --porcelain (post-hook snapshot)
             # _run_release_mutating phase:
             porcelain_dirty,    # git status --porcelain (baseline snapshot)
             porcelain_recheck,  # git status --porcelain (re-check guard) -- has surprise.txt
