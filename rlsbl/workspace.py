@@ -66,12 +66,28 @@ def load_workspace(root):
 def save_workspace(root, projects):
     """Write workspace.toml atomically using tomlkit for clean TOML output.
 
+    Preserves top-level sections, comments, and formatting from the existing
+    file by reading it with tomlkit first and modifying the ``[[projects]]``
+    array in-place.  Falls back to creating a new document when the file does
+    not yet exist.
+
     Creates .rlsbl-monorepo/ directory if it doesn't exist.
     """
     ws_dir = os.path.join(root, WORKSPACE_DIR)
     os.makedirs(ws_dir, exist_ok=True)
 
-    doc = tomlkit.document()
+    target = os.path.join(ws_dir, WORKSPACE_FILE)
+
+    # Read existing document to preserve non-project sections/comments.
+    if os.path.isfile(target):
+        with open(target, encoding="utf-8") as f:
+            doc = tomlkit.loads(f.read())
+        # Remove old projects key so we can replace it.
+        if "projects" in doc:
+            del doc["projects"]
+    else:
+        doc = tomlkit.document()
+
     if not projects:
         # Empty AoT produces no output in tomlkit; use inline array instead
         doc.add("projects", tomlkit.array())
@@ -87,7 +103,6 @@ def save_workspace(root, projects):
             aot.append(table)
         doc.add("projects", aot)
 
-    target = os.path.join(ws_dir, WORKSPACE_FILE)
     tmp = target + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         f.write(tomlkit.dumps(doc))
