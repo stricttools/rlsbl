@@ -217,3 +217,11 @@ fast = false
 pure = true
 needs_network = false
 depends_on = []
+
+[checks.deps-stale]
+tags = []
+severity = "error"
+fast = false
+pure = true
+needs_network = false
+depends_on = []

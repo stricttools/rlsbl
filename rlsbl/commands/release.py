@@ -748,6 +748,50 @@ def run_cmd(release_config_or_registry, flags_or_args=None, flags=None):
                 _update_last_build_release(version_dir, new_version)
 
 
+def _print_stale_dep_advisory(monorepo_name, new_version, version_dir):
+    """Print advisory about downstream packages with stale constraints.
+
+    After releasing a package, checks if any workspace package that depends
+    on the just-released package has a constraint that no longer satisfies
+    the new version. Prints to stderr as a non-blocking advisory.
+    """
+    try:
+        from .monorepo import _evaluate_constraint
+        from ..workspace_graph import WorkspaceGraph
+
+        projects = load_workspace(".")
+        graph = WorkspaceGraph(".", projects)
+
+        # Find direct dependents of the released package
+        dependents = graph.dependents(monorepo_name)
+        if not dependents:
+            return
+
+        stale_lines = []
+        for dep_name in dependents:
+            deps = graph.dependencies(dep_name)
+            for dep in deps:
+                if dep.name != monorepo_name:
+                    continue
+                if dep.dep_type != "versioned":
+                    continue
+                status = _evaluate_constraint(dep.constraint, new_version)
+                if status == "outdated":
+                    stale_lines.append(
+                        f"  {dep_name} depends on {monorepo_name} "
+                        f"{dep.constraint} but {monorepo_name} is now {new_version}\n"
+                        f"    Suggested: update to >={new_version}"
+                    )
+
+        if stale_lines:
+            print("! Stale dependency constraints:", file=sys.stderr)
+            for line in stale_lines:
+                print(line, file=sys.stderr)
+    except Exception:
+        # Advisory is non-blocking; swallow errors silently
+        pass
+
+
 def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current_version,
                           bump_type, tag, branch, changelog_entry, target,
                           secondary_targets=None, monorepo_name=None,
@@ -1168,6 +1212,10 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
             log(f"Regenerated monorepo snapshot: {rel_path}")
         except Exception as e:
             print(f"Warning: snapshot regeneration failed: {e}", file=sys.stderr)
+
+    # Advisory: constraint propagation
+    if monorepo_name:
+        _print_stale_dep_advisory(monorepo_name, new_version, version_dir)
 
     # Hint: how to watch CI for this release (uses SHA captured before post-release hooks)
     log(f"Watch CI: rlsbl watch {pushed_sha}")

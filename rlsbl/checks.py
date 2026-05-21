@@ -782,6 +782,60 @@ def register_checks(app):
             )
         return CheckResult("pass", "no undeclared workspace dependencies")
 
+    @app.check("deps-stale")
+    def check_deps_stale(ctx):
+        """Intra-workspace dependency constraints must satisfy current versions."""
+        if not isinstance(ctx, WorkspaceCheckContext):
+            return CheckResult("skip", "not a monorepo workspace")
+
+        from .commands.monorepo import _evaluate_constraint
+        from .targets import TARGETS, detect_targets
+
+        root = str(ctx.workspace_root)
+
+        # Build version lookup: project name -> current version
+        project_versions = {}
+        for proj in ctx.projects:
+            proj_dir = os.path.join(root, proj["path"])
+            target_entries = detect_targets(proj_dir)
+            for entry in target_entries:
+                target = TARGETS.get(entry.name)
+                if target is None:
+                    continue
+                try:
+                    version = target.read_version(entry.path)
+                except Exception:
+                    continue
+                if version:
+                    project_versions[proj["name"]] = version
+                    break
+
+        errors = []
+        for proj in ctx.projects:
+            name = proj["name"]
+            deps = ctx.graph.dependencies(name)
+            for dep in deps:
+                # Only evaluate versioned constraints (not workspace/path/explicit)
+                if dep.dep_type != "versioned":
+                    continue
+                current_version = project_versions.get(dep.name)
+                if current_version is None:
+                    continue
+                status = _evaluate_constraint(dep.constraint, current_version)
+                if status == "outdated":
+                    errors.append(
+                        f"{name} depends on {dep.name} {dep.constraint} "
+                        f"but {dep.name} is now {current_version}"
+                    )
+
+        if errors:
+            return CheckResult(
+                "fail",
+                f"{len(errors)} stale dependency constraint(s)",
+                details=errors,
+            )
+        return CheckResult("pass", "all intra-workspace constraints are current")
+
     # ------------------------------------------------------------------
     # Layer violations
     # ------------------------------------------------------------------
