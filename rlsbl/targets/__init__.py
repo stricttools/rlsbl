@@ -14,6 +14,7 @@ from .spec import SpecTarget
 from .hex import HexTarget
 from .deno import DenoTarget
 from .cargo import CargoTarget
+from .dart import DartTarget
 from .docker import DockerTarget
 from .maven import MavenTarget
 from .zig import ZigTarget
@@ -40,6 +41,7 @@ TARGETS = {
     "hex": HexTarget(),
     "deno": DenoTarget(),
     "cargo": CargoTarget(),
+    "dart": DartTarget(),
     "docker": DockerTarget(),
     "maven": MavenTarget(),
     "zig": ZigTarget(),
