@@ -320,7 +320,7 @@ class TestPublishRouterScale:
         assert isinstance(parsed, dict)
 
     def test_job_count(self, tmp_path):
-        """Inline publish router has exactly 30 project jobs (1 per project)."""
+        """Inline publish router has 30 project jobs + 1 no-op job."""
         root = str(tmp_path)
         projects = _make_projects_on_disk(root, PROJECT_COUNT)
         with patch(
@@ -329,7 +329,7 @@ class TestPublishRouterScale:
         ):
             content = generate_inline_publish_router(projects, root)
         parsed = yaml.safe_load(content)
-        assert len(parsed["jobs"]) == PROJECT_COUNT
+        assert len(parsed["jobs"]) == PROJECT_COUNT + 1  # +1 for no-op job
 
     def test_no_duplicate_job_names(self, tmp_path):
         """All job names in inline publish router are unique."""

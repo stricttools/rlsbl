@@ -605,8 +605,9 @@ class TestGenerateInlinePublishRouter:
             result = generate_inline_publish_router(projects, root)
 
         parsed = yaml.safe_load(result)
-        assert len(parsed["jobs"]) == 1
+        assert len(parsed["jobs"]) == 2  # 1 project job + 1 no-op
         assert "mypkg-pypi" in parsed["jobs"]
+        assert "no-op" in parsed["jobs"]
 
     def test_multi_project_workspace(self, tmp_path):
         root = str(tmp_path)
@@ -624,9 +625,10 @@ class TestGenerateInlinePublishRouter:
             result = generate_inline_publish_router(projects, root)
 
         parsed = yaml.safe_load(result)
-        assert len(parsed["jobs"]) == 2
+        assert len(parsed["jobs"]) == 3  # 2 project jobs + 1 no-op
         assert "mypkg-pypi" in parsed["jobs"]
         assert "mylib-npm" in parsed["jobs"]
+        assert "no-op" in parsed["jobs"]
 
     def test_output_starts_with_header(self, tmp_path):
         root = str(tmp_path)
@@ -1056,8 +1058,8 @@ class TestIntegrationRealWorkflows:
         assert isinstance(parsed, dict), "Output must be valid YAML"
         jobs = parsed["jobs"]
 
-        # pylib has 1 job, jslib has 1 job, golib has 2 jobs = 4 total
-        assert len(jobs) == 4
+        # pylib has 1 job, jslib has 1 job, golib has 2 jobs + 1 no-op = 5 total
+        assert len(jobs) == 5
 
         # All expected jobs present
         assert "pylib-pypi" in jobs
