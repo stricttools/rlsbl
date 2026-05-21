@@ -123,3 +123,121 @@ def read_release_file(path: str) -> ReleaseConfig:
         exclude=list(exclude),
         targets=targets,
     )
+
+
+@dataclass
+class BatchReleaseConfig:
+    """Configuration from a batch release TOML file (monorepo)."""
+
+    packages: dict[str, ReleaseConfig]  # package name -> config
+
+
+def get_batch_release_file_path(workspace_root: str = ".") -> str:
+    """Return the path to .rlsbl-monorepo/releases/unreleased.toml."""
+    return os.path.join(workspace_root, ".rlsbl-monorepo", "releases", "unreleased.toml")
+
+
+def read_batch_release_file(path: str) -> BatchReleaseConfig:
+    """Read and validate a batch release TOML file.
+
+    Expects [packages.<name>] sections, each with the same fields
+    as a single ReleaseConfig (bump, include, exclude, optional targets).
+
+    Raises FileNotFoundError if the file doesn't exist.
+    Raises ValueError for schema/validation failures.
+    """
+    with open(path, "r", encoding="utf-8") as f:
+        data = tomlkit.load(f)
+
+    if "packages" not in data:
+        raise ValueError("missing required section: [packages]")
+
+    packages_raw = data["packages"]
+    if not isinstance(packages_raw, dict):
+        raise ValueError("[packages] must be a table of package configurations")
+
+    if not packages_raw:
+        raise ValueError("[packages] is empty -- at least one package is required")
+
+    packages = {}
+    for pkg_name, pkg_data in packages_raw.items():
+        if not isinstance(pkg_data, dict):
+            raise ValueError(
+                f"[packages.{pkg_name}] must be a table"
+            )
+
+        # --- bump ---
+        if "bump" not in pkg_data:
+            raise ValueError(f"[packages.{pkg_name}] missing required field: bump")
+        bump = pkg_data["bump"]
+        if not isinstance(bump, str) or bump not in VALID_BUMP_TYPES:
+            raise ValueError(
+                f"[packages.{pkg_name}] invalid bump value: {bump!r} "
+                f"(must be one of {VALID_BUMP_TYPES})"
+            )
+
+        # --- include ---
+        if "include" not in pkg_data:
+            raise ValueError(f"[packages.{pkg_name}] missing required field: include")
+        include = pkg_data["include"]
+        if not isinstance(include, list) or not all(isinstance(s, str) for s in include):
+            raise ValueError(f"[packages.{pkg_name}] include must be a list of strings")
+
+        # --- exclude ---
+        if "exclude" not in pkg_data:
+            raise ValueError(f"[packages.{pkg_name}] missing required field: exclude")
+        exclude = pkg_data["exclude"]
+        if not isinstance(exclude, list) or not all(isinstance(s, str) for s in exclude):
+            raise ValueError(f"[packages.{pkg_name}] exclude must be a list of strings")
+
+        # --- include/exclude overlap ---
+        overlap = set(include) & set(exclude)
+        if overlap:
+            raise ValueError(
+                f"[packages.{pkg_name}] targets appear in both include and exclude: "
+                f"{sorted(overlap)}"
+            )
+
+        # --- targets section (optional) ---
+        targets_raw = pkg_data.get("targets", {})
+        targets = {}
+        if targets_raw:
+            if not isinstance(targets_raw, dict):
+                raise ValueError(
+                    f"[packages.{pkg_name}] targets must be a table"
+                )
+            include_set = set(include)
+            for tname, tcfg in targets_raw.items():
+                if tname not in include_set:
+                    raise ValueError(
+                        f"[packages.{pkg_name}] target config for {tname!r} "
+                        "but it is not in include"
+                    )
+                if not isinstance(tcfg, dict):
+                    raise ValueError(
+                        f"[packages.{pkg_name}] target config for {tname!r} "
+                        "must be a table"
+                    )
+                for key, value in tcfg.items():
+                    if key == "mode":
+                        if value not in VALID_TARGET_MODES:
+                            raise ValueError(
+                                f"[packages.{pkg_name}] invalid mode for target "
+                                f"{tname!r}: {value!r} "
+                                f"(must be one of {VALID_TARGET_MODES})"
+                            )
+                    else:
+                        raise ValueError(
+                            f"[packages.{pkg_name}] unknown field {key!r} "
+                            f"in target config for {tname!r}"
+                        )
+                targets[tname] = dict(tcfg)
+
+        packages[pkg_name] = ReleaseConfig(
+            bump=bump,
+            include=list(include),
+            exclude=list(exclude),
+            targets=targets,
+        )
+
+    return BatchReleaseConfig(packages=packages)

@@ -1,4 +1,4 @@
-"""Monorepo workspace management commands: init, add, remove, list, sync, status, outdated, release-order, check-names, graph, and impact."""
+"""Monorepo workspace management commands: init, add, remove, list, sync, status, outdated, release-order, check-names, graph, impact, and batch release."""
 
 from .commands import (
     _cmd_init,
@@ -12,6 +12,8 @@ from .commands import (
     _evaluate_constraint,
     _parse_version_tuple,
 )
+
+from .batch_release import _cmd_batch_release
 
 from .graph import _cmd_graph
 
@@ -39,6 +41,7 @@ __all__ = [
     "_cmd_outdated",
     "_cmd_release_order",
     "_cmd_check_names",
+    "_cmd_batch_release",
     "_cmd_graph",
     "_cmd_impact",
     "_cmd_snapshot",
