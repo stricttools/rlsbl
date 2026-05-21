@@ -1,0 +1,1 @@
+{"commits":["3f8505d1ee6a05830e411f6f2efd1583a0b3d2c0"],"user_facing":true,"description":"**Fix PyPI build for subdirectory targets.** `uv build --out-dir` no longer produces a doubled path (e.g. `pypi/pypi/dist`) when the pypi target lives in a subdirectory.","type":"fix"}
