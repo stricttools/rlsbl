@@ -236,8 +236,7 @@ class PypiTarget(BaseTarget):
                 return
 
         # No monorepo or no path deps -- build in place
-        dist_dir = os.path.join(dir_path, "dist")
-        run("uv", ["build", "--out-dir", dist_dir], env=os.environ, cwd=dir_path)
+        run("uv", ["build", "--out-dir", "dist"], env=os.environ, cwd=dir_path)
 
     # Directories excluded when copying the project to a temp build dir
     _COPY_EXCLUDE = {".git", "__pycache__", ".rlsbl", ".rlsbl-monorepo", "dist"}
@@ -269,7 +268,7 @@ class PypiTarget(BaseTarget):
                 f.write(rewritten_content)
 
             # Build in the temp dir, output to the real project's dist/
-            dist_dir = os.path.join(dir_path, "dist")
+            dist_dir = os.path.abspath(os.path.join(dir_path, "dist"))
             os.makedirs(dist_dir, exist_ok=True)
             subprocess.run(
                 ["uv", "build", "--out-dir", dist_dir],
