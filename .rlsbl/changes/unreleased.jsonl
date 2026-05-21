@@ -1,2 +1,3 @@
 {"commits":["3f8505d1ee6a05830e411f6f2efd1583a0b3d2c0"],"user_facing":true,"description":"**Fix PyPI build for subdirectory targets.** `uv build --out-dir` no longer produces a doubled path (e.g. `pypi/pypi/dist`) when the pypi target lives in a subdirectory.","type":"fix"}
 {"commits":["cc1f8a5d980f0db401c0709f9ee092c9f8220307"],"user_facing":true,"description":"**Hook-generated files included in release commit.** Files modified or created by pre-checks and pre-release hooks are now automatically detected and included in the release commit, instead of being left dirty.","type":"feature"}
+{"commits":["5afd1249e805b9d26e9523b3d21275c9900e51a5"],"user_facing":false}
