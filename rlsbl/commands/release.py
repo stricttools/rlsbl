@@ -309,11 +309,67 @@ def _sync_lockfiles(target_paths, files_to_commit, log):
                     log(f"Lockfile updated: {lockfile}")
 
 
-def run_cmd(registry, args, flags):
+def run_cmd(release_config_or_registry, flags_or_args=None, flags=None):
     """Release command handler.
+
+    Primary signature: run_cmd(ReleaseConfig, flags)
+        Called by the CLI entry point with a validated release file config.
+
+    Legacy signature: run_cmd(registry_str, args_list, flags)
+        Supported for backward compatibility with existing tests.
 
     Bumps version, commits, pushes, and creates a GitHub Release.
     """
+    from ..release_file import ReleaseConfig
+
+    if isinstance(release_config_or_registry, ReleaseConfig):
+        # New path: ReleaseConfig from the release file
+        release_config = release_config_or_registry
+        if flags is not None:
+            raise TypeError("run_cmd(ReleaseConfig, flags) takes exactly 2 args")
+        flags = flags_or_args if flags_or_args is not None else {}
+
+        if not release_config.include:
+            print("Error: release file has an empty include list. Add at least one target.", file=sys.stderr)
+            sys.exit(1)
+        registry = release_config.include[0]
+
+        # Validate that all included/excluded targets are known
+        for t_name in release_config.include + release_config.exclude:
+            if t_name not in TARGETS:
+                print(
+                    f"Error: unknown target '{t_name}' in release file. "
+                    f"Valid: {', '.join(TARGETS.keys())}",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+
+        # Validate exhaustiveness: include + exclude must cover all detected targets
+        detected = {entry.name for entry in detect_targets(".")}
+        declared = set(release_config.include) | set(release_config.exclude)
+        missing = detected - declared
+        extra = declared - detected
+        if missing:
+            print(
+                f"Error: detected targets not in release file: {', '.join(sorted(missing))}. "
+                "Add them to include or exclude.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        if extra:
+            print(
+                f"Warning: release file lists targets not detected in project: {', '.join(sorted(extra))}",
+                file=sys.stderr,
+            )
+
+        bump_arg = release_config.bump
+        args = [bump_arg]
+    else:
+        # Legacy path: run_cmd(registry, args, flags)
+        registry = release_config_or_registry
+        args = flags_or_args if flags_or_args is not None else []
+        flags = flags if flags is not None else {}
+
     quiet = flags.get("quiet", False)
 
     def log(msg):

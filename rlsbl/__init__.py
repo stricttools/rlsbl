@@ -165,19 +165,32 @@ app.set_check_context(_check_context_factory)
 # release
 # ---------------------------------------------------------------------------
 
-@app.command(name="release", help="Bump the project version, validate the changelog, commit, tag, push, and create a GitHub Release. Supports patch, minor, and major bumps with dry-run preview and non-interactive mode for CI.")
-@strictcli.flag(name="target", type=str, help="Target a specific registry (auto-detected if omitted)", default="")
+@app.command(name="release", help="Bump the project version, validate the changelog, commit, tag, push, and create a GitHub Release. Reads bump type and target selection from .rlsbl/releases/unreleased.toml (create with rlsbl release-init). Supports dry-run preview and non-interactive mode for CI.")
 @strictcli.flag(name="skip-remote-check", type=bool, help="Skip the remote-ahead check")
 @strictcli.flag(name="skip-tests", type=bool, help="Skip built-in test execution")
 @strictcli.flag(name="skip-lint", type=bool, help="Skip built-in library lint")
 @strictcli.flag(name="skip-docs", type=bool, help="Skip selfdoc documentation check")
 @strictcli.flag(name="allow-dirty", type=bool, help="Allow releasing with a dirty working tree")
 @strictcli.flag(name="no-tag", type=bool, help="Disable ecosystem tagging for this invocation")
-@strictcli.arg(name="bump", help="Bump type: patch, minor, or major", required=False)
-def cmd_release(target, dry_run, yes, quiet, skip_remote_check, skip_tests, skip_lint, skip_docs, allow_dirty, no_tag, bump=None):
+def cmd_release(dry_run, yes, quiet, skip_remote_check, skip_tests, skip_lint, skip_docs, allow_dirty, no_tag, **_kwargs):
     _require_project_root()
-    registry = _resolve_target(target or None)
-    args = [bump] if bump else []
+
+    from .release_file import read_release_file, get_release_file_path
+
+    release_path = get_release_file_path(".")
+    if not os.path.exists(release_path):
+        print(
+            "No release file found. Run `rlsbl release-init` to create one.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    try:
+        release_config = read_release_file(release_path)
+    except ValueError as e:
+        print(f"Error in release file: {e}", file=sys.stderr)
+        sys.exit(1)
+
     flags = {
         "dry-run": dry_run,
         "yes": yes,
@@ -190,7 +203,7 @@ def cmd_release(target, dry_run, yes, quiet, skip_remote_check, skip_tests, skip
         "no-tag": no_tag,
     }
     from .commands.release import run_cmd
-    run_cmd(registry, args, flags)
+    run_cmd(release_config, flags)
 
 
 # ---------------------------------------------------------------------------
