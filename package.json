@@ -1,6 +1,6 @@
 {
   "name": "rlsbl",
-  "version": "0.38.1",
+  "version": "0.38.2",
   "description": "Release orchestration and project scaffolding for npm, PyPI, and Go",
   "license": "MIT",
   "bin": {

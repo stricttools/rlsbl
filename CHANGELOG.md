@@ -2,6 +2,12 @@
 
 # Changelog
 
+## 0.38.2
+
+### Fixes
+
+- **Fix.** Publish router no longer fails for plain-target releases. Added a no-op job so GitHub Actions workflows succeed even when all conditional publish jobs are skipped.
+
 ## 0.38.1
 
 ### Features
