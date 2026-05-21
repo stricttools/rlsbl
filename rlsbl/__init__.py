@@ -715,6 +715,13 @@ def cmd_mono_outdated(**_kwargs):
     _cmd_outdated({})
 
 
+@mono.command(name="snapshot", help="Generate a committed JSON artifact at .rlsbl-monorepo/snapshot.json summarizing all packages, versions, dependencies, and graph structure. Use --check to verify the snapshot is up-to-date without regenerating it (exits 1 if stale).")
+@strictcli.flag(name="check", type=bool, help="Verify snapshot.json is up-to-date (exit 1 if stale)")
+def cmd_mono_snapshot(check, **_kwargs):
+    from .commands.monorepo import _cmd_snapshot
+    _cmd_snapshot({"check": check})
+
+
 @mono.command(name="graph", help="Export the monorepo dependency graph in JSON, DOT (Graphviz), or indented text tree format. Supports filtering by a root package (transitive deps) or reverse package (transitive rdeps), with optional depth limiting. Use --output to write to a file instead of stdout.")
 @strictcli.flag(name="format", type=str, help="Output format: json, dot, or text (default: json)", default="json")
 @strictcli.flag(name="output", type=str, help="Write output to file instead of stdout", default="")

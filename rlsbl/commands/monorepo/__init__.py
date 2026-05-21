@@ -15,6 +15,8 @@ from .commands import (
 
 from .graph import _cmd_graph
 
+from .snapshot_cmd import _cmd_snapshot
+
 from .sync import (
     _cmd_sync,
     _rewrite_trigger,
@@ -36,6 +38,7 @@ __all__ = [
     "_cmd_release_order",
     "_cmd_check_names",
     "_cmd_graph",
+    "_cmd_snapshot",
     "_evaluate_constraint",
     "_parse_version_tuple",
     # sync
