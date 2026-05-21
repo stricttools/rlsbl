@@ -220,6 +220,7 @@ def generate_inline_publish_router(projects_with_publish: list, root: str) -> st
         "no-op": {
             "runs-on": "ubuntu-latest",
             "if": "true",
+            "permissions": {},
             "steps": [{"run": "echo 'No publish target for this release tag'"}],
         },
     }
