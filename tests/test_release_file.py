@@ -52,7 +52,7 @@ class TestReadReleaseFileValid:
             'mode = "ota"\n'
             "\n"
             "[targets.flutter-android]\n"
-            'mode = "build"\n'
+            'mode = "ota"\n'
         )
         cfg = read_release_file(str(f))
         assert cfg.bump == "minor"
@@ -60,7 +60,7 @@ class TestReadReleaseFileValid:
         assert cfg.exclude == ["npm"]
         assert cfg.targets == {
             "flutter-ios": {"mode": "ota"},
-            "flutter-android": {"mode": "build"},
+            "flutter-android": {"mode": "ota"},
         }
 
     def test_returns_dataclass(self, tmp_path):

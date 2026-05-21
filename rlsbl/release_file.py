@@ -96,6 +96,27 @@ def read_release_file(path: str) -> ReleaseConfig:
                     )
             targets[name] = dict(cfg)
 
+    # Flutter targets require a mode field in their per-target config
+    for name in include:
+        if name.startswith("flutter-"):
+            if name not in targets or "mode" not in targets[name]:
+                raise ValueError(
+                    f"Flutter target {name!r} requires a [targets.{name}] section "
+                    f"with mode = \"ota\" or mode = \"build\""
+                )
+
+    # Both flutter-ios and flutter-android must have the same mode when both present
+    flutter_names = [n for n in include if n.startswith("flutter-")]
+    if len(flutter_names) >= 2:
+        modes = {n: targets[n]["mode"] for n in flutter_names}
+        unique_modes = set(modes.values())
+        if len(unique_modes) > 1:
+            mode_list = ", ".join(f"{n}={m!r}" for n, m in sorted(modes.items()))
+            raise ValueError(
+                f"All Flutter targets must have the same mode, "
+                f"but got: {mode_list}"
+            )
+
     return ReleaseConfig(
         bump=bump,
         include=list(include),

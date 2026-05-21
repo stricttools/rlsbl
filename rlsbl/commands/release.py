@@ -309,6 +309,21 @@ def _sync_lockfiles(target_paths, files_to_commit, log):
                     log(f"Lockfile updated: {lockfile}")
 
 
+def _update_last_build_release(version_dir, version):
+    """Store last_build_release version in .rlsbl/config.json for OTA validation."""
+    config_path = os.path.join(version_dir, ".rlsbl", "config.json")
+    try:
+        config = read_json_config(config_path)
+    except Exception:
+        config = {}
+    config["last_build_release"] = version
+    tmp_path = config_path + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=2)
+        f.write("\n")
+    os.replace(tmp_path, config_path)
+
+
 def run_cmd(release_config_or_registry, flags_or_args=None, flags=None):
     """Release command handler.
 
@@ -361,6 +376,43 @@ def run_cmd(release_config_or_registry, flags_or_args=None, flags=None):
                 f"Warning: release file lists targets not detected in project: {', '.join(sorted(extra))}",
                 file=sys.stderr,
             )
+
+        # OTA validation: check for native changes when Flutter targets use mode="ota"
+        flutter_targets = [
+            t for t in release_config.include if t.startswith("flutter-")
+        ]
+        if flutter_targets:
+            flutter_cfg = release_config.targets
+            ota_targets = [
+                t for t in flutter_targets
+                if flutter_cfg.get(t, {}).get("mode") == "ota"
+            ]
+            if ota_targets:
+                from ..targets.native_changes import detect_native_changes
+                # Find last build release tag for native change detection
+                config = read_json_config(os.path.join(".", ".rlsbl", "config.json"))
+                last_build = config.get("last_build_release")
+                if last_build:
+                    since_ref = f"v{last_build}"
+                    native_files = detect_native_changes(".", since_ref)
+                    if native_files:
+                        print(
+                            "Error: OTA release requested but native files changed "
+                            f"since last build release ({last_build}):",
+                            file=sys.stderr,
+                        )
+                        for nf in native_files[:10]:
+                            print(f"  {nf}", file=sys.stderr)
+                        if len(native_files) > 10:
+                            print(
+                                f"  ... and {len(native_files) - 10} more",
+                                file=sys.stderr,
+                            )
+                        print(
+                            "Use mode = \"build\" for a full release instead.",
+                            file=sys.stderr,
+                        )
+                        sys.exit(1)
 
         bump_arg = release_config.bump
         args = [bump_arg]
@@ -682,6 +734,18 @@ def run_cmd(release_config_or_registry, flags_or_args=None, flags=None):
         )
     finally:
         release_lock()
+
+    # Track build releases for Flutter OTA validation.
+    # When a Flutter target completes a "build" release, store the version
+    # in .rlsbl/config.json so future OTA releases can detect native changes.
+    from ..release_file import ReleaseConfig as _RC
+    if isinstance(release_config_or_registry, _RC):
+        _rc = release_config_or_registry
+        flutter_targets = [t for t in _rc.include if t.startswith("flutter-")]
+        if flutter_targets:
+            mode = _rc.targets.get(flutter_targets[0], {}).get("mode")
+            if mode == "build":
+                _update_last_build_release(version_dir, new_version)
 
 
 def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current_version,

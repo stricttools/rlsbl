@@ -24,11 +24,21 @@ def generate_version_section(version: str, entries: list[ChangelogEntry]) -> str
     Only includes entries where user_facing=True. Groups by type under
     sub-headers (Breaking, Features, Fixes, Other). Empty groups are omitted.
     If no user-facing entries exist, emits a single "No user-facing changes." bullet.
+
+    If all entries share a release_type (e.g., "ota" or "build"), a marker
+    is appended to the version heading.
     """
+    # Determine release type marker from entries
+    release_types = {e.release_type for e in entries if e.release_type}
+    release_marker = ""
+    if len(release_types) == 1:
+        rt = release_types.pop()
+        release_marker = f" ({rt.upper()})"
+
     user_facing = [e for e in entries if e.user_facing]
 
     if not user_facing:
-        return f"## {version}\n\n- No user-facing changes.\n"
+        return f"## {version}{release_marker}\n\n- No user-facing changes.\n"
 
     # Bucket entries by type.
     buckets: dict[str, list[str]] = {}
@@ -36,7 +46,7 @@ def generate_version_section(version: str, entries: list[ChangelogEntry]) -> str
         key = entry.type if entry.type in ("breaking", "feature", "fix") else "_other"
         buckets.setdefault(key, []).append(entry.description or "")
 
-    parts: list[str] = [f"## {version}"]
+    parts: list[str] = [f"## {version}{release_marker}"]
 
     for type_key, header in _TYPE_ORDER:
         descs = buckets.get(type_key)
