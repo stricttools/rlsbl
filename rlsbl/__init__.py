@@ -742,6 +742,21 @@ def cmd_mono_graph(format, output, root, reverse, depth=None, **_kwargs):
     _cmd_graph(flags)
 
 
+@mono.command(name="impact", help="Analyze the impact of changes to a package, file, or git diff range on the monorepo dependency graph. Shows direct and transitive dependents, test scope, and release candidates. Supports package names, file paths, and --since for git-based change detection.")
+@strictcli.flag(name="format", type=str, help="Output format: json or text (default: text)", default="text")
+@strictcli.flag(name="depth", type=int, help="Limit traversal depth")
+@strictcli.flag(name="since", type=str, help="Git ref to diff against HEAD (e.g. HEAD~3, v1.0.0)", default="")
+def cmd_mono_impact(format, depth=None, since="", **_kwargs):
+    args = _variadic_args
+    flags = {"format": format}
+    if depth is not None:
+        flags["depth"] = depth
+    if since:
+        flags["since"] = since
+    from .commands.monorepo import _cmd_impact
+    _cmd_impact(args, flags)
+
+
 # ---------------------------------------------------------------------------
 # dev group
 # ---------------------------------------------------------------------------
@@ -873,6 +888,31 @@ def _extract_variadic_args():
         new_argv = [sys.argv[0], "monorepo", "check-names"]
         i = 2  # index into argv (after 'monorepo check-names')
         value_flags = {"target", "prefix", "suffix", "delay"}
+        while i < len(argv):
+            tok = argv[i]
+            if tok.startswith("--"):
+                key = tok[2:]
+                if "=" in key:
+                    new_argv.append(tok)
+                elif key in value_flags and i + 1 < len(argv):
+                    new_argv.append(tok)
+                    new_argv.append(argv[i + 1])
+                    i += 1
+                else:
+                    new_argv.append(tok)
+            elif tok.startswith("-"):
+                new_argv.append(tok)
+            else:
+                positionals.append(tok)
+            i += 1
+        sys.argv = new_argv
+        return positionals
+
+    if cmd == "monorepo" and len(argv) > 1 and argv[1] == "impact":
+        positionals = []
+        new_argv = [sys.argv[0], "monorepo", "impact"]
+        i = 2  # index into argv (after 'monorepo impact')
+        value_flags = {"format", "since", "depth"}
         while i < len(argv):
             tok = argv[i]
             if tok.startswith("--"):
