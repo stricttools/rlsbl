@@ -150,7 +150,50 @@ class NpmScanner:
         return deps
 
 
-SCANNERS: list[WorkspaceScanner] = [PypiScanner(), NpmScanner()]
+class DartScanner:
+    """Scan pubspec.yaml for intra-workspace Dart/Flutter dependencies."""
+
+    def scan(self, project_dir: str, workspace_names: set[str]) -> list[Dependency]:
+        manifest = os.path.join(project_dir, "pubspec.yaml")
+        if not os.path.isfile(manifest):
+            return []
+
+        try:
+            from ruamel.yaml import YAML
+            yaml = YAML(typ="safe")
+            with open(manifest, "r", encoding="utf-8") as f:
+                data = yaml.load(f)
+        except Exception as exc:
+            print(f"Warning: failed to parse {manifest}: {exc}", file=sys.stderr)
+            return []
+
+        if not isinstance(data, dict):
+            return []
+
+        deps = []
+        for section in ("dependencies", "dev_dependencies"):
+            section_data = data.get(section)
+            if not isinstance(section_data, dict):
+                continue
+            for name, spec in section_data.items():
+                if name not in workspace_names:
+                    continue
+                if spec is None:
+                    deps.append(Dependency(name=name, dep_type="versioned", constraint=""))
+                elif isinstance(spec, str):
+                    deps.append(Dependency(name=name, dep_type="versioned", constraint=spec))
+                elif isinstance(spec, dict):
+                    if "path" in spec:
+                        deps.append(Dependency(name=name, dep_type="path", constraint=spec["path"]))
+                    elif "version" in spec:
+                        deps.append(Dependency(name=name, dep_type="versioned", constraint=spec["version"]))
+                    else:
+                        deps.append(Dependency(name=name, dep_type="versioned", constraint=""))
+
+        return deps
+
+
+SCANNERS: list[WorkspaceScanner] = [PypiScanner(), NpmScanner(), DartScanner()]
 
 
 class WorkspaceGraph:
