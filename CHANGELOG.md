@@ -2,6 +2,16 @@
 
 # Changelog
 
+## 0.38.1
+
+### Features
+
+- **Hook-generated files included in release commit.** Files modified or created by pre-checks and pre-release hooks are now automatically detected and included in the release commit, instead of being left dirty.
+
+### Fixes
+
+- **Fix PyPI build for subdirectory targets.** `uv build --out-dir` no longer produces a doubled path (e.g. `pypi/pypi/dist`) when the pypi target lives in a subdirectory.
+
 ## 0.38.0
 
 ### Breaking
