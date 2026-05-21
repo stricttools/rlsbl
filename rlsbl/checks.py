@@ -1,4 +1,4 @@
-"""Doctor checks migrated to the strictcli check system.
+"""Project checks registered on the strictcli check system.
 
 Each check is registered via ``@app.check("name")`` and receives a
 :class:`~rlsbl.check_context.ProjectCheckContext` (or its
@@ -39,7 +39,7 @@ def _resolve_version_and_tag(ctx):
 
 
 def register_checks(app):
-    """Register all 11 doctor checks on *app*.
+    """Register all project checks on *app*.
 
     Silently returns if the check system is not enabled (i.e. no
     ``.strictcli/checks.toml`` was found at import time -- this happens

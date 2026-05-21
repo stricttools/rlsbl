@@ -2,8 +2,7 @@
 
 Covers: _parse_target_entry, detect_targets with subdirectory config,
 version sync with subdirectory targets, resolve_release_targets with
-structured config, doctor checks across subdirectories, and
-_merge_template_vars with per-target paths.
+structured config, and _merge_template_vars with per-target paths.
 """
 
 import json
@@ -13,10 +12,6 @@ import pytest
 from rlsbl.targets import TARGETS, TargetEntry, _parse_target_entry, detect_targets
 from rlsbl.commands.release import resolve_release_targets, resolve_target_paths
 from rlsbl.commands.init_cmd import _merge_template_vars
-from rlsbl.commands.doctor import (
-    _check_name_consistency,
-    _check_version_consistency,
-)
 
 
 # ---------------------------------------------------------------------------
@@ -230,91 +225,6 @@ class TestResolveReleaseTargetsSubdirectory:
         assert result["go"] == str(tmp_path)
         assert result["npm"] == str(npm_dir)
 
-
-# ---------------------------------------------------------------------------
-# Test class 5: doctor checks with subdirectory targets
-# ---------------------------------------------------------------------------
-
-
-class TestDoctorSubdirectory:
-    """Tests that doctor checks work with subdirectory targets."""
-
-    def test_version_consistency_across_subdirs(self, tmp_path, monkeypatch):
-        """Version check works when targets are in different subdirectories."""
-        monkeypatch.chdir(tmp_path)
-        config_dir = tmp_path / ".rlsbl"
-        config_dir.mkdir()
-        npm_dir = tmp_path / "npm"
-        npm_dir.mkdir()
-        pypi_dir = tmp_path / "pypi"
-        pypi_dir.mkdir()
-        (npm_dir / "package.json").write_text('{"name": "test", "version": "1.0.0"}')
-        (pypi_dir / "pyproject.toml").write_text(
-            '[project]\nname = "test"\nversion = "1.0.0"\n'
-        )
-        (config_dir / "config.json").write_text(
-            '{"targets": [{"name": "npm", "path": "npm"}, {"name": "pypi", "path": "pypi"}]}'
-        )
-        status, msg = _check_version_consistency()
-        assert status == "PASS"
-
-    def test_version_mismatch_across_subdirs(self, tmp_path, monkeypatch):
-        """Version mismatch detected across subdirectories."""
-        monkeypatch.chdir(tmp_path)
-        config_dir = tmp_path / ".rlsbl"
-        config_dir.mkdir()
-        npm_dir = tmp_path / "npm"
-        npm_dir.mkdir()
-        pypi_dir = tmp_path / "pypi"
-        pypi_dir.mkdir()
-        (npm_dir / "package.json").write_text('{"name": "test", "version": "1.0.0"}')
-        (pypi_dir / "pyproject.toml").write_text(
-            '[project]\nname = "test"\nversion = "2.0.0"\n'
-        )
-        (config_dir / "config.json").write_text(
-            '{"targets": [{"name": "npm", "path": "npm"}, {"name": "pypi", "path": "pypi"}]}'
-        )
-        status, msg = _check_version_consistency()
-        assert status == "FAIL"
-
-    def test_name_consistency_across_subdirs(self, tmp_path, monkeypatch):
-        """Name check passes when targets in different subdirectories have the same name."""
-        monkeypatch.chdir(tmp_path)
-        config_dir = tmp_path / ".rlsbl"
-        config_dir.mkdir()
-        npm_dir = tmp_path / "npm"
-        npm_dir.mkdir()
-        pypi_dir = tmp_path / "pypi"
-        pypi_dir.mkdir()
-        (npm_dir / "package.json").write_text('{"name": "test", "version": "1.0.0"}')
-        (pypi_dir / "pyproject.toml").write_text(
-            '[project]\nname = "test"\nversion = "1.0.0"\n'
-        )
-        (config_dir / "config.json").write_text(
-            '{"targets": [{"name": "npm", "path": "npm"}, {"name": "pypi", "path": "pypi"}]}'
-        )
-        status, msg = _check_name_consistency()
-        assert status == "PASS"
-
-    def test_name_mismatch_across_subdirs(self, tmp_path, monkeypatch):
-        """Name check warns when targets in different subdirectories have different names."""
-        monkeypatch.chdir(tmp_path)
-        config_dir = tmp_path / ".rlsbl"
-        config_dir.mkdir()
-        npm_dir = tmp_path / "npm"
-        npm_dir.mkdir()
-        pypi_dir = tmp_path / "pypi"
-        pypi_dir.mkdir()
-        (npm_dir / "package.json").write_text('{"name": "alpha", "version": "1.0.0"}')
-        (pypi_dir / "pyproject.toml").write_text(
-            '[project]\nname = "beta"\nversion = "1.0.0"\n'
-        )
-        (config_dir / "config.json").write_text(
-            '{"targets": [{"name": "npm", "path": "npm"}, {"name": "pypi", "path": "pypi"}]}'
-        )
-        status, msg = _check_name_consistency()
-        assert status == "WARN"
-        assert "mismatch" in msg
 
 
 # ---------------------------------------------------------------------------

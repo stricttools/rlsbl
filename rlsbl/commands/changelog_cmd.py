@@ -1,4 +1,4 @@
-"""Changelog subcommands for adding new entries, validating existing ones, and generating Markdown changelogs from JSONL sources."""
+"""Changelog subcommands for adding new entries and generating Markdown changelogs from JSONL sources."""
 
 import os
 import subprocess
@@ -8,10 +8,7 @@ from ..changelog.files import append_entry, changes_dir_exists, get_changes_dir
 from ..changelog.generate import generate_changelog
 from ..changelog.resolve import resolve_hash
 from ..changelog.schema import ChangelogEntry, validate_schema
-from ..changelog.validate import validate_unreleased
-from ..targets import TARGETS, detect_targets
 from ..utils import commit_files
-from ..workspace import find_workspace_root, resolve_project
 
 
 def cmd_add(flags):
@@ -86,51 +83,6 @@ def cmd_add(flags):
             commit_msg = "changelog: non-user-facing entry"
         commit_files(commit_msg, [unreleased_path], allow_failure=True)
 
-
-def cmd_validate(flags):
-    """Run the changelog validation engine on unreleased entries."""
-    if not changes_dir_exists("."):
-        print("Error: .rlsbl/changes/ does not exist.", file=sys.stderr)
-        sys.exit(1)
-
-    # Detect monorepo context for tag-scoped validation
-    tag_glob = None
-    monorepo_root = find_workspace_root(".")
-    if monorepo_root:
-        project = resolve_project(monorepo_root, ".")
-        if project is None:
-            print(
-                "Error: current directory is inside a monorepo but not inside any project.",
-                file=sys.stderr,
-            )
-            print(
-                "Run 'rlsbl monorepo status' to see registered projects.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        # Compute the tag glob via the target for correct format (path-based for Go)
-        target_entries = detect_targets(os.path.join(monorepo_root, project["path"]))
-        if target_entries:
-            target = TARGETS[target_entries[0].name]
-            tag_glob = target.monorepo_tag_glob(project["name"], path=project["path"])
-        else:
-            tag_glob = f"{project['name']}@v*"
-
-    changes_dir = get_changes_dir(".")
-    results = validate_unreleased(changes_dir, tag_glob=tag_glob)
-
-    overall = results["passed"]
-    for name, (passed, details) in results["checks"].items():
-        status = "PASS" if passed else "FAIL"
-        print(f"  {status}  {name}")
-        for detail in details:
-            print(f"         {detail}")
-
-    if overall:
-        print("\nAll checks passed.")
-    else:
-        print("\nValidation failed.", file=sys.stderr)
-        sys.exit(1)
 
 
 def cmd_generate(flags):

@@ -160,7 +160,7 @@ def _check_context_factory():
 
 app.set_check_context(_check_context_factory)
 
-# Register doctor checks on the strictcli check system.
+# Register project checks on the strictcli check system.
 # The check definitions live in rlsbl/data/checks.toml (shipped with the
 # package) rather than .strictcli/checks.toml at CWD, because rlsbl is a CLI
 # tool that runs from arbitrary directories -- CWD-based discovery would only
@@ -554,19 +554,6 @@ def cmd_migrate(dry_run, status, **_kwargs):
     run_cmd(None, [], flags)
 
 
-# ---------------------------------------------------------------------------
-# doctor
-# ---------------------------------------------------------------------------
-
-@app.command(name="doctor", help="Run diagnostic checks on the project release state, including version consistency, tag alignment, changelog coverage, and config validity. Use --fix to auto-repair issues where possible.")
-@strictcli.flag(name="fix", type=bool, help="Auto-fix issues where possible")
-@strictcli.flag(name="check", type=str, help="Run a specific check by name", default="")
-def cmd_doctor(fix, check, **_kwargs):
-    _require_project_root()
-    flags = {"fix": fix, "check": check or None}
-    from .commands.doctor import run_cmd
-    run_cmd(None, [], flags)
-
 
 # ---------------------------------------------------------------------------
 # deploy
@@ -604,7 +591,7 @@ def cmd_commit(message, **_kwargs):
 # changelog group
 # ---------------------------------------------------------------------------
 
-chlog = app.group("changelog", help="Structured changelog management using JSONL entries. Add, validate, and generate CHANGELOG.md from per-commit changelog entries stored in unreleased.jsonl for precise, auditable release notes.")
+chlog = app.group("changelog", help="Structured changelog management using JSONL entries. Add and generate CHANGELOG.md from per-commit changelog entries stored in unreleased.jsonl for precise, auditable release notes.")
 
 
 @chlog.command(name="add", help="Append a structured changelog entry to the project's unreleased.jsonl file. Each entry includes a human-readable description, an entry type (feature, fix, or breaking), and optional commit hashes linking it to specific changes. The file is auto-committed unless --no-commit is passed. Use --no-user-facing to mark internal changes that should not appear in the published changelog.")
@@ -625,12 +612,6 @@ def cmd_chlog_add(commits, description, type, no_user_facing, no_commit, **_kwar
     from .commands.changelog_cmd import cmd_add
     cmd_add(flags)
 
-
-@chlog.command(name="validate", help="Parse and validate all entries in the project's unreleased.jsonl file. Checks each entry for schema conformance, verifies that required fields like description and type are present and well-formed, ensures entry types are one of the allowed values (feature, fix, breaking), and validates referential integrity of any attached commit hashes against the git history.")
-def cmd_chlog_validate(**_kwargs):
-    _require_project_root()
-    from .commands.changelog_cmd import cmd_validate
-    cmd_validate({})
 
 
 @chlog.command(name="generate", help="Compile all validated JSONL changelog entries into a formatted CHANGELOG.md file. Groups entries by type (features, fixes, breaking changes) under the appropriate version heading, preserving existing changelog content for previous releases. Use --dry-run to preview the generated Markdown output without writing to disk, which is useful for reviewing before committing.")
@@ -733,11 +714,6 @@ def cmd_mono_outdated(**_kwargs):
     from .commands.monorepo import _cmd_outdated
     _cmd_outdated({})
 
-
-@mono.command(name="lint", help="Detect unregistered projects and stale workspace entries in your monorepo. Scans first-level directories for recognized project manifests across all 14 supported targets (npm, PyPI, Go, Cargo, etc.) and compares against workspace.toml. Reports unregistered projects on disk and registered entries pointing to missing directories. Exits non-zero if issues are found, suitable for CI gating.")
-def cmd_mono_lint(**_kwargs):
-    from .commands.monorepo import _cmd_lint
-    _cmd_lint({})
 
 
 # ---------------------------------------------------------------------------
