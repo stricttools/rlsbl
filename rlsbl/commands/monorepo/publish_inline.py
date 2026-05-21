@@ -6,8 +6,9 @@ import copy
 import hashlib
 import json
 import os
+from io import StringIO
 
-import yaml
+from ruamel.yaml import YAML
 
 from .sync import _get_monorepo_tag_prefix
 
@@ -26,7 +27,7 @@ def parse_publish_workflow(path: str) -> dict:
         name       -- workflow ``name`` string, or None
     """
     with open(path) as f:
-        data = yaml.safe_load(f)
+        data = YAML(typ='safe').load(f)
 
     if not isinstance(data, dict) or "jobs" not in data:
         raise ValueError(f"Workflow file {path} is missing a 'jobs' key")
@@ -39,18 +40,11 @@ def parse_publish_workflow(path: str) -> dict:
     }
 
 
-class _LiteralBlockDumper(yaml.SafeDumper):
-    """SafeDumper subclass that emits multi-line strings as YAML literal blocks."""
-
-
-def _literal_str_representer(dumper: yaml.SafeDumper, data: str) -> yaml.ScalarNode:
+def _literal_str_representer(representer, data):
     """Represent multi-line strings with ``|`` literal block style."""
     if "\n" in data:
-        return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
-    return dumper.represent_scalar("tag:yaml.org,2002:str", data)
-
-
-_LiteralBlockDumper.add_representer(str, _literal_str_representer)
+        return representer.represent_scalar("tag:yaml.org,2002:str", data, style="|")
+    return representer.represent_scalar("tag:yaml.org,2002:str", data)
 
 
 def emit_workflow(workflow_dict: dict) -> str:
@@ -60,12 +54,12 @@ def emit_workflow(workflow_dict: dict) -> str:
     key order.  The custom representer is registered on a private Dumper
     subclass so the global ``yaml`` state is never modified.
     """
-    return yaml.dump(
-        workflow_dict,
-        Dumper=_LiteralBlockDumper,
-        default_flow_style=False,
-        sort_keys=False,
-    )
+    yml = YAML()
+    yml.default_flow_style = False
+    yml.representer.add_representer(str, _literal_str_representer)
+    stream = StringIO()
+    yml.dump(workflow_dict, stream)
+    return stream.getvalue()
 
 
 # ---------------------------------------------------------------------------

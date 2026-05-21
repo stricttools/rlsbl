@@ -14,9 +14,13 @@ import textwrap
 from unittest.mock import patch
 
 import pytest
-import yaml
+from ruamel.yaml import YAML
 
 from rlsbl.commands.monorepo.publish_inline import generate_inline_publish_router
+
+
+def _safe_load(text):
+    return YAML(typ='safe').load(text)
 
 
 # ---------------------------------------------------------------------------
@@ -125,7 +129,7 @@ class TestPublishRouterTopLevel:
             side_effect=_mock_tag_prefix,
         ):
             content = generate_inline_publish_router(projects, root)
-        parsed = yaml.safe_load(content)
+        parsed = _safe_load(content)
         assert parsed["on"] == {"release": {"types": ["published"]}}
 
     def test_has_router_name(self, tmp_path):
@@ -137,7 +141,7 @@ class TestPublishRouterTopLevel:
             side_effect=_mock_tag_prefix,
         ):
             content = generate_inline_publish_router(projects, root)
-        parsed = yaml.safe_load(content)
+        parsed = _safe_load(content)
         assert parsed["name"] == "Publish Router"
 
     def test_no_top_level_permissions(self, tmp_path):
@@ -149,7 +153,7 @@ class TestPublishRouterTopLevel:
             side_effect=_mock_tag_prefix,
         ):
             content = generate_inline_publish_router(projects, root)
-        parsed = yaml.safe_load(content)
+        parsed = _safe_load(content)
         assert "permissions" not in parsed
 
 
@@ -165,7 +169,7 @@ class TestPublishRouterPyPIOidc:
             side_effect=_mock_tag_prefix,
         ):
             content = generate_inline_publish_router(projects, root)
-        parsed = yaml.safe_load(content)
+        parsed = _safe_load(content)
         job = parsed["jobs"]["mypkg-publish"]
         assert job["permissions"]["id-token"] == "write"
         assert job["permissions"]["contents"] == "read"
@@ -183,7 +187,7 @@ class TestPublishRouterNpmSecrets:
             side_effect=_mock_tag_prefix,
         ):
             content = generate_inline_publish_router(projects, root)
-        parsed = yaml.safe_load(content)
+        parsed = _safe_load(content)
         job = parsed["jobs"]["mylib-publish"]
         assert job["permissions"]["id-token"] == "write"
 
@@ -212,7 +216,7 @@ class TestPublishRouterGoContents:
             side_effect=_mock_tag_prefix,
         ):
             content = generate_inline_publish_router(projects, root)
-        parsed = yaml.safe_load(content)
+        parsed = _safe_load(content)
         job = parsed["jobs"]["mymod-goreleaser"]
         assert job["permissions"]["contents"] == "write"
 
@@ -229,7 +233,7 @@ class TestRouterJobStructure:
             side_effect=_mock_tag_prefix,
         ):
             content = generate_inline_publish_router(projects, root)
-        parsed = yaml.safe_load(content)
+        parsed = _safe_load(content)
         job = parsed["jobs"]["mylib-publish"]
         assert job["if"] == "startsWith(github.event.release.tag_name, 'mylib@v')"
 
@@ -242,7 +246,7 @@ class TestRouterJobStructure:
             side_effect=_mock_tag_prefix,
         ):
             content = generate_inline_publish_router(projects, root)
-        parsed = yaml.safe_load(content)
+        parsed = _safe_load(content)
         job = parsed["jobs"]["mylib-publish"]
         assert job["defaults"]["run"]["working-directory"] == "node"
 
@@ -255,7 +259,7 @@ class TestRouterJobStructure:
             side_effect=_mock_tag_prefix,
         ):
             content = generate_inline_publish_router(projects, root)
-        parsed = yaml.safe_load(content)
+        parsed = _safe_load(content)
         job = parsed["jobs"]["mypkg-publish"]
         pypi_step = next(
             s for s in job["steps"]
@@ -277,7 +281,7 @@ class TestRouterJobStructure:
             side_effect=_mock_tag_prefix,
         ):
             content = generate_inline_publish_router(projects, root)
-        parsed = yaml.safe_load(content)
+        parsed = _safe_load(content)
         assert "permissions" not in parsed
         for job_name, job in parsed["jobs"].items():
             assert "permissions" in job, f"Job {job_name} is missing permissions"
@@ -295,7 +299,7 @@ class TestRouterJobStructure:
             side_effect=_mock_tag_prefix,
         ):
             content = generate_inline_publish_router(projects, root)
-        parsed = yaml.safe_load(content)
+        parsed = _safe_load(content)
         job_names = list(parsed["jobs"].keys())
         assert "mypkg-publish" in job_names
         assert "mylib-publish" in job_names
