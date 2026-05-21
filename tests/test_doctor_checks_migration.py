@@ -15,7 +15,7 @@ from rlsbl.check_context import ProjectCheckContext, WorkspaceCheckContext
 
 
 # ---------------------------------------------------------------------------
-# All 23 checks are declared in checks.toml and registered on the app
+# All 24 checks are declared in checks.toml and registered on the app
 # ---------------------------------------------------------------------------
 
 EXPECTED_CHECKS = [
@@ -44,13 +44,15 @@ EXPECTED_CHECKS = [
     "workspace-targets",
     "workspace-unregistered",
     "workspace-stale-entries",
+    # Layer checks
+    "layers-violations",
 ]
 
 
 class TestCheckDeclarations:
     """Every check must be declared in checks.toml and registered on the app."""
 
-    def test_all_23_checks_declared(self):
+    def test_all_24_checks_declared(self):
         """checks.toml defines exactly the 23 expected checks."""
         assert sorted(app._check_defs.keys()) == sorted(EXPECTED_CHECKS)
 
@@ -67,7 +69,7 @@ class TestCheckDeclarations:
             assert name in result.stdout
 
     def test_check_list_json(self):
-        """``rlsbl check --list --json`` outputs valid JSON with all 23 checks."""
+        """``rlsbl check --list --json`` outputs valid JSON with all 24 checks."""
         result = app.test(["check", "--list", "--json"])
         assert result.exit_code == 0
         data = json.loads(result.stdout)

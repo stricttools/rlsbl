@@ -189,3 +189,11 @@ fast = true
 pure = true
 needs_network = false
 depends_on = []
+
+[checks.layers-violations]
+tags = []
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []

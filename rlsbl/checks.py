@@ -718,3 +718,28 @@ def register_checks(app):
                 details=[f"{s}: directory missing or no manifest" for s in stale],
             )
         return CheckResult("pass", "no stale entries")
+
+    # ------------------------------------------------------------------
+    # Layer violations
+    # ------------------------------------------------------------------
+
+    @app.check("layers-violations")
+    def check_layers_violations(ctx):
+        """Dependency edges must not violate layer ordering."""
+        if not isinstance(ctx, WorkspaceCheckContext):
+            return CheckResult("skip", "not a monorepo workspace")
+
+        from .layers import check_layer_violations, load_layer_config
+
+        config = load_layer_config(str(ctx.workspace_root))
+        if config is None:
+            return CheckResult("skip", "layers not configured")
+
+        violations = check_layer_violations(ctx.projects, config, ctx.graph)
+        if violations:
+            return CheckResult(
+                "fail",
+                f"{len(violations)} layer violation(s)",
+                details=violations,
+            )
+        return CheckResult("pass", "no layer violations")

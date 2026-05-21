@@ -131,6 +131,75 @@ def resolve_package_layer(name: str, config: LayerConfig) -> str | None:
     return None
 
 
+def check_layer_violations(
+    projects: list[dict], config: LayerConfig, graph
+) -> list[str]:
+    """Check dependency edges for layer violations.
+
+    Returns a list of violation strings (empty means all good).
+    The *graph* argument is a WorkspaceGraph instance.
+    """
+    # First validate assignments -- if there are errors, return them immediately
+    assignment_errors = validate_layer_assignments(projects, config)
+    if assignment_errors:
+        return assignment_errors
+
+    layer_index = {name: i for i, name in enumerate(config.order)}
+    violations = []
+
+    for proj in projects:
+        source = proj["name"]
+
+        # Unrestricted packages: skip all checks as source
+        if any(fnmatch(source, pat) for pat in config.unrestricted):
+            continue
+
+        source_layer = resolve_package_layer(source, config)
+        if source_layer is None:
+            continue  # unassigned -- already caught by validate_layer_assignments
+
+        for dep in graph.dependencies(source):
+            target = dep.name
+
+            # Forbidden targets: anything depending on these is a violation
+            if any(fnmatch(target, pat) for pat in config.forbidden_targets):
+                violations.append(
+                    f"'{source}' depends on forbidden target '{target}'"
+                )
+                continue
+
+            # Explicit allows: skip the layer check for matching edges
+            if _is_explicitly_allowed(source, target, config.allow):
+                continue
+
+            target_layer = resolve_package_layer(target, config)
+            if target_layer is None:
+                continue  # unassigned target -- already caught above
+
+            source_idx = layer_index[source_layer]
+            target_idx = layer_index[target_layer]
+
+            # Higher index = higher layer.  Higher depending on lower is OK.
+            # Same layer is OK.  Lower depending on higher is a violation.
+            if source_idx < target_idx:
+                violations.append(
+                    f"'{source}' ({source_layer}) depends on '{target}' "
+                    f"({target_layer}) -- lower layer cannot depend on higher"
+                )
+
+    return violations
+
+
+def _is_explicitly_allowed(
+    source: str, target: str, allow: list[dict[str, str]]
+) -> bool:
+    """Check if an edge is explicitly allowed by an override rule."""
+    for entry in allow:
+        if fnmatch(source, entry["source"]) and fnmatch(target, entry["target"]):
+            return True
+    return False
+
+
 def validate_layer_assignments(
     projects: list[dict], config: LayerConfig
 ) -> list[str]:
