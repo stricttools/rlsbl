@@ -720,6 +720,69 @@ def register_checks(app):
         return CheckResult("pass", "no stale entries")
 
     # ------------------------------------------------------------------
+    # Dependency validation
+    # ------------------------------------------------------------------
+
+    @app.check("deps-unused")
+    def check_deps_unused(ctx):
+        """Declared workspace deps must be imported by at least one source file."""
+        if not isinstance(ctx, WorkspaceCheckContext):
+            return CheckResult("skip", "not a monorepo workspace")
+
+        from .dep_validation import check_unused_deps, load_dep_overrides
+
+        root = str(ctx.workspace_root)
+        whitelist = load_dep_overrides(root)
+        workspace_names = {p["name"] for p in ctx.projects}
+
+        all_errors = []
+        for proj in ctx.projects:
+            name = proj["name"]
+            project_dir = os.path.join(root, proj["path"])
+            manifest_deps = {d.name for d in ctx.graph.dependencies(name)}
+            errors = check_unused_deps(
+                name, project_dir, manifest_deps, workspace_names, whitelist
+            )
+            all_errors.extend(errors)
+
+        if all_errors:
+            return CheckResult(
+                "fail",
+                f"{len(all_errors)} unused dependency(ies)",
+                details=all_errors,
+            )
+        return CheckResult("pass", "no unused workspace dependencies")
+
+    @app.check("deps-undeclared")
+    def check_deps_undeclared(ctx):
+        """Source files must not import workspace packages not declared as deps."""
+        if not isinstance(ctx, WorkspaceCheckContext):
+            return CheckResult("skip", "not a monorepo workspace")
+
+        from .dep_validation import check_undeclared_deps
+
+        root = str(ctx.workspace_root)
+        workspace_names = {p["name"] for p in ctx.projects}
+
+        all_errors = []
+        for proj in ctx.projects:
+            name = proj["name"]
+            project_dir = os.path.join(root, proj["path"])
+            manifest_deps = {d.name for d in ctx.graph.dependencies(name)}
+            errors = check_undeclared_deps(
+                name, project_dir, manifest_deps, workspace_names
+            )
+            all_errors.extend(errors)
+
+        if all_errors:
+            return CheckResult(
+                "fail",
+                f"{len(all_errors)} undeclared dependency(ies)",
+                details=all_errors,
+            )
+        return CheckResult("pass", "no undeclared workspace dependencies")
+
+    # ------------------------------------------------------------------
     # Layer violations
     # ------------------------------------------------------------------
 

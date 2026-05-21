@@ -197,3 +197,23 @@ fast = true
 pure = true
 needs_network = false
 depends_on = []
+
+# ---------------------------------------------------------------------------
+# Dependency validation checks (from dep_validation.py)
+# ---------------------------------------------------------------------------
+
+[checks.deps-unused]
+tags = []
+severity = "error"
+fast = false
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.deps-undeclared]
+tags = []
+severity = "error"
+fast = false
+pure = true
+needs_network = false
+depends_on = []
