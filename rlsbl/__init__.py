@@ -194,6 +194,54 @@ def cmd_release(target, dry_run, yes, quiet, skip_remote_check, skip_tests, skip
 
 
 # ---------------------------------------------------------------------------
+# release-init
+# ---------------------------------------------------------------------------
+
+@app.command(name="release-init", help="Scaffold a .rlsbl/releases/unreleased.toml file by auto-detecting project targets. The generated file contains a default bump type (patch), an include list of all detected targets, and per-target configuration sections for Flutter targets.")
+def cmd_release_init(**_kwargs):
+    _require_project_root()
+    from .release_file import get_release_file_path
+    from .targets import detect_targets, TargetEntry
+
+    release_path = get_release_file_path(".")
+    if os.path.exists(release_path):
+        print(f"Error: {release_path} already exists.", file=sys.stderr)
+        sys.exit(1)
+
+    entries = detect_targets(".")
+    if not entries:
+        print("Error: no targets detected in the current directory.", file=sys.stderr)
+        sys.exit(1)
+
+    target_names = [e.name for e in entries]
+
+    import tomlkit
+
+    doc = tomlkit.document()
+    doc.add("bump", "patch")
+    doc.add("include", target_names)
+    doc.add("exclude", [])
+
+    # Add per-target config sections for Flutter targets
+    flutter_targets = [n for n in target_names if "flutter" in n]
+    if flutter_targets:
+        targets_table = tomlkit.table(is_super_table=True)
+        for ft in flutter_targets:
+            t = tomlkit.table()
+            t.add("mode", "build")
+            targets_table.add(ft, t)
+        doc.add("targets", targets_table)
+
+    releases_dir = os.path.dirname(release_path)
+    os.makedirs(releases_dir, exist_ok=True)
+
+    with open(release_path, "w", encoding="utf-8") as f:
+        tomlkit.dump(doc, f)
+
+    print(release_path)
+
+
+# ---------------------------------------------------------------------------
 # status
 # ---------------------------------------------------------------------------
 
