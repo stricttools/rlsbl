@@ -13,10 +13,14 @@ import re
 import textwrap
 from unittest.mock import patch
 
-import yaml
+from ruamel.yaml import YAML
 
 from rlsbl.commands.monorepo import _generate_router
 from rlsbl.commands.monorepo.publish_inline import generate_inline_publish_router
+
+
+def _safe_load(text):
+    return YAML(typ='safe').load(text)
 
 
 def _parse_workflow_yaml(content):
@@ -316,7 +320,7 @@ class TestPublishRouterScale:
             side_effect=_mock_tag_prefix,
         ):
             content = generate_inline_publish_router(projects, root)
-        parsed = yaml.safe_load(content)
+        parsed = _safe_load(content)
         assert isinstance(parsed, dict)
 
     def test_job_count(self, tmp_path):
@@ -328,7 +332,7 @@ class TestPublishRouterScale:
             side_effect=_mock_tag_prefix,
         ):
             content = generate_inline_publish_router(projects, root)
-        parsed = yaml.safe_load(content)
+        parsed = _safe_load(content)
         assert len(parsed["jobs"]) == PROJECT_COUNT + 1  # +1 for no-op job
 
     def test_no_duplicate_job_names(self, tmp_path):
@@ -340,7 +344,7 @@ class TestPublishRouterScale:
             side_effect=_mock_tag_prefix,
         ):
             content = generate_inline_publish_router(projects, root)
-        parsed = yaml.safe_load(content)
+        parsed = _safe_load(content)
         job_names = list(parsed["jobs"].keys())
         assert len(job_names) == len(set(job_names))
 
@@ -353,7 +357,7 @@ class TestPublishRouterScale:
             side_effect=_mock_tag_prefix,
         ):
             content = generate_inline_publish_router(projects, root)
-        parsed = yaml.safe_load(content)
+        parsed = _safe_load(content)
         for proj in projects:
             name = proj["name"]
             job_key = f"{name}-publish"
@@ -371,7 +375,7 @@ class TestPublishRouterScale:
             side_effect=_mock_tag_prefix,
         ):
             content = generate_inline_publish_router(projects, root)
-        parsed = yaml.safe_load(content)
+        parsed = _safe_load(content)
         for job_name, job in parsed["jobs"].items():
             assert "permissions" in job, f"Job {job_name} missing permissions"
 
@@ -384,5 +388,5 @@ class TestPublishRouterScale:
             side_effect=_mock_tag_prefix,
         ):
             content = generate_inline_publish_router(projects, root)
-        parsed = yaml.safe_load(content)
+        parsed = _safe_load(content)
         assert parsed["on"] == {"release": {"types": ["published"]}}

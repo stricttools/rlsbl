@@ -6,7 +6,7 @@ import textwrap
 from unittest.mock import patch
 
 import pytest
-import yaml
+from ruamel.yaml import YAML
 
 from rlsbl.commands.monorepo.publish_inline import (
     compute_publish_hashes,
@@ -22,6 +22,18 @@ from rlsbl.commands.monorepo.publish_inline import (
     should_regenerate_router,
     transform_project_jobs,
 )
+
+
+def _safe_load(text):
+    return YAML(typ='safe').load(text)
+
+
+def _dump(data):
+    from io import StringIO
+    yml = YAML()
+    stream = StringIO()
+    yml.dump(data, stream)
+    return stream.getvalue()
 
 
 # ---------------------------------------------------------------------------
@@ -162,7 +174,7 @@ class TestEmitWorkflow:
             },
         }
         emitted = emit_workflow(original)
-        reloaded = yaml.safe_load(emitted)
+        reloaded = _safe_load(emitted)
 
         assert reloaded == original
 
@@ -184,7 +196,7 @@ class TestEmitWorkflow:
         assert "${{ secrets.NPM_TOKEN }}" in output
 
         # Verify round-trip preserves the expression
-        reloaded = yaml.safe_load(output)
+        reloaded = _safe_load(output)
         token = reloaded["jobs"]["publish"]["steps"][0]["env"]["NODE_AUTH_TOKEN"]
         assert token == "${{ secrets.NPM_TOKEN }}"
 
@@ -604,7 +616,7 @@ class TestGenerateInlinePublishRouter:
         ):
             result = generate_inline_publish_router(projects, root)
 
-        parsed = yaml.safe_load(result)
+        parsed = _safe_load(result)
         assert len(parsed["jobs"]) == 2  # 1 project job + 1 no-op
         assert "mypkg-pypi" in parsed["jobs"]
         assert "no-op" in parsed["jobs"]
@@ -624,7 +636,7 @@ class TestGenerateInlinePublishRouter:
         ):
             result = generate_inline_publish_router(projects, root)
 
-        parsed = yaml.safe_load(result)
+        parsed = _safe_load(result)
         assert len(parsed["jobs"]) == 3  # 2 project jobs + 1 no-op
         assert "mypkg-pypi" in parsed["jobs"]
         assert "mylib-npm" in parsed["jobs"]
@@ -654,7 +666,7 @@ class TestGenerateInlinePublishRouter:
         ):
             result = generate_inline_publish_router(projects, root)
 
-        parsed = yaml.safe_load(result)
+        parsed = _safe_load(result)
         assert isinstance(parsed, dict)
         assert "name" in parsed
         assert "on" in parsed
@@ -675,7 +687,7 @@ class TestGenerateInlinePublishRouter:
         ):
             result = generate_inline_publish_router(projects, root)
 
-        parsed = yaml.safe_load(result)
+        parsed = _safe_load(result)
         pypi_job = parsed["jobs"]["mypkg-pypi"]
         npm_job = parsed["jobs"]["mylib-npm"]
 
@@ -693,7 +705,7 @@ class TestGenerateInlinePublishRouter:
         ):
             result = generate_inline_publish_router(projects, root)
 
-        parsed = yaml.safe_load(result)
+        parsed = _safe_load(result)
         assert "permissions" not in parsed
 
     def test_workflow_structure(self, tmp_path):
@@ -707,7 +719,7 @@ class TestGenerateInlinePublishRouter:
         ):
             result = generate_inline_publish_router(projects, root)
 
-        parsed = yaml.safe_load(result)
+        parsed = _safe_load(result)
         assert parsed["name"] == "Publish Router"
         assert parsed["on"] == {"release": {"types": ["published"]}}
 
@@ -722,7 +734,7 @@ class TestGenerateInlinePublishRouter:
         ):
             result = generate_inline_publish_router(projects, root)
 
-        parsed = yaml.safe_load(result)
+        parsed = _safe_load(result)
         job = parsed["jobs"]["mypkg-pypi"]
         assert job["defaults"]["run"]["working-directory"] == "packages/mypkg"
 
@@ -963,7 +975,7 @@ class TestIntegrationRealWorkflows:
         ):
             result = generate_inline_publish_router(projects, root)
 
-        parsed = yaml.safe_load(result)
+        parsed = _safe_load(result)
         jobs = parsed["jobs"]
 
         # Correct job names
@@ -994,7 +1006,7 @@ class TestIntegrationRealWorkflows:
         assert pypi_publish_step["with"]["packages-dir"] == "python/dist/"
 
         # npm job preserves secrets (NOT filtered out -- works in non-reusable workflows)
-        npm_steps_yaml = yaml.dump(jobs["strictcli-npm"]["steps"])
+        npm_steps_yaml = _dump(jobs["strictcli-npm"]["steps"])
         assert "${{ secrets.NPM_TOKEN }}" in npm_steps_yaml
 
         # No top-level permissions on the workflow
@@ -1015,7 +1027,7 @@ class TestIntegrationRealWorkflows:
         ):
             result = generate_inline_publish_router(projects, root)
 
-        parsed = yaml.safe_load(result)
+        parsed = _safe_load(result)
         jobs = parsed["jobs"]
 
         # Both jobs are prefixed
@@ -1054,7 +1066,7 @@ class TestIntegrationRealWorkflows:
         ):
             result = generate_inline_publish_router(projects, root)
 
-        parsed = yaml.safe_load(result)
+        parsed = _safe_load(result)
         assert isinstance(parsed, dict), "Output must be valid YAML"
         jobs = parsed["jobs"]
 
@@ -1078,8 +1090,8 @@ class TestIntegrationRealWorkflows:
         all_job_names = list(jobs.keys())
         assert len(all_job_names) == len(set(all_job_names))
 
-        # Round-trip through yaml.safe_load confirms structural validity
-        re_parsed = yaml.safe_load(result)
+        # Round-trip through _safe_load confirms structural validity
+        re_parsed = _safe_load(result)
         assert re_parsed == parsed
 
     def test_cache_skip_behavior(self, tmp_path):
@@ -1181,7 +1193,7 @@ class TestIntegrationRealWorkflows:
         assert "'on'" in emitted or "on:" in emitted
 
         # Most importantly: round-trip preserves the key and its value
-        reloaded = yaml.safe_load(emitted)
+        reloaded = _safe_load(emitted)
         assert "on" in reloaded
         assert reloaded["on"] == {"release": {"types": ["published"]}}
         assert reloaded["name"] == "Publish Router"
