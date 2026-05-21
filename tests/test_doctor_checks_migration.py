@@ -11,11 +11,11 @@ import pytest
 from strictcli import CheckResult
 
 from rlsbl import app
-from rlsbl.check_context import ProjectCheckContext
+from rlsbl.check_context import ProjectCheckContext, WorkspaceCheckContext
 
 
 # ---------------------------------------------------------------------------
-# All 11 checks are declared in checks.toml and registered on the app
+# All 23 checks are declared in checks.toml and registered on the app
 # ---------------------------------------------------------------------------
 
 EXPECTED_CHECKS = [
@@ -30,14 +30,28 @@ EXPECTED_CHECKS = [
     "branch-sync",
     "changelog-entry",
     "library-lint",
+    # Changelog validation checks
+    "changelog-hashes",
+    "changelog-range",
+    "changelog-coverage",
+    "changelog-orphans",
+    "changelog-schema",
+    "changelog-batch-commits",
+    "changelog-batch-entries",
+    # Workspace checks
+    "workspace-ci-router",
+    "workspace-ci-synced",
+    "workspace-targets",
+    "workspace-unregistered",
+    "workspace-stale-entries",
 ]
 
 
 class TestCheckDeclarations:
     """Every check must be declared in checks.toml and registered on the app."""
 
-    def test_all_11_checks_declared(self):
-        """checks.toml defines exactly the 11 expected checks."""
+    def test_all_23_checks_declared(self):
+        """checks.toml defines exactly the 23 expected checks."""
         assert sorted(app._check_defs.keys()) == sorted(EXPECTED_CHECKS)
 
     @pytest.mark.parametrize("name", EXPECTED_CHECKS)
@@ -46,14 +60,14 @@ class TestCheckDeclarations:
         assert app._check_defs[name].impl is not None
 
     def test_check_list_shows_all(self):
-        """``rlsbl check --list`` outputs all 11 check names."""
+        """``rlsbl check --list`` outputs all 23 check names."""
         result = app.test(["check", "--list"])
         assert result.exit_code == 0
         for name in EXPECTED_CHECKS:
             assert name in result.stdout
 
     def test_check_list_json(self):
-        """``rlsbl check --list --json`` outputs valid JSON with all 11 checks."""
+        """``rlsbl check --list --json`` outputs valid JSON with all 23 checks."""
         result = app.test(["check", "--list", "--json"])
         assert result.exit_code == 0
         data = json.loads(result.stdout)
@@ -290,3 +304,218 @@ class TestCheckTagFiltering:
         result = app.test(["check", "--tag", "changelog", "--dry-run"])
         assert result.exit_code == 0
         assert "changelog-entry" in result.stdout
+        # New changelog validation checks should also appear
+        assert "changelog-hashes" in result.stdout
+        assert "changelog-range" in result.stdout
+        assert "changelog-coverage" in result.stdout
+        assert "changelog-orphans" in result.stdout
+        assert "changelog-schema" in result.stdout
+        assert "changelog-batch-commits" in result.stdout
+        assert "changelog-batch-entries" in result.stdout
+
+    def test_tag_workspace(self):
+        result = app.test(["check", "--tag", "workspace", "--dry-run"])
+        assert result.exit_code == 0
+        assert "workspace-ci-router" in result.stdout
+        assert "workspace-ci-synced" in result.stdout
+        assert "workspace-targets" in result.stdout
+        assert "workspace-unregistered" in result.stdout
+        assert "workspace-stale-entries" in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# Dependency chains for new checks
+# ---------------------------------------------------------------------------
+
+class TestNewCheckDependencies:
+    """Dependency chains for changelog and workspace checks."""
+
+    def test_changelog_range_depends_on_hashes(self):
+        assert "changelog-hashes" in app._check_defs["changelog-range"].depends_on
+
+    def test_changelog_coverage_depends_on_hashes(self):
+        assert "changelog-hashes" in app._check_defs["changelog-coverage"].depends_on
+
+    def test_changelog_orphans_no_deps(self):
+        assert app._check_defs["changelog-orphans"].depends_on == []
+
+    def test_changelog_schema_no_deps(self):
+        assert app._check_defs["changelog-schema"].depends_on == []
+
+    def test_workspace_checks_no_deps(self):
+        for name in [
+            "workspace-ci-router", "workspace-ci-synced",
+            "workspace-targets", "workspace-unregistered",
+            "workspace-stale-entries",
+        ]:
+            assert app._check_defs[name].depends_on == []
+
+
+# ---------------------------------------------------------------------------
+# Functional tests: changelog-schema check
+# ---------------------------------------------------------------------------
+
+class TestChangelogSchemaCheck:
+    """The changelog-schema check validates entry structure."""
+
+    def test_schema_pass_valid_entries(self, mock_git_repo):
+        """Valid entries -> pass."""
+        changes = mock_git_repo / ".rlsbl" / "changes"
+        changes.mkdir(parents=True)
+        # Need a real commit hash for the entry
+        head = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=str(mock_git_repo), capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        (changes / "unreleased.jsonl").write_text(
+            f'{{"commits":["{head}"],"user_facing":true,"description":"A feature.","type":"feature"}}\n'
+        )
+        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        result = app._check_defs["changelog-schema"].impl(ctx)
+        assert result.status == "pass"
+
+    def test_schema_fail_missing_description(self, mock_git_repo):
+        """user_facing entry without description -> fail."""
+        changes = mock_git_repo / ".rlsbl" / "changes"
+        changes.mkdir(parents=True)
+        head = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=str(mock_git_repo), capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        (changes / "unreleased.jsonl").write_text(
+            f'{{"commits":["{head}"],"user_facing":true}}\n'
+        )
+        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        result = app._check_defs["changelog-schema"].impl(ctx)
+        assert result.status == "fail"
+        assert len(result.details) > 0
+
+    def test_schema_skip_no_changes_dir(self, mock_git_repo):
+        """No .rlsbl/changes/ -> skip."""
+        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        result = app._check_defs["changelog-schema"].impl(ctx)
+        assert result.status == "skip"
+
+    def test_schema_pass_empty_unreleased(self, mock_git_repo):
+        """Empty unreleased.jsonl -> pass (no entries to validate)."""
+        changes = mock_git_repo / ".rlsbl" / "changes"
+        changes.mkdir(parents=True)
+        (changes / "unreleased.jsonl").write_text("")
+        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        result = app._check_defs["changelog-schema"].impl(ctx)
+        assert result.status == "pass"
+
+
+# ---------------------------------------------------------------------------
+# Functional tests: changelog-hashes check
+# ---------------------------------------------------------------------------
+
+class TestChangelogHashesCheck:
+    """The changelog-hashes check validates that commit hashes resolve."""
+
+    def test_hashes_pass(self, mock_git_repo):
+        """Valid hash -> pass."""
+        changes = mock_git_repo / ".rlsbl" / "changes"
+        changes.mkdir(parents=True)
+        head = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=str(mock_git_repo), capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        (changes / "unreleased.jsonl").write_text(
+            f'{{"commits":["{head[:7]}"],"user_facing":false}}\n'
+        )
+        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        result = app._check_defs["changelog-hashes"].impl(ctx)
+        assert result.status == "pass"
+
+    def test_hashes_fail_bad_hash(self, mock_git_repo):
+        """Bogus hash -> fail."""
+        changes = mock_git_repo / ".rlsbl" / "changes"
+        changes.mkdir(parents=True)
+        (changes / "unreleased.jsonl").write_text(
+            '{"commits":["deadbeef0000000"],"user_facing":false}\n'
+        )
+        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        result = app._check_defs["changelog-hashes"].impl(ctx)
+        assert result.status == "fail"
+        assert len(result.details) > 0
+
+
+# ---------------------------------------------------------------------------
+# Functional tests: workspace checks
+# ---------------------------------------------------------------------------
+
+class TestWorkspaceChecksSkipForNonWorkspace:
+    """Workspace checks return skip when context is not a WorkspaceCheckContext."""
+
+    @pytest.mark.parametrize("name", [
+        "workspace-ci-router",
+        "workspace-ci-synced",
+        "workspace-targets",
+        "workspace-unregistered",
+        "workspace-stale-entries",
+    ])
+    def test_skip_for_project_context(self, mock_git_repo, name):
+        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        result = app._check_defs[name].impl(ctx)
+        assert result.status == "skip"
+        assert "not a monorepo" in result.message
+
+
+class TestWorkspaceCiRouterCheck:
+    """The workspace-ci-router check verifies ci-router.yml exists."""
+
+    def test_ci_router_pass(self, mock_git_repo):
+        """ci-router.yml exists -> pass."""
+        workflows = mock_git_repo / ".github" / "workflows"
+        workflows.mkdir(parents=True)
+        (workflows / "ci-router.yml").write_text("name: CI Router\n")
+        ctx = WorkspaceCheckContext(
+            project_root=mock_git_repo,
+            workspace_root=mock_git_repo,
+            projects=[],
+            graph=None,
+        )
+        result = app._check_defs["workspace-ci-router"].impl(ctx)
+        assert result.status == "pass"
+
+    def test_ci_router_fail(self, mock_git_repo):
+        """ci-router.yml missing -> fail."""
+        ctx = WorkspaceCheckContext(
+            project_root=mock_git_repo,
+            workspace_root=mock_git_repo,
+            projects=[],
+            graph=None,
+        )
+        result = app._check_defs["workspace-ci-router"].impl(ctx)
+        assert result.status == "fail"
+
+
+class TestWorkspaceStaleEntriesCheck:
+    """The workspace-stale-entries check finds entries pointing to missing dirs."""
+
+    def test_stale_entries_pass(self, mock_git_repo):
+        """All registered projects have dirs with manifests -> pass."""
+        proj_dir = mock_git_repo / "mylib"
+        proj_dir.mkdir()
+        (proj_dir / "package.json").write_text('{"name":"mylib","version":"1.0.0"}')
+        ctx = WorkspaceCheckContext(
+            project_root=mock_git_repo,
+            workspace_root=mock_git_repo,
+            projects=[{"path": "mylib", "name": "mylib"}],
+            graph=None,
+        )
+        result = app._check_defs["workspace-stale-entries"].impl(ctx)
+        assert result.status == "pass"
+
+    def test_stale_entries_fail_missing_dir(self, mock_git_repo):
+        """Registered project dir doesn't exist -> fail."""
+        ctx = WorkspaceCheckContext(
+            project_root=mock_git_repo,
+            workspace_root=mock_git_repo,
+            projects=[{"path": "nonexistent", "name": "ghost"}],
+            graph=None,
+        )
+        result = app._check_defs["workspace-stale-entries"].impl(ctx)
+        assert result.status == "fail"
+        assert len(result.details) == 1

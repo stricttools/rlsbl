@@ -14,6 +14,8 @@ import sys
 
 from strictcli import CheckResult
 
+from .check_context import WorkspaceCheckContext
+
 
 def _resolve_version_and_tag(ctx):
     """Detect version and tag from project targets rooted at *ctx*.
@@ -389,3 +391,330 @@ def register_checks(app):
         if total_warnings > 0:
             return CheckResult("warn", f"{total_warnings} warning(s)")
         return CheckResult("pass", "project clean")
+
+    # ------------------------------------------------------------------
+    # Tag: changelog (validation checks)
+    # ------------------------------------------------------------------
+
+    def _get_changelog_context(ctx):
+        """Resolve changes_dir, tag_glob, and entries for changelog checks.
+
+        Returns ``(changes_dir, tag_glob, entries)`` or ``None`` when the
+        changes directory does not exist (caller should return skip).
+        """
+        from .changelog.files import get_changes_dir, read_unreleased
+
+        changes_dir = get_changes_dir(str(ctx.project_root))
+        if not os.path.isdir(changes_dir):
+            return None
+
+        tag_glob = None
+        if isinstance(ctx, WorkspaceCheckContext):
+            # Derive tag_glob from project name for monorepo scoping
+            from .workspace import resolve_project
+            proj = resolve_project(str(ctx.workspace_root), str(ctx.project_root))
+            if proj is not None:
+                tag_glob = f"{proj['name']}@v*"
+
+        entries = read_unreleased(changes_dir)
+        return changes_dir, tag_glob, entries
+
+    @app.check("changelog-hashes")
+    def check_changelog_hashes(ctx):
+        """Every hash in unreleased.jsonl must resolve via git rev-parse."""
+        from .changelog.validate import check_hashes_resolve
+
+        info = _get_changelog_context(ctx)
+        if info is None:
+            return CheckResult("skip", "no .rlsbl/changes/ directory")
+        _changes_dir, _tag_glob, entries = info
+
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(ctx.project_root)
+            passed, details = check_hashes_resolve(entries)
+        finally:
+            os.chdir(original_cwd)
+
+        if passed:
+            return CheckResult("pass", "all hashes resolve")
+        return CheckResult("fail", f"{len(details)} hash(es) failed to resolve", details=details)
+
+    @app.check("changelog-range")
+    def check_changelog_range(ctx):
+        """Every resolved hash must be in the unreleased commit range."""
+        from .changelog.validate import check_in_range
+
+        info = _get_changelog_context(ctx)
+        if info is None:
+            return CheckResult("skip", "no .rlsbl/changes/ directory")
+        _changes_dir, tag_glob, entries = info
+
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(ctx.project_root)
+            passed, details = check_in_range(entries, tag_glob)
+        finally:
+            os.chdir(original_cwd)
+
+        if passed:
+            return CheckResult("pass", "all hashes in unreleased range")
+        return CheckResult("fail", f"{len(details)} hash(es) out of range", details=details)
+
+    @app.check("changelog-coverage")
+    def check_changelog_coverage(ctx):
+        """Every unreleased commit must appear in at least one entry."""
+        from .changelog.validate import check_coverage
+
+        info = _get_changelog_context(ctx)
+        if info is None:
+            return CheckResult("skip", "no .rlsbl/changes/ directory")
+        _changes_dir, tag_glob, entries = info
+
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(ctx.project_root)
+            passed, details = check_coverage(entries, tag_glob)
+        finally:
+            os.chdir(original_cwd)
+
+        if passed:
+            return CheckResult("pass", "all unreleased commits covered")
+        # Filter out informational "skipped N ..." lines from the fail count
+        fail_details = [d for d in details if not d.startswith("skipped ")]
+        return CheckResult("fail", f"{len(fail_details)} uncovered commit(s)", details=details)
+
+    @app.check("changelog-orphans")
+    def check_changelog_orphans(ctx):
+        """No entry should have ALL hashes unresolvable (stale/rebased)."""
+        from .changelog.validate import check_no_orphans
+
+        info = _get_changelog_context(ctx)
+        if info is None:
+            return CheckResult("skip", "no .rlsbl/changes/ directory")
+        _changes_dir, _tag_glob, entries = info
+
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(ctx.project_root)
+            passed, details = check_no_orphans(entries)
+        finally:
+            os.chdir(original_cwd)
+
+        if passed:
+            return CheckResult("pass", "no orphaned entries")
+        return CheckResult("fail", f"{len(details)} orphaned entry(ies)", details=details)
+
+    @app.check("changelog-schema")
+    def check_changelog_schema(ctx):
+        """Every entry must pass schema validation."""
+        from .changelog.validate import check_schema
+
+        info = _get_changelog_context(ctx)
+        if info is None:
+            return CheckResult("skip", "no .rlsbl/changes/ directory")
+        _changes_dir, _tag_glob, entries = info
+
+        passed, details = check_schema(entries)
+        if passed:
+            return CheckResult("pass", "all entries valid")
+        return CheckResult("fail", f"{len(details)} schema error(s)", details=details)
+
+    @app.check("changelog-batch-commits")
+    def check_changelog_batch_commits(ctx):
+        """No entry should have more commits than max_commits_per_entry."""
+        from .changelog.validate import check_batch_size_commits, _get_batch_limits_config
+
+        info = _get_changelog_context(ctx)
+        if info is None:
+            return CheckResult("skip", "no .rlsbl/changes/ directory")
+        _changes_dir, _tag_glob, entries = info
+
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(ctx.project_root)
+            batch_config = _get_batch_limits_config()
+        finally:
+            os.chdir(original_cwd)
+
+        passed, details = check_batch_size_commits(entries, batch_config, version="unreleased")
+        if passed:
+            return CheckResult("pass", "all entries within commit batch limit")
+        return CheckResult("fail", f"{len(details)} entry(ies) exceed commit limit", details=details)
+
+    @app.check("changelog-batch-entries")
+    def check_changelog_batch_entries(ctx):
+        """No commit should appear in more entries than max_entries_per_commit."""
+        from .changelog.validate import (
+            check_batch_size_entries,
+            _get_batch_limits_config,
+            _read_all_versioned_entries,
+        )
+
+        info = _get_changelog_context(ctx)
+        if info is None:
+            return CheckResult("skip", "no .rlsbl/changes/ directory")
+        changes_dir, _tag_glob, _entries = info
+
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(ctx.project_root)
+            batch_config = _get_batch_limits_config()
+            entries_by_version = _read_all_versioned_entries(changes_dir)
+        finally:
+            os.chdir(original_cwd)
+
+        passed, details = check_batch_size_entries(entries_by_version, batch_config)
+        if passed:
+            return CheckResult("pass", "all commits within entry batch limit")
+        return CheckResult("fail", f"{len(details)} commit(s) exceed entry limit", details=details)
+
+    # ------------------------------------------------------------------
+    # Tag: workspace
+    # ------------------------------------------------------------------
+
+    @app.check("workspace-ci-router")
+    def check_workspace_ci_router(ctx):
+        """ci-router.yml must exist at the repo root."""
+        if not isinstance(ctx, WorkspaceCheckContext):
+            return CheckResult("skip", "not a monorepo workspace")
+
+        router = os.path.join(str(ctx.workspace_root), ".github", "workflows", "ci-router.yml")
+        if os.path.isfile(router):
+            return CheckResult("pass", "ci-router.yml exists")
+        return CheckResult("fail", "ci-router.yml not found")
+
+    @app.check("workspace-ci-synced")
+    def check_workspace_ci_synced(ctx):
+        """Each project must have a synced CI workflow at the repo root."""
+        if not isinstance(ctx, WorkspaceCheckContext):
+            return CheckResult("skip", "not a monorepo workspace")
+
+        missing = []
+        for proj in ctx.projects:
+            name = proj["name"]
+            workflow = os.path.join(
+                str(ctx.workspace_root), ".github", "workflows", f"{name}-ci.yml"
+            )
+            if not os.path.isfile(workflow):
+                missing.append(name)
+
+        if missing:
+            return CheckResult(
+                "fail",
+                f"missing workflows: {', '.join(missing)}",
+                details=[f"{n}: {n}-ci.yml not found" for n in missing],
+            )
+        return CheckResult("pass", f"all {len(ctx.projects)} project(s) have synced workflows")
+
+    @app.check("workspace-targets")
+    def check_workspace_targets(ctx):
+        """Every project must have at least one detectable target."""
+        if not isinstance(ctx, WorkspaceCheckContext):
+            return CheckResult("skip", "not a monorepo workspace")
+
+        from .targets import detect_targets
+
+        missing = []
+        for proj in ctx.projects:
+            targets = detect_targets(os.path.join(str(ctx.workspace_root), proj["path"]))
+            if not targets:
+                missing.append(proj["name"])
+
+        if missing:
+            return CheckResult(
+                "fail",
+                f"no targets detected: {', '.join(missing)}",
+                details=[f"{n}: no release target found" for n in missing],
+            )
+        return CheckResult("pass", f"all {len(ctx.projects)} project(s) have targets")
+
+    @app.check("workspace-unregistered")
+    def check_workspace_unregistered(ctx):
+        """No project directories on disk should be missing from workspace.toml."""
+        if not isinstance(ctx, WorkspaceCheckContext):
+            return CheckResult("skip", "not a monorepo workspace")
+
+        root = str(ctx.workspace_root)
+        registered_paths = {proj["path"].rstrip("/") for proj in ctx.projects}
+
+        # Determine gitignored directories
+        gitignored = set()
+        try:
+            result = subprocess.run(
+                ["git", "ls-files", "--others", "--ignored", "--exclude-standard", "--directory"],
+                cwd=root,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            for line in result.stdout.splitlines():
+                gitignored.add(line.rstrip("/"))
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pass
+
+        project_manifests = (
+            "go.mod", "pyproject.toml", "package.json", "Cargo.toml",
+            "mix.exs", "deno.json", "build.zig.zon",
+        )
+
+        found_project_dirs = set()
+        try:
+            entries = os.listdir(root)
+        except OSError:
+            entries = []
+
+        for entry in sorted(entries):
+            if entry.startswith("."):
+                continue
+            if entry in gitignored:
+                continue
+            dir_path = os.path.join(root, entry)
+            if not os.path.isdir(dir_path):
+                continue
+            for manifest in project_manifests:
+                if os.path.isfile(os.path.join(dir_path, manifest)):
+                    found_project_dirs.add(entry)
+                    break
+
+        unregistered = sorted(found_project_dirs - registered_paths)
+        if unregistered:
+            return CheckResult(
+                "fail",
+                f"{len(unregistered)} unregistered project(s)",
+                details=[f"{d}: has manifest but not in workspace.toml" for d in unregistered],
+            )
+        return CheckResult("pass", "no unregistered projects")
+
+    @app.check("workspace-stale-entries")
+    def check_workspace_stale_entries(ctx):
+        """No workspace.toml entries should point to missing or manifest-less dirs."""
+        if not isinstance(ctx, WorkspaceCheckContext):
+            return CheckResult("skip", "not a monorepo workspace")
+
+        root = str(ctx.workspace_root)
+
+        project_manifests = (
+            "go.mod", "pyproject.toml", "package.json", "Cargo.toml",
+            "mix.exs", "deno.json", "build.zig.zon",
+        )
+
+        stale = []
+        for proj in ctx.projects:
+            dir_path = os.path.join(root, proj["path"])
+            if not os.path.isdir(dir_path):
+                stale.append(proj["path"])
+                continue
+            has_manifest = any(
+                os.path.isfile(os.path.join(dir_path, m)) for m in project_manifests
+            )
+            if not has_manifest:
+                stale.append(proj["path"])
+
+        if stale:
+            return CheckResult(
+                "fail",
+                f"{len(stale)} stale workspace entry(ies)",
+                details=[f"{s}: directory missing or no manifest" for s in stale],
+            )
+        return CheckResult("pass", "no stale entries")

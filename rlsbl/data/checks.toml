@@ -85,3 +85,107 @@ fast = false
 pure = true
 needs_network = false
 depends_on = []
+
+# ---------------------------------------------------------------------------
+# Changelog validation checks (from changelog/validate.py)
+# ---------------------------------------------------------------------------
+
+[checks.changelog-hashes]
+tags = ["changelog"]
+severity = "error"
+fast = true
+pure = false
+needs_network = false
+depends_on = []
+
+[checks.changelog-range]
+tags = ["changelog"]
+severity = "error"
+fast = true
+pure = false
+needs_network = false
+depends_on = ["changelog-hashes"]
+
+[checks.changelog-coverage]
+tags = ["changelog"]
+severity = "error"
+fast = true
+pure = false
+needs_network = false
+depends_on = ["changelog-hashes"]
+
+[checks.changelog-orphans]
+tags = ["changelog"]
+severity = "error"
+fast = true
+pure = false
+needs_network = false
+depends_on = []
+
+[checks.changelog-schema]
+tags = ["changelog"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.changelog-batch-commits]
+tags = ["changelog"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.changelog-batch-entries]
+tags = ["changelog"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+# ---------------------------------------------------------------------------
+# Workspace checks (from doctor.py ad-hoc + monorepo lint)
+# ---------------------------------------------------------------------------
+
+[checks.workspace-ci-router]
+tags = ["workspace"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.workspace-ci-synced]
+tags = ["workspace"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.workspace-targets]
+tags = ["workspace"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.workspace-unregistered]
+tags = ["workspace"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.workspace-stale-entries]
+tags = ["workspace"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
