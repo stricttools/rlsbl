@@ -216,7 +216,13 @@ def generate_inline_publish_router(projects_with_publish: list, root: str) -> st
 
     Returns the complete YAML string, ready to write to disk.
     """
-    all_jobs: dict = {}
+    all_jobs: dict = {
+        "no-op": {
+            "runs-on": "ubuntu-latest",
+            "if": "true",
+            "steps": [{"run": "echo 'No publish target for this release tag'"}],
+        },
+    }
 
     for project in projects_with_publish:
         tag_prefix = _get_monorepo_tag_prefix(project, root)
