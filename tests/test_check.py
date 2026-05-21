@@ -243,10 +243,10 @@ class TestCheckTargetRequired(unittest.TestCase):
     """Tests verifying that --target is required for the check command."""
 
     def test_missing_target_prints_error(self):
-        """Running 'rlsbl check <name>' without --target should exit with error."""
+        """Running 'rlsbl check-name <name>' without --target should exit with error."""
         from rlsbl import main
 
-        with patch("sys.argv", ["rlsbl", "check", "some-name"]):
+        with patch("sys.argv", ["rlsbl", "check-name", "some-name"]):
             with self.assertRaises(SystemExit) as ctx:
                 main()
             self.assertEqual(ctx.exception.code, 1)
@@ -255,7 +255,7 @@ class TestCheckTargetRequired(unittest.TestCase):
         """Error message should mention --target is required."""
         from rlsbl import app
 
-        result = app.test(["check"])
+        result = app.test(["check-name"])
         self.assertEqual(result.exit_code, 1)
         self.assertIn("target", result.stderr)
         self.assertIn("required", result.stderr)
@@ -360,7 +360,7 @@ class TestDelayFlag(unittest.TestCase):
         # Set the variadic args that _extract_variadic_args would populate
         rlsbl._variadic_args = ["my-pkg"]
         try:
-            result = rlsbl.app.test(["check", "--target", "npm", "--delay", "500"])
+            result = rlsbl.app.test(["check-name", "--target", "npm", "--delay", "500"])
         finally:
             rlsbl._variadic_args = []
         self.assertEqual(result.exit_code, 0)
@@ -379,7 +379,7 @@ class TestDelayFlag(unittest.TestCase):
         import rlsbl
         rlsbl._variadic_args = ["a", "b"]
         try:
-            result = rlsbl.app.test(["check", "--target", "npm"])
+            result = rlsbl.app.test(["check-name", "--target", "npm"])
         finally:
             rlsbl._variadic_args = []
         self.assertEqual(result.exit_code, 0)

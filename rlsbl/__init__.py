@@ -127,6 +127,35 @@ app = strictcli.App(
 )
 
 
+def _check_context_factory():
+    """Create the appropriate check context for the current project.
+
+    Returns WorkspaceCheckContext if in a monorepo, otherwise ProjectCheckContext.
+    Imports are deferred to avoid circular dependencies and to keep the factory lazy.
+    """
+    from pathlib import Path
+
+    from .check_context import ProjectCheckContext, WorkspaceCheckContext
+    from .workspace import find_workspace_root, load_workspace
+
+    workspace_root = find_workspace_root()
+    if workspace_root is not None:
+        from .workspace_graph import WorkspaceGraph
+
+        projects = load_workspace(workspace_root)
+        graph = WorkspaceGraph(projects)
+        return WorkspaceCheckContext(
+            project_root=Path.cwd(),
+            workspace_root=Path(workspace_root),
+            projects=projects,
+            graph=graph,
+        )
+    return ProjectCheckContext(project_root=Path.cwd())
+
+
+app.set_check_context(_check_context_factory)
+
+
 # ---------------------------------------------------------------------------
 # release
 # ---------------------------------------------------------------------------
@@ -251,15 +280,15 @@ def cmd_scaffold(target, force, update, private, no_commit, skip_shared, no_tag,
 # check
 # ---------------------------------------------------------------------------
 
-@app.command(name="check", help="Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.")
+@app.command(name="check-name", help="Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.")
 @strictcli.flag(name="target", type=str, help="Target registry (npm, pypi, or go)")
 @strictcli.flag(name="delay", type=str, help="Delay between checks in ms", default="200")
-def cmd_check(target, delay):
-    # --target is required for check
+def cmd_check_name(target, delay):
+    # --target is required for check-name
     if not target:
         print(
             "Error: --target is required. "
-            "Usage: rlsbl check <name> [<name2> ...] --target <npm|pypi|go>",
+            "Usage: rlsbl check-name <name> [<name2> ...] --target <npm|pypi|go>",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -712,12 +741,12 @@ def _extract_variadic_args():
         sys.argv = new_argv
         return positionals
 
-    if cmd == "check":
-        # Everything after 'check' that doesn't start with '-' and isn't
+    if cmd == "check-name":
+        # Everything after 'check-name' that doesn't start with '-' and isn't
         # a value following a flag is a positional name arg.
         positionals = []
-        new_argv = [sys.argv[0], "check"]
-        i = 1  # index into argv (after 'check')
+        new_argv = [sys.argv[0], "check-name"]
+        i = 1  # index into argv (after 'check-name')
         value_flags = {"target", "delay"}
         while i < len(argv):
             tok = argv[i]
