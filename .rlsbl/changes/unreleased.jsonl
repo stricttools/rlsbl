@@ -1,0 +1,1 @@
+{"commits":["88460f8a862b672ccfc5a8e9eec24225a77cd342","1e68ab3d3009751d17b7f9d96c84cb2efda5cf9f"],"user_facing":true,"description":"**Fix.** Publish router no longer fails for plain-target releases. Added a no-op job so GitHub Actions workflows succeed even when all conditional publish jobs are skipped.","type":"fix"}
