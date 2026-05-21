@@ -715,6 +715,25 @@ def cmd_mono_outdated(**_kwargs):
     _cmd_outdated({})
 
 
+@mono.command(name="graph", help="Export the monorepo dependency graph in JSON, DOT (Graphviz), or indented text tree format. Supports filtering by a root package (transitive deps) or reverse package (transitive rdeps), with optional depth limiting. Use --output to write to a file instead of stdout.")
+@strictcli.flag(name="format", type=str, help="Output format: json, dot, or text (default: json)", default="json")
+@strictcli.flag(name="output", type=str, help="Write output to file instead of stdout", default="")
+@strictcli.flag(name="root", type=str, help="Show only transitive deps from this package", default="")
+@strictcli.flag(name="reverse", type=str, help="Show only transitive rdeps of this package", default="")
+@strictcli.flag(name="depth", type=int, help="Limit traversal depth")
+def cmd_mono_graph(format, output, root, reverse, depth=None, **_kwargs):
+    flags = {"format": format}
+    if output:
+        flags["output"] = output
+    if root:
+        flags["root"] = root
+    if reverse:
+        flags["reverse"] = reverse
+    if depth is not None:
+        flags["depth"] = depth
+    from .commands.monorepo import _cmd_graph
+    _cmd_graph(flags)
+
 
 # ---------------------------------------------------------------------------
 # dev group
