@@ -328,107 +328,92 @@ def _update_last_build_release(version_dir, version):
     os.replace(tmp_path, config_path)
 
 
-def run_cmd(release_config_or_registry, flags_or_args=None, flags=None):
+def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None):
     """Release command handler.
 
-    Primary signature: run_cmd(ReleaseConfig, flags)
-        Called by the CLI entry point with a validated release file config.
-
-    Legacy signature: run_cmd(registry_str, args_list, flags)
-        Supported for backward compatibility with existing tests.
-
-    Bumps version, commits, pushes, and creates a GitHub Release.
+    Accepts a ReleaseConfig instance (from the release file) and an optional
+    flags dict.  Bumps version, commits, pushes, and creates a GitHub Release.
     """
     from ..release_file import ReleaseConfig
 
-    if isinstance(release_config_or_registry, ReleaseConfig):
-        # New path: ReleaseConfig from the release file
-        release_config = release_config_or_registry
-        if flags is not None:
-            raise TypeError("run_cmd(ReleaseConfig, flags) takes exactly 2 args")
-        flags = flags_or_args if flags_or_args is not None else {}
+    if flags is None:
+        flags = {}
 
-        if not release_config.include:
-            print("Error: release file has an empty include list. Add at least one target.", file=sys.stderr)
-            sys.exit(1)
-        registry = release_config.include[0]
+    if not release_config.include:
+        print("Error: release file has an empty include list. Add at least one target.", file=sys.stderr)
+        sys.exit(1)
+    registry = release_config.include[0]
 
-        # Validate that all included/excluded targets are known
-        for t_name in release_config.include + release_config.exclude:
-            if t_name not in TARGETS:
-                print(
-                    f"Error: unknown target '{t_name}' in release file. "
-                    f"Valid: {', '.join(TARGETS.keys())}",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-
-        # Validate exhaustiveness: include + exclude must cover all detected targets
-        detected = {entry.name for entry in detect_targets(".")}
-        declared = set(release_config.include) | set(release_config.exclude)
-        missing = detected - declared
-        extra = declared - detected
-        if missing:
+    # Validate that all included/excluded targets are known
+    for t_name in release_config.include + release_config.exclude:
+        if t_name not in TARGETS:
             print(
-                f"Error: detected targets not in release file: {', '.join(sorted(missing))}. "
-                "Add them to include or exclude.",
+                f"Error: unknown target '{t_name}' in release file. "
+                f"Valid: {', '.join(TARGETS.keys())}",
                 file=sys.stderr,
             )
             sys.exit(1)
-        if extra:
-            print(
-                f"Warning: release file lists targets not detected in project: {', '.join(sorted(extra))}",
-                file=sys.stderr,
-            )
 
-        # OTA validation: check for native changes when Flutter targets use mode="ota"
-        flutter_targets = [
-            t for t in release_config.include if t.startswith("flutter-")
+    # Validate exhaustiveness: include + exclude must cover all detected targets
+    detected = {entry.name for entry in detect_targets(".")}
+    declared = set(release_config.include) | set(release_config.exclude)
+    missing = detected - declared
+    extra = declared - detected
+    if missing:
+        print(
+            f"Error: detected targets not in release file: {', '.join(sorted(missing))}. "
+            "Add them to include or exclude.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if extra:
+        print(
+            f"Warning: release file lists targets not detected in project: {', '.join(sorted(extra))}",
+            file=sys.stderr,
+        )
+
+    # OTA validation: check for native changes when Flutter targets use mode="ota"
+    flutter_targets = [
+        t for t in release_config.include if t.startswith("flutter-")
+    ]
+    if flutter_targets:
+        flutter_cfg = release_config.targets
+        ota_targets = [
+            t for t in flutter_targets
+            if flutter_cfg.get(t, {}).get("mode") == "ota"
         ]
-        if flutter_targets:
-            flutter_cfg = release_config.targets
-            ota_targets = [
-                t for t in flutter_targets
-                if flutter_cfg.get(t, {}).get("mode") == "ota"
-            ]
-            if ota_targets:
-                from ..targets.native_changes import detect_native_changes
-                # Find last build release tag for native change detection
-                config = read_json_config(os.path.join(".", ".rlsbl", "config.json"))
-                last_build = config.get("last_build_release")
-                if last_build:
-                    since_ref = f"v{last_build}"
-                    native_files = detect_native_changes(".", since_ref)
-                    if native_files:
+        if ota_targets:
+            from ..targets.native_changes import detect_native_changes
+            # Find last build release tag for native change detection
+            config = read_json_config(os.path.join(".", ".rlsbl", "config.json"))
+            last_build = config.get("last_build_release")
+            if last_build:
+                since_ref = f"v{last_build}"
+                native_files = detect_native_changes(".", since_ref)
+                if native_files:
+                    print(
+                        "Error: OTA release requested but native files changed "
+                        f"since last build release ({last_build}):",
+                        file=sys.stderr,
+                    )
+                    for nf in native_files[:10]:
+                        print(f"  {nf}", file=sys.stderr)
+                    if len(native_files) > 10:
                         print(
-                            "Error: OTA release requested but native files changed "
-                            f"since last build release ({last_build}):",
+                            f"  ... and {len(native_files) - 10} more",
                             file=sys.stderr,
                         )
-                        for nf in native_files[:10]:
-                            print(f"  {nf}", file=sys.stderr)
-                        if len(native_files) > 10:
-                            print(
-                                f"  ... and {len(native_files) - 10} more",
-                                file=sys.stderr,
-                            )
-                        print(
-                            "Use mode = \"build\" for a full release instead.",
-                            file=sys.stderr,
-                        )
-                        sys.exit(1)
+                    print(
+                        "Use mode = \"build\" for a full release instead.",
+                        file=sys.stderr,
+                    )
+                    sys.exit(1)
 
-        # Infer docs skip from the release file's exclude list
-        docs_excluded = "docs" in release_config.exclude
+    # Infer docs skip from the release file's exclude list
+    docs_excluded = "docs" in release_config.exclude
 
-        bump_arg = release_config.bump
-        args = [bump_arg]
-    else:
-        # Legacy path: run_cmd(registry, args, flags)
-        registry = release_config_or_registry
-        args = flags_or_args if flags_or_args is not None else []
-        flags = flags if flags is not None else {}
-        docs_excluded = False
+    bump_arg = release_config.bump
+    args = [bump_arg]
 
     quiet = flags.get("quiet", False)
 
