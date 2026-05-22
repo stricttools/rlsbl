@@ -5,7 +5,7 @@ import re
 import sys
 
 from ...action_versions import format_action
-from ...utils import commit_files
+from ...utils import commit_files, commit_files_if_changed
 from ...workspace import find_workspace_root, load_workspace
 from ...targets import detect_targets, TARGETS
 
@@ -383,7 +383,7 @@ def _cmd_sync(flags):
             quoted = " ".join(all_files)
             print(f"Skipped commit (--no-commit). Run `safegit commit -- {quoted}` manually.")
         else:
-            commit_files("monorepo: sync CI workflows", all_files, allow_failure=True)
+            commit_files_if_changed("monorepo: sync CI workflows", all_files, skip_message="No workflow changes to commit.")
 
     # written_files includes CI workflows + CI router + publish router (if any)
     router_count = 1 + (1 if projects_with_publish else 0)

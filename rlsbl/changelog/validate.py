@@ -10,7 +10,7 @@ from .files import list_versioned_files, read_unreleased
 from .resolve import resolve_hash, resolve_hashes
 from .schema import ChangelogEntry, parse_jsonl, validate_schema
 from ..config import get_changelog_validation_config
-from ..utils import commit_files
+from ..utils import commit_files_if_changed
 
 
 # Defaults applied when batch_limits keys are absent or malformed.
@@ -257,7 +257,7 @@ def _write_cache(changes_dir: str) -> None:
     path = _cache_path(changes_dir)
     with open(path, "w", encoding="utf-8") as f:
         f.write(head + "\n")
-    commit_files("update validation cache", [path], allow_failure=True)
+    commit_files_if_changed("update validation cache", [path], skip_message="Validation cache unchanged.")
 
 
 def _is_cache_valid(changes_dir: str) -> bool:
