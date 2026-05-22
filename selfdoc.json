@@ -7,5 +7,6 @@
   "deploy": {
     "provider": "cloudflare-pages",
     "project": "rlsbl-docs"
-  }
+  },
+  "root_files": ["docs/_CLAUDE.md", "docs/_README.md"]
 }
