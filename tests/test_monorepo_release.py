@@ -9,7 +9,17 @@ from unittest.mock import patch, call
 import pytest
 
 from rlsbl.commands.release import run_cmd
+from rlsbl.release_file import ReleaseConfig
 from rlsbl.targets.base import BaseTarget
+
+
+def _rc(bump="patch", include=None, exclude=None):
+    """Shorthand for creating a ReleaseConfig with sensible defaults."""
+    return ReleaseConfig(
+        bump=bump,
+        include=include or ["npm"],
+        exclude=exclude or [],
+    )
 
 
 class TestMonorepoTagFormat:
@@ -94,7 +104,7 @@ class TestMonorepoRelease:
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd("npm", ["patch"], {"dry-run": True, "quiet": False})
+            run_cmd(_rc(), {"dry-run": True, "quiet": False})
 
         output = mock_out.getvalue()
         assert "tooling@v1.0.0" in output
@@ -119,7 +129,7 @@ class TestMonorepoRelease:
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd("npm", ["patch"], {"dry-run": True, "quiet": False})
+            run_cmd(_rc(), {"dry-run": True, "quiet": False})
 
         output = mock_out.getvalue()
         assert "tooling: release v1.0.0" in output
@@ -150,7 +160,7 @@ class TestMonorepoRelease:
         mock_run.side_effect = ["", "0", "tooling@v1.0.0", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd("npm", ["patch"], {"dry-run": True, "quiet": False})
+            run_cmd(_rc(), {"dry-run": True, "quiet": False})
 
         output = mock_out.getvalue()
         assert "tooling@v1.0.1" in output
@@ -174,7 +184,7 @@ class TestMonorepoRelease:
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd("npm", ["patch"], {"dry-run": True, "quiet": False})
+            run_cmd(_rc(), {"dry-run": True, "quiet": False})
 
         output = mock_out.getvalue()
         assert "Project:   tooling (tooling)" in output
@@ -210,7 +220,7 @@ class TestMonorepoRelease:
         mock_run.side_effect = []
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd("npm", ["patch"], {
+            run_cmd(_rc(), {
                 "dry-run": True, "quiet": True,
             })
         assert exc_info.value.code == 1
@@ -250,7 +260,7 @@ class TestMonorepoRelease:
         mock_run.side_effect = ["", "0", "v2.0.0", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd("npm", ["patch"], {"dry-run": True, "quiet": False})
+            run_cmd(_rc(), {"dry-run": True, "quiet": False})
 
         output = mock_out.getvalue()
         assert "Tag:       v2.0.1" in output
@@ -288,7 +298,7 @@ class TestMonorepoRelease:
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd("npm", ["patch"], {"dry-run": True, "quiet": False})
+            run_cmd(_rc(), {"dry-run": True, "quiet": False})
 
         output = mock_out.getvalue()
         # Should read 1.0.0 from libs/core/package.json, not 9.9.9 from root
@@ -324,7 +334,7 @@ class TestMonorepoRelease:
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd("npm", [], {"dry-run": True, "quiet": False})
+            run_cmd(_rc(), {"dry-run": True, "quiet": False})
 
         output = mock_out.getvalue()
         assert "Initial release of core component" in output
@@ -391,7 +401,7 @@ class TestSubtreePublish:
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd("npm", ["patch"], {"dry-run": True, "quiet": False})
+            run_cmd(_rc(), {"dry-run": True, "quiet": False})
 
         output = mock_out.getvalue()
         assert "Subtree:" in output
@@ -418,7 +428,7 @@ class TestSubtreePublish:
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd("npm", ["patch"], {"dry-run": True, "quiet": False})
+            run_cmd(_rc(), {"dry-run": True, "quiet": False})
 
         output = mock_out.getvalue()
         assert "Subtree:" not in output
@@ -457,4 +467,4 @@ class TestSubtreePublish:
 
         # The release should complete without raising, despite subtree failure
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd("npm", [], {"yes": True, "quiet": False})
+            run_cmd(_rc(), {"yes": True, "quiet": False})

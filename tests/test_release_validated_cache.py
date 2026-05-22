@@ -14,6 +14,17 @@ import unittest
 from io import StringIO
 from unittest.mock import patch
 
+from rlsbl.release_file import ReleaseConfig
+
+
+def _rc(bump="patch", include=None, exclude=None):
+    """Shorthand for creating a ReleaseConfig with sensible defaults."""
+    return ReleaseConfig(
+        bump=bump,
+        include=include or ["npm"],
+        exclude=exclude or [],
+    )
+
 
 class TestReleaseValidatedCache(unittest.TestCase):
     """Tests that .validated is expected by the dirty-tree guard."""
@@ -94,7 +105,7 @@ class TestReleaseValidatedCache(unittest.TestCase):
 
         with patch("sys.stdout", new_callable=StringIO):
             # Should NOT raise SystemExit -- .validated is expected
-            run_cmd("npm", ["patch"], {
+            run_cmd(_rc(), {
                 "yes": True,
                 "quiet": False,
             })
@@ -138,7 +149,7 @@ class TestReleaseValidatedCache(unittest.TestCase):
 
         with patch("sys.stdout", new_callable=StringIO):
             with self.assertRaises(SystemExit) as ctx:
-                run_cmd("npm", ["patch"], {
+                run_cmd(_rc(), {
                     "yes": True,
                     "quiet": False,
                 })

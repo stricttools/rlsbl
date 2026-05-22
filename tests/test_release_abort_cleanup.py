@@ -18,6 +18,17 @@ from unittest.mock import patch
 
 import pytest
 
+from rlsbl.release_file import ReleaseConfig
+
+
+def _rc(bump="patch", include=None, exclude=None):
+    """Shorthand for creating a ReleaseConfig with sensible defaults."""
+    return ReleaseConfig(
+        bump=bump,
+        include=include or ["npm"],
+        exclude=exclude or [],
+    )
+
 
 def _git(repo, *args):
     subprocess.run(
@@ -136,8 +147,7 @@ class TestReleaseAbortCleanup:
         ):
             with pytest.raises(SystemExit) as exc_info:
                 run_cmd(
-                    "npm",
-                    ["patch"],
+                    _rc(),
                     {
                         "yes": True,
                         "quiet": True,
@@ -186,8 +196,7 @@ class TestReleaseAbortCleanup:
         ):
             with pytest.raises(SystemExit) as exc_info:
                 run_cmd(
-                    "npm",
-                    ["patch"],
+                    _rc(),
                     {
                         "yes": True,
                         "quiet": True,
@@ -266,8 +275,7 @@ class TestReleaseAbortCleanup:
             # is what matters; assert that below.
             with pytest.raises((SystemExit, subprocess.CalledProcessError)):
                 run_cmd(
-                    "npm",
-                    ["patch"],
+                    _rc(exclude=["docs"]),
                     {
                         "yes": True,
                         "quiet": True,

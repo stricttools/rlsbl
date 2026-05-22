@@ -405,11 +405,11 @@ class TestCmdReleaseInvalidFile:
 
 
 # ---------------------------------------------------------------------------
-# Legacy signature compatibility tests
+# ReleaseConfig signature tests
 # ---------------------------------------------------------------------------
 
-class TestLegacySignatureCompat:
-    """run_cmd(registry, args, flags) still works for backward compatibility."""
+class TestReleaseConfigSignature:
+    """run_cmd(ReleaseConfig, flags) is the only supported calling convention."""
 
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
@@ -423,7 +423,7 @@ class TestLegacySignatureCompat:
         "rlsbl.commands.release.validate_unreleased",
         return_value={"passed": True, "checks": {}},
     )
-    def test_legacy_run_cmd_still_works(
+    def test_run_cmd_with_release_config(
         self,
         _validate,
         _gen_cl,
@@ -437,12 +437,14 @@ class TestLegacySignatureCompat:
         tmp_project,
         capsys,
     ):
-        """The old run_cmd(registry, args, flags) signature continues to work."""
+        """run_cmd(ReleaseConfig, flags) works in dry-run mode."""
         _setup_npm_project(tmp_project)
         mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
 
-        # Old-style call
-        run_cmd("npm", ["patch"], {"dry-run": True, "quiet": False, "yes": True})
+        run_cmd(
+            ReleaseConfig(bump="patch", include=["npm"], exclude=[]),
+            {"dry-run": True, "quiet": False, "yes": True},
+        )
 
         captured = capsys.readouterr()
         assert "1.0.1" in captured.out

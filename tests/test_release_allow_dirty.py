@@ -8,6 +8,17 @@ import unittest
 from io import StringIO
 from unittest.mock import patch, call
 
+from rlsbl.release_file import ReleaseConfig
+
+
+def _rc(bump="patch", include=None, exclude=None):
+    """Shorthand for creating a ReleaseConfig with sensible defaults."""
+    return ReleaseConfig(
+        bump=bump,
+        include=include or ["npm"],
+        exclude=exclude or [],
+    )
+
 
 class TestReleaseAllowDirty(unittest.TestCase):
     """Tests that --allow-dirty skips the clean-tree check."""
@@ -40,7 +51,7 @@ class TestReleaseAllowDirty(unittest.TestCase):
         from rlsbl.commands.release import run_cmd
 
         with self.assertRaises(SystemExit) as ctx:
-            run_cmd("npm", ["patch"], {"quiet": True})
+            run_cmd(_rc(), {"quiet": True})
         self.assertEqual(ctx.exception.code, 1)
 
     @patch("rlsbl.commands.release.push_if_needed")
@@ -68,7 +79,7 @@ class TestReleaseAllowDirty(unittest.TestCase):
 
         with patch("sys.stdout", new_callable=StringIO):
             # Should not raise SystemExit
-            run_cmd("npm", ["patch"], {
+            run_cmd(_rc(), {
                 "allow-dirty": True,
                 "dry-run": True,
                 "quiet": False,
@@ -132,7 +143,7 @@ class TestReleaseAllowDirty(unittest.TestCase):
         with patch("sys.stdout", new_callable=StringIO):
             # Should not raise SystemExit -- the re-check guard must not
             # treat the pre-existing dirty file as unexpected.
-            run_cmd("npm", ["patch"], {
+            run_cmd(_rc(), {
                 "allow-dirty": True,
                 "yes": True,
                 "quiet": False,
@@ -181,7 +192,7 @@ class TestReleaseAllowDirty(unittest.TestCase):
 
         with patch("sys.stdout", new_callable=StringIO):
             with self.assertRaises(SystemExit) as ctx:
-                run_cmd("npm", ["patch"], {
+                run_cmd(_rc(), {
                     "allow-dirty": True,
                     "yes": True,
                     "quiet": False,

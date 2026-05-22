@@ -13,6 +13,17 @@ from unittest.mock import patch
 
 import pytest
 
+from rlsbl.release_file import ReleaseConfig
+
+
+def _rc(bump="patch", include=None, exclude=None):
+    """Shorthand for creating a ReleaseConfig with sensible defaults."""
+    return ReleaseConfig(
+        bump=bump,
+        include=include or ["npm"],
+        exclude=exclude or [],
+    )
+
 
 def _git(repo, *args):
     subprocess.run(
@@ -111,8 +122,7 @@ class TestReleaseFinalizeMd:
             patch("rlsbl.commands.release.run", side_effect=fake_run),
         ):
             run_cmd(
-                "npm",
-                ["patch"],
+                _rc(),
                 {
                     "yes": True,
                     "quiet": True,

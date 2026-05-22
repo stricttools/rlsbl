@@ -9,6 +9,16 @@ import pytest
 
 from rlsbl.commands.release import _run_builtin_lint, _run_builtin_tests, _run_selfdoc_check
 from rlsbl.lint.result import LintResult
+from rlsbl.release_file import ReleaseConfig
+
+
+def _rc(bump="patch", include=None, exclude=None):
+    """Shorthand for creating a ReleaseConfig with sensible defaults."""
+    return ReleaseConfig(
+        bump=bump,
+        include=include or ["npm"],
+        exclude=exclude or [],
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -551,7 +561,7 @@ class TestTwoHookModel:
 
             from rlsbl.commands.release import run_cmd
 
-            run_cmd("npm", ["patch"], {"dry-run": True, "quiet": True, "yes": True})
+            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True})
 
             # The hook should have actually run and created the marker
             assert marker.exists(), "pre-checks.sh should have created the marker file"
@@ -602,7 +612,7 @@ class TestTwoHookModel:
 
             from rlsbl.commands.release import run_cmd
 
-            run_cmd("npm", ["patch"], {"dry-run": True, "quiet": True, "yes": True})
+            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True})
 
             # pre-release hook runs after tests/lint but is still executed for dry-run
             # (based on the code, pre-release hook runs before dry-run return)
@@ -648,7 +658,7 @@ class TestTwoHookModel:
             from rlsbl.commands.release import run_cmd
 
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd("npm", ["patch"], {"quiet": True, "yes": True})
+                run_cmd(_rc(), {"quiet": True, "yes": True})
 
             assert exc_info.value.code == 1
             # Tests and lint should NOT have been called
@@ -723,7 +733,7 @@ class TestFullFlowOrder:
         ):
             from rlsbl.commands.release import run_cmd
 
-            run_cmd("npm", ["patch"], {"dry-run": True, "quiet": True, "yes": True})
+            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True})
 
         # Read hook execution order from the file
         assert order_file.exists(), "Hooks should have written to order file"

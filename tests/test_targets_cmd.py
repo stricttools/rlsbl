@@ -9,6 +9,17 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
+from rlsbl.release_file import ReleaseConfig
+
+
+def _rc(bump="patch", include=None, exclude=None):
+    """Shorthand for creating a ReleaseConfig with sensible defaults."""
+    return ReleaseConfig(
+        bump=bump,
+        include=include or ["npm"],
+        exclude=exclude or [],
+    )
+
 
 class TestTargetsCommand:
     """Tests for the `rlsbl targets` command output."""
@@ -176,7 +187,7 @@ class TestMultiTargetRelease:
             from rlsbl.commands.release import run_cmd
 
             with patch("sys.stdout", StringIO()):
-                run_cmd("npm", ["patch"], {"yes": True, "quiet": False})
+                run_cmd(_rc(include=["npm", "docs"]), {"yes": True, "quiet": False})
 
             # Verify docs target build/publish were called
             build_mock.assert_called_once_with(".", "1.0.1")
@@ -227,7 +238,7 @@ class TestMultiTargetRelease:
             # Should not raise -- secondary failures are non-fatal
             buf = StringIO()
             with patch("sys.stdout", StringIO()), patch("sys.stderr", buf):
-                run_cmd("npm", ["patch"], {"yes": True, "quiet": False})
+                run_cmd(_rc(include=["npm", "docs"]), {"yes": True, "quiet": False})
 
             # Verify warnings were emitted
             stderr_output = buf.getvalue()
