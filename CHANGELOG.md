@@ -26,6 +26,7 @@
 - **Breaking: `rlsbl doctor`, `monorepo lint`, and `changelog validate` removed.** Replaced by the unified `rlsbl check` command. Use `rlsbl check --all`, `rlsbl check --tag workspace`, or `rlsbl check --tag changelog`.
 - **Breaking: `--dry-run`, `--yes`, `--quiet` are now global flags.** They apply to all commands. Both `rlsbl --dry-run release` and `rlsbl release --dry-run` work.
 - **Breaking: PyYAML replaced with ruamel.yaml.** Projects extending rlsbl's YAML handling must use the ruamel.yaml API.
+- **Breaking:** `rlsbl check` (name availability) renamed to `rlsbl check-name` to make room for the unified check system.
 
 ### Features
 

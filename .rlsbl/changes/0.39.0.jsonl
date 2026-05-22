@@ -18,3 +18,4 @@
 {"commits":["95f935cf0c6a348a688fd8ffa500cf19faf04226"],"user_facing":false}
 {"commits":["f3a320849fb324b681f485461d01532c754e5621"],"user_facing":false}
 {"commits":["bb996e35babf49162c6ad7d1ac64e3607c99debf"],"user_facing":false}
+{"commits":["f3aebb1f792fc1a4e655b1ca70d7a34e547c580d"],"user_facing":true,"description":"**Breaking:** `rlsbl check` (name availability) renamed to `rlsbl check-name` to make room for the unified check system.","type":"breaking"}
