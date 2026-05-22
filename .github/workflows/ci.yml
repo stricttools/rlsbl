@@ -21,7 +21,7 @@ jobs:
       - run: pip install . pytest
       - run: python -m rlsbl --version
       - run: python -m rlsbl --help
-      - run: python -m rlsbl check test-ci-check-12345 --target npm
+      - run: python -m rlsbl check-name test-ci-check-12345 --target npm
       - run: python -m pytest tests/ -v
 
   test-npm-wrapper:
