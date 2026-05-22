@@ -197,8 +197,8 @@ def test_conflict_tip_not_printed_when_no_conflict(mock_git_repo, capsys):
 
 
 def test_conflict_tip_not_printed_for_other_conflicts(mock_git_repo, capsys):
-    """A conflict on some other file (e.g., CLAUDE.md) doesn't trigger the workflow tip."""
-    other = "CLAUDE.md"
+    """A conflict on some other file (e.g., CONVENTIONS.md) doesn't trigger the workflow tip."""
+    other = "CONVENTIONS.md"
     (mock_git_repo / other).write_text("<<<<<<< ours\n=======\n>>>>>>> theirs\n")
 
     _finalize_scaffold(
