@@ -326,10 +326,10 @@ class TestCmdSnapshot:
 
         monkeypatch.chdir(tmp_path)
 
-        # Mock commit_files to avoid needing a real git repo
+        # Mock commit_files_if_changed to avoid needing a real git repo
         import rlsbl.commands.monorepo.snapshot_cmd as snap_mod
         committed = []
-        monkeypatch.setattr(snap_mod, "commit_files", lambda *a, **kw: committed.append(a))
+        monkeypatch.setattr(snap_mod, "commit_files_if_changed", lambda *a, **kw: committed.append(a))
 
         from rlsbl.commands.monorepo import _cmd_snapshot
         _cmd_snapshot({"check": False})
