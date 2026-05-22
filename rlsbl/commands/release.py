@@ -630,14 +630,14 @@ def run_cmd(release_config_or_registry, flags_or_args=None, flags=None):
             print(f"Error: pre-checks hook timed out after {hook_timeout}s.", file=sys.stderr)
             sys.exit(1)
 
+    # Built-in selfdoc check (before tests so doc issues surface early)
+    _run_selfdoc_check(flags, project_dir=abs_project_dir, docs_excluded=docs_excluded)
+
     # Built-in test runner
     _run_builtin_tests(registry, flags, project_dir=abs_project_dir)
 
     # Built-in lint runner
     _run_builtin_lint(flags, is_library=is_library, project_dir=abs_project_dir)
-
-    # Built-in selfdoc check
-    _run_selfdoc_check(flags, project_dir=abs_project_dir, docs_excluded=docs_excluded)
 
     # Run pre-release hook if present
     pre_release_script = os.path.join(version_dir, ".rlsbl", "hooks", "pre-release.sh")
