@@ -730,14 +730,11 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None):
     # Track build releases for Flutter OTA validation.
     # When a Flutter target completes a "build" release, store the version
     # in .rlsbl/config.json so future OTA releases can detect native changes.
-    from ..release_file import ReleaseConfig as _RC
-    if isinstance(release_config_or_registry, _RC):
-        _rc = release_config_or_registry
-        flutter_targets = [t for t in _rc.include if t.startswith("flutter-")]
-        if flutter_targets:
-            mode = _rc.targets.get(flutter_targets[0], {}).get("mode")
-            if mode == "build":
-                _update_last_build_release(version_dir, new_version)
+    flutter_targets = [t for t in release_config.include if t.startswith("flutter-")]
+    if flutter_targets:
+        mode = release_config.targets.get(flutter_targets[0], {}).get("mode")
+        if mode == "build":
+            _update_last_build_release(version_dir, new_version)
 
 
 def _print_stale_dep_advisory(monorepo_name, new_version, version_dir):
