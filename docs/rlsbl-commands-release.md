@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.release
-description: "Release command that bumps version, validates changelog, runs hooks (collecting generated files), tags, pushes, and creates a GitHub Release."
+description: "File-based release command that reads unreleased.toml for bump type and target selection, validates changelog, runs hooks, tags, pushes, and creates a GitHub Release."
 generated: true
 nav_group: "API Reference"
 nav_order: 33
