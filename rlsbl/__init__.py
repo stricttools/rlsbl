@@ -615,6 +615,27 @@ def cmd_chlog_generate(dry_run, no_commit, **_kwargs):
     cmd_generate(flags)
 
 
+@chlog.command(name="amend", help="Append a changelog entry to a released version's JSONL file. Temporarily unlocks the read-only file, appends the entry, re-locks it, regenerates CHANGELOG.md, and syncs GitHub Release notes. Use --no-resolve to skip hash validation for old or amended commits.")
+@strictcli.flag(name="version", type=str, help="Released version to amend (e.g., 0.39.0)")
+@strictcli.flag(name="commits", type=str, help="Comma-separated commit hashes")
+@strictcli.flag(name="description", type=str, help="Entry description", default="")
+@strictcli.flag(name="type", type=str, help="Entry type (feature, fix, breaking)", default="")
+@strictcli.flag(name="no-user-facing", type=bool, help="Mark as non-user-facing")
+@strictcli.flag(name="no-resolve", type=bool, help="Skip hash validation")
+def cmd_chlog_amend(version, commits, description, type, no_user_facing, no_resolve, **_kwargs):
+    _require_project_root()
+    flags = {
+        "version": version,
+        "commits": commits,
+        "description": description,
+        "type": type,
+        "no-user-facing": no_user_facing,
+        "no-resolve": no_resolve,
+    }
+    from .commands.changelog_cmd import cmd_amend
+    cmd_amend(flags)
+
+
 # ---------------------------------------------------------------------------
 # monorepo group
 # ---------------------------------------------------------------------------

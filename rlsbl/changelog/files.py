@@ -65,10 +65,30 @@ def append_entry(changes_dir: str, entry: ChangelogEntry) -> None:
     """
     os.makedirs(changes_dir, exist_ok=True)
     target = os.path.join(changes_dir, "unreleased.jsonl")
+    _append_entry_to_file(target, entry)
+
+
+def append_entry_to_version(changes_dir: str, version: str, entry: ChangelogEntry) -> None:
+    """Append one entry to a versioned JSONL file (e.g., 0.39.0.jsonl).
+
+    The caller is responsible for unlocking/re-locking the file if it is read-only.
+    """
+    target = os.path.join(changes_dir, f"{version}.jsonl")
+    _append_entry_to_file(target, entry)
+
+
+def _append_entry_to_file(target: str, entry: ChangelogEntry) -> None:
+    """Append one entry to any JSONL file atomically.
+
+    Writes the serialized line to a temp file, then appends it to the target.
+    Creates parent directories if they don't exist.
+    """
+    parent = os.path.dirname(target)
+    os.makedirs(parent, exist_ok=True)
     line = serialize_entry(entry) + "\n"
 
     # Write to a temp file in the same directory (same filesystem for rename)
-    fd, tmp_path = tempfile.mkstemp(dir=changes_dir, suffix=".tmp")
+    fd, tmp_path = tempfile.mkstemp(dir=parent, suffix=".tmp")
     try:
         os.write(fd, line.encode("utf-8"))
         os.close(fd)

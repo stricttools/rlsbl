@@ -4,7 +4,13 @@ import os
 import subprocess
 import sys
 
-from ..changelog.files import append_entry, changes_dir_exists, get_changes_dir
+from ..changelog.files import (
+    append_entry,
+    append_entry_to_version,
+    changes_dir_exists,
+    get_changes_dir,
+    is_read_only,
+)
 from ..changelog.generate import generate_changelog
 from ..changelog.resolve import resolve_hash
 from ..changelog.schema import ChangelogEntry, validate_schema
@@ -134,6 +140,147 @@ def cmd_generate(flags):
                     changed_files,
                     allow_failure=True,
                 )
+
+
+def cmd_amend(flags):
+    """Amend a released version's JSONL changelog by appending a new entry.
+
+    Unlocks the read-only versioned JSONL file, appends the entry, re-locks it,
+    regenerates CHANGELOG.md, and optionally syncs GitHub Release notes.
+
+    Required flags:
+    - --version: which released version to amend (e.g., "0.39.0")
+    - --commits: comma-separated commit hashes
+
+    Optional flags:
+    - --description and --type: required unless --no-user-facing is set
+    - --no-user-facing: mark entry as non-user-facing
+    - --no-resolve: skip hash validation (for old/amended commits)
+    """
+    version = flags.get("version", "")
+    if not version:
+        print("Error: --version is required.", file=sys.stderr)
+        sys.exit(1)
+
+    commits_raw = flags.get("commits", "")
+    if not commits_raw:
+        print("Error: --commits is required.", file=sys.stderr)
+        sys.exit(1)
+
+    commits = [h.strip() for h in commits_raw.split(",") if h.strip()]
+    if not commits:
+        print("Error: --commits must contain at least one hash.", file=sys.stderr)
+        sys.exit(1)
+
+    no_resolve = flags.get("no-resolve", False)
+
+    if no_resolve:
+        resolved_commits = commits
+    else:
+        resolved_commits = []
+        for h in commits:
+            full = resolve_hash(h)
+            if full is None:
+                print(f"Error: commit hash does not resolve: {h}", file=sys.stderr)
+                sys.exit(1)
+            resolved_commits.append(full)
+
+    no_user_facing = flags.get("no-user-facing", False)
+    user_facing = not no_user_facing
+    description = flags.get("description") or None
+    entry_type = flags.get("type") or None
+
+    if user_facing:
+        if not description:
+            print(
+                "Error: --description is required for user-facing entries. "
+                "Use --no-user-facing to skip.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        if not entry_type:
+            print(
+                "Error: --type is required for user-facing entries. "
+                "Use --no-user-facing to skip.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+    entry = ChangelogEntry(
+        commits=resolved_commits,
+        user_facing=user_facing,
+        description=description,
+        type=entry_type,
+    )
+
+    errors = validate_schema(entry)
+    if errors:
+        for err in errors:
+            print(f"Error: schema validation: {err}", file=sys.stderr)
+        sys.exit(1)
+
+    changes_dir = get_changes_dir(".")
+    jsonl_path = os.path.join(changes_dir, f"{version}.jsonl")
+
+    if not os.path.isfile(jsonl_path):
+        print(f"Error: {jsonl_path} does not exist.", file=sys.stderr)
+        sys.exit(1)
+
+    was_read_only = is_read_only(jsonl_path)
+    if was_read_only:
+        os.chmod(jsonl_path, 0o644)
+
+    try:
+        append_entry_to_version(changes_dir, version, entry)
+        print(f"Amended {version}.jsonl with {len(resolved_commits)} commit(s)")
+    finally:
+        # Always re-lock the file
+        if was_read_only:
+            os.chmod(jsonl_path, 0o444)
+
+    # Regenerate CHANGELOG.md
+    generate_changelog(".")
+    print("Regenerated CHANGELOG.md")
+
+    # Sync GitHub Release notes (best-effort)
+    _sync_github_release(version)
+
+    # Auto-commit all changed files
+    changed_files = [jsonl_path]
+    md_path = os.path.join(changes_dir, f"{version}.md")
+    if os.path.isfile(md_path):
+        changed_files.append(md_path)
+    changelog_path = os.path.join(".", "CHANGELOG.md")
+    if os.path.isfile(changelog_path):
+        changed_files.append(changelog_path)
+
+    commit_msg = f"changelog: amend {version}"
+    if user_facing and description:
+        commit_msg = f"changelog: amend {version}: {description}"[:72]
+    commit_files(commit_msg, changed_files, allow_failure=True)
+
+
+def _sync_github_release(version: str) -> None:
+    """Sync GitHub Release notes for a version (best-effort, warns on failure)."""
+    try:
+        result = subprocess.run(
+            ["rlsbl", "edit-release", version],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode == 0:
+            print(f"Synced GitHub Release notes for v{version}")
+        else:
+            print(
+                f"Warning: could not sync GitHub Release notes: {result.stderr.strip()}",
+                file=sys.stderr,
+            )
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:
+        print(
+            f"Warning: could not sync GitHub Release notes: {e}",
+            file=sys.stderr,
+        )
 
 
 def _get_generated_files(project_path: str) -> list[str]:
