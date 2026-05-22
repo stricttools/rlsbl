@@ -211,7 +211,7 @@ class TestMonorepoRelease:
 
         with pytest.raises(SystemExit) as exc_info:
             run_cmd("npm", ["patch"], {
-                "dry-run": True, "quiet": True, "skip-remote-check": True,
+                "dry-run": True, "quiet": True,
             })
         assert exc_info.value.code == 1
 

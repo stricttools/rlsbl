@@ -116,7 +116,6 @@ class TestReleaseFinalizeMd:
                 {
                     "yes": True,
                     "quiet": True,
-                    "skip-remote-check": True,
                 },
             )
 

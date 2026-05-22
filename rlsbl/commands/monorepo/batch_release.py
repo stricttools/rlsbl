@@ -105,12 +105,7 @@ def _cmd_batch_release(flags):
                 "dry-run": dry_run,
                 "yes": yes,
                 "quiet": quiet,
-                "skip-remote-check": flags.get("skip-remote-check", False),
-                "skip-tests": flags.get("skip-tests", False),
-                "skip-lint": flags.get("skip-lint", False),
-                "skip-docs": flags.get("skip-docs", False),
                 "allow-dirty": flags.get("allow-dirty", False),
-                "no-tag": flags.get("no-tag", False),
             }
             run_cmd(release_config, release_flags)
             released.append(pkg_name)

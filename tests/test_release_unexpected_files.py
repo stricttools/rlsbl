@@ -150,7 +150,6 @@ class TestReleaseUnexpectedFiles:
                 {
                     "yes": True,
                     "quiet": True,
-                    "skip-remote-check": True,
                 },
             )
 
@@ -212,8 +211,7 @@ class TestReleaseUnexpectedFiles:
                     {
                         "yes": True,
                         "quiet": True,
-                        "skip-remote-check": True,
-                    },
+                        },
                 )
 
         assert exc_info.value.code == 1, (

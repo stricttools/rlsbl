@@ -160,16 +160,6 @@ class TestBuiltinTestRunner:
 
             assert exc_info.value.code == 1
 
-    def test_skip_tests_flag(self, tmp_project):
-        """--skip-tests flag prevents any test command from running."""
-        _setup_npm_project(tmp_project, test_script="jest")
-
-        with patch("rlsbl.commands.release.subprocess.run") as mock_run:
-            result = _run_builtin_tests("npm", {"skip-tests": True})
-
-            assert result is True
-            mock_run.assert_not_called()
-
     def test_dry_run_skips_tests(self, tmp_project):
         """--dry-run flag prevents any test command from running."""
         _setup_npm_project(tmp_project, test_script="jest")
@@ -373,14 +363,6 @@ class TestBuiltinLintRunner:
 
             assert result is True
 
-    def test_skip_lint_flag(self, tmp_project):
-        """--skip-lint flag prevents lint_library from being called."""
-        with patch("rlsbl.lint.lint_library") as mock_lint:
-            result = _run_builtin_lint({"skip-lint": True})
-
-            assert result is True
-            mock_lint.assert_not_called()
-
     def test_dry_run_skips_lint(self, tmp_project):
         """--dry-run flag prevents lint_library from being called."""
         with patch("rlsbl.lint.lint_library") as mock_lint:
@@ -447,12 +429,12 @@ class TestSelfdocCheck:
             assert result is True
             mock_run.assert_not_called()
 
-    def test_selfdoc_check_skipped_with_flag(self, tmp_project, capsys):
-        """When skip-docs flag is set, selfdoc check is skipped."""
+    def test_selfdoc_check_skipped_when_docs_excluded(self, tmp_project, capsys):
+        """When docs_excluded is True, selfdoc check is skipped."""
         (tmp_project / "selfdoc.json").write_text("{}")
 
         with patch("rlsbl.commands.release.subprocess.run") as mock_run:
-            result = _run_selfdoc_check({"skip-docs": True})
+            result = _run_selfdoc_check({}, docs_excluded=True)
 
             assert result is True
             mock_run.assert_not_called()
@@ -729,12 +711,10 @@ class TestFullFlowOrder:
 
         def tracking_tests(registry, flags, project_dir=None):
             execution_order.append("tests")
-            # Short-circuit: skip-tests so no subprocess is needed
             return True
 
         def tracking_lint(flags, is_library=False, project_dir=None):
             execution_order.append("lint")
-            # Short-circuit: skip-lint so no subprocess is needed
             return True
 
         with (

@@ -874,7 +874,7 @@ class TestHookGeneratedFiles:
             patch("rlsbl.commands.release.push_if_needed"),
             patch("rlsbl.commands.release.run", side_effect=_fake_run_intercepting_remote),
         ):
-            run_cmd("npm", ["patch"], {"yes": True, "skip-remote-check": True})
+            run_cmd("npm", ["patch"], {"yes": True})
 
         # Verify the release commit includes schema.json
         # The release commit is HEAD~1 (before the finalize commit)
@@ -918,7 +918,7 @@ class TestHookGeneratedFiles:
             patch("rlsbl.commands.release.push_if_needed"),
             patch("rlsbl.commands.release.run", side_effect=_fake_run_intercepting_remote),
         ):
-            run_cmd("npm", ["patch"], {"yes": True, "skip-remote-check": True})
+            run_cmd("npm", ["patch"], {"yes": True})
 
         # Find the release commit
         result = subprocess.run(
@@ -988,7 +988,7 @@ class TestHookGeneratedFiles:
             patch("rlsbl.commands.release.push_if_needed"),
             patch("rlsbl.commands.release.run", side_effect=_fake_run_intercepting_remote),
         ):
-            run_cmd("npm", ["patch"], {"yes": True, "quiet": True, "skip-remote-check": True})
+            run_cmd("npm", ["patch"], {"yes": True, "quiet": True})
 
         # Verify that the release completed
         pkg = json.loads((tmp_project / "package.json").read_text())
@@ -1050,7 +1050,7 @@ class TestHookGeneratedFiles:
         ):
             run_cmd(
                 "npm", ["patch"],
-                {"yes": True, "quiet": True, "skip-remote-check": True, "allow-dirty": True},
+                {"yes": True, "quiet": True, "allow-dirty": True},
             )
 
         # Verify the release completed

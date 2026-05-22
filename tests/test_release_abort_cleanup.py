@@ -141,7 +141,6 @@ class TestReleaseAbortCleanup:
                     {
                         "yes": True,
                         "quiet": True,
-                        "skip-remote-check": True,
                     },
                 )
 
@@ -192,7 +191,6 @@ class TestReleaseAbortCleanup:
                     {
                         "yes": True,
                         "quiet": True,
-                        "skip-remote-check": True,
                     },
                 )
 
@@ -273,7 +271,6 @@ class TestReleaseAbortCleanup:
                     {
                         "yes": True,
                         "quiet": True,
-                        "skip-remote-check": True,
                     },
                 )
 

@@ -119,7 +119,7 @@ def _run_builtin_tests(registry, flags, project_dir=None):
     filesystem checks are resolved relative to it.
     Returns True if tests pass, calls sys.exit(1) on failure.
     """
-    if flags.get("skip-tests") or flags.get("dry-run"):
+    if flags.get("dry-run"):
         return True
 
     print("Running tests...")
@@ -177,7 +177,7 @@ def _run_builtin_lint(flags, is_library=False, project_dir=None):
     Only runs on library projects (monorepo projects with library = true).
     When project_dir is set (monorepo mode), lint runs against that directory.
     """
-    if flags.get("skip-lint") or flags.get("dry-run"):
+    if flags.get("dry-run"):
         return True
 
     if not is_library:
@@ -209,16 +209,18 @@ def _run_builtin_lint(flags, is_library=False, project_dir=None):
     return True
 
 
-def _run_selfdoc_check(flags, project_dir=None):
+def _run_selfdoc_check(flags, project_dir=None, docs_excluded=False):
     """Run selfdoc check if selfdoc.json exists in the project directory.
 
     Checks documentation consistency before releasing. Non-fatal if selfdoc
     is not installed; fatal if it is installed and the check fails.
     When project_dir is set (monorepo mode), checks are resolved relative to it.
+    When docs_excluded is True (the "docs" target is in the release file's
+    exclude list), the check is skipped automatically.
     """
-    if flags.get("skip-docs") or flags.get("dry-run"):
-        if flags.get("skip-docs"):
-            print("Skipping selfdoc check")
+    if docs_excluded or flags.get("dry-run"):
+        if docs_excluded:
+            print("Skipping selfdoc check (docs excluded in release file)")
         return True
 
     check_dir = project_dir if project_dir else "."
@@ -414,6 +416,9 @@ def run_cmd(release_config_or_registry, flags_or_args=None, flags=None):
                         )
                         sys.exit(1)
 
+        # Infer docs skip from the release file's exclude list
+        docs_excluded = "docs" in release_config.exclude
+
         bump_arg = release_config.bump
         args = [bump_arg]
     else:
@@ -421,6 +426,7 @@ def run_cmd(release_config_or_registry, flags_or_args=None, flags=None):
         registry = release_config_or_registry
         args = flags_or_args if flags_or_args is not None else []
         flags = flags if flags is not None else {}
+        docs_excluded = False
 
     quiet = flags.get("quiet", False)
 
@@ -466,24 +472,23 @@ def run_cmd(release_config_or_registry, flags_or_args=None, flags=None):
         print(f'Warning: you are on branch "{branch}", not main/master.', file=sys.stderr)
 
     # Remote-ahead check: abort if local branch is behind origin
-    if not flags.get("skip-remote-check"):
+    try:
+        run("git", ["fetch", "origin", "--quiet"])
+    except Exception:
+        # Network failure or no remote — warn but don't block the release
+        print("Warning: could not fetch from origin. Skipping remote-ahead check.", file=sys.stderr)
+    else:
         try:
-            run("git", ["fetch", "origin", "--quiet"])
+            behind_count = int(run("git", ["rev-list", "--count", f"HEAD..origin/{branch}"]))
         except Exception:
-            # Network failure or no remote — warn but don't block the release
-            print("Warning: could not fetch from origin. Skipping remote-ahead check.", file=sys.stderr)
-        else:
-            try:
-                behind_count = int(run("git", ["rev-list", "--count", f"HEAD..origin/{branch}"]))
-            except Exception:
-                # Remote branch may not exist yet — not an error
-                behind_count = 0
-            if behind_count > 0:
-                print(
-                    f"Error: local branch is {behind_count} commit(s) behind origin/{branch}. Pull before releasing.",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
+            # Remote branch may not exist yet — not an error
+            behind_count = 0
+        if behind_count > 0:
+            print(
+                f"Error: local branch is {behind_count} commit(s) behind origin/{branch}. Pull before releasing.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
     # Monorepo context detection
     monorepo_root = find_workspace_root(".")
@@ -630,7 +635,7 @@ def run_cmd(release_config_or_registry, flags_or_args=None, flags=None):
     _run_builtin_lint(flags, is_library=is_library, project_dir=abs_project_dir)
 
     # Built-in selfdoc check
-    _run_selfdoc_check(flags, project_dir=abs_project_dir)
+    _run_selfdoc_check(flags, project_dir=abs_project_dir, docs_excluded=docs_excluded)
 
     # Run pre-release hook if present
     pre_release_script = os.path.join(version_dir, ".rlsbl", "hooks", "pre-release.sh")

@@ -189,13 +189,8 @@ del _bootstrap_checks
 # ---------------------------------------------------------------------------
 
 @app.command(name="release", help="Bump the project version, validate the changelog, commit, tag, push, and create a GitHub Release. Reads bump type and target selection from .rlsbl/releases/unreleased.toml (create with rlsbl release-init). Supports dry-run preview and non-interactive mode for CI.")
-@strictcli.flag(name="skip-remote-check", type=bool, help="Skip the remote-ahead check")
-@strictcli.flag(name="skip-tests", type=bool, help="Skip built-in test execution")
-@strictcli.flag(name="skip-lint", type=bool, help="Skip built-in library lint")
-@strictcli.flag(name="skip-docs", type=bool, help="Skip selfdoc documentation check")
 @strictcli.flag(name="allow-dirty", type=bool, help="Allow releasing with a dirty working tree")
-@strictcli.flag(name="no-tag", type=bool, help="Disable ecosystem tagging for this invocation")
-def cmd_release(dry_run, yes, quiet, skip_remote_check, skip_tests, skip_lint, skip_docs, allow_dirty, no_tag, **_kwargs):
+def cmd_release(dry_run, yes, quiet, allow_dirty, **_kwargs):
     _require_project_root()
 
     from .release_file import read_release_file, get_release_file_path
@@ -227,12 +222,7 @@ def cmd_release(dry_run, yes, quiet, skip_remote_check, skip_tests, skip_lint, s
         "dry-run": dry_run,
         "yes": yes,
         "quiet": quiet,
-        "skip-remote-check": skip_remote_check,
-        "skip-tests": skip_tests,
-        "skip-lint": skip_lint,
-        "skip-docs": skip_docs,
         "allow-dirty": allow_dirty,
-        "no-tag": no_tag,
     }
     from .commands.release import run_cmd
     run_cmd(release_config, flags)
@@ -757,24 +747,14 @@ def cmd_mono_impact(format, depth=None, since="", **_kwargs):
     _cmd_impact(args, flags)
 
 
-@mono.command(name="release", help="Execute a batch release of multiple monorepo packages in topological order. Reads package configurations from .rlsbl-monorepo/releases/unreleased.toml. Each package is released sequentially using the single-package release flow, with leaves (no dependencies) released first. Supports all standard release flags (--dry-run, --yes, --skip-tests, etc.).")
-@strictcli.flag(name="skip-remote-check", type=bool, help="Skip the remote-ahead check")
-@strictcli.flag(name="skip-tests", type=bool, help="Skip built-in test execution")
-@strictcli.flag(name="skip-lint", type=bool, help="Skip built-in library lint")
-@strictcli.flag(name="skip-docs", type=bool, help="Skip selfdoc documentation check")
+@mono.command(name="release", help="Execute a batch release of multiple monorepo packages in topological order. Reads package configurations from .rlsbl-monorepo/releases/unreleased.toml. Each package is released sequentially using the single-package release flow, with leaves (no dependencies) released first. Supports --dry-run, --yes, --allow-dirty flags.")
 @strictcli.flag(name="allow-dirty", type=bool, help="Allow releasing with a dirty working tree")
-@strictcli.flag(name="no-tag", type=bool, help="Disable ecosystem tagging for this invocation")
-def cmd_mono_release(dry_run, yes, quiet, skip_remote_check, skip_tests, skip_lint, skip_docs, allow_dirty, no_tag, **_kwargs):
+def cmd_mono_release(dry_run, yes, quiet, allow_dirty, **_kwargs):
     flags = {
         "dry-run": dry_run,
         "yes": yes,
         "quiet": quiet,
-        "skip-remote-check": skip_remote_check,
-        "skip-tests": skip_tests,
-        "skip-lint": skip_lint,
-        "skip-docs": skip_docs,
         "allow-dirty": allow_dirty,
-        "no-tag": no_tag,
     }
     from .commands.monorepo import _cmd_batch_release
     _cmd_batch_release(flags)

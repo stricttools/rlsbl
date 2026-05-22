@@ -368,12 +368,7 @@ class TestCmdReleaseMissingFile:
                 dry_run=False,
                 yes=True,
                 quiet=True,
-                skip_remote_check=False,
-                skip_tests=False,
-                skip_lint=False,
-                skip_docs=False,
                 allow_dirty=False,
-                no_tag=False,
             )
 
         assert exc_info.value.code == 1
@@ -401,12 +396,7 @@ class TestCmdReleaseInvalidFile:
                 dry_run=False,
                 yes=True,
                 quiet=True,
-                skip_remote_check=False,
-                skip_tests=False,
-                skip_lint=False,
-                skip_docs=False,
                 allow_dirty=False,
-                no_tag=False,
             )
 
         assert exc_info.value.code == 1
