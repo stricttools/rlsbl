@@ -178,6 +178,25 @@ class TestVersionConsistencyCheck:
         assert result.status == "warn"
         assert "no targets" in result.message
 
+    def test_versionless_target_ignored(self, mock_git_repo):
+        """A target with version_file() = None should not cause a mismatch.
+
+        DocsTarget returns "0.0.0" from read_version but has no version file.
+        It should be excluded from comparison, so a project with npm@1.0.0 +
+        docs@0.0.0 should pass, not fail.
+        """
+        from rlsbl.targets import TargetEntry
+
+        pkg = {"name": "test-pkg", "version": "1.0.0"}
+        (mock_git_repo / "package.json").write_text(json.dumps(pkg))
+        # Create selfdoc.json so DocsTarget detects
+        (mock_git_repo / "selfdoc.json").write_text("{}")
+
+        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        result = app._check_defs["version-consistency"].impl(ctx)
+        assert result.status == "pass"
+        assert "1.0.0" in result.message
+
 
 # ---------------------------------------------------------------------------
 # Functional tests: changelog-entry check
