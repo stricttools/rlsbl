@@ -2,6 +2,27 @@
 
 # Changelog
 
+## 0.39.0
+
+### Breaking
+
+- **Breaking: file-based releases.** `rlsbl release` now reads from `.rlsbl/releases/unreleased.toml` instead of CLI args. Run `rlsbl release-init` to scaffold the file. The file declares bump type, included/excluded targets, and per-target config.
+- **Breaking: `rlsbl doctor`, `monorepo lint`, and `changelog validate` removed.** Replaced by the unified `rlsbl check` command. Use `rlsbl check --all`, `rlsbl check --tag workspace`, or `rlsbl check --tag changelog`.
+- **Breaking: `--dry-run`, `--yes`, `--quiet` are now global flags.** They apply to all commands. Both `rlsbl --dry-run release` and `rlsbl release --dry-run` work.
+- **Breaking: PyYAML replaced with ruamel.yaml.** Projects extending rlsbl's YAML handling must use the ruamel.yaml API.
+
+### Features
+
+- **Unified check system.** 27 checks migrated to strictcli's `@app.check()` framework. Run `rlsbl check --all`, filter by tag (`--tag project`, `--tag changelog`, `--tag workspace`, `--tag release`), or by name (`--name lock`). Supports dependency ordering, JSON output, dry-run, and verbose modes.
+- **Dart target and workspace scanner.** New `dart` target type: reads/writes `pubspec.yaml` version field with round-trip formatting preservation. DartScanner detects intra-workspace dependencies in Dart monorepos.
+- **Flutter iOS/Android targets with Shorebird OTA.** Separate `flutter-ios` and `flutter-android` targets with platform-specific tags. Release file `mode` field (`ota`/`build`) controls release type. Native file detection blocks OTA when platform code changes. Build number (`+N`) management opt-in via config.
+- **`monorepo graph` command.** Export the workspace dependency graph as JSON, DOT (Graphviz), or indented text. Filter with `--root` (transitive deps), `--reverse` (transitive rdeps), and `--depth`.
+- **`monorepo snapshot` command.** Generates `.rlsbl-monorepo/snapshot.json` summarizing all packages, versions, deps, and graph structure. `--check` mode for CI staleness detection. Auto-regenerates during monorepo releases.
+- **Architectural layer rules.** Define `[layers]` in `workspace.toml` with ordered layers and glob-based package assignments. The `layers-violations` check enforces dependency direction. Supports unrestricted packages, forbidden targets, and explicit cross-layer allowances.
+- **Dependency-import validation.** New `deps-unused` and `deps-undeclared` checks scan source files (Python via tree-sitter, Dart via regex) to verify declared dependencies match actual imports. Whitelist via `.rlsbl-monorepo/dep-overrides.toml`.
+- **`monorepo impact` command.** Analyze blast radius of changes: input a package name, file paths, or git range (`--since`). Outputs direct/transitive dependents, test scope, and release candidates in JSON or text.
+- **Coordinated multi-package releases.** `monorepo release` reads a batch release file (`.rlsbl-monorepo/releases/unreleased.toml`) and releases packages in topological order. New `deps-stale` check detects outdated intra-workspace constraints. Advisory constraint propagation after each release.
+
 ## 0.38.2
 
 ### Fixes
