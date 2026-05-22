@@ -49,3 +49,13 @@ class TestSelfdocBeforeTestsAndLint:
             f"Expected ordering selfdoc ({selfdoc_pos}) < tests ({tests_pos}) "
             f"< lint ({lint_pos})"
         )
+
+    def test_selfdoc_after_pre_checks_hook(self):
+        """Selfdoc check must run after the pre-checks hook."""
+        source = inspect.getsource(run_cmd)
+        pre_checks_pos = source.index("pre_checks_script")
+        selfdoc_pos = source.index("_run_selfdoc_check(")
+
+        assert pre_checks_pos < selfdoc_pos, (
+            "pre-checks hook must appear before _run_selfdoc_check"
+        )
