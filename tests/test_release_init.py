@@ -136,6 +136,46 @@ class TestReleaseInitAlreadyExists:
             _run_release_init(tmp_path, entries)
 
 
+class TestReleaseInitEmptyFileAllowed:
+    """Empty or whitespace-only file does not block release-init."""
+
+    def test_empty_file_allows_overwrite(self, tmp_path):
+        releases_dir = tmp_path / ".rlsbl" / "releases"
+        releases_dir.mkdir(parents=True)
+        (releases_dir / "unreleased.toml").write_text("")
+
+        entries = [TargetEntry(name="pypi", path=str(tmp_path))]
+        _run_release_init(tmp_path, entries)
+
+        release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
+        assert release_path.exists()
+        cfg = read_release_file(str(release_path))
+        assert cfg.bump == "patch"
+        assert cfg.include == ["pypi"]
+
+    def test_whitespace_only_file_allows_overwrite(self, tmp_path):
+        releases_dir = tmp_path / ".rlsbl" / "releases"
+        releases_dir.mkdir(parents=True)
+        (releases_dir / "unreleased.toml").write_text("   \n\n  \n")
+
+        entries = [TargetEntry(name="npm", path=str(tmp_path))]
+        _run_release_init(tmp_path, entries)
+
+        release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
+        cfg = read_release_file(str(release_path))
+        assert cfg.bump == "patch"
+        assert cfg.include == ["npm"]
+
+    def test_nonempty_file_still_blocks(self, tmp_path):
+        releases_dir = tmp_path / ".rlsbl" / "releases"
+        releases_dir.mkdir(parents=True)
+        (releases_dir / "unreleased.toml").write_text('bump = "minor"\n')
+
+        entries = [TargetEntry(name="pypi", path=str(tmp_path))]
+        with pytest.raises(SystemExit):
+            _run_release_init(tmp_path, entries)
+
+
 class TestReleaseInitRoundTrip:
     """Verify the generated file is valid by reading it back with read_release_file()."""
 

@@ -249,8 +249,10 @@ def cmd_release_init(**_kwargs):
 
     release_path = get_release_file_path(project_dir)
     if os.path.exists(release_path):
-        print(f"Error: {release_path} already exists.", file=sys.stderr)
-        sys.exit(1)
+        content = open(release_path).read().strip()
+        if content:
+            print(f"Error: {release_path} already exists.", file=sys.stderr)
+            sys.exit(1)
 
     entries = detect_targets(project_dir)
     if not entries:
