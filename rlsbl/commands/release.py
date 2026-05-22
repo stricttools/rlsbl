@@ -31,6 +31,7 @@ from ..utils import (
     get_current_branch,
     get_hook_timeout,
     get_push_timeout,
+    has_staged_or_modified,
     is_clean_tree,
     push_if_needed,
     require_tool,
@@ -982,14 +983,6 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
     # Commit if any of the files we track actually have changes.
     # Don't use is_clean_tree() as a proxy — the advisory lock file (.rlsbl/lock)
     # makes the tree appear dirty even when no release-relevant files changed.
-    def has_staged_or_modified(paths):
-        """Check if any of the given paths have actual changes vs the index."""
-        for p in paths:
-            diff = run("git", ["diff", "--name-only", "--", p]) if os.path.exists(p) else ""
-            status = run("git", ["status", "--porcelain", "--", p])
-            if diff or status:
-                return True
-        return False
 
     # Capture HEAD before any git mutations so we can roll back on failure
     pre_release_sha = run("git", ["rev-parse", "HEAD"])

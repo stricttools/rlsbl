@@ -197,6 +197,16 @@ def find_commit_tool():
     return "git"
 
 
+def has_staged_or_modified(paths: list[str]) -> bool:
+    """Check if any of the given paths have staged or unstaged changes."""
+    for p in paths:
+        diff = run("git", ["diff", "--name-only", "--", p]) if os.path.exists(p) else ""
+        status = run("git", ["status", "--porcelain", "--", p])
+        if diff or status:
+            return True
+    return False
+
+
 def commit_files(
     message: str,
     files: list[str],

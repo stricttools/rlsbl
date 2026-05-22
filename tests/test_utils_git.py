@@ -1,0 +1,53 @@
+"""Tests for rlsbl.utils git helpers: has_staged_or_modified, commit_files_if_changed."""
+
+import subprocess
+
+import pytest
+
+from rlsbl.utils import has_staged_or_modified
+
+
+class TestHasStagedOrModified:
+    """Tests for has_staged_or_modified using a real git repo."""
+
+    def test_modified_file_detected(self, mock_git_repo):
+        """A tracked file with unstaged changes is detected."""
+        readme = mock_git_repo / "README.md"
+        readme.write_text("modified content\n")
+        assert has_staged_or_modified(["README.md"]) is True
+
+    def test_staged_file_detected(self, mock_git_repo):
+        """A file staged for commit is detected."""
+        tracked = mock_git_repo / "tracked.txt"
+        tracked.write_text("new file\n")
+        subprocess.run(
+            ["git", "add", "tracked.txt"],
+            cwd=str(mock_git_repo),
+            check=True,
+        )
+        assert has_staged_or_modified(["tracked.txt"]) is True
+
+    def test_untracked_file_not_in_list(self, mock_git_repo):
+        """An untracked file that is NOT in the paths list is not detected."""
+        untracked = mock_git_repo / "untracked.txt"
+        untracked.write_text("I am untracked\n")
+        # Only check README.md which is clean
+        assert has_staged_or_modified(["README.md"]) is False
+
+    def test_clean_state_returns_false(self, mock_git_repo):
+        """When no files are modified or staged, returns False."""
+        assert has_staged_or_modified(["README.md"]) is False
+
+    def test_nonexistent_path_returns_false(self, mock_git_repo):
+        """A path that doesn't exist on disk returns False (no diff, no status)."""
+        assert has_staged_or_modified(["does_not_exist.txt"]) is False
+
+    def test_multiple_paths_one_dirty(self, mock_git_repo):
+        """Returns True when at least one of multiple paths is dirty."""
+        readme = mock_git_repo / "README.md"
+        readme.write_text("changed\n")
+        assert has_staged_or_modified(["nonexistent.txt", "README.md"]) is True
+
+    def test_empty_paths_returns_false(self, mock_git_repo):
+        """An empty paths list returns False."""
+        assert has_staged_or_modified([]) is False
