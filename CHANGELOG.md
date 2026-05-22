@@ -2,6 +2,12 @@
 
 # Changelog
 
+## 0.40.1
+
+### Fixes
+
+- **Fix.** CI workflow updated for the `check` to `check-name` rename.
+
 ## 0.40.0
 
 ### Breaking
