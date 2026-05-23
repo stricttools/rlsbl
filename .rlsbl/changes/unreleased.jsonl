@@ -1,0 +1,1 @@
+{"commits":["025f96816b2c9ae4b2c0ac7db9016ce19303d004","81ad39d157ff9a0ffe9f348c47bc701043190ae1"],"user_facing":true,"description":"**Breaking: `private` config key is now required.** No implicit default. Set `\"private\": true` for private repos or `\"private\": false` for public repos. Private repos are blocked from publishing to public registries.","type":"breaking"}
