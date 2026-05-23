@@ -1,10 +1,10 @@
-"""Tests for the asset size guard in the private post-release hook.
+"""Tests for the asset size guard.
 
 Verifies:
-- The template contains the size-check code.
+- The old private hook template has been removed (asset upload is built-in).
 - The get_max_asset_size_mb config accessor returns correct defaults and
   respects overrides from .rlsbl/config.json.
-- A bash snippet replicating the hook's size check passes small files and
+- A bash snippet replicating the size check passes small files and
   rejects oversized files, with both default and custom limits.
 """
 
@@ -17,16 +17,7 @@ import pytest
 from rlsbl.config import get_max_asset_size_mb
 
 
-TEMPLATE_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(__file__)),
-    "rlsbl",
-    "templates",
-    "shared",
-    "hooks",
-    "post-release-private.sh.tpl",
-)
-
-# Minimal bash snippet that replicates the size-check logic from the template.
+# Minimal bash snippet that replicates the size-check logic.
 # Exits 0 if all files pass, 1 if any file exceeds the limit.
 _SIZE_CHECK_SCRIPT = """\
 set -euo pipefail
@@ -64,37 +55,23 @@ def _write_config(tmp_path, payload):
 
 
 # ---------------------------------------------------------------------------
-# Template content
+# Private hook template removed (asset upload is built-in)
 # ---------------------------------------------------------------------------
 
 
-class TestTemplateContainsSizeCheck:
-    """Verify the template file includes the expected size guard code."""
+class TestPrivateHookTemplateRemoved:
+    """The old post-release-private.sh.tpl no longer exists."""
 
-    def test_template_has_max_asset_size_read(self):
-        with open(TEMPLATE_PATH) as f:
-            content = f.read()
-        assert "max_asset_size_mb" in content
-
-    def test_template_has_stat_check(self):
-        with open(TEMPLATE_PATH) as f:
-            content = f.read()
-        assert "stat --format=%s" in content
-        assert "stat -f%z" in content
-
-    def test_template_has_size_comparison(self):
-        with open(TEMPLATE_PATH) as f:
-            content = f.read()
-        assert "max_size_bytes" in content
-        assert "-gt" in content
-
-    def test_template_guard_before_upload(self):
-        """The size guard must appear BEFORE the gh release upload line."""
-        with open(TEMPLATE_PATH) as f:
-            content = f.read()
-        guard_pos = content.index("max_size_bytes")
-        upload_pos = content.index("gh release upload")
-        assert guard_pos < upload_pos
+    def test_template_deleted(self):
+        tpl_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "rlsbl", "templates", "shared", "hooks",
+            "post-release-private.sh.tpl",
+        )
+        assert not os.path.exists(tpl_path), (
+            "post-release-private.sh.tpl should be deleted; "
+            "asset upload is now a built-in release step"
+        )
 
 
 # ---------------------------------------------------------------------------

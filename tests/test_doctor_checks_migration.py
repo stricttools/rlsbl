@@ -24,6 +24,7 @@ EXPECTED_CHECKS = [
     "name-consistency",
     "license-consistency",
     "description-consistency",
+    "private-hook-stale",
     "local-tag",
     "remote-tag",
     "github-release",
@@ -56,8 +57,8 @@ EXPECTED_CHECKS = [
 class TestCheckDeclarations:
     """Every check must be declared in checks.toml and registered on the app."""
 
-    def test_all_27_checks_declared(self):
-        """checks.toml defines exactly the 26 expected checks."""
+    def test_all_28_checks_declared(self):
+        """checks.toml defines exactly the 28 expected checks."""
         assert sorted(app._check_defs.keys()) == sorted(EXPECTED_CHECKS)
 
     @pytest.mark.parametrize("name", EXPECTED_CHECKS)
@@ -66,14 +67,14 @@ class TestCheckDeclarations:
         assert app._check_defs[name].impl is not None
 
     def test_check_list_shows_all(self):
-        """``rlsbl check --list`` outputs all 26 check names."""
+        """``rlsbl check --list`` outputs all 28 check names."""
         result = app.test(["check", "--list"])
         assert result.exit_code == 0
         for name in EXPECTED_CHECKS:
             assert name in result.stdout
 
     def test_check_list_json(self):
-        """``rlsbl check --list --json`` outputs valid JSON with all 27 checks."""
+        """``rlsbl check --list --json`` outputs valid JSON with all 28 checks."""
         result = app.test(["check", "--list", "--json"])
         assert result.exit_code == 0
         data = json.loads(result.stdout)
@@ -91,6 +92,7 @@ class TestCheckTags:
     @pytest.mark.parametrize("name", [
         "lock", "version-consistency", "name-consistency",
         "license-consistency", "description-consistency",
+        "private-hook-stale",
     ])
     def test_project_tag(self, name):
         assert "project" in app._check_defs[name].tags
@@ -544,3 +546,46 @@ class TestWorkspaceStaleEntriesCheck:
         result = app._check_defs["workspace-stale-entries"].impl(ctx)
         assert result.status == "fail"
         assert len(result.details) == 1
+
+
+# ---------------------------------------------------------------------------
+# Functional tests: private-hook-stale check
+# ---------------------------------------------------------------------------
+
+class TestPrivateHookStaleCheck:
+    """The private-hook-stale check detects legacy private hook code."""
+
+    def test_stale_hook_detected(self, mock_git_repo):
+        """Hook containing legacy private marker -> fail."""
+        hooks_dir = mock_git_repo / ".rlsbl" / "hooks"
+        hooks_dir.mkdir(parents=True)
+        (hooks_dir / "post-release.sh").write_text(
+            "#!/usr/bin/env bash\n"
+            "# Post-release hook for private repositories.\n"
+            "gh release upload \"v$version\" ./dist/* --clobber\n"
+        )
+        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        result = app._check_defs["private-hook-stale"].impl(ctx)
+        assert result.status == "fail"
+        assert "legacy private asset upload" in result.message
+        assert "rlsbl scaffold --update" in result.message
+
+    def test_normal_hook_passes(self, mock_git_repo):
+        """Standard hook without legacy marker -> pass."""
+        hooks_dir = mock_git_repo / ".rlsbl" / "hooks"
+        hooks_dir.mkdir(parents=True)
+        (hooks_dir / "post-release.sh").write_text(
+            "#!/usr/bin/env bash\n"
+            "# Built-in checks handle tests and lint.\n"
+            "echo 'post-release'\n"
+        )
+        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        result = app._check_defs["private-hook-stale"].impl(ctx)
+        assert result.status == "pass"
+
+    def test_no_hook_file_passes(self, mock_git_repo):
+        """No post-release.sh at all -> pass."""
+        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        result = app._check_defs["private-hook-stale"].impl(ctx)
+        assert result.status == "pass"
+        assert "no post-release hook" in result.message

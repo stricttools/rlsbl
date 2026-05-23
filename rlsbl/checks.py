@@ -220,6 +220,26 @@ def register_checks(app):
         detail = ", ".join(f"{k}={v}" for k, v in descriptions.items())
         return CheckResult("warn", f"description mismatch: {detail}")
 
+    @app.check("private-hook-stale")
+    def check_private_hook_stale(ctx):
+        """Detect legacy private asset upload code in post-release hook."""
+        hook_path = os.path.join(str(ctx.project_root), ".rlsbl", "hooks", "post-release.sh")
+        if not os.path.exists(hook_path):
+            return CheckResult("pass", "no post-release hook")
+
+        with open(hook_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        # The old private hook template had this distinctive comment line
+        if "Post-release hook for private repositories" in content:
+            return CheckResult(
+                "fail",
+                "Post-release hook contains legacy private asset upload code. "
+                "Asset upload is now a built-in release step. "
+                "Run `rlsbl scaffold --update` to get the standard hook template.",
+            )
+        return CheckResult("pass", "no legacy private hook code")
+
     # ------------------------------------------------------------------
     # Tag: release
     # ------------------------------------------------------------------

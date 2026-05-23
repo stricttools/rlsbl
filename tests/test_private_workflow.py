@@ -10,7 +10,6 @@ import pytest
 from rlsbl.commands.init_cmd import (
     _resolve_private,
     _filter_mappings_for_private,
-    _replace_post_release_hook_for_private,
     process_mappings,
     run_cmd,
 )
@@ -111,8 +110,8 @@ class TestPrivateFlagScaffold:
         publish_path = os.path.join(".github", "workflows", "publish.yml")
         assert not os.path.exists(publish_path), "publish.yml should not exist for auto-detected private repos"
 
-    def test_private_writes_post_release_hook(self, mock_git_repo):
-        """Private scaffold should write the private-specific post-release hook."""
+    def test_private_writes_standard_post_release_hook(self, mock_git_repo):
+        """Private scaffold should write the standard post-release hook (asset upload is built-in)."""
         pkg = {"name": "test-pkg", "version": "1.0.0"}
         (mock_git_repo / "package.json").write_text(json.dumps(pkg))
 
@@ -126,9 +125,9 @@ class TestPrivateFlagScaffold:
         with open(hook_path) as f:
             content = f.read()
 
-        # Should contain the private-specific content (artifact upload)
-        assert "gh release upload" in content
-        assert "private" in content.lower()
+        # Should NOT contain legacy private hook content -- asset upload is now built-in
+        assert "gh release upload" not in content
+        assert "Post-release hook for private repositories" not in content
 
     def test_private_saved_to_config(self, mock_git_repo):
         """Private flag should be saved to .rlsbl/config.json."""
@@ -193,19 +192,7 @@ class TestFilterMappings:
         assert "ci.yml.tpl" in templates
         assert "goreleaser.yml.tpl" in templates
 
-    def test_replace_post_release_hook(self):
-        """_replace_post_release_hook_for_private swaps the hook template."""
-        mappings = [
-            {"template": "CHANGELOG.md.tpl", "target": "CHANGELOG.md"},
-            {"template": "hooks/post-release.sh.tpl", "target": ".rlsbl/hooks/post-release.sh"},
-            {"template": "hooks/pre-release.sh.tpl", "target": ".rlsbl/hooks/pre-release.sh"},
-        ]
-        result = _replace_post_release_hook_for_private(mappings)
-        assert len(result) == 3
-
-        hook_mapping = next(m for m in result if m["target"] == ".rlsbl/hooks/post-release.sh")
-        assert hook_mapping["template"] == "hooks/post-release-private.sh.tpl"
-
-        # Other mappings unchanged
-        changelog = next(m for m in result if m["target"] == "CHANGELOG.md")
-        assert changelog["template"] == "CHANGELOG.md.tpl"
+    def test_replace_function_removed(self):
+        """_replace_post_release_hook_for_private no longer exists."""
+        import rlsbl.commands.init_cmd as init_cmd
+        assert not hasattr(init_cmd, "_replace_post_release_hook_for_private")
