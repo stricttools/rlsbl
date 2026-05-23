@@ -670,6 +670,9 @@ class TestRelease(unittest.TestCase):
         os.makedirs(os.path.join(".rlsbl", "changes"), exist_ok=True)
         with open(os.path.join(".rlsbl", "changes", "unreleased.jsonl"), "w") as f:
             f.write('{"commits":["abc1234"],"user_facing":true,"description":"Bugfix","type":"fix"}\n')
+        # Config with required private key
+        with open(os.path.join(".rlsbl", "config.json"), "w") as f:
+            json.dump({"private": False}, f)
 
     def tearDown(self):
         os.chdir(self.orig_dir)
@@ -790,6 +793,8 @@ class TestReleaseCommitTrailers(unittest.TestCase):
         os.makedirs(os.path.join(".rlsbl", "changes"), exist_ok=True)
         with open(os.path.join(".rlsbl", "changes", "unreleased.jsonl"), "w") as f:
             f.write('{"commits":["abc1234"],"user_facing":true,"description":"Bugfix","type":"fix"}\n')
+        with open(os.path.join(".rlsbl", "config.json"), "w") as f:
+            json.dump({"private": False}, f)
 
     def tearDown(self):
         os.chdir(self.orig_dir)
@@ -1450,6 +1455,8 @@ class TestReleaseRollbackOnPushFailure(unittest.TestCase):
         with open(os.path.join(".rlsbl", "changes", "unreleased.jsonl"), "w") as f:
             f.write('{"commits":["abc1234"],"user_facing":true,'
                     '"description":"Bugfix","type":"fix"}\n')
+        with open(os.path.join(".rlsbl", "config.json"), "w") as f:
+            json.dump({"private": False}, f)
 
         # Initial commit and tag
         subprocess.run(["git", "add", "."], check=True)

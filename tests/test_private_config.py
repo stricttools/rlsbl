@@ -1,0 +1,140 @@
+"""Tests for the required ``private`` config key in the release flow.
+
+Verifies:
+- Release aborts when ``private`` key is missing from config.
+- Release aborts when ``private: true`` and a target has ``publish.<target>.local: true``.
+- Release proceeds when ``private: true`` with no local publish config.
+- Release proceeds when ``private: false`` (normal case).
+"""
+
+import json
+import os
+import shutil
+import tempfile
+from io import StringIO
+from unittest.mock import patch
+
+import pytest
+
+from rlsbl.release_file import ReleaseConfig
+
+
+def _rc(bump="patch", include=None, exclude=None):
+    """Shorthand for creating a ReleaseConfig with sensible defaults."""
+    return ReleaseConfig(
+        bump=bump,
+        include=include or ["npm"],
+        exclude=exclude or [],
+    )
+
+
+def _write_config(tmp_dir, config):
+    """Write .rlsbl/config.json in tmp_dir with the given dict."""
+    rlsbl_dir = os.path.join(tmp_dir, ".rlsbl")
+    os.makedirs(rlsbl_dir, exist_ok=True)
+    with open(os.path.join(rlsbl_dir, "config.json"), "w") as f:
+        json.dump(config, f)
+
+
+class TestPrivateConfigRequired:
+    """Tests that release enforces the ``private`` config key."""
+
+    def setup_method(self):
+        self.orig_dir = os.getcwd()
+        self.tmp_dir = tempfile.mkdtemp()
+        os.chdir(self.tmp_dir)
+        # Minimal npm project
+        with open("package.json", "w") as f:
+            json.dump({"name": "test-pkg", "version": "1.0.0"}, f, indent=2)
+            f.write("\n")
+        with open("CHANGELOG.md", "w") as f:
+            f.write("# Changelog\n\n## 1.0.1\n\nPatch release.\n")
+        os.makedirs(os.path.join(".rlsbl", "changes"), exist_ok=True)
+        with open(os.path.join(".rlsbl", "changes", "unreleased.jsonl"), "w") as f:
+            f.write('{"commits":["abc1234"],"user_facing":true,"description":"Bugfix","type":"fix"}\n')
+
+    def teardown_method(self):
+        os.chdir(self.orig_dir)
+        shutil.rmtree(self.tmp_dir)
+
+    def test_release_aborts_when_private_key_missing(self, capsys):
+        """Release exits with error when ``private`` is absent from config."""
+        # No config.json at all, or config without "private"
+        _write_config(self.tmp_dir, {"targets": ["npm"]})
+
+        from rlsbl.commands.release import run_cmd
+
+        with pytest.raises(SystemExit) as exc_info:
+            run_cmd(_rc(), {"quiet": True})
+        assert exc_info.value.code == 1
+
+        captured = capsys.readouterr()
+        assert '"private" key missing' in captured.err
+
+    @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
+    @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
+    def test_release_aborts_when_private_true_with_local_publish(
+        self, _gh_inst, _gh_auth, capsys
+    ):
+        """Release exits when private=true and a target has publish.local=true."""
+        _write_config(self.tmp_dir, {
+            "private": True,
+            "publish": {"npm": {"local": True}},
+        })
+
+        from rlsbl.commands.release import run_cmd
+
+        with pytest.raises(SystemExit) as exc_info:
+            run_cmd(_rc(), {"quiet": True})
+        assert exc_info.value.code == 1
+
+        captured = capsys.readouterr()
+        assert "private repo cannot publish" in captured.err
+
+    @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.run")
+    @patch("rlsbl.commands.release.commit_files", return_value=True)
+    @patch("rlsbl.commands.release.get_current_branch", return_value="main")
+    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
+    @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
+    @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
+    @patch("rlsbl.commands.release.generate_changelog")
+    @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
+    def test_release_proceeds_when_private_true_no_local_publish(
+        self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch,
+        _commit_files, mock_run, _push,
+    ):
+        """Release does not abort when private=true and no publish.local config."""
+        _write_config(self.tmp_dir, {"private": True})
+
+        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
+
+        from rlsbl.commands.release import run_cmd
+
+        with patch("sys.stdout", new_callable=StringIO):
+            # Should not raise SystemExit
+            run_cmd(_rc(), {"dry-run": True, "quiet": False})
+
+    @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.run")
+    @patch("rlsbl.commands.release.commit_files", return_value=True)
+    @patch("rlsbl.commands.release.get_current_branch", return_value="main")
+    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
+    @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
+    @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
+    @patch("rlsbl.commands.release.generate_changelog")
+    @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
+    def test_release_proceeds_when_private_false(
+        self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch,
+        _commit_files, mock_run, _push,
+    ):
+        """Release does not abort when private=false (normal public repo)."""
+        _write_config(self.tmp_dir, {"private": False})
+
+        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
+
+        from rlsbl.commands.release import run_cmd
+
+        with patch("sys.stdout", new_callable=StringIO):
+            # Should not raise SystemExit
+            run_cmd(_rc(), {"dry-run": True, "quiet": False})

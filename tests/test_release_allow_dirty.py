@@ -38,6 +38,8 @@ class TestReleaseAllowDirty(unittest.TestCase):
         os.makedirs(os.path.join(".rlsbl", "changes"), exist_ok=True)
         with open(os.path.join(".rlsbl", "changes", "unreleased.jsonl"), "w") as f:
             f.write('{"commits":["abc1234"],"user_facing":true,"description":"Bugfix","type":"fix"}\n')
+        with open(os.path.join(".rlsbl", "config.json"), "w") as f:
+            json.dump({"private": False}, f)
 
     def tearDown(self):
         os.chdir(self.orig_dir)

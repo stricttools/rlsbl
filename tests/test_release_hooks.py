@@ -38,6 +38,10 @@ def _setup_project(tmp_path, hook_name, hook_body):
     changes_dir = tmp_path / ".rlsbl" / "changes"
     changes_dir.mkdir(parents=True, exist_ok=True)
     (changes_dir / "unreleased.jsonl").write_text("")
+    # Config with required private key
+    (tmp_path / ".rlsbl" / "config.json").write_text(
+        json.dumps({"private": False}) + "\n"
+    )
     # Hook script
     hooks_dir = tmp_path / ".rlsbl" / "hooks"
     hooks_dir.mkdir(parents=True)
@@ -147,6 +151,9 @@ class TestPreReleaseHookOutput:
         changes_dir = tmp_project / ".rlsbl" / "changes"
         changes_dir.mkdir(parents=True, exist_ok=True)
         (changes_dir / "unreleased.jsonl").write_text("")
+        (tmp_project / ".rlsbl" / "config.json").write_text(
+            json.dumps({"private": False}) + "\n"
+        )
         # No .rlsbl/hooks/pre-release.sh created
 
         with (
@@ -796,7 +803,10 @@ def _setup_releasable_project_with_hook(repo, hook_name, hook_body):
     changes_dir = repo / ".rlsbl" / "changes"
     changes_dir.mkdir(parents=True)
     (changes_dir / "unreleased.jsonl").write_text("")
-    _git(repo, "add", "package.json", "CHANGELOG.md", ".rlsbl/changes/unreleased.jsonl")
+    (repo / ".rlsbl" / "config.json").write_text(
+        json.dumps({"private": False}) + "\n"
+    )
+    _git(repo, "add", "package.json", "CHANGELOG.md", ".rlsbl/changes/unreleased.jsonl", ".rlsbl/config.json")
     _git(repo, "commit", "-q", "-m", "initial")
     _git(repo, "tag", "v1.0.0")
 
@@ -969,7 +979,10 @@ class TestHookGeneratedFiles:
         changes_dir = tmp_project / ".rlsbl" / "changes"
         changes_dir.mkdir(parents=True)
         (changes_dir / "unreleased.jsonl").write_text("")
-        _git(tmp_project, "add", "package.json", "CHANGELOG.md", ".rlsbl/changes/unreleased.jsonl")
+        (tmp_project / ".rlsbl" / "config.json").write_text(
+            json.dumps({"private": False}) + "\n"
+        )
+        _git(tmp_project, "add", "package.json", "CHANGELOG.md", ".rlsbl/changes/unreleased.jsonl", ".rlsbl/config.json")
         _git(tmp_project, "commit", "-q", "-m", "initial")
         _git(tmp_project, "tag", "v1.0.0")
 

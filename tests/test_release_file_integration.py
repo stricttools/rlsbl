@@ -35,7 +35,7 @@ def _setup_npm_project(tmp_path):
     # Config to declare targets so detect_targets returns consistent results
     config_dir = tmp_path / ".rlsbl"
     config_dir.mkdir(exist_ok=True)
-    config = {"targets": ["npm"]}
+    config = {"targets": ["npm"], "private": False}
     (config_dir / "config.json").write_text(json.dumps(config) + "\n")
 
 
@@ -55,7 +55,7 @@ def _setup_multi_target_project(tmp_path, targets):
     (changes_dir / "unreleased.jsonl").write_text("")
     config_dir = tmp_path / ".rlsbl"
     config_dir.mkdir(exist_ok=True)
-    config = {"targets": targets}
+    config = {"targets": targets, "private": False}
     (config_dir / "config.json").write_text(json.dumps(config) + "\n")
 
 

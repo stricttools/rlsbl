@@ -467,6 +467,35 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None):
 
     # Load env file if configured
     config = read_project_config()
+
+    # Require explicit "private" key in config
+    if "private" not in config:
+        print(
+            'Error: "private" key missing from .rlsbl/config.json.',
+            file=sys.stderr,
+        )
+        print(
+            'Set "private": true for private repos or "private": false for public repos.',
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    # Private repos must not have any target with publish.<target>.local = true
+    if config["private"]:
+        publish = config.get("publish", {})
+        if isinstance(publish, dict):
+            for target_name, target_cfg in publish.items():
+                if isinstance(target_cfg, dict) and target_cfg.get("local"):
+                    print(
+                        f"Error: private repo cannot publish to public registries.",
+                        file=sys.stderr,
+                    )
+                    print(
+                        f'Remove publish.{target_name}.local or set "private": false.',
+                        file=sys.stderr,
+                    )
+                    sys.exit(1)
+
     env_file = config.get("env_file")
     if env_file:
         from ..config import load_env_file

@@ -48,6 +48,8 @@ class TestReleaseValidatedCache(unittest.TestCase):
         # The .validated file exists (written by validate_unreleased during release)
         with open(os.path.join(changes_dir, ".validated"), "w") as f:
             f.write("fakehash123\n")
+        with open(os.path.join(".rlsbl", "config.json"), "w") as f:
+            json.dump({"private": False}, f)
 
     def tearDown(self):
         os.chdir(self.orig_dir)

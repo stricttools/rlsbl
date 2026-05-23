@@ -71,6 +71,9 @@ class TestMonorepoRelease:
         changes_dir = proj_dir / ".rlsbl" / "changes"
         changes_dir.mkdir(parents=True, exist_ok=True)
         (changes_dir / "unreleased.jsonl").write_text("")
+        (proj_dir / ".rlsbl" / "config.json").write_text(
+            json.dumps({"private": False}) + "\n"
+        )
 
         # Commit the monorepo structure
         subprocess.run(["git", "add", "."], cwd=str(repo_root), check=True)
@@ -247,6 +250,9 @@ class TestMonorepoRelease:
         changes_dir = mock_git_repo / ".rlsbl" / "changes"
         changes_dir.mkdir(parents=True, exist_ok=True)
         (changes_dir / "unreleased.jsonl").write_text("")
+        (mock_git_repo / ".rlsbl" / "config.json").write_text(
+            json.dumps({"private": False}) + "\n"
+        )
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", "add standalone project"],
@@ -371,6 +377,9 @@ class TestSubtreePublish:
         changes_dir = proj_dir / ".rlsbl" / "changes"
         changes_dir.mkdir(parents=True, exist_ok=True)
         (changes_dir / "unreleased.jsonl").write_text("")
+        (proj_dir / ".rlsbl" / "config.json").write_text(
+            json.dumps({"private": False}) + "\n"
+        )
 
         subprocess.run(["git", "add", "."], cwd=str(repo_root), check=True)
         subprocess.run(

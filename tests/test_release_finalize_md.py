@@ -68,7 +68,10 @@ def _setup_releasable_npm_project(repo):
     changes_dir = repo / ".rlsbl" / "changes"
     changes_dir.mkdir(parents=True)
     (changes_dir / "unreleased.jsonl").write_text("")
-    _git(repo, "add", "package.json", "CHANGELOG.md", ".rlsbl/changes/unreleased.jsonl")
+    (repo / ".rlsbl" / "config.json").write_text(
+        json.dumps({"private": False}) + "\n"
+    )
+    _git(repo, "add", "package.json", "CHANGELOG.md", ".rlsbl/changes/unreleased.jsonl", ".rlsbl/config.json")
     _git(repo, "commit", "-q", "-m", "initial")
     _git(repo, "tag", "v1.0.0")
 

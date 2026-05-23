@@ -825,7 +825,14 @@ def _resolve_private(flags):
     """Determine if this is a private repository.
 
     Checks --private flag first, then saved config, then auto-detects via GitHub API.
-    Returns True/False, or False if detection fails.
+
+    On --update: if ``private`` is missing from config and no --private flag was
+    passed, prints an error and exits.  The user must add the key explicitly.
+
+    On new scaffold: auto-detects if needed and returns the result.  The caller
+    is responsible for persisting the value to config.json.
+
+    Returns True/False, or False if detection fails (new scaffold only).
     """
     if flags.get("private"):
         return True
@@ -835,7 +842,19 @@ def _resolve_private(flags):
     if "private" in config:
         return bool(config["private"])
 
-    # Auto-detect via GitHub API
+    # On --update, require explicit config — never auto-detect
+    if flags.get("update"):
+        print(
+            'Error: "private" key missing from .rlsbl/config.json.',
+            file=sys.stderr,
+        )
+        print(
+            'Add "private": true for private repos or "private": false for public repos.',
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    # Auto-detect via GitHub API (new scaffold only)
     detected = is_private_repo()
     if detected is not None:
         return detected
@@ -943,8 +962,8 @@ def run_cmd(registry, args, flags):
 
         # Determine if this is a private repository
         private = _resolve_private(flags)
-        if private and not dry_run:
-            write_project_config("private", True)
+        if not dry_run:
+            write_project_config("private", private)
 
         # Gather template variables
         vars_dict = reg.template_vars(".")
@@ -1370,8 +1389,8 @@ def run_cmd_multi(registries_list, args, flags):
 
         # Determine if this is a private repository
         private = _resolve_private(flags)
-        if private and not dry_run:
-            write_project_config("private", True)
+        if not dry_run:
+            write_project_config("private", private)
 
         print(f"Multiple registries detected: {', '.join(registries_list)}")
         if private:
