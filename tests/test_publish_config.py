@@ -433,3 +433,60 @@ class TestDocsPublishConfig:
                 DocsTarget().publish(".", "1.0.0")
                 mock_run.assert_called_once()
                 assert mock_run.call_args[0][0] == ["selfdoc", "deploy"]
+
+
+# ---------------------------------------------------------------------------
+# validate_publish_config (assets schema)
+# ---------------------------------------------------------------------------
+
+
+class TestValidatePublishConfigAssets:
+    """Tests for the ``assets`` / ``max_asset_size_mb`` validation."""
+
+    def test_assets_true_with_max_size_passes(self):
+        config = {"publish": {"npm": {"assets": True, "max_asset_size_mb": 50}}}
+        # Should not raise
+        from rlsbl.config import validate_publish_config
+        validate_publish_config(config, "npm")
+
+    def test_assets_true_without_max_size_fails(self):
+        config = {"publish": {"npm": {"assets": True}}}
+        from rlsbl.config import validate_publish_config
+        with pytest.raises(ValueError, match="max_asset_size_mb is not set"):
+            validate_publish_config(config, "npm")
+
+    def test_assets_false_without_max_size_passes(self):
+        config = {"publish": {"npm": {"assets": False}}}
+        from rlsbl.config import validate_publish_config
+        # Should not raise
+        validate_publish_config(config, "npm")
+
+    def test_max_asset_size_zero_fails(self):
+        config = {"publish": {"npm": {"assets": True, "max_asset_size_mb": 0}}}
+        from rlsbl.config import validate_publish_config
+        with pytest.raises(ValueError, match="positive integer"):
+            validate_publish_config(config, "npm")
+
+    def test_max_asset_size_negative_fails(self):
+        config = {"publish": {"npm": {"assets": True, "max_asset_size_mb": -10}}}
+        from rlsbl.config import validate_publish_config
+        with pytest.raises(ValueError, match="positive integer"):
+            validate_publish_config(config, "npm")
+
+    def test_no_publish_section_passes(self):
+        config = {}
+        from rlsbl.config import validate_publish_config
+        # Should not raise
+        validate_publish_config(config, "npm")
+
+    def test_no_target_section_passes(self):
+        config = {"publish": {"pypi": {"local": True}}}
+        from rlsbl.config import validate_publish_config
+        # Should not raise (npm target not configured)
+        validate_publish_config(config, "npm")
+
+    def test_assets_absent_passes(self):
+        """When assets key is absent (defaults to False), no max_asset_size_mb required."""
+        config = {"publish": {"npm": {"local": True}}}
+        from rlsbl.config import validate_publish_config
+        validate_publish_config(config, "npm")
