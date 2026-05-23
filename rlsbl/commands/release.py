@@ -15,7 +15,7 @@ from ..changelog import (
     get_changes_dir,
     validate_unreleased,
 )
-from ..config import read_deploy_config, read_json_config, read_project_config, should_tag
+from ..config import get_publish_config, read_deploy_config, read_json_config, read_project_config, should_tag
 from ..deploy import deploy_target
 from ..lock import acquire_lock, release_lock
 from ..targets import TARGETS, detect_targets, _parse_target_entry
@@ -857,6 +857,96 @@ def _print_stale_dep_advisory(monorepo_name, new_version, version_dir):
         pass
 
 
+def _upload_release_assets(tag, version_dir, new_version, log, flags):
+    """Build and upload release assets for targets with ``publish.<target>.assets: true``.
+
+    For each detected target that has assets enabled in its publish config:
+    1. Create a dist directory under ``.rlsbl/dist/<target>/``
+    2. Call ``target.build_assets()`` to build artifacts
+    3. Check each artifact against ``max_asset_size_mb``
+    4. Upload via ``gh release upload``
+    5. Clean up the dist directory
+
+    Skips silently if no targets have assets enabled.
+    Warns and skips targets whose ``build_assets()`` raises ``NotImplementedError``.
+    """
+    entries = detect_targets(version_dir)
+    config = read_project_config()
+
+    targets_with_assets = []
+    for entry in entries:
+        pub_cfg = config.get("publish", {})
+        if isinstance(pub_cfg, dict):
+            target_pub = pub_cfg.get(entry.name, {})
+            if isinstance(target_pub, dict) and target_pub.get("assets"):
+                targets_with_assets.append(entry)
+
+    if not targets_with_assets:
+        return
+
+    dry_run = flags.get("dry-run", False)
+
+    for entry in targets_with_assets:
+        target_obj = TARGETS.get(entry.name)
+        if target_obj is None:
+            continue
+
+        pub_cfg = get_publish_config(entry.name)
+        max_size_mb = pub_cfg.get("max_asset_size_mb")
+
+        dist_dir = os.path.join(version_dir, ".rlsbl", "dist", entry.name)
+
+        if dry_run:
+            log(f"Would build and upload assets for target '{entry.name}' to release {tag}")
+            continue
+
+        # Build assets
+        try:
+            artifacts = target_obj.build_assets(entry.path, new_version, dist_dir)
+        except NotImplementedError:
+            print(
+                f"Warning: target '{entry.name}' does not support asset builds, skipping.",
+                file=sys.stderr,
+            )
+            continue
+
+        if not artifacts:
+            log(f"No artifacts produced for target '{entry.name}', skipping upload.")
+            continue
+
+        # Size check
+        if max_size_mb is not None:
+            max_size_bytes = max_size_mb * 1024 * 1024
+            for artifact_path in artifacts:
+                try:
+                    file_size = os.path.getsize(artifact_path)
+                except OSError:
+                    continue
+                if file_size > max_size_bytes:
+                    file_name = os.path.basename(artifact_path)
+                    actual_mb = file_size / (1024 * 1024)
+                    print(
+                        f"Error: artifact '{file_name}' is {actual_mb:.1f}MB, "
+                        f"exceeds max_asset_size_mb ({max_size_mb}MB) for target '{entry.name}'.",
+                        file=sys.stderr,
+                    )
+                    # Clean up dist before aborting
+                    if os.path.isdir(dist_dir):
+                        shutil.rmtree(dist_dir)
+                    sys.exit(1)
+
+        # Upload
+        try:
+            run("gh", ["release", "upload", tag] + artifacts + ["--clobber"])
+            log(f"Uploaded {len(artifacts)} asset(s) for target '{entry.name}'")
+        except Exception as e:
+            print(f"Warning: asset upload failed for target '{entry.name}': {e}", file=sys.stderr)
+
+        # Clean up dist directory
+        if os.path.isdir(dist_dir):
+            shutil.rmtree(dist_dir)
+
+
 def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current_version,
                           bump_type, tag, branch, changelog_entry, target,
                           secondary_targets=None, monorepo_name=None,
@@ -1187,28 +1277,33 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
             if os.path.exists(tmp):
                 os.unlink(tmp)
 
-    # Publish step (no-op for npm/pypi/go targets)
-    try:
-        target.publish(primary_path, new_version)
-    except Exception as e:
-        print(f"Warning: target publish step failed: {e}", file=sys.stderr)
+    # Upload release assets for targets with publish.<target>.assets: true
+    _upload_release_assets(tag, version_dir, new_version, log, flags)
 
-    # Multi-target: run build/publish for secondary targets resolved earlier
-    if secondary_targets:
-        from ..targets import TARGETS as ALL_TARGETS
-        for sec_name in sorted(secondary_targets):
-            sec_target = ALL_TARGETS.get(sec_name)
-            if sec_target is None:
-                continue
-            sec_path = secondary_targets[sec_name]
-            try:
-                sec_target.build(sec_path, new_version)
-            except Exception as e:
-                print(f"Warning: {sec_name} target build failed: {e}", file=sys.stderr)
-            try:
-                sec_target.publish(sec_path, new_version)
-            except Exception as e:
-                print(f"Warning: {sec_name} target publish failed: {e}", file=sys.stderr)
+    # Publish step: skip for private repos (they don't publish to registries)
+    is_private = read_project_config().get("private", False)
+    if not is_private:
+        try:
+            target.publish(primary_path, new_version)
+        except Exception as e:
+            print(f"Warning: target publish step failed: {e}", file=sys.stderr)
+
+        # Multi-target: run build/publish for secondary targets resolved earlier
+        if secondary_targets:
+            from ..targets import TARGETS as ALL_TARGETS
+            for sec_name in sorted(secondary_targets):
+                sec_target = ALL_TARGETS.get(sec_name)
+                if sec_target is None:
+                    continue
+                sec_path = secondary_targets[sec_name]
+                try:
+                    sec_target.build(sec_path, new_version)
+                except Exception as e:
+                    print(f"Warning: {sec_name} target build failed: {e}", file=sys.stderr)
+                try:
+                    sec_target.publish(sec_path, new_version)
+                except Exception as e:
+                    print(f"Warning: {sec_name} target publish failed: {e}", file=sys.stderr)
 
     # Deploy phase (after publish, before post-release hook)
     deploy_targets, deploy_errors = read_deploy_config()
