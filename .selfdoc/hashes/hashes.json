@@ -93,7 +93,7 @@
   },
   "configuration.md": {
     "content": "0263363d29d6f039fbecc4e22ebb3ba0ae5fd1da6a47a450a11da80c649547f6",
-    "description": "5204a3e21619bf50e8dfadb82cb36719c470fc7eac587123ddfc053a25f62560"
+    "description": "2d34864e44a5da5a3cc6ebff43ce9f1d1938e0f341aa041ffab18455a624501b"
   },
   "gen-index.md": {
     "content": "5d78527a5c001e9ceffacb9ce1cecdf4ec0f20e296376042b44775504c9e0b3c",
@@ -117,7 +117,7 @@
   },
   "rlsbl-changelog-files.md": {
     "content": "f738086f9318c903ae2e0d17cea3cdc26b87ef9f7468f4c42aa23cd5058e0cb8",
-    "description": "9669e8b077b5ba65fc0c5f19b5345d6ea6b1be11bf0560e45995d8ac82701553"
+    "description": "8d3cfe9c468a10b7815f7219fb98a25538a495d453ad2545e3535b6d76ca63aa"
   },
   "rlsbl-changelog-generate.md": {
     "content": "13aab17e30c093674e0ed5ca19b9eb59afb1409234f93696d3aa85a984bfa82e",
@@ -181,7 +181,7 @@
   },
   "rlsbl-commands-init_cmd.md": {
     "content": "6e7afaa3b476546fa61e858a9ab908e9d23474755a28b8f139fbc06c106c7734",
-    "description": "8dfca453e97c702cf648e273858ef53903522dde4f954aee92abb82dd344cde0"
+    "description": "556df93996c40bd495b33ec871cb77a6b258d0d144a76650a1eacc40de28cf1b"
   },
   "rlsbl-commands-migrate.md": {
     "content": "e9491cc81e5db4d8805bda9691cf789321146328c993576e2929b70992553f8b",
@@ -357,7 +357,7 @@
   },
   "rlsbl-targets-base.md": {
     "content": "8ae3cf2dab7274062d69fa74774d501941e59484c87ff3a317a51d5f040d1ed3",
-    "description": "878ce6c3cc56b2dce6e3f427484c436385cd6c929e23bc0189bf32f672af87e9"
+    "description": "9c45f2d173069765b86d5b12cc6ace11871012cf64a449c29879627cba6d68d1"
   },
   "rlsbl-targets-cargo.md": {
     "content": "18f32c7ab4fe05b7a8ca409700bc5fb2cbcf07c25d9c1761f90730bf3219f05f",
@@ -405,7 +405,7 @@
   },
   "rlsbl-targets-npm.md": {
     "content": "b62c90a5aab1e572c313aba381f1f793d406c7c891981e27ef2d02c53a6b782f",
-    "description": "d60a3fa2881c84e6f99010cc9c7824510aaa4652a2d17f96fb722004d1142b82"
+    "description": "c3b1baee52612dc981379bd297c5b6c229d27ad606d0d514baff62f2ee71c360"
   },
   "rlsbl-targets-plain.md": {
     "content": "9b3b2f7729262e3a1fc19bf2ce12c9fc56336e345425f4eff40569ba8c282b2e",
@@ -417,7 +417,7 @@
   },
   "rlsbl-targets-pypi.md": {
     "content": "6695a53753ca9baee9a3e94a001840e8978882e83a900557d8a2781fd30054be",
-    "description": "16a19e03040561fd769ded5cb3f979a06b8b38e67d023e745063cac4ee66574f"
+    "description": "08730d9c6f4b56924c278f9df4f1739470c2b2edc610266ec247ea3658fee261"
   },
   "rlsbl-targets-spec.md": {
     "content": "a2626d591f4017fa6318b39b51ebecf4fee036c35f4ea00df9e58b44aedc5bd0",
@@ -449,7 +449,7 @@
   },
   "rlsbl-utils.md": {
     "content": "82c44ce83f63272bef3459ff9abe57c23b0fd3ad51c343f50fa563d6ef93036d",
-    "description": "68a8c557a7a1a131466a8a6304a9cd707f065882cce7badf782e2e6783f3aa2a"
+    "description": "0195dc369552b0d9e704fd296ef6b7ce1c07a44f1d0fc21d9b2ef70d26859114"
   },
   "rlsbl-workspace.md": {
     "content": "562362ff9acba0645fe5ba7b0de43b8f4ea6a56f382a5daf9776d0b337bff902",
@@ -461,7 +461,7 @@
   },
   "rlsbl.md": {
     "content": "a037f52bf791136b5caddc474a2b23ac6857bc63aa346d1a12b7568ebc27851d",
-    "description": "359312a8e7729826646ec114ac37a3bb4db17dd3f8cc82f5b20c3fa58d3a973e"
+    "description": "22257685f4e3457d5ca2018fe29d4991b1dffd12d2b52df4db28a468a7951cff"
   },
   "targets.md": {
     "content": "f679b75c3560affb9f79d589df3458350ce8408d6f87606bae6ef75dcbf37fa1",
