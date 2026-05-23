@@ -1,19 +1,68 @@
 {
   "name": "rlsbl",
-  "version": "0.37.0",
+  "version": "0.40.1",
   "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 14 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, and more). Ships 32 commands organized into 18 top-level commands and 3 command groups (changelog, monorepo, dev).",
   "env_prefix": null,
   "config": false,
-  "global_flags": [],
+  "global_flags": [
+    {
+      "name": "dry-run",
+      "type": "bool",
+      "help": "Preview changes without applying them",
+      "short": null,
+      "default": false,
+      "env": null,
+      "choices": null,
+      "repeatable": false,
+      "negatable": true,
+      "hidden": false
+    },
+    {
+      "name": "yes",
+      "type": "bool",
+      "help": "Skip confirmation prompts",
+      "short": "y",
+      "default": false,
+      "env": null,
+      "choices": null,
+      "repeatable": false,
+      "negatable": true,
+      "hidden": false
+    },
+    {
+      "name": "quiet",
+      "type": "bool",
+      "help": "Suppress non-essential output",
+      "short": null,
+      "default": false,
+      "env": null,
+      "choices": null,
+      "repeatable": false,
+      "negatable": true,
+      "hidden": false
+    }
+  ],
   "commands": {
-    "release": {
-      "name": "release",
-      "help": "Bump the project version, validate the changelog, commit, tag, push, and create a GitHub Release. Supports patch, minor, and major bumps with dry-run preview and non-interactive mode for CI.",
+    "check": {
+      "name": "check",
+      "help": "Run project checks",
       "flags": [
         {
-          "name": "target",
+          "name": "all",
+          "type": "bool",
+          "help": "Run all checks",
+          "short": null,
+          "default": false,
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": true,
+          "hidden": false
+        },
+        {
+          "name": "tag",
           "type": "str",
-          "help": "Target a specific registry (auto-detected if omitted)",
+          "help": "Tag DSL expression to filter checks",
           "short": null,
           "default": "",
           "env": null,
@@ -23,9 +72,21 @@
           "hidden": false
         },
         {
-          "name": "dry-run",
+          "name": "name",
+          "type": "str",
+          "help": "Glob pattern to filter by check name",
+          "short": null,
+          "default": "",
+          "env": null,
+          "choices": null,
+          "repeatable": false,
+          "negatable": null,
+          "hidden": false
+        },
+        {
+          "name": "list",
           "type": "bool",
-          "help": "Preview release without making changes",
+          "help": "List all checks and their tags",
           "short": null,
           "default": false,
           "env": null,
@@ -35,9 +96,9 @@
           "hidden": false
         },
         {
-          "name": "yes",
+          "name": "json",
           "type": "bool",
-          "help": "Non-interactive mode (skip confirmations)",
+          "help": "Output results as JSON",
           "short": null,
           "default": false,
           "env": null,
@@ -47,9 +108,9 @@
           "hidden": false
         },
         {
-          "name": "quiet",
+          "name": "ignore-warnings",
           "type": "bool",
-          "help": "Suppress non-essential output",
+          "help": "Warn severity does not cause nonzero exit",
           "short": null,
           "default": false,
           "env": null,
@@ -59,9 +120,9 @@
           "hidden": false
         },
         {
-          "name": "skip-remote-check",
+          "name": "verbose",
           "type": "bool",
-          "help": "Skip the remote-ahead check",
+          "help": "Show details for passing checks too",
           "short": null,
           "default": false,
           "env": null,
@@ -69,43 +130,15 @@
           "repeatable": false,
           "negatable": true,
           "hidden": false
-        },
-        {
-          "name": "skip-tests",
-          "type": "bool",
-          "help": "Skip built-in test execution",
-          "short": null,
-          "default": false,
-          "env": null,
-          "choices": null,
-          "repeatable": false,
-          "negatable": true,
-          "hidden": false
-        },
-        {
-          "name": "skip-lint",
-          "type": "bool",
-          "help": "Skip built-in library lint",
-          "short": null,
-          "default": false,
-          "env": null,
-          "choices": null,
-          "repeatable": false,
-          "negatable": true,
-          "hidden": false
-        },
-        {
-          "name": "skip-docs",
-          "type": "bool",
-          "help": "Skip selfdoc documentation check",
-          "short": null,
-          "default": false,
-          "env": null,
-          "choices": null,
-          "repeatable": false,
-          "negatable": true,
-          "hidden": false
-        },
+        }
+      ],
+      "args": [],
+      "passthrough": false
+    },
+    "release": {
+      "name": "release",
+      "help": "Bump the project version, validate the changelog, commit, tag, push, and create a GitHub Release. Reads bump type and target selection from .rlsbl/releases/unreleased.toml (create with rlsbl release-init). Supports dry-run preview and non-interactive mode for CI.",
+      "flags": [
         {
           "name": "allow-dirty",
           "type": "bool",
@@ -117,28 +150,16 @@
           "repeatable": false,
           "negatable": true,
           "hidden": false
-        },
-        {
-          "name": "no-tag",
-          "type": "bool",
-          "help": "Disable ecosystem tagging for this invocation",
-          "short": null,
-          "default": false,
-          "env": null,
-          "choices": null,
-          "repeatable": false,
-          "negatable": true,
-          "hidden": false
         }
       ],
-      "args": [
-        {
-          "name": "bump",
-          "help": "Bump type: patch, minor, or major",
-          "required": false,
-          "variadic": false
-        }
-      ],
+      "args": [],
+      "passthrough": false
+    },
+    "release-init": {
+      "name": "release-init",
+      "help": "Scaffold a .rlsbl/releases/unreleased.toml file by auto-detecting project targets. The generated file contains a default bump type (patch), an include list of all detected targets, and per-target configuration sections for Flutter targets.",
+      "flags": [],
+      "args": [],
       "passthrough": false
     },
     "status": {
@@ -260,25 +281,13 @@
           "repeatable": false,
           "negatable": true,
           "hidden": false
-        },
-        {
-          "name": "dry-run",
-          "type": "bool",
-          "help": "Show planned changes without writing files or committing",
-          "short": null,
-          "default": false,
-          "env": null,
-          "choices": null,
-          "repeatable": false,
-          "negatable": true,
-          "hidden": false
         }
       ],
       "args": [],
       "passthrough": false
     },
-    "check": {
-      "name": "check",
+    "check-name": {
+      "name": "check-name",
       "help": "Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.",
       "flags": [
         {
@@ -312,20 +321,7 @@
     "edit-release": {
       "name": "edit-release",
       "help": "Sync the GitHub Release notes for a given version with the corresponding CHANGELOG.md entry. Defaults to the current version if none is specified. Use --dry-run to preview changes without updating GitHub.",
-      "flags": [
-        {
-          "name": "dry-run",
-          "type": "bool",
-          "help": "Preview without making changes",
-          "short": null,
-          "default": false,
-          "env": null,
-          "choices": null,
-          "repeatable": false,
-          "negatable": true,
-          "hidden": false
-        }
-      ],
+      "flags": [],
       "args": [
         {
           "name": "version",
@@ -350,18 +346,6 @@
           "choices": null,
           "repeatable": false,
           "negatable": null,
-          "hidden": false
-        },
-        {
-          "name": "yes",
-          "type": "bool",
-          "help": "Non-interactive mode (skip confirmations)",
-          "short": null,
-          "default": false,
-          "env": null,
-          "choices": null,
-          "repeatable": false,
-          "negatable": true,
           "hidden": false
         }
       ],
@@ -400,18 +384,6 @@
           "name": "hard",
           "type": "bool",
           "help": "Delete the release instead of marking as pre-release",
-          "short": null,
-          "default": false,
-          "env": null,
-          "choices": null,
-          "repeatable": false,
-          "negatable": true,
-          "hidden": false
-        },
-        {
-          "name": "dry-run",
-          "type": "bool",
-          "help": "Preview without making changes",
           "short": null,
           "default": false,
           "env": null,
@@ -580,18 +552,6 @@
       "help": "Run pending configuration migrations to update .rlsbl config files to the latest schema. Use --dry-run to preview changes without applying, or --status to see which migrations are pending.",
       "flags": [
         {
-          "name": "dry-run",
-          "type": "bool",
-          "help": "Preview migrations without applying",
-          "short": null,
-          "default": false,
-          "env": null,
-          "choices": null,
-          "repeatable": false,
-          "negatable": true,
-          "hidden": false
-        },
-        {
           "name": "status",
           "type": "bool",
           "help": "Show migration status",
@@ -601,38 +561,6 @@
           "choices": null,
           "repeatable": false,
           "negatable": true,
-          "hidden": false
-        }
-      ],
-      "args": [],
-      "passthrough": false
-    },
-    "doctor": {
-      "name": "doctor",
-      "help": "Run diagnostic checks on the project release state, including version consistency, tag alignment, changelog coverage, and config validity. Use --fix to auto-repair issues where possible.",
-      "flags": [
-        {
-          "name": "fix",
-          "type": "bool",
-          "help": "Auto-fix issues where possible",
-          "short": null,
-          "default": false,
-          "env": null,
-          "choices": null,
-          "repeatable": false,
-          "negatable": true,
-          "hidden": false
-        },
-        {
-          "name": "check",
-          "type": "str",
-          "help": "Run a specific check by name",
-          "short": null,
-          "default": "",
-          "env": null,
-          "choices": null,
-          "repeatable": false,
-          "negatable": null,
           "hidden": false
         }
       ],
@@ -653,18 +581,6 @@
           "choices": null,
           "repeatable": false,
           "negatable": null,
-          "hidden": false
-        },
-        {
-          "name": "dry-run",
-          "type": "bool",
-          "help": "Show what would be deployed",
-          "short": null,
-          "default": false,
-          "env": null,
-          "choices": null,
-          "repeatable": false,
-          "negatable": true,
           "hidden": false
         },
         {
@@ -714,7 +630,7 @@
   "groups": {
     "changelog": {
       "name": "changelog",
-      "help": "Structured changelog management using JSONL entries. Add, validate, and generate CHANGELOG.md from per-commit changelog entries stored in unreleased.jsonl for precise, auditable release notes.",
+      "help": "Structured changelog management using JSONL entries. Add and generate CHANGELOG.md from per-commit changelog entries stored in unreleased.jsonl for precise, auditable release notes.",
       "commands": {
         "add": {
           "name": "add",
@@ -784,21 +700,82 @@
           "args": [],
           "passthrough": false
         },
-        "validate": {
-          "name": "validate",
-          "help": "Parse and validate all entries in the project's unreleased.jsonl file. Checks each entry for schema conformance, verifies that required fields like description and type are present and well-formed, ensures entry types are one of the allowed values (feature, fix, breaking), and validates referential integrity of any attached commit hashes against the git history.",
-          "flags": [],
-          "args": [],
-          "passthrough": false
-        },
         "generate": {
           "name": "generate",
           "help": "Compile all validated JSONL changelog entries into a formatted CHANGELOG.md file. Groups entries by type (features, fixes, breaking changes) under the appropriate version heading, preserving existing changelog content for previous releases. Use --dry-run to preview the generated Markdown output without writing to disk, which is useful for reviewing before committing.",
           "flags": [
             {
-              "name": "dry-run",
+              "name": "no-commit",
               "type": "bool",
-              "help": "Preview without writing files",
+              "help": "Skip auto-commit of generated files",
+              "short": null,
+              "default": false,
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": true,
+              "hidden": false
+            }
+          ],
+          "args": [],
+          "passthrough": false
+        },
+        "amend": {
+          "name": "amend",
+          "help": "Append a changelog entry to a released version's JSONL file. Temporarily unlocks the read-only file, appends the entry, re-locks it, regenerates CHANGELOG.md, and syncs GitHub Release notes. Use --no-resolve to skip hash validation for old or amended commits.",
+          "flags": [
+            {
+              "name": "version",
+              "type": "str",
+              "help": "Released version to amend (e.g., 0.39.0)",
+              "short": null,
+              "default": null,
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": null,
+              "hidden": false
+            },
+            {
+              "name": "commits",
+              "type": "str",
+              "help": "Comma-separated commit hashes",
+              "short": null,
+              "default": null,
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": null,
+              "hidden": false
+            },
+            {
+              "name": "description",
+              "type": "str",
+              "help": "Entry description",
+              "short": null,
+              "default": "",
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": null,
+              "hidden": false
+            },
+            {
+              "name": "type",
+              "type": "str",
+              "help": "Entry type (feature, fix, breaking)",
+              "short": null,
+              "default": "",
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": null,
+              "hidden": false
+            },
+            {
+              "name": "no-user-facing",
+              "type": "bool",
+              "help": "Mark as non-user-facing",
               "short": null,
               "default": false,
               "env": null,
@@ -808,9 +785,9 @@
               "hidden": false
             },
             {
-              "name": "no-commit",
+              "name": "no-resolve",
               "type": "bool",
-              "help": "Skip auto-commit of generated files",
+              "help": "Skip hash validation",
               "short": null,
               "default": false,
               "env": null,
@@ -1068,10 +1045,155 @@
           "args": [],
           "passthrough": false
         },
-        "lint": {
-          "name": "lint",
-          "help": "Detect unregistered projects and stale workspace entries in your monorepo. Scans first-level directories for recognized project manifests across all 14 supported targets (npm, PyPI, Go, Cargo, etc.) and compares against workspace.toml. Reports unregistered projects on disk and registered entries pointing to missing directories. Exits non-zero if issues are found, suitable for CI gating.",
-          "flags": [],
+        "snapshot": {
+          "name": "snapshot",
+          "help": "Generate a committed JSON artifact at .rlsbl-monorepo/snapshot.json summarizing all packages, versions, dependencies, and graph structure. Use --check to verify the snapshot is up-to-date without regenerating it (exits 1 if stale).",
+          "flags": [
+            {
+              "name": "check",
+              "type": "bool",
+              "help": "Verify snapshot.json is up-to-date (exit 1 if stale)",
+              "short": null,
+              "default": false,
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": true,
+              "hidden": false
+            }
+          ],
+          "args": [],
+          "passthrough": false
+        },
+        "graph": {
+          "name": "graph",
+          "help": "Export the monorepo dependency graph in JSON, DOT (Graphviz), or indented text tree format. Supports filtering by a root package (transitive deps) or reverse package (transitive rdeps), with optional depth limiting. Use --output to write to a file instead of stdout.",
+          "flags": [
+            {
+              "name": "format",
+              "type": "str",
+              "help": "Output format: json, dot, or text (default: json)",
+              "short": null,
+              "default": "json",
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": null,
+              "hidden": false
+            },
+            {
+              "name": "output",
+              "type": "str",
+              "help": "Write output to file instead of stdout",
+              "short": null,
+              "default": "",
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": null,
+              "hidden": false
+            },
+            {
+              "name": "root",
+              "type": "str",
+              "help": "Show only transitive deps from this package",
+              "short": null,
+              "default": "",
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": null,
+              "hidden": false
+            },
+            {
+              "name": "reverse",
+              "type": "str",
+              "help": "Show only transitive rdeps of this package",
+              "short": null,
+              "default": "",
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": null,
+              "hidden": false
+            },
+            {
+              "name": "depth",
+              "type": "int",
+              "help": "Limit traversal depth",
+              "short": null,
+              "default": null,
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": null,
+              "hidden": false
+            }
+          ],
+          "args": [],
+          "passthrough": false
+        },
+        "impact": {
+          "name": "impact",
+          "help": "Analyze the impact of changes to a package, file, or git diff range on the monorepo dependency graph. Shows direct and transitive dependents, test scope, and release candidates. Supports package names, file paths, and --since for git-based change detection.",
+          "flags": [
+            {
+              "name": "format",
+              "type": "str",
+              "help": "Output format: json or text (default: text)",
+              "short": null,
+              "default": "text",
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": null,
+              "hidden": false
+            },
+            {
+              "name": "depth",
+              "type": "int",
+              "help": "Limit traversal depth",
+              "short": null,
+              "default": null,
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": null,
+              "hidden": false
+            },
+            {
+              "name": "since",
+              "type": "str",
+              "help": "Git ref to diff against HEAD (e.g. HEAD~3, v1.0.0)",
+              "short": null,
+              "default": "",
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": null,
+              "hidden": false
+            }
+          ],
+          "args": [],
+          "passthrough": false
+        },
+        "release": {
+          "name": "release",
+          "help": "Execute a batch release of multiple monorepo packages in topological order. Reads package configurations from .rlsbl-monorepo/releases/unreleased.toml. Each package is released sequentially using the single-package release flow, with leaves (no dependencies) released first. Supports --dry-run, --yes, --allow-dirty flags.",
+          "flags": [
+            {
+              "name": "allow-dirty",
+              "type": "bool",
+              "help": "Allow releasing with a dirty working tree",
+              "short": null,
+              "default": false,
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": true,
+              "hidden": false
+            }
+          ],
           "args": [],
           "passthrough": false
         }
@@ -1168,5 +1290,281 @@
       "deprecated": {}
     }
   },
-  "deprecated": {}
+  "deprecated": {},
+  "checks": {
+    "lock": {
+      "tags": [
+        "project"
+      ],
+      "severity": "warn",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "version-consistency": {
+      "tags": [
+        "project"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "name-consistency": {
+      "tags": [
+        "project"
+      ],
+      "severity": "warn",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "license-consistency": {
+      "tags": [
+        "project"
+      ],
+      "severity": "warn",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "description-consistency": {
+      "tags": [
+        "project"
+      ],
+      "severity": "warn",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "local-tag": {
+      "tags": [
+        "release"
+      ],
+      "severity": "warn",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [
+        "version-consistency"
+      ]
+    },
+    "remote-tag": {
+      "tags": [
+        "release"
+      ],
+      "severity": "warn",
+      "fast": true,
+      "pure": false,
+      "needs_network": true,
+      "depends_on": [
+        "local-tag"
+      ]
+    },
+    "github-release": {
+      "tags": [
+        "release"
+      ],
+      "severity": "warn",
+      "fast": false,
+      "pure": false,
+      "needs_network": true,
+      "depends_on": [
+        "remote-tag"
+      ]
+    },
+    "branch-sync": {
+      "tags": [
+        "release"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": false,
+      "needs_network": true,
+      "depends_on": []
+    },
+    "changelog-entry": {
+      "tags": [
+        "changelog"
+      ],
+      "severity": "warn",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [
+        "version-consistency"
+      ]
+    },
+    "library-lint": {
+      "tags": [
+        "quality"
+      ],
+      "severity": "error",
+      "fast": false,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "changelog-hashes": {
+      "tags": [
+        "changelog"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": false,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "changelog-range": {
+      "tags": [
+        "changelog"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": false,
+      "needs_network": false,
+      "depends_on": [
+        "changelog-hashes"
+      ]
+    },
+    "changelog-coverage": {
+      "tags": [
+        "changelog"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": false,
+      "needs_network": false,
+      "depends_on": [
+        "changelog-hashes"
+      ]
+    },
+    "changelog-orphans": {
+      "tags": [
+        "changelog"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": false,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "changelog-schema": {
+      "tags": [
+        "changelog"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "changelog-batch-commits": {
+      "tags": [
+        "changelog"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "changelog-batch-entries": {
+      "tags": [
+        "changelog"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "workspace-ci-router": {
+      "tags": [
+        "workspace"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "workspace-ci-synced": {
+      "tags": [
+        "workspace"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "workspace-targets": {
+      "tags": [
+        "workspace"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "workspace-unregistered": {
+      "tags": [
+        "workspace"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "workspace-stale-entries": {
+      "tags": [
+        "workspace"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "layers-violations": {
+      "tags": [],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "deps-unused": {
+      "tags": [],
+      "severity": "error",
+      "fast": false,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "deps-undeclared": {
+      "tags": [],
+      "severity": "error",
+      "fast": false,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "deps-stale": {
+      "tags": [],
+      "severity": "error",
+      "fast": false,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    }
+  }
 }
