@@ -92,6 +92,13 @@ class ReleaseTarget(Protocol):
         """Post-push publish/deploy step. No-op by default."""
         pass
 
+    def build_assets(self, dir_path: str, version: str, dist_dir: str) -> list[str]:
+        """Build distributable artifacts for GH Release upload.
+
+        Returns list of artifact file paths in dist_dir.
+        """
+        ...
+
     # --- Optional: Developer-mode local install ---
 
     def dev_install_command(self, project_dir: str) -> dict[str, dict | None]:

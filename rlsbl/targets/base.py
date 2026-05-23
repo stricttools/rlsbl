@@ -75,6 +75,11 @@ class BaseTarget:
     def publish(self, dir_path, version):
         pass
 
+    def build_assets(self, dir_path, version, dist_dir):
+        raise NotImplementedError(
+            f"Asset builds not supported for target '{self.name}'"
+        )
+
     def dev_install_command(self, project_dir):
         """Specs for local install via `rlsbl dev install`, keyed by mode.
 
