@@ -20,6 +20,7 @@ from ..deploy import deploy_target
 from ..lock import acquire_lock, release_lock
 from ..targets import TARGETS, detect_targets, _parse_target_entry
 from ..tagging import ensure_github_topic, ensure_npm_keyword, ensure_pypi_keyword
+from ..strictcli_detect import detect_strictcli
 from ..workspace import find_workspace_root, load_workspace, resolve_project
 from ..utils import (
     bump_version,
@@ -237,6 +238,49 @@ def _run_selfdoc_check(flags, project_dir=None, docs_excluded=False):
     print("Running selfdoc check...")
     subprocess.run(["selfdoc", "check"], cwd=project_dir, check=True)
     return True
+
+
+_SCHEMA_DUMP_TIMEOUT = 30
+
+
+def _run_strictcli_schema_dump(flags, log, version_dir=".", project_dir=None):
+    """Run --dump-schema for strictcli projects to regenerate .strictcli/schema.json.
+
+    Detects strictcli usage via pyproject.toml, runs the entry point with
+    --dump-schema, and logs the result. The generated file is picked up by
+    the hook-generated file mechanism (pre/post hook dirty snapshots).
+
+    Non-fatal: a failing dump command prints a warning but does not abort.
+    """
+    if flags.get("dry-run"):
+        check_dir = project_dir if project_dir else version_dir
+        result = detect_strictcli(check_dir)
+        if result:
+            entry_point, _ = result
+            log(f"Would run: uv run {entry_point} --dump-schema")
+        return
+
+    check_dir = project_dir if project_dir else version_dir
+    result = detect_strictcli(check_dir)
+    if not result:
+        return
+
+    entry_point, lang = result
+    log(f"Dumping strictcli schema ({entry_point})...")
+
+    try:
+        subprocess.run(
+            ["uv", "run", entry_point, "--dump-schema"],
+            cwd=project_dir,
+            timeout=_SCHEMA_DUMP_TIMEOUT,
+        )
+    except subprocess.TimeoutExpired:
+        print(
+            f"Warning: strictcli schema dump timed out after {_SCHEMA_DUMP_TIMEOUT}s.",
+            file=sys.stderr,
+        )
+    except (subprocess.CalledProcessError, OSError) as e:
+        print(f"Warning: strictcli schema dump failed: {e}", file=sys.stderr)
 
 
 # Lockfile -> (tool name, sync command args)
@@ -614,6 +658,9 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None):
         except subprocess.TimeoutExpired:
             print(f"Error: pre-checks hook timed out after {hook_timeout}s.", file=sys.stderr)
             sys.exit(1)
+
+    # Dump strictcli schema if the project uses strictcli
+    _run_strictcli_schema_dump(flags, log, version_dir=version_dir, project_dir=abs_project_dir)
 
     # Built-in selfdoc check (before tests so doc issues surface early)
     _run_selfdoc_check(flags, project_dir=abs_project_dir, docs_excluded=docs_excluded)

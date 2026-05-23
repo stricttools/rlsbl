@@ -1,0 +1,167 @@
+"""Tests for strictcli schema auto-dump during release."""
+
+import inspect
+import json
+import os
+import subprocess
+from unittest.mock import patch, MagicMock
+
+import pytest
+
+from rlsbl.commands.release import run_cmd, _run_strictcli_schema_dump
+from rlsbl.release_file import ReleaseConfig
+
+
+def _rc(bump="patch", include=None, exclude=None):
+    """Shorthand for creating a ReleaseConfig with sensible defaults."""
+    return ReleaseConfig(
+        bump=bump,
+        include=include or ["pypi"],
+        exclude=exclude or [],
+    )
+
+
+class TestStrictcliSchemaDumpFunction:
+    """Tests for the _run_strictcli_schema_dump helper function."""
+
+    def test_skipped_when_not_strictcli_project(self, tmp_path, capsys):
+        """When the project does not use strictcli, nothing happens."""
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "myapp"\nversion = "1.0.0"\n'
+            'dependencies = ["click"]\n'
+        )
+        messages = []
+        _run_strictcli_schema_dump(
+            {}, lambda msg: messages.append(msg),
+            version_dir=str(tmp_path), project_dir=str(tmp_path),
+        )
+        assert not messages
+        captured = capsys.readouterr()
+        assert captured.err == ""
+
+    def test_dry_run_prints_what_would_happen(self, tmp_path, capsys):
+        """In dry-run mode, prints what would happen without running the command."""
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "myapp"\nversion = "1.0.0"\n'
+            'dependencies = ["strictcli"]\n'
+            '\n[project.scripts]\nmyapp = "myapp:main"\n'
+        )
+        messages = []
+        _run_strictcli_schema_dump(
+            {"dry-run": True}, lambda msg: messages.append(msg),
+            version_dir=str(tmp_path), project_dir=str(tmp_path),
+        )
+        assert any("Would run: uv run myapp --dump-schema" in m for m in messages)
+
+    def test_dry_run_silent_when_not_strictcli(self, tmp_path):
+        """In dry-run mode with no strictcli, nothing is printed."""
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "myapp"\nversion = "1.0.0"\n'
+            'dependencies = ["click"]\n'
+        )
+        messages = []
+        _run_strictcli_schema_dump(
+            {"dry-run": True}, lambda msg: messages.append(msg),
+            version_dir=str(tmp_path), project_dir=str(tmp_path),
+        )
+        assert not messages
+
+    def test_command_failure_prints_warning(self, tmp_path, capsys):
+        """When the dump command fails, a warning is printed but no exception raised."""
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "myapp"\nversion = "1.0.0"\n'
+            'dependencies = ["strictcli"]\n'
+            '\n[project.scripts]\nmyapp = "myapp:main"\n'
+        )
+        messages = []
+        with patch("rlsbl.commands.release.subprocess") as mock_sp:
+            mock_sp.run.side_effect = subprocess.CalledProcessError(1, "uv")
+            mock_sp.CalledProcessError = subprocess.CalledProcessError
+            mock_sp.TimeoutExpired = subprocess.TimeoutExpired
+
+            _run_strictcli_schema_dump(
+                {}, lambda msg: messages.append(msg),
+                version_dir=str(tmp_path), project_dir=str(tmp_path),
+            )
+
+        captured = capsys.readouterr()
+        assert "Warning: strictcli schema dump failed" in captured.err
+
+    def test_timeout_prints_warning(self, tmp_path, capsys):
+        """When the dump command times out, a warning is printed."""
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "myapp"\nversion = "1.0.0"\n'
+            'dependencies = ["strictcli"]\n'
+            '\n[project.scripts]\nmyapp = "myapp:main"\n'
+        )
+        messages = []
+        with patch("rlsbl.commands.release.subprocess") as mock_sp:
+            mock_sp.run.side_effect = subprocess.TimeoutExpired("uv", 30)
+            mock_sp.CalledProcessError = subprocess.CalledProcessError
+            mock_sp.TimeoutExpired = subprocess.TimeoutExpired
+
+            _run_strictcli_schema_dump(
+                {}, lambda msg: messages.append(msg),
+                version_dir=str(tmp_path), project_dir=str(tmp_path),
+            )
+
+        captured = capsys.readouterr()
+        assert "timed out" in captured.err
+
+    def test_runs_uv_with_correct_args(self, tmp_path):
+        """When strictcli is detected, runs uv run <entry_point> --dump-schema."""
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "myapp"\nversion = "1.0.0"\n'
+            'dependencies = ["strictcli"]\n'
+            '\n[project.scripts]\nmyapp = "myapp:main"\n'
+        )
+        messages = []
+        with patch("rlsbl.commands.release.subprocess") as mock_sp:
+            mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+            mock_sp.CalledProcessError = subprocess.CalledProcessError
+            mock_sp.TimeoutExpired = subprocess.TimeoutExpired
+
+            _run_strictcli_schema_dump(
+                {}, lambda msg: messages.append(msg),
+                version_dir=str(tmp_path), project_dir=str(tmp_path),
+            )
+
+        mock_sp.run.assert_called_once()
+        call_args = mock_sp.run.call_args
+        assert call_args[0][0] == ["uv", "run", "myapp", "--dump-schema"]
+        assert call_args[1]["cwd"] == str(tmp_path)
+        assert call_args[1]["timeout"] == 30
+
+
+class TestStrictcliSchemaOrdering:
+    """Tests that the schema dump runs in the correct position in the release pipeline."""
+
+    def test_schema_dump_after_pre_checks_hook(self):
+        """Schema dump must run after the pre-checks hook."""
+        source = inspect.getsource(run_cmd)
+        pre_checks_pos = source.index("pre_checks_script")
+        schema_pos = source.index("_run_strictcli_schema_dump(")
+
+        assert pre_checks_pos < schema_pos, (
+            "pre-checks hook must appear before _run_strictcli_schema_dump"
+        )
+
+    def test_schema_dump_before_selfdoc_check(self):
+        """Schema dump must run before the selfdoc check."""
+        source = inspect.getsource(run_cmd)
+        schema_pos = source.index("_run_strictcli_schema_dump(")
+        selfdoc_pos = source.index("_run_selfdoc_check(")
+
+        assert schema_pos < selfdoc_pos, (
+            "_run_strictcli_schema_dump must appear before _run_selfdoc_check"
+        )
+
+    def test_schema_dump_before_tests(self):
+        """Schema dump must run before tests."""
+        source = inspect.getsource(run_cmd)
+        schema_pos = source.index("_run_strictcli_schema_dump(")
+        tests_pos = source.index("_run_builtin_tests(")
+
+        assert schema_pos < tests_pos, (
+            "_run_strictcli_schema_dump must appear before _run_builtin_tests"
+        )
