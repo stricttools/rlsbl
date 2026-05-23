@@ -1,7 +1,9 @@
 """Cargo (Rust) release target that uses tomlkit for round-trip Cargo.toml editing with hybrid publish support via CARGO_REGISTRY_TOKEN."""
 
+import glob
 import os
 import re
+import shutil
 import subprocess
 import sys
 
@@ -177,6 +179,19 @@ class CargoTarget(BaseTarget):
                 {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
             )
         return mappings
+
+    def build_assets(self, dir_path, version, dist_dir):
+        """Build Rust binary in release mode and copy to dist_dir."""
+        os.makedirs(dist_dir, exist_ok=True)
+        run("cargo", ["build", "--release"], cwd=dir_path)
+
+        # Determine the binary name from Cargo.toml
+        name = self.read_name(dir_path) or ""
+        target_release = os.path.join(dir_path, "target", "release", name)
+        if os.path.isfile(target_release):
+            shutil.copy2(target_release, dist_dir)
+
+        return sorted(glob.glob(os.path.join(dist_dir, "*")))
 
     def publish(self, dir_path, version):
         """Publish to crates.io based on per-target config and token availability."""
