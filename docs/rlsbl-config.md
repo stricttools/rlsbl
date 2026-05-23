@@ -1,6 +1,6 @@
 ---
 title: rlsbl.config
-description: "Project configuration loading with layered precedence and asset size limits — CLI flags override project config which overrides user defaults."
+description: "Project configuration loading with layered precedence (CLI > project > user), plus publish, deploy, changelog validation, and asset size limit helpers."
 generated: true
 nav_group: "API Reference"
 nav_order: 40

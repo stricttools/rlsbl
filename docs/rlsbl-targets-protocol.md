@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.protocol
-description: "Release target protocol defining the formal interface that all target implementations must satisfy for detection, versioning, and scaffolding."
+description: "Release target protocol defining the formal interface for detection, versioning, scaffolding, build/publish steps, asset builds, and dev-install support."
 generated: true
 nav_group: "API Reference"
 nav_order: 78

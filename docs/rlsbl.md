@@ -1,6 +1,6 @@
 ---
 title: rlsbl
-description: "Top-level rlsbl package: CLI entry point via strictcli, version detection, target auto-detection across 17 registries, and release orchestration API."
+description: "Top-level rlsbl package: strictcli-based CLI with 18 commands and 3 groups, version detection, and target auto-detection across 17 registries."
 generated: true
 nav_group: "API Reference"
 nav_order: 1

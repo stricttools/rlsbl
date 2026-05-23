@@ -1,5 +1,5 @@
 ---
-description: "All 12 rlsbl release targets — npm, PyPI, Go, Cargo, Deno, Hex, Maven, Swift, Docker, docs, and more — with the ReleaseTarget protocol."
+description: "All 17 rlsbl release targets — npm, PyPI, Go, Cargo, Deno, Hex, Maven, Swift, Zig, Docker, Dart, Flutter, docs, and more — with the ReleaseTarget protocol."
 ---
 
 # Release targets

@@ -1,5 +1,5 @@
 ---
-description: "Configuration reference for rlsbl projects — config.json targets, tagging, and precedence; workspace.toml for monorepos; and selfdoc.json for docs builds."
+description: "Configuration reference for rlsbl — config.json with 17 targets, publish, deploy, and changelog validation; workspace.toml; and selfdoc.json."
 ---
 
 # Configuration reference

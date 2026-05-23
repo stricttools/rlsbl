@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.pypi
-description: "PyPI release target that manages version tracking in pyproject.toml and scaffolds CI workflows for OIDC-based publishing to the PyPI index."
+description: "PyPI release target managing version tracking in pyproject.toml, OIDC-based CI scaffolding, asset builds, dep rewriting, and dev-install."
 generated: true
 nav_group: "API Reference"
 nav_order: 79
