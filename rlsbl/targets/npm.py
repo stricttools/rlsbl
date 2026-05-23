@@ -1,5 +1,6 @@
 """npm release target that manages version tracking in package.json and scaffolds CI workflows for automated publishing to the npm registry."""
 
+import glob
 import json
 import os
 import re
@@ -186,6 +187,12 @@ class NpmTarget(BaseTarget):
             {"template": ci_template, "target": ".github/workflows/ci.yml"},
             {"template": publish_template, "target": ".github/workflows/publish.yml"},
         ]
+
+    def build_assets(self, dir_path, version, dist_dir):
+        """Pack a tarball for GH Release upload."""
+        os.makedirs(dist_dir, exist_ok=True)
+        run("npm", ["pack", "--pack-destination", dist_dir], cwd=dir_path)
+        return sorted(glob.glob(os.path.join(dist_dir, "*.tgz")))
 
     def publish(self, dir_path, version):
         """Publish to npm based on per-target config and NPM_TOKEN availability."""
