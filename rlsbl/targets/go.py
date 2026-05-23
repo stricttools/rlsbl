@@ -116,6 +116,12 @@ class GoTarget(BaseTarget):
             first_line = f.readline()
         return bool(re.match(r"^package\s+main\b", first_line))
 
+    def build_assets(self, dir_path, version, dist_dir):
+        """Build Go binary for the host platform into dist_dir."""
+        os.makedirs(dist_dir, exist_ok=True)
+        run("go", ["build", "-o", dist_dir + "/", "./..."], cwd=dir_path)
+        return sorted(glob.glob(os.path.join(dist_dir, "*")))
+
     def publish(self, dir_path, version):
         """Notify the Go module proxy so the new version is immediately available."""
         module_path = self._read_module_path(dir_path)
