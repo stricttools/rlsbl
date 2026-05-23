@@ -5,6 +5,8 @@ Verifies:
 - Release aborts when ``private: true`` and a target has ``publish.<target>.local: true``.
 - Release proceeds when ``private: true`` with no local publish config.
 - Release proceeds when ``private: false`` (normal case).
+- When ``private: true``, ``target.publish()`` is not called.
+- When ``private: true`` with ``assets: true``, asset upload still runs.
 """
 
 import json
@@ -138,3 +140,133 @@ class TestPrivateConfigRequired:
         with patch("sys.stdout", new_callable=StringIO):
             # Should not raise SystemExit
             run_cmd(_rc(), {"dry-run": True, "quiet": False})
+
+
+class TestPrivatePublishGuardrail:
+    """Tests that private repos skip target.publish() but still allow asset upload."""
+
+    def setup_method(self):
+        self.orig_dir = os.getcwd()
+        self.tmp_dir = tempfile.mkdtemp()
+        os.chdir(self.tmp_dir)
+        # Minimal npm project
+        with open("package.json", "w") as f:
+            json.dump({"name": "test-pkg", "version": "1.0.0"}, f, indent=2)
+            f.write("\n")
+        with open("CHANGELOG.md", "w") as f:
+            f.write("# Changelog\n\n## 1.0.1\n\nPatch release.\n")
+        os.makedirs(os.path.join(".rlsbl", "changes"), exist_ok=True)
+        with open(os.path.join(".rlsbl", "changes", "unreleased.jsonl"), "w") as f:
+            f.write('{"commits":["abc1234"],"user_facing":true,"description":"Bugfix","type":"fix"}\n')
+
+    def teardown_method(self):
+        os.chdir(self.orig_dir)
+        shutil.rmtree(self.tmp_dir)
+
+    @patch("rlsbl.commands.release.release_lock")
+    @patch("rlsbl.commands.release.acquire_lock")
+    @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.run")
+    @patch("rlsbl.commands.release.commit_files", return_value=True)
+    @patch("rlsbl.commands.release.get_current_branch", return_value="main")
+    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
+    @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
+    @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
+    @patch("rlsbl.commands.release.should_tag", return_value=False)
+    @patch("rlsbl.commands.release.read_deploy_config", return_value=([], []))
+    @patch("rlsbl.commands.release.generate_changelog")
+    @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
+    @patch("rlsbl.commands.release.generate_version_file")
+    @patch("rlsbl.commands.release.finalize_version")
+    @patch("rlsbl.commands.release.extract_changelog_entry", return_value="- Bugfix")
+    @patch("rlsbl.commands.release.get_changes_dir", return_value=".rlsbl/changes")
+    def test_private_true_skips_publish(
+        self, _changes_dir, _extract, _finalize, _gen_ver_file,
+        _validate, _gen_cl, _deploy, _tag, _gh_inst, _gh_auth,
+        _clean, _branch, _commit_files, mock_run, _push, _lock, _unlock,
+    ):
+        """When private=true, target.publish() is not called."""
+        _write_config(self.tmp_dir, {"private": True})
+
+        from rlsbl.commands.release import run_cmd
+        from rlsbl.targets.npm import NpmTarget
+
+        mock_run.side_effect = [
+            # run_cmd phase:
+            "",                 # git fetch origin --quiet
+            "0",                # git rev-list --count HEAD..origin/main
+            "v1.0.0",           # git tag -l v1.0.0 (exists -> bump)
+            "",                 # git tag -l v1.0.1 (doesn't exist)
+            "",                 # git status --porcelain (pre-hook snapshot)
+            "",                 # git status --porcelain (post-hook snapshot)
+            # _run_release_mutating phase:
+            "",                 # git status --porcelain (baseline snapshot)
+            "",                 # git status --porcelain (re-check guard)
+            "abc123",           # git rev-parse HEAD (pre_release_sha)
+            "",                 # git tag v1.0.1
+            "",                 # git push origin v1.0.1
+            "def456",           # git rev-parse HEAD (pushed_sha)
+            "",                 # gh release create ...
+        ]
+
+        with patch("sys.stdout", new_callable=StringIO):
+            with patch.object(NpmTarget, "publish") as mock_publish:
+                run_cmd(_rc(), {"yes": True, "quiet": False})
+                # publish() must NOT be called for private repos
+                mock_publish.assert_not_called()
+
+    @patch("rlsbl.commands.release.release_lock")
+    @patch("rlsbl.commands.release.acquire_lock")
+    @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.run")
+    @patch("rlsbl.commands.release.commit_files", return_value=True)
+    @patch("rlsbl.commands.release.get_current_branch", return_value="main")
+    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
+    @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
+    @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
+    @patch("rlsbl.commands.release.should_tag", return_value=False)
+    @patch("rlsbl.commands.release.read_deploy_config", return_value=([], []))
+    @patch("rlsbl.commands.release.generate_changelog")
+    @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
+    @patch("rlsbl.commands.release.generate_version_file")
+    @patch("rlsbl.commands.release.finalize_version")
+    @patch("rlsbl.commands.release.extract_changelog_entry", return_value="- Bugfix")
+    @patch("rlsbl.commands.release.get_changes_dir", return_value=".rlsbl/changes")
+    @patch("rlsbl.commands.release._upload_release_assets")
+    def test_private_true_with_assets_still_uploads(
+        self, mock_upload_assets,
+        _changes_dir, _extract, _finalize, _gen_ver_file,
+        _validate, _gen_cl, _deploy, _tag, _gh_inst, _gh_auth,
+        _clean, _branch, _commit_files, mock_run, _push, _lock, _unlock,
+    ):
+        """When private=true with assets: true, asset upload still runs."""
+        _write_config(self.tmp_dir, {
+            "private": True,
+            "publish": {"npm": {"assets": True, "max_asset_size_mb": 50}},
+        })
+
+        from rlsbl.commands.release import run_cmd
+
+        mock_run.side_effect = [
+            # run_cmd phase:
+            "",                 # git fetch origin --quiet
+            "0",                # git rev-list --count HEAD..origin/main
+            "v1.0.0",           # git tag -l v1.0.0 (exists -> bump)
+            "",                 # git tag -l v1.0.1 (doesn't exist)
+            "",                 # git status --porcelain (pre-hook snapshot)
+            "",                 # git status --porcelain (post-hook snapshot)
+            # _run_release_mutating phase:
+            "",                 # git status --porcelain (baseline snapshot)
+            "",                 # git status --porcelain (re-check guard)
+            "abc123",           # git rev-parse HEAD (pre_release_sha)
+            "",                 # git tag v1.0.1
+            "",                 # git push origin v1.0.1
+            "def456",           # git rev-parse HEAD (pushed_sha)
+            "",                 # gh release create ...
+        ]
+
+        with patch("sys.stdout", new_callable=StringIO):
+            run_cmd(_rc(), {"yes": True, "quiet": False})
+
+        # _upload_release_assets must be called even for private repos
+        mock_upload_assets.assert_called_once()
