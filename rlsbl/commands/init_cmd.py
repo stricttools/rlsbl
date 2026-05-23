@@ -879,25 +879,12 @@ def _append_deploy_workflow_if_configured(mappings):
     return mappings
 
 
-def _replace_post_release_hook_for_private(mappings):
-    """Replace the generic post-release hook mapping with the private-specific one."""
-    result = []
-    for m in mappings:
-        if m["target"] == ".rlsbl/hooks/post-release.sh":
-            result.append({
-                "template": "hooks/post-release-private.sh.tpl",
-                "target": ".rlsbl/hooks/post-release.sh",
-            })
-        else:
-            result.append(m)
-    return result
-
 
 def _print_private_summary():
     """Print helpful output for private repository scaffold."""
     print("\nPrivate repository detected. Scaffold configured for private distribution.")
     print("- publish.yml skipped (no public registry)")
-    print("- Post-release hook will build and upload artifacts to GitHub Releases")
+    print("- Asset upload is a built-in release step (configure via publish.<target>.assets)")
     print("\nConsumers can install via:")
     print('  Python: uv pip install "pkg @ git+ssh://git@github.com/owner/repo@vX.Y.Z"')
     print("  npm:    npm install git+ssh://git@github.com/owner/repo#vX.Y.Z")
@@ -987,8 +974,6 @@ def run_cmd(registry, args, flags):
         shared_plans = []
         if not flags.get("skip-shared"):
             shared_mappings = reg.shared_template_mappings()
-            if private:
-                shared_mappings = _replace_post_release_hook_for_private(shared_mappings)
             shared_mappings = _append_deploy_workflow_if_configured(shared_mappings)
             shared_plans = plan_mappings(
                 reg.shared_template_dir(), shared_mappings, vars_dict, force, update=update,
@@ -1426,8 +1411,6 @@ def run_cmd_multi(registries_list, args, flags):
 
         # Plan shared templates (once)
         shared_mappings = reg.shared_template_mappings()
-        if private:
-            shared_mappings = _replace_post_release_hook_for_private(shared_mappings)
         shared_mappings = _append_deploy_workflow_if_configured(shared_mappings)
         shared_plans = plan_mappings(
             reg.shared_template_dir(), shared_mappings, vars_dict, force, update=update,
