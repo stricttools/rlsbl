@@ -1342,6 +1342,16 @@
       "needs_network": false,
       "depends_on": []
     },
+    "private-hook-stale": {
+      "tags": [
+        "project"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
     "local-tag": {
       "tags": [
         "release"
