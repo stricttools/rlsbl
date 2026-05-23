@@ -1,5 +1,6 @@
 """PyPI release target that manages version tracking in pyproject.toml and scaffolds CI workflows for OIDC-based publishing to the PyPI index."""
 
+import glob
 import os
 import re
 import shutil
@@ -280,6 +281,12 @@ class PypiTarget(BaseTarget):
             )
         finally:
             shutil.rmtree(tmp_dir, ignore_errors=True)
+
+    def build_assets(self, dir_path, version, dist_dir):
+        """Build sdist and wheel for GH Release upload."""
+        os.makedirs(dist_dir, exist_ok=True)
+        run("uv", ["build", "--out-dir", dist_dir], env=os.environ, cwd=dir_path)
+        return sorted(glob.glob(os.path.join(dist_dir, "*")))
 
     def publish(self, dir_path, version):
         """Publish to PyPI based on per-target config and token availability.
