@@ -431,22 +431,10 @@ def register_checks(app):
                 return CheckResult("warn", f"{total_warnings} warning(s)")
             return CheckResult("pass", "all library projects clean")
 
-        # Standalone project: lint current directory
-        results = lint_library(str(ctx.project_root))
-
-        total_errors = 0
-        total_warnings = 0
-        for r in results:
-            if r.severity == "error":
-                total_errors += 1
-            elif r.severity == "warning":
-                total_warnings += 1
-
-        if total_errors > 0:
-            return CheckResult("fail", f"{total_errors} error(s), {total_warnings} warning(s)")
-        if total_warnings > 0:
-            return CheckResult("warn", f"{total_warnings} warning(s)")
-        return CheckResult("pass", "project clean")
+        # Standalone projects are never libraries (only monorepo projects
+        # with library = true are).  Match the release flow which skips lint
+        # for non-library projects.
+        return CheckResult("skip", "not a library project")
 
     # ------------------------------------------------------------------
     # Tag: changelog (validation checks)

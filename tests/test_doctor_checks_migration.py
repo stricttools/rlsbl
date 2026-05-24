@@ -590,3 +590,18 @@ class TestPrivateHookStaleCheck:
         result = app._check_defs["private-hook-stale"].impl(ctx)
         assert result.status == "pass"
         assert "no post-release hook" in result.message
+
+
+# ---------------------------------------------------------------------------
+# Functional tests: library-lint check
+# ---------------------------------------------------------------------------
+
+class TestLibraryLintCheck:
+    """The library-lint check skips non-library projects."""
+
+    def test_standalone_project_skips(self, mock_git_repo):
+        """Standalone (non-monorepo) project -> skip."""
+        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        result = app._check_defs["library-lint"].impl(ctx)
+        assert result.status == "skip"
+        assert "not a library" in result.message
