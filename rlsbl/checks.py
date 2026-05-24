@@ -240,6 +240,33 @@ def register_checks(app):
             )
         return CheckResult("pass", "no legacy private hook code")
 
+    @app.check("config-schema")
+    def check_config_schema(ctx):
+        """Validate .rlsbl/config.json schema: private key and publish config."""
+        from .config import read_json_config, validate_publish_config
+
+        config_path = os.path.join(str(ctx.project_root), ".rlsbl", "config.json")
+        if not os.path.exists(config_path):
+            return CheckResult("skip", "no .rlsbl/config.json")
+
+        config = read_json_config(config_path)
+        errors = []
+
+        if "private" not in config:
+            errors.append('"private" key missing from .rlsbl/config.json')
+
+        publish = config.get("publish", {})
+        if isinstance(publish, dict):
+            for target_name in publish:
+                try:
+                    validate_publish_config(config, target_name)
+                except ValueError as e:
+                    errors.append(str(e))
+
+        if errors:
+            return CheckResult("fail", f"{len(errors)} config error(s)", details=errors)
+        return CheckResult("pass", "config schema valid")
+
     # ------------------------------------------------------------------
     # Tag: release
     # ------------------------------------------------------------------

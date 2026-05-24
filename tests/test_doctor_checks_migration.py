@@ -15,7 +15,7 @@ from rlsbl.check_context import ProjectCheckContext, WorkspaceCheckContext
 
 
 # ---------------------------------------------------------------------------
-# All 27 checks are declared in checks.toml and registered on the app
+# All 29 checks are declared in checks.toml and registered on the app
 # ---------------------------------------------------------------------------
 
 EXPECTED_CHECKS = [
@@ -25,6 +25,7 @@ EXPECTED_CHECKS = [
     "license-consistency",
     "description-consistency",
     "private-hook-stale",
+    "config-schema",
     "local-tag",
     "remote-tag",
     "github-release",
@@ -58,7 +59,7 @@ class TestCheckDeclarations:
     """Every check must be declared in checks.toml and registered on the app."""
 
     def test_all_28_checks_declared(self):
-        """checks.toml defines exactly the 28 expected checks."""
+        """checks.toml defines exactly the 29 expected checks."""
         assert sorted(app._check_defs.keys()) == sorted(EXPECTED_CHECKS)
 
     @pytest.mark.parametrize("name", EXPECTED_CHECKS)
@@ -74,7 +75,7 @@ class TestCheckDeclarations:
             assert name in result.stdout
 
     def test_check_list_json(self):
-        """``rlsbl check --list --json`` outputs valid JSON with all 28 checks."""
+        """``rlsbl check --list --json`` outputs valid JSON with all 29 checks."""
         result = app.test(["check", "--list", "--json"])
         assert result.exit_code == 0
         data = json.loads(result.stdout)
@@ -92,7 +93,7 @@ class TestCheckTags:
     @pytest.mark.parametrize("name", [
         "lock", "version-consistency", "name-consistency",
         "license-consistency", "description-consistency",
-        "private-hook-stale",
+        "private-hook-stale", "config-schema",
     ])
     def test_project_tag(self, name):
         assert "project" in app._check_defs[name].tags
