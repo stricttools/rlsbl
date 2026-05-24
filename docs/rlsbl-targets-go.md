@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.go
-description: "Go release target using a VERSION file as source of truth, with GoReleaser integration, npm wrapper packaging, asset builds, and dev-install support."
+description: "Go release target using a VERSION file as source of truth, with GoReleaser integration for binaries and module proxy notification for libs."
 generated: true
 nav_group: "API Reference"
 nav_order: 73
