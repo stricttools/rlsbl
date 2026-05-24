@@ -5,6 +5,8 @@
 
 set -euo pipefail
 
+uv run rlsbl --dump-schema
+
 echo "Running pre-release checks..."
 
 if [ -f pyproject.toml ]; then
