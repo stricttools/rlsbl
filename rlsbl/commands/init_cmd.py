@@ -842,17 +842,14 @@ def _resolve_private(flags):
     if "private" in config:
         return bool(config["private"])
 
-    # On --update, require explicit config — never auto-detect
+    # On --update, auto-detect and persist to config
     if flags.get("update"):
-        print(
-            'Error: "private" key missing from .rlsbl/config.json.',
-            file=sys.stderr,
-        )
-        print(
-            'Add "private": true for private repos or "private": false for public repos.',
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        detected = is_private_repo()
+        value = detected if detected is not None else False
+        write_project_config("private", value)
+        label = "private repo" if value else "public repo"
+        print(f"Auto-detected private: {str(value).lower()} ({label}). Written to config.json.")
+        return value
 
     # Auto-detect via GitHub API (new scaffold only)
     detected = is_private_repo()
