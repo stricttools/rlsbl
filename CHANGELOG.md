@@ -2,6 +2,12 @@
 
 # Changelog
 
+## 0.41.4
+
+### Fixes
+
+- **Fix: selfdoc hashes no longer left dirty after release.** Content hashes are refreshed after the version bump so the working tree stays clean post-release.
+
 ## 0.41.3
 
 ### Features
