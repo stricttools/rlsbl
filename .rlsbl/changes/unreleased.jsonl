@@ -3,3 +3,4 @@
 {"commits":["cd43a353c7f34d237b452ccbb1255ec93a5ebef7"],"user_facing":true,"description":"**Fix: `library-lint` check skips non-library projects.** Standalone projects no longer produce 523 spurious lint errors in `rlsbl check --all`.","type":"fix"}
 {"commits":["62a8fbcc932d2cf883657edec65c53bd454ebc11","76fb85685f846b0fb51a93a02bc115806ed9b570","75b924c7e2fb6e963d12e8f395db5feef8a0af82","b001f805c45ef9dcab263af78d512739c6e4481f"],"user_facing":false}
 {"commits":["8feb1300be2a1b235ae1469a8910ec2e6a4a5b64","a3dec058fb3a719d5940892e61512b61ad91e7f8","e3704c4f1a5bd1449eede9c07f58c52c098b90ea"],"user_facing":false}
+{"commits":["df82c42e3b0c196be7e05e307a1fdbba67b86968"],"user_facing":false}
