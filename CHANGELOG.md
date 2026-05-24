@@ -2,6 +2,12 @@
 
 # Changelog
 
+## 0.41.3
+
+### Features
+
+- **DocsTarget is now a versioned target.** Reads and writes version from `selfdoc.json`. The `version-consistency` check now includes docs targets instead of skipping them.
+
 ## 0.41.2
 
 ### Features

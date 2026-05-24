@@ -1,15 +1,31 @@
 {
-  "version": "0.41.2",
+  "version": "0.41.3",
   "base_url": "https://rlsbl.smmh.dev",
   "language": "python",
-  "source": ["rlsbl/"],
+  "source": [
+    "rlsbl/"
+  ],
   "docs": "docs/",
   "output": "docs/_build/",
-  "versions": [{"version": "0.40.1", "indexed": true}],
-  "locales": [{"code": "en", "label": "English", "default": true}],
+  "versions": [
+    {
+      "version": "0.40.1",
+      "indexed": true
+    }
+  ],
+  "locales": [
+    {
+      "code": "en",
+      "label": "English",
+      "default": true
+    }
+  ],
   "deploy": {
     "provider": "cloudflare-pages",
     "project": "rlsbl-docs"
   },
-  "root_files": ["docs/_CLAUDE.md", "docs/_README.md"]
+  "root_files": [
+    "docs/_CLAUDE.md",
+    "docs/_README.md"
+  ]
 }
