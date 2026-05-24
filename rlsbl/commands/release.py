@@ -478,6 +478,10 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None):
             'Set "private": true for private repos or "private": false for public repos.',
             file=sys.stderr,
         )
+        print(
+            'Quick fix: rlsbl scaffold --update',
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     # Private repos must not have any target with publish.<target>.local = true
