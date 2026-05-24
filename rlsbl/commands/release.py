@@ -15,7 +15,7 @@ from ..changelog import (
     get_changes_dir,
     validate_unreleased,
 )
-from ..config import get_publish_config, read_deploy_config, read_json_config, read_project_config, should_tag
+from ..config import get_publish_config, read_deploy_config, read_json_config, read_project_config, should_tag, validate_publish_config
 from ..deploy import deploy_target
 from ..lock import acquire_lock, release_lock
 from ..targets import TARGETS, detect_targets, _parse_target_entry
@@ -495,6 +495,16 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None):
                         file=sys.stderr,
                     )
                     sys.exit(1)
+
+    # Validate publish config for each target
+    publish = config.get("publish", {})
+    if isinstance(publish, dict):
+        for target_name in publish:
+            try:
+                validate_publish_config(config, target_name)
+            except ValueError as e:
+                print(f"Error: {e}", file=sys.stderr)
+                sys.exit(1)
 
     env_file = config.get("env_file")
     if env_file:
