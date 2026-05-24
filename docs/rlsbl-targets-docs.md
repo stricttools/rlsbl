@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.docs
-description: "Docs release target that delegates entirely to the selfdoc CLI, detecting selfdoc.json projects and routing build and deploy through selfdoc."
+description: "Docs release target that detects selfdoc.json projects, reads and writes version from selfdoc.json, and delegates build and deploy to the selfdoc CLI."
 generated: true
 nav_group: "API Reference"
 nav_order: 70

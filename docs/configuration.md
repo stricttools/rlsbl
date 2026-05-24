@@ -1,5 +1,5 @@
 ---
-description: "Configuration reference for rlsbl — config.json with 17 targets, publish, deploy, and changelog validation; workspace.toml; and selfdoc.json."
+description: "Configuration reference for rlsbl — config.json with required private flag, publish, deploy, and changelog validation; workspace.toml; selfdoc.json."
 ---
 
 # Configuration reference
