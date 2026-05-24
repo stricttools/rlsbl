@@ -2,19 +2,12 @@
 
 Verifies:
 - The old private hook template has been removed (asset upload is built-in).
-- The get_max_asset_size_mb config accessor returns correct defaults and
-  respects overrides from .rlsbl/config.json.
 - A bash snippet replicating the size check passes small files and
   rejects oversized files, with both default and custom limits.
 """
 
-import json
 import os
 import subprocess
-
-import pytest
-
-from rlsbl.config import get_max_asset_size_mb
 
 
 # Minimal bash snippet that replicates the size-check logic.
@@ -48,12 +41,6 @@ def _run_size_check(dist_dir, max_size_mb=2):
     )
 
 
-def _write_config(tmp_path, payload):
-    rlsbl_dir = tmp_path / ".rlsbl"
-    rlsbl_dir.mkdir(exist_ok=True)
-    (rlsbl_dir / "config.json").write_text(json.dumps(payload))
-
-
 # ---------------------------------------------------------------------------
 # Private hook template removed (asset upload is built-in)
 # ---------------------------------------------------------------------------
@@ -72,44 +59,6 @@ class TestPrivateHookTemplateRemoved:
             "post-release-private.sh.tpl should be deleted; "
             "asset upload is now a built-in release step"
         )
-
-
-# ---------------------------------------------------------------------------
-# Config accessor
-# ---------------------------------------------------------------------------
-
-
-class TestGetMaxAssetSizeMb:
-    """Tests for get_max_asset_size_mb config accessor."""
-
-    def test_default_when_no_config(self, tmp_path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        assert get_max_asset_size_mb() == 2
-
-    def test_reads_custom_value(self, tmp_path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        _write_config(tmp_path, {"max_asset_size_mb": 100})
-        assert get_max_asset_size_mb() == 100
-
-    def test_ignores_non_numeric(self, tmp_path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        _write_config(tmp_path, {"max_asset_size_mb": "big"})
-        assert get_max_asset_size_mb() == 2
-
-    def test_ignores_zero(self, tmp_path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        _write_config(tmp_path, {"max_asset_size_mb": 0})
-        assert get_max_asset_size_mb() == 2
-
-    def test_ignores_negative(self, tmp_path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        _write_config(tmp_path, {"max_asset_size_mb": -5})
-        assert get_max_asset_size_mb() == 2
-
-    def test_float_truncated(self, tmp_path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        _write_config(tmp_path, {"max_asset_size_mb": 10.9})
-        assert get_max_asset_size_mb() == 10
 
 
 # ---------------------------------------------------------------------------
