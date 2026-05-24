@@ -47,7 +47,6 @@ class BaseTarget:
             {"template": "hooks/pre-checks.sh.tpl", "target": ".rlsbl/hooks/pre-checks.sh"},
             {"template": "hooks/pre-release.sh.tpl", "target": ".rlsbl/hooks/pre-release.sh"},
             {"template": "hooks/post-release.sh.tpl", "target": ".rlsbl/hooks/post-release.sh"},
-            {"template": "claude-settings.json.tpl", "target": ".claude/settings.json"},
             {"template": "lint/python.toml.tpl", "target": ".rlsbl/lint/python.toml"},
             {"template": "lint/go.toml.tpl", "target": ".rlsbl/lint/go.toml"},
             {"template": "lint/npm.toml.tpl", "target": ".rlsbl/lint/npm.toml"},
