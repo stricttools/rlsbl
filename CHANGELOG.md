@@ -2,6 +2,12 @@
 
 # Changelog
 
+## 0.41.2
+
+### Features
+
+- **Go assets use goreleaser for cross-compilation.** When goreleaser is installed, `build_assets()` produces binaries for linux/darwin/windows x amd64/arm64. Falls back to host-only `go build` when goreleaser is unavailable.
+
 ## 0.41.1
 
 ### Breaking
