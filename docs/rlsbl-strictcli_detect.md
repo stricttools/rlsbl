@@ -1,6 +1,6 @@
 ---
 title: rlsbl.strictcli_detect
-description: "Detect whether a project uses strictcli and extract its entry point."
+description: "Detect whether a Python project uses strictcli by scanning pyproject.toml dependencies and extract its script entry point for schema dumping."
 generated: true
 nav_group: "API Reference"
 nav_order: 62

@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.monorepo.graph
-description: "Monorepo dependency graph export command: JSON, DOT, and text tree formats."
+description: "Monorepo dependency graph export command supporting JSON, DOT, and text tree formats with optional root/reverse filtering and depth limiting."
 generated: true
 nav_group: "API Reference"
 nav_order: 25

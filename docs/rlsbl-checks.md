@@ -1,6 +1,6 @@
 ---
 title: rlsbl.checks
-description: "Project checks registered on the strictcli check system."
+description: "Project checks registered on the strictcli check system, including version consistency, lock staleness, and changelog validation."
 generated: true
 nav_group: "API Reference"
 nav_order: 11

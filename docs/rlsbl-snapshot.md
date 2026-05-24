@@ -1,6 +1,6 @@
 ---
 title: rlsbl.snapshot
-description: "Monorepo snapshot generator: produces a JSON summary of all packages, versions, deps, and graph structure."
+description: "Monorepo snapshot generator that produces a committed JSON summary of all packages, versions, dependencies, topological order, and graph structure."
 generated: true
 nav_group: "API Reference"
 nav_order: 61

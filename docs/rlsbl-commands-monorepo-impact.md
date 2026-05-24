@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.monorepo.impact
-description: "Monorepo impact analysis command: show affected packages from a change."
+description: "Monorepo impact analysis command that maps changed files or git diffs to affected packages and their transitive dependents in the workspace."
 generated: true
 nav_group: "API Reference"
 nav_order: 26

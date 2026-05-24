@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.dart
-description: "Dart release target that manages version tracking in pubspec.yaml and scaffolds CI workflows for publishing to pub.dev."
+description: "Dart release target that manages version tracking in pubspec.yaml, handles build number strategies, and scaffolds CI workflows for pub.dev publishing."
 generated: true
 nav_group: "API Reference"
 nav_order: 67

@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.monorepo.batch_release
-description: "Batch release command for monorepo workspaces."
+description: "Batch release command for monorepo workspaces that reads unreleased.toml, resolves topological order, and releases each package sequentially."
 generated: true
 nav_group: "API Reference"
 nav_order: 23

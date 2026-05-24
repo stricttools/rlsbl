@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.monorepo.snapshot_cmd
-description: "Monorepo snapshot command: generate or verify .rlsbl-monorepo/snapshot.json."
+description: "Monorepo snapshot command that generates or verifies .rlsbl-monorepo/snapshot.json, capturing all package versions, dependencies, and graph structure."
 generated: true
 nav_group: "API Reference"
 nav_order: 28

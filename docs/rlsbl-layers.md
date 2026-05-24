@@ -1,6 +1,6 @@
 ---
 title: rlsbl.layers
-description: "Layer configuration loading and validation for monorepo architectural rules."
+description: "Layer configuration loading and validation for monorepo architectural rules, parsing workspace.toml layer assignments and enforcing dependency direction."
 generated: true
 nav_group: "API Reference"
 nav_order: 46

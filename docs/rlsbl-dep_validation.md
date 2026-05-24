@@ -1,6 +1,6 @@
 ---
 title: rlsbl.dep_validation
-description: "Dependency validation for monorepo workspaces."
+description: "Dependency validation for monorepo workspaces that detects unused declared dependencies and undeclared imports across workspace projects."
 generated: true
 nav_group: "API Reference"
 nav_order: 42

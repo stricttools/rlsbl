@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.native_changes
-description: "Detect native platform file changes in Flutter projects since a given git ref."
+description: "Detect native platform file changes in Flutter projects since a given git ref to determine whether an OTA release is safe or a full build is required."
 generated: true
 nav_group: "API Reference"
 nav_order: 76

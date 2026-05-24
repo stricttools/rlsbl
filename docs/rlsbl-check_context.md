@@ -1,6 +1,6 @@
 ---
 title: rlsbl.check_context
-description: "Check context types for the strictcli check system."
+description: "Check context dataclasses for the strictcli check system, providing ProjectCheckContext and WorkspaceCheckContext for monorepo checks."
 generated: true
 nav_group: "API Reference"
 nav_order: 10

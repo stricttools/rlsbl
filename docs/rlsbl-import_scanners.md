@@ -1,6 +1,6 @@
 ---
 title: rlsbl.import_scanners
-description: "Python and Dart import scanners for dependency-import validation."
+description: "Python and Dart import scanners for dependency-import validation, filtering workspace-relevant imports and distinguishing lib vs test contexts."
 generated: true
 nav_group: "API Reference"
 nav_order: 45

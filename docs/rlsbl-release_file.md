@@ -1,6 +1,6 @@
 ---
 title: rlsbl.release_file
-description: "Release file reader and validator for file-based releases."
+description: "Release file reader and validator that parses .rlsbl/releases/unreleased.toml for bump type, target inclusion, and per-target configuration."
 generated: true
 nav_group: "API Reference"
 nav_order: 60
