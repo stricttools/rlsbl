@@ -11,12 +11,6 @@ nav_order: 8
 
 Sync the GitHub Release notes for a given version with the corresponding CHANGELOG.md entry. Defaults to the current version if none is specified. Use --dry-run to preview changes without updating GitHub.
 
-## Flags
-
-| Name | Short | Type | Default | Env | Description |
-|------|-------|------|---------|-----|-------------|
-| `--dry-run` |  | bool |  |  | Preview without making changes |
-
 ## Arguments
 
 | Name | Required | Description |

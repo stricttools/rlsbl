@@ -92,6 +92,48 @@ Compute and display the topological release order for all projects in the monore
 
 Scan all projects in the monorepo workspace for intra-workspace dependencies that reference older versions than what is currently available in the workspace. Lists each outdated dependency with the referenced version and the latest available version, helping identify which downstream projects need a version bump after upstream releases.
 
-## monorepo lint
+## monorepo snapshot
 
-Detect unregistered projects and stale workspace entries in your monorepo. Scans first-level directories for recognized project manifests across all 14 supported targets (npm, PyPI, Go, Cargo, etc.) and compares against workspace.toml. Reports unregistered projects on disk and registered entries pointing to missing directories. Exits non-zero if issues are found, suitable for CI gating.
+Generate a committed JSON artifact at .rlsbl-monorepo/snapshot.json summarizing all packages, versions, dependencies, and graph structure. Use --check to verify the snapshot is up-to-date without regenerating it (exits 1 if stale).
+
+### Flags
+
+| Name | Short | Type | Default | Env | Description |
+|------|-------|------|---------|-----|-------------|
+| `--check` |  | bool |  |  | Verify snapshot.json is up-to-date (exit 1 if stale) |
+
+## monorepo graph
+
+Export the monorepo dependency graph in JSON, DOT (Graphviz), or indented text tree format. Supports filtering by a root package (transitive deps) or reverse package (transitive rdeps), with optional depth limiting. Use --output to write to a file instead of stdout.
+
+### Flags
+
+| Name | Short | Type | Default | Env | Description |
+|------|-------|------|---------|-----|-------------|
+| `--format` |  | str | json |  | Output format: json, dot, or text (default: json) |
+| `--output` |  | str |  |  | Write output to file instead of stdout |
+| `--root` |  | str |  |  | Show only transitive deps from this package |
+| `--reverse` |  | str |  |  | Show only transitive rdeps of this package |
+| `--depth` |  | int |  |  | Limit traversal depth |
+
+## monorepo impact
+
+Analyze the impact of changes to a package, file, or git diff range on the monorepo dependency graph. Shows direct and transitive dependents, test scope, and release candidates. Supports package names, file paths, and --since for git-based change detection.
+
+### Flags
+
+| Name | Short | Type | Default | Env | Description |
+|------|-------|------|---------|-----|-------------|
+| `--format` |  | str | text |  | Output format: json or text (default: text) |
+| `--depth` |  | int |  |  | Limit traversal depth |
+| `--since` |  | str |  |  | Git ref to diff against HEAD (e.g. HEAD~3, v1.0.0) |
+
+## monorepo release
+
+Execute a batch release of multiple monorepo packages in topological order. Reads package configurations from .rlsbl-monorepo/releases/unreleased.toml. Each package is released sequentially using the single-package release flow, with leaves (no dependencies) released first. Supports --dry-run, --yes, --allow-dirty flags.
+
+### Flags
+
+| Name | Short | Type | Default | Env | Description |
+|------|-------|------|---------|-----|-------------|
+| `--allow-dirty` |  | bool |  |  | Allow releasing with a dirty working tree |

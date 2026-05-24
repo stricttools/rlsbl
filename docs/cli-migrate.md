@@ -15,5 +15,4 @@ Run pending configuration migrations to update .rlsbl config files to the latest
 
 | Name | Short | Type | Default | Env | Description |
 |------|-------|------|---------|-----|-------------|
-| `--dry-run` |  | bool |  |  | Preview migrations without applying |
 | `--status` |  | bool |  |  | Show migration status |

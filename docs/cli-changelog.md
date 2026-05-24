@@ -9,7 +9,7 @@ nav_order: 1
 
 # rlsbl changelog
 
-Structured changelog management using JSONL entries. Add, validate, and generate CHANGELOG.md from per-commit changelog entries stored in unreleased.jsonl for precise, auditable release notes.
+Structured changelog management using JSONL entries. Add and generate CHANGELOG.md from per-commit changelog entries stored in unreleased.jsonl for precise, auditable release notes.
 
 ## changelog add
 
@@ -25,10 +25,6 @@ Append a structured changelog entry to the project's unreleased.jsonl file. Each
 | `--no-user-facing` |  | bool |  |  | Mark as non-user-facing |
 | `--no-commit` |  | bool |  |  | Skip auto-commit of unreleased.jsonl |
 
-## changelog validate
-
-Parse and validate all entries in the project's unreleased.jsonl file. Checks each entry for schema conformance, verifies that required fields like description and type are present and well-formed, ensures entry types are one of the allowed values (feature, fix, breaking), and validates referential integrity of any attached commit hashes against the git history.
-
 ## changelog generate
 
 Compile all validated JSONL changelog entries into a formatted CHANGELOG.md file. Groups entries by type (features, fixes, breaking changes) under the appropriate version heading, preserving existing changelog content for previous releases. Use --dry-run to preview the generated Markdown output without writing to disk, which is useful for reviewing before committing.
@@ -37,5 +33,19 @@ Compile all validated JSONL changelog entries into a formatted CHANGELOG.md file
 
 | Name | Short | Type | Default | Env | Description |
 |------|-------|------|---------|-----|-------------|
-| `--dry-run` |  | bool |  |  | Preview without writing files |
 | `--no-commit` |  | bool |  |  | Skip auto-commit of generated files |
+
+## changelog amend
+
+Append a changelog entry to a released version's JSONL file. Temporarily unlocks the read-only file, appends the entry, re-locks it, regenerates CHANGELOG.md, and syncs GitHub Release notes. Use --no-resolve to skip hash validation for old or amended commits.
+
+### Flags
+
+| Name | Short | Type | Default | Env | Description |
+|------|-------|------|---------|-----|-------------|
+| `--version` |  | str |  |  | Released version to amend (e.g., 0.39.0) |
+| `--commits` |  | str |  |  | Comma-separated commit hashes |
+| `--description` |  | str |  |  | Entry description |
+| `--type` |  | str |  |  | Entry type (feature, fix, breaking) |
+| `--no-user-facing` |  | bool |  |  | Mark as non-user-facing |
+| `--no-resolve` |  | bool |  |  | Skip hash validation |

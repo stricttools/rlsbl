@@ -9,25 +9,10 @@ nav_order: 14
 
 # rlsbl release
 
-Bump the project version, validate the changelog, commit, tag, push, and create a GitHub Release. Supports patch, minor, and major bumps with dry-run preview and non-interactive mode for CI.
+Bump the project version, validate the changelog, commit, tag, push, and create a GitHub Release. Reads bump type and target selection from .rlsbl/releases/unreleased.toml (create with rlsbl release-init). Supports dry-run preview and non-interactive mode for CI.
 
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |
 |------|-------|------|---------|-----|-------------|
-| `--target` |  | str |  |  | Target a specific registry (auto-detected if omitted) |
-| `--dry-run` |  | bool |  |  | Preview release without making changes |
-| `--yes` |  | bool |  |  | Non-interactive mode (skip confirmations) |
-| `--quiet` |  | bool |  |  | Suppress non-essential output |
-| `--skip-remote-check` |  | bool |  |  | Skip the remote-ahead check |
-| `--skip-tests` |  | bool |  |  | Skip built-in test execution |
-| `--skip-lint` |  | bool |  |  | Skip built-in library lint |
-| `--skip-docs` |  | bool |  |  | Skip selfdoc documentation check |
 | `--allow-dirty` |  | bool |  |  | Allow releasing with a dirty working tree |
-| `--no-tag` |  | bool |  |  | Disable ecosystem tagging for this invocation |
-
-## Arguments
-
-| Name | Required | Description |
-|------|----------|-------------|
-| `bump` | no | Bump type: patch, minor, or major |

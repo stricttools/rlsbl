@@ -71,6 +71,7 @@ order: 90
 - [rlsbl.npm_wrapper](rlsbl-npm_wrapper.html)
 - [rlsbl.release_file](rlsbl-release_file.html)
 - [rlsbl.snapshot](rlsbl-snapshot.html)
+- [rlsbl.strictcli_detect](rlsbl-strictcli_detect.html)
 - [rlsbl.tagging](rlsbl-tagging.html)
 - [rlsbl.targets](rlsbl-targets.html)
 - [rlsbl.targets.base](rlsbl-targets-base.html)

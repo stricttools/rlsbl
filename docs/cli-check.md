@@ -9,11 +9,16 @@ nav_order: 2
 
 # rlsbl check
 
-Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.
+Run project checks
 
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |
 |------|-------|------|---------|-----|-------------|
-| `--target` |  | str |  |  | Target registry (npm, pypi, or go) |
-| `--delay` |  | str | 200 |  | Delay between checks in ms |
+| `--all` |  | bool |  |  | Run all checks |
+| `--tag` |  | str |  |  | Tag DSL expression to filter checks |
+| `--name` |  | str |  |  | Glob pattern to filter by check name |
+| `--list` |  | bool |  |  | List all checks and their tags |
+| `--json` |  | bool |  |  | Output results as JSON |
+| `--ignore-warnings` |  | bool |  |  | Warn severity does not cause nonzero exit |
+| `--verbose` |  | bool |  |  | Show details for passing checks too |
