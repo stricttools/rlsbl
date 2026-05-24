@@ -1150,13 +1150,15 @@ class TestWriteVersionReturnPaths:
         result = target.write_version(str(tmp_path), "2.0.0")
         assert result == [os.path.join("spec", "version.json")]
 
-    def test_docs_returns_empty(self):
-        """DocsTarget.write_version returns [] (no-op)."""
+    def test_docs_returns_selfdoc_json(self):
+        """DocsTarget.write_version returns ['selfdoc.json']."""
         from rlsbl.targets.docs import DocsTarget
         target = DocsTarget()
         with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "selfdoc.json"), "w") as f:
+                json.dump({"language": "python"}, f, indent=2)
             result = target.write_version(d, "1.0.0")
-            assert result == []
+            assert result == ["selfdoc.json"]
 
     def test_plain_returns_version_file(self, tmp_path):
         """PlainTarget.write_version returns ['VERSION']."""

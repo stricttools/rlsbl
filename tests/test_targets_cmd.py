@@ -95,8 +95,8 @@ class TestTargetsCommand:
         for line in lines:
             assert "no" in line
 
-    def test_docs_target_shows_none_version_file(self):
-        """Docs target shows '(none)' for version file."""
+    def test_docs_target_shows_selfdoc_json_version_file(self):
+        """Docs target shows 'selfdoc.json' for version file."""
         from rlsbl.commands.targets_cmd import run_cmd
 
         buf = StringIO()
@@ -106,7 +106,7 @@ class TestTargetsCommand:
         output = buf.getvalue()
         for line in output.splitlines():
             if line.startswith("docs"):
-                assert "(none)" in line
+                assert "selfdoc.json" in line
                 break
         else:
             pytest.fail("docs line not found in output")

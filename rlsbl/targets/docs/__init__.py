@@ -4,9 +4,11 @@ Detection is based on the presence of selfdoc.json in the project root.
 Build and deploy are delegated entirely to the `selfdoc` CLI tool.
 """
 
+import json
 import os
 import subprocess
 import sys
+import tempfile
 
 from ..base import BaseTarget
 from ...config import get_publish_config
@@ -29,16 +31,45 @@ class DocsTarget(BaseTarget):
         return os.path.exists(os.path.join(dir_path, "selfdoc.json"))
 
     def read_version(self, dir_path):
-        """Docs don't have their own version -- return fallback."""
-        return "0.0.0"
+        """Read version from selfdoc.json; fall back to '0.0.0' when absent."""
+        config_path = os.path.join(dir_path, "selfdoc.json")
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data.get("version", "0.0.0")
+        except (OSError, json.JSONDecodeError):
+            return "0.0.0"
 
     def write_version(self, dir_path, version):
-        """No-op: docs inherit version from primary target."""
-        return []
+        """Write version to selfdoc.json atomically, preserving formatting."""
+        config_path = os.path.join(dir_path, "selfdoc.json")
+        with open(config_path, "r", encoding="utf-8") as f:
+            raw = f.read()
+        data = json.loads(raw)
+        data["version"] = version
+        # Detect indent from existing file
+        indent = 2
+        for line in raw.splitlines()[1:]:
+            stripped = line.lstrip()
+            if stripped:
+                indent = len(line) - len(stripped)
+                break
+        new_content = json.dumps(data, indent=indent, ensure_ascii=False) + "\n"
+        fd, tmp_path = tempfile.mkstemp(
+            dir=dir_path, prefix=".selfdoc.json.", suffix=".tmp",
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(new_content)
+            os.replace(tmp_path, config_path)
+        except BaseException:
+            os.unlink(tmp_path)
+            raise
+        return ["selfdoc.json"]
 
     def version_file(self):
-        """No version file -- docs inherit from primary target."""
-        return None
+        """Version is stored in selfdoc.json."""
+        return "selfdoc.json"
 
     def tag_format(self, version):
         """No separate tag -- uses primary target's tag."""

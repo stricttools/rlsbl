@@ -82,17 +82,8 @@ def register_checks(app):
         if not target_entries:
             return CheckResult("warn", "no targets detected")
 
-        # Filter out targets with no version file (e.g. DocsTarget) --
-        # they return a fallback version that would cause false mismatches.
-        versioned_entries = [
-            (name, path) for name, path in target_entries
-            if TARGETS[name].version_file() is not None
-        ]
-        if not versioned_entries:
-            return CheckResult("warn", "no targets reported a version")
-
         versions = {}
-        for name, path in versioned_entries:
+        for name, path in target_entries:
             target = TARGETS[name]
             try:
                 v = target.read_version(path)
@@ -108,7 +99,7 @@ def register_checks(app):
             return CheckResult("fail", f"version mismatch: {detail}")
 
         version = unique.pop()
-        return CheckResult("pass", f"{version} across {len(versioned_entries)} target(s)")
+        return CheckResult("pass", f"{version} across {len(target_entries)} target(s)")
 
     @app.check("name-consistency")
     def check_name_consistency(ctx):
