@@ -3,6 +3,7 @@
 import glob
 import json
 import os
+import subprocess
 import textwrap
 
 import pytest
@@ -200,7 +201,7 @@ class TestNpmTarget:
 
 
 class TestGoTarget:
-    def test_calls_go_build(self, tmp_path, monkeypatch):
+    def test_uses_goreleaser_when_available(self, tmp_path, monkeypatch):
         proj = _make_go_project(tmp_path)
         dist = str(tmp_path / "dist")
         target = GoTarget()
@@ -209,12 +210,47 @@ class TestGoTarget:
 
         def fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
             calls.append((cmd, args, cwd))
-            # Simulate creating a binary in dist_dir
+            # Simulate goreleaser output structure
+            gr_dist = os.path.join(str(proj), "dist")
+            for platform in ("myapp_linux_amd64", "myapp_darwin_arm64"):
+                d = os.path.join(gr_dist, platform)
+                os.makedirs(d, exist_ok=True)
+                open(os.path.join(d, "myapp"), "w").close()
+            return ""
+
+        monkeypatch.setattr("rlsbl.targets.go.run", fake_run)
+        monkeypatch.setattr("rlsbl.targets.go.shutil.which", lambda name: "/usr/bin/goreleaser")
+
+        result = target.build_assets(str(proj), "1.0.0", dist)
+
+        assert len(calls) == 1
+        cmd, args, cwd = calls[0]
+        assert cmd == "goreleaser"
+        assert args == ["build", "--snapshot", "--clean"]
+        assert cwd == str(proj)
+
+        assert len(result) == 2
+        basenames = sorted(os.path.basename(p) for p in result)
+        assert basenames == ["myapp_darwin_arm64__myapp", "myapp_linux_amd64__myapp"]
+        # All artifacts should be in dist_dir
+        for p in result:
+            assert os.path.dirname(p) == dist
+
+    def test_falls_back_to_go_build_without_goreleaser(self, tmp_path, monkeypatch, capsys):
+        proj = _make_go_project(tmp_path)
+        dist = str(tmp_path / "dist")
+        target = GoTarget()
+
+        calls = []
+
+        def fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
+            calls.append((cmd, args, cwd))
             os.makedirs(dist, exist_ok=True)
             open(os.path.join(dist, "myapp"), "w").close()
             return ""
 
         monkeypatch.setattr("rlsbl.targets.go.run", fake_run)
+        monkeypatch.setattr("rlsbl.targets.go.shutil.which", lambda name: None)
 
         result = target.build_assets(str(proj), "1.0.0", dist)
 
@@ -229,6 +265,42 @@ class TestGoTarget:
         assert len(result) == 1
         assert result[0].endswith("myapp")
 
+        captured = capsys.readouterr()
+        assert "goreleaser not found" in captured.out
+
+    def test_falls_back_on_goreleaser_failure(self, tmp_path, monkeypatch, capsys):
+        proj = _make_go_project(tmp_path)
+        dist = str(tmp_path / "dist")
+        target = GoTarget()
+
+        calls = []
+
+        def fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
+            calls.append((cmd, args, cwd))
+            if cmd == "goreleaser":
+                raise subprocess.CalledProcessError(1, "goreleaser")
+            # Fallback go build
+            os.makedirs(dist, exist_ok=True)
+            open(os.path.join(dist, "myapp"), "w").close()
+            return ""
+
+        monkeypatch.setattr("rlsbl.targets.go.run", fake_run)
+        monkeypatch.setattr("rlsbl.targets.go.shutil.which", lambda name: "/usr/bin/goreleaser")
+
+        result = target.build_assets(str(proj), "1.0.0", dist)
+
+        # Should have called goreleaser first, then fallen back to go build
+        assert len(calls) == 2
+        assert calls[0][0] == "goreleaser"
+        assert calls[1][0] == "go"
+
+        assert len(result) == 1
+        assert result[0].endswith("myapp")
+
+        captured = capsys.readouterr()
+        assert "goreleaser failed" in captured.out
+        assert "falling back" in captured.out
+
     def test_creates_dist_dir(self, tmp_path, monkeypatch):
         proj = _make_go_project(tmp_path)
         dist = str(tmp_path / "nonexistent" / "dist")
@@ -238,6 +310,7 @@ class TestGoTarget:
             return ""
 
         monkeypatch.setattr("rlsbl.targets.go.run", fake_run)
+        monkeypatch.setattr("rlsbl.targets.go.shutil.which", lambda name: None)
 
         target.build_assets(str(proj), "1.0.0", dist)
         assert os.path.isdir(dist)

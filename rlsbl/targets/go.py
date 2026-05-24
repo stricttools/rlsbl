@@ -3,6 +3,7 @@
 import glob
 import os
 import re
+import shutil
 import subprocess
 
 from .base import BaseTarget
@@ -117,10 +118,44 @@ class GoTarget(BaseTarget):
         return bool(re.match(r"^package\s+main\b", first_line))
 
     def build_assets(self, dir_path, version, dist_dir):
-        """Build Go binary for the host platform into dist_dir."""
+        """Build Go binaries into dist_dir.
+
+        Uses goreleaser for cross-compilation when available, falling back
+        to ``go build`` (host platform only) otherwise.
+        """
         os.makedirs(dist_dir, exist_ok=True)
+
+        if shutil.which("goreleaser"):
+            try:
+                return self._build_with_goreleaser(dir_path, dist_dir)
+            except (subprocess.CalledProcessError, OSError) as exc:
+                print(f"Warning: goreleaser failed ({exc}), falling back to go build.")
+
+        else:
+            print("goreleaser not found, building for host platform only.")
+
+        # Fallback: host-only build
         run("go", ["build", "-o", dist_dir + "/", "./..."], cwd=dir_path)
         return sorted(glob.glob(os.path.join(dist_dir, "*")))
+
+    def _build_with_goreleaser(self, dir_path, dist_dir):
+        """Run goreleaser build and collect cross-compiled binaries into *dist_dir*."""
+        run(
+            "goreleaser",
+            ["build", "--snapshot", "--clean"],
+            cwd=dir_path,
+        )
+        goreleaser_dist = os.path.join(dir_path, "dist")
+        artifacts = []
+        for direntry in sorted(os.scandir(goreleaser_dist), key=lambda e: e.name):
+            if not direntry.is_dir():
+                continue
+            for fentry in sorted(os.scandir(direntry.path), key=lambda e: e.name):
+                if fentry.is_file() and not fentry.name.startswith("."):
+                    dest = os.path.join(dist_dir, f"{direntry.name}__{fentry.name}")
+                    shutil.copy2(fentry.path, dest)
+                    artifacts.append(dest)
+        return sorted(artifacts)
 
     def publish(self, dir_path, version):
         """Notify the Go module proxy so the new version is immediately available."""
