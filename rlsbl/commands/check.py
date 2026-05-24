@@ -182,16 +182,30 @@ def check_npm_availability(name):
 
 
 def get_npm_variants(name):
-    """Generate common npm name variants for similarity checking."""
+    """Generate common npm name variants for similarity checking.
+
+    npm's moniker collision algorithm strips all ``-``, ``.``, and ``_``
+    characters and lowercases before comparing.  We generate:
+    1. All separator-swap variants (replace every separator with each of -._)
+    2. The fully stripped form
+    3. Insertion variants when the name has no separators (insert each of -._
+       at every interior position so we can detect existing hyphenated packages
+       that would collide)
+    """
     variants = set()
     lower = name.lower()
-    variants.add(lower)
-    variants.add(lower.replace("_", "-"))
-    variants.add(lower.replace("-", "_"))
-    variants.add(re.sub(r"[-_]", "", lower))
-    variants.add(re.sub(r"[-_]", ".", lower))
+    separators = "-._"
 
-    # Remove the original name itself from the set
+    stripped = re.sub(r"[-._]", "", lower)
+    variants.add(stripped)
+    for sep in separators:
+        variants.add(re.sub(r"[-._]", sep, lower))
+
+    if stripped == lower:
+        for i in range(1, len(lower)):
+            for sep in separators:
+                variants.add(lower[:i] + sep + lower[i:])
+
     variants.discard(name)
 
     return list(variants)
