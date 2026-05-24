@@ -1,0 +1,1 @@
+{"commits":["8f2f116974d97794ffaceff9dc01059bcc505d30","d1c4f57b0821e77259a95d71125c0e6d975d7538"],"user_facing":true,"description":"**DocsTarget is now a versioned target.** Reads and writes version from `selfdoc.json`. The `version-consistency` check now includes docs targets instead of skipping them.","type":"feature"}
