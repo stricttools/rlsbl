@@ -15,7 +15,7 @@ from rlsbl.check_context import ProjectCheckContext, WorkspaceCheckContext
 
 
 # ---------------------------------------------------------------------------
-# All 29 checks are declared in checks.toml and registered on the app
+# All 30 checks are declared in checks.toml and registered on the app
 # ---------------------------------------------------------------------------
 
 EXPECTED_CHECKS = [
@@ -38,6 +38,7 @@ EXPECTED_CHECKS = [
     "changelog-coverage",
     "changelog-orphans",
     "changelog-schema",
+    "changelog-user-facing",
     "changelog-batch-commits",
     "changelog-batch-entries",
     # Workspace checks
@@ -58,8 +59,8 @@ EXPECTED_CHECKS = [
 class TestCheckDeclarations:
     """Every check must be declared in checks.toml and registered on the app."""
 
-    def test_all_28_checks_declared(self):
-        """checks.toml defines exactly the 29 expected checks."""
+    def test_all_30_checks_declared(self):
+        """checks.toml defines exactly the 30 expected checks."""
         assert sorted(app._check_defs.keys()) == sorted(EXPECTED_CHECKS)
 
     @pytest.mark.parametrize("name", EXPECTED_CHECKS)
@@ -68,14 +69,14 @@ class TestCheckDeclarations:
         assert app._check_defs[name].impl is not None
 
     def test_check_list_shows_all(self):
-        """``rlsbl check --list`` outputs all 28 check names."""
+        """``rlsbl check --list`` outputs all 30 check names."""
         result = app.test(["check", "--list"])
         assert result.exit_code == 0
         for name in EXPECTED_CHECKS:
             assert name in result.stdout
 
     def test_check_list_json(self):
-        """``rlsbl check --list --json`` outputs valid JSON with all 29 checks."""
+        """``rlsbl check --list --json`` outputs valid JSON with all 30 checks."""
         result = app.test(["check", "--list", "--json"])
         assert result.exit_code == 0
         data = json.loads(result.stdout)
