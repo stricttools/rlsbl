@@ -6,3 +6,4 @@
 {"commits":["51962819eee46c8e9df7afbb0a1277daab16c420"],"user_facing":true,"description":"**Fix.** `selfdoc check` failures now print a clean error message instead of a raw Python traceback.","type":"fix"}
 {"commits":["33e2e3db1e512c6465bb6b22aa19bfc814780de5"],"user_facing":false}
 {"commits":["a52332bd31aadbe1b1de79b15f24502c2ad25a07"],"user_facing":false}
+{"commits":["51a0b0aec8e539be871fc77ea75d6693ecdeae0a"],"user_facing":false}
