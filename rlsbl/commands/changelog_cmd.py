@@ -1,4 +1,4 @@
-"""Changelog subcommands for adding new entries and generating Markdown changelogs from JSONL sources."""
+"""Changelog subcommands for adding new entries, amending released versions, and generating Markdown changelogs from JSONL sources."""
 
 import os
 import subprocess
