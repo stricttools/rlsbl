@@ -7,3 +7,4 @@
 {"commits":["11aed95d85d5543c1b93ed0cfcb344cc9b251340"],"user_facing":false,"description":"Tests for duplicate commit detection"}
 {"commits":["edf76635df30dc21343db951ab0bc3592b9946ed"],"user_facing":false,"description":"Removed duplicate changelog entries"}
 {"commits":["3d3ee46439ffc477d95b4f5b5ff0259e718ae7bd","3344e52af45c4fad4123b69b789568c2b24f7f26"],"user_facing":false,"description":"Updated docstring and frontmatter descriptions"}
+{"commits":["2d670af3475ede16c17f3c4f2e49f4b358cc03d1"],"user_facing":false,"description":"Fix test for DocsTarget versions sync"}
