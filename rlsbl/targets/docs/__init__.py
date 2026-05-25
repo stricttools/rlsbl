@@ -47,6 +47,9 @@ class DocsTarget(BaseTarget):
             raw = f.read()
         data = json.loads(raw)
         data["version"] = version
+        versions = data.get("versions")
+        if versions and isinstance(versions, list):
+            versions[-1]["version"] = version
         # Detect indent from existing file
         indent = 2
         for line in raw.splitlines()[1:]:
