@@ -4,3 +4,4 @@
 {"commits":["833d484024813603b07ff167ee2810be61cb2e26"],"user_facing":true,"description":"**Fix.** `DocsTarget.write_version` now updates the `versions` array in `selfdoc.json`, fixing the VER003 check error.","type":"fix"}
 {"commits":["349ec03ff76d08ccb300845fe522d49564b25b64","7a39c6033148e0086ef514c9b8ab35350ebc6b8d"],"user_facing":false,"description":"Updated release.py docstring and docs frontmatter"}
 {"commits":["70725a15063c276d968c52484f1923c3895819a5","5f5310f01c9130b230b636c2e11385feb4d14633","d23936451ea7b5e5bbb126b7a66c5b76df6dd84f"],"user_facing":false,"description":"Tests for user-facing check and check registration"}
+{"commits":["478d26c18936318decf1698805fae97c88b4bc5d"],"user_facing":false,"description":"Release file preparation"}
