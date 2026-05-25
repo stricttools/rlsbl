@@ -212,6 +212,43 @@ def _run_builtin_lint(flags, is_library=False, project_dir=None):
     return True
 
 
+def _run_selfdoc_gen(flags, project_dir=None, docs_excluded=False):
+    """Run selfdoc gen if selfdoc.json exists in the project directory.
+
+    Regenerates documentation pages from source before the selfdoc check step,
+    ensuring the check validates fresh content rather than stale pages.
+    """
+    if docs_excluded:
+        print("Skipping selfdoc gen (docs excluded in release file)")
+        return True
+
+    check_dir = project_dir if project_dir else "."
+    selfdoc_config = os.path.join(check_dir, "selfdoc.json")
+    if not os.path.exists(selfdoc_config):
+        return True
+
+    if flags.get("dry-run"):
+        print("Would run: selfdoc gen --no-commit")
+        return True
+
+    if not require_tool("selfdoc", fatal=False):
+        print(
+            "Note: selfdoc.json found but selfdoc is not installed. Skipping docs generation."
+        )
+        return True
+
+    print("Running selfdoc gen...")
+    try:
+        subprocess.run(["selfdoc", "gen", "--no-commit"], cwd=project_dir, check=True)
+    except subprocess.CalledProcessError as e:
+        print(
+            f"Error: selfdoc gen failed (exit code {e.returncode}).",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    return True
+
+
 def _run_selfdoc_check(flags, project_dir=None, docs_excluded=False):
     """Run selfdoc check if selfdoc.json exists in the project directory.
 
