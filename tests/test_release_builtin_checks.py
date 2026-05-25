@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-from rlsbl.commands.release import _run_builtin_lint, _run_builtin_tests, _run_selfdoc_check
+from rlsbl.commands.release import _run_builtin_lint, _run_builtin_tests, _run_selfdoc_check, _run_selfdoc_gen
 from rlsbl.lint.result import LintResult
 from rlsbl.release_file import ReleaseConfig
 
@@ -511,6 +511,114 @@ class TestSelfdocCheck:
 
             assert result is True
             mock_run.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Built-in selfdoc gen tests
+# ---------------------------------------------------------------------------
+
+class TestSelfdocGen:
+    """Tests for _run_selfdoc_gen()."""
+
+    def test_selfdoc_gen_runs_when_present(self, tmp_project):
+        """When selfdoc.json exists and selfdoc is on PATH, subprocess.run is called."""
+        (tmp_project / "selfdoc.json").write_text("{}")
+
+        with (
+            patch("rlsbl.commands.release.require_tool") as mock_which,
+            patch("rlsbl.commands.release.subprocess.run") as mock_run,
+        ):
+            mock_which.return_value = "/usr/bin/selfdoc"
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+
+            result = _run_selfdoc_gen({})
+
+            assert result is True
+            mock_run.assert_called_once_with(
+                ["selfdoc", "gen", "--no-commit"], cwd=None, check=True
+            )
+
+    def test_selfdoc_gen_skipped_when_no_config(self, tmp_project):
+        """When selfdoc.json does not exist, function returns without running."""
+        with patch("rlsbl.commands.release.subprocess.run") as mock_run:
+            result = _run_selfdoc_gen({})
+
+            assert result is True
+            mock_run.assert_not_called()
+
+    def test_selfdoc_gen_skipped_when_docs_excluded(self, tmp_project, capsys):
+        """When docs_excluded is True, selfdoc gen is skipped."""
+        (tmp_project / "selfdoc.json").write_text("{}")
+
+        with patch("rlsbl.commands.release.subprocess.run") as mock_run:
+            result = _run_selfdoc_gen({}, docs_excluded=True)
+
+            assert result is True
+            mock_run.assert_not_called()
+            captured = capsys.readouterr()
+            assert "Skipping selfdoc gen" in captured.out
+
+    def test_selfdoc_gen_skipped_when_not_installed(self, tmp_project, capsys):
+        """When selfdoc.json exists but selfdoc is not on PATH, print note and return."""
+        (tmp_project / "selfdoc.json").write_text("{}")
+
+        with (
+            patch("rlsbl.commands.release.require_tool", return_value=None),
+            patch("rlsbl.commands.release.subprocess.run") as mock_run,
+        ):
+            result = _run_selfdoc_gen({})
+
+            assert result is True
+            mock_run.assert_not_called()
+            captured = capsys.readouterr()
+            assert "selfdoc is not installed" in captured.out
+
+    def test_selfdoc_gen_failure_exits(self, tmp_project):
+        """When selfdoc gen fails, sys.exit(1) is called."""
+        (tmp_project / "selfdoc.json").write_text("{}")
+
+        with (
+            patch("rlsbl.commands.release.require_tool", return_value="/usr/bin/selfdoc"),
+            patch(
+                "rlsbl.commands.release.subprocess.run",
+                side_effect=subprocess.CalledProcessError(1, ["selfdoc", "gen", "--no-commit"]),
+            ),
+        ):
+            with pytest.raises(SystemExit) as exc_info:
+                _run_selfdoc_gen({})
+
+            assert exc_info.value.code == 1
+
+    def test_selfdoc_gen_uses_project_dir(self, tmp_project):
+        """When project_dir is set, selfdoc.json is checked there and cwd is passed."""
+        project_dir = tmp_project / "libs" / "mylib"
+        project_dir.mkdir(parents=True)
+        (project_dir / "selfdoc.json").write_text("{}")
+
+        with (
+            patch("rlsbl.commands.release.require_tool", return_value="/usr/bin/selfdoc"),
+            patch("rlsbl.commands.release.subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+
+            result = _run_selfdoc_gen({}, project_dir=str(project_dir))
+
+            assert result is True
+            mock_run.assert_called_once_with(
+                ["selfdoc", "gen", "--no-commit"], cwd=str(project_dir), check=True
+            )
+
+    def test_selfdoc_gen_dry_run_logs(self, tmp_project, capsys):
+        """When dry-run flag is set, selfdoc gen is skipped with a log message."""
+        (tmp_project / "selfdoc.json").write_text("{}")
+
+        with patch("rlsbl.commands.release.subprocess.run") as mock_run:
+            result = _run_selfdoc_gen({"dry-run": True})
+
+            assert result is True
+            mock_run.assert_not_called()
+            captured = capsys.readouterr()
+            assert "Would run: selfdoc gen --no-commit" in captured.out
 
 
 # ---------------------------------------------------------------------------
