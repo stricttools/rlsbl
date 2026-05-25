@@ -273,7 +273,14 @@ def _run_selfdoc_check(flags, project_dir=None, docs_excluded=False):
         return True
 
     print("Running selfdoc check...")
-    subprocess.run(["selfdoc", "check"], cwd=project_dir, check=True)
+    try:
+        subprocess.run(["selfdoc", "check"], cwd=project_dir, check=True)
+    except subprocess.CalledProcessError as e:
+        print(
+            f"Error: selfdoc check failed (exit code {e.returncode}).",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     return True
 
 
