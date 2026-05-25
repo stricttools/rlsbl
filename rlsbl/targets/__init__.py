@@ -20,6 +20,7 @@ from .flutter_ios import FlutterIosTarget
 from .flutter_android import FlutterAndroidTarget
 from .maven import MavenTarget
 from .zig import ZigTarget
+from .pgdesign import PgdesignTarget
 from .plain import PlainTarget
 from .protocol import ReleaseTarget
 from .base import BaseTarget
@@ -49,6 +50,7 @@ TARGETS = {
     "flutter-android": FlutterAndroidTarget(),
     "maven": MavenTarget(),
     "zig": ZigTarget(),
+    "pgdesign": PgdesignTarget(),
     "plain": PlainTarget(),
 }
 
