@@ -795,6 +795,9 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None):
     # Dump strictcli schema if the project uses strictcli
     _run_strictcli_schema_dump(flags, log, version_dir=version_dir, project_dir=abs_project_dir)
 
+    # Regenerate selfdoc pages so the subsequent check validates fresh content
+    _run_selfdoc_gen(flags, project_dir=abs_project_dir, docs_excluded=docs_excluded)
+
     # Built-in selfdoc check (before tests so doc issues surface early)
     _run_selfdoc_check(flags, project_dir=abs_project_dir, docs_excluded=docs_excluded)
 
