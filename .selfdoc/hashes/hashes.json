@@ -144,7 +144,7 @@
     "description": "92c829699be90c4ea09e05c6e0ff3830b755bdd05be47a9427e51074cedcb831"
   },
   "en/cli-index.md": {
-    "content": "26ada6b521056ddf2de949e32207371293004389acb7fc55352be855641102eb",
+    "content": "4feba1bc8c8a03163473db7289aa9dddc2b20e80fcf2d48aa000e60622a429c5",
     "description": "472b595ee78b5b818ea32e7f0ed06fd90ad59c2bce66811707dea4cb145743c8"
   },
   "en/cli-migrate.md": {
@@ -204,7 +204,7 @@
     "description": "f934ebcc70f1b9dc3c86b2020fcfac4db46bd2cd252d78e4d5989f59cc429886"
   },
   "en/configuration.md": {
-    "content": "7b763c30889193eecbb7d4aab05fc9660b13ff9a65b716bee2aae03b0aa42c34",
+    "content": "92c09924f00b93caef92b94f3b79ff1b38b6acc2f13eee835e9cd4e6ef6d483e",
     "description": "eca8376cb4732400dcc36d6990552987352bb3529f7049346c3d54df6f6c0207"
   },
   "en/gen-index.md": {
@@ -265,7 +265,7 @@
   },
   "en/rlsbl-commands-check.md": {
     "content": "d6a556f1bb0de120a1257730711a7c755524a16dc0f69e7699cf529bd644e95c",
-    "description": "96eff5c4fe9d48fa7fdb0cf820d0467c06010c20c60b4e1bc71b59d6c78b71d4"
+    "description": "1fcfae4ee247730d055ff6a61ddc9688f6e10d888512cea974fc2242bf0427b7"
   },
   "en/rlsbl-commands-commit_cmd.md": {
     "content": "dfa2d8781ef8014f9a4ebafbd5fa9e9bed270c22e339392c038cfc08a25e3ac6",
@@ -340,7 +340,7 @@
     "description": "c7776d190150330f960501da40b144d7eaa95549b77ddb022210aa638d70f571"
   },
   "en/rlsbl-commands-release.md": {
-    "content": "bca71258f48c82496628b6549c7d50527054fe1ffa5ddd4bf274c4a3132b920c",
+    "content": "da80c1507c538f8be5b35dd86f526397cf89b5a7199969bbf129c431178ad99f",
     "description": "ebf6fd842614e4c6fd2cbecc8133e4c5ff1d2413f87fe94c4ea8b3cc288e09b1"
   },
   "en/rlsbl-commands-status.md": {
