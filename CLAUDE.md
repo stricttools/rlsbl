@@ -70,10 +70,11 @@ During `rlsbl release`, the validation and build steps run in this order:
 
 1. Pre-checks hook (`.rlsbl/hooks/pre-checks.sh`)
 2. Strictcli schema dump (`--dump-schema`, for projects using strictcli)
-3. Selfdoc check (verifies generated docs are up-to-date)
-4. Built-in tests (`uv run pytest`, `go test`, `npm test`)
-5. Built-in lint (library projects only)
-6. Pre-release hook (`.rlsbl/hooks/pre-release.sh`)
+3. Selfdoc gen (`selfdoc gen --no-commit`, regenerates docs from source)
+4. Selfdoc check (verifies generated docs are up-to-date)
+5. Built-in tests (`uv run pytest`, `go test`, `npm test`)
+6. Built-in lint (library projects only)
+7. Pre-release hook (`.rlsbl/hooks/pre-release.sh`)
 
 ## Conventions
 
