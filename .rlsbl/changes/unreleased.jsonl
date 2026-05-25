@@ -1,1 +1,2 @@
 {"commits":["349ec03ff76d08ccb300845fe522d49564b25b64","7a39c6033148e0086ef514c9b8ab35350ebc6b8d"],"user_facing":false,"description":"Updated release.py docstring and docs frontmatter to accurately describe the release pipeline"}
+{"commits":["833d484024813603b07ff167ee2810be61cb2e26"],"user_facing":true,"description":"**Fix.** DocsTarget version sync now also updates the last entry in selfdoc.json `versions` array, preventing VER003 lint failures after release.","type":"fix"}
