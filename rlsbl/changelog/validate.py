@@ -399,6 +399,14 @@ def check_schema(entries: list[ChangelogEntry]) -> tuple[bool, list[str]]:
     return (len(details) == 0, details)
 
 
+def check_has_user_facing(entries: list[ChangelogEntry]) -> tuple[bool, list[str]]:
+    """Check that at least one entry is user-facing."""
+    user_facing = [e for e in entries if e.user_facing]
+    if user_facing:
+        return True, []
+    return False, ["no user-facing changelog entries — every release must have at least one"]
+
+
 def check_batch_size_commits(
     entries: list[ChangelogEntry],
     config: dict,
@@ -505,7 +513,7 @@ def _read_all_versioned_entries(changes_dir: str) -> dict[str, list[ChangelogEnt
 # ---------------------------------------------------------------------------
 
 def validate_unreleased(changes_dir: str, tag_glob: str | None = None) -> dict:
-    """Run all 7 validation checks on unreleased.jsonl.
+    """Run all 8 validation checks on unreleased.jsonl.
 
     Returns a dict with:
     - check names as keys, (passed, details) tuples as values
@@ -542,6 +550,7 @@ def validate_unreleased(changes_dir: str, tag_glob: str | None = None) -> dict:
                     "schema": (True, []),
                     "batch_size_commits": (True, []),
                     "batch_size_entries": (True, []),
+                    "user_facing": (True, []),
                 },
             }
         # Cache is valid but HEAD moved: only validate new entries
@@ -559,6 +568,7 @@ def validate_unreleased(changes_dir: str, tag_glob: str | None = None) -> dict:
         "schema": check_schema(entries),
         "batch_size_commits": check_batch_size_commits(entries, batch_config, version="unreleased"),
         "batch_size_entries": check_batch_size_entries(entries_by_version, batch_config),
+        "user_facing": check_has_user_facing(entries),
     }
 
     overall = all(passed for passed, _ in checks.values())
