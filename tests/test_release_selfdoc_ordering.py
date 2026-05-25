@@ -5,7 +5,7 @@ import os
 import subprocess
 from unittest.mock import MagicMock, patch
 
-from rlsbl.commands.release import _refresh_selfdoc_hashes, run_cmd
+from rlsbl.commands.release import _refresh_selfdoc_hashes, _run_selfdoc_gen, run_cmd
 
 
 class TestSelfdocBeforeTestsAndLint:
@@ -61,6 +61,36 @@ class TestSelfdocBeforeTestsAndLint:
 
         assert pre_checks_pos < selfdoc_pos, (
             "pre-checks hook must appear before _run_selfdoc_check"
+        )
+
+    def test_selfdoc_gen_before_selfdoc_check(self):
+        """Selfdoc gen must run before selfdoc check."""
+        source = inspect.getsource(run_cmd)
+        gen_pos = source.index("_run_selfdoc_gen(")
+        check_pos = source.index("_run_selfdoc_check(")
+
+        assert gen_pos < check_pos, (
+            "_run_selfdoc_gen must appear before _run_selfdoc_check"
+        )
+
+    def test_selfdoc_gen_after_strictcli_schema_dump(self):
+        """Selfdoc gen must run after strictcli schema dump."""
+        source = inspect.getsource(run_cmd)
+        schema_pos = source.index("_run_strictcli_schema_dump(")
+        gen_pos = source.index("_run_selfdoc_gen(")
+
+        assert schema_pos < gen_pos, (
+            "_run_strictcli_schema_dump must appear before _run_selfdoc_gen"
+        )
+
+    def test_selfdoc_gen_before_tests(self):
+        """Selfdoc gen must run before tests."""
+        source = inspect.getsource(run_cmd)
+        gen_pos = source.index("_run_selfdoc_gen(")
+        tests_pos = source.index("_run_builtin_tests(")
+
+        assert gen_pos < tests_pos, (
+            "_run_selfdoc_gen must appear before _run_builtin_tests"
         )
 
 
