@@ -144,7 +144,7 @@
     "description": "92c829699be90c4ea09e05c6e0ff3830b755bdd05be47a9427e51074cedcb831"
   },
   "en/cli-index.md": {
-    "content": "4feba1bc8c8a03163473db7289aa9dddc2b20e80fcf2d48aa000e60622a429c5",
+    "content": "9e8be5cee367fddbb720b85f998b9ffdcd9af1acc0fca45324825116389a2840",
     "description": "472b595ee78b5b818ea32e7f0ed06fd90ad59c2bce66811707dea4cb145743c8"
   },
   "en/cli-migrate.md": {
@@ -204,7 +204,7 @@
     "description": "f934ebcc70f1b9dc3c86b2020fcfac4db46bd2cd252d78e4d5989f59cc429886"
   },
   "en/configuration.md": {
-    "content": "92c09924f00b93caef92b94f3b79ff1b38b6acc2f13eee835e9cd4e6ef6d483e",
+    "content": "439941d4084e352a6763a59c43bbf52f91b5c552bd74e9024304affd34d0cba6",
     "description": "eca8376cb4732400dcc36d6990552987352bb3529f7049346c3d54df6f6c0207"
   },
   "en/gen-index.md": {
@@ -244,7 +244,7 @@
     "description": "33b8f696a59e3dc4a5f6acccdf60f0e0021e2c6bf7aa1a3177395c23e4a6330a"
   },
   "en/rlsbl-changelog-validate.md": {
-    "content": "e7abdd1ed06b82b644768dc198064fe3f52d1055673f620361d8983d6a930bcb",
+    "content": "9a8318d7e2f16efebfc80f14ddf65ae1647528aaa656c8320d030bef0e6f031e",
     "description": "6757baf13b4fc24f8bf76d396748f5520c0097716d037cbc6dfcd38ada007b7e"
   },
   "en/rlsbl-changelog.md": {
@@ -260,8 +260,8 @@
     "description": "d3137ed885db74c9735a5a877e1502aeaecacfcda42bbe6a066df0cc2fe532d4"
   },
   "en/rlsbl-commands-changelog_cmd.md": {
-    "content": "7e7224d66e99695f539f539e3f78c1178886558fbc65d3e0cbfa395222d8e769",
-    "description": "0418827b7c648a71434cfc3fe4485cdb44a02d3daf5ba599733592cccf2d9774"
+    "content": "b2e76d6bdc909825e32d992ded7235d2307a23ed1caba74e175cd03048bce440",
+    "description": "718a2c4072231924b773d39e888fd9a57609cdd0b1ced98ac06c9cd1054614f7"
   },
   "en/rlsbl-commands-check.md": {
     "content": "d6a556f1bb0de120a1257730711a7c755524a16dc0f69e7699cf529bd644e95c",
@@ -340,8 +340,8 @@
     "description": "c7776d190150330f960501da40b144d7eaa95549b77ddb022210aa638d70f571"
   },
   "en/rlsbl-commands-release.md": {
-    "content": "da80c1507c538f8be5b35dd86f526397cf89b5a7199969bbf129c431178ad99f",
-    "description": "ebf6fd842614e4c6fd2cbecc8133e4c5ff1d2413f87fe94c4ea8b3cc288e09b1"
+    "content": "698f553a5ffc252e740bacee3cbc210229fe646e393d5f8a3a4d892519dc78eb",
+    "description": "c58cbce457f76584d0203c41c5a412f34aeed57807db344e684b21e0e8df355b"
   },
   "en/rlsbl-commands-status.md": {
     "content": "6f3fb8dfee875a6f2d0134a6cb3bea62650464a040db1be67e66f701d4924a95",
