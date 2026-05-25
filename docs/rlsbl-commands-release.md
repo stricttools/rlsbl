@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.release
-description: "Release command that bumps version, validates changelog, runs hooks, regenerates and checks selfdoc, refreshes selfdoc hashes, syncs lockfiles, tags, pushes, and creates a GitHub Release."
+description: "Release command: bumps version, validates changelog, runs hooks, regenerates selfdoc, syncs lockfiles, tags, pushes, and creates a GitHub Release."
 generated: true
 nav_group: "API Reference"
 nav_order: 33
