@@ -268,10 +268,12 @@ class TestCheckBatchSizeEntries:
 # ---------------------------------------------------------------------------
 
 class TestValidateUnreleasedIntegration:
-    def test_seven_checks_pass(self, git_repo):
+    def test_eight_checks_pass(self, git_repo):
         changes = str(git_repo / ".rlsbl" / "changes")
         sha = _make_commit(git_repo)
-        append_entry(changes, ChangelogEntry(commits=[sha], user_facing=False))
+        append_entry(changes, ChangelogEntry(
+            commits=[sha], user_facing=True, description="New feature", type="feature",
+        ))
 
         result = validate_unreleased(changes)
         assert result["passed"] is True
@@ -283,6 +285,7 @@ class TestValidateUnreleasedIntegration:
             "schema",
             "batch_size_commits",
             "batch_size_entries",
+            "user_facing",
         ):
             assert key in result["checks"], f"missing check {key}"
             passed, _ = result["checks"][key]
