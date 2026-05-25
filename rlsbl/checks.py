@@ -555,6 +555,21 @@ def register_checks(app):
             return CheckResult("pass", "all entries valid")
         return CheckResult("fail", f"{len(details)} schema error(s)", details=details)
 
+    @app.check("changelog-user-facing")
+    def check_changelog_user_facing(ctx):
+        """At least one entry must be user-facing."""
+        from .changelog.validate import check_has_user_facing
+
+        info = _get_changelog_context(ctx)
+        if info is None:
+            return CheckResult("skip", "no .rlsbl/changes/ directory")
+        _changes_dir, _tag_glob, entries = info
+
+        passed, details = check_has_user_facing(entries)
+        if passed:
+            return CheckResult("pass", "has user-facing entries")
+        return CheckResult("warn", "no user-facing entries", details=details)
+
     @app.check("changelog-batch-commits")
     def check_changelog_batch_commits(ctx):
         """No entry should have more commits than max_commits_per_entry."""
