@@ -2,6 +2,16 @@
 
 # Changelog
 
+## 0.41.6
+
+### Features
+
+- **New feature.** Run `selfdoc gen --no-commit` before `selfdoc check` during release, ensuring docs are regenerated from source before validation.
+
+### Fixes
+
+- **Fix.** `selfdoc check` failures now print a clean error message instead of a raw Python traceback.
+
 ## 0.41.5
 
 ### Fixes
