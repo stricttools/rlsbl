@@ -1,0 +1,10 @@
+{"commits":["349ec03ff76d08ccb300845fe522d49564b25b64","7a39c6033148e0086ef514c9b8ab35350ebc6b8d"],"user_facing":false,"description":"Updated release.py docstring and docs frontmatter to accurately describe the release pipeline"}
+{"commits":["833d484024813603b07ff167ee2810be61cb2e26"],"user_facing":true,"description":"**Fix.** DocsTarget version sync now also updates the last entry in selfdoc.json `versions` array, preventing VER003 lint failures after release.","type":"fix"}
+{"commits":["419cba304e5b644c25a48b300f6f4ef432a34e6e","39fa2cc8807b4e33e28270902ea3c61901faa3d6","905ebdb739257b7ee8de5ccb26c5b16182ecd87b","d7c39f8283720c03aaaa71fffd0cadfd6e1becd7"],"user_facing":true,"description":"**New feature.** Releases are now blocked when there are no user-facing changelog entries. Shown as a warning during `rlsbl check`, hard error during `rlsbl release`.","type":"feature"}
+{"commits":["70725a15063c276d968c52484f1923c3895819a5","5f5310f01c9130b230b636c2e11385feb4d14633","d23936451ea7b5e5bbb126b7a66c5b76df6dd84f"],"user_facing":false,"description":"Tests for user-facing check and check registration"}
+{"commits":["478d26c18936318decf1698805fae97c88b4bc5d"],"user_facing":false,"description":"Release file preparation"}
+{"commits":["c78eda1a076ae90b5ec49de6f2b6f19a19649d51"],"user_facing":true,"description":"**New feature.** `changelog add` and `changelog amend` now detect duplicate commits -- hard error when the same commit appears in an entry with matching type, warning when types differ.","type":"feature"}
+{"commits":["11aed95d85d5543c1b93ed0cfcb344cc9b251340"],"user_facing":false,"description":"Tests for duplicate commit detection"}
+{"commits":["edf76635df30dc21343db951ab0bc3592b9946ed"],"user_facing":false,"description":"Removed duplicate changelog entries"}
+{"commits":["3d3ee46439ffc477d95b4f5b5ff0259e718ae7bd","3344e52af45c4fad4123b69b789568c2b24f7f26"],"user_facing":false,"description":"Updated docstring and frontmatter descriptions"}
+{"commits":["2d670af3475ede16c17f3c4f2e49f4b358cc03d1"],"user_facing":false,"description":"Fix test for DocsTarget versions sync"}
