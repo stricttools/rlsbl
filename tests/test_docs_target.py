@@ -137,7 +137,7 @@ class TestDocsTargetWriteVersion:
                 data = json.load(f)
             assert data["version"] == "0.6.0"
             assert data["source"] == ["src/"]
-            assert data["versions"] == [{"version": "1.0", "indexed": True}]
+            assert data["versions"] == [{"version": "0.6.0", "indexed": True}]
 
     def test_preserves_indentation(self):
         target = DocsTarget()
