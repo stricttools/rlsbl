@@ -193,6 +193,105 @@ class TestCmdAdd:
             mock_commit.assert_called_once()
             assert mock_commit.call_args[0][0] == "changelog: non-user-facing entry"
 
+    def test_duplicate_commit_same_type_rejected(self, rlsbl_repo):
+        """Adding the same commit with the same user_facing and type is a hard error."""
+        sha = _make_commit(rlsbl_repo)
+        flags_first = {
+            "commits": sha[:12],
+            "description": "First feature",
+            "type": "feature",
+            "no-user-facing": False,
+            "no-commit": True,
+        }
+        cmd_add(flags_first)
+
+        flags_second = {
+            "commits": sha[:12],
+            "description": "Duplicate feature",
+            "type": "feature",
+            "no-user-facing": False,
+            "no-commit": True,
+        }
+        with pytest.raises(SystemExit) as exc_info:
+            cmd_add(flags_second)
+        assert exc_info.value.code == 1
+
+        entries = read_unreleased(get_changes_dir("."))
+        assert len(entries) == 1
+
+    def test_duplicate_commit_different_type_allowed(self, rlsbl_repo):
+        """Same commit with different types is allowed (one commit, two changelog types)."""
+        sha = _make_commit(rlsbl_repo)
+        flags_first = {
+            "commits": sha[:12],
+            "description": "Feature entry",
+            "type": "feature",
+            "no-user-facing": False,
+            "no-commit": True,
+        }
+        cmd_add(flags_first)
+
+        flags_second = {
+            "commits": sha[:12],
+            "description": "Fix entry",
+            "type": "fix",
+            "no-user-facing": False,
+            "no-commit": True,
+        }
+        cmd_add(flags_second)
+
+        entries = read_unreleased(get_changes_dir("."))
+        assert len(entries) == 2
+
+    def test_duplicate_commit_non_user_facing_rejected(self, rlsbl_repo):
+        """Adding the same commit as non-user-facing twice is a hard error."""
+        sha = _make_commit(rlsbl_repo)
+        flags_first = {
+            "commits": sha,
+            "description": "",
+            "type": "",
+            "no-user-facing": True,
+            "no-commit": True,
+        }
+        cmd_add(flags_first)
+
+        flags_second = {
+            "commits": sha,
+            "description": "",
+            "type": "",
+            "no-user-facing": True,
+            "no-commit": True,
+        }
+        with pytest.raises(SystemExit) as exc_info:
+            cmd_add(flags_second)
+        assert exc_info.value.code == 1
+
+    def test_duplicate_commit_user_facing_vs_non_user_facing_warns(self, rlsbl_repo, capsys):
+        """User-facing then non-user-facing for the same commit warns but succeeds."""
+        sha = _make_commit(rlsbl_repo)
+        flags_first = {
+            "commits": sha[:12],
+            "description": "A feature",
+            "type": "feature",
+            "no-user-facing": False,
+            "no-commit": True,
+        }
+        cmd_add(flags_first)
+
+        flags_second = {
+            "commits": sha[:12],
+            "description": "",
+            "type": "",
+            "no-user-facing": True,
+            "no-commit": True,
+        }
+        cmd_add(flags_second)
+
+        entries = read_unreleased(get_changes_dir("."))
+        assert len(entries) == 2
+
+        captured = capsys.readouterr()
+        assert "Warning" in captured.err
 
 
 # ---------------------------------------------------------------------------
