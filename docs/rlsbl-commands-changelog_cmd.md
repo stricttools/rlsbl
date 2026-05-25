@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.changelog_cmd
-description: "Changelog subcommands for adding new entries, amending released versions, and generating Markdown changelogs from JSONL sources."
+description: "Changelog subcommands for adding new entries with duplicate commit detection, amending released versions, and generating Markdown changelogs from JSONL sources."
 generated: true
 nav_group: "API Reference"
 nav_order: 13
