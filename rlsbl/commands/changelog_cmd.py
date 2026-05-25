@@ -10,11 +10,39 @@ from ..changelog.files import (
     changes_dir_exists,
     get_changes_dir,
     is_read_only,
+    read_unreleased,
 )
 from ..changelog.generate import generate_changelog
 from ..changelog.resolve import resolve_hash
-from ..changelog.schema import ChangelogEntry, validate_schema
+from ..changelog.schema import ChangelogEntry, parse_jsonl, validate_schema
 from ..utils import commit_files
+
+
+def _check_duplicate_commits(existing_entries, new_entry):
+    """Check if any commits in new_entry already appear in existing entries.
+
+    Hard error when a commit appears in an existing entry with the same
+    user_facing value and type. Warning when the types differ (legitimate
+    case: one commit spanning multiple changelog types).
+    """
+    for new_hash in new_entry.commits:
+        for i, existing in enumerate(existing_entries, start=1):
+            if new_hash in existing.commits:
+                short = new_hash[:12]
+                if (existing.user_facing == new_entry.user_facing
+                        and existing.type == new_entry.type):
+                    desc = existing.description or "(no description)"
+                    print(
+                        f"Error: commit {short} already covered by entry {i}: {desc}",
+                        file=sys.stderr,
+                    )
+                    sys.exit(1)
+                else:
+                    desc = existing.description or "(no description)"
+                    print(
+                        f"Warning: commit {short} already in entry {i}: {desc}",
+                        file=sys.stderr,
+                    )
 
 
 def cmd_add(flags):
@@ -78,6 +106,8 @@ def cmd_add(flags):
         sys.exit(1)
 
     changes_dir = get_changes_dir(".")
+    existing = read_unreleased(changes_dir)
+    _check_duplicate_commits(existing, entry)
     append_entry(changes_dir, entry)
     print(f"Added entry with {len(resolved_commits)} commit(s)")
 
@@ -229,6 +259,9 @@ def cmd_amend(flags):
     was_read_only = is_read_only(jsonl_path)
     if was_read_only:
         os.chmod(jsonl_path, 0o644)
+
+    existing = parse_jsonl(jsonl_path)
+    _check_duplicate_commits(existing, entry)
 
     try:
         append_entry_to_version(changes_dir, version, entry)
