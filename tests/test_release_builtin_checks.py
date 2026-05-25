@@ -470,7 +470,7 @@ class TestSelfdocCheck:
             assert "selfdoc is not installed" in captured.out
 
     def test_selfdoc_check_failure_propagates(self, tmp_project):
-        """When selfdoc check fails, CalledProcessError propagates."""
+        """When selfdoc check fails, sys.exit(1) is called."""
         (tmp_project / "selfdoc.json").write_text("{}")
 
         with (
@@ -480,8 +480,9 @@ class TestSelfdocCheck:
                 side_effect=subprocess.CalledProcessError(1, ["selfdoc", "check"]),
             ),
         ):
-            with pytest.raises(subprocess.CalledProcessError):
+            with pytest.raises(SystemExit) as exc_info:
                 _run_selfdoc_check({})
+            assert exc_info.value.code == 1
 
     def test_selfdoc_check_uses_project_dir(self, tmp_project):
         """When project_dir is set, selfdoc.json is checked there and cwd is passed."""
