@@ -199,6 +199,21 @@ def run_cmd(registry, args, flags):
 
         if not runs:
             print(f"rlsbl: {label}: no CI runs found after 30s", file=sys.stderr)
+            # Best-effort hint: if this commit has a GitHub Release but no
+            # workflows ran, suggest `rlsbl release retry`.
+            try:
+                release_tag = run("git", ["describe", "--tags", "--exact-match", commit_sha])
+                try:
+                    run("gh", ["release", "view", release_tag])
+                    print(
+                        f"rlsbl: hint: GitHub Release {release_tag} exists but "
+                        "no workflows ran. Try: rlsbl release retry",
+                        file=sys.stderr,
+                    )
+                except Exception:
+                    pass
+            except Exception:
+                pass
             sys.exit(1)
 
         print(f"rlsbl: {label}: found {len(runs)} CI run(s), watching...", file=sys.stderr)

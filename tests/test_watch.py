@@ -142,6 +142,100 @@ class TestPrintWorkflowAudit:
         assert "Warning:" not in err
 
 
+class TestNoRunsHint:
+    """Tests for the release-retry hint when no CI runs are found."""
+
+    @patch("rlsbl.commands.watch.poll_runs", return_value=[])
+    @patch("rlsbl.commands.watch.run")
+    def test_hint_printed_when_tag_and_release_exist(self, mock_run, mock_poll, capsys):
+        """When no runs, commit has a tag, and GitHub Release exists, hint is printed."""
+        mock_run.side_effect = [
+            "abc123full",  # git rev-parse (resolve arg)
+            json.dumps({"nameWithOwner": "user/repo", "name": "repo"}),  # gh repo view
+            "v1.2.0",  # git describe --tags --exact-match (label)
+            "v1.2.0",  # git describe --tags --exact-match (hint check)
+            "Release v1.2.0\n...",  # gh release view
+        ]
+
+        with pytest.raises(SystemExit) as exc_info:
+            run_cmd(None, ["abc123"], {})
+
+        assert exc_info.value.code == 1
+        err = capsys.readouterr().err
+        assert "no CI runs found after 30s" in err
+        assert "rlsbl: hint: GitHub Release v1.2.0 exists but no workflows ran" in err
+        assert "rlsbl release retry" in err
+
+    @patch("rlsbl.commands.watch.poll_runs", return_value=[])
+    @patch("rlsbl.commands.watch.run")
+    def test_no_hint_when_tag_exists_but_no_release(self, mock_run, mock_poll, capsys):
+        """When no runs, commit has a tag, but no GitHub Release, no hint."""
+        mock_run.side_effect = [
+            "abc123full",  # git rev-parse
+            json.dumps({"nameWithOwner": "user/repo", "name": "repo"}),  # gh repo view
+            "v1.2.0",  # git describe --tags --exact-match (label)
+            "v1.2.0",  # git describe --tags --exact-match (hint check)
+            Exception("release not found"),  # gh release view fails
+        ]
+
+        with pytest.raises(SystemExit) as exc_info:
+            run_cmd(None, ["abc123"], {})
+
+        assert exc_info.value.code == 1
+        err = capsys.readouterr().err
+        assert "no CI runs found after 30s" in err
+        assert "hint:" not in err
+
+    @patch("rlsbl.commands.watch.poll_runs", return_value=[])
+    @patch("rlsbl.commands.watch.run")
+    def test_no_hint_when_no_tag(self, mock_run, mock_poll, capsys):
+        """When no runs and commit has no tag, no hint."""
+        mock_run.side_effect = [
+            "abc123full",  # git rev-parse
+            json.dumps({"nameWithOwner": "user/repo", "name": "repo"}),  # gh repo view
+            Exception("no tag"),  # git describe --tags --exact-match (label) fails
+            Exception("no tag"),  # git describe --tags --exact-match (hint check) fails
+        ]
+
+        with pytest.raises(SystemExit) as exc_info:
+            run_cmd(None, ["abc123"], {})
+
+        assert exc_info.value.code == 1
+        err = capsys.readouterr().err
+        assert "no CI runs found after 30s" in err
+        assert "hint:" not in err
+
+    @patch("rlsbl.commands.watch._notify")
+    @patch("rlsbl.commands.watch._print_workflow_audit", return_value=False)
+    @patch("rlsbl.commands.watch._watch_runs")
+    @patch("rlsbl.commands.watch.poll_runs")
+    @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.run")
+    def test_hint_not_reached_when_runs_found(
+        self, mock_run, mock_time, mock_poll, mock_watch, mock_audit, mock_notify, capsys
+    ):
+        """When CI runs are found, the hint logic is never reached."""
+        ci_run = {"databaseId": 100, "name": "CI", "status": "in_progress"}
+        mock_poll.side_effect = [
+            [ci_run],  # initial poll finds runs
+            [ci_run],  # re-poll
+        ]
+        mock_run.side_effect = [
+            "abc123full",  # git rev-parse
+            json.dumps({"nameWithOwner": "user/repo", "name": "repo"}),  # gh repo view
+            "v1.2.0",  # git describe
+        ]
+        mock_watch.return_value = [{"name": "CI", "passed": True}]
+
+        with pytest.raises(SystemExit) as exc_info:
+            run_cmd(None, ["abc123"], {})
+
+        assert exc_info.value.code == 0
+        err = capsys.readouterr().err
+        assert "hint:" not in err
+        assert "no CI runs found" not in err
+
+
 class TestRePoll:
     """Tests for the re-poll logic that catches late-starting workflows."""
 
