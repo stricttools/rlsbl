@@ -138,7 +138,7 @@ def _print_workflow_audit(results):
     return missing_publish
 
 
-def _poll_runs(commit_sha, max_attempts=15, interval=2):
+def poll_runs(commit_sha, max_attempts=15, interval=2):
     """Poll gh run list until at least one run appears.
 
     Returns a list of run dicts (may be empty if nothing found after all attempts).
@@ -195,7 +195,7 @@ def run_cmd(registry, args, flags):
         label = f"{repo_name} {tag}" if repo_name else tag
 
         # Poll until at least one run appears (retry up to 30s)
-        runs = _poll_runs(commit_sha)
+        runs = poll_runs(commit_sha)
 
         if not runs:
             print(f"rlsbl: {label}: no CI runs found after 30s", file=sys.stderr)
@@ -211,7 +211,7 @@ def run_cmd(registry, args, flags):
         # then check once for any runs that were not in the initial set.
         initial_ids = {r["databaseId"] for r in runs}
         time.sleep(5)
-        all_runs_now = _poll_runs(commit_sha, max_attempts=1, interval=0)
+        all_runs_now = poll_runs(commit_sha, max_attempts=1, interval=0)
         late_runs = [r for r in all_runs_now if r["databaseId"] not in initial_ids]
 
         if late_runs:

@@ -148,7 +148,7 @@ class TestRePoll:
     @patch("rlsbl.commands.watch._notify")
     @patch("rlsbl.commands.watch._print_workflow_audit")
     @patch("rlsbl.commands.watch._watch_runs")
-    @patch("rlsbl.commands.watch._poll_runs")
+    @patch("rlsbl.commands.watch.poll_runs")
     @patch("rlsbl.commands.watch.time")
     @patch("rlsbl.commands.watch.run")
     def test_late_run_discovered_on_repoll(
@@ -182,7 +182,7 @@ class TestRePoll:
 
         assert exc_info.value.code == 0
 
-        # _poll_runs called twice: initial discovery + re-poll
+        # poll_runs called twice: initial discovery + re-poll
         assert mock_poll.call_count == 2
         # Re-poll uses max_attempts=1, interval=0
         mock_poll.assert_called_with("abc123full", max_attempts=1, interval=0)
@@ -203,7 +203,7 @@ class TestRePoll:
     @patch("rlsbl.commands.watch._notify")
     @patch("rlsbl.commands.watch._print_workflow_audit")
     @patch("rlsbl.commands.watch._watch_runs")
-    @patch("rlsbl.commands.watch._poll_runs")
+    @patch("rlsbl.commands.watch.poll_runs")
     @patch("rlsbl.commands.watch.time")
     @patch("rlsbl.commands.watch.run")
     def test_no_late_runs_skips_second_watch(
