@@ -196,8 +196,8 @@ release_group = app.group("release", help="Release orchestration commands.")
     help="Bump version, validate changelog, commit, tag, push, and create a GitHub Release. Reads bump type from .rlsbl/releases/unreleased.toml (create with rlsbl release init).",
     mutex=[
         strictcli.MutexGroup(flags=[
-            strictcli.Flag(name="watch", type=bool, help="After release, automatically watch CI runs to completion"),
-            strictcli.Flag(name="no-watch", type=bool, help="After release, print the watch command hint without watching"),
+            strictcli.Flag(name="watch", type=bool, negatable=False, help="After release, automatically watch CI runs to completion"),
+            strictcli.Flag(name="no-watch", type=bool, negatable=False, help="After release, print the watch command hint without watching"),
         ]),
     ],
 )
