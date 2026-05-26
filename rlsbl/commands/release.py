@@ -1474,7 +1474,12 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
     if monorepo_name:
         _print_stale_dep_advisory(monorepo_name, new_version, version_dir)
 
-    # Hint: how to watch CI for this release (uses SHA captured before post-release hooks)
-    log(f"Watch CI: rlsbl watch {pushed_sha}")
+    # Watch CI or print hint (uses SHA captured before post-release hooks)
+    if flags.get("watch"):
+        log(f"Watching CI for {pushed_sha}...")
+        from .watch import run_cmd as watch_run_cmd
+        watch_run_cmd(None, [pushed_sha], {})
+    else:
+        log(f"Watch CI: rlsbl watch {pushed_sha}")
 
     log(f"\nRelease {new_version} complete!")

@@ -123,7 +123,7 @@ def _resolve_target(target):
 app = strictcli.App(
     name="rlsbl",
     version=__version__,
-    help="Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 14 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, and more). Ships 32 commands organized into 18 top-level commands and 3 command groups (changelog, monorepo, dev).",
+    help="Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 14 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, and more). Ships 32 commands organized into 16 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
     flags=[
         strictcli.Flag(name="dry-run", type=bool, help="Preview changes without applying them"),
         strictcli.Flag(name="yes", type=bool, short="y", help="Skip confirmation prompts"),
@@ -191,9 +191,18 @@ del _bootstrap_checks
 release_group = app.group("release", help="Release orchestration commands.")
 
 
-@release_group.command(name="run", help="Bump version, validate changelog, commit, tag, push, and create a GitHub Release. Reads bump type from .rlsbl/releases/unreleased.toml (create with rlsbl release init).")
+@release_group.command(
+    name="run",
+    help="Bump version, validate changelog, commit, tag, push, and create a GitHub Release. Reads bump type from .rlsbl/releases/unreleased.toml (create with rlsbl release init).",
+    mutex=[
+        strictcli.MutexGroup(flags=[
+            strictcli.Flag(name="watch", type=bool, help="After release, automatically watch CI runs to completion"),
+            strictcli.Flag(name="no-watch", type=bool, help="After release, print the watch command hint without watching"),
+        ]),
+    ],
+)
 @strictcli.flag(name="allow-dirty", type=bool, help="Allow releasing with a dirty working tree")
-def cmd_release_run(dry_run, yes, quiet, allow_dirty, **_kwargs):
+def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, no_watch, **_kwargs):
     _require_project_root()
 
     from .release_file import read_release_file, get_release_file_path
@@ -226,6 +235,7 @@ def cmd_release_run(dry_run, yes, quiet, allow_dirty, **_kwargs):
         "yes": yes,
         "quiet": quiet,
         "allow-dirty": allow_dirty,
+        "watch": bool(watch),
     }
     from .commands.release import run_cmd
     run_cmd(release_config, flags)
