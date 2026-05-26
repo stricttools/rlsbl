@@ -721,7 +721,7 @@ class TestGenerateInlinePublishRouter:
 
         parsed = _safe_load(result)
         assert parsed["name"] == "Publish Router"
-        assert parsed["on"] == {"release": {"types": ["published"]}}
+        assert parsed["on"] == {"release": {"types": ["published"]}, "workflow_dispatch": None}
 
     def test_trailing_slash_stripped_from_path(self, tmp_path):
         root = str(tmp_path)

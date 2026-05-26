@@ -130,7 +130,7 @@ class TestPublishRouterTopLevel:
         ):
             content = generate_inline_publish_router(projects, root)
         parsed = _safe_load(content)
-        assert parsed["on"] == {"release": {"types": ["published"]}}
+        assert parsed["on"] == {"release": {"types": ["published"]}, "workflow_dispatch": None}
 
     def test_has_router_name(self, tmp_path):
         root = str(tmp_path)
