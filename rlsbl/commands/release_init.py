@@ -1,4 +1,4 @@
-"""release-init command: scaffold a release file by auto-detecting project targets."""
+"""release init command: scaffold a release file by auto-detecting project targets."""
 
 import os
 import sys
