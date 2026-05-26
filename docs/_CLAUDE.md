@@ -64,7 +64,7 @@ During `rlsbl release run`, the validation and build steps run in this order:
 
 ## Check system
 
-29 checks registered across 5 tags: `project`, `release`, `changelog`, `workspace`, `quality`. Run individual checks or by tag:
+30 checks registered across 5 tags: `project`, `release`, `changelog`, `workspace`, `quality`. Run individual checks or by tag:
 
 - `rlsbl check --all` -- run all checks
 - `rlsbl check --tag changelog` -- run all changelog validation checks (replaces the removed `rlsbl changelog validate`)

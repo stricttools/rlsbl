@@ -115,19 +115,19 @@ See [docs/ci-customization.md](docs/ci-customization.md) for an example.
 
 ## Check system
 
-28 project checks organized by tag:
+30 project checks organized by tag:
 
 | Tag | Checks | Description |
 |-----|--------|-------------|
-| `project` | 5 | Version, name, license, description consistency; lockfile presence |
+| `project` | 7 | Version, name, license, description consistency; lockfile presence; private hook staleness; config schema |
 | `release` | 4 | Local/remote tag, GitHub Release, branch sync |
-| `changelog` | 8 | Hash resolution, range, coverage, orphans, schema, batch limits, entry |
+| `changelog` | 9 | Hash resolution, range, coverage, orphans, schema, user-facing, batch limits, entry |
 | `workspace` | 5 | CI router, CI sync, targets, unregistered, stale entries |
 | `quality` | 1 | Library lint |
-| (untagged) | 5 | Layer violations, dependency validation (unused/undeclared/stale) |
+| (untagged) | 4 | Layer violations, dependency validation (unused/undeclared/stale) |
 
 ```
-rlsbl check --all              # run all 28 checks
+rlsbl check --all              # run all 30 checks
 rlsbl check --tag changelog    # run checks by tag
 rlsbl check --name lock        # run a single check
 ```
