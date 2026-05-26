@@ -185,12 +185,15 @@ del _bootstrap_checks
 
 
 # ---------------------------------------------------------------------------
-# release
+# release group
 # ---------------------------------------------------------------------------
 
-@app.command(name="release", help="Bump the project version, validate the changelog, commit, tag, push, and create a GitHub Release. Reads bump type and target selection from .rlsbl/releases/unreleased.toml (create with rlsbl release-init). Supports dry-run preview and non-interactive mode for CI.")
+release_group = app.group("release", help="Release orchestration commands.")
+
+
+@release_group.command(name="run", help="Bump version, validate changelog, commit, tag, push, and create a GitHub Release. Reads bump type from .rlsbl/releases/unreleased.toml (create with rlsbl release init).")
 @strictcli.flag(name="allow-dirty", type=bool, help="Allow releasing with a dirty working tree")
-def cmd_release(dry_run, yes, quiet, allow_dirty, **_kwargs):
+def cmd_release_run(dry_run, yes, quiet, allow_dirty, **_kwargs):
     _require_project_root()
 
     from .release_file import read_release_file, get_release_file_path
@@ -207,7 +210,7 @@ def cmd_release(dry_run, yes, quiet, allow_dirty, **_kwargs):
     release_path = get_release_file_path(project_dir)
     if not os.path.exists(release_path):
         print(
-            "No release file found. Run `rlsbl release-init` to create one.",
+            "No release file found. Run `rlsbl release init` to create one.",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -228,15 +231,17 @@ def cmd_release(dry_run, yes, quiet, allow_dirty, **_kwargs):
     run_cmd(release_config, flags)
 
 
-# ---------------------------------------------------------------------------
-# release-init
-# ---------------------------------------------------------------------------
-
-@app.command(name="release-init", help="Scaffold a .rlsbl/releases/unreleased.toml file by auto-detecting project targets. The generated file contains a default bump type (patch), an include list of all detected targets, and per-target configuration sections for Flutter targets.")
+@release_group.command(name="init", help="Scaffold a .rlsbl/releases/unreleased.toml file by auto-detecting project targets. The generated file contains a default bump type (patch), an include list of all detected targets, and per-target configuration sections for Flutter targets.")
 def cmd_release_init(**_kwargs):
     _require_project_root()
     from .commands.release_init import run_cmd
     run_cmd()
+
+
+@release_group.command(name="retry", help="Re-create a GitHub Release to re-trigger CI/CD workflows.")
+def cmd_release_retry(**_kwargs):
+    print("rlsbl: release retry is not yet implemented", file=sys.stderr)
+    sys.exit(1)
 
 
 # ---------------------------------------------------------------------------

@@ -354,17 +354,17 @@ class TestTargetExhaustivenessValidation:
 # ---------------------------------------------------------------------------
 
 class TestCmdReleaseMissingFile:
-    """cmd_release errors when no release file exists."""
+    """cmd_release_run errors when no release file exists."""
 
     def test_no_release_file_gives_error(self, tmp_project, capsys):
-        """Running release without a release file prints an actionable error."""
+        """Running release run without a release file prints an actionable error."""
         # Create .rlsbl/ so _require_project_root succeeds
         (tmp_project / ".rlsbl").mkdir()
 
-        from rlsbl import cmd_release
+        from rlsbl import cmd_release_run
 
         with pytest.raises(SystemExit) as exc_info:
-            cmd_release(
+            cmd_release_run(
                 dry_run=False,
                 yes=True,
                 quiet=True,
@@ -374,11 +374,11 @@ class TestCmdReleaseMissingFile:
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
         assert "No release file found" in captured.err
-        assert "rlsbl release-init" in captured.err
+        assert "rlsbl release init" in captured.err
 
 
 class TestCmdReleaseInvalidFile:
-    """cmd_release errors when the release file is malformed."""
+    """cmd_release_run errors when the release file is malformed."""
 
     def test_invalid_bump_in_release_file(self, tmp_project, capsys):
         """A release file with an invalid bump type prints a validation error."""
@@ -389,10 +389,10 @@ class TestCmdReleaseInvalidFile:
             'bump = "huge"\ninclude = ["npm"]\nexclude = []\n'
         )
 
-        from rlsbl import cmd_release
+        from rlsbl import cmd_release_run
 
         with pytest.raises(SystemExit) as exc_info:
-            cmd_release(
+            cmd_release_run(
                 dry_run=False,
                 yes=True,
                 quiet=True,
