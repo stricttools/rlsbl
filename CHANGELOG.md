@@ -2,6 +2,24 @@
 
 # Changelog
 
+## 0.42.0
+
+### Breaking
+
+- **Breaking.** `rlsbl release` is now a command group. Use `rlsbl release run` (was `rlsbl release`), `rlsbl release init` (was `rlsbl release-init`), and the new `rlsbl release retry`.
+- **Breaking.** `rlsbl release run` requires `--watch` or `--no-watch`. `--watch` auto-monitors CI to completion; `--no-watch` prints the watch hint.
+
+### Features
+
+- **New command.** `rlsbl release retry` re-creates a GitHub Release to re-trigger CI/CD workflows, with asset re-upload and automatic `gh workflow run` fallback.
+- **Scaffold.** All generated CI and Publish workflow templates now include `workflow_dispatch` trigger for manual re-triggering after GitHub Actions outages.
+- **Watch.** `rlsbl watch` now suggests `rlsbl release retry` when no CI runs are found but a GitHub Release exists for the commit.
+- **New target.** `pgdesign` release target for database schema projects.
+
+### Fixes
+
+- **Bug fix.** `rlsbl check` commands no longer crash in monorepo context with `WorkspaceGraph.__init__() missing required argument`.
+
 ## 0.41.7
 
 ### Features
