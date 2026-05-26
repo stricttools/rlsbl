@@ -1,0 +1,1 @@
+{"commits":["bdd3b1bb8aa441a40cab1d81b4d2bb5614a82459"],"user_facing":true,"description":"**Bug fix.** `rlsbl check` commands no longer crash in monorepo context with `WorkspaceGraph.__init__() missing required argument`.","type":"fix"}
