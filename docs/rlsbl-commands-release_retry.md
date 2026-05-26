@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.release_retry
-description: "Release retry command that re-creates a GitHub Release to re-trigger CI/CD workflows."
+description: "Release retry command that re-creates a GitHub Release to re-trigger CI/CD publish workflows after outages or missed event deliveries."
 generated: true
 nav_group: "API Reference"
 nav_order: 35

@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.release_init
-description: "release init command: scaffold a release file by auto-detecting project targets."
+description: "Release init command that scaffolds a release TOML file by auto-detecting project targets, setting default bump type, and listing include targets."
 generated: true
 nav_group: "API Reference"
 nav_order: 34

@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.pgdesign
-description: "Pgdesign release target for projects using pgdesign to manage database schemas, with version tracking in pgdesign.toml."
+description: "Pgdesign release target for projects using pgdesign to manage PostgreSQL database schemas, with version tracking in pgdesign.toml."
 generated: true
 nav_group: "API Reference"
 nav_order: 80

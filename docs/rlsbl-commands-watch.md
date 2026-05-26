@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.watch
-description: "Watch command that polls GitHub Actions CI workflow runs for a given commit SHA and reports pass, fail, or in-progress status."
+description: "Watch command that polls GitHub Actions CI workflow runs for a given commit SHA, reports pass/fail/in-progress status, and suggests retry on failure."
 generated: true
 nav_group: "API Reference"
 nav_order: 40
