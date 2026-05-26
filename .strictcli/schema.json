@@ -1,7 +1,7 @@
 {
   "name": "rlsbl",
-  "version": "0.41.6",
-  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 14 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, and more). Ships 32 commands organized into 18 top-level commands and 3 command groups (changelog, monorepo, dev).",
+  "version": "0.41.7",
+  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 14 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, and more). Ships 32 commands organized into 16 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
   "env_prefix": null,
   "config": false,
   "global_flags": [
@@ -132,33 +132,6 @@
           "hidden": false
         }
       ],
-      "args": [],
-      "passthrough": false
-    },
-    "release": {
-      "name": "release",
-      "help": "Bump the project version, validate the changelog, commit, tag, push, and create a GitHub Release. Reads bump type and target selection from .rlsbl/releases/unreleased.toml (create with rlsbl release-init). Supports dry-run preview and non-interactive mode for CI.",
-      "flags": [
-        {
-          "name": "allow-dirty",
-          "type": "bool",
-          "help": "Allow releasing with a dirty working tree",
-          "short": null,
-          "default": false,
-          "env": null,
-          "choices": null,
-          "repeatable": false,
-          "negatable": true,
-          "hidden": false
-        }
-      ],
-      "args": [],
-      "passthrough": false
-    },
-    "release-init": {
-      "name": "release-init",
-      "help": "Scaffold a .rlsbl/releases/unreleased.toml file by auto-detecting project targets. The generated file contains a default bump type (patch), an include list of all detected targets, and per-target configuration sections for Flutter targets.",
-      "flags": [],
       "args": [],
       "passthrough": false
     },
@@ -628,6 +601,104 @@
     }
   },
   "groups": {
+    "release": {
+      "name": "release",
+      "help": "Release orchestration commands.",
+      "commands": {
+        "run": {
+          "name": "run",
+          "help": "Bump version, validate changelog, commit, tag, push, and create a GitHub Release. Reads bump type from .rlsbl/releases/unreleased.toml (create with rlsbl release init).",
+          "flags": [
+            {
+              "name": "allow-dirty",
+              "type": "bool",
+              "help": "Allow releasing with a dirty working tree",
+              "short": null,
+              "default": false,
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": true,
+              "hidden": false
+            },
+            {
+              "name": "watch",
+              "type": "bool",
+              "help": "After release, automatically watch CI runs to completion",
+              "short": null,
+              "default": false,
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": false,
+              "hidden": false
+            },
+            {
+              "name": "no-watch",
+              "type": "bool",
+              "help": "After release, print the watch command hint without watching",
+              "short": null,
+              "default": false,
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": false,
+              "hidden": false
+            }
+          ],
+          "args": [],
+          "passthrough": false
+        },
+        "init": {
+          "name": "init",
+          "help": "Scaffold a .rlsbl/releases/unreleased.toml file by auto-detecting project targets. The generated file contains a default bump type (patch), an include list of all detected targets, and per-target configuration sections for Flutter targets.",
+          "flags": [],
+          "args": [],
+          "passthrough": false
+        },
+        "retry": {
+          "name": "retry",
+          "help": "Re-create a GitHub Release to re-trigger CI/CD workflows. Deletes the existing release and re-creates it with the same changelog notes, firing a new release:published event. Re-uploads assets if configured. Falls back to gh workflow run if no CI runs appear.",
+          "flags": [
+            {
+              "name": "watch",
+              "type": "bool",
+              "help": "After retry, automatically watch CI runs to completion",
+              "short": null,
+              "default": false,
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": false,
+              "hidden": false
+            },
+            {
+              "name": "no-watch",
+              "type": "bool",
+              "help": "After retry, print the watch command hint without watching",
+              "short": null,
+              "default": false,
+              "env": null,
+              "choices": null,
+              "repeatable": false,
+              "negatable": false,
+              "hidden": false
+            }
+          ],
+          "args": [
+            {
+              "name": "version",
+              "help": "Version to retry (defaults to current)",
+              "required": false,
+              "variadic": false
+            }
+          ],
+          "passthrough": false
+        }
+      },
+      "groups": {},
+      "deprecated": {}
+    },
     "changelog": {
       "name": "changelog",
       "help": "Structured changelog management using JSONL entries. Add and generate CHANGELOG.md from per-commit changelog entries stored in unreleased.jsonl for precise, auditable release notes.",
