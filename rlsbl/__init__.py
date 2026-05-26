@@ -148,7 +148,7 @@ def _check_context_factory():
         from .workspace_graph import WorkspaceGraph
 
         projects = load_workspace(workspace_root)
-        graph = WorkspaceGraph(projects)
+        graph = WorkspaceGraph(workspace_root, projects)
         return WorkspaceCheckContext(
             project_root=Path.cwd(),
             workspace_root=Path(workspace_root),
