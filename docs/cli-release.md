@@ -11,22 +11,35 @@ nav_order: 14
 
 Release orchestration commands.
 
-## Subcommands
-
-### rlsbl release run
+## release run
 
 Bump version, validate changelog, commit, tag, push, and create a GitHub Release. Reads bump type from .rlsbl/releases/unreleased.toml (create with rlsbl release init).
 
-#### Flags
+### Flags
 
 | Name | Short | Type | Default | Env | Description |
 |------|-------|------|---------|-----|-------------|
 | `--allow-dirty` |  | bool |  |  | Allow releasing with a dirty working tree |
+| `--watch` |  | bool |  |  | After release, automatically watch CI runs to completion |
+| `--no-watch` |  | bool |  |  | After release, print the watch command hint without watching |
 
-### rlsbl release init
+## release init
 
 Scaffold a .rlsbl/releases/unreleased.toml file by auto-detecting project targets. The generated file contains a default bump type (patch), an include list of all detected targets, and per-target configuration sections for Flutter targets.
 
-### rlsbl release retry
+## release retry
 
-Re-create a GitHub Release to re-trigger CI/CD workflows. (Not yet implemented.)
+Re-create a GitHub Release to re-trigger CI/CD workflows. Deletes the existing release and re-creates it with the same changelog notes, firing a new release:published event. Re-uploads assets if configured. Falls back to gh workflow run if no CI runs appear.
+
+### Flags
+
+| Name | Short | Type | Default | Env | Description |
+|------|-------|------|---------|-----|-------------|
+| `--watch` |  | bool |  |  | After retry, automatically watch CI runs to completion |
+| `--no-watch` |  | bool |  |  | After retry, print the watch command hint without watching |
+
+### Arguments
+
+| Name | Required | Description |
+|------|----------|-------------|
+| `version` | no | Version to retry (defaults to current) |
