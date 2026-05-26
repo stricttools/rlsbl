@@ -232,7 +232,7 @@ class TestPrivatePublishGuardrail:
     @patch("rlsbl.commands.release.finalize_version")
     @patch("rlsbl.commands.release.extract_changelog_entry", return_value="- Bugfix")
     @patch("rlsbl.commands.release.get_changes_dir", return_value=".rlsbl/changes")
-    @patch("rlsbl.commands.release._upload_release_assets")
+    @patch("rlsbl.commands.release.upload_release_assets")
     def test_private_true_with_assets_still_uploads(
         self, mock_upload_assets,
         _changes_dir, _extract, _finalize, _gen_ver_file,
@@ -268,5 +268,5 @@ class TestPrivatePublishGuardrail:
         with patch("sys.stdout", new_callable=StringIO):
             run_cmd(_rc(), {"yes": True, "quiet": False})
 
-        # _upload_release_assets must be called even for private repos
+        # upload_release_assets must be called even for private repos
         mock_upload_assets.assert_called_once()

@@ -1,4 +1,4 @@
-"""Tests for the release asset upload step (_upload_release_assets).
+"""Tests for the release asset upload step (upload_release_assets).
 
 Verifies:
 1. When no targets have ``assets: true``, the step is skipped.
@@ -16,7 +16,7 @@ from unittest.mock import MagicMock, patch, call
 
 import pytest
 
-from rlsbl.commands.release import _upload_release_assets
+from rlsbl.commands.release import upload_release_assets
 
 
 def _write_config(tmp_dir, config):
@@ -53,7 +53,7 @@ class TestNoAssetsConfigured:
         log = lambda msg: messages.append(msg)
 
         with patch("rlsbl.commands.release.run") as mock_run:
-            _upload_release_assets("v1.0.0", ".", "1.0.0", log, {})
+            upload_release_assets("v1.0.0", ".", "1.0.0", log, {})
             # gh release upload should never be called
             mock_run.assert_not_called()
 
@@ -67,7 +67,7 @@ class TestNoAssetsConfigured:
             json.dump({"name": "test", "version": "1.0.0"}, f)
 
         with patch("rlsbl.commands.release.run") as mock_run:
-            _upload_release_assets("v1.0.0", ".", "1.0.0", lambda m: None, {})
+            upload_release_assets("v1.0.0", ".", "1.0.0", lambda m: None, {})
             mock_run.assert_not_called()
 
     def test_assets_false_skips(self):
@@ -80,7 +80,7 @@ class TestNoAssetsConfigured:
             json.dump({"name": "test", "version": "1.0.0"}, f)
 
         with patch("rlsbl.commands.release.run") as mock_run:
-            _upload_release_assets("v1.0.0", ".", "1.0.0", lambda m: None, {})
+            upload_release_assets("v1.0.0", ".", "1.0.0", lambda m: None, {})
             mock_run.assert_not_called()
 
 
@@ -123,7 +123,7 @@ class TestAssetBuildAndUpload:
 
         with patch("rlsbl.commands.release.TARGETS", {"npm": mock_target}):
             with patch("rlsbl.commands.release.run") as mock_run:
-                _upload_release_assets("v1.0.0", ".", "1.0.0", log, {})
+                upload_release_assets("v1.0.0", ".", "1.0.0", log, {})
 
                 # gh release upload should be called with --clobber
                 mock_run.assert_called_once()
@@ -153,7 +153,7 @@ class TestAssetBuildAndUpload:
 
         with patch("rlsbl.commands.release.TARGETS", {"npm": mock_target}):
             with patch("rlsbl.commands.release.run") as mock_run:
-                _upload_release_assets("v1.0.0", ".", "1.0.0", log, {})
+                upload_release_assets("v1.0.0", ".", "1.0.0", log, {})
                 mock_run.assert_not_called()
 
         assert any("No artifacts" in m for m in messages)
@@ -196,7 +196,7 @@ class TestAssetSizeExceeded:
         with patch("rlsbl.commands.release.TARGETS", {"pypi": mock_target}):
             with patch("rlsbl.commands.release.run"):
                 with pytest.raises(SystemExit) as exc_info:
-                    _upload_release_assets("v1.0.0", ".", "1.0.0", lambda m: None, {})
+                    upload_release_assets("v1.0.0", ".", "1.0.0", lambda m: None, {})
                 assert exc_info.value.code == 1
 
         captured = capsys.readouterr()
@@ -232,7 +232,7 @@ class TestBuildAssetsNotImplemented:
         with patch("rlsbl.commands.release.TARGETS", {"npm": mock_target}):
             with patch("rlsbl.commands.release.run") as mock_run:
                 # Should not raise
-                _upload_release_assets("v1.0.0", ".", "1.0.0", lambda m: None, {})
+                upload_release_assets("v1.0.0", ".", "1.0.0", lambda m: None, {})
                 # No upload call
                 mock_run.assert_not_called()
 
@@ -268,7 +268,7 @@ class TestDryRun:
 
         with patch("rlsbl.commands.release.TARGETS", {"npm": mock_target}):
             with patch("rlsbl.commands.release.run") as mock_run:
-                _upload_release_assets("v1.0.0", ".", "1.0.0", log, {"dry-run": True})
+                upload_release_assets("v1.0.0", ".", "1.0.0", log, {"dry-run": True})
                 # No build_assets or upload calls
                 mock_target.build_assets.assert_not_called()
                 mock_run.assert_not_called()

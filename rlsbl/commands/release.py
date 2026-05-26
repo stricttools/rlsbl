@@ -964,7 +964,7 @@ def _print_stale_dep_advisory(monorepo_name, new_version, version_dir):
         pass
 
 
-def _upload_release_assets(tag, version_dir, new_version, log, flags):
+def upload_release_assets(tag, version_dir, new_version, log, flags):
     """Build and upload release assets for targets with ``publish.<target>.assets: true``.
 
     For each detected target that has assets enabled in its publish config:
@@ -1388,7 +1388,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                 os.unlink(tmp)
 
     # Upload release assets for targets with publish.<target>.assets: true
-    _upload_release_assets(tag, version_dir, new_version, log, flags)
+    upload_release_assets(tag, version_dir, new_version, log, flags)
 
     # Publish step: skip for private repos (they don't publish to registries)
     is_private = read_project_config().get("private", False)
