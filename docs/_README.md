@@ -28,9 +28,9 @@ npm i -g rlsbl
 ```
 rlsbl scaffold          # set up CI/CD, hooks, changelog
 # ... develop, commit ...
-rlsbl release-init      # scaffold .rlsbl/releases/unreleased.toml
+rlsbl release init      # scaffold .rlsbl/releases/unreleased.toml
 # ... edit bump type, targets ...
-rlsbl release           # bump, tag, push, create GitHub Release
+rlsbl release run       # bump, tag, push, create GitHub Release
 rlsbl watch <sha>       # monitor CI for that release
 ```
 
@@ -44,7 +44,7 @@ Global flags: `--help`, `--version`, `--dry-run`, `--yes`, `--quiet`.
 
 ## Release flow
 
-When you run `rlsbl release`:
+When you run `rlsbl release run`:
 
 1. Reads `.rlsbl/releases/unreleased.toml` for bump type (patch/minor/major) and target selection
 2. Verifies `gh` CLI is installed and authenticated
@@ -68,7 +68,7 @@ When you run `rlsbl release`:
 
 Use `--dry-run` to preview without changes. Use `--yes` for non-interactive mode (CI, AI agents).
 
-Create the release file with `rlsbl release-init`, which auto-detects project targets and scaffolds the TOML file.
+Create the release file with `rlsbl release init`, which auto-detects project targets and scaffolds the TOML file.
 
 First release: if the current version has never been tagged, `release` publishes it as-is (bump type is ignored).
 

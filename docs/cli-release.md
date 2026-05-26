@@ -1,6 +1,6 @@
 ---
 title: rlsbl release
-description: "Bump the project version, regenerate the changelog, commit, tag, push, and create a GitHub Release in one atomic, validated, idempotent step."
+description: "Release orchestration command group with subcommands for running releases, scaffolding release files, and retrying failed releases."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 14
@@ -9,10 +9,24 @@ nav_order: 14
 
 # rlsbl release
 
-Bump the project version, validate the changelog, commit, tag, push, and create a GitHub Release. Reads bump type and target selection from .rlsbl/releases/unreleased.toml (create with rlsbl release-init). Supports dry-run preview and non-interactive mode for CI.
+Release orchestration commands.
 
-## Flags
+## Subcommands
+
+### rlsbl release run
+
+Bump version, validate changelog, commit, tag, push, and create a GitHub Release. Reads bump type from .rlsbl/releases/unreleased.toml (create with rlsbl release init).
+
+#### Flags
 
 | Name | Short | Type | Default | Env | Description |
 |------|-------|------|---------|-----|-------------|
 | `--allow-dirty` |  | bool |  |  | Allow releasing with a dirty working tree |
+
+### rlsbl release init
+
+Scaffold a .rlsbl/releases/unreleased.toml file by auto-detecting project targets. The generated file contains a default bump type (patch), an include list of all detected targets, and per-target configuration sections for Flutter targets.
+
+### rlsbl release retry
+
+Re-create a GitHub Release to re-trigger CI/CD workflows. (Not yet implemented.)

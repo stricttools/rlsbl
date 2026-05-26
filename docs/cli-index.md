@@ -17,8 +17,6 @@ Version: 0.41.6
 ## Commands
 
 - [check](cli-check.html) -- Run project checks
-- [release](cli-release.html) -- Bump the project version, validate the changelog, commit, tag, push, and create a GitHub Release. Reads bump type and target selection from .rlsbl/releases/unreleased.toml (create with rlsbl release-init). Supports dry-run preview and non-interactive mode for CI.
-- [release-init](cli-release-init.html) -- Scaffold a .rlsbl/releases/unreleased.toml file by auto-detecting project targets. The generated file contains a default bump type (patch), an include list of all detected targets, and per-target configuration sections for Flutter targets.
 - [status](cli-status.html) -- Display the current project version, branch, last release tag, unreleased commit count, and changelog coverage. Outputs plain text by default or structured JSON with the --json flag.
 - [scaffold](cli-scaffold.html) -- Generate or update CI/CD workflows, git hooks, changelog, and license files for the detected release target. Use --update for three-way merge preserving customizations, or --force to overwrite all files.
 - [check-name](cli-check-name.html) -- Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.
@@ -38,6 +36,7 @@ Version: 0.41.6
 
 ## Command Groups
 
+- [release](cli-release.html) -- Release orchestration commands. Subcommands: run (bump, tag, push, create GitHub Release), init (scaffold release file), retry (re-trigger CI/CD).
 - [changelog](cli-changelog.html) -- Structured changelog management using JSONL entries. Add and generate CHANGELOG.md from per-commit changelog entries stored in unreleased.jsonl for precise, auditable release notes.
 - [monorepo](cli-monorepo.html) -- Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Provides 10 monorepo subcommands and supports all 14 release targets in a single workspace.toml.
 - [dev](cli-dev.html) -- Developer utilities for locally working with rlsbl projects, including editable installs that mirror the project's release target (pypi -> uv tool install -e, npm -> npm link, go -> go install).

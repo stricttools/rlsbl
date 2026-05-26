@@ -15,19 +15,19 @@ Built in Python 3.11+ with ruamel-yaml, tomlkit, strictcli, and tree-sitter. Als
 
 This project uses [rlsbl](https://github.com/smm-h/rlsbl) for release orchestration.
 
-- Run `rlsbl release-init` to scaffold `.rlsbl/releases/unreleased.toml`
+- Run `rlsbl release init` to scaffold `.rlsbl/releases/unreleased.toml`
 - Edit the release file: set bump type (patch/minor/major), include/exclude targets
-- Run `rlsbl release` to read the release file, bump version, and create a GitHub Release
+- Run `rlsbl release run` to read the release file, bump version, and create a GitHub Release
 - CI handles publishing automatically via the publish workflow
-- Never publish manually -- always use `rlsbl release`
+- Never publish manually -- always use `rlsbl release run`
 - Requires NPM_TOKEN secret on GitHub (Settings > Secrets > Actions)
-- Use `rlsbl release --dry-run` to preview a release without making changes
+- Use `rlsbl release run --dry-run` to preview a release without making changes
 - Global flags `--dry-run`, `--yes`, `--quiet` are available on all commands
 - Only `--allow-dirty` remains as a release-specific flag
 
 ## Release pipeline order
 
-During `rlsbl release`, the validation and build steps run in this order:
+During `rlsbl release run`, the validation and build steps run in this order:
 
 1. Pre-checks hook (`.rlsbl/hooks/pre-checks.sh`)
 2. Strictcli schema dump (`--dump-schema`, for projects using strictcli)
@@ -80,7 +80,7 @@ Add custom GitHub Actions jobs via the user-owned `.github/workflows/ci-custom.y
 `.git/hooks/pre-push` runs `rlsbl pre-push-check`, which:
 
 - enforces JSONL commit coverage for every pushed commit (hard error -- blocks the push)
-- warns when a push targets a release branch but did not originate from `rlsbl release` / `rlsbl undo`
+- warns when a push targets a release branch but did not originate from `rlsbl release run` / `rlsbl undo`
 
 The release/undo commands set `RLSBL_RELEASE_PUSH=1` in the push environment so the hook recognises legitimate release pushes and suppresses the warning. Users should not set this env var directly -- it is an internal contract between rlsbl and its own git hook.
 
