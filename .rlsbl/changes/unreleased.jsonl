@@ -1,1 +1,2 @@
 {"commits":["bdd3b1bb8aa441a40cab1d81b4d2bb5614a82459"],"user_facing":true,"description":"**Bug fix.** `rlsbl check` commands no longer crash in monorepo context with `WorkspaceGraph.__init__() missing required argument`.","type":"fix"}
+{"commits":["ced7c2ff3c0830292d791adfae88a72f9319e80a"],"user_facing":true,"description":"**Breaking.** `rlsbl release` is now a command group. Use `rlsbl release run` (was `rlsbl release`), `rlsbl release init` (was `rlsbl release-init`), and the new `rlsbl release retry`.","type":"breaking"}
