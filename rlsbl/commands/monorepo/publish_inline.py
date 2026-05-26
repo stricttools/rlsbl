@@ -234,7 +234,7 @@ def generate_inline_publish_router(projects_with_publish: list, root: str) -> st
 
     workflow_dict = {
         "name": "Publish Router",
-        "on": {"release": {"types": ["published"]}},
+        "on": {"release": {"types": ["published"]}, "workflow_dispatch": None},
         "jobs": all_jobs,
     }
 

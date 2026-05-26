@@ -176,6 +176,7 @@ def _generate_router(projects):
     lines.append("  push:")
     lines.append("    branches: [main]")
     lines.append("  pull_request:")
+    lines.append("  workflow_dispatch:")
     lines.append("")
     lines.append("jobs:")
 
