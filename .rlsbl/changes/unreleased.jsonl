@@ -6,3 +6,4 @@
 {"commits":["f9184974824d0567bc48b674323bdea2551d1a0d"],"user_facing":true,"description":"**Watch.** `rlsbl watch` now suggests `rlsbl release retry` when no CI runs are found but a GitHub Release exists for the commit.","type":"feature"}
 {"commits":["95193108751961c9e40962fdc723b85283598758"],"user_facing":true,"description":"**New target.** `pgdesign` release target for database schema projects.","type":"feature"}
 {"commits":["f306e20c5e382fea459f04b39771d4609f1bded4","953493eab1453e67d02aa9ddf3c8a1bfbede751e","7368483354a2f855db785b9a99906631e934f09a"],"user_facing":false}
+{"commits":["f8b3d5867ee7c3f2951ddc2adfefbc7c1ddeaa7d","9c85ae4c27a286b83d9bd2736d3528f539998712","650778807571ac837d16f1e2c7bdece8a3f673a8","f84c18c77823b47ddffdfebc2b3471fd529b1d20"],"user_facing":false}
