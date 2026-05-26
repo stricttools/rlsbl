@@ -248,10 +248,29 @@ def cmd_release_init(**_kwargs):
     run_cmd()
 
 
-@release_group.command(name="retry", help="Re-create a GitHub Release to re-trigger CI/CD workflows.")
-def cmd_release_retry(**_kwargs):
-    print("rlsbl: release retry is not yet implemented", file=sys.stderr)
-    sys.exit(1)
+@release_group.command(
+    name="retry",
+    help="Re-create a GitHub Release to re-trigger CI/CD workflows. Deletes the existing release and re-creates it with the same changelog notes, firing a new release:published event. Re-uploads assets if configured. Falls back to gh workflow run if no CI runs appear.",
+    mutex=[
+        strictcli.MutexGroup(flags=[
+            strictcli.Flag(name="watch", type=bool, negatable=False, help="After retry, automatically watch CI runs to completion"),
+            strictcli.Flag(name="no-watch", type=bool, negatable=False, help="After retry, print the watch command hint without watching"),
+        ]),
+    ],
+)
+@strictcli.arg(name="version", help="Version to retry (defaults to current)", required=False)
+def cmd_release_retry(dry_run, yes, quiet, watch, no_watch, version=None, **_kwargs):
+    _require_project_root()
+
+    args = [version] if version else []
+    flags = {
+        "dry-run": dry_run,
+        "yes": yes,
+        "quiet": quiet,
+        "watch": bool(watch),
+    }
+    from .commands.release_retry import run_cmd
+    run_cmd(args, flags)
 
 
 # ---------------------------------------------------------------------------
