@@ -1,6 +1,6 @@
 ---
 title: rlsbl.changelog.validate
-description: "Validates JSONL changelog entries against git history: hash resolution, range checking, commit coverage with monorepo project filtering, orphan detection, and schema conformance."
+description: "Validates JSONL changelog entries against git history: hash resolution, range checking, commit coverage with monorepo filtering, orphans, and schema."
 generated: true
 nav_group: "API Reference"
 nav_order: 9

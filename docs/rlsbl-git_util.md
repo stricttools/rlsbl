@@ -1,6 +1,6 @@
 ---
 title: rlsbl.git_util
-description: "Shared git path-filtering utilities: get_commit_files, file_matches_project (path prefix and watch globs), and filter_commits_for_project for monorepo scoping."
+description: "Shared git path-filtering utilities: get_commit_files, file_matches_project with path prefix and watch globs, and filter_commits_for_project."
 generated: true
 nav_group: "API Reference"
 nav_order: 46
