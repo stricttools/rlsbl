@@ -10,7 +10,7 @@ order: 91
 
 # rlsbl CLI Reference
 
-Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 14 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, and more). Ships 32 commands organized into 16 top-level commands and 4 command groups (release, changelog, monorepo, dev).
+Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 14 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, and more). Ships 32 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).
 
 Version: 0.42.0
 
@@ -20,9 +20,6 @@ Version: 0.42.0
 - [status](cli-status.html) -- Display the current project version, branch, last release tag, unreleased commit count, and changelog coverage. Outputs plain text by default or structured JSON with the --json flag.
 - [scaffold](cli-scaffold.html) -- Generate or update CI/CD workflows, git hooks, changelog, and license files for the detected release target. Use --update for three-way merge preserving customizations, or --force to overwrite all files.
 - [check-name](cli-check-name.html) -- Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.
-- [edit-release](cli-edit-release.html) -- Sync the GitHub Release notes for a given version with the corresponding CHANGELOG.md entry. Defaults to the current version if none is specified. Use --dry-run to preview changes without updating GitHub.
-- [undo](cli-undo.html) -- Revert the most recent release by deleting the GitHub Release, removing the git tag from local and remote, and reverting the version bump commit. Requires a manual git push afterward to finalize.
-- [yank](cli-yank.html) -- Mark a past release as deprecated (soft yank) or delete it (hard yank). Soft yank marks the GitHub Release as pre-release and prepends a deprecation notice. Hard yank deletes the release entirely while preserving the git tag.
 - [discover](cli-discover.html) -- Search GitHub for repositories tagged with the rlsbl topic and list them. Use --mine to filter results to only your own repositories. Requires the gh CLI to be authenticated.
 - [watch](cli-watch.html) -- Poll GitHub Actions CI workflow runs for a specific commit SHA and report pass or fail status. Defaults to HEAD if no SHA is provided. Useful after rlsbl release to monitor the publish pipeline.
 - [pre-push-check](cli-pre-push-check.html) -- Verify that CHANGELOG.md contains an entry matching the current project version. Designed to run as a git pre-push hook to prevent pushing releases without documented changes.
