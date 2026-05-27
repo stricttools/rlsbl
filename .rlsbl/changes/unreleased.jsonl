@@ -1,0 +1,1 @@
+{"commits":["7ac07a0fba08237f7d5963053d63655e36059d31"],"user_facing":true,"description":"**Bug fix.** `release retry` now always dispatches all workflows listed in `retry.toml`, not just as a fallback when no runs are found. Fixes CI never being re-triggered when Publish triggers naturally.","type":"fix"}
