@@ -10,6 +10,7 @@ from .files import list_versioned_files, read_unreleased
 from .resolve import resolve_hash, resolve_hashes
 from .schema import ChangelogEntry, parse_jsonl, validate_schema
 from ..config import get_changelog_validation_config
+from ..git_util import get_commit_files
 from ..utils import commit_files_if_changed
 
 
@@ -144,19 +145,7 @@ def _is_changelog_only_commit(sha: str) -> bool:
     Subprocess errors or empty file lists are treated conservatively
     (returns False).
     """
-    try:
-        result = subprocess.run(
-            ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", sha],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        if result.returncode != 0:
-            return False
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
-        return False
-
-    files = [line.strip() for line in result.stdout.strip().splitlines() if line.strip()]
+    files = get_commit_files(sha)
     if not files:
         return False
 
