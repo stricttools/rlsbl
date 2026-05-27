@@ -2,6 +2,16 @@
 
 # Changelog
 
+## 0.43.1
+
+### Features
+
+- **Scaffold.** npm targets now get a `.npmignore` file with sensible defaults, preventing non-npm content from being published.
+
+### Fixes
+
+- **Bug fix.** `release retry` now always dispatches all workflows listed in `retry.toml`, not just as a fallback when no runs are found. Fixes CI never being re-triggered when Publish triggers naturally.
+
 ## 0.43.0
 
 ### Breaking
