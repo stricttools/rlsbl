@@ -193,7 +193,7 @@ release_group = app.group("release", help="Release orchestration commands.")
 
 @release_group.command(
     name="run",
-    help="Bump version, validate changelog, commit, tag, push, and create a GitHub Release. Reads bump type from .rlsbl/releases/unreleased.toml (create with rlsbl release init).",
+    help="Bump version, validate the JSONL changelog, run tests and lint, commit, tag, push, and create a GitHub Release. Reads the bump type (patch, minor, or major) and target selection from .rlsbl/releases/unreleased.toml, which can be scaffolded with rlsbl release init. Supports dry-run preview, non-interactive mode with --yes, and --allow-dirty to skip the clean working tree check.",
     mutex=[
         strictcli.MutexGroup(flags=[
             strictcli.Flag(name="watch", type=bool, negatable=False, help="After release, automatically watch CI runs to completion"),
