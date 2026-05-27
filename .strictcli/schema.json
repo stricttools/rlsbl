@@ -34,7 +34,7 @@
   },
   "name": "rlsbl",
   "version": "0.42.0",
-  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 14 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, and more). Ships 32 commands organized into 16 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
+  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 14 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, and more). Ships 32 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
   "global_flags": [
     {
       "name": "dry-run",
@@ -200,60 +200,6 @@
           "type": "str",
           "help": "Delay between checks in ms",
           "default": "200"
-        }
-      ]
-    },
-    "edit-release": {
-      "name": "edit-release",
-      "help": "Sync the GitHub Release notes for a given version with the corresponding CHANGELOG.md entry. Defaults to the current version if none is specified. Use --dry-run to preview changes without updating GitHub.",
-      "args": [
-        {
-          "name": "version",
-          "help": "Version to update (defaults to current)",
-          "required": false
-        }
-      ]
-    },
-    "undo": {
-      "name": "undo",
-      "help": "Revert the most recent release by deleting the GitHub Release, removing the git tag from local and remote, and reverting the version bump commit. Requires a manual git push afterward to finalize.",
-      "flags": [
-        {
-          "name": "target",
-          "type": "str",
-          "help": "Target a specific registry",
-          "default": ""
-        }
-      ]
-    },
-    "yank": {
-      "name": "yank",
-      "help": "Mark a past release as deprecated (soft yank) or delete it (hard yank). Soft yank marks the GitHub Release as pre-release and prepends a deprecation notice. Hard yank deletes the release entirely while preserving the git tag.",
-      "flags": [
-        {
-          "name": "reason",
-          "type": "str",
-          "help": "Why the version is being yanked",
-          "default": ""
-        },
-        {
-          "name": "use",
-          "type": "str",
-          "help": "Replacement version to recommend",
-          "default": ""
-        },
-        {
-          "name": "hard",
-          "type": "bool",
-          "help": "Delete the release instead of marking as pre-release",
-          "default": false,
-          "negatable": true
-        }
-      ],
-      "args": [
-        {
-          "name": "version",
-          "help": "Version to yank (e.g. 0.9.1 or v0.9.1)"
         }
       ]
     },
@@ -456,6 +402,60 @@
               "name": "version",
               "help": "Version to retry (defaults to current)",
               "required": false
+            }
+          ]
+        },
+        "edit": {
+          "name": "edit",
+          "help": "Sync the GitHub Release notes for a given version with the corresponding CHANGELOG.md entry. Defaults to the current version if none is specified. Use --dry-run to preview changes without updating GitHub.",
+          "args": [
+            {
+              "name": "version",
+              "help": "Version to update (defaults to current)",
+              "required": false
+            }
+          ]
+        },
+        "undo": {
+          "name": "undo",
+          "help": "Revert the most recent release by deleting the GitHub Release, removing the git tag from local and remote, and reverting the version bump commit. Requires a manual git push afterward to finalize.",
+          "flags": [
+            {
+              "name": "target",
+              "type": "str",
+              "help": "Target a specific registry",
+              "default": ""
+            }
+          ]
+        },
+        "yank": {
+          "name": "yank",
+          "help": "Mark a past release as deprecated (soft yank) or delete it (hard yank). Soft yank marks the GitHub Release as pre-release and prepends a deprecation notice. Hard yank deletes the release entirely while preserving the git tag.",
+          "flags": [
+            {
+              "name": "reason",
+              "type": "str",
+              "help": "Why the version is being yanked",
+              "default": ""
+            },
+            {
+              "name": "use",
+              "type": "str",
+              "help": "Replacement version to recommend",
+              "default": ""
+            },
+            {
+              "name": "hard",
+              "type": "bool",
+              "help": "Delete the release instead of marking as pre-release",
+              "default": false,
+              "negatable": true
+            }
+          ],
+          "args": [
+            {
+              "name": "version",
+              "help": "Version to yank (e.g. 0.9.1 or v0.9.1)"
             }
           ]
         }
