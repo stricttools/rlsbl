@@ -3,8 +3,8 @@
 When a GitHub Release exists but CI/CD never ran (e.g., GitHub Actions outage),
 this command deletes the release and re-creates it with the correct release notes.
 This fires a new ``release: published`` event, re-triggering the Publish workflow.
-It also re-uploads release assets if configured, and falls back to
-``gh workflow run`` if the event still doesn't trigger workflows.
+It also re-uploads release assets if configured, and dispatches all workflows
+listed in ``retry.toml`` via ``gh workflow run``.
 
 The command is file-driven: it reads ``.rlsbl/releases/retry.toml`` for
 configuration (version, workflows, ci_ref, assets). If the file does not
@@ -24,7 +24,7 @@ from ..targets import TARGETS, detect_targets
 from ..utils import check_gh_auth, check_gh_installed, extract_changelog_entry, run
 from ..workspace import find_workspace_root, resolve_project
 from .release import upload_release_assets
-from .watch import poll_runs, run_cmd as watch_run_cmd
+from .watch import run_cmd as watch_run_cmd
 
 
 def _find_dispatch_workflows():
@@ -130,7 +130,7 @@ def run_cmd(retry_config, flags):
     Deletes the existing GitHub Release for the configured version
     and re-creates it with the same changelog notes. This fires a new
     ``release: published`` event. Re-uploads release assets if configured.
-    Falls back to ``gh workflow run`` if no CI runs appear.
+    Dispatches all workflows listed in retry config via ``gh workflow run``.
 
     Args:
         retry_config: RetryConfig instance, or None to auto-scaffold.
@@ -278,22 +278,15 @@ def run_cmd(retry_config, flags):
     if retry_config.assets:
         upload_release_assets(tag, version_dir, version, log, flags)
 
-    # Poll for workflow runs
-    runs = poll_runs(commit_sha)
-
-    if not runs:
-        # Dispatch fallback: use workflows from retry config
-        dispatch_files = retry_config.workflows
-        if dispatch_files:
-            log("No CI runs found after polling. Dispatching workflows manually...")
-            for filename in dispatch_files:
-                try:
-                    run("gh", ["workflow", "run", filename, "--ref", retry_config.ci_ref])
-                    log(f"  Dispatched: {filename}")
-                except Exception as e:
-                    print(f"  Warning: failed to dispatch {filename}: {e}", file=sys.stderr)
-        else:
-            log("No CI runs found and no dispatchable workflows configured.")
+    # Dispatch all configured workflows
+    if retry_config.workflows:
+        log("Dispatching workflows...")
+        for filename in retry_config.workflows:
+            try:
+                run("gh", ["workflow", "run", filename, "--ref", retry_config.ci_ref])
+                log(f"  Dispatched: {filename}")
+            except Exception as e:
+                print(f"  Warning: failed to dispatch {filename}: {e}", file=sys.stderr)
 
     # Clean up retry.toml after successful retry
     if os.path.exists(retry_path):
