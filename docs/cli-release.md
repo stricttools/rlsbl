@@ -1,6 +1,6 @@
 ---
 title: rlsbl release
-description: "Release orchestration command group with subcommands for running releases, scaffolding release files, and retrying failed releases."
+description: "Release orchestration command group with 6 subcommands: run, init, retry, edit, undo, and yank for managing the full release lifecycle."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 13
@@ -29,7 +29,7 @@ Scaffold a .rlsbl/releases/unreleased.toml file by auto-detecting project target
 
 ## release retry
 
-Re-create a GitHub Release to re-trigger CI/CD workflows. Deletes the existing release and re-creates it with the same changelog notes, firing a new release:published event. Re-uploads assets if configured. Falls back to gh workflow run if no CI runs appear.
+Re-create a GitHub Release to re-trigger CI/CD workflows. Reads configuration from .rlsbl/releases/retry.toml (auto-scaffolded if missing). Deletes the existing release and re-creates it with the same changelog notes, firing a new release:published event. Re-uploads assets if configured. Falls back to gh workflow run if no CI runs appear.
 
 ### Flags
 
@@ -37,12 +37,6 @@ Re-create a GitHub Release to re-trigger CI/CD workflows. Deletes the existing r
 |------|-------|------|---------|-----|-------------|
 | `--watch` |  | bool |  |  | After retry, automatically watch CI runs to completion |
 | `--no-watch` |  | bool |  |  | After retry, print the watch command hint without watching |
-
-### Arguments
-
-| Name | Required | Description |
-|------|----------|-------------|
-| `version` | no | Version to retry (defaults to current) |
 
 ## release edit
 

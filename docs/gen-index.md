@@ -1,6 +1,6 @@
 ---
 title: API Reference
-description: "Complete auto-generated API reference index — browse all modules, classes, and functions with their signatures and docstrings."
+description: "Auto-generated API reference index listing all 93 rlsbl modules including commands, targets, changelog, lint, config, and workspace utilities."
 generated: true
 nav_group: "API Reference"
 nav_order: 0

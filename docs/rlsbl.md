@@ -1,6 +1,6 @@
 ---
 title: rlsbl
-description: "Top-level rlsbl package: strictcli CLI with 16 commands and 4 groups (release, changelog, monorepo, dev), version detection, and 17-target auto-detection."
+description: "Top-level rlsbl package: strictcli CLI with 14 top-level commands and 4 groups (release, changelog, monorepo, dev), version detection, and 14-target release support."
 generated: true
 nav_group: "API Reference"
 nav_order: 1

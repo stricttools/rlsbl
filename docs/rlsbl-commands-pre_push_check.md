@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.pre_push_check
-description: "Pre-push-check command that verifies CHANGELOG.md contains an entry for the current version before allowing a git push to proceed."
+description: "Pre-push-check command that enforces JSONL commit coverage and warns on manual release-branch pushes, using git_util for monorepo-aware file filtering."
 generated: true
 nav_group: "API Reference"
 nav_order: 30

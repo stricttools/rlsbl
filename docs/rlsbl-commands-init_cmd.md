@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.init_cmd
-description: "Scaffold command that generates and updates release infrastructure from templates with three-way merge, CI workflows, hooks, and multi-target support."
+description: "Scaffold command that generates and updates release infrastructure from templates with three-way merge, CI workflow on-trigger merging, hooks, and multi-target support."
 generated: true
 nav_group: "API Reference"
 nav_order: 20

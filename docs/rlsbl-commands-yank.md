@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.yank
-description: "Yank command: deprecate a past release by marking it pre-release with a notice (soft) or deleting the GitHub release entirely (hard)."
+description: "Yank command that deprecates a past release via soft yank (pre-release flag with notice) or hard yank (delete), with monorepo tag format support."
 generated: true
 nav_group: "API Reference"
 nav_order: 41
