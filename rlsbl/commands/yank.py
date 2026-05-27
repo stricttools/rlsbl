@@ -54,6 +54,21 @@ def run_cmd(args, flags):
         # If we cannot determine the latest release, proceed anyway
         pass
 
+    # Confirmation prompt (skipped with --yes or --dry-run)
+    if not dry_run and not flags.get("yes"):
+        if hard:
+            prompt = f"Will DELETE GitHub Release for {tag}. Continue? [y/N] "
+        else:
+            prompt = f"Will mark {tag} as deprecated. Continue? [y/N] "
+        try:
+            answer = input(prompt).strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print("\nAborted.")
+            sys.exit(1)
+        if answer != "y":
+            print("Aborted.")
+            sys.exit(0)
+
     if hard:
         _hard_yank(tag, dry_run)
     else:

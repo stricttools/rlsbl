@@ -27,7 +27,7 @@ class TestSoftYank(unittest.TestCase):
 
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout, \
              patch("builtins.open", unittest.mock.mock_open()):
-            run_cmd(["0.9.1"], {})
+            run_cmd(["0.9.1"], {"yes": True})
 
         output = mock_stdout.getvalue()
         self.assertIn("Yanked v0.9.1", output)
@@ -57,7 +57,7 @@ class TestSoftYank(unittest.TestCase):
         mock_open = unittest.mock.mock_open()
         with patch("sys.stdout", new_callable=StringIO), \
              patch("builtins.open", mock_open):
-            run_cmd(["0.9.1"], {"reason": "broken on macOS", "use": "0.9.2"})
+            run_cmd(["0.9.1"], {"reason": "broken on macOS", "use": "0.9.2", "yes": True})
 
         # Check what was written to the notes file
         written = "".join(
@@ -86,7 +86,7 @@ class TestHardYank(unittest.TestCase):
         ]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            run_cmd(["0.9.1"], {"hard": True})
+            run_cmd(["0.9.1"], {"hard": True, "yes": True})
 
         output = mock_stdout.getvalue()
         self.assertIn("Deleted GitHub Release v0.9.1", output)
@@ -193,7 +193,7 @@ class TestVersionNormalization(unittest.TestCase):
         ]
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd(["0.9.1"], {"hard": True})
+            run_cmd(["0.9.1"], {"hard": True, "yes": True})
 
         mock_run.assert_any_call("gh", ["release", "view", "v0.9.1"])
         mock_run.assert_any_call("gh", ["release", "delete", "v0.9.1", "--yes"])
@@ -210,7 +210,7 @@ class TestVersionNormalization(unittest.TestCase):
         ]
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd(["v0.9.1"], {"hard": True})
+            run_cmd(["v0.9.1"], {"hard": True, "yes": True})
 
         mock_run.assert_any_call("gh", ["release", "view", "v0.9.1"])
         mock_run.assert_any_call("gh", ["release", "delete", "v0.9.1", "--yes"])
