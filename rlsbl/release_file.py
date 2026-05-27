@@ -241,3 +241,68 @@ def read_batch_release_file(path: str) -> BatchReleaseConfig:
         )
 
     return BatchReleaseConfig(packages=packages)
+
+
+# ---------------------------------------------------------------------------
+# Retry file
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class RetryConfig:
+    """Configuration from a retry TOML file (.rlsbl/releases/retry.toml)."""
+
+    version: str  # version to retry (mandatory)
+    workflows: list[str]  # workflow filenames to dispatch, e.g. ["publish.yml"]
+    ci_ref: str  # git ref for CI dispatch, defaults to tag
+    assets: bool  # whether to re-upload assets
+
+
+def get_retry_file_path(project_dir: str = ".") -> str:
+    """Return the path to .rlsbl/releases/retry.toml relative to project_dir."""
+    return os.path.join(project_dir, ".rlsbl", "releases", "retry.toml")
+
+
+def read_retry_file(path: str) -> RetryConfig:
+    """Read and validate a retry TOML file.
+
+    Raises FileNotFoundError if the file doesn't exist.
+    Raises ValueError for schema/validation failures.
+    """
+    with open(path, "r", encoding="utf-8") as f:
+        data = tomlkit.load(f)
+
+    # --- version ---
+    if "version" not in data:
+        raise ValueError("missing required field: version")
+    version = data["version"]
+    if not isinstance(version, str) or not version.strip():
+        raise ValueError("version must be a non-empty string")
+
+    # --- workflows ---
+    if "workflows" not in data:
+        raise ValueError("missing required field: workflows")
+    workflows = data["workflows"]
+    if not isinstance(workflows, list) or not all(isinstance(s, str) for s in workflows):
+        raise ValueError("workflows must be a list of strings")
+
+    # --- ci_ref ---
+    if "ci_ref" not in data:
+        raise ValueError("missing required field: ci_ref")
+    ci_ref = data["ci_ref"]
+    if not isinstance(ci_ref, str) or not ci_ref.strip():
+        raise ValueError("ci_ref must be a non-empty string")
+
+    # --- assets ---
+    if "assets" not in data:
+        raise ValueError("missing required field: assets")
+    assets = data["assets"]
+    if not isinstance(assets, bool):
+        raise ValueError("assets must be a boolean")
+
+    return RetryConfig(
+        version=version.strip(),
+        workflows=list(workflows),
+        ci_ref=ci_ref.strip(),
+        assets=assets,
+    )
