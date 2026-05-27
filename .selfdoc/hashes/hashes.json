@@ -629,7 +629,7 @@
   },
   "rlsbl-changelog-validate.md": {
     "content": "18ccbf4b996b3d98199420334b5325c84fa3ff90c804cb0c790e8e1e2e3d0829",
-    "description": "d0ab1c14a34ce4be8a25f51f1c3b73beb32f690bb6fb8040c8ba592991a74cd5"
+    "description": "35b52ec92e356cfc5c677f36ecea5d8eedfc5dffd70ae82f8d02ce0e63afb789"
   },
   "rlsbl-changelog.md": {
     "content": "8f0e46c897bd88af9b0278d3c0525025c50ff767bca9ec10e1dfaf03a278ba0e",
@@ -677,7 +677,7 @@
   },
   "rlsbl-commands-init_cmd.md": {
     "content": "0fcf920a53de65975429242418f207e6417f3e0b509db486c37c2ff11432e22f",
-    "description": "c63d18d5cfe9ee4782ece16b1349aa972d0a3429bfcb133e39f5d026f47e2e04"
+    "description": "0c13614aa11a0d178a7c0daee8e7fa6f8bf87a0a36d0e37f474a3d865cbbae64"
   },
   "rlsbl-commands-migrate.md": {
     "content": "e9491cc81e5db4d8805bda9691cf789321146328c993576e2929b70992553f8b",
@@ -737,7 +737,7 @@
   },
   "rlsbl-commands-release_retry.md": {
     "content": "870513c4d1f929bd72a91049bfb0b39492c789882a7654dd6ee5138c824ad1a9",
-    "description": "49ee499173e942cc43999d01dc3da20e85e0e6442a392c6bcb0069c4658fa4a1"
+    "description": "a3e667344d7af3fe08b6a4b4a3a70455c3bf318b6aebad307d2526130427b72f"
   },
   "rlsbl-commands-status.md": {
     "content": "6f3fb8dfee875a6f2d0134a6cb3bea62650464a040db1be67e66f701d4924a95",
@@ -785,7 +785,7 @@
   },
   "rlsbl-git_util.md": {
     "content": "3b325dcc645869b06d91160772ad2af290d04322d6078c1486d69beef455bbf5",
-    "description": "fd063efd5f8da8e9b94c869dcb2ce4484ee569dd272589c4a9573fb64820b8a4"
+    "description": "6963c8785942ac820a4cb9d1934cfc55464b3ab93a6778605c6b6ceedbc67c0d"
   },
   "rlsbl-hook_hashes.md": {
     "content": "c303088498432d551a81ea2ee87070f85cf57c7dee94e26d13cd31bea937538b",
@@ -977,7 +977,7 @@
   },
   "rlsbl.md": {
     "content": "861394ca28c5a61b9e6a050c8404937dcd1d88504711ba3b1ca4f85fbe7733a5",
-    "description": "4ae75ef857fd9503f4074e8a3bf0a6f9b9dcc19990311463f7a96027a3757273"
+    "description": "846d7106c20777b824e0116e8e62127eb6c86ab277fe4904e1cbecc2e9839d43"
   },
   "targets.md": {
     "content": "f679b75c3560affb9f79d589df3458350ce8408d6f87606bae6ef75dcbf37fa1",
