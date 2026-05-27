@@ -91,6 +91,20 @@ def register_checks(app):
             except Exception:
                 versions[name] = None
 
+        # Include selfdoc.json even when "docs" is not in the explicit
+        # targets list, so version drift is always caught.
+        detected_names = {name for name, _path in target_entries}
+        if "docs" not in detected_names:
+            import os as _os
+            selfdoc_path = _os.path.join(str(ctx.project_root), "selfdoc.json")
+            if _os.path.exists(selfdoc_path):
+                from .targets.docs import DocsTarget
+                try:
+                    v = DocsTarget().read_version(str(ctx.project_root))
+                    versions["docs"] = v
+                except Exception:
+                    versions["docs"] = None
+
         unique = set(v for v in versions.values() if v is not None)
         if len(unique) == 0:
             return CheckResult("warn", "no targets reported a version")
@@ -99,7 +113,7 @@ def register_checks(app):
             return CheckResult("fail", f"version mismatch: {detail}")
 
         version = unique.pop()
-        return CheckResult("pass", f"{version} across {len(target_entries)} target(s)")
+        return CheckResult("pass", f"{version} across {len(versions)} target(s)")
 
     @app.check("name-consistency")
     def check_name_consistency(ctx):

@@ -1150,6 +1150,20 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                 if other_modified:
                     log(f"Synced version to {', '.join(target_vpath(t_path, r) for r in other_modified)}")
 
+        # Ensure selfdoc.json is bumped even when "docs" is not in the
+        # explicit targets list.  DocsTarget.detect() checks for the file.
+        bumped_files = set(files_to_commit)
+        selfdoc_path = os.path.join(version_dir, "selfdoc.json")
+        if os.path.exists(selfdoc_path) and "docs" not in target_paths:
+            from ..targets.docs import DocsTarget
+            docs_modified = DocsTarget().write_version(version_dir, new_version)
+            for rel in docs_modified:
+                fpath = vpath(rel)
+                if fpath not in bumped_files:
+                    files_to_commit.append(fpath)
+            if docs_modified:
+                log(f"Synced version to {', '.join(vpath(r) for r in docs_modified)}")
+
     # Ecosystem tagging: add keyword to manifests if enabled
     if should_tag(flags):
         npm_path = target_paths.get("npm", version_dir)
