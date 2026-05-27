@@ -123,7 +123,7 @@ def _resolve_target(target):
 app = strictcli.App(
     name="rlsbl",
     version=__version__,
-    help="Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 14 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, and more). Ships 32 commands organized into 16 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
+    help="Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 14 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, and more). Ships 32 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
     flags=[
         strictcli.Flag(name="dry-run", type=bool, help="Preview changes without applying them"),
         strictcli.Flag(name="yes", type=bool, short="y", help="Skip confirmation prompts"),
@@ -388,12 +388,12 @@ def cmd_check_name(target, delay, **_kwargs):
 
 
 # ---------------------------------------------------------------------------
-# edit-release
+# release edit (was: edit-release)
 # ---------------------------------------------------------------------------
 
-@app.command(name="edit-release", help="Sync the GitHub Release notes for a given version with the corresponding CHANGELOG.md entry. Defaults to the current version if none is specified. Use --dry-run to preview changes without updating GitHub.")
+@release_group.command(name="edit", help="Sync the GitHub Release notes for a given version with the corresponding CHANGELOG.md entry. Defaults to the current version if none is specified. Use --dry-run to preview changes without updating GitHub.")
 @strictcli.arg(name="version", help="Version to update (defaults to current)", required=False)
-def cmd_edit_release(dry_run, version=None, **_kwargs):
+def cmd_release_edit(dry_run, version=None, **_kwargs):
     _require_project_root()
     args = [version] if version else []
     flags = {"dry-run": dry_run}
@@ -402,33 +402,34 @@ def cmd_edit_release(dry_run, version=None, **_kwargs):
 
 
 # ---------------------------------------------------------------------------
-# undo
+# release undo (was: undo)
 # ---------------------------------------------------------------------------
 
-@app.command(name="undo", help="Revert the most recent release by deleting the GitHub Release, removing the git tag from local and remote, and reverting the version bump commit. Requires a manual git push afterward to finalize.")
+@release_group.command(name="undo", help="Revert the most recent release by deleting the GitHub Release, removing the git tag from local and remote, and reverting the version bump commit. Requires a manual git push afterward to finalize.")
 @strictcli.flag(name="target", type=str, help="Target a specific registry", default="")
-def cmd_undo(target, yes, **_kwargs):
+def cmd_release_undo(target, yes, **_kwargs):
     flags = {"yes": yes}
     from .commands.undo import run_cmd
     run_cmd(target or None, [], flags)
 
 
 # ---------------------------------------------------------------------------
-# yank
+# release yank (was: yank)
 # ---------------------------------------------------------------------------
 
-@app.command(name="yank", help="Mark a past release as deprecated (soft yank) or delete it (hard yank). Soft yank marks the GitHub Release as pre-release and prepends a deprecation notice. Hard yank deletes the release entirely while preserving the git tag.")
+@release_group.command(name="yank", help="Mark a past release as deprecated (soft yank) or delete it (hard yank). Soft yank marks the GitHub Release as pre-release and prepends a deprecation notice. Hard yank deletes the release entirely while preserving the git tag.")
 @strictcli.flag(name="reason", type=str, help="Why the version is being yanked", default="")
 @strictcli.flag(name="use", type=str, help="Replacement version to recommend", default="")
 @strictcli.flag(name="hard", type=bool, help="Delete the release instead of marking as pre-release")
 @strictcli.arg(name="version", help="Version to yank (e.g. 0.9.1 or v0.9.1)")
-def cmd_yank(reason, use, hard, dry_run, version, **_kwargs):
+def cmd_release_yank(reason, use, hard, dry_run, yes, version, **_kwargs):
     args = [version]
     flags = {
         "reason": reason or None,
         "use": use or None,
         "hard": hard,
         "dry-run": dry_run,
+        "yes": yes,
     }
     from .commands.yank import run_cmd
     run_cmd(args, flags)
