@@ -446,10 +446,12 @@ def register_checks(app):
     # ------------------------------------------------------------------
 
     def _get_changelog_context(ctx):
-        """Resolve changes_dir, tag_glob, and entries for changelog checks.
+        """Resolve changes_dir, tag_glob, project, and entries for changelog checks.
 
-        Returns ``(changes_dir, tag_glob, entries)`` or ``None`` when the
+        Returns ``(changes_dir, tag_glob, project, entries)`` or ``None`` when the
         changes directory does not exist (caller should return skip).
+        The ``project`` value is a dict with ``path`` and ``watch`` keys when
+        running in monorepo mode, or ``None`` for standalone projects.
         """
         from .changelog.files import get_changes_dir, read_unreleased
 
@@ -458,15 +460,17 @@ def register_checks(app):
             return None
 
         tag_glob = None
+        project = None
         if isinstance(ctx, WorkspaceCheckContext):
-            # Derive tag_glob from project name for monorepo scoping
+            # Derive tag_glob and project dict from workspace for monorepo scoping
             from .workspace import resolve_project
             proj = resolve_project(str(ctx.workspace_root), str(ctx.project_root))
             if proj is not None:
                 tag_glob = f"{proj['name']}@v*"
+                project = proj
 
         entries = read_unreleased(changes_dir)
-        return changes_dir, tag_glob, entries
+        return changes_dir, tag_glob, project, entries
 
     @app.check("changelog-hashes")
     def check_changelog_hashes(ctx):
@@ -476,7 +480,7 @@ def register_checks(app):
         info = _get_changelog_context(ctx)
         if info is None:
             return CheckResult("skip", "no .rlsbl/changes/ directory")
-        _changes_dir, _tag_glob, entries = info
+        _changes_dir, _tag_glob, _project, entries = info
 
         original_cwd = os.getcwd()
         try:
@@ -497,12 +501,12 @@ def register_checks(app):
         info = _get_changelog_context(ctx)
         if info is None:
             return CheckResult("skip", "no .rlsbl/changes/ directory")
-        _changes_dir, tag_glob, entries = info
+        _changes_dir, tag_glob, project, entries = info
 
         original_cwd = os.getcwd()
         try:
             os.chdir(ctx.project_root)
-            passed, details = check_in_range(entries, tag_glob)
+            passed, details = check_in_range(entries, tag_glob, project=project)
         finally:
             os.chdir(original_cwd)
 
@@ -518,12 +522,12 @@ def register_checks(app):
         info = _get_changelog_context(ctx)
         if info is None:
             return CheckResult("skip", "no .rlsbl/changes/ directory")
-        _changes_dir, tag_glob, entries = info
+        _changes_dir, tag_glob, project, entries = info
 
         original_cwd = os.getcwd()
         try:
             os.chdir(ctx.project_root)
-            passed, details = check_coverage(entries, tag_glob)
+            passed, details = check_coverage(entries, tag_glob, project=project)
         finally:
             os.chdir(original_cwd)
 
@@ -541,7 +545,7 @@ def register_checks(app):
         info = _get_changelog_context(ctx)
         if info is None:
             return CheckResult("skip", "no .rlsbl/changes/ directory")
-        _changes_dir, _tag_glob, entries = info
+        _changes_dir, _tag_glob, _project, entries = info
 
         original_cwd = os.getcwd()
         try:
@@ -562,7 +566,7 @@ def register_checks(app):
         info = _get_changelog_context(ctx)
         if info is None:
             return CheckResult("skip", "no .rlsbl/changes/ directory")
-        _changes_dir, _tag_glob, entries = info
+        _changes_dir, _tag_glob, _project, entries = info
 
         passed, details = check_schema(entries)
         if passed:
@@ -577,7 +581,7 @@ def register_checks(app):
         info = _get_changelog_context(ctx)
         if info is None:
             return CheckResult("skip", "no .rlsbl/changes/ directory")
-        _changes_dir, _tag_glob, entries = info
+        _changes_dir, _tag_glob, _project, entries = info
 
         passed, details = check_has_user_facing(entries)
         if passed:
@@ -592,7 +596,7 @@ def register_checks(app):
         info = _get_changelog_context(ctx)
         if info is None:
             return CheckResult("skip", "no .rlsbl/changes/ directory")
-        _changes_dir, _tag_glob, entries = info
+        _changes_dir, _tag_glob, _project, entries = info
 
         original_cwd = os.getcwd()
         try:
@@ -618,7 +622,7 @@ def register_checks(app):
         info = _get_changelog_context(ctx)
         if info is None:
             return CheckResult("skip", "no .rlsbl/changes/ directory")
-        changes_dir, _tag_glob, _entries = info
+        changes_dir, _tag_glob, _project, _entries = info
 
         original_cwd = os.getcwd()
         try:
