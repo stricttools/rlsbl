@@ -297,7 +297,7 @@ def _sync_github_release(version: str) -> None:
     """Sync GitHub Release notes for a version (best-effort, warns on failure)."""
     try:
         result = subprocess.run(
-            ["rlsbl", "edit-release", version],
+            ["rlsbl", "release", "edit", version],
             capture_output=True,
             text=True,
             timeout=30,

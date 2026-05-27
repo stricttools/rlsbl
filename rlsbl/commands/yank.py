@@ -41,12 +41,12 @@ def run_cmd(args, flags):
         print(f"Error: GitHub Release for {tag} not found.", file=sys.stderr)
         sys.exit(1)
 
-    # Refuse to yank the latest release -- suggest rlsbl undo instead
+    # Refuse to yank the latest release -- suggest rlsbl release undo instead
     try:
         latest_line = run("gh", ["release", "list", "--limit", "1", "--json", "tagName", "--jq", ".[0].tagName"])
         if latest_line == tag:
             print(
-                f"Error: {tag} is the latest release. Use 'rlsbl undo' to revert it instead.",
+                f"Error: {tag} is the latest release. Use 'rlsbl release undo' to revert it instead.",
                 file=sys.stderr,
             )
             sys.exit(1)

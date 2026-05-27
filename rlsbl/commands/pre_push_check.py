@@ -57,7 +57,7 @@ def _warn_if_manual_release_push(stdin_lines):
     """Print a warning when a manual push targets a release branch.
 
     Fires only when ``RLSBL_RELEASE_PUSH`` is NOT set (i.e. the push didn't
-    originate from ``rlsbl release``/``rlsbl undo``). Inspects the pushed
+    originate from ``rlsbl release run``/``rlsbl release undo``). Inspects the pushed
     refs and warns on any branch matching the configured release-branch
     list. Never blocks -- the warning is purely advisory.
     """
@@ -420,7 +420,7 @@ def run_cmd(registry, args, flags):
         sys.exit(0)
 
     # Warn if this looks like a manual push to a release branch (the env
-    # marker is only set by `rlsbl release` and `rlsbl undo`). Non-blocking.
+    # marker is only set by `rlsbl release run` and `rlsbl release undo`). Non-blocking.
     _warn_if_manual_release_push(stdin_lines)
 
     # Detect monorepo context
