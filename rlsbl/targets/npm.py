@@ -186,6 +186,7 @@ class NpmTarget(BaseTarget):
         return [
             {"template": ci_template, "target": ".github/workflows/ci.yml"},
             {"template": publish_template, "target": ".github/workflows/publish.yml"},
+            {"template": "npmignore.tpl", "target": ".npmignore"},
         ]
 
     def build_assets(self, dir_path, version, dist_dir):

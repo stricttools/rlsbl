@@ -49,6 +49,7 @@ def _check_npm_lockfile_missing():
 USER_OWNED = {
     "CHANGELOG.md",
     "LICENSE",
+    ".npmignore",
     ".rlsbl/hooks/pre-checks.sh",
     ".rlsbl/changes/unreleased.jsonl",
     # Custom workflow files: never created by scaffold, never touched on update.

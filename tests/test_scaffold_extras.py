@@ -287,3 +287,88 @@ def test_pre_push_hook_does_not_pass_args(mock_git_repo, capsys):
     assert '"$@"' not in content, "Hook must not pass $@ (strictcli rejects extra args)"
     assert "'$@'" not in content, "Hook must not pass $@ (strictcli rejects extra args)"
     assert "pre-push-check" in content, "Hook should delegate to pre-push-check"
+
+
+# --- .npmignore scaffolding tests ---
+
+
+def test_npm_scaffold_creates_npmignore(tmp_project):
+    """Scaffold for npm target should create .npmignore from the template."""
+    from rlsbl.targets.npm import NpmTarget
+
+    target = NpmTarget()
+    tpl_dir = target.template_dir()
+    mappings = target.template_mappings()
+
+    # Verify .npmignore is in the mappings
+    npmignore_mappings = [m for m in mappings if m["target"] == ".npmignore"]
+    assert len(npmignore_mappings) == 1, ".npmignore should be in npm template_mappings"
+    assert npmignore_mappings[0]["template"] == "npmignore.tpl"
+
+    # Process the template and verify the file is created
+    created, skipped, warnings, _ = process_mappings(
+        tpl_dir, npmignore_mappings, {}, force=False, update=False,
+    )
+
+    npmignore_path = tmp_project / ".npmignore"
+    assert npmignore_path.exists(), ".npmignore should be created by scaffold"
+    content = npmignore_path.read_text()
+    assert ".rlsbl/" in content, ".npmignore should exclude rlsbl metadata"
+    assert "__pycache__/" in content, ".npmignore should exclude Python artifacts"
+
+    created_targets = [t for t, _ in created]
+    assert ".npmignore" in created_targets
+
+
+def test_npmignore_is_user_owned(tmp_project):
+    """.npmignore must be in USER_OWNED so scaffold --update doesn't overwrite it."""
+    assert ".npmignore" in USER_OWNED
+
+    # Pre-existing user content
+    npmignore = tmp_project / ".npmignore"
+    npmignore.write_text("# My custom npmignore\nmy-custom-dir/\n")
+
+    from rlsbl.targets.npm import NpmTarget
+
+    target = NpmTarget()
+    tpl_dir = target.template_dir()
+    npmignore_mappings = [
+        m for m in target.template_mappings() if m["target"] == ".npmignore"
+    ]
+
+    # With --update, the user-owned file should not be overwritten
+    created, skipped, warnings, _ = process_mappings(
+        tpl_dir, npmignore_mappings, {}, force=False, update=True,
+    )
+
+    assert npmignore.read_text() == "# My custom npmignore\nmy-custom-dir/\n"
+    skipped_targets = [t for t, _ in skipped]
+    assert ".npmignore" in skipped_targets
+    created_targets = [t for t, _ in created]
+    assert ".npmignore" not in created_targets
+
+    # With --force, the user-owned file should still not be overwritten
+    created, skipped, warnings, _ = process_mappings(
+        tpl_dir, npmignore_mappings, {}, force=True, update=False,
+    )
+
+    assert npmignore.read_text() == "# My custom npmignore\nmy-custom-dir/\n"
+    skipped_targets = [t for t, _ in skipped]
+    assert ".npmignore" in skipped_targets
+
+
+def test_pypi_scaffold_does_not_create_npmignore(tmp_project):
+    """Scaffold for a non-npm target (pypi) should NOT create .npmignore."""
+    from rlsbl.targets.pypi import PypiTarget
+
+    target = PypiTarget()
+    mappings = target.template_mappings()
+
+    # .npmignore must not appear in pypi's template_mappings
+    npmignore_mappings = [m for m in mappings if m["target"] == ".npmignore"]
+    assert len(npmignore_mappings) == 0, "pypi target should not include .npmignore"
+
+    # Also check shared_template_mappings -- .npmignore should not be there either
+    shared_mappings = target.shared_template_mappings()
+    shared_npmignore = [m for m in shared_mappings if m["target"] == ".npmignore"]
+    assert len(shared_npmignore) == 0, ".npmignore should not be in shared templates"
