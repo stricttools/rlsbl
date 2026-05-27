@@ -2,6 +2,25 @@
 
 # Changelog
 
+## 0.43.0
+
+### Breaking
+
+- **Breaking.** `edit-release`, `undo`, and `yank` are now subcommands of the `release` group: `release edit`, `release undo`, `release yank`.
+- **Breaking.** `release retry` is now file-driven via `retry.toml`. Auto-scaffolds the file with defaults when not present. The version positional argument is removed.
+
+### Features
+
+- **Improvement.** `release yank` now shows a confirmation prompt before destructive operations, with `--yes` to bypass.
+- **Improvement.** `release run` now detects monorepo root and errors with guidance to use `monorepo release`.
+
+### Fixes
+
+- **Bug fix.** Multi-target scaffold now correctly includes `workflow_dispatch` in merged publish workflows.
+- **Bug fix.** `selfdoc.json` version is now auto-bumped during release even when `docs` is not in the configured targets. The version-consistency check also detects drift independently of target config.
+- **Bug fix.** Monorepo changelog coverage now only requires entries for commits touching the package's own files, not all commits in the range.
+- **Bug fix.** `release yank` now uses correct monorepo tag format instead of hardcoding `v{version}`.
+
 ## 0.42.0
 
 ### Breaking
