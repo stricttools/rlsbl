@@ -16,7 +16,9 @@ class TestSoftYank(unittest.TestCase):
     @patch("rlsbl.commands.yank.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.yank.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.yank.run")
-    def test_soft_yank_basic(self, mock_run, _gh_inst, _gh_auth, _rename, _unlink, _exists):
+    @patch("rlsbl.commands.yank.find_workspace_root", return_value=None)
+    @patch("rlsbl.commands.yank.detect_targets", return_value=[])
+    def test_soft_yank_basic(self, _detect, _ws_root, mock_run, _gh_inst, _gh_auth, _rename, _unlink, _exists):
         """Soft yank marks release as pre-release and prepends deprecation notice."""
         mock_run.side_effect = [
             "",          # gh release view v0.9.1 (exists check)
@@ -45,7 +47,9 @@ class TestSoftYank(unittest.TestCase):
     @patch("rlsbl.commands.yank.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.yank.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.yank.run")
-    def test_soft_yank_with_reason_and_use(self, mock_run, _gh_inst, _gh_auth, _rename, _unlink, _exists):
+    @patch("rlsbl.commands.yank.find_workspace_root", return_value=None)
+    @patch("rlsbl.commands.yank.detect_targets", return_value=[])
+    def test_soft_yank_with_reason_and_use(self, _detect, _ws_root, mock_run, _gh_inst, _gh_auth, _rename, _unlink, _exists):
         """Soft yank with --reason and --use includes both in the deprecation notice."""
         mock_run.side_effect = [
             "",             # gh release view v0.9.1
@@ -77,7 +81,9 @@ class TestHardYank(unittest.TestCase):
     @patch("rlsbl.commands.yank.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.yank.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.yank.run")
-    def test_hard_yank(self, mock_run, _gh_inst, _gh_auth):
+    @patch("rlsbl.commands.yank.find_workspace_root", return_value=None)
+    @patch("rlsbl.commands.yank.detect_targets", return_value=[])
+    def test_hard_yank(self, _detect, _ws_root, mock_run, _gh_inst, _gh_auth):
         """Hard yank deletes the release."""
         mock_run.side_effect = [
             "",         # gh release view v0.9.1
@@ -101,7 +107,9 @@ class TestDryRun(unittest.TestCase):
     @patch("rlsbl.commands.yank.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.yank.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.yank.run")
-    def test_soft_dry_run(self, mock_run, _gh_inst, _gh_auth):
+    @patch("rlsbl.commands.yank.find_workspace_root", return_value=None)
+    @patch("rlsbl.commands.yank.detect_targets", return_value=[])
+    def test_soft_dry_run(self, _detect, _ws_root, mock_run, _gh_inst, _gh_auth):
         """Soft dry run prints what would happen without editing."""
         mock_run.side_effect = [
             "",         # gh release view v0.9.1
@@ -123,7 +131,9 @@ class TestDryRun(unittest.TestCase):
     @patch("rlsbl.commands.yank.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.yank.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.yank.run")
-    def test_hard_dry_run(self, mock_run, _gh_inst, _gh_auth):
+    @patch("rlsbl.commands.yank.find_workspace_root", return_value=None)
+    @patch("rlsbl.commands.yank.detect_targets", return_value=[])
+    def test_hard_dry_run(self, _detect, _ws_root, mock_run, _gh_inst, _gh_auth):
         """Hard dry run prints what would happen without deleting."""
         mock_run.side_effect = [
             "",         # gh release view v0.9.1
@@ -148,7 +158,9 @@ class TestErrorCases(unittest.TestCase):
     @patch("rlsbl.commands.yank.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.yank.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.yank.run")
-    def test_nonexistent_release(self, mock_run, _gh_inst, _gh_auth):
+    @patch("rlsbl.commands.yank.find_workspace_root", return_value=None)
+    @patch("rlsbl.commands.yank.detect_targets", return_value=[])
+    def test_nonexistent_release(self, _detect, _ws_root, mock_run, _gh_inst, _gh_auth):
         """Yanking a non-existent release prints an error and exits."""
         mock_run.side_effect = Exception("release not found")
 
@@ -162,7 +174,9 @@ class TestErrorCases(unittest.TestCase):
     @patch("rlsbl.commands.yank.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.yank.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.yank.run")
-    def test_latest_release_blocked(self, mock_run, _gh_inst, _gh_auth):
+    @patch("rlsbl.commands.yank.find_workspace_root", return_value=None)
+    @patch("rlsbl.commands.yank.detect_targets", return_value=[])
+    def test_latest_release_blocked(self, _detect, _ws_root, mock_run, _gh_inst, _gh_auth):
         """Yanking the latest release is blocked with a suggestion to use undo."""
         mock_run.side_effect = [
             "",         # gh release view v1.0.0 (exists)
@@ -184,7 +198,9 @@ class TestVersionNormalization(unittest.TestCase):
     @patch("rlsbl.commands.yank.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.yank.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.yank.run")
-    def test_without_v_prefix(self, mock_run, _gh_inst, _gh_auth):
+    @patch("rlsbl.commands.yank.find_workspace_root", return_value=None)
+    @patch("rlsbl.commands.yank.detect_targets", return_value=[])
+    def test_without_v_prefix(self, _detect, _ws_root, mock_run, _gh_inst, _gh_auth):
         """'0.9.1' is normalized to tag 'v0.9.1'."""
         mock_run.side_effect = [
             "",         # gh release view v0.9.1
@@ -201,7 +217,9 @@ class TestVersionNormalization(unittest.TestCase):
     @patch("rlsbl.commands.yank.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.yank.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.yank.run")
-    def test_with_v_prefix(self, mock_run, _gh_inst, _gh_auth):
+    @patch("rlsbl.commands.yank.find_workspace_root", return_value=None)
+    @patch("rlsbl.commands.yank.detect_targets", return_value=[])
+    def test_with_v_prefix(self, _detect, _ws_root, mock_run, _gh_inst, _gh_auth):
         """'v0.9.1' is also normalized to tag 'v0.9.1'."""
         mock_run.side_effect = [
             "",         # gh release view v0.9.1

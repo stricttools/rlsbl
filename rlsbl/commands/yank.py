@@ -4,7 +4,9 @@ import os
 import sys
 import time
 
+from ..targets import TARGETS, detect_targets
 from ..utils import run, check_gh_installed, check_gh_auth
+from ..workspace import find_workspace_root, resolve_project
 
 
 def run_cmd(args, flags):
@@ -12,6 +14,9 @@ def run_cmd(args, flags):
 
     Default (soft): mark as pre-release and prepend a deprecation notice.
     With --hard: delete the GitHub Release (git tag is preserved).
+
+    In monorepo mode, uses the project's monorepo tag format (e.g.
+    ``mylib@v1.2.3``) instead of the plain ``v1.2.3`` tag.
     """
     dry_run = flags.get("dry-run", False)
     hard = flags.get("hard", False)
@@ -22,10 +27,31 @@ def run_cmd(args, flags):
         print("Error: version argument is required.", file=sys.stderr)
         sys.exit(1)
 
-    # Normalize version: strip leading "v" for display, ensure "v" prefix for tag
+    # Normalize version: strip leading "v" for display
     raw_version = args[0]
     version = raw_version.lstrip("v")
-    tag = f"v{version}"
+
+    # Detect monorepo context and build tag accordingly
+    monorepo_name = None
+    monorepo_project_path = None
+    monorepo_root = find_workspace_root(".")
+    if monorepo_root:
+        project = resolve_project(monorepo_root, ".")
+        if project is not None:
+            monorepo_name = project["name"]
+            monorepo_project_path = project["path"]
+            os.chdir(monorepo_root)
+
+    version_dir = monorepo_project_path if monorepo_name else "."
+    entries = detect_targets(version_dir)
+    if entries:
+        target = TARGETS[entries[0].name]
+        if monorepo_name:
+            tag = target.monorepo_tag_format(monorepo_name, version, path=monorepo_project_path)
+        else:
+            tag = target.tag_format(version)
+    else:
+        tag = f"v{version}"
 
     if not check_gh_installed():
         print("Error: gh CLI is not installed.", file=sys.stderr)
