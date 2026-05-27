@@ -2,3 +2,4 @@
 {"commits":["555cc99d8e413b644de0b43a6b6326a00a768662"],"user_facing":true,"description":"**Scaffold.** npm targets now get a `.npmignore` file with sensible defaults, preventing non-npm content from being published.","type":"feature"}
 {"commits":["ef980a73c2488e75a5d494fad8fc83f785975fb2","5a59506223d51c5b5972b85aeb155c68523e499e","1f90a6c63e0307f2bab3f30e49948e7a4473d2b0"],"user_facing":false}
 {"commits":["340bca6e0f76a4df318ecca23f9a0310aee1819b"],"user_facing":false}
+{"commits":["2cd68298c15d7d853b3cafe2ac2d70b4dadcdb25"],"user_facing":false}
