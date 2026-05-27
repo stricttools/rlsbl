@@ -55,6 +55,7 @@ order: 90
 - [rlsbl.dep_rewrite](rlsbl-dep_rewrite.html)
 - [rlsbl.dep_validation](rlsbl-dep_validation.html)
 - [rlsbl.deploy](rlsbl-deploy.html)
+- [rlsbl.git_util](rlsbl-git_util.html)
 - [rlsbl.hook_hashes](rlsbl-hook_hashes.html)
 - [rlsbl.import_scanners](rlsbl-import_scanners.html)
 - [rlsbl.layers](rlsbl-layers.html)

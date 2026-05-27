@@ -121,7 +121,7 @@ Add custom GitHub Actions jobs via the user-owned `.github/workflows/ci-custom.y
 `.git/hooks/pre-push` runs `rlsbl pre-push-check`, which:
 
 - enforces JSONL commit coverage for every pushed commit (hard error -- blocks the push)
-- warns when a push targets a release branch but did not originate from `rlsbl release run` / `rlsbl undo`
+- warns when a push targets a release branch but did not originate from `rlsbl release run` / `rlsbl release undo`
 
 The release/undo commands set `RLSBL_RELEASE_PUSH=1` in the push environment so the hook recognises legitimate release pushes and suppresses the warning. Users should not set this env var directly -- it is an internal contract between rlsbl and its own git hook.
 
