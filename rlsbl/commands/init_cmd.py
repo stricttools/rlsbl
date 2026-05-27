@@ -1093,6 +1093,61 @@ def _merge_permissions(perm_dicts):
     return merged
 
 
+def _parse_on_triggers(block_lines):
+    """Parse an ``on:`` block into a dict of trigger names to sub-block lines.
+
+    Each trigger key maps to a list of its indented continuation lines (if any).
+    Triggers without sub-keys (e.g. ``workflow_dispatch:``) map to an empty list.
+
+    Returns a dict like::
+
+        {"release": ["    types: [published]\\n"], "workflow_dispatch": []}
+    """
+    triggers = {}
+    current_trigger = None
+    for line in block_lines:
+        stripped = line.rstrip()
+        # Skip the ``on:`` header line, blank lines before first trigger, and comments
+        if stripped == "on:" or stripped.startswith("on: "):
+            continue
+        if not stripped or stripped.startswith("#"):
+            # Blank or comment lines inside a trigger's sub-block
+            if current_trigger is not None:
+                triggers[current_trigger].append(line)
+            continue
+        # A line at exactly 2-space indent is a trigger key
+        if line.startswith("  ") and not line.startswith("    "):
+            key = stripped.rstrip(":").strip()
+            current_trigger = key
+            triggers[key] = []
+        elif current_trigger is not None:
+            # Deeper-indented continuation line belongs to the current trigger
+            triggers[current_trigger].append(line)
+    return triggers
+
+
+def _merge_on_triggers(trigger_dicts):
+    """Merge multiple parsed ``on:`` trigger dicts into a single dict.
+
+    Unions all trigger keys. For triggers with sub-blocks, the first non-empty
+    sub-block wins (all templates currently have identical sub-blocks).
+    Ensures ``workflow_dispatch`` is always present.
+    """
+    merged = {}
+    for d in trigger_dicts:
+        for key, sub_lines in d.items():
+            if key not in merged:
+                merged[key] = sub_lines
+            else:
+                # Keep the first non-empty sub-block
+                if not merged[key] and sub_lines:
+                    merged[key] = sub_lines
+    # Guarantee workflow_dispatch is present
+    if "workflow_dispatch" not in merged:
+        merged["workflow_dispatch"] = []
+    return merged
+
+
 def _extract_jobs_section(lines):
     """Extract the content under the 'jobs:' key from template lines.
 
@@ -1120,6 +1175,7 @@ def _generate_merged_publish(targets, template_vars):
     """
     templates_root = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates")
 
+    all_on_triggers = []
     all_permissions = []
     all_env_entries = []
     all_jobs = []
@@ -1145,6 +1201,11 @@ def _generate_merged_publish(targets, template_vars):
         # Process template variables
         content, _ = process_template(raw, per_target_vars, template_path=tpl_path)
         lines = content.splitlines(keepends=True)
+
+        # Extract top-level on block
+        on_block, lines = _extract_top_level_block(lines, "on")
+        if on_block:
+            all_on_triggers.append(_parse_on_triggers(on_block))
 
         # Extract top-level permissions block
         perm_block, lines = _extract_top_level_block(lines, "permissions")
@@ -1196,9 +1257,18 @@ def _generate_merged_publish(targets, template_vars):
     output_lines = []
     output_lines.append("name: Publish\n")
     output_lines.append("\n")
+
+    # Merged on: triggers
+    merged_triggers = _merge_on_triggers(all_on_triggers)
     output_lines.append("on:\n")
-    output_lines.append("  release:\n")
-    output_lines.append("    types: [published]\n")
+    for trigger_key, sub_lines in merged_triggers.items():
+        if sub_lines:
+            output_lines.append(f"  {trigger_key}:\n")
+            for sl in sub_lines:
+                line = sl if sl.endswith("\n") else sl + "\n"
+                output_lines.append(line)
+        else:
+            output_lines.append(f"  {trigger_key}:\n")
 
     # Merged permissions
     merged_perms = _merge_permissions(all_permissions)

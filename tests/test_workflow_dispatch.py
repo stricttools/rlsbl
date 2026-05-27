@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from ruamel.yaml import YAML
 
+from rlsbl.commands.init_cmd import _generate_merged_publish
 from rlsbl.commands.monorepo import _generate_router
 from rlsbl.commands.monorepo.publish_inline import generate_inline_publish_router
 
@@ -140,3 +141,50 @@ class TestMonorepoRouterWorkflowDispatch:
         parsed = yaml.load(yaml_content)
         on_block = parsed["on"]
         assert "workflow_dispatch" in on_block
+
+
+class TestMultiTargetMergeWorkflowDispatch:
+    """Multi-target merged publish workflow includes workflow_dispatch."""
+
+    TEMPLATE_VARS = {
+        "repoName": "user/repo",
+        "name": "test",
+        "version": "1.0.0",
+        "npm.registryUrl": "https://registry.npmjs.org",
+        "npm.name": "test",
+        "npm.version": "1.0.0",
+        "npm.repoName": "user/repo",
+        "npm.binCommand": "test",
+        "npm.author": "",
+        "npm.packageManager": "npm",
+        "pypi.name": "test",
+        "pypi.version": "1.0.0",
+        "pypi.repoName": "user/repo",
+        "pypi.minRequiredPython": "3.11",
+        "cargo.name": "test",
+        "cargo.version": "1.0.0",
+        "cargo.repoName": "user/repo",
+    }
+
+    def test_merged_publish_has_workflow_dispatch(self):
+        """_generate_merged_publish output includes workflow_dispatch."""
+        result = _generate_merged_publish(["npm", "pypi"], self.TEMPLATE_VARS)
+        assert "workflow_dispatch:" in result
+
+    def test_merged_publish_yaml_parses_workflow_dispatch(self):
+        """workflow_dispatch appears as a top-level trigger key in parsed YAML."""
+        result = _generate_merged_publish(["npm", "pypi"], self.TEMPLATE_VARS)
+        yaml = YAML(typ="safe")
+        parsed = yaml.load(result)
+        on_block = parsed["on"]
+        assert "workflow_dispatch" in on_block
+
+    def test_merged_publish_three_targets_has_workflow_dispatch(self):
+        """Three-target merge also includes workflow_dispatch."""
+        result = _generate_merged_publish(
+            ["npm", "pypi", "cargo"], self.TEMPLATE_VARS
+        )
+        assert "workflow_dispatch:" in result
+        yaml = YAML(typ="safe")
+        parsed = yaml.load(result)
+        assert "workflow_dispatch" in parsed["on"]

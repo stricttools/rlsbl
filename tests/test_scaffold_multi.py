@@ -7,7 +7,12 @@ from unittest.mock import patch
 
 import pytest
 
-from rlsbl.commands.init_cmd import run_cmd_multi, _generate_merged_publish
+from rlsbl.commands.init_cmd import (
+    run_cmd_multi,
+    _generate_merged_publish,
+    _parse_on_triggers,
+    _merge_on_triggers,
+)
 
 
 @pytest.fixture
@@ -305,3 +310,80 @@ class TestMergedPublishCombinations:
 
         # id-token: write should be preserved from npm
         assert "id-token: write" in result
+
+    def test_workflow_dispatch_present_in_merged(self):
+        """Merged publish includes workflow_dispatch from templates."""
+        result = _generate_merged_publish(["npm", "pypi"], self.TEMPLATE_VARS)
+        assert "workflow_dispatch:" in result
+
+    def test_workflow_dispatch_present_single_target(self):
+        """Single-target merged publish includes workflow_dispatch."""
+        result = _generate_merged_publish(["npm"], self.TEMPLATE_VARS)
+        assert "workflow_dispatch:" in result
+
+    def test_on_block_preserves_release_trigger(self):
+        """Merged on: block preserves release trigger with sub-keys."""
+        result = _generate_merged_publish(["cargo", "deno"], self.TEMPLATE_VARS)
+        assert "release:" in result
+        assert "types: [published]" in result
+        assert "workflow_dispatch:" in result
+
+    def test_on_triggers_merged_from_all_targets(self):
+        """All trigger keys from all templates are present in merged output."""
+        result = _generate_merged_publish(["npm", "go"], self.TEMPLATE_VARS)
+        assert "\non:\n" in result
+        assert "  release:" in result
+        assert "  workflow_dispatch:" in result
+
+
+class TestOnTriggerParsing:
+    """Unit tests for _parse_on_triggers and _merge_on_triggers."""
+
+    def test_parse_simple_on_block(self):
+        """Parse on: block with release + workflow_dispatch."""
+        block = [
+            "on:\n",
+            "  release:\n",
+            "    types: [published]\n",
+            "  workflow_dispatch:\n",
+        ]
+        result = _parse_on_triggers(block)
+        assert "release" in result
+        assert "workflow_dispatch" in result
+        assert len(result["release"]) == 1
+        assert "types: [published]" in result["release"][0]
+        assert result["workflow_dispatch"] == []
+
+    def test_parse_only_release(self):
+        """Parse on: block with only release trigger."""
+        block = [
+            "on:\n",
+            "  release:\n",
+            "    types: [published]\n",
+        ]
+        result = _parse_on_triggers(block)
+        assert "release" in result
+        assert "workflow_dispatch" not in result
+
+    def test_merge_adds_workflow_dispatch(self):
+        """Merge guarantees workflow_dispatch even if no template has it."""
+        triggers = [{"release": ["    types: [published]\n"]}]
+        result = _merge_on_triggers(triggers)
+        assert "workflow_dispatch" in result
+        assert "release" in result
+
+    def test_merge_unions_keys(self):
+        """Merge unions trigger keys from all dicts."""
+        t1 = {"release": ["    types: [published]\n"], "workflow_dispatch": []}
+        t2 = {"release": ["    types: [published]\n"], "push": ["    branches: [main]\n"]}
+        result = _merge_on_triggers([t1, t2])
+        assert "release" in result
+        assert "workflow_dispatch" in result
+        assert "push" in result
+
+    def test_merge_keeps_first_nonempty_subblock(self):
+        """When both dicts have sub-lines for same trigger, first non-empty wins."""
+        t1 = {"release": ["    types: [published]\n"]}
+        t2 = {"release": ["    types: [created]\n"]}
+        result = _merge_on_triggers([t1, t2])
+        assert "published" in result["release"][0]
