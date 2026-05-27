@@ -5,13 +5,21 @@ this command deletes the release and re-creates it with the correct release note
 This fires a new ``release: published`` event, re-triggering the Publish workflow.
 It also re-uploads release assets if configured, and falls back to
 ``gh workflow run`` if the event still doesn't trigger workflows.
+
+The command is file-driven: it reads ``.rlsbl/releases/retry.toml`` for
+configuration (version, workflows, ci_ref, assets). If the file does not
+exist, it auto-scaffolds one from project state and proceeds.
 """
 
 import os
+import subprocess
 import sys
 import time
 
+import tomlkit
+
 from ..config import read_project_config
+from ..release_file import RetryConfig, get_retry_file_path, read_retry_file
 from ..targets import TARGETS, detect_targets
 from ..utils import check_gh_auth, check_gh_installed, extract_changelog_entry, run
 from ..workspace import find_workspace_root, resolve_project
@@ -42,16 +50,90 @@ def _find_dispatch_workflows():
     return results
 
 
-def run_cmd(args, flags):
+def _has_assets_config():
+    """Check whether any target has assets enabled in .rlsbl/config.json."""
+    config = read_project_config()
+    publish = config.get("publish", {})
+    if not isinstance(publish, dict):
+        return False
+    for _target_name, target_cfg in publish.items():
+        if isinstance(target_cfg, dict) and target_cfg.get("assets"):
+            return True
+    return False
+
+
+def _scaffold_retry_file(retry_path, version_dir, target, monorepo_name, monorepo_project_path, log):
+    """Auto-scaffold retry.toml from project state.
+
+    Returns the RetryConfig after writing the file.
+    """
+    # Auto-detect version
+    entries = detect_targets(version_dir)
+    if not entries:
+        print("Error: no package.json, pyproject.toml, or go.mod found.", file=sys.stderr)
+        sys.exit(1)
+    primary = entries[0]
+    tgt = TARGETS[primary.name]
+    raw_version = tgt.read_version(primary.path)
+    version = raw_version.lstrip("v")
+
+    # Build tag
+    if monorepo_name:
+        tag = tgt.monorepo_tag_format(monorepo_name, version, path=monorepo_project_path)
+    else:
+        tag = tgt.tag_format(version)
+
+    # Auto-detect dispatchable workflows
+    workflows = _find_dispatch_workflows()
+
+    # Assets from config
+    assets = _has_assets_config()
+
+    # Write retry.toml
+    doc = tomlkit.document()
+    doc.add("version", version)
+    doc.add("workflows", workflows)
+    doc.add("ci_ref", tag)
+    doc.add("assets", assets)
+
+    os.makedirs(os.path.dirname(retry_path), exist_ok=True)
+    tmp_path = retry_path + ".writing"
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        tomlkit.dump(doc, f)
+    os.rename(tmp_path, retry_path)
+
+    log(f"Auto-scaffolded retry file: {retry_path}")
+    with open(retry_path, "r", encoding="utf-8") as f:
+        log(f.read().rstrip())
+
+    return read_retry_file(retry_path)
+
+
+def _cleanup_retry_file(retry_path, log):
+    """Delete retry.toml via saferm after successful retry."""
+    try:
+        subprocess.run(
+            ["saferm", "delete", "--description", "Retry completed successfully", retry_path],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        log(f"Cleaned up: {retry_path}")
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        # Non-fatal: warn but don't fail the retry
+        print(f"Warning: failed to clean up {retry_path}: {e}", file=sys.stderr)
+
+
+def run_cmd(retry_config, flags):
     """Re-create a GitHub Release to re-trigger CI/CD workflows.
 
-    Deletes the existing GitHub Release for the given (or current) version
+    Deletes the existing GitHub Release for the configured version
     and re-creates it with the same changelog notes. This fires a new
     ``release: published`` event. Re-uploads release assets if configured.
     Falls back to ``gh workflow run`` if no CI runs appear.
 
     Args:
-        args: optional list where args[0] is the version to retry.
+        retry_config: RetryConfig instance, or None to auto-scaffold.
         flags: dict with keys ``dry-run``, ``yes``, ``quiet``, ``watch``.
     """
     dry_run = flags.get("dry-run", False)
@@ -84,7 +166,7 @@ def run_cmd(args, flags):
     # Version directory: project subdir in monorepo, repo root otherwise
     version_dir = monorepo_project_path if monorepo_name else "."
 
-    # Detect primary target
+    # Detect primary target (needed for tag format)
     entries = detect_targets(version_dir)
     if not entries:
         print("Error: no package.json, pyproject.toml, or go.mod found.", file=sys.stderr)
@@ -92,14 +174,24 @@ def run_cmd(args, flags):
     primary = entries[0]
     target = TARGETS[primary.name]
 
-    # Resolve version
-    if args:
-        raw_version = args[0]
-    else:
-        raw_version = target.read_version(primary.path)
+    # Auto-scaffold retry.toml if not provided
+    retry_path = get_retry_file_path(version_dir)
+    if retry_config is None:
+        if os.path.exists(retry_path):
+            # File exists but wasn't read by the caller -- read it now
+            try:
+                retry_config = read_retry_file(retry_path)
+            except ValueError as e:
+                print(f"Error in retry file: {e}", file=sys.stderr)
+                sys.exit(1)
+        else:
+            retry_config = _scaffold_retry_file(
+                retry_path, version_dir, target,
+                monorepo_name, monorepo_project_path, log,
+            )
 
-    # Normalize: strip leading "v" for changelog lookup
-    version = raw_version.lstrip("v")
+    # Use config values
+    version = retry_config.version
 
     # Build the tag: monorepo format or standalone
     if monorepo_name:
@@ -150,10 +242,8 @@ def run_cmd(args, flags):
             sys.exit(1)
 
     # Delete the existing GitHub Release
-    release_deleted = False
     try:
         run("gh", ["release", "delete", tag, "--yes"])
-        release_deleted = True
         log(f"Deleted GitHub Release: {tag}")
     except Exception as e:
         print(f"Error: failed to delete GitHub Release for {tag}: {e}", file=sys.stderr)
@@ -184,25 +274,30 @@ def run_cmd(args, flags):
             if os.path.exists(tmp):
                 os.unlink(tmp)
 
-    # Re-upload release assets
-    upload_release_assets(tag, version_dir, version, log, flags)
+    # Re-upload release assets (gated by config.assets)
+    if retry_config.assets:
+        upload_release_assets(tag, version_dir, version, log, flags)
 
     # Poll for workflow runs
     runs = poll_runs(commit_sha)
 
     if not runs:
-        # Dispatch fallback: trigger workflows that support workflow_dispatch
-        dispatch_files = _find_dispatch_workflows()
+        # Dispatch fallback: use workflows from retry config
+        dispatch_files = retry_config.workflows
         if dispatch_files:
             log("No CI runs found after polling. Dispatching workflows manually...")
             for filename in dispatch_files:
                 try:
-                    run("gh", ["workflow", "run", filename, "--ref", tag])
+                    run("gh", ["workflow", "run", filename, "--ref", retry_config.ci_ref])
                     log(f"  Dispatched: {filename}")
                 except Exception as e:
                     print(f"  Warning: failed to dispatch {filename}: {e}", file=sys.stderr)
         else:
-            log("No CI runs found and no workflow_dispatch workflows available.")
+            log("No CI runs found and no dispatchable workflows configured.")
+
+    # Clean up retry.toml after successful retry
+    if os.path.exists(retry_path):
+        _cleanup_retry_file(retry_path, log)
 
     # Watch CI or print hint
     if watch:
