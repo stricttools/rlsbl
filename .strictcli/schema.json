@@ -380,7 +380,7 @@
         },
         "retry": {
           "name": "retry",
-          "help": "Re-create a GitHub Release to re-trigger CI/CD workflows. Deletes the existing release and re-creates it with the same changelog notes, firing a new release:published event. Re-uploads assets if configured. Falls back to gh workflow run if no CI runs appear.",
+          "help": "Re-create a GitHub Release to re-trigger CI/CD workflows. Reads configuration from .rlsbl/releases/retry.toml (auto-scaffolded if missing). Deletes the existing release and re-creates it with the same changelog notes, firing a new release:published event. Re-uploads assets if configured. Falls back to gh workflow run if no CI runs appear.",
           "flags": [
             {
               "name": "watch",
@@ -395,13 +395,6 @@
               "help": "After retry, print the watch command hint without watching",
               "default": false,
               "negatable": false
-            }
-          ],
-          "args": [
-            {
-              "name": "version",
-              "help": "Version to retry (defaults to current)",
-              "required": false
             }
           ]
         },
