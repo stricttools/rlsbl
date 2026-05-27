@@ -1,0 +1,1 @@
+{"commits":["ef63d6335b4572b51f27661936c3a61c0fb067b6"],"user_facing":true,"description":"**Bug fix.** Multi-target scaffold now correctly includes `workflow_dispatch` in merged publish workflows.","type":"fix"}
