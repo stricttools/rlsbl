@@ -810,3 +810,236 @@ class TestIsChangelogOnlyCommit:
         _run_git(git_repo, "commit", "-m", "update changelog")
         sha = _git_head(git_repo)
         assert _is_changelog_only_commit(sha) is True
+
+
+class TestMonorepoPathScoping:
+    """Tests for monorepo changelog path scoping.
+
+    When a project dict is passed to check_coverage and check_in_range,
+    only commits touching the project's files should require JSONL entries.
+    Commits outside the package directory are filtered out.
+    """
+
+    @pytest.fixture
+    def monorepo_repo(self, tmp_path, monkeypatch):
+        """Create a monorepo with two packages (pkg-a, pkg-b) and a baseline tag."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+
+        _run_git(repo, "init", "-q")
+        _run_git(repo, "config", "user.email", "test@test.local")
+        _run_git(repo, "config", "user.name", "Test")
+
+        # Create package directories
+        (repo / "pkg-a").mkdir()
+        (repo / "pkg-a" / "lib.py").write_text("a = 1\n")
+        (repo / "pkg-b").mkdir()
+        (repo / "pkg-b" / "lib.py").write_text("b = 1\n")
+        (repo / "README.md").write_text("# monorepo\n")
+
+        _run_git(repo, "add", ".")
+        _run_git(repo, "commit", "-q", "-m", "initial monorepo setup")
+
+        # Tag for pkg-a baseline
+        _run_git(repo, "tag", "pkg-a@v0.1.0")
+
+        # Set up .rlsbl/changes for pkg-a
+        changes = repo / "pkg-a" / ".rlsbl" / "changes"
+        changes.mkdir(parents=True)
+
+        return repo
+
+    def _project_a(self):
+        """Return a project dict for pkg-a."""
+        return {"path": "pkg-a", "name": "pkg-a"}
+
+    def test_coverage_only_requires_project_commits(self, monorepo_repo):
+        """Only commits touching pkg-a's files need coverage entries."""
+        repo = monorepo_repo
+        project = self._project_a()
+
+        # Commit touching only pkg-a
+        (repo / "pkg-a" / "lib.py").write_text("a = 2\n")
+        _run_git(repo, "add", "pkg-a/lib.py")
+        _run_git(repo, "commit", "-q", "-m", "update pkg-a")
+        sha_a = _git_head(repo)
+
+        # Commit touching only pkg-b (should NOT require coverage for pkg-a)
+        (repo / "pkg-b" / "lib.py").write_text("b = 2\n")
+        _run_git(repo, "add", "pkg-b/lib.py")
+        _run_git(repo, "commit", "-q", "-m", "update pkg-b")
+
+        # Commit touching only root files (should NOT require coverage for pkg-a)
+        (repo / "README.md").write_text("# updated\n")
+        _run_git(repo, "add", "README.md")
+        _run_git(repo, "commit", "-q", "-m", "update readme")
+
+        # Only cover the pkg-a commit
+        entries = [ChangelogEntry(commits=[sha_a], user_facing=False)]
+        passed, details = check_coverage(entries, tag_glob="pkg-a@v*", project=project)
+        assert passed is True
+        # Should report skipped commits outside package directory
+        assert any("outside package directory" in d for d in details)
+
+    def test_coverage_fails_when_project_commit_uncovered(self, monorepo_repo):
+        """Coverage fails if a commit touching pkg-a is not covered."""
+        repo = monorepo_repo
+        project = self._project_a()
+
+        # Commit touching pkg-a (uncovered)
+        (repo / "pkg-a" / "lib.py").write_text("a = 3\n")
+        _run_git(repo, "add", "pkg-a/lib.py")
+        _run_git(repo, "commit", "-q", "-m", "update pkg-a uncovered")
+
+        entries = []
+        passed, details = check_coverage(entries, tag_glob="pkg-a@v*", project=project)
+        assert passed is False
+        assert any("not covered" in d for d in details)
+
+    def test_coverage_without_project_requires_all_commits(self, monorepo_repo):
+        """Without project (non-monorepo), all commits need coverage."""
+        repo = monorepo_repo
+
+        # Commit touching pkg-a
+        (repo / "pkg-a" / "lib.py").write_text("a = 4\n")
+        _run_git(repo, "add", "pkg-a/lib.py")
+        _run_git(repo, "commit", "-q", "-m", "update pkg-a")
+        sha_a = _git_head(repo)
+
+        # Commit touching pkg-b
+        (repo / "pkg-b" / "lib.py").write_text("b = 4\n")
+        _run_git(repo, "add", "pkg-b/lib.py")
+        _run_git(repo, "commit", "-q", "-m", "update pkg-b")
+
+        # Only cover pkg-a commit -- pkg-b commit is uncovered
+        entries = [ChangelogEntry(commits=[sha_a], user_facing=False)]
+        passed, details = check_coverage(entries, tag_glob="pkg-a@v*", project=None)
+        assert passed is False
+        assert any("not covered" in d for d in details)
+
+    def test_coverage_skipped_count_matches_filtered_commits(self, monorepo_repo):
+        """The skip count should equal the number of non-project commits."""
+        repo = monorepo_repo
+        project = self._project_a()
+
+        # Commit touching pkg-a
+        (repo / "pkg-a" / "lib.py").write_text("a = 5\n")
+        _run_git(repo, "add", "pkg-a/lib.py")
+        _run_git(repo, "commit", "-q", "-m", "update pkg-a")
+        sha_a = _git_head(repo)
+
+        # 2 commits outside pkg-a
+        (repo / "pkg-b" / "lib.py").write_text("b = 5\n")
+        _run_git(repo, "add", "pkg-b/lib.py")
+        _run_git(repo, "commit", "-q", "-m", "update pkg-b")
+
+        (repo / "README.md").write_text("# v2\n")
+        _run_git(repo, "add", "README.md")
+        _run_git(repo, "commit", "-q", "-m", "update readme")
+
+        entries = [ChangelogEntry(commits=[sha_a], user_facing=False)]
+        passed, details = check_coverage(entries, tag_glob="pkg-a@v*", project=project)
+        assert passed is True
+        assert any("skipped 2 commit(s) outside package directory" in d for d in details)
+
+    def test_in_range_with_project_scoping(self, monorepo_repo):
+        """check_in_range with project only considers project commits as in-range."""
+        repo = monorepo_repo
+        project = self._project_a()
+
+        # Commit touching pkg-a
+        (repo / "pkg-a" / "lib.py").write_text("a = 6\n")
+        _run_git(repo, "add", "pkg-a/lib.py")
+        _run_git(repo, "commit", "-q", "-m", "update pkg-a")
+        sha_a = _git_head(repo)
+
+        entries = [ChangelogEntry(commits=[sha_a], user_facing=False)]
+        passed, details = check_in_range(entries, tag_glob="pkg-a@v*", project=project)
+        assert passed is True
+
+    def test_validate_unreleased_with_project_scoping(self, monorepo_repo):
+        """validate_unreleased with project dict passes when only project commits are covered."""
+        repo = monorepo_repo
+        project = self._project_a()
+        changes_dir = str(repo / "pkg-a" / ".rlsbl" / "changes")
+
+        # Commit touching pkg-a
+        (repo / "pkg-a" / "lib.py").write_text("a = 7\n")
+        _run_git(repo, "add", "pkg-a/lib.py")
+        _run_git(repo, "commit", "-q", "-m", "update pkg-a")
+        sha_a = _git_head(repo)
+
+        # Commit touching pkg-b (should be filtered out)
+        (repo / "pkg-b" / "lib.py").write_text("b = 7\n")
+        _run_git(repo, "add", "pkg-b/lib.py")
+        _run_git(repo, "commit", "-q", "-m", "update pkg-b")
+
+        # Add entry for pkg-a commit
+        from rlsbl.changelog.files import append_entry
+        append_entry(changes_dir, ChangelogEntry(
+            commits=[sha_a], user_facing=True, description="Update pkg-a", type="feature",
+        ))
+
+        result = validate_unreleased(changes_dir, tag_glob="pkg-a@v*", project=project)
+        assert result["passed"] is True
+
+    def test_validate_unreleased_without_project_fails(self, monorepo_repo):
+        """validate_unreleased without project fails when cross-package commits are uncovered."""
+        repo = monorepo_repo
+        changes_dir = str(repo / "pkg-a" / ".rlsbl" / "changes")
+
+        # Commit touching pkg-a
+        (repo / "pkg-a" / "lib.py").write_text("a = 8\n")
+        _run_git(repo, "add", "pkg-a/lib.py")
+        _run_git(repo, "commit", "-q", "-m", "update pkg-a")
+        sha_a = _git_head(repo)
+
+        # Commit touching pkg-b (uncovered without project scoping)
+        (repo / "pkg-b" / "lib.py").write_text("b = 8\n")
+        _run_git(repo, "add", "pkg-b/lib.py")
+        _run_git(repo, "commit", "-q", "-m", "update pkg-b")
+
+        # Only cover pkg-a commit
+        from rlsbl.changelog.files import append_entry
+        append_entry(changes_dir, ChangelogEntry(
+            commits=[sha_a], user_facing=True, description="Update pkg-a", type="feature",
+        ))
+
+        result = validate_unreleased(changes_dir, tag_glob="pkg-a@v*", project=None)
+        assert result["passed"] is False
+        passed, details = result["checks"]["coverage"]
+        assert passed is False
+
+    def test_coverage_with_watch_globs(self, monorepo_repo):
+        """Project with watch globs includes commits matching the globs."""
+        repo = monorepo_repo
+        project = {"path": "pkg-a", "name": "pkg-a", "watch": ["shared/*.py"]}
+
+        # Commit touching pkg-a
+        (repo / "pkg-a" / "lib.py").write_text("a = 9\n")
+        _run_git(repo, "add", "pkg-a/lib.py")
+        _run_git(repo, "commit", "-q", "-m", "update pkg-a")
+        sha_a = _git_head(repo)
+
+        # Commit touching a watched shared file (should need coverage)
+        (repo / "shared").mkdir(exist_ok=True)
+        (repo / "shared" / "utils.py").write_text("u = 1\n")
+        _run_git(repo, "add", "shared/utils.py")
+        _run_git(repo, "commit", "-q", "-m", "update shared")
+        sha_shared = _git_head(repo)
+
+        # Commit touching only pkg-b (should be filtered out)
+        (repo / "pkg-b" / "lib.py").write_text("b = 9\n")
+        _run_git(repo, "add", "pkg-b/lib.py")
+        _run_git(repo, "commit", "-q", "-m", "update pkg-b")
+
+        # Cover both pkg-a and shared commits
+        entries = [
+            ChangelogEntry(commits=[sha_a], user_facing=False),
+            ChangelogEntry(commits=[sha_shared], user_facing=False),
+        ]
+        passed, details = check_coverage(entries, tag_glob="pkg-a@v*", project=project)
+        assert passed is True
+        # Should have 1 skipped commit (pkg-b)
+        assert any("skipped 1 commit(s) outside package directory" in d for d in details)
