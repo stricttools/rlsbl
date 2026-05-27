@@ -23,7 +23,7 @@ CHANGELOG = """\
 
 
 class TestEditRelease(unittest.TestCase):
-    """Tests for the edit-release command."""
+    """Tests for the release edit command (formerly edit-release)."""
 
     def _make_mock_target(self, version="0.23.0"):
         """Create a mock target with read_version and tag_format."""

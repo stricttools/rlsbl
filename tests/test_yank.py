@@ -189,7 +189,7 @@ class TestErrorCases(unittest.TestCase):
 
         self.assertEqual(ctx.exception.code, 1)
         self.assertIn("latest release", mock_stderr.getvalue())
-        self.assertIn("rlsbl undo", mock_stderr.getvalue())
+        self.assertIn("rlsbl release undo", mock_stderr.getvalue())
 
 
 class TestVersionNormalization(unittest.TestCase):

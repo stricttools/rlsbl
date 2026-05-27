@@ -154,8 +154,8 @@ result = migrate(".")  # returns {filename: was_written} or None
 ## Undo
 
 ```
-rlsbl undo         # interactive: confirms before each destructive step
-rlsbl undo --yes   # non-interactive: auto-confirms, auto-pushes
+rlsbl release undo         # interactive: confirms before each destructive step
+rlsbl release undo --yes   # non-interactive: auto-confirms, auto-pushes
 ```
 
 Reverts the last release:
