@@ -1,2 +1,3 @@
 {"commits":["ef63d6335b4572b51f27661936c3a61c0fb067b6"],"user_facing":true,"description":"**Bug fix.** Multi-target scaffold now correctly includes `workflow_dispatch` in merged publish workflows.","type":"fix"}
 {"commits":["3d4e5387cdd7da74dbad046c64bfb5d6bc31b725"],"user_facing":true,"description":"**Bug fix.** `selfdoc.json` version is now auto-bumped during release even when `docs` is not in the configured targets. The version-consistency check also detects drift independently of target config.","type":"fix"}
+{"commits":["35c32f2f4adae24642425c0a54b1b3b6585acf5a"],"user_facing":true,"description":"**Bug fix.** Monorepo changelog coverage now only requires entries for commits touching the package's own files, not all commits in the range.","type":"fix"}
