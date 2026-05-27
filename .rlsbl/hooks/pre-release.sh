@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# Pre-release validation hook.
-# Runs before rlsbl creates a release. Exit non-zero to abort.
-# Detects project type and runs appropriate checks automatically.
-
 set -euo pipefail
 
 uv run rlsbl --dump-schema
