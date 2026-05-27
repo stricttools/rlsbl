@@ -213,8 +213,15 @@ def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, no_watch, **_kwargs
     monorepo_root = find_workspace_root(".")
     if monorepo_root:
         project = resolve_project(monorepo_root, ".")
-        if project is not None:
-            project_dir = os.path.join(monorepo_root, project["path"])
+        if project is None:
+            print(
+                "Error: cannot release from monorepo root. "
+                "Use `rlsbl monorepo release` for batch releases, "
+                "or cd to a package directory.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        project_dir = os.path.join(monorepo_root, project["path"])
 
     release_path = get_release_file_path(project_dir)
     if not os.path.exists(release_path):
