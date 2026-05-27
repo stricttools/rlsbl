@@ -3,5 +3,10 @@
   "env_file": "~/Projects/.env",
   "batch_limits": {
     "exclusions": []
-  }
+  },
+  "targets": [
+    "npm",
+    "pypi",
+    "docs"
+  ]
 }
