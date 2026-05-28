@@ -3,10 +3,13 @@
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 import keyword as _keyword
 
 import strictcli
+
+from .context import create_context
 
 
 # Strictcli derives a Python parameter name from each flag name by stripping
@@ -90,6 +93,7 @@ def _require_project_root():
         print("Error: not in an rlsbl project (no .rlsbl/ found in any ancestor directory).", file=sys.stderr)
         sys.exit(1)
     os.chdir(root)
+    return Path(root)
 
 
 def _resolve_target(target):
@@ -203,14 +207,15 @@ release_group = app.group("release", help="Release orchestration commands. Provi
 )
 @strictcli.flag(name="allow-dirty", type=bool, help="Allow releasing with a dirty working tree")
 def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, no_watch, **_kwargs):
-    _require_project_root()
+    root = _require_project_root()
 
     from .release_file import read_release_file, get_release_file_path
     from .workspace import find_workspace_root, resolve_project
 
     # In monorepo mode, the release file lives in the package's directory
     project_dir = "."
-    monorepo_root = find_workspace_root(".")
+    monorepo_root = find_workspace_root(str(root))
+    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     if monorepo_root:
         project = resolve_project(monorepo_root, ".")
         if project is None:
@@ -250,7 +255,8 @@ def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, no_watch, **_kwargs
 
 @release_group.command(name="init", help="Scaffold a .rlsbl/releases/unreleased.toml file by auto-detecting project targets. The generated file contains a default bump type (patch), an include list of all detected targets, and per-target configuration sections for Flutter targets.")
 def cmd_release_init(**_kwargs):
-    _require_project_root()
+    root = _require_project_root()
+    ctx = create_context(root)
     from .commands.release_init import run_cmd
     run_cmd()
 
@@ -266,7 +272,8 @@ def cmd_release_init(**_kwargs):
     ],
 )
 def cmd_release_retry(dry_run, yes, quiet, watch, no_watch, **_kwargs):
-    _require_project_root()
+    root = _require_project_root()
+    ctx = create_context(root)
 
     from .release_file import get_retry_file_path, read_retry_file
 
@@ -297,7 +304,8 @@ def cmd_release_retry(dry_run, yes, quiet, watch, no_watch, **_kwargs):
 @strictcli.flag(name="target", type=str, help="Target a specific registry (auto-detected if omitted)", default="")
 @strictcli.flag(name="json", type=bool, help="Output status as JSON")
 def cmd_status(target, json, **_kwargs):
-    _require_project_root()
+    root = _require_project_root()
+    ctx = create_context(root)
     registry = _resolve_target(target or None)
     flags = {"json": json}
     from .commands.status import run_cmd
@@ -408,7 +416,8 @@ def cmd_check_name(target, delay, **_kwargs):
 @release_group.command(name="edit", help="Sync the GitHub Release notes for a given version with the corresponding CHANGELOG.md entry. Defaults to the current version if none is specified. Use --dry-run to preview changes without updating GitHub.")
 @strictcli.arg(name="version", help="Version to update (defaults to current)", required=False)
 def cmd_release_edit(dry_run, version=None, **_kwargs):
-    _require_project_root()
+    root = _require_project_root()
+    ctx = create_context(root)
     args = [version] if version else []
     flags = {"dry-run": dry_run}
     from .commands.edit_release import run_cmd
@@ -480,7 +489,8 @@ def cmd_watch(target, sha=None, **_kwargs):
 
 @app.command(name="pre-push-check", help="Verify that CHANGELOG.md contains an entry matching the current project version. Designed to run as a git pre-push hook to prevent pushing releases without documented changes.")
 def cmd_pre_push_check(**_kwargs):
-    _require_project_root()
+    root = _require_project_root()
+    ctx = create_context(root)
     from .commands.pre_push_check import run_cmd
     run_cmd(None, [], {})
 
@@ -502,7 +512,8 @@ def cmd_prs(**_kwargs):
 @app.command(name="unreleased", help="List commits between the latest release tag and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain text or JSON to help prepare the next release.")
 @strictcli.flag(name="json", type=bool, help="Output as JSON")
 def cmd_unreleased(json, **_kwargs):
-    _require_project_root()
+    root = _require_project_root()
+    ctx = create_context(root)
     flags = {"json": json}
     from .commands.unreleased import run_cmd
     run_cmd(None, [], flags)
@@ -514,7 +525,8 @@ def cmd_unreleased(json, **_kwargs):
 
 @app.command(name="targets", help="List all release targets detected in the current project directory, showing which ecosystems (npm, PyPI, Go, Cargo, etc.) are active based on manifest files found.")
 def cmd_targets(**_kwargs):
-    _require_project_root()
+    root = _require_project_root()
+    ctx = create_context(root)
     from .commands.targets_cmd import run_cmd
     run_cmd(None, [], {})
 
@@ -529,7 +541,8 @@ def cmd_targets(**_kwargs):
 @strictcli.flag(name="font-size", type=str, help="Font size in pixels", default="24")
 @strictcli.flag(name="duration", type=str, help="Duration in seconds", default="10")
 def cmd_record_gif(width, height, font_size, duration, **_kwargs):
-    _require_project_root()
+    root = _require_project_root()
+    ctx = create_context(root)
     flags = {"width": width, "height": height, "font-size": font_size, "duration": duration}
     from .commands.record_gif import run_cmd
     run_cmd(None, [], flags)
@@ -557,7 +570,8 @@ def cmd_migrate(dry_run, status, **_kwargs):
 @strictcli.flag(name="force", type=bool, help="Override branch restrictions")
 @strictcli.arg(name="target_name", help="Deploy target name", required=False)
 def cmd_deploy(target, dry_run, force, target_name=None, **_kwargs):
-    _require_project_root()
+    root = _require_project_root()
+    ctx = create_context(root)
     args = [target_name] if target_name else []
     flags = {"dry-run": dry_run, "force": force}
     from .commands.deploy_cmd import run_cmd
@@ -594,7 +608,8 @@ chlog = app.group("changelog", help="Structured changelog management using JSONL
 @strictcli.flag(name="no-user-facing", type=bool, help="Mark as non-user-facing")
 @strictcli.flag(name="no-commit", type=bool, help="Skip auto-commit of unreleased.jsonl")
 def cmd_chlog_add(commits, description, type, no_user_facing, no_commit, **_kwargs):
-    _require_project_root()
+    root = _require_project_root()
+    ctx = create_context(root)
     flags = {
         "commits": commits,
         "description": description,
@@ -610,7 +625,8 @@ def cmd_chlog_add(commits, description, type, no_user_facing, no_commit, **_kwar
 @chlog.command(name="generate", help="Compile all validated JSONL changelog entries into a formatted CHANGELOG.md file. Groups entries by type (features, fixes, breaking changes) under the appropriate version heading, preserving existing changelog content for previous releases. Use --dry-run to preview the generated Markdown output without writing to disk, which is useful for reviewing before committing.")
 @strictcli.flag(name="no-commit", type=bool, help="Skip auto-commit of generated files")
 def cmd_chlog_generate(dry_run, no_commit, **_kwargs):
-    _require_project_root()
+    root = _require_project_root()
+    ctx = create_context(root)
     flags = {"dry-run": dry_run, "no-commit": no_commit}
     from .commands.changelog_cmd import cmd_generate
     cmd_generate(flags)
@@ -624,7 +640,8 @@ def cmd_chlog_generate(dry_run, no_commit, **_kwargs):
 @strictcli.flag(name="no-user-facing", type=bool, help="Mark as non-user-facing")
 @strictcli.flag(name="no-resolve", type=bool, help="Skip hash validation")
 def cmd_chlog_amend(version, commits, description, type, no_user_facing, no_resolve, **_kwargs):
-    _require_project_root()
+    root = _require_project_root()
+    ctx = create_context(root)
     flags = {
         "version": version,
         "commits": commits,
@@ -805,7 +822,8 @@ def cmd_dev_install(all, include, exclude, uninstall, global_, venv, **_kwargs):
             file=sys.stderr,
         )
         sys.exit(2)
-    _require_project_root()
+    root = _require_project_root()
+    ctx = create_context(root)
     # Both flags default to False (not True) so strictcli's mutex check doesn't
     # always fire when neither is passed. The user-visible default (no flags ->
     # global mode) is preserved by deriving install_global from --venv only.
