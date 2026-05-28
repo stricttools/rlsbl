@@ -114,7 +114,7 @@ def resolve_release_targets(primary, flags, version_dir="."):
     return baseline
 
 
-def _run_builtin_tests(registry, flags, project_dir=None):
+def _run_builtin_tests(registry, flags, project_dir=None, project_root=None):
     """Run built-in tests for the detected project type.
 
     Detects the project type from registry and runs the appropriate test command.
@@ -128,7 +128,7 @@ def _run_builtin_tests(registry, flags, project_dir=None):
     print("Running tests...")
 
     if registry == "pypi":
-        config = read_project_config()
+        config = read_project_config(project_root)
         uv_verbose = config.get("uv_sync_verbose", False)
         if require_tool("uv", fatal=False):
             sync_cmd = ["uv", "sync"]
@@ -462,11 +462,17 @@ def _update_last_build_release(version_dir, version):
     os.replace(tmp_path, config_path)
 
 
-def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None):
+def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None,
+            project_root=None, monorepo_root=None):
     """Release command handler.
 
     Accepts a ReleaseConfig instance (from the release file) and an optional
     flags dict.  Bumps version, commits, pushes, and creates a GitHub Release.
+
+    project_root: explicit project root path (transitional -- falls back to
+    CWD-relative paths when None).
+    monorepo_root: explicit monorepo root path (transitional -- auto-detected
+    when None).
     """
     from ..release_file import ReleaseConfig
 
@@ -489,7 +495,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None):
             sys.exit(1)
 
     # Validate exhaustiveness: include + exclude must cover all detected targets
-    detected = {entry.name for entry in detect_targets(".")}
+    detected = {entry.name for entry in detect_targets(str(project_root) if project_root else ".")}
     declared = set(release_config.include) | set(release_config.exclude)
     missing = detected - declared
     extra = declared - detected
@@ -519,11 +525,12 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None):
         if ota_targets:
             from ..targets.native_changes import detect_native_changes
             # Find last build release tag for native change detection
-            config = read_json_config(os.path.join(".", ".rlsbl", "config.json"))
+            _ota_root = str(project_root) if project_root else "."
+            config = read_json_config(os.path.join(_ota_root, ".rlsbl", "config.json"))
             last_build = config.get("last_build_release")
             if last_build:
                 since_ref = f"v{last_build}"
-                native_files = detect_native_changes(".", since_ref)
+                native_files = detect_native_changes(_ota_root, since_ref)
                 if native_files:
                     print(
                         "Error: OTA release requested but native files changed "
@@ -556,7 +563,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None):
             print(msg)
 
     # Load env file if configured
-    config = read_project_config()
+    config = read_project_config(project_root)
 
     # Require explicit "private" key in config
     if "private" not in config:
@@ -655,13 +662,14 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None):
             sys.exit(1)
 
     # Monorepo context detection
-    monorepo_root = find_workspace_root(".")
+    if monorepo_root is None:
+        monorepo_root = find_workspace_root(str(project_root) if project_root else ".")
     monorepo_name = None
     monorepo_project_path = None
     is_library = False
 
     if monorepo_root:
-        project = resolve_project(monorepo_root, ".")
+        project = resolve_project(monorepo_root, str(project_root) if project_root else ".")
         if project is None:
             print("Error: current directory is inside a monorepo but not inside any project.", file=sys.stderr)
             print("Run 'rlsbl monorepo status' to see registered projects.", file=sys.stderr)
@@ -805,7 +813,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None):
     _run_selfdoc_check(flags, project_dir=abs_project_dir, docs_excluded=docs_excluded)
 
     # Built-in test runner
-    _run_builtin_tests(registry, flags, project_dir=abs_project_dir)
+    _run_builtin_tests(registry, flags, project_dir=abs_project_dir, project_root=project_root)
 
     # Built-in lint runner
     _run_builtin_lint(flags, is_library=is_library, project_dir=abs_project_dir)
@@ -909,6 +917,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None):
             pre_existing_dirty=pre_existing_dirty,
             abs_project_dir=abs_project_dir,
             hook_generated=hook_generated,
+            project_root=project_root,
         )
     finally:
         release_lock()
@@ -967,7 +976,7 @@ def _print_stale_dep_advisory(monorepo_name, new_version, version_dir):
         pass
 
 
-def upload_release_assets(tag, version_dir, new_version, log, flags):
+def upload_release_assets(tag, version_dir, new_version, log, flags, project_root=None):
     """Build and upload release assets for targets with ``publish.<target>.assets: true``.
 
     For each detected target that has assets enabled in its publish config:
@@ -981,7 +990,7 @@ def upload_release_assets(tag, version_dir, new_version, log, flags):
     Warns and skips targets whose ``build_assets()`` raises ``NotImplementedError``.
     """
     entries = detect_targets(version_dir)
-    config = read_project_config()
+    config = read_project_config(project_root)
 
     targets_with_assets = []
     for entry in entries:
@@ -1001,7 +1010,7 @@ def upload_release_assets(tag, version_dir, new_version, log, flags):
         if target_obj is None:
             continue
 
-        pub_cfg = get_publish_config(entry.name)
+        pub_cfg = get_publish_config(entry.name, project_root)
         max_size_mb = pub_cfg.get("max_asset_size_mb")
 
         dist_dir = os.path.join(version_dir, ".rlsbl", "dist", entry.name)
@@ -1066,7 +1075,8 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                           lock_dir=".rlsbl",
                           pre_existing_dirty=None,
                           abs_project_dir=None,
-                          hook_generated=None):
+                          hook_generated=None,
+                          project_root=None):
     """Inner release logic that runs under the advisory lock (mutating phase)."""
     # Snapshot dirty files BEFORE any version-bump writes. This captures
     # everything dirtied by prior stages (generate_changelog, hooks, lint,
@@ -1120,7 +1130,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
             print(f"  Files: {', '.join(preview_files)}")
         else:
             print("  Files: (none -- version is the git tag)")
-        if should_tag(flags):
+        if should_tag(flags, project_root):
             print("  Will add 'rlsbl' keyword to project manifests")
         try:
             answer = input("Proceed? [y/N] ").strip().lower()
@@ -1168,7 +1178,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                 log(f"Synced version to {', '.join(vpath(r) for r in docs_modified)}")
 
     # Ecosystem tagging: add keyword to manifests if enabled
-    if should_tag(flags):
+    if should_tag(flags, project_root):
         npm_path = target_paths.get("npm", version_dir)
         try:
             if TARGETS["npm"].check_project_exists(npm_path):
@@ -1318,13 +1328,13 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
         log(f"Tagged: {tag}")
 
         # Push commits and tag
-        push_timeout = get_push_timeout()
+        push_timeout = get_push_timeout(project_root)
         if push_timeout != 120:
             log(f"Push timeout: {push_timeout}s (from RLSBL_PUSH_TIMEOUT)")
         # Mark pushes as release-authorized so the pre-push hook skips its
         # "manual push" warning. The hook still runs JSONL coverage checks.
         push_env = {**os.environ, "RLSBL_RELEASE_PUSH": "1"}
-        push_if_needed(branch, env=push_env)
+        push_if_needed(branch, env=push_env, project_root=project_root)
         run("git", ["push", "origin", tag], timeout=push_timeout, env=push_env)
         log(f"Pushed to origin/{branch}")
     except Exception:
@@ -1405,10 +1415,10 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                 os.unlink(tmp)
 
     # Upload release assets for targets with publish.<target>.assets: true
-    upload_release_assets(tag, version_dir, new_version, log, flags)
+    upload_release_assets(tag, version_dir, new_version, log, flags, project_root=project_root)
 
     # Publish step: skip for private repos (they don't publish to registries)
-    is_private = read_project_config().get("private", False)
+    is_private = read_project_config(project_root).get("private", False)
     if not is_private:
         try:
             target.publish(primary_path, new_version)
@@ -1433,7 +1443,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                     print(f"Warning: {sec_name} target publish failed: {e}", file=sys.stderr)
 
     # Deploy phase (after publish, before post-release hook)
-    deploy_targets, deploy_errors = read_deploy_config()
+    deploy_targets, deploy_errors = read_deploy_config(project_root)
     if deploy_targets and not deploy_errors:
         current_branch = get_current_branch()
         for target_config in deploy_targets:
@@ -1454,7 +1464,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
     # If no deploy targets configured, silently skip (most projects don't have deploy)
 
     # Ecosystem tagging: add GitHub topic after release is created
-    if should_tag(flags):
+    if should_tag(flags, project_root):
         ensure_github_topic(quiet=quiet)
 
     # Run post-release hook if present (non-fatal: release is already complete)

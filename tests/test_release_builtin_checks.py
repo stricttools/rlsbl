@@ -831,7 +831,7 @@ class TestFullFlowOrder:
         original_tests = _run_builtin_tests
         original_lint = _run_builtin_lint
 
-        def tracking_tests(registry, flags, project_dir=None):
+        def tracking_tests(registry, flags, project_dir=None, project_root=None):
             execution_order.append("tests")
             return True
 
