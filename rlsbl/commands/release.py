@@ -1108,12 +1108,11 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
         return full
 
     def target_vpath(t_path, filename):
-        """Join filename with a target's resolved path, normalized.
-
-        Target paths from detect_targets() are already resolved relative to
-        the repo root, so we just join and normalize.
-        """
-        return os.path.normpath(os.path.join(t_path, filename))
+        """Join filename with a target's resolved path, return relative to git root."""
+        full = os.path.normpath(os.path.join(t_path, filename))
+        if os.path.isabs(full):
+            return os.path.relpath(full, _git_root)
+        return full
 
     # Pre-compute expected version files for the confirmation prompt display.
     # The actual files_to_commit list is built from write_version() return
