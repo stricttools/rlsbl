@@ -1,0 +1,1 @@
+{"commits":["ea25e28abe7e95049bd4a2e1f6f58a598a3c91f6","1f3e5df217c0b7ea6be30f627827fdfcd1947977"],"user_facing":true,"description":"**Breaking.** `--update` flag removed from `scaffold`. Bare `rlsbl scaffold` is now idempotent \u2014 creates what's missing, three-way merges what exists. Run it anytime.","type":"breaking"}
