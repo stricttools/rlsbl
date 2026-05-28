@@ -21,13 +21,13 @@ BASES_DIR = os.path.join(".rlsbl", "bases")
 _NPM_LOCKFILES = ("package-lock.json", "pnpm-lock.yaml", "yarn.lock")
 
 
-def _check_npm_lockfile_missing():
-    """Check if any npm lockfile exists from cwd up to the git root.
+def _check_npm_lockfile_missing(start_dir="."):
+    """Check if any npm lockfile exists from start_dir up to the git root.
 
     Returns True if no lockfile is found (i.e., lockfile is missing).
     Prints a warning to stderr when missing.
     """
-    current = os.path.abspath(".")
+    current = os.path.abspath(start_dir)
     while True:
         for lockfile in _NPM_LOCKFILES:
             if os.path.exists(os.path.join(current, lockfile)):
@@ -119,8 +119,11 @@ NEXT_STEPS = {
 }
 
 
+_ESCAPE_SENTINEL = "__RLSBL_ESCAPE_OPEN__"
+
+
 def process_template(template_content, vars_dict, template_path=None):
-    """Process a template string with a two-pass substitution.
+    r"""Process a template string with substitution and escape handling.
 
     Pass 1 resolves ``{{action "owner/name"}}`` placeholders against the
     central action-version table (rlsbl/data/action_versions.toml). An
@@ -130,10 +133,19 @@ def process_template(template_content, vars_dict, template_path=None):
     Pass 2 resolves the existing ``{{varName}}`` (and dotted ``{{a.b}}``)
     placeholders against ``vars_dict``.
 
+    Escaped placeholders: ``\{{word}}`` in a template emits ``{{word}}``
+    literally in the output (the backslash is consumed, the braces are
+    preserved). This lets templates contain third-party ``{{...}}`` syntax
+    (e.g. Docker metadata-action's ``{{version}}``) without colliding with
+    rlsbl's template engine.
+
     Returns ``(content, unreplaced)`` where ``unreplaced`` is the list of
     variable names in pass 2 that had no entry in ``vars_dict``. Pass 1
     misses raise instead of being collected.
     """
+
+    # Pre-pass: shelter escaped placeholders from substitution.
+    content = template_content.replace(r"\{{", _ESCAPE_SENTINEL)
 
     # Pass 1: action placeholders.
     def action_replacer(match):
@@ -147,7 +159,7 @@ def process_template(template_content, vars_dict, template_path=None):
             ) from exc
 
     content = re.sub(
-        r'\{\{action\s+"([^"]+)"\}\}', action_replacer, template_content
+        r'\{\{action\s+"([^"]+)"\}\}', action_replacer, content
     )
 
     # Pass 2: variable placeholders (existing behavior).
@@ -161,6 +173,10 @@ def process_template(template_content, vars_dict, template_path=None):
         return match.group(0)
 
     content = re.sub(r"\{\{(\w+(?:\.\w+)*)\}\}", replacer, content)
+
+    # Post-pass: restore escaped placeholders to literal ``{{``.
+    content = content.replace(_ESCAPE_SENTINEL, "{{")
+
     return content, unreplaced
 
 
@@ -666,7 +682,7 @@ def _install_or_update_pre_push_hook():
 
 def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnings,
                        registry=None, flags=None, registries=None,
-                       npm_lockfile_missing=False):
+                       npm_lockfile_missing=False, target_paths=None):
     """Shared post-processing for scaffold: chmod, hooks, version marker, hashes, tagging, summary.
 
     all_hash_dicts is a list of dicts to merge into existing_hashes.
@@ -712,7 +728,7 @@ def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnin
 
     # Ecosystem tagging
     if should_tag(flags):
-        ensure_tags(registries)
+        ensure_tags(registries, target_paths=target_paths)
 
     # Print unified file list with dot-padded status column
     _print_file_status_table(created, skipped)
@@ -1004,6 +1020,7 @@ def run_cmd(registry, args, flags):
             created, skipped, warnings, registry=registry,
             flags=flags, registries=[registry],
             npm_lockfile_missing=npm_lockfile_missing,
+            target_paths={registry: "."},
         )
 
         if private:
@@ -1423,10 +1440,14 @@ def run_cmd_multi(registries_list, args, flags):
         print(f"Error: no {primary} project found in current directory.", file=sys.stderr)
         sys.exit(1)
 
-    # Check for npm lockfile
+    # Build per-target path mapping early (read-only, no lock needed)
+    target_entries = detect_targets(".")
+    target_paths = {entry.name: entry.path for entry in target_entries}
+
+    # Check for npm lockfile using the detected npm target path
     npm_lockfile_missing = False
     if "npm" in registries_list:
-        npm_lockfile_missing = _check_npm_lockfile_missing()
+        npm_lockfile_missing = _check_npm_lockfile_missing(target_paths.get("npm", "."))
 
     dry_run = flags.get("dry-run", False)
 
@@ -1450,10 +1471,6 @@ def run_cmd_multi(registries_list, args, flags):
             print("Scaffolding for private repository (no publish workflow).")
         else:
             print("Scaffolding with merged publish workflow.")
-
-        # Build per-target path mapping from detect_targets or default to "."
-        target_entries = detect_targets(".")
-        target_paths = {entry.name: entry.path for entry in target_entries}
         vars_dict = _merge_template_vars(registries_list, primary, target_paths)
         from datetime import datetime
         vars_dict["year"] = str(datetime.now().year)
@@ -1467,6 +1484,26 @@ def run_cmd_multi(registries_list, args, flags):
         ci_plans = plan_mappings(
             reg.template_dir(), ci_mappings, vars_dict, force, update=update,
         )
+
+        # Collect non-workflow files from non-primary targets (e.g. .npmignore
+        # from npm, VERSION/.goreleaser.yml from Go).  The primary target's
+        # non-workflow files are already included in ci_mappings above;
+        # non-primary targets only contribute files outside .github/workflows/.
+        seen_targets = {m["target"] for m in ci_mappings}
+        extra_plans = []
+        _wf_prefix = os.path.join(".github", "workflows", "")
+        for r in registries_list[1:]:
+            secondary = TARGETS[r]
+            secondary_extra = [
+                m for m in secondary.template_mappings()
+                if not m["target"].startswith(_wf_prefix) and m["target"] not in seen_targets
+            ]
+            if secondary_extra:
+                for m in secondary_extra:
+                    seen_targets.add(m["target"])
+                extra_plans.extend(plan_mappings(
+                    secondary.template_dir(), secondary_extra, vars_dict, force, update=update,
+                ))
 
         # Plan the merged publish workflow (skip for private repos)
         merged_plans = []
@@ -1486,23 +1523,25 @@ def run_cmd_multi(registries_list, args, flags):
 
         if dry_run:
             _print_dry_run_report(
-                [ci_plans, merged_plans, shared_plans],
+                [ci_plans, extra_plans, merged_plans, shared_plans],
                 registries=registries_list,
             )
             return
 
         ci_created, ci_skipped, ci_warnings, ci_hashes = apply_plans(ci_plans)
+        extra_created, extra_skipped, extra_warnings, extra_hashes = apply_plans(extra_plans)
         merged_created, merged_skipped, merged_warnings, merged_hashes = apply_plans(merged_plans)
         shared_created, shared_skipped, shared_warnings, shared_hashes = apply_plans(shared_plans)
 
-        created = ci_created + merged_created + shared_created
-        skipped = ci_skipped + merged_skipped + shared_skipped
-        warnings = ci_warnings + merged_warnings + shared_warnings
+        created = ci_created + extra_created + merged_created + shared_created
+        skipped = ci_skipped + extra_skipped + merged_skipped + shared_skipped
+        warnings = ci_warnings + extra_warnings + merged_warnings + shared_warnings
 
         _finalize_scaffold(
-            existing_hashes, [ci_hashes, merged_hashes, shared_hashes],
+            existing_hashes, [ci_hashes, extra_hashes, merged_hashes, shared_hashes],
             created, skipped, warnings,
             flags=flags, registries=registries_list,
+            target_paths=target_paths,
         )
 
         if private:

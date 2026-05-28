@@ -215,6 +215,26 @@ class TestPypiPrimaryNpmSecondary:
         assert "\n  pypi:" in content
         assert "\n  npm:" in content
 
+    def test_npmignore_created_when_npm_is_secondary(self, pypi_npm_project):
+        """Non-workflow files from secondary targets must be scaffolded.
+
+        Regression: run_cmd_multi only called template_mappings() on the
+        primary target, so .npmignore (from npm) was skipped when pypi was
+        primary.
+        """
+        with patch("sys.stdout", new_callable=StringIO):
+            run_cmd_multi(["pypi", "npm"], [], {})
+
+        assert os.path.exists(".npmignore"), (
+            ".npmignore should be created from npm's template_mappings "
+            "even when npm is the secondary target"
+        )
+
+        with open(".npmignore") as f:
+            content = f.read()
+        # Sanity-check that the file has real content from the template
+        assert ".rlsbl/" in content
+
 
 class TestMergedPublishCombinations:
     """Unit tests for _generate_merged_publish with diverse target combinations."""
