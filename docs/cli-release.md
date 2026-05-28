@@ -29,7 +29,7 @@ Scaffold a .rlsbl/releases/unreleased.toml file by auto-detecting project target
 
 ## release retry
 
-Dispatch CI/CD workflows for a completed release. Reads configuration from .rlsbl/releases/retry.toml (auto-scaffolded if missing). Verifies the GitHub Release exists, then dispatches each workflow via gh workflow run.
+Re-create a GitHub Release to re-trigger CI/CD workflows. Reads configuration from .rlsbl/releases/retry.toml, which is auto-scaffolded if missing. Verifies the release exists, deletes it, and re-creates it with the same changelog notes, firing a new release published event. Re-uploads assets if configured. Falls back to gh workflow run if no CI runs appear.
 
 ### Flags
 
