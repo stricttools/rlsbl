@@ -1,3 +1,4 @@
 {"commits":["f5aab6fc0109b7bb7e9d6666e5897b81d80086c1"],"user_facing":true,"description":"**Bug fix.** Scaffold now creates non-workflow files (like `.npmignore`) from all targets, not just the primary.","type":"fix"}
 {"commits":["7dddfffcf9f2fb94b68a41508f2a66d203fdea95"],"user_facing":true,"description":"**Bug fix.** Docker publish template no longer has `{{version}}` replaced by the literal version. Added escape syntax (`\\{{...}}`) to the template engine.","type":"fix"}
 {"commits":["5881c6a1ef6373b6ac6fa9e57c6bdf219dd2d2dc"],"user_facing":true,"description":"**Bug fix.** Scaffold now uses the correct subdirectory path for npm targets instead of always looking at the repo root.","type":"fix"}
+{"commits":["19693caadd27613b66a7595534667e747ff7bcdd"],"user_facing":true,"description":"**Docs.** `release retry` help text updated to describe dispatch-only behavior.","type":"fix"}
