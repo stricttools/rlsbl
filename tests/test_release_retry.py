@@ -294,9 +294,8 @@ class TestReleaseRetry(unittest.TestCase):
 
         config = _make_retry_config("0.41.7")
 
-        with patch("os.chdir"):
-            with patch("sys.stdout", new_callable=StringIO):
-                run_cmd(config, {"yes": True})
+        with patch("sys.stdout", new_callable=StringIO):
+            run_cmd(config, {"yes": True})
 
         # Monorepo tag format should be used
         target.monorepo_tag_format.assert_called_once_with("my-pkg", "0.41.7", path="packages/my-pkg")

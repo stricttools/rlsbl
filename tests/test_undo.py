@@ -68,9 +68,8 @@ class TestUndoMonorepo(unittest.TestCase):
     @patch("rlsbl.commands.undo.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.undo.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.undo.check_gh_installed", return_value=True)
-    @patch("os.chdir")
     @patch("rlsbl.commands.undo.run")
-    def test_monorepo_finds_scoped_tag(self, mock_run, _chdir, _gh_inst,
+    def test_monorepo_finds_scoped_tag(self, mock_run, _gh_inst,
                                        _gh_auth, _clean, mock_branch,
                                        mock_push, _resolve, _ws_root):
         """In monorepo mode, undo uses --match '<project>@v*' to find the tag."""
@@ -107,9 +106,8 @@ class TestUndoMonorepo(unittest.TestCase):
     @patch("rlsbl.commands.undo.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.undo.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.undo.check_gh_installed", return_value=True)
-    @patch("os.chdir")
     @patch("rlsbl.commands.undo.run")
-    def test_monorepo_skips_revert_on_mismatch(self, mock_run, _chdir,
+    def test_monorepo_skips_revert_on_mismatch(self, mock_run,
                                                 _gh_inst, _gh_auth, _clean,
                                                 mock_branch, mock_push,
                                                 _resolve, _ws_root):

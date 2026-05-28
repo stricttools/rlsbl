@@ -116,6 +116,7 @@ class TestMonorepoReleaseLockPlacement:
         return proj_dir
 
     @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
     @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
@@ -124,7 +125,8 @@ class TestMonorepoReleaseLockPlacement:
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_monorepo_release_uses_monorepo_lock_dir(
-        self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run, _push,
+        self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run,
+        _commit_files, _push,
         mock_git_repo,
     ):
         """Monorepo release puts lock in .rlsbl-monorepo/, not .rlsbl/ at repo root."""

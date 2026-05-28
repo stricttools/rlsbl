@@ -301,11 +301,11 @@ class TestBatchTopologicalOrder:
             'exclude = []\n',
         )
 
-        # Track which project dirs run_cmd is called from
+        # Track which project dirs run_cmd is called with via project_root
         release_order = []
 
         def mock_run_cmd(release_config, flags, **kwargs):
-            release_order.append(os.path.basename(os.getcwd()))
+            release_order.append(os.path.basename(str(kwargs["project_root"])))
 
         with patch("rlsbl.commands.monorepo.batch_release._finalize_batch_file"):
             with patch("rlsbl.commands.release.run_cmd", mock_run_cmd):
@@ -345,7 +345,7 @@ class TestBatchTopologicalOrder:
         release_order = []
 
         def mock_run_cmd(release_config, flags, **kwargs):
-            release_order.append(os.path.basename(os.getcwd()))
+            release_order.append(os.path.basename(str(kwargs["project_root"])))
 
         with patch("rlsbl.commands.monorepo.batch_release._finalize_batch_file"):
             with patch("rlsbl.commands.release.run_cmd", mock_run_cmd):
@@ -382,7 +382,7 @@ class TestBatchTopologicalOrder:
         release_order = []
 
         def mock_run_cmd(release_config, flags, **kwargs):
-            release_order.append(os.path.basename(os.getcwd()))
+            release_order.append(os.path.basename(str(kwargs["project_root"])))
 
         with patch("rlsbl.commands.monorepo.batch_release._finalize_batch_file"):
             with patch("rlsbl.commands.release.run_cmd", mock_run_cmd):

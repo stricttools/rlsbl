@@ -566,9 +566,9 @@ class TestMonorepoReleaseFilePath:
 class TestMonorepoDirectoryScoping:
     """validate_unreleased receives the correct project dict in monorepo mode.
 
-    Regression test: previously, run_cmd called resolve_project(monorepo_root, ".")
-    AFTER os.chdir(monorepo_root), so "." resolved to the workspace root instead
-    of the package directory, causing resolve_project to return None.
+    Regression test: ensures resolve_project receives the correct start path
+    (the package directory, not the workspace root), so it returns the project
+    dict rather than None.
     """
 
     @patch("rlsbl.commands.release.push_if_needed")
@@ -625,7 +625,7 @@ class TestMonorepoDirectoryScoping:
             project_arg = call_kwargs.args[2]
         assert project_arg is not None, (
             "validate_unreleased was called with project=None; "
-            "directory scoping is broken after os.chdir(monorepo_root)"
+            "directory scoping is broken in monorepo mode"
         )
         assert project_arg["name"] == "mypylib"
         assert project_arg["path"] == "python"

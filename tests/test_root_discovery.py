@@ -68,13 +68,14 @@ class TestFindProjectRoot:
 class TestMainRootDiscovery:
     """Integration tests for root discovery in main()."""
 
-    def test_main_chdir_for_project_commands(self, tmp_path, monkeypatch):
-        """Project-dependent commands chdir to project root from a subdirectory."""
+    def test_main_no_chdir_for_project_commands(self, tmp_path, monkeypatch):
+        """Project-dependent commands no longer chdir; CWD stays at subdirectory."""
         (tmp_path / ".rlsbl").mkdir()
         (tmp_path / "package.json").write_text('{"name": "test", "version": "1.0.0"}')
         subdir = tmp_path / "src"
         subdir.mkdir()
         monkeypatch.chdir(subdir)
+        original_cwd = os.getcwd()
 
         # Mock the status command's run_cmd to avoid actual execution
         with patch("rlsbl.commands.status.run_cmd") as mock_run:
@@ -82,8 +83,8 @@ class TestMainRootDiscovery:
                 from rlsbl import app
                 app.test(["status"])
 
-        # After dispatch, cwd should be the project root
-        assert os.getcwd() == str(tmp_path)
+        # CWD should remain unchanged (no os.chdir in _require_project_root)
+        assert os.getcwd() == original_cwd
 
     def test_main_no_chdir_for_independent_commands(self, tmp_path, monkeypatch):
         """Independent commands (discover, check, watch) don't chdir."""
@@ -122,22 +123,24 @@ class TestMainRootDiscovery:
         assert os.getcwd() == original_cwd
 
     def test_scaffold_finds_root_for_update(self, tmp_path, monkeypatch):
-        """Scaffold with .rlsbl/ in parent chdirs there from a plain subdirectory."""
+        """Scaffold with .rlsbl/ in parent finds the root but does not chdir."""
         (tmp_path / ".rlsbl").mkdir()
         (tmp_path / "package.json").write_text('{"name": "test", "version": "1.0.0"}')
         subdir = tmp_path / "src"
         subdir.mkdir()
         monkeypatch.chdir(subdir)
+        original_cwd = os.getcwd()
 
         # First call: cwd check (src/ has no project files -> []).
-        # Second call: after chdir to root (has package.json -> ["npm"]).
+        # Second call: auto-detect from root (has package.json -> ["npm"]).
         with patch("rlsbl.commands.init_cmd.run_cmd") as mock_run:
             with patch("rlsbl.detect_registries", side_effect=[[], ["npm"]]):
                 with patch("rlsbl.config.read_project_config", return_value={}):
                     from rlsbl import app
                     app.test(["scaffold"])
 
-        assert os.getcwd() == str(tmp_path)
+        # CWD should remain unchanged (no os.chdir in cmd_scaffold)
+        assert os.getcwd() == original_cwd
 
     def test_scaffold_stays_in_subproject_with_project_files(self, tmp_path, monkeypatch):
         """Scaffold from a monorepo sub-project (with go.mod) stays in the sub-project."""

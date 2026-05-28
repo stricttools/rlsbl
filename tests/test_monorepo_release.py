@@ -443,6 +443,7 @@ class TestSubtreePublish:
         assert "Subtree:" not in output
 
     @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
     @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
@@ -451,7 +452,8 @@ class TestSubtreePublish:
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_subtree_push_failure_nonfatal(
-        self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run, _push,
+        self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run,
+        _commit_files, _push,
         mock_git_repo, capsys,
     ):
         """Subtree push failure does not abort the release."""
