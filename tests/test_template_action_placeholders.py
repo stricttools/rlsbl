@@ -107,3 +107,68 @@ jobs:
         ):
             assert f"{name}@{table[name]}" in content
         assert unreplaced == []
+
+
+class TestEscapedPlaceholders:
+    r"""Tests for the \{{ escape syntax that emits literal {{ in output."""
+
+    def test_escaped_placeholder_emits_literal_braces(self):
+        r"""``\{{version}}`` should produce ``{{version}}`` literally."""
+        content, unreplaced = process_template(
+            r"pattern=\{{version}}", {"version": "1.2.3"}
+        )
+        assert content == "pattern={{version}}"
+        assert unreplaced == []
+
+    def test_normal_placeholder_still_replaced(self):
+        """Unescaped ``{{key}}`` is still substituted when key is in vars_dict."""
+        content, unreplaced = process_template(
+            "v={{version}}", {"version": "1.2.3"}
+        )
+        assert content == "v=1.2.3"
+        assert unreplaced == []
+
+    def test_github_expression_passthrough(self):
+        """``${{ github.something }}`` passes through untouched (spaces
+        inside prevent the variable regex from matching)."""
+        template = "ref: ${{ github.ref }}"
+        content, unreplaced = process_template(template, {})
+        assert content == "ref: ${{ github.ref }}"
+        assert unreplaced == []
+
+    def test_mixed_escaped_and_normal(self):
+        """Escaped and normal placeholders coexist in the same template."""
+        template = r"name={{name}} tag=\{{version}}"
+        content, unreplaced = process_template(template, {"name": "myimg"})
+        assert content == "name=myimg tag={{version}}"
+        assert unreplaced == []
+
+    def test_multiple_escaped_placeholders(self):
+        r"""Multiple \{{ escapes in a single template all resolve."""
+        template = r"a=\{{major}}.b=\{{minor}}"
+        content, unreplaced = process_template(template, {})
+        assert content == "a={{major}}.b={{minor}}"
+        assert unreplaced == []
+
+    def test_escaped_action_placeholder_not_resolved(self):
+        r"""``\{{action "..."}}`` should NOT be treated as an action
+        placeholder -- the escape protects it."""
+        template = r'literal: \{{action "actions/checkout"}}'
+        content, unreplaced = process_template(template, {})
+        assert content == 'literal: {{action "actions/checkout"}}'
+        assert unreplaced == []
+
+    def test_docker_template_pattern(self):
+        r"""Reproduce the exact Docker metadata-action pattern to ensure
+        ``\{{version}}`` survives even when ``version`` is in vars_dict."""
+        template = (
+            "tags: |\n"
+            r"  type=semver,pattern=\{{version}}" "\n"
+            "  type=raw,value=latest\n"
+        )
+        content, unreplaced = process_template(
+            template, {"version": "2.0.0"}
+        )
+        assert "type=semver,pattern={{version}}" in content
+        assert "2.0.0" not in content
+        assert unreplaced == []

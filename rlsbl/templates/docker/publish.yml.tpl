@@ -27,7 +27,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=semver,pattern={{version}}
+            type=semver,pattern=\{{version}}
             type=raw,value=latest
       - uses: {{action "docker/build-push-action"}}
         with:
