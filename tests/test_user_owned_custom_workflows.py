@@ -1,6 +1,6 @@
 """Tests for the user-owned ci-custom.yml / publish-custom.yml workflow pattern.
 
-These files are NEVER created by scaffold and NEVER touched on --update. They
+These files are NEVER created by scaffold and NEVER overwritten. They
 exist as the escape hatch for users who want to add jobs to CI without fighting
 the three-way merge on the scaffold-managed ci.yml/publish.yml.
 """
@@ -30,12 +30,12 @@ def test_publish_custom_in_user_owned():
 
 
 # ---------------------------------------------------------------------------
-# Task 8.1: scaffold --update never touches ci-custom.yml
+# Task 8.1: scaffold never touches ci-custom.yml
 # ---------------------------------------------------------------------------
 
 
 def test_scaffold_update_does_not_touch_ci_custom(tmp_project):
-    """If a user creates ci-custom.yml, scaffold --update must leave it alone.
+    """If a user creates ci-custom.yml, scaffold must leave it alone.
 
     We simulate a scaffold by running process_mappings with a template targeting
     .github/workflows/ci-custom.yml -- the USER_OWNED guard should kick in
@@ -66,7 +66,7 @@ def test_scaffold_update_does_not_touch_ci_custom(tmp_project):
     mappings = [{"template": "ci-custom.yml.tpl", "target": target}]
 
     created, skipped, warnings, _ = process_mappings(
-        str(tpl_dir), mappings, {}, force=False, update=True,
+        str(tpl_dir), mappings, {}, force=False,
     )
 
     # Content untouched
@@ -92,7 +92,7 @@ def test_scaffold_force_does_not_touch_ci_custom(tmp_project):
     mappings = [{"template": "ci-custom.yml.tpl", "target": target}]
 
     created, skipped, warnings, _ = process_mappings(
-        str(tpl_dir), mappings, {}, force=True, update=False,
+        str(tpl_dir), mappings, {}, force=True,
     )
 
     assert target_path.read_text() == user_content
@@ -115,7 +115,7 @@ def test_scaffold_update_does_not_touch_publish_custom(tmp_project):
     mappings = [{"template": "publish-custom.yml.tpl", "target": target}]
 
     created, skipped, warnings, _ = process_mappings(
-        str(tpl_dir), mappings, {}, force=False, update=True,
+        str(tpl_dir), mappings, {}, force=False,
     )
 
     assert target_path.read_text() == user_content

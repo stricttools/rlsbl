@@ -59,7 +59,7 @@ class TestPrivateScaffoldUsesStandardHook:
         # (previously _replace_post_release_hook_for_private would swap the template)
         created, skipped, warnings, _ = process_mappings(
             str(shared_tpl_dir), shared_mappings, {"year": "2026"},
-            force=False, update=False,
+            force=False,
         )
 
         # The standard post-release.sh should be created

@@ -7,7 +7,7 @@ from rlsbl.commands.init_cmd import USER_OWNED, process_mappings
 
 
 def test_unreleased_jsonl_in_user_owned():
-    """The unreleased.jsonl file should be in USER_OWNED so scaffold --update skips it."""
+    """The unreleased.jsonl file should be in USER_OWNED so scaffold skips it."""
     assert ".rlsbl/changes/unreleased.jsonl" in USER_OWNED
 
 
@@ -44,7 +44,7 @@ def test_scaffold_creates_unreleased_jsonl(tmp_project):
                 if m["target"] == ".rlsbl/changes/unreleased.jsonl"]
 
     created, skipped, warnings, _ = process_mappings(
-        tpl_dir, mappings, {}, force=False, update=False,
+        tpl_dir, mappings, {}, force=False,
     )
 
     target = tmp_project / ".rlsbl" / "changes" / "unreleased.jsonl"
@@ -55,7 +55,7 @@ def test_scaffold_creates_unreleased_jsonl(tmp_project):
 
 
 def test_scaffold_update_does_not_overwrite_unreleased_jsonl(tmp_project):
-    """scaffold --update must not overwrite unreleased.jsonl (it's user-owned)."""
+    """scaffold must not overwrite unreleased.jsonl (it's user-owned)."""
     from rlsbl.targets.base import BaseTarget
 
     # Create the file with some existing entries
@@ -71,7 +71,7 @@ def test_scaffold_update_does_not_overwrite_unreleased_jsonl(tmp_project):
                 if m["target"] == ".rlsbl/changes/unreleased.jsonl"]
 
     created, skipped, warnings, _ = process_mappings(
-        tpl_dir, mappings, {}, force=False, update=True,
+        tpl_dir, mappings, {}, force=False,
     )
 
     # File must be unchanged
@@ -98,7 +98,7 @@ def test_scaffold_force_does_not_overwrite_unreleased_jsonl(tmp_project):
                 if m["target"] == ".rlsbl/changes/unreleased.jsonl"]
 
     created, skipped, warnings, _ = process_mappings(
-        tpl_dir, mappings, {}, force=True, update=False,
+        tpl_dir, mappings, {}, force=True,
     )
 
     # User-owned files are never overwritten, even with --force

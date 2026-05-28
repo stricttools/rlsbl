@@ -244,7 +244,7 @@ def _three_way_merge(ours_text, base_text, theirs_text):
                     pass
 
 
-def plan_mappings(template_dir, mappings, vars_dict, force, update=False):
+def plan_mappings(template_dir, mappings, vars_dict, force):
     """Compute what process_mappings would do, without writing anything.
 
     Returns a list of plan dicts. Each plan represents one mapping and contains:
@@ -290,7 +290,7 @@ def plan_mappings(template_dir, mappings, vars_dict, force, update=False):
         theirs, unreplaced = process_template(raw, vars_dict, template_path=template_path)
 
         # --- User-owned files: never overwrite (even with --force),
-        # except LICENSE gets its copyright year updated on --update.
+        # except LICENSE gets its copyright year updated.
         if os.path.exists(target) and target in USER_OWNED:
             if target == "LICENSE":
                 from datetime import datetime
@@ -546,7 +546,7 @@ def apply_plans(plans):
     return created, skipped, warnings, new_hashes
 
 
-def process_mappings(template_dir, mappings, vars_dict, force, update=False,
+def process_mappings(template_dir, mappings, vars_dict, force,
                      existing_hashes=None):
     """Process a list of template mappings: read each template, apply vars, write target files.
 
@@ -559,7 +559,7 @@ def process_mappings(template_dir, mappings, vars_dict, force, update=False,
 
     Implemented as plan_mappings() (pure analysis) + apply_plans() (side effects).
     """
-    plans = plan_mappings(template_dir, mappings, vars_dict, force, update=update)
+    plans = plan_mappings(template_dir, mappings, vars_dict, force)
     return apply_plans(plans)
 
 
@@ -719,7 +719,7 @@ def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnin
         f.write(__version__ + "\n")
     print("Wrote scaffolding version marker (.rlsbl/version)")
 
-    # Persist file hashes for future --update customization detection
+    # Persist file hashes for future customization detection
     all_new_hashes = {}
     for h in all_hash_dicts:
         all_new_hashes.update(h)
@@ -842,14 +842,9 @@ def _resolve_private(flags):
     """Determine if this is a private repository.
 
     Checks --private flag first, then saved config, then auto-detects via GitHub API.
+    The caller is responsible for persisting the value to config.json.
 
-    On --update: if ``private`` is missing from config and no --private flag was
-    passed, prints an error and exits.  The user must add the key explicitly.
-
-    On new scaffold: auto-detects if needed and returns the result.  The caller
-    is responsible for persisting the value to config.json.
-
-    Returns True/False, or False if detection fails (new scaffold only).
+    Returns True/False, or False if detection fails.
     """
     if flags.get("private"):
         return True
@@ -963,7 +958,6 @@ def run_cmd(registry, args, flags):
         vars_dict["year"] = str(datetime.now().year)
 
         force = flags.get("force", False)
-        update = flags.get("update", False)
 
         existing_hashes = load_hashes()
 
@@ -973,7 +967,7 @@ def run_cmd(registry, args, flags):
             reg_mappings = _filter_mappings_for_private(reg_mappings)
 
         reg_plans = plan_mappings(
-            reg.template_dir(), reg_mappings, vars_dict, force, update=update,
+            reg.template_dir(), reg_mappings, vars_dict, force,
         )
 
         shared_plans = []
@@ -981,7 +975,7 @@ def run_cmd(registry, args, flags):
             shared_mappings = reg.shared_template_mappings()
             shared_mappings = _append_deploy_workflow_if_configured(shared_mappings)
             shared_plans = plan_mappings(
-                reg.shared_template_dir(), shared_mappings, vars_dict, force, update=update,
+                reg.shared_template_dir(), shared_mappings, vars_dict, force,
             )
 
         if dry_run:
@@ -1338,7 +1332,7 @@ def _merge_template_vars(registries_list, primary, target_paths):
     return merged
 
 
-def _plan_merged_publish(publish_target, merged_content, force, update):
+def _plan_merged_publish(publish_target, merged_content, force):
     """Compute a plan for the merged publish workflow (analysis only)."""
     is_overwrite = os.path.exists(publish_target)
     if not is_overwrite or force:
@@ -1460,13 +1454,12 @@ def run_cmd_multi(registries_list, args, flags):
         vars_dict["year"] = str(datetime.now().year)
 
         force = flags.get("force", False)
-        update = flags.get("update", False)
         existing_hashes = load_hashes()
 
         # Process primary registry CI template only (publish will come from merged)
         ci_mappings = [m for m in reg.template_mappings() if "publish" not in m["template"]]
         ci_plans = plan_mappings(
-            reg.template_dir(), ci_mappings, vars_dict, force, update=update,
+            reg.template_dir(), ci_mappings, vars_dict, force,
         )
 
         # Collect non-workflow files from non-primary targets (e.g. .npmignore
@@ -1486,7 +1479,7 @@ def run_cmd_multi(registries_list, args, flags):
                 for m in secondary_extra:
                     seen_targets.add(m["target"])
                 extra_plans.extend(plan_mappings(
-                    secondary.template_dir(), secondary_extra, vars_dict, force, update=update,
+                    secondary.template_dir(), secondary_extra, vars_dict, force,
                 ))
 
         # Plan the merged publish workflow (skip for private repos)
@@ -1495,14 +1488,14 @@ def run_cmd_multi(registries_list, args, flags):
             publish_target = os.path.join(".github", "workflows", "publish.yml")
             merged_content = _generate_merged_publish(registries_list, vars_dict)
             merged_plans = [_plan_merged_publish(
-                publish_target, merged_content, force, update,
+                publish_target, merged_content, force,
             )]
 
         # Plan shared templates (once)
         shared_mappings = reg.shared_template_mappings()
         shared_mappings = _append_deploy_workflow_if_configured(shared_mappings)
         shared_plans = plan_mappings(
-            reg.shared_template_dir(), shared_mappings, vars_dict, force, update=update,
+            reg.shared_template_dir(), shared_mappings, vars_dict, force,
         )
 
         if dry_run:

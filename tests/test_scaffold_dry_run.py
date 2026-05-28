@@ -115,12 +115,10 @@ class TestDryRunExistingProject:
         assert ci_path.exists()
         original_content = ci_path.read_text()
 
-        # Simulate a user modifying the file (but matching the base, so update would write)
-        # Actually if user-content==base, scaffold would write 'theirs' on update.
-        # We'll just verify dry-run on a clean scaffolded project doesn't rewrite anything.
-        # Use --update so we hit the merge path.
+        # Verify dry-run on a clean scaffolded project doesn't rewrite anything.
+        # scaffold always uses the merge path.
         capsys.readouterr()  # drain previous output
-        run_cmd("npm", [], {"dry-run": True, "update": True, "no-tag": True})
+        run_cmd("npm", [], {"dry-run": True, "no-tag": True})
 
         # File content must be untouched
         assert ci_path.read_text() == original_content

@@ -54,7 +54,7 @@ def test_force_does_not_overwrite_changelog(tmp_project):
     mappings = [{"template": "changelog.tpl", "target": "CHANGELOG.md"}]
 
     created, skipped, warnings, _ = process_mappings(
-        str(tpl_dir), mappings, {}, force=True, update=False,
+        str(tpl_dir), mappings, {}, force=True,
     )
 
     # CHANGELOG.md must be skipped as user-owned, not overwritten
@@ -82,7 +82,7 @@ def test_force_does_not_overwrite_license(tmp_project):
 
     created, skipped, warnings, _ = process_mappings(
         str(tpl_dir), mappings, {"year": "2026", "author": "Template Author"},
-        force=True, update=False,
+        force=True,
     )
 
     # LICENSE is user-owned (not overwritten with template content),
@@ -104,7 +104,7 @@ def test_template_author_never_literal(tmp_project):
 
     # With a non-empty author value
     created, skipped, warnings, _ = process_mappings(
-        str(tpl_dir), mappings, {"author": "Test User"}, force=False, update=False,
+        str(tpl_dir), mappings, {"author": "Test User"}, force=False,
     )
     license_file = tmp_project / "LICENSE"
     content = license_file.read_text()
@@ -114,7 +114,7 @@ def test_template_author_never_literal(tmp_project):
     # Remove the file and test with empty author -- empty is fine, literal is not
     license_file.unlink()
     created, skipped, warnings, _ = process_mappings(
-        str(tpl_dir), mappings, {"author": ""}, force=False, update=False,
+        str(tpl_dir), mappings, {"author": ""}, force=False,
     )
     content = license_file.read_text()
     assert "{{author}}" not in content
@@ -138,7 +138,7 @@ def test_force_overwrites_hooks(tmp_project):
     mappings = [{"template": "pre-release.sh.tpl", "target": hook_path}]
 
     created, skipped, warnings, _ = process_mappings(
-        str(tpl_dir), mappings, {}, force=True, update=False,
+        str(tpl_dir), mappings, {}, force=True,
     )
 
     # Hook must be overwritten since it's no longer user-owned
@@ -163,7 +163,7 @@ def test_force_overwrites_non_user_owned(tmp_project):
     mappings = [{"template": "ci.yml.tpl", "target": target}]
 
     created, skipped, warnings, _ = process_mappings(
-        str(tpl_dir), mappings, {}, force=True, update=False,
+        str(tpl_dir), mappings, {}, force=True,
     )
 
     # File must be overwritten with template content
@@ -193,7 +193,7 @@ def test_scaffold_auto_commits_files(mock_git_repo, capsys):
 
     mappings = [{"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"}]
     created, skipped, warnings, new_hashes = process_mappings(
-        str(tpl_dir), mappings, {}, force=False, update=False,
+        str(tpl_dir), mappings, {}, force=False,
     )
 
     assert len(created) == 1
@@ -238,7 +238,7 @@ def test_scaffold_no_commit_flag_skips_commit(mock_git_repo, capsys):
 
     mappings = [{"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"}]
     created, skipped, warnings, new_hashes = process_mappings(
-        str(tpl_dir), mappings, {}, force=False, update=False,
+        str(tpl_dir), mappings, {}, force=False,
     )
 
     # Run _finalize_scaffold with --no-commit flag
@@ -306,7 +306,7 @@ def test_npm_scaffold_creates_npmignore(tmp_project):
 
     # Process the template and verify the file is created
     created, skipped, warnings, _ = process_mappings(
-        tpl_dir, npmignore_mappings, {}, force=False, update=False,
+        tpl_dir, npmignore_mappings, {}, force=False,
     )
 
     npmignore_path = tmp_project / ".npmignore"
@@ -320,7 +320,7 @@ def test_npm_scaffold_creates_npmignore(tmp_project):
 
 
 def test_npmignore_is_user_owned(tmp_project):
-    """.npmignore must be in USER_OWNED so scaffold --update doesn't overwrite it."""
+    """.npmignore must be in USER_OWNED so scaffold doesn't overwrite it."""
     assert ".npmignore" in USER_OWNED
 
     # Pre-existing user content
@@ -335,9 +335,9 @@ def test_npmignore_is_user_owned(tmp_project):
         m for m in target.template_mappings() if m["target"] == ".npmignore"
     ]
 
-    # With --update, the user-owned file should not be overwritten
+    # The user-owned file should not be overwritten
     created, skipped, warnings, _ = process_mappings(
-        tpl_dir, npmignore_mappings, {}, force=False, update=True,
+        tpl_dir, npmignore_mappings, {}, force=False,
     )
 
     assert npmignore.read_text() == "# My custom npmignore\nmy-custom-dir/\n"
@@ -348,7 +348,7 @@ def test_npmignore_is_user_owned(tmp_project):
 
     # With --force, the user-owned file should still not be overwritten
     created, skipped, warnings, _ = process_mappings(
-        tpl_dir, npmignore_mappings, {}, force=True, update=False,
+        tpl_dir, npmignore_mappings, {}, force=True,
     )
 
     assert npmignore.read_text() == "# My custom npmignore\nmy-custom-dir/\n"

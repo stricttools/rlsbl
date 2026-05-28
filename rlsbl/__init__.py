@@ -308,15 +308,14 @@ def cmd_status(target, json, **_kwargs):
 # scaffold
 # ---------------------------------------------------------------------------
 
-@app.command(name="scaffold", help="Generate or update CI/CD workflows, git hooks, changelog, and license files for the detected release target. Use --update for three-way merge preserving customizations, or --force to overwrite all files.")
+@app.command(name="scaffold", help="Generate or update CI/CD workflows, git hooks, changelog, and license files. Safe to run repeatedly -- merges template changes with your customizations. Use --force to overwrite all files.")
 @strictcli.flag(name="target", type=str, help="Target a specific registry (auto-detected if omitted)", default="")
 @strictcli.flag(name="force", type=bool, help="Overwrite all files (ignore user customizations)")
-@strictcli.flag(name="update", type=bool, help="Update scaffolding via three-way merge")
 @strictcli.flag(name="private", type=bool, help="Scaffold for private repos (skip publish)")
 @strictcli.flag(name="no-commit", type=bool, help="Skip auto-commit of scaffolded files")
 @strictcli.flag(name="skip-shared", type=bool, help="Skip shared template processing")
 @strictcli.flag(name="no-tag", type=bool, help="Disable ecosystem tagging for this invocation")
-def cmd_scaffold(target, force, update, private, no_commit, skip_shared, no_tag, dry_run, **_kwargs):
+def cmd_scaffold(target, force, private, no_commit, skip_shared, no_tag, dry_run, **_kwargs):
     # Scaffold is special: if a project root exists, chdir to it;
     # if not, stay in cwd (for new projects).
     # However, if the current directory has project markers (pyproject.toml,
@@ -332,7 +331,6 @@ def cmd_scaffold(target, force, update, private, no_commit, skip_shared, no_tag,
 
     flags = {
         "force": force,
-        "update": update,
         "private": private,
         "no-commit": no_commit,
         "skip-shared": skip_shared,

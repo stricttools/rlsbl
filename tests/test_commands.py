@@ -164,13 +164,11 @@ class TestScaffold(unittest.TestCase):
         os.chdir(self.orig_dir)
         shutil.rmtree(self.tmp_dir)
 
-    def _run_scaffold(self, force=False, update=False):
+    def _run_scaffold(self, force=False):
         """Run scaffold for npm with stdout suppressed."""
         flags = {}
         if force:
             flags["force"] = True
-        if update:
-            flags["update"] = True
         with patch("sys.stdout", new_callable=StringIO):
             run_cmd("npm", [], flags)
 
@@ -239,7 +237,7 @@ class TestScaffold(unittest.TestCase):
     # -- Three-way merge integration tests --
 
     def test_update_clean_when_user_did_not_modify(self):
-        """When user hasn't modified a file, --update should cleanly overwrite."""
+        """When user hasn't modified a file, scaffold should cleanly overwrite."""
         self._run_scaffold()
         ci_path = ".github/workflows/ci.yml"
         with open(ci_path) as f:
@@ -420,10 +418,10 @@ class TestScaffold(unittest.TestCase):
                     f"Hash mismatch for {path}",
                 )
 
-    # -- --update tests --
+    # -- merge tests --
 
     def test_update_processes_managed_files(self):
-        """--update should still process CI files via three-way merge."""
+        """scaffold should process CI files via three-way merge."""
         self._run_scaffold()
 
         ci_path = ".github/workflows/ci.yml"
@@ -431,17 +429,17 @@ class TestScaffold(unittest.TestCase):
         self.assertIn(ci_path, hashes_before)
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd("npm", [], {"update": True})
+            run_cmd("npm", [], {})
 
         self.assertTrue(os.path.exists(ci_path))
 
     def test_hooks_not_user_owned(self):
-        """Hooks should not be in USER_OWNED, allowing scaffold --update to merge them."""
+        """Hooks should not be in USER_OWNED, allowing scaffold to merge them."""
         self.assertNotIn(".rlsbl/hooks/pre-release.sh", USER_OWNED)
         self.assertNotIn(".rlsbl/hooks/post-release.sh", USER_OWNED)
 
     def test_update_merges_hook_changes(self):
-        """scaffold --update should three-way merge pre-release.sh when template changes."""
+        """scaffold should three-way merge pre-release.sh when template changes."""
         tpl_dir = os.path.join(self.tmp_dir, "_tpls")
         os.makedirs(os.path.join(tpl_dir, "hooks"))
 
@@ -498,7 +496,7 @@ class TestScaffold(unittest.TestCase):
 
 
 class TestGitignoreSetUnionMerge(unittest.TestCase):
-    """Tests for .gitignore set-union merge in scaffold --update."""
+    """Tests for .gitignore set-union merge in scaffold."""
 
     def setUp(self):
         self.orig_dir = os.getcwd()
@@ -511,7 +509,7 @@ class TestGitignoreSetUnionMerge(unittest.TestCase):
         shutil.rmtree(self.tmp_dir)
 
     def test_gitignore_appends_new_entries(self):
-        """Scaffold --update on .gitignore appends new entries without conflicts."""
+        """Scaffold on .gitignore appends new entries without conflicts."""
         tpl_dir = os.path.join(self.tmp_dir, "_tpls")
         os.makedirs(tpl_dir)
 
@@ -525,7 +523,7 @@ class TestGitignoreSetUnionMerge(unittest.TestCase):
 
         mappings = [{"template": "gitignore.tpl", "target": ".gitignore"}]
         created, skipped, warnings, _ = process_mappings(
-            tpl_dir, mappings, {}, force=False, update=True,
+            tpl_dir, mappings, {}, force=False,
         )
 
         with open(".gitignore") as f:
@@ -558,7 +556,7 @@ class TestGitignoreSetUnionMerge(unittest.TestCase):
 
         mappings = [{"template": "gitignore.tpl", "target": ".gitignore"}]
         created, skipped, warnings, _ = process_mappings(
-            tpl_dir, mappings, {}, force=False, update=True,
+            tpl_dir, mappings, {}, force=False,
         )
 
         with open(".gitignore") as f:
@@ -583,7 +581,7 @@ class TestGitignoreSetUnionMerge(unittest.TestCase):
             f.write("node_modules/\n.rlsbl/lock\n")
 
         mappings = [{"template": "gitignore.tpl", "target": ".gitignore"}]
-        process_mappings(tpl_dir, mappings, {}, force=False, update=True)
+        process_mappings(tpl_dir, mappings, {}, force=False)
 
         with open(".gitignore") as f:
             result = f.read()
