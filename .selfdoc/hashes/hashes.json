@@ -68,7 +68,7 @@
     "description": "728d53ed39a7f216758061237899c35db9b081c75e29c38d44b9d136c412b691"
   },
   "cli-release.md": {
-    "content": "576f3de7dc2aa772a5f36227c02f09f1bc5f4fc605d34ff55ba55fa812f62daf",
+    "content": "0af0613ad27731e2920e69d403a5cd5fd8e18db73ed35e809b5c4738dcd67661",
     "description": "78b096ab8634097254c64a4e3c8b144cfed9033a0b96209afc4f836471c0ceb2"
   },
   "cli-scaffold.md": {
@@ -680,7 +680,7 @@
     "description": "77349d50382ca6c0faf97553b8abf8c24bb360c895f32005f7de62abdf1bbe75"
   },
   "rlsbl-commands-init_cmd.md": {
-    "content": "0fcf920a53de65975429242418f207e6417f3e0b509db486c37c2ff11432e22f",
+    "content": "0198c035bb4ea852d5ebcbff028271e02b07e74364f5f915121b61cff3c4215f",
     "description": "0c13614aa11a0d178a7c0daee8e7fa6f8bf87a0a36d0e37f474a3d865cbbae64"
   },
   "rlsbl-commands-migrate.md": {
@@ -868,7 +868,7 @@
     "description": "88a63e5447b718acc27b9f03247bc3ca398e81e8335c4c7d1048793ab1af0217"
   },
   "rlsbl-tagging.md": {
-    "content": "58a66c8c00cfd6416e637e261b0e0d98de2950cb771c1650c04999fca5c55e18",
+    "content": "1dd6c751d4787dbfd4a7916cab8a5902e71aac05077ce0a0e0f895922bf231c7",
     "description": "1dab5473e391e8bb1f1cad9802c9de83079fd1461e8ce00a68091cfa332a2b31"
   },
   "rlsbl-targets-base.md": {
