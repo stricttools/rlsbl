@@ -253,9 +253,8 @@ class RetryConfig:
     """Configuration from a retry TOML file (.rlsbl/releases/retry.toml)."""
 
     version: str  # version to retry (mandatory)
-    workflows: list[str]  # workflow filenames to dispatch, e.g. ["publish.yml"]
-    ci_ref: str  # git ref for CI dispatch, defaults to tag
-    assets: bool  # whether to re-upload assets
+    dispatch: list[str]  # workflow filenames to dispatch, e.g. ["publish.yml"]
+    ref: str  # git ref for CI dispatch, defaults to tag
 
 
 def get_retry_file_path(project_dir: str = ".") -> str:
@@ -279,30 +278,24 @@ def read_retry_file(path: str) -> RetryConfig:
     if not isinstance(version, str) or not version.strip():
         raise ValueError("version must be a non-empty string")
 
-    # --- workflows ---
-    if "workflows" not in data:
-        raise ValueError("missing required field: workflows")
-    workflows = data["workflows"]
-    if not isinstance(workflows, list) or not all(isinstance(s, str) for s in workflows):
-        raise ValueError("workflows must be a list of strings")
+    # --- dispatch ---
+    if "dispatch" not in data:
+        raise ValueError("missing required field: dispatch")
+    dispatch = data["dispatch"]
+    if not isinstance(dispatch, list) or not all(isinstance(s, str) for s in dispatch):
+        raise ValueError("dispatch must be a list of strings")
+    if not dispatch:
+        raise ValueError("dispatch must be non-empty")
 
-    # --- ci_ref ---
-    if "ci_ref" not in data:
-        raise ValueError("missing required field: ci_ref")
-    ci_ref = data["ci_ref"]
-    if not isinstance(ci_ref, str) or not ci_ref.strip():
-        raise ValueError("ci_ref must be a non-empty string")
-
-    # --- assets ---
-    if "assets" not in data:
-        raise ValueError("missing required field: assets")
-    assets = data["assets"]
-    if not isinstance(assets, bool):
-        raise ValueError("assets must be a boolean")
+    # --- ref ---
+    if "ref" not in data:
+        raise ValueError("missing required field: ref")
+    ref = data["ref"]
+    if not isinstance(ref, str) or not ref.strip():
+        raise ValueError("ref must be a non-empty string")
 
     return RetryConfig(
         version=version.strip(),
-        workflows=list(workflows),
-        ci_ref=ci_ref.strip(),
-        assets=assets,
+        dispatch=list(dispatch),
+        ref=ref.strip(),
     )
