@@ -371,3 +371,82 @@ def test_pypi_scaffold_does_not_create_npmignore(tmp_project):
     shared_mappings = target.shared_template_mappings()
     shared_npmignore = [m for m in shared_mappings if m["target"] == ".npmignore"]
     assert len(shared_npmignore) == 0, ".npmignore should not be in shared templates"
+
+
+def test_bare_scaffold_is_idempotent(mock_git_repo):
+    """Bare scaffold (no --force) preserves user customizations via three-way merge.
+
+    This proves that bare scaffold does what --update used to do:
+    1. Initial scaffold creates a file and stores a merge base
+    2. User modifies the scaffolded file (adds a custom line)
+    3. Bare scaffold again three-way merges, preserving the custom line
+    """
+    tpl_dir = mock_git_repo / "_tpls"
+    tpl_dir.mkdir()
+
+    # Template v1: a multi-line CI workflow (enough lines for clean merge regions)
+    tpl_v1 = (
+        "name: CI\n"
+        "on:\n"
+        "  push:\n"
+        "    branches: [main]\n"
+        "jobs:\n"
+        "  test:\n"
+        "    runs-on: ubuntu-latest\n"
+        "    steps:\n"
+        "      - uses: actions/checkout@v4\n"
+        "      - run: npm test\n"
+    )
+    (tpl_dir / "ci.yml.tpl").write_text(tpl_v1)
+
+    target = ".github/workflows/ci.yml"
+    mappings = [{"template": "ci.yml.tpl", "target": target}]
+
+    # Step 1: initial scaffold -- creates file and stores base
+    created, skipped, warnings, _ = process_mappings(
+        str(tpl_dir), mappings, {}, force=False,
+    )
+    ci_path = mock_git_repo / ".github" / "workflows" / "ci.yml"
+    assert ci_path.exists()
+    created_targets = [t for t, _ in created]
+    assert target in created_targets
+
+    initial_content = ci_path.read_text()
+    assert "actions/checkout@v4" in initial_content
+
+    # Step 2: user adds a custom line (non-adjacent to where template will change)
+    custom_line = "      # Custom: user-added deployment step"
+    user_content = initial_content.rstrip("\n") + "\n" + custom_line + "\n"
+    ci_path.write_text(user_content)
+
+    # Step 3: bare scaffold again (no --force) -- template unchanged
+    # Should detect no template changes and preserve user content exactly
+    created2, skipped2, warnings2, _ = process_mappings(
+        str(tpl_dir), mappings, {}, force=False,
+    )
+    after_content = ci_path.read_text()
+    assert custom_line in after_content, (
+        "User customization must be preserved when bare scaffold re-runs"
+    )
+
+    # Step 4: template changes (v2), bare scaffold should three-way merge
+    tpl_v2 = tpl_v1.replace("actions/checkout@v4", "actions/checkout@v5")
+    (tpl_dir / "ci.yml.tpl").write_text(tpl_v2)
+
+    created3, skipped3, warnings3, _ = process_mappings(
+        str(tpl_dir), mappings, {}, force=False,
+    )
+    merged_content = ci_path.read_text()
+
+    # Template update applied
+    assert "actions/checkout@v5" in merged_content, (
+        "Template update must be applied via three-way merge"
+    )
+    # User customization preserved
+    assert custom_line in merged_content, (
+        "User customization must survive three-way merge with template update"
+    )
+    # Verify the merge was reported correctly
+    merged_targets = {t: s for t, s in created3}
+    assert target in merged_targets
+    assert merged_targets[target] == "merged"
