@@ -44,7 +44,7 @@ def read_release_file(path: str) -> ReleaseConfig:
     bump = data["bump"]
     if not isinstance(bump, str) or bump not in VALID_BUMP_TYPES:
         raise ValueError(
-            f"invalid bump value: {bump!r} (must be one of {VALID_BUMP_TYPES})"
+            f"bump must be set in unreleased.toml: got {bump!r} (must be one of {VALID_BUMP_TYPES})"
         )
 
     # --- include ---
@@ -292,7 +292,7 @@ def read_retry_file(path: str) -> RetryConfig:
         raise ValueError("missing required field: ref")
     ref = data["ref"]
     if not isinstance(ref, str) or not ref.strip():
-        raise ValueError("ref must be a non-empty string")
+        raise ValueError("ref must be set in retry.toml (e.g. a tag like v1.2.3 or a branch like main)")
 
     return RetryConfig(
         version=version.strip(),
