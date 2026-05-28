@@ -52,6 +52,7 @@ order: 90
 - [rlsbl.commands.watch](rlsbl-commands-watch.html)
 - [rlsbl.commands.yank](rlsbl-commands-yank.html)
 - [rlsbl.config](rlsbl-config.html)
+- [rlsbl.context](rlsbl-context.html)
 - [rlsbl.dep_rewrite](rlsbl-dep_rewrite.html)
 - [rlsbl.dep_validation](rlsbl-dep_validation.html)
 - [rlsbl.deploy](rlsbl-deploy.html)
