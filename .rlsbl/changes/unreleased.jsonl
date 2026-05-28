@@ -1,1 +1,2 @@
 {"commits":["f5aab6fc0109b7bb7e9d6666e5897b81d80086c1"],"user_facing":true,"description":"**Bug fix.** Scaffold now creates non-workflow files (like `.npmignore`) from all targets, not just the primary.","type":"fix"}
+{"commits":["7dddfffcf9f2fb94b68a41508f2a66d203fdea95"],"user_facing":true,"description":"**Bug fix.** Docker publish template no longer has `{{version}}` replaced by the literal version. Added escape syntax (`\\{{...}}`) to the template engine.","type":"fix"}
