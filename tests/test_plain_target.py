@@ -79,6 +79,67 @@ class TestPlainTargetWriteVersion:
             assert "VERSION.tmp" not in files
 
 
+class TestPlainTargetWriteVersionPyproject:
+    """Writing version bumps pyproject.toml when present with [project].version."""
+
+    def test_write_version_bumps_pyproject_toml(self):
+        target = PlainTarget()
+        with tempfile.TemporaryDirectory() as d:
+            # Create VERSION
+            with open(os.path.join(d, "VERSION"), "w") as f:
+                f.write("1.0.0\n")
+            # Create pyproject.toml with [project].version
+            with open(os.path.join(d, "pyproject.toml"), "w") as f:
+                f.write('[project]\nname = "test"\nversion = "1.0.0"\n')
+            modified = target.write_version(d, "2.0.0")
+            assert "VERSION" in modified
+            assert "pyproject.toml" in modified
+            # Check VERSION was updated
+            with open(os.path.join(d, "VERSION")) as f:
+                assert f.read() == "2.0.0\n"
+            # Check pyproject.toml was updated
+            import tomlkit
+            with open(os.path.join(d, "pyproject.toml")) as f:
+                doc = tomlkit.parse(f.read())
+            assert doc["project"]["version"] == "2.0.0"
+
+    def test_write_version_without_pyproject_toml(self):
+        target = PlainTarget()
+        with tempfile.TemporaryDirectory() as d:
+            modified = target.write_version(d, "1.0.0")
+            assert modified == ["VERSION"]
+            with open(os.path.join(d, "VERSION")) as f:
+                assert f.read() == "1.0.0\n"
+
+    def test_write_version_pyproject_no_project_version(self):
+        target = PlainTarget()
+        with tempfile.TemporaryDirectory() as d:
+            # Create VERSION
+            with open(os.path.join(d, "VERSION"), "w") as f:
+                f.write("1.0.0\n")
+            # Create pyproject.toml WITHOUT [project].version
+            with open(os.path.join(d, "pyproject.toml"), "w") as f:
+                f.write('[project]\nname = "test"\n')
+            modified = target.write_version(d, "2.0.0")
+            assert modified == ["VERSION"]
+            # pyproject.toml should be unchanged
+            with open(os.path.join(d, "pyproject.toml")) as f:
+                content = f.read()
+            assert "version" not in content.lower() or "2.0.0" not in content
+
+    def test_write_version_pyproject_no_tmp_left_behind(self):
+        target = PlainTarget()
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "VERSION"), "w") as f:
+                f.write("1.0.0\n")
+            with open(os.path.join(d, "pyproject.toml"), "w") as f:
+                f.write('[project]\nname = "test"\nversion = "1.0.0"\n')
+            target.write_version(d, "2.0.0")
+            files = os.listdir(d)
+            assert "pyproject.toml.tmp" not in files
+            assert "VERSION.tmp" not in files
+
+
 class TestPlainTargetProperties:
     """Static properties and template methods."""
 

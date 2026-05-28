@@ -2,6 +2,8 @@
 
 import os
 
+import tomlkit
+
 from .base import BaseTarget
 
 VERSION_FILE = "VERSION"
@@ -29,7 +31,7 @@ class PlainTarget(BaseTarget):
             return f.read().strip()
 
     def write_version(self, dir_path, version):
-        """Write the new version to the VERSION file atomically.
+        """Write the new version to the VERSION file and pyproject.toml atomically.
 
         Returns a list of relative file paths that were modified.
         """
@@ -38,7 +40,24 @@ class PlainTarget(BaseTarget):
         with open(tmp_path, "w", encoding="utf-8") as f:
             f.write(version + "\n")
         os.replace(tmp_path, version_path)
-        return [self.version_file()]
+
+        modified = [self.version_file()]
+
+        # Also bump pyproject.toml if it exists and has [project].version
+        pyproject_path = os.path.join(dir_path, "pyproject.toml")
+        if os.path.exists(pyproject_path):
+            with open(pyproject_path, "r", encoding="utf-8") as f:
+                doc = tomlkit.parse(f.read())
+            project = doc.get("project")
+            if project is not None and "version" in project:
+                doc["project"]["version"] = version
+                tmp_pyproject = pyproject_path + ".tmp"
+                with open(tmp_pyproject, "w", encoding="utf-8") as f:
+                    f.write(tomlkit.dumps(doc))
+                os.replace(tmp_pyproject, pyproject_path)
+                modified.append("pyproject.toml")
+
+        return modified
 
     def version_file(self):
         return VERSION_FILE
