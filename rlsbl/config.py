@@ -31,8 +31,15 @@ def load_env_file(path):
             os.environ[key] = value
 
 
-def _project_config():
-    """Resolve project config path at call time (respects cwd changes)."""
+def _project_config(project_root=None):
+    """Resolve project config path at call time.
+
+    When project_root is provided, returns an absolute path based on it.
+    When None, falls back to a relative path (transition -- will become
+    required once os.chdir is removed).
+    """
+    if project_root is not None:
+        return os.path.join(str(project_root), ".rlsbl", "config.json")
     return os.path.join(".rlsbl", "config.json")
 
 USER_CONFIG = os.path.expanduser("~/.rlsbl/config.json")
@@ -47,14 +54,14 @@ def read_json_config(path):
         return {}
 
 
-def should_tag(flags):
+def should_tag(flags, project_root=None):
     """Returns True if tagging is enabled, checking flag > project > user > default."""
     # CLI flag takes highest precedence
     if flags.get("no-tag"):
         return False
 
     # Project-level config
-    project = read_json_config(_project_config())
+    project = read_json_config(_project_config(project_root))
     if "tag" in project:
         return bool(project["tag"])
 
@@ -67,16 +74,16 @@ def should_tag(flags):
     return True
 
 
-def read_project_config():
+def read_project_config(project_root=None):
     """Read .rlsbl/config.json, return dict or empty dict if missing/malformed."""
-    return read_json_config(_project_config())
+    return read_json_config(_project_config(project_root))
 
 
-def read_deploy_config():
+def read_deploy_config(project_root=None):
     """Read and validate deploy targets from project config. Returns (targets, errors)."""
     from rlsbl.deploy import validate_deploy_config
 
-    config = read_project_config()
+    config = read_project_config(project_root)
     targets = config.get("deploy", [])
     if not targets:
         return [], []
@@ -84,13 +91,13 @@ def read_deploy_config():
     return targets, errors
 
 
-def get_publish_config(target_name):
+def get_publish_config(target_name, project_root=None):
     """Read per-target publish config from .rlsbl/config.json.
 
     Returns a dict like {"local": True, "token_var": "PYPI_TOKEN"}.
     Returns empty dict if no config exists for this target.
     """
-    config = read_project_config()
+    config = read_project_config(project_root)
     publish = config.get("publish", {})
     if not isinstance(publish, dict):
         return {}
@@ -129,7 +136,7 @@ def validate_publish_config(config, target_name):
         )
 
 
-def get_changelog_validation_config():
+def get_changelog_validation_config(project_root=None):
     """Read changelog validation config from .rlsbl/config.json.
 
     Returns the batch_limits section as a dict like
@@ -143,7 +150,7 @@ def get_changelog_validation_config():
 
     Returns an empty dict if no config or malformed.
     """
-    config = read_project_config()
+    config = read_project_config(project_root)
     batch_limits = config.get("batch_limits", {})
     if not isinstance(batch_limits, dict):
         return {}
@@ -151,11 +158,12 @@ def get_changelog_validation_config():
 
 
 
-def write_project_config(key, value):
+def write_project_config(key, value, project_root=None):
     """Write or update a key in .rlsbl/config.json (creates dir if needed)."""
-    os.makedirs(os.path.dirname(_project_config()), exist_ok=True)
-    existing = read_json_config(_project_config())
+    config_path = _project_config(project_root)
+    os.makedirs(os.path.dirname(config_path), exist_ok=True)
+    existing = read_json_config(config_path)
     existing[key] = value
-    with open(_project_config(), "w", encoding="utf-8") as f:
+    with open(config_path, "w", encoding="utf-8") as f:
         json.dump(existing, f, indent=2)
         f.write("\n")
