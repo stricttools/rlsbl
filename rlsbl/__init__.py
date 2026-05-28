@@ -256,7 +256,9 @@ def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, no_watch, **_kwargs
 @release_group.command(name="init", help="Scaffold a .rlsbl/releases/unreleased.toml file by auto-detecting project targets. The generated file contains a default bump type (patch), an include list of all detected targets, and per-target configuration sections for Flutter targets.")
 def cmd_release_init(**_kwargs):
     root = _require_project_root()
-    ctx = create_context(root)
+    from .workspace import find_workspace_root
+    monorepo_root = find_workspace_root(str(root))
+    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     from .commands.release_init import run_cmd
     run_cmd()
 
@@ -273,7 +275,9 @@ def cmd_release_init(**_kwargs):
 )
 def cmd_release_retry(dry_run, yes, quiet, watch, no_watch, **_kwargs):
     root = _require_project_root()
-    ctx = create_context(root)
+    from .workspace import find_workspace_root
+    monorepo_root = find_workspace_root(str(root))
+    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
 
     from .release_file import get_retry_file_path, read_retry_file
 
@@ -305,7 +309,9 @@ def cmd_release_retry(dry_run, yes, quiet, watch, no_watch, **_kwargs):
 @strictcli.flag(name="json", type=bool, help="Output status as JSON")
 def cmd_status(target, json, **_kwargs):
     root = _require_project_root()
-    ctx = create_context(root)
+    from .workspace import find_workspace_root
+    monorepo_root = find_workspace_root(str(root))
+    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     registry = _resolve_target(target or None)
     flags = {"json": json}
     from .commands.status import run_cmd
@@ -421,7 +427,9 @@ def cmd_check_name(target, delay, **_kwargs):
 @strictcli.arg(name="version", help="Version to update (defaults to current)", required=False)
 def cmd_release_edit(dry_run, version=None, **_kwargs):
     root = _require_project_root()
-    ctx = create_context(root)
+    from .workspace import find_workspace_root
+    monorepo_root = find_workspace_root(str(root))
+    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     args = [version] if version else []
     flags = {"dry-run": dry_run}
     from .commands.edit_release import run_cmd
@@ -494,7 +502,9 @@ def cmd_watch(target, sha=None, **_kwargs):
 @app.command(name="pre-push-check", help="Verify that CHANGELOG.md contains an entry matching the current project version. Designed to run as a git pre-push hook to prevent pushing releases without documented changes.")
 def cmd_pre_push_check(**_kwargs):
     root = _require_project_root()
-    ctx = create_context(root)
+    from .workspace import find_workspace_root
+    monorepo_root = find_workspace_root(str(root))
+    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     from .commands.pre_push_check import run_cmd
     run_cmd(None, [], {})
 
@@ -827,7 +837,9 @@ def cmd_dev_install(all, include, exclude, uninstall, global_, venv, **_kwargs):
         )
         sys.exit(2)
     root = _require_project_root()
-    ctx = create_context(root)
+    from .workspace import find_workspace_root
+    monorepo_root = find_workspace_root(str(root))
+    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     # Both flags default to False (not True) so strictcli's mutex check doesn't
     # always fire when neither is passed. The user-visible default (no flags ->
     # global mode) is preserved by deriving install_global from --venv only.
