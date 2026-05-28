@@ -1096,9 +1096,16 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
     if target_paths is None:
         target_paths = resolve_target_paths(version_dir)
 
+    # git status --porcelain outputs paths relative to the repo root.
+    # Compute the repo root so vpath can produce matching relative paths.
+    _git_root = run("git", ["rev-parse", "--show-toplevel"]).strip()
+
     def vpath(filename):
-        """Join filename with version_dir and normalize (e.g. './x' -> 'x')."""
-        return os.path.normpath(os.path.join(version_dir, filename))
+        """Join filename with version_dir, return relative to git root."""
+        full = os.path.normpath(os.path.join(version_dir, filename))
+        if os.path.isabs(full):
+            return os.path.relpath(full, _git_root)
+        return full
 
     def target_vpath(t_path, filename):
         """Join filename with a target's resolved path, normalized.
@@ -1242,21 +1249,12 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
     dirty_output = run("git", ["status", "--porcelain"])
     if dirty_output:
         dirty_files = parse_porcelain_paths(dirty_output)
-        # git status outputs paths relative to repo root; normalize expected
-        # paths the same way so the set comparison works with absolute version_dir.
-        git_root = run("git", ["rev-parse", "--show-toplevel"]).strip()
-        def _rel(p):
-            ap = os.path.abspath(p)
-            try:
-                return os.path.relpath(ap, git_root)
-            except ValueError:
-                return os.path.normpath(p)
-        expected_files = {_rel(f) for f in files_to_commit}
-        expected_files.add(_rel(os.path.join(lock_dir, "lock")))
+        expected_files = set(files_to_commit)
+        expected_files.add(vpath(os.path.join(lock_dir, "lock")))
         # The .validated cache is written by changelog validation earlier in the
         # release flow.  It may be tracked (dirty) or gitignored (invisible to
         # git status).  Either way it is not a concurrent-change signal.
-        validated_file = _rel(
+        validated_file = os.path.normpath(
             os.path.join(get_changes_dir(version_dir), ".validated")
         )
         expected_files.add(validated_file)
@@ -1264,13 +1262,12 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
         # release started are not "unexpected" -- only genuinely new modifications
         # (from e.g. concurrent processes) should trigger the abort.
         if pre_existing_dirty:
-            expected_files |= {_rel(f) for f in pre_existing_dirty}
+            expected_files |= pre_existing_dirty
         # Subtract the baseline snapshot taken at the start of the mutating
         # phase.  This covers files written by intermediate stages that ran
         # BEFORE version-bump writes (generate_changelog, hooks, lint) which
         # are not in files_to_commit or pre_existing_dirty.
-        norm_baseline = {_rel(f) for f in baseline_dirty} if baseline_dirty else set()
-        unexpected = dirty_files - expected_files - norm_baseline
+        unexpected = dirty_files - expected_files - baseline_dirty
         if unexpected:
             unexpected_list = ", ".join(sorted(unexpected))
             print(
