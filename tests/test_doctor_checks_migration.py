@@ -583,7 +583,7 @@ class TestPrivateHookStaleCheck:
         result = app._check_defs["private-hook-stale"].impl(ctx)
         assert result.status == "fail"
         assert "legacy private asset upload" in result.message
-        assert "rlsbl scaffold --update" in result.message
+        assert "rlsbl scaffold" in result.message
 
     def test_normal_hook_passes(self, mock_git_repo):
         """Standard hook without legacy marker -> pass."""

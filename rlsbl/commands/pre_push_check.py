@@ -444,7 +444,7 @@ def run_cmd(registry, args, flags):
 
     if not changes_dir_exists("."):
         # JSONL changelog not set up -- warn but don't block
-        print("Warning: JSONL changelog not set up. Run 'rlsbl scaffold --update' to create .rlsbl/changes/", file=sys.stderr)
+        print("Warning: JSONL changelog not set up. Run 'rlsbl scaffold' to create .rlsbl/changes/", file=sys.stderr)
         sys.exit(0)
 
     # JSONL mode: check commit coverage

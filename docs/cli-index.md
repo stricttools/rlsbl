@@ -18,7 +18,7 @@ Version: 0.45.0
 
 - [check](cli-check.html) -- Run project checks
 - [status](cli-status.html) -- Display the current project version, branch, last release tag, unreleased commit count, and changelog coverage. Outputs plain text by default or structured JSON with the --json flag.
-- [scaffold](cli-scaffold.html) -- Generate or update CI/CD workflows, git hooks, changelog, and license files for the detected release target. Use --update for three-way merge preserving customizations, or --force to overwrite all files.
+- [scaffold](cli-scaffold.html) -- Generate or update CI/CD workflows, git hooks, changelog, and license files. Safe to run repeatedly -- merges template changes with your customizations. Use --force to overwrite all files.
 - [check-name](cli-check-name.html) -- Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.
 - [discover](cli-discover.html) -- Search GitHub for repositories tagged with the rlsbl topic and list them. Use --mine to filter results to only your own repositories. Requires the gh CLI to be authenticated.
 - [watch](cli-watch.html) -- Poll GitHub Actions CI workflow runs for a specific commit SHA and report pass or fail status. Defaults to HEAD if no SHA is provided. Useful after rlsbl release to monitor the publish pipeline.

@@ -241,7 +241,7 @@ def register_checks(app):
                 "fail",
                 "Post-release hook contains legacy private asset upload code. "
                 "Asset upload is now a built-in release step. "
-                "Run `rlsbl scaffold --update` to get the standard hook template.",
+                "Run `rlsbl scaffold` to get the standard hook template.",
             )
         return CheckResult("pass", "no legacy private hook code")
 

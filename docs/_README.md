@@ -77,8 +77,7 @@ Pre-release versions (e.g. `1.0.0-beta.1`) are supported.
 ## Scaffold
 
 ```
-rlsbl scaffold              # create CI/CD for all detected registries
-rlsbl scaffold --update     # three-way merge template updates with user customizations
+rlsbl scaffold              # create or update CI/CD for all detected registries
 rlsbl scaffold --force      # overwrite managed files (user-owned files still preserved)
 rlsbl scaffold --no-commit  # skip auto-commit of scaffolded files
 ```
@@ -98,13 +97,13 @@ Created files are committed automatically by default.
 | `.rlsbl/hooks/pre-release.sh` | User-customizable pre-release validation |
 | `.rlsbl/hooks/post-release.sh` | User-customizable post-release actions |
 | `.git/hooks/pre-push` | One-liner: `exec rlsbl pre-push-check "$@"` |
-| `.rlsbl/bases/` | Three-way merge bases for `--update` |
+| `.rlsbl/bases/` | Three-way merge bases for scaffold |
 
-**Three-way merge (`--update`):** Bases are stored at scaffold time. On `--update`, user customizations and template updates merge via `git merge-file`. Conflicts get git-style conflict markers.
+**Three-way merge:** Bases are stored at scaffold time. On re-run, user customizations and template updates merge via `git merge-file`. Conflicts get git-style conflict markers.
 
 **User-owned files** (CHANGELOG.md, LICENSE, hooks) are never overwritten, even with `--force`.
 
-**Customizing CI without conflicts:** Instead of editing `ci.yml` or `publish.yml` (which can produce merge conflicts on `--update`), put extra jobs in a separate workflow file scaffold never touches:
+**Customizing CI without conflicts:** Instead of editing `ci.yml` or `publish.yml` (which can produce merge conflicts on re-scaffold), put extra jobs in a separate workflow file scaffold never touches:
 
 - `.github/workflows/ci-custom.yml` -- runs alongside `ci.yml`
 - `.github/workflows/publish-custom.yml` -- runs alongside `publish.yml`

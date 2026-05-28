@@ -73,7 +73,7 @@ During `rlsbl release run`, the validation and build steps run in this order:
 
 ## CI customization
 
-Add custom GitHub Actions jobs via the user-owned `.github/workflows/ci-custom.yml` and `publish-custom.yml` files. Scaffold never touches them, so they survive `scaffold --update`'s three-way merge. See `docs/ci-customization.md` for the pattern.
+Add custom GitHub Actions jobs via the user-owned `.github/workflows/ci-custom.yml` and `publish-custom.yml` files. Scaffold never touches them, so they survive `scaffold`'s three-way merge. See `docs/ci-customization.md` for the pattern.
 
 ## Pre-push hook
 

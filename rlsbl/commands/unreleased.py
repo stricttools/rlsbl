@@ -76,7 +76,7 @@ def run_cmd(registry, args, flags):
     # Cross-reference each commit against JSONL changelog
     if not changes_dir_exists("."):
         print(
-            "Error: JSONL changelog not set up. Run 'rlsbl scaffold --update' to create .rlsbl/changes/",
+            "Error: JSONL changelog not set up. Run 'rlsbl scaffold' to create .rlsbl/changes/",
             file=sys.stderr,
         )
         sys.exit(1)

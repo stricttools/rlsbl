@@ -5,7 +5,7 @@ description: "Add custom GitHub Actions jobs to scaffold-managed projects via ci
 
 # Customizing CI workflows
 
-`rlsbl scaffold` generates `.github/workflows/ci.yml` and `publish.yml` and updates them on `--update`. To add custom jobs without fighting merge conflicts, use a separate workflow file:
+`rlsbl scaffold` generates `.github/workflows/ci.yml` and `publish.yml` and updates them on re-run. To add custom jobs without fighting merge conflicts, use a separate workflow file:
 
 - `.github/workflows/ci-custom.yml` -- runs on push/PR like ci.yml
 - `.github/workflows/publish-custom.yml` -- runs on release like publish.yml
@@ -34,8 +34,8 @@ These workflows run alongside the scaffold-managed ones -- no merging required.
 
 ## Why not edit ci.yml directly?
 
-`scaffold --update` uses a three-way merge (`git merge-file`) to apply template updates to your local workflow files. For most files this works well, but YAML workflows have rigid structure: a customization in one job can collide with an upstream change in a neighboring job, producing conflict markers that block the auto-commit.
+`scaffold` uses a three-way merge (`git merge-file`) to apply template updates to your local workflow files. For most files this works well, but YAML workflows have rigid structure: a customization in one job can collide with an upstream change in a neighboring job, producing conflict markers that block the auto-commit.
 
 Custom workflow files sidestep this entirely. GitHub Actions runs every `.yml` file in `.github/workflows/`, so a separate file is functionally equivalent to extra jobs in `ci.yml` -- but scaffold has no template for it and will never touch it.
 
-When `scaffold --update` does hit a conflict on `ci.yml` or `publish.yml`, it prints a tip pointing at this pattern.
+When `scaffold` does hit a conflict on `ci.yml` or `publish.yml`, it prints a tip pointing at this pattern.

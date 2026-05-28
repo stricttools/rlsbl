@@ -160,7 +160,7 @@ class TestMainRootDiscovery:
         assert os.getcwd() == original_cwd
 
     def test_scaffold_update_stays_in_subproject_with_rlsbl(self, tmp_path, monkeypatch):
-        """Scaffold --update from a sub-project with .rlsbl/ stays in the sub-project."""
+        """Scaffold from a sub-project with .rlsbl/ stays in the sub-project."""
         # Monorepo root has .rlsbl-monorepo/
         (tmp_path / ".rlsbl-monorepo").mkdir()
         # Sub-project has .rlsbl/ and package.json
@@ -174,7 +174,7 @@ class TestMainRootDiscovery:
         with patch("rlsbl.commands.init_cmd.run_cmd") as mock_run:
             with patch("rlsbl.config.read_project_config", return_value={}):
                 from rlsbl import app
-                app.test(["scaffold", "--update"])
+                app.test(["scaffold"])
 
         # Should stay in sub-project, not walk to monorepo root
         assert os.getcwd() == original_cwd

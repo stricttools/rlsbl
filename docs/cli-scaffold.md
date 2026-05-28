@@ -9,7 +9,7 @@ nav_order: 14
 
 # rlsbl scaffold
 
-Generate or update CI/CD workflows, git hooks, changelog, and license files for the detected release target. Use --update for three-way merge preserving customizations, or --force to overwrite all files.
+Generate or update CI/CD workflows, git hooks, changelog, and license files. Safe to run repeatedly -- merges template changes with your customizations. Use --force to overwrite all files.
 
 ## Flags
 
@@ -17,7 +17,7 @@ Generate or update CI/CD workflows, git hooks, changelog, and license files for 
 |------|-------|------|---------|-----|-------------|
 | `--target` |  | str |  |  | Target a specific registry (auto-detected if omitted) |
 | `--force` |  | bool |  |  | Overwrite all files (ignore user customizations) |
-| `--update` |  | bool |  |  | Update scaffolding via three-way merge |
+| `--update` |  | bool |  |  | (Legacy, now the default) Update scaffolding via three-way merge |
 | `--private` |  | bool |  |  | Scaffold for private repos (skip publish) |
 | `--no-commit` |  | bool |  |  | Skip auto-commit of scaffolded files |
 | `--skip-shared` |  | bool |  |  | Skip shared template processing |

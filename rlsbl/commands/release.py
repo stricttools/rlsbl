@@ -569,7 +569,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None):
             file=sys.stderr,
         )
         print(
-            'Quick fix: rlsbl scaffold --update',
+            'Quick fix: rlsbl scaffold',
             file=sys.stderr,
         )
         sys.exit(1)
@@ -730,7 +730,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None):
     # Validate JSONL changelog
     if not changes_dir_exists(version_dir):
         print(
-            "Error: JSONL changelog not set up. Run 'rlsbl scaffold --update' to create .rlsbl/changes/",
+            "Error: JSONL changelog not set up. Run 'rlsbl scaffold' to create .rlsbl/changes/",
             file=sys.stderr,
         )
         sys.exit(1)

@@ -2,7 +2,7 @@
 
 Covers: process_template dotted vars, normalize functions, min-version extraction,
 read_name/read_metadata, _merge_template_vars,
-and scaffold --update preservation of version-reference comments.
+and scaffold preservation of version-reference comments.
 """
 
 import json
@@ -262,7 +262,7 @@ class TestMergeTemplateVars:
 
 class TestScaffoldUpdateVersionComments:
     """Tests that version-reference comments (e.g. '# requires-python: >= 3.11')
-    render correctly and survive scaffold --update three-way merges."""
+    render correctly and survive scaffold three-way merges."""
 
     def test_process_template_renders_version_comment(self):
         """process_template should render dotted vars in YAML comments."""
@@ -287,7 +287,7 @@ class TestScaffoldUpdateVersionComments:
         assert "pypi.minRequiredPython" in unreplaced
 
     def test_scaffold_update_preserves_version_comment(self, mock_git_repo):
-        """After scaffold + user edit + scaffold --update, version-reference
+        """After scaffold + user edit + scaffold, version-reference
         comments survive the three-way merge."""
         tpl_dir = mock_git_repo / "_tpls"
         tpl_dir.mkdir()
@@ -329,7 +329,7 @@ class TestScaffoldUpdateVersionComments:
         tpl_v2 = tpl_v1.replace("actions/checkout@v6", "actions/checkout@v7")
         (tpl_dir / "ci.yml.tpl").write_text(tpl_v2)
 
-        # Scaffold --update (three-way merge)
+        # Scaffold (three-way merge)
         created2, skipped2, warnings2, hashes2 = process_mappings(
             str(tpl_dir), mappings, vars_dict, force=False,
         )
