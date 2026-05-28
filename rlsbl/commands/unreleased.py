@@ -5,13 +5,23 @@ import subprocess
 import sys
 
 from ..changelog import changes_dir_exists, get_changes_dir, read_unreleased, resolve_hashes
+from ..git_util import filter_commits_for_project
+from ..targets import TARGETS, detect_targets
+from ..workspace import find_workspace_root, load_workspace, resolve_project
 
 
-def _get_last_tag():
-    """Get the most recent tag. Returns None if no tags exist."""
+def _get_last_tag(tag_glob=None):
+    """Get the most recent tag. Returns None if no tags exist.
+
+    When tag_glob is set (monorepo mode), only tags matching the glob
+    are considered, so each project resolves its own last release tag.
+    """
     try:
+        cmd = ["git", "describe", "--tags", "--abbrev=0"]
+        if tag_glob:
+            cmd.extend(["--match", tag_glob])
         result = subprocess.run(
-            ["git", "describe", "--tags", "--abbrev=0"],
+            cmd,
             capture_output=True, text=True, check=True, timeout=10,
         )
         return result.stdout.strip()
@@ -67,8 +77,32 @@ def run_cmd(registry, args, flags, project_root=None):
         project_root = "."
     root_str = str(project_root)
 
-    tag = _get_last_tag()
+    # Detect monorepo context for scoped tags and directory filtering
+    monorepo_project = None
+    tag_glob = None
+    try:
+        ws_root = find_workspace_root(root_str)
+        if ws_root is not None:
+            monorepo_project = resolve_project(ws_root, root_str)
+            if monorepo_project:
+                targets = detect_targets(root_str)
+                if targets:
+                    target = TARGETS[targets[0].name]
+                    tag_glob = target.monorepo_tag_glob(
+                        monorepo_project["name"],
+                        path=monorepo_project["path"],
+                    )
+    except Exception:
+        pass
+
+    tag = _get_last_tag(tag_glob=tag_glob)
     commits = _get_commits_since(tag)
+
+    # In monorepo mode, filter to commits touching this project's files
+    if monorepo_project and commits:
+        commit_shas = set(c["hash"] for c in commits)
+        filtered = filter_commits_for_project(commit_shas, monorepo_project)
+        commits = [c for c in commits if c["hash"] in filtered]
 
     if not commits:
         if flags.get("json"):

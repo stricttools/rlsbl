@@ -251,14 +251,102 @@ class TestStatusCommitsAheadMonorepo:
         assert "commits ahead" not in out
         assert not any(line.startswith(WARN_PREFIX) for line in out.splitlines())
 
+    def test_monorepo_directory_filtering_excludes_other_projects(self, mock_git_repo, capsys):
+        """Commits touching only another project's files are excluded from the count.
+
+        alpha and beta both tagged, then commits are added touching only
+        beta's files. alpha should show 0 commits ahead (no warning),
+        not count beta's commits.
+        """
+        _cmd_init({})
+
+        alpha = mock_git_repo / "alpha"
+        alpha.mkdir()
+        with open(alpha / "package.json", "w") as f:
+            json.dump({"name": "alpha", "version": "1.0.0"}, f)
+        _cmd_add(["alpha"], {})
+
+        beta = mock_git_repo / "beta"
+        beta.mkdir()
+        with open(beta / "package.json", "w") as f:
+            json.dump({"name": "beta", "version": "1.0.0"}, f)
+        _cmd_add(["beta"], {})
+
+        # Tag both at the same commit
+        subprocess.run(["git", "tag", "alpha@v1.0.0"], cwd=str(mock_git_repo), check=True)
+        subprocess.run(["git", "tag", "beta@v1.0.0"], cwd=str(mock_git_repo), check=True)
+
+        # Add commits touching ONLY beta's files
+        _commit_file(mock_git_repo, "beta/x.txt", message="beta change 1")
+        _commit_file(mock_git_repo, "beta/y.txt", message="beta change 2")
+
+        from rlsbl.commands.status import run_cmd
+
+        # alpha: no commits touch its files -> no warning
+        capsys.readouterr()
+        os.chdir(str(alpha))
+        run_cmd("npm", [], {})
+        alpha_out = capsys.readouterr().out
+        alpha_warnings = [l for l in alpha_out.splitlines() if l.startswith(WARN_PREFIX)]
+        assert len(alpha_warnings) == 0, (
+            f"alpha should have no warning (commits only touch beta), "
+            f"got: {alpha_warnings}"
+        )
+
+        # beta: 2 commits touch its files -> warning
+        capsys.readouterr()
+        os.chdir(str(beta))
+        run_cmd("npm", [], {})
+        beta_out = capsys.readouterr().out
+        beta_warnings = [l for l in beta_out.splitlines() if l.startswith(WARN_PREFIX)]
+        assert len(beta_warnings) == 1
+        assert "2 commits ahead" in beta_warnings[0]
+
+    def test_monorepo_directory_filtering_json(self, mock_git_repo, capsys):
+        """JSON output reflects directory-filtered commit counts."""
+        _cmd_init({})
+
+        alpha = mock_git_repo / "alpha"
+        alpha.mkdir()
+        with open(alpha / "package.json", "w") as f:
+            json.dump({"name": "alpha", "version": "1.0.0"}, f)
+        _cmd_add(["alpha"], {})
+
+        beta = mock_git_repo / "beta"
+        beta.mkdir()
+        with open(beta / "package.json", "w") as f:
+            json.dump({"name": "beta", "version": "1.0.0"}, f)
+        _cmd_add(["beta"], {})
+
+        subprocess.run(["git", "tag", "alpha@v1.0.0"], cwd=str(mock_git_repo), check=True)
+        subprocess.run(["git", "tag", "beta@v1.0.0"], cwd=str(mock_git_repo), check=True)
+
+        # One commit touches alpha, two touch beta
+        _commit_file(mock_git_repo, "alpha/a.txt", message="alpha change")
+        _commit_file(mock_git_repo, "beta/b1.txt", message="beta change 1")
+        _commit_file(mock_git_repo, "beta/b2.txt", message="beta change 2")
+
+        from rlsbl.commands.status import run_cmd
+
+        capsys.readouterr()
+        os.chdir(str(alpha))
+        run_cmd("npm", [], {"json": True})
+        data = json.loads(capsys.readouterr().out)
+        assert data["commits_ahead"] == 1
+
+        capsys.readouterr()
+        os.chdir(str(beta))
+        run_cmd("npm", [], {"json": True})
+        data = json.loads(capsys.readouterr().out)
+        assert data["commits_ahead"] == 2
+
     def test_monorepo_warns_only_for_projects_with_unreleased_commits(self, mock_git_repo, capsys):
         """Two projects: only the one whose tag is behind HEAD shows the warning.
 
         Each project uses its own scoped tag (alpha@v* vs beta@v*), so a
         project whose tag is AT HEAD has no commits ahead, while a project
-        whose tag is older has commits ahead. Because the range is purely
-        tag-based (not path-scoped), beta's count is independent of which
-        files the unreleased commits touch.
+        whose tag is older has commits ahead. Directory filtering ensures
+        only commits touching the project's files are counted.
         """
         _cmd_init({})
         # alpha: older tag, will have unreleased commits
