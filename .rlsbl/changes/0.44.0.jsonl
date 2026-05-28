@@ -1,0 +1,8 @@
+{"commits":["5bab9d2a3ff6cda81e279c4dac90a2d4f1fd3c29","b9e8b4b0d173e1584dd63efd97995219def85158"],"user_facing":true,"description":"**Breaking.** `release retry` is now dispatch-only. It no longer deletes/re-creates the GitHub Release or re-uploads assets. It dispatches workflows from `retry.toml` via `gh workflow run`. Schema simplified to 3 fields: `version`, `dispatch`, `ref`.","type":"breaking"}
+{"commits":["3e7f24577d3b0f8a31ce2c0617d19058d8be2bcd"],"user_facing":false}
+{"commits":["0bd0d98169330fcdbc04c8b701db14f02df39157","3e9d03b4172acd49c12771826723fd7936a502c6","f493cf34d341a41a1fca8e4b36cfbbe4a5848430"],"user_facing":false}
+{"commits":["7b702db35b1bd01635710a5be9d4e0ddc6d9c30a","2698c9c7e7c38387fab8dd28e54fe95324d351dc","07b1f8a6d8bea988911660223655533c2dde8572","bed3e12396dfc90318f2c88555a90c8a57fa41a3"],"user_facing":false}
+{"commits":["2d14cae61df15e95c86479c9f5a6e83f07317d47","513099ff94f3974758927a3e48429218b477f11f","b1a2d95bff581bd7284e05c6fa422c799ad9dc67","fb2886cd2e2f409c1b44f408484f9e083a0fe908","b0cd014f9868e6f91e37a49f2665319c7bbd6ea8"],"user_facing":false}
+{"commits":["fbfd8a84ce66c0d14f1d83b8d8e7b486694363db"],"user_facing":false}
+{"commits":["c79f5651d71cb7b87b646b0dc54770a2c8dbe50d"],"user_facing":false}
+{"commits":["49b605f54a53432b32f441a513013cb1674e8910"],"user_facing":false}
