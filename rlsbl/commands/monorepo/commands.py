@@ -12,12 +12,13 @@ from ...workspace_graph import WorkspaceGraph
 from ...targets import detect_targets, TARGETS, TargetEntry
 
 
-def _cmd_init(flags):
-    ws_file = os.path.join(".", WORKSPACE_DIR, WORKSPACE_FILE)
+def _cmd_init(flags, project_root=None):
+    root_dir = str(project_root) if project_root else "."
+    ws_file = os.path.join(root_dir, WORKSPACE_DIR, WORKSPACE_FILE)
     if os.path.isfile(ws_file):
         print("Error: Workspace already initialized.", file=sys.stderr)
         sys.exit(1)
-    save_workspace(".", [])
+    save_workspace(root_dir, [])
     print("Initialized monorepo workspace in .rlsbl-monorepo/")
 
     rel_ws_file = os.path.join(WORKSPACE_DIR, WORKSPACE_FILE)
@@ -29,7 +30,7 @@ def _cmd_init(flags):
     commit_files("monorepo: init workspace", [rel_ws_file], allow_failure=True)
 
 
-def _cmd_add(args, flags):
+def _cmd_add(args, flags, project_root=None):
     if not args:
         print("Error: Usage: rlsbl monorepo add <path> [--name <name>]", file=sys.stderr)
         sys.exit(1)
@@ -71,7 +72,8 @@ def _cmd_add(args, flags):
             print(f"Error: --library must be 'true' or 'false', got '{library_raw}'.", file=sys.stderr)
             sys.exit(1)
 
-    root = find_workspace_root(".")
+    start = str(project_root) if project_root else "."
+    root = find_workspace_root(start)
     if root is None:
         print("Error: No workspace found. Run 'rlsbl monorepo init' first.", file=sys.stderr)
         sys.exit(1)
@@ -151,14 +153,15 @@ def _cmd_add(args, flags):
         pass
 
 
-def _cmd_remove(args, flags):
+def _cmd_remove(args, flags, project_root=None):
     if not args:
         print("Error: Usage: rlsbl monorepo remove <path>", file=sys.stderr)
         sys.exit(1)
 
     path = args[0]
 
-    root = find_workspace_root(".")
+    start = str(project_root) if project_root else "."
+    root = find_workspace_root(start)
     if root is None:
         print("Error: No workspace found. Run 'rlsbl monorepo init' first.", file=sys.stderr)
         sys.exit(1)
@@ -176,8 +179,9 @@ def _cmd_remove(args, flags):
     print(f"Removed project at {path}")
 
 
-def _cmd_list(flags):
-    root = find_workspace_root(".")
+def _cmd_list(flags, project_root=None):
+    start = str(project_root) if project_root else "."
+    root = find_workspace_root(start)
     if root is None:
         print("Error: No workspace found. Run 'rlsbl monorepo init' first.", file=sys.stderr)
         sys.exit(1)
@@ -196,8 +200,9 @@ def _cmd_list(flags):
         print(f"{name_col}  {proj['path']}")
 
 
-def _cmd_status(flags):
-    root = find_workspace_root(".")
+def _cmd_status(flags, project_root=None):
+    start = str(project_root) if project_root else "."
+    root = find_workspace_root(start)
     if root is None:
         print("Error: No workspace found. Run 'rlsbl monorepo init' first.", file=sys.stderr)
         sys.exit(1)
@@ -444,8 +449,9 @@ def _evaluate_constraint(constraint, current_version):
     return "versioned"
 
 
-def _cmd_outdated(flags):
-    root = find_workspace_root(".")
+def _cmd_outdated(flags, project_root=None):
+    start = str(project_root) if project_root else "."
+    root = find_workspace_root(start)
     if root is None:
         print("Error: No workspace found. Run 'rlsbl monorepo init' first.", file=sys.stderr)
         sys.exit(1)
@@ -512,8 +518,9 @@ def _cmd_outdated(flags):
         print(line)
 
 
-def _cmd_release_order(flags):
-    root = find_workspace_root(".")
+def _cmd_release_order(flags, project_root=None):
+    start = str(project_root) if project_root else "."
+    root = find_workspace_root(start)
     if root is None:
         print("Error: No workspace found. Run 'rlsbl monorepo init' first.", file=sys.stderr)
         sys.exit(1)
@@ -548,7 +555,7 @@ def _cmd_release_order(flags):
             print(f"  {i}. {name}")
 
 
-def _cmd_check_names(args, flags):
+def _cmd_check_names(args, flags, project_root=None):
     target = flags.get("target")
     if not target:
         print("Error: --target is required. Usage: rlsbl monorepo check-names --target <npm|pypi|go>", file=sys.stderr)
@@ -558,7 +565,8 @@ def _cmd_check_names(args, flags):
     suffix = flags.get("suffix", "")
     delay_ms = int(flags.get("delay", "200"))
 
-    root = find_workspace_root(".")
+    start = str(project_root) if project_root else "."
+    root = find_workspace_root(start)
     if root is None:
         print("Error: No workspace found. Run 'rlsbl monorepo init' first.", file=sys.stderr)
         sys.exit(1)

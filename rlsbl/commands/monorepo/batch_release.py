@@ -20,9 +20,10 @@ from ...workspace import find_workspace_root, load_workspace
 from ...workspace_graph import CycleError, WorkspaceGraph
 
 
-def _cmd_batch_release(flags):
+def _cmd_batch_release(flags, project_root=None):
     """Execute a batch release of multiple monorepo packages."""
-    workspace_root = find_workspace_root(".")
+    start = str(project_root) if project_root else "."
+    workspace_root = find_workspace_root(start)
     if workspace_root is None:
         print(
             "Error: No workspace found. Run 'rlsbl monorepo init' first.",
@@ -107,7 +108,8 @@ def _cmd_batch_release(flags):
                 "quiet": quiet,
                 "allow-dirty": flags.get("allow-dirty", False),
             }
-            run_cmd(release_config, release_flags)
+            from pathlib import Path
+            run_cmd(release_config, release_flags, project_root=Path(project_dir))
             released.append(pkg_name)
         except SystemExit as e:
             if e.code != 0:

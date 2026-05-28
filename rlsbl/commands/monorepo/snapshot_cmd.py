@@ -8,9 +8,10 @@ from ...workspace import find_workspace_root, load_workspace
 from ...workspace_graph import WorkspaceGraph
 
 
-def _cmd_snapshot(flags):
+def _cmd_snapshot(flags, project_root=None):
     """Generate or check the monorepo snapshot."""
-    root = find_workspace_root(".")
+    start = str(project_root) if project_root else "."
+    root = find_workspace_root(start)
     if root is None:
         print("Error: No workspace found. Run 'rlsbl monorepo init' first.", file=sys.stderr)
         sys.exit(1)

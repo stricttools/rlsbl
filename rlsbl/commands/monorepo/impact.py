@@ -132,9 +132,10 @@ def _render_json(impact_data):
     return json.dumps(impact_data, indent=2)
 
 
-def _cmd_impact(args, flags):
+def _cmd_impact(args, flags, project_root=None):
     """Analyze the impact of changes on the monorepo dependency graph."""
-    root = find_workspace_root(".")
+    start = str(project_root) if project_root else "."
+    root = find_workspace_root(start)
     if root is None:
         print(
             "Error: No workspace found. Run 'rlsbl monorepo init' first.",
