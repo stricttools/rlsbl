@@ -1,3 +1,0 @@
-bump = "minor"
-include = ["npm", "pypi", "docs"]
-exclude = []
