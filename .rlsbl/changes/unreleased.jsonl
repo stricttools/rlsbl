@@ -3,3 +3,4 @@
 {"commits":["0ef04c4d73933de4da1536f8ed4ea675f5a90f2f"],"user_facing":true,"description":"**Improvement.** The `plain` release target now bumps `pyproject.toml` version when present, keeping it in sync with `VERSION`.","type":"feature"}
 {"commits":["e5c33678d49664b9907929565dd374d1d50c41e7"],"user_facing":true,"description":"**Breaking.** `push_timeout` must now be explicitly set in `.rlsbl/config.json` or via `RLSBL_PUSH_TIMEOUT` env var. The implicit 120-second default is removed.","type":"breaking"}
 {"commits":["82bceb00c061968e3f29262655db748a86ccde89","fe2715eebbb9c650fec300b6f5af2400e27ee48c","8a569f15d38112c1fc4605cdd7d3546e660ecd66"],"user_facing":false}
+{"commits":["9d5406745ecdcb4dda57a9aa9720589d39ef72ab"],"user_facing":false}
