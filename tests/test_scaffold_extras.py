@@ -85,12 +85,11 @@ def test_force_does_not_overwrite_license(tmp_project):
         force=True, update=False,
     )
 
-    # LICENSE must be skipped as user-owned, not overwritten
-    assert license_file.read_text() == "MIT License\n\nCopyright (c) 2025 Custom Author\n"
-    skipped_targets = [t for t, _ in skipped]
-    assert "LICENSE" in skipped_targets
+    # LICENSE is user-owned (not overwritten with template content),
+    # but the copyright year is always updated
+    assert license_file.read_text() == "MIT License\n\nCopyright (c) 2025-2026 Custom Author\n"
     created_targets = [t for t, _ in created]
-    assert "LICENSE" not in created_targets
+    assert "LICENSE" in created_targets
 
 
 def test_template_author_never_literal(tmp_project):

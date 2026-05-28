@@ -292,7 +292,7 @@ def plan_mappings(template_dir, mappings, vars_dict, force, update=False):
         # --- User-owned files: never overwrite (even with --force),
         # except LICENSE gets its copyright year updated on --update.
         if os.path.exists(target) and target in USER_OWNED:
-            if update and target == "LICENSE":
+            if target == "LICENSE":
                 from datetime import datetime
                 current_year = str(datetime.now().year)
                 with open(target, "r", encoding="utf-8") as f:
@@ -859,16 +859,7 @@ def _resolve_private(flags):
     if "private" in config:
         return bool(config["private"])
 
-    # On --update, auto-detect and persist to config
-    if flags.get("update"):
-        detected = is_private_repo()
-        value = detected if detected is not None else False
-        write_project_config("private", value)
-        label = "private repo" if value else "public repo"
-        print(f"Auto-detected private: {str(value).lower()} ({label}). Written to config.json.")
-        return value
-
-    # Auto-detect via GitHub API (new scaffold only)
+    # Auto-detect via GitHub API
     detected = is_private_repo()
     if detected is not None:
         return detected
@@ -1360,70 +1351,63 @@ def _plan_merged_publish(publish_target, merged_content, force, update):
             "content": merged_content,
             "base_content": merged_content,
         }
-    if update:
-        with open(publish_target, "r", encoding="utf-8") as f:
-            ours = f.read()
-        base = _load_base(publish_target)
-        if base is None:
-            if ours == merged_content:
-                return {
-                    "target": publish_target,
-                    "status": "unchanged, base seeded",
-                    "bucket": "skipped",
-                    "action": "save_base_only",
-                    "base_content": merged_content,
-                }
+    with open(publish_target, "r", encoding="utf-8") as f:
+        ours = f.read()
+    base = _load_base(publish_target)
+    if base is None:
+        if ours == merged_content:
             return {
                 "target": publish_target,
-                "status": "no base -- run scaffold --force to enable merging",
+                "status": "unchanged, base seeded",
                 "bucket": "skipped",
                 "action": "save_base_only",
                 "base_content": merged_content,
-                "warning": (
-                    f"{publish_target}: no base stored, cannot merge; "
-                    "run scaffold --force to reset"
-                ),
-            }
-        if ours == base:
-            return {
-                "target": publish_target,
-                "status": "updated",
-                "bucket": "created",
-                "action": "write",
-                "content": merged_content,
-                "base_content": merged_content,
-            }
-        if base == merged_content or ours == merged_content:
-            return {
-                "target": publish_target,
-                "status": "unchanged",
-                "bucket": "skipped",
-                "action": "none",
-            }
-        merged_text, has_conflicts = _three_way_merge(ours, base, merged_content)
-        if has_conflicts:
-            return {
-                "target": publish_target,
-                "status": "CONFLICTS -- resolve manually",
-                "bucket": "created",
-                "action": "write",
-                "content": merged_text,
-                "base_content": merged_content,
-                "warning": f"{publish_target}: merge conflicts detected, resolve manually",
             }
         return {
             "target": publish_target,
-            "status": "merged",
+            "status": "no base -- run scaffold --force to enable merging",
+            "bucket": "skipped",
+            "action": "save_base_only",
+            "base_content": merged_content,
+            "warning": (
+                f"{publish_target}: no base stored, cannot merge; "
+                "run scaffold --force to reset"
+            ),
+        }
+    if ours == base:
+        return {
+            "target": publish_target,
+            "status": "updated",
+            "bucket": "created",
+            "action": "write",
+            "content": merged_content,
+            "base_content": merged_content,
+        }
+    if base == merged_content or ours == merged_content:
+        return {
+            "target": publish_target,
+            "status": "unchanged",
+            "bucket": "skipped",
+            "action": "none",
+        }
+    merged_text, has_conflicts = _three_way_merge(ours, base, merged_content)
+    if has_conflicts:
+        return {
+            "target": publish_target,
+            "status": "CONFLICTS -- resolve manually",
             "bucket": "created",
             "action": "write",
             "content": merged_text,
             "base_content": merged_content,
+            "warning": f"{publish_target}: merge conflicts detected, resolve manually",
         }
     return {
         "target": publish_target,
-        "status": "exists",
-        "bucket": "skipped",
-        "action": "none",
+        "status": "merged",
+        "bucket": "created",
+        "action": "write",
+        "content": merged_text,
+        "base_content": merged_content,
     }
 
 
