@@ -35,7 +35,8 @@ def run_cmd():
     target_names = [e.name for e in entries]
 
     doc = tomlkit.document()
-    doc.add("bump", "patch")
+    doc.add(tomlkit.comment("Version bump type: patch, minor, or major"))
+    doc.add("bump", "")
     doc.add("include", target_names)
     doc.add("exclude", [])
 
