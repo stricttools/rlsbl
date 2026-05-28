@@ -2,6 +2,21 @@
 
 # Changelog
 
+## 0.45.0
+
+### Breaking
+
+- **Breaking.** `push_timeout` must now be explicitly set in `.rlsbl/config.json` or via `RLSBL_PUSH_TIMEOUT` env var. The implicit 120-second default is removed.
+
+### Features
+
+- **Improvement.** The `plain` release target now bumps `pyproject.toml` version when present, keeping it in sync with `VERSION`.
+
+### Fixes
+
+- **Bug fix.** `release run` now correctly applies directory scoping for monorepo changelog validation, matching `rlsbl check --tag changelog` behavior.
+- **Bug fix.** Changelog checks now use the target-specific tag pattern in monorepos (e.g., `go/v*` for Go targets instead of `go@v*`).
+
 ## 0.44.0
 
 ### Breaking
