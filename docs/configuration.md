@@ -1,5 +1,5 @@
 ---
-description: "Configuration reference for rlsbl: config.json with target selection, tagging, push timeout, publish settings, and deploy targets across 14 registries; workspace.toml for monorepos; and selfdoc.json."
+description: "Configuration reference for rlsbl: config.json settings, workspace.toml for monorepos, and selfdoc.json for documentation."
 ---
 
 # Configuration reference
