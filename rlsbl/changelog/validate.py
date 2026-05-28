@@ -22,7 +22,7 @@ _BATCH_LIMITS_DEFAULTS = {
 }
 
 
-def _get_batch_limits_config() -> dict:
+def _get_batch_limits_config(project_root=None) -> dict:
     """Return the resolved batch_limits config with defaults applied.
 
     Reads the raw ``batch_limits`` section via
@@ -36,7 +36,7 @@ def _get_batch_limits_config() -> dict:
     If any key is missing or has the wrong type, the default is used and a
     warning is emitted on stderr.
     """
-    raw = get_changelog_validation_config() or {}
+    raw = get_changelog_validation_config(project_root) or {}
     resolved: dict = {}
 
     for key, default in _BATCH_LIMITS_DEFAULTS.items():

@@ -82,9 +82,9 @@ def save_hashes(hashes):
         f.write("\n")
 
 
-def _ensure_target_in_config(registry_name):
+def _ensure_target_in_config(registry_name, project_root=None):
     """Add registry_name to the targets array in .rlsbl/config.json if not already present."""
-    config = read_project_config()
+    config = read_project_config(project_root)
     targets = config.get("targets", [])
     if not isinstance(targets, list):
         targets = []
@@ -97,7 +97,7 @@ def _ensure_target_in_config(registry_name):
             existing_names.append(t.get("name", ""))
     if registry_name not in existing_names:
         targets.append(registry_name)
-    write_project_config("targets", targets)
+    write_project_config("targets", targets, project_root)
 
 
 NEXT_STEPS = {
@@ -682,7 +682,8 @@ def _install_or_update_pre_push_hook():
 
 def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnings,
                        registry=None, flags=None, registries=None,
-                       npm_lockfile_missing=False, target_paths=None):
+                       npm_lockfile_missing=False, target_paths=None,
+                       project_root=None):
     """Shared post-processing for scaffold: chmod, hooks, version marker, hashes, tagging, summary.
 
     all_hash_dicts is a list of dicts to merge into existing_hashes.
@@ -727,7 +728,7 @@ def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnin
     save_hashes(existing_hashes)
 
     # Ecosystem tagging
-    if should_tag(flags):
+    if should_tag(flags, project_root):
         ensure_tags(registries, target_paths=target_paths)
 
     # Print unified file list with dot-padded status column
@@ -838,7 +839,7 @@ def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnin
         print("Committed scaffold changes.")
 
 
-def _resolve_private(flags):
+def _resolve_private(flags, project_root=None):
     """Determine if this is a private repository.
 
     Checks --private flag first, then saved config, then auto-detects via GitHub API.
@@ -850,7 +851,7 @@ def _resolve_private(flags):
         return True
 
     # Check saved config
-    config = read_project_config()
+    config = read_project_config(project_root)
     if "private" in config:
         return bool(config["private"])
 
@@ -867,9 +868,9 @@ def _filter_mappings_for_private(mappings):
     return [m for m in mappings if "publish" not in m["template"]]
 
 
-def _append_deploy_workflow_if_configured(mappings):
+def _append_deploy_workflow_if_configured(mappings, project_root=None):
     """Add deploy workflow template to mappings if deploy config exists."""
-    deploy_targets, _ = read_deploy_config()
+    deploy_targets, _ = read_deploy_config(project_root)
     if deploy_targets:
         mappings = list(mappings)
         mappings.append({

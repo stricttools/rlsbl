@@ -21,7 +21,7 @@ _filter_commits_for_project = filter_commits_for_project
 DEFAULT_RELEASE_BRANCHES = ["main", "master"]
 
 
-def _get_release_branches():
+def _get_release_branches(project_root=None):
     """Return the configured release-branch list.
 
     Reads ``release_branches`` from ``.rlsbl/config.json`` if present;
@@ -32,7 +32,7 @@ def _get_release_branches():
     disable the manual-release-push warning, which is almost never
     what the user wants; require explicit removal of the key instead.
     """
-    config = read_project_config()
+    config = read_project_config(project_root)
     if "release_branches" not in config:
         return list(DEFAULT_RELEASE_BRANCHES)
     branches = config["release_branches"]

@@ -332,10 +332,14 @@ def cmd_scaffold(target, force, private, no_commit, skip_shared, no_tag, dry_run
     # root when inside a sub-project.
     from .utils import find_project_root
     cwd_has_project = bool(detect_registries())
+    scaffold_root = None
     if not cwd_has_project:
         root = find_project_root()
         if root is not None:
             os.chdir(root)
+            scaffold_root = Path(root)
+    else:
+        scaffold_root = Path.cwd()
 
     flags = {
         "force": force,
@@ -364,7 +368,7 @@ def cmd_scaffold(target, force, private, no_commit, skip_shared, no_tag, dry_run
             sys.exit(1)
         # Warn when auto-detection is used without explicit config
         from .config import read_project_config
-        cfg = read_project_config()
+        cfg = read_project_config(scaffold_root)
         if "targets" not in cfg:
             print(
                 f"Note: Auto-detected target(s): {', '.join(regs)}. "

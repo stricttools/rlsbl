@@ -609,7 +609,7 @@ def register_checks(app):
         original_cwd = os.getcwd()
         try:
             os.chdir(ctx.project_root)
-            batch_config = _get_batch_limits_config()
+            batch_config = _get_batch_limits_config(ctx.project_root)
         finally:
             os.chdir(original_cwd)
 
@@ -635,7 +635,7 @@ def register_checks(app):
         original_cwd = os.getcwd()
         try:
             os.chdir(ctx.project_root)
-            batch_config = _get_batch_limits_config()
+            batch_config = _get_batch_limits_config(ctx.project_root)
             entries_by_version = _read_all_versioned_entries(changes_dir)
         finally:
             os.chdir(original_cwd)
