@@ -257,7 +257,7 @@ def cmd_release_init(**_kwargs):
 
 @release_group.command(
     name="retry",
-    help="Re-create a GitHub Release to re-trigger CI/CD workflows. Reads configuration from .rlsbl/releases/retry.toml, which is auto-scaffolded if missing. Verifies the release exists, deletes it, and re-creates it with the same changelog notes, firing a new release published event. Re-uploads assets if configured. Falls back to gh workflow run if no CI runs appear.",
+    help="Dispatch CI/CD workflows for a completed release via gh workflow run. Reads the dispatch list and ref from .rlsbl/releases/retry.toml, which is auto-scaffolded with sensible defaults if missing. Verifies the GitHub Release exists before dispatching. Each workflow in the dispatch list is triggered against the configured ref (defaults to the release tag).",
     mutex=[
         strictcli.MutexGroup(flags=[
             strictcli.Flag(name="watch", type=bool, negatable=False, help="After retry, automatically watch CI runs to completion"),
