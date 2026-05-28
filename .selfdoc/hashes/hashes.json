@@ -104,7 +104,7 @@
     "description": "85a3ab93738e01a1b279590b81e3dcbc173e3df46161a6f75c68e3743eb53f04"
   },
   "en/ci-customization.md": {
-    "content": "0017b4176bab0b709a10431f48880737dfa56c63924c63268a47d0289965fd2d",
+    "content": "6ca3fe39c2f1a77fdfc2220fb8b8ff2d983c5a0fcc023414b10b669c063f9857",
     "description": "cd270279509f6c0f32ff0a31c7271fc3f4950e6ff4248cb1009cf56da0894333"
   },
   "en/cli-changelog.md": {
@@ -144,7 +144,7 @@
     "description": "92c829699be90c4ea09e05c6e0ff3830b755bdd05be47a9427e51074cedcb831"
   },
   "en/cli-index.md": {
-    "content": "78f7b358caa667b604b9c069e31b0fda01f79965142d3cf232856d55f90c7949",
+    "content": "a5ec2e98512fd9e1e7732ee0fc9d9ba4a240bac04a29667f78929d2d53712233",
     "description": "0f01533cb10562a220aa70ea5e33e2500c0c1e4aa8e16b2f80c532449a68b7ea"
   },
   "en/cli-migrate.md": {
@@ -176,7 +176,7 @@
     "description": "4437506314b7ca982c6cd8ae65c5f2be7e3f33143fc5f3f6aed9e64077bba20f"
   },
   "en/cli-scaffold.md": {
-    "content": "abd160fa03e1a929fe87e20d855ac2fb3b13358c09433f16408a863bc958e876",
+    "content": "a7836150dbd37b2809ad445fb1545d1021439f7d3d1aa7a92916d2bde54c597f",
     "description": "31acd7c7109c3c875b03d8e9de68bd48c636fff5abb1297a5f5d2e9000de6547"
   },
   "en/cli-status.md": {
@@ -204,7 +204,7 @@
     "description": "f934ebcc70f1b9dc3c86b2020fcfac4db46bd2cd252d78e4d5989f59cc429886"
   },
   "en/configuration.md": {
-    "content": "6d553b0c11abb28e54752cdc2e1789034843b5e1b69081f059d8a2ce1f646fb3",
+    "content": "724273541ab09b1359c37e83582a30015fc7dd81149cf083a1004c25465680cc",
     "description": "85a3ab93738e01a1b279590b81e3dcbc173e3df46161a6f75c68e3743eb53f04"
   },
   "en/gen-index.md": {
@@ -288,7 +288,7 @@
     "description": "77349d50382ca6c0faf97553b8abf8c24bb360c895f32005f7de62abdf1bbe75"
   },
   "en/rlsbl-commands-init_cmd.md": {
-    "content": "0198c035bb4ea852d5ebcbff028271e02b07e74364f5f915121b61cff3c4215f",
+    "content": "3636599c3d535493cb235eaec3adc1b32e5299e90042e069d95cc60793c2e643",
     "description": "b4a7db2e3882de4af592870ee977b98522a4635188b12262d78e7441b533611c"
   },
   "en/rlsbl-commands-migrate.md": {
@@ -588,7 +588,7 @@
     "description": "cbc6efd4505a9d5f40720a9c4b6607789053bc8eb9137163a99e5e3ca41e240e"
   },
   "en/rlsbl.md": {
-    "content": "861394ca28c5a61b9e6a050c8404937dcd1d88504711ba3b1ca4f85fbe7733a5",
+    "content": "665004a52bff554774c1ec6a7556eddac6bc0d9bc18a66acc2721f5575f49382",
     "description": "846d7106c20777b824e0116e8e62127eb6c86ab277fe4904e1cbecc2e9839d43"
   },
   "en/targets.md": {
