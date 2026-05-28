@@ -15,7 +15,7 @@ import sys
 
 import tomlkit
 
-from ..release_file import RetryConfig, get_retry_file_path, read_retry_file
+from ..release_file import get_retry_file_path, read_retry_file
 from ..targets import TARGETS, detect_targets
 from ..utils import check_gh_auth, check_gh_installed, run
 from ..workspace import find_workspace_root, resolve_project
