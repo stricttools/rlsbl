@@ -66,9 +66,9 @@ class DartTarget(BaseTarget):
         os.replace(tmp_path, pubspec)
         return [self.version_file()]
 
-    def _compute_version_with_build_number(self, old_version, new_semver, dir_path):
+    def _compute_version_with_build_number(self, old_version, new_semver, dir_path, project_root=None):
         """Determine the full version string including build number handling."""
-        config = read_project_config()
+        config = read_project_config(project_root)
         build_config = config.get("build_number", {})
         enabled = build_config.get("enabled", False)
         strategy = build_config.get("strategy", "increment")

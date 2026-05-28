@@ -242,9 +242,9 @@ class GoTarget(BaseTarget):
             os.path.dirname(os.path.dirname(__file__)), "templates", "go"
         )
 
-    def template_vars(self, dir_path):
+    def template_vars(self, dir_path, project_root=None):
         """Extract template variables from go.mod and .rlsbl/config.json."""
-        config = read_project_config()
+        config = read_project_config(project_root)
         name = self._read_module_path(dir_path)
 
         # Derive short name from module path (last segment)
@@ -371,10 +371,10 @@ class GoTarget(BaseTarget):
             # npm wrapper scaffolding is in shared_template_mappings()
         return mappings
 
-    def shared_template_mappings(self):
+    def shared_template_mappings(self, project_root=None):
         mappings = super().shared_template_mappings()
         if not self._is_library("."):
-            config = read_project_config()
+            config = read_project_config(project_root)
             npm_wrapper_config = config.get("npm_wrapper", {})
             if npm_wrapper_config.get("scope"):
                 mappings.extend(npm_wrapper_template_mappings())

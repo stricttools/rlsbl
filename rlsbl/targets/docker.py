@@ -20,9 +20,9 @@ class DockerTarget(BaseTarget):
     def detect(self, dir_path):
         return os.path.exists(os.path.join(dir_path, "Dockerfile"))
 
-    def read_name(self, dir_path):
+    def read_name(self, dir_path, project_root=None):
         """Return image name from config or directory name."""
-        config = read_project_config()
+        config = read_project_config(project_root)
         docker_config = config.get("docker", {})
         image = docker_config.get("image")
         if image:
@@ -61,9 +61,9 @@ class DockerTarget(BaseTarget):
     def tag_format(self, version):
         return f"v{version}"
 
-    def publish(self, dir_path, version):
+    def publish(self, dir_path, version, project_root=None):
         """Build and push Docker image to the configured registry."""
-        pub_config = get_publish_config(self.name)
+        pub_config = get_publish_config(self.name, project_root)
 
         if pub_config.get("local") is False:
             print(f"Skipping local {self.name} publish (config: local=false). CI will handle it.")
@@ -85,7 +85,7 @@ class DockerTarget(BaseTarget):
             print(f"Skipping local docker publish (no {username_var}/{password_var}). CI will handle it.")
             return
 
-        config = read_project_config()
+        config = read_project_config(project_root)
         docker_config = config.get("docker", {})
         image = docker_config.get("image")
         registry = docker_config.get("registry")
@@ -119,9 +119,9 @@ class DockerTarget(BaseTarget):
             os.path.dirname(os.path.dirname(__file__)), "templates", "docker"
         )
 
-    def template_vars(self, dir_path):
+    def template_vars(self, dir_path, project_root=None):
         """Extract template variables from config and git."""
-        config = read_project_config()
+        config = read_project_config(project_root)
         docker_config = config.get("docker", {})
         image = docker_config.get("image", "")
         registry = docker_config.get("registry", "")
