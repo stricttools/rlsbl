@@ -4,8 +4,12 @@ import os
 import sys
 
 
-def run_cmd():
-    """Create .rlsbl/releases/unreleased.toml with auto-detected targets."""
+def run_cmd(project_root=None):
+    """Create .rlsbl/releases/unreleased.toml with auto-detected targets.
+
+    Args:
+        project_root: Path to the project root directory, or None for cwd.
+    """
     import tomlkit
 
     from ..release_file import get_release_file_path
@@ -13,10 +17,11 @@ def run_cmd():
     from ..workspace import find_workspace_root, resolve_project
 
     # In monorepo mode, create the release file in the package's directory
-    project_dir = "."
-    monorepo_root = find_workspace_root(".")
+    start_path = str(project_root) if project_root else "."
+    project_dir = start_path
+    monorepo_root = find_workspace_root(start_path)
     if monorepo_root:
-        project = resolve_project(monorepo_root, ".")
+        project = resolve_project(monorepo_root, start_path)
         if project is not None:
             project_dir = os.path.join(monorepo_root, project["path"])
 

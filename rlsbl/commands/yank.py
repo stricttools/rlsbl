@@ -9,7 +9,7 @@ from ..utils import run, check_gh_installed, check_gh_auth
 from ..workspace import find_workspace_root, resolve_project
 
 
-def run_cmd(args, flags):
+def run_cmd(args, flags, project_root=None):
     """Yank a past GitHub Release.
 
     Default (soft): mark as pre-release and prepend a deprecation notice.
@@ -17,6 +17,11 @@ def run_cmd(args, flags):
 
     In monorepo mode, uses the project's monorepo tag format (e.g.
     ``mylib@v1.2.3``) instead of the plain ``v1.2.3`` tag.
+
+    Args:
+        args: Positional args; first element is the version to yank.
+        flags: dict with keys ``dry-run``, ``yes``, ``hard``, ``reason``, ``use``.
+        project_root: Path to the project root directory, or None for cwd.
     """
     dry_run = flags.get("dry-run", False)
     hard = flags.get("hard", False)
@@ -34,15 +39,16 @@ def run_cmd(args, flags):
     # Detect monorepo context and build tag accordingly
     monorepo_name = None
     monorepo_project_path = None
-    monorepo_root = find_workspace_root(".")
+    start_path = str(project_root) if project_root else "."
+    monorepo_root = find_workspace_root(start_path)
     if monorepo_root:
-        project = resolve_project(monorepo_root, ".")
+        project = resolve_project(monorepo_root, start_path)
         if project is not None:
             monorepo_name = project["name"]
             monorepo_project_path = project["path"]
             os.chdir(monorepo_root)
 
-    version_dir = monorepo_project_path if monorepo_name else "."
+    version_dir = monorepo_project_path if monorepo_name else start_path
     entries = detect_targets(version_dir)
     if entries:
         target = TARGETS[entries[0].name]

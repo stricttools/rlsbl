@@ -29,7 +29,7 @@ def _print_summary(results):
         print(f"{step_name:<{step_width}}  {status:<{status_width}}  {remediation}")
 
 
-def run_cmd(registry, args, flags):
+def run_cmd(registry, args, flags, project_root=None):
     if not check_gh_installed():
         print("Error: gh CLI is not installed.", file=sys.stderr)
         sys.exit(1)
@@ -44,9 +44,10 @@ def run_cmd(registry, args, flags):
     # Monorepo detection
     monorepo_name = None
     monorepo_project_path = None
-    ws_root = find_workspace_root(".")
+    start_path = str(project_root) if project_root else "."
+    ws_root = find_workspace_root(start_path)
     if ws_root:
-        project = resolve_project(ws_root, ".")
+        project = resolve_project(ws_root, start_path)
         if project is None:
             print("Error: current directory is inside a monorepo but not inside any project.", file=sys.stderr)
             sys.exit(1)
@@ -99,7 +100,7 @@ def run_cmd(registry, args, flags):
     # release flow, so the pre-push hook shouldn't warn about a manual push).
     try:
         undo_push_env = {**os.environ, "RLSBL_RELEASE_PUSH": "1"}
-        run("git", ["push", "origin", f":{tag}"], timeout=get_push_timeout(), env=undo_push_env)
+        run("git", ["push", "origin", f":{tag}"], timeout=get_push_timeout(project_root=project_root), env=undo_push_env)
         results.append(("Delete remote tag", OK, "-"))
     except Exception:
         results.append(("Delete remote tag", FAILED, f"git push origin :{tag}"))
@@ -193,7 +194,7 @@ def run_cmd(registry, args, flags):
                 # hook doesn't warn about a "manual push" to the release
                 # branch -- undo is part of the release flow.
                 push_env = {**os.environ, "RLSBL_RELEASE_PUSH": "1"}
-                push_if_needed(branch, env=push_env)
+                push_if_needed(branch, env=push_env, project_root=project_root)
                 results.append(("Push", OK, "-"))
             except Exception:
                 results.append(("Push", FAILED, "git push"))

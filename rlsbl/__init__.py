@@ -260,7 +260,7 @@ def cmd_release_init(**_kwargs):
     monorepo_root = find_workspace_root(str(root))
     ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     from .commands.release_init import run_cmd
-    run_cmd()
+    run_cmd(project_root=ctx.project_root)
 
 
 @release_group.command(
@@ -297,7 +297,7 @@ def cmd_release_retry(dry_run, yes, quiet, watch, no_watch, **_kwargs):
         "watch": bool(watch),
     }
     from .commands.release_retry import run_cmd
-    run_cmd(retry_config, flags)
+    run_cmd(retry_config, flags, project_root=ctx.project_root)
 
 
 # ---------------------------------------------------------------------------
@@ -433,7 +433,7 @@ def cmd_release_edit(dry_run, version=None, **_kwargs):
     args = [version] if version else []
     flags = {"dry-run": dry_run}
     from .commands.edit_release import run_cmd
-    run_cmd(args, flags)
+    run_cmd(args, flags, project_root=ctx.project_root)
 
 
 # ---------------------------------------------------------------------------
@@ -443,9 +443,13 @@ def cmd_release_edit(dry_run, version=None, **_kwargs):
 @release_group.command(name="undo", help="Revert the most recent release by deleting the GitHub Release, removing the git tag from local and remote, and reverting the version bump commit. Requires a manual git push afterward to finalize.")
 @strictcli.flag(name="target", type=str, help="Target a specific registry", default="")
 def cmd_release_undo(target, yes, **_kwargs):
+    root = _require_project_root()
+    from .workspace import find_workspace_root
+    monorepo_root = find_workspace_root(str(root))
+    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     flags = {"yes": yes}
     from .commands.undo import run_cmd
-    run_cmd(target or None, [], flags)
+    run_cmd(target or None, [], flags, project_root=ctx.project_root)
 
 
 # ---------------------------------------------------------------------------
@@ -458,6 +462,10 @@ def cmd_release_undo(target, yes, **_kwargs):
 @strictcli.flag(name="hard", type=bool, help="Delete the release instead of marking as pre-release")
 @strictcli.arg(name="version", help="Version to yank (e.g. 0.9.1 or v0.9.1)")
 def cmd_release_yank(reason, use, hard, dry_run, yes, version, **_kwargs):
+    root = _require_project_root()
+    from .workspace import find_workspace_root
+    monorepo_root = find_workspace_root(str(root))
+    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     args = [version]
     flags = {
         "reason": reason or None,
@@ -467,7 +475,7 @@ def cmd_release_yank(reason, use, hard, dry_run, yes, version, **_kwargs):
         "yes": yes,
     }
     from .commands.yank import run_cmd
-    run_cmd(args, flags)
+    run_cmd(args, flags, project_root=ctx.project_root)
 
 
 # ---------------------------------------------------------------------------

@@ -104,7 +104,7 @@ def _cleanup_retry_file(retry_path, log):
         print(f"Warning: failed to clean up {retry_path}: {e}", file=sys.stderr)
 
 
-def run_cmd(retry_config, flags):
+def run_cmd(retry_config, flags, project_root=None):
     """Dispatch CI/CD workflows for an existing GitHub Release.
 
     Verifies the GitHub Release exists for the configured version, then
@@ -114,6 +114,7 @@ def run_cmd(retry_config, flags):
     Args:
         retry_config: RetryConfig instance, or None to auto-scaffold.
         flags: dict with keys ``dry-run``, ``yes``, ``quiet``, ``watch``.
+        project_root: Path to the project root directory, or None for cwd.
     """
     dry_run = flags.get("dry-run", False)
     quiet = flags.get("quiet", False)
@@ -134,16 +135,17 @@ def run_cmd(retry_config, flags):
     # Detect monorepo context
     monorepo_name = None
     monorepo_project_path = None
-    monorepo_root = find_workspace_root(".")
+    start_path = str(project_root) if project_root else "."
+    monorepo_root = find_workspace_root(start_path)
     if monorepo_root:
-        project = resolve_project(monorepo_root, ".")
+        project = resolve_project(monorepo_root, start_path)
         if project is not None:
             monorepo_name = project["name"]
             monorepo_project_path = project["path"]
             os.chdir(monorepo_root)
 
     # Version directory: project subdir in monorepo, repo root otherwise
-    version_dir = monorepo_project_path if monorepo_name else "."
+    version_dir = monorepo_project_path if monorepo_name else start_path
 
     # Detect primary target (needed for tag format)
     entries = detect_targets(version_dir)

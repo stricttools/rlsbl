@@ -9,7 +9,7 @@ from ..utils import check_gh_auth, check_gh_installed, extract_changelog_entry, 
 from ..workspace import find_workspace_root, resolve_project
 
 
-def run_cmd(args, flags):
+def run_cmd(args, flags, project_root=None):
     """Update GitHub Release notes from the changelog entry for a version.
 
     If no version is given, detects the current version from the project's
@@ -17,6 +17,11 @@ def run_cmd(args, flags):
 
     In monorepo mode, uses the project's monorepo tag format and reads
     CHANGELOG.md from the project subdirectory.
+
+    Args:
+        args: Positional args; optional first element is the version.
+        flags: dict with key ``dry-run``.
+        project_root: Path to the project root directory, or None for cwd.
     """
     dry_run = flags.get("dry-run", False)
 
@@ -30,16 +35,17 @@ def run_cmd(args, flags):
     # Detect monorepo context
     monorepo_name = None
     monorepo_project_path = None
-    monorepo_root = find_workspace_root(".")
+    start_path = str(project_root) if project_root else "."
+    monorepo_root = find_workspace_root(start_path)
     if monorepo_root:
-        project = resolve_project(monorepo_root, ".")
+        project = resolve_project(monorepo_root, start_path)
         if project is not None:
             monorepo_name = project["name"]
             monorepo_project_path = project["path"]
             os.chdir(monorepo_root)
 
     # Version directory: project subdir in monorepo, repo root otherwise
-    version_dir = monorepo_project_path if monorepo_name else "."
+    version_dir = monorepo_project_path if monorepo_name else start_path
 
     # Detect primary target
     entries = detect_targets(version_dir)

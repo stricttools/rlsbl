@@ -55,7 +55,7 @@ class TestUndoHappyPath(unittest.TestCase):
         self.assertEqual(mock_run.call_count, 6)
 
         # Verify push_if_needed was called with the current branch
-        mock_push.assert_called_once_with("main", env=ANY)
+        mock_push.assert_called_once_with("main", env=ANY, project_root=None)
 
 
 class TestUndoMonorepo(unittest.TestCase):
@@ -98,7 +98,7 @@ class TestUndoMonorepo(unittest.TestCase):
         ]
         mock_run.assert_has_calls(expected_calls, any_order=False)
         self.assertEqual(mock_run.call_count, 6)
-        mock_push.assert_called_once_with("main", env=ANY)
+        mock_push.assert_called_once_with("main", env=ANY, project_root=None)
 
     @patch("rlsbl.commands.undo.find_workspace_root", return_value="/fake/monorepo")
     @patch("rlsbl.commands.undo.resolve_project", return_value={"name": "mylib", "path": "packages/mylib"})
@@ -243,7 +243,7 @@ class TestUndoTwoCommitPattern(unittest.TestCase):
         mock_generate.assert_called_once()
 
         # Push should still be called after reverting
-        mock_push.assert_called_once_with("main", env=ANY)
+        mock_push.assert_called_once_with("main", env=ANY, project_root=None)
 
 
 if __name__ == "__main__":
