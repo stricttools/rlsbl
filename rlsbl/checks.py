@@ -466,7 +466,15 @@ def register_checks(app):
             from .workspace import resolve_project
             proj = resolve_project(str(ctx.workspace_root), str(ctx.project_root))
             if proj is not None:
-                tag_glob = f"{proj['name']}@v*"
+                # Use the target's monorepo_tag_glob() to get the correct
+                # tag pattern (e.g. Go uses "path/v*" not "name@v*").
+                from .targets import TARGETS, detect_targets
+                target_entries = detect_targets(str(ctx.project_root))
+                if target_entries:
+                    target = TARGETS[target_entries[0].name]
+                    tag_glob = target.monorepo_tag_glob(proj['name'], path=proj['path'])
+                else:
+                    tag_glob = f"{proj['name']}@v*"
                 project = proj
 
         entries = read_unreleased(changes_dir)
