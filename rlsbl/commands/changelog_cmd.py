@@ -45,13 +45,15 @@ def _check_duplicate_commits(existing_entries, new_entry):
                     )
 
 
-def cmd_add(flags):
+def cmd_add(flags, project_root=None):
     """Add a changelog entry to unreleased.jsonl.
 
     Required flags:
     - --commits: comma-separated commit hashes
     - --description and --type: required unless --no-user-facing is set
     """
+    if project_root is None:
+        project_root = "."
     commits_raw = flags.get("commits", "")
     if not commits_raw:
         print("Error: --commits is required.", file=sys.stderr)
@@ -105,7 +107,7 @@ def cmd_add(flags):
             print(f"Error: schema validation: {err}", file=sys.stderr)
         sys.exit(1)
 
-    changes_dir = get_changes_dir(".")
+    changes_dir = get_changes_dir(project_root)
     existing = read_unreleased(changes_dir)
     _check_duplicate_commits(existing, entry)
     append_entry(changes_dir, entry)
@@ -121,9 +123,12 @@ def cmd_add(flags):
 
 
 
-def cmd_generate(flags):
+def cmd_generate(flags, project_root=None):
     """Generate CHANGELOG.md from JSONL changelog files."""
-    if not changes_dir_exists("."):
+    if project_root is None:
+        project_root = "."
+
+    if not changes_dir_exists(project_root):
         print("Error: .rlsbl/changes/ does not exist.", file=sys.stderr)
         sys.exit(1)
 
@@ -140,7 +145,7 @@ def cmd_generate(flags):
             generate_version_section,
         )
 
-        changes_dir = get_changes_dir(".")
+        changes_dir = get_changes_dir(project_root)
         sections = []
 
         unreleased = read_unreleased(changes_dir)
@@ -158,12 +163,12 @@ def cmd_generate(flags):
         print(content)
         print("\n(dry-run: no files written)")
     else:
-        content = generate_changelog(".")
+        content = generate_changelog(project_root)
         print("Generated CHANGELOG.md")
 
         if not flags.get("no-commit"):
             # Collect changed files: CHANGELOG.md and per-version .md files
-            changed_files = _get_generated_files(".")
+            changed_files = _get_generated_files(project_root)
             if changed_files:
                 commit_files(
                     "changelog: regenerate from JSONL",
@@ -172,7 +177,7 @@ def cmd_generate(flags):
                 )
 
 
-def cmd_amend(flags):
+def cmd_amend(flags, project_root=None):
     """Amend a released version's JSONL changelog by appending a new entry.
 
     Unlocks the read-only versioned JSONL file, appends the entry, re-locks it,
@@ -187,6 +192,8 @@ def cmd_amend(flags):
     - --no-user-facing: mark entry as non-user-facing
     - --no-resolve: skip hash validation (for old/amended commits)
     """
+    if project_root is None:
+        project_root = "."
     version = flags.get("version", "")
     if not version:
         print("Error: --version is required.", file=sys.stderr)
@@ -249,7 +256,7 @@ def cmd_amend(flags):
             print(f"Error: schema validation: {err}", file=sys.stderr)
         sys.exit(1)
 
-    changes_dir = get_changes_dir(".")
+    changes_dir = get_changes_dir(project_root)
     jsonl_path = os.path.join(changes_dir, f"{version}.jsonl")
 
     if not os.path.isfile(jsonl_path):
@@ -272,7 +279,7 @@ def cmd_amend(flags):
             os.chmod(jsonl_path, 0o444)
 
     # Regenerate CHANGELOG.md
-    generate_changelog(".")
+    generate_changelog(project_root)
     print("Regenerated CHANGELOG.md")
 
     # Sync GitHub Release notes (best-effort)
@@ -283,7 +290,7 @@ def cmd_amend(flags):
     md_path = os.path.join(changes_dir, f"{version}.md")
     if os.path.isfile(md_path):
         changed_files.append(md_path)
-    changelog_path = os.path.join(".", "CHANGELOG.md")
+    changelog_path = os.path.join(project_root, "CHANGELOG.md")
     if os.path.isfile(changelog_path):
         changed_files.append(changelog_path)
 
