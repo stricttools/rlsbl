@@ -14,6 +14,7 @@ from rlsbl.commands.monorepo import (
     _cmd_sync,
     _generate_router,
     _inject_packages_dir,
+    _inject_working_directory,
     _rewrite_trigger,
     _rewrite_version_file_inputs,
     parse_ci_workflow,
@@ -327,6 +328,110 @@ class TestRewriteTrigger:
         # jobs preserved
         assert "publish:" in result
         assert "runs-on: ubuntu-latest" in result
+
+
+class TestInjectWorkingDirectory:
+    """Unit tests for _inject_working_directory per-job merging behavior."""
+
+    def test_basic_injection(self):
+        """Single job with no existing defaults gets working-directory added."""
+        content = (
+            "on: push\n"
+            "\n"
+            "jobs:\n"
+            "  test:\n"
+            "    runs-on: ubuntu-latest\n"
+            "    steps:\n"
+            "      - run: echo hello\n"
+        )
+        doc = parse_ci_workflow(content)
+        _inject_working_directory(doc, "myproject")
+        result = emit_ci_workflow(doc)
+        assert "working-directory: myproject" in result
+
+    def test_per_job_injection(self):
+        """Multiple jobs each get their own defaults.run.working-directory."""
+        content = (
+            "on: push\n"
+            "\n"
+            "jobs:\n"
+            "  build:\n"
+            "    runs-on: ubuntu-latest\n"
+            "    steps:\n"
+            "      - run: echo build\n"
+            "  test:\n"
+            "    runs-on: ubuntu-latest\n"
+            "    steps:\n"
+            "      - run: echo test\n"
+            "  lint:\n"
+            "    runs-on: ubuntu-latest\n"
+            "    steps:\n"
+            "      - run: echo lint\n"
+        )
+        doc = parse_ci_workflow(content)
+        _inject_working_directory(doc, "myproject")
+        result = emit_ci_workflow(doc)
+        # Each job should have working-directory
+        for job_name in ("build", "test", "lint"):
+            job = doc['jobs'][job_name]
+            assert job['defaults']['run']['working-directory'] == "myproject"
+
+    def test_preserves_existing_defaults(self):
+        """Job with existing defaults.run.shell keeps shell and gains working-directory."""
+        content = (
+            "on: push\n"
+            "\n"
+            "jobs:\n"
+            "  test:\n"
+            "    runs-on: ubuntu-latest\n"
+            "    defaults:\n"
+            "      run:\n"
+            "        shell: bash\n"
+            "    steps:\n"
+            "      - run: echo hello\n"
+        )
+        doc = parse_ci_workflow(content)
+        _inject_working_directory(doc, "myproject")
+        result = emit_ci_workflow(doc)
+        assert "working-directory: myproject" in result
+        assert "shell: bash" in result
+
+    def test_existing_working_directory_not_overwritten(self):
+        """Job with existing working-directory keeps its value, not overwritten."""
+        content = (
+            "on: push\n"
+            "\n"
+            "jobs:\n"
+            "  test:\n"
+            "    runs-on: ubuntu-latest\n"
+            "    defaults:\n"
+            "      run:\n"
+            "        working-directory: custom/path\n"
+            "    steps:\n"
+            "      - run: echo hello\n"
+        )
+        doc = parse_ci_workflow(content)
+        _inject_working_directory(doc, "myproject")
+        result = emit_ci_workflow(doc)
+        assert "working-directory: custom/path" in result
+        assert "working-directory: myproject" not in result
+
+    def test_trailing_slash_stripped(self):
+        """Path with trailing slash is stripped before injection."""
+        content = (
+            "on: push\n"
+            "\n"
+            "jobs:\n"
+            "  test:\n"
+            "    runs-on: ubuntu-latest\n"
+            "    steps:\n"
+            "      - run: echo hello\n"
+        )
+        doc = parse_ci_workflow(content)
+        _inject_working_directory(doc, "myproject/")
+        result = emit_ci_workflow(doc)
+        assert "working-directory: myproject\n" in result
+        assert "working-directory: myproject/" not in result
 
 
 class TestRouterWatchPaths:
