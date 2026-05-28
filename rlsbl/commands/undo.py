@@ -53,11 +53,11 @@ def run_cmd(registry, args, flags, project_root=None):
             sys.exit(1)
         monorepo_name = project["name"]
         monorepo_project_path = project["path"]
-        os.chdir(ws_root)
 
     # Find the latest tag (scoped to project in monorepo mode)
     if monorepo_name:
-        target_entries = detect_targets(monorepo_project_path)
+        abs_project_dir = os.path.join(ws_root, monorepo_project_path)
+        target_entries = detect_targets(abs_project_dir)
         if target_entries:
             target = TARGETS[target_entries[0].name]
             match_pattern = target.monorepo_tag_glob(monorepo_name, path=monorepo_project_path)
@@ -166,7 +166,7 @@ def run_cmd(registry, args, flags, project_root=None):
     # Restore changelog state if we reverted a finalize commit
     if finalize_reverted:
         try:
-            project_path = os.getcwd()
+            project_path = os.path.join(ws_root, monorepo_project_path) if monorepo_name else str(project_root or ".")
             changes_dir = get_changes_dir(project_path)
             unfinalize_version(changes_dir, bare_version)
             generate_changelog(project_path)

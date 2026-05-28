@@ -35,8 +35,7 @@ def _project_config(project_root=None):
     """Resolve project config path at call time.
 
     When project_root is provided, returns an absolute path based on it.
-    When None, falls back to a relative path (transition -- will become
-    required once os.chdir is removed).
+    When None, falls back to a relative path (legacy callers).
     """
     if project_root is not None:
         return os.path.join(str(project_root), ".rlsbl", "config.json")
@@ -50,7 +49,7 @@ def read_json_config(path):
     try:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
-    except (OSError, json.JSONDecodeError):
+    except (FileNotFoundError, json.JSONDecodeError):
         return {}
 
 

@@ -95,11 +95,7 @@ def _cmd_batch_release(flags, project_root=None):
 
         log(f"--- Releasing {pkg_name} ({release_config.bump}) ---")
 
-        # Change to the project directory so `rlsbl release` detects it
-        saved_cwd = os.getcwd()
         try:
-            os.chdir(project_dir)
-
             from ..release import run_cmd
 
             release_flags = {
@@ -119,8 +115,6 @@ def _cmd_batch_release(flags, project_root=None):
                     file=sys.stderr,
                 )
                 raise
-        finally:
-            os.chdir(saved_cwd)
 
         log("")
 

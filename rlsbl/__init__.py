@@ -86,13 +86,12 @@ def detect_registries():
 # ---------------------------------------------------------------------------
 
 def _require_project_root():
-    """Find the rlsbl project root, chdir to it, or exit with an error."""
+    """Find the rlsbl project root or exit with an error."""
     from .utils import find_project_root
     root = find_project_root()
     if root is None:
         print("Error: not in an rlsbl project (no .rlsbl/ found in any ancestor directory).", file=sys.stderr)
         sys.exit(1)
-    os.chdir(root)
     return Path(root)
 
 
@@ -330,10 +329,10 @@ def cmd_status(target, json, **_kwargs):
 @strictcli.flag(name="skip-shared", type=bool, help="Skip shared template processing")
 @strictcli.flag(name="no-tag", type=bool, help="Disable ecosystem tagging for this invocation")
 def cmd_scaffold(target, force, private, no_commit, skip_shared, no_tag, dry_run, **_kwargs):
-    # Scaffold is special: if a project root exists, chdir to it;
-    # if not, stay in cwd (for new projects).
-    # However, if the current directory has project markers (pyproject.toml,
-    # package.json, go.mod, etc.), stay here -- the user is in a sub-project
+    # Scaffold is special: if a project root exists, resolve it for use as
+    # scaffold_root; if not, stay in cwd (for new projects).
+    # If the current directory has project markers (pyproject.toml,
+    # package.json, go.mod, etc.), use cwd -- the user is in a sub-project
     # and wants to scaffold in place. This prevents walking up to a monorepo
     # root when inside a sub-project.
     from .utils import find_project_root
@@ -342,7 +341,6 @@ def cmd_scaffold(target, force, private, no_commit, skip_shared, no_tag, dry_run
     if not cwd_has_project:
         root = find_project_root()
         if root is not None:
-            os.chdir(root)
             scaffold_root = Path(root)
     else:
         scaffold_root = Path.cwd()

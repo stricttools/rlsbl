@@ -677,13 +677,14 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None,
         monorepo_name = project["name"]
         monorepo_project_path = project["path"]
         is_library = bool(project.get("library"))
-        # Change to monorepo root so all paths (git and filesystem) are
-        # relative to the repo root, matching git's expectations.
-        os.chdir(monorepo_root)
         log(f"Monorepo project: {monorepo_name} ({monorepo_project_path})")
 
-    # Scoped version directory: project subdir in monorepo, repo root otherwise
-    version_dir = monorepo_project_path if monorepo_name else "."
+    # Scoped version directory: absolute path to the project within the monorepo,
+    # or the project root in standalone mode.
+    if monorepo_name:
+        version_dir = os.path.join(monorepo_root, monorepo_project_path)
+    else:
+        version_dir = str(project_root) if project_root else "."
 
     # Get target instance for tag_format/build/publish
     target = TARGETS[registry]
@@ -777,8 +778,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None,
             sys.exit(1)
         changelog_entry = extract_changelog_entry(changelog_path, new_version)
 
-    # In monorepo mode, hooks/tests/lint must run from the project subdirectory
-    # (not the monorepo root that os.chdir switched to).
+    # In monorepo mode, hooks/tests/lint must run from the project subdirectory.
     abs_project_dir = os.path.join(monorepo_root, monorepo_project_path) if monorepo_root else None
 
     # Snapshot dirty files BEFORE any hooks run, so we can detect which files
@@ -873,7 +873,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None,
         # Show subtree publishing info in dry-run
         if monorepo_name:
             try:
-                projects = load_workspace(".")
+                projects = load_workspace(monorepo_root)
                 proj_dict = next((p for p in projects if p["name"] == monorepo_name), None)
                 subtree_remote = proj_dict.get("subtree_remote") if proj_dict else None
             except Exception:
@@ -918,6 +918,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None,
             abs_project_dir=abs_project_dir,
             hook_generated=hook_generated,
             project_root=project_root,
+            monorepo_root=monorepo_root,
         )
     finally:
         release_lock()
@@ -932,7 +933,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None,
             _update_last_build_release(version_dir, new_version)
 
 
-def _print_stale_dep_advisory(monorepo_name, new_version, version_dir):
+def _print_stale_dep_advisory(monorepo_name, new_version, version_dir, monorepo_root=None):
     """Print advisory about downstream packages with stale constraints.
 
     After releasing a package, checks if any workspace package that depends
@@ -943,8 +944,9 @@ def _print_stale_dep_advisory(monorepo_name, new_version, version_dir):
         from .monorepo import _evaluate_constraint
         from ..workspace_graph import WorkspaceGraph
 
-        projects = load_workspace(".")
-        graph = WorkspaceGraph(".", projects)
+        ws_root = monorepo_root or "."
+        projects = load_workspace(ws_root)
+        graph = WorkspaceGraph(ws_root, projects)
 
         # Find direct dependents of the released package
         dependents = graph.dependents(monorepo_name)
@@ -1076,7 +1078,8 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                           pre_existing_dirty=None,
                           abs_project_dir=None,
                           hook_generated=None,
-                          project_root=None):
+                          project_root=None,
+                          monorepo_root=None):
     """Inner release logic that runs under the advisory lock (mutating phase)."""
     # Snapshot dirty files BEFORE any version-bump writes. This captures
     # everything dirtied by prior stages (generate_changelog, hooks, lint,
@@ -1375,7 +1378,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
         # Subtree publishing for monorepo projects with subtree_remote configured
         if monorepo_name and monorepo_project_path:
             try:
-                projects = load_workspace(".")
+                projects = load_workspace(monorepo_root)
                 proj_dict = None
                 for p in projects:
                     if p["name"] == monorepo_name:
@@ -1488,10 +1491,10 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
             from ..snapshot import generate_snapshot, write_snapshot
             from ..workspace_graph import WorkspaceGraph
 
-            projects = load_workspace(".")
-            graph = WorkspaceGraph(".", projects)
-            snapshot = generate_snapshot(".", projects, graph)
-            rel_path = write_snapshot(".", snapshot)
+            projects = load_workspace(monorepo_root)
+            graph = WorkspaceGraph(monorepo_root, projects)
+            snapshot = generate_snapshot(monorepo_root, projects, graph)
+            rel_path = write_snapshot(monorepo_root, snapshot)
             commit_files_if_changed("snapshot", [rel_path], skip_message="Snapshot unchanged.", autogenerated=True)
             log(f"Regenerated monorepo snapshot: {rel_path}")
         except Exception as e:
@@ -1499,7 +1502,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
 
     # Advisory: constraint propagation
     if monorepo_name:
-        _print_stale_dep_advisory(monorepo_name, new_version, version_dir)
+        _print_stale_dep_advisory(monorepo_name, new_version, version_dir, monorepo_root=monorepo_root)
 
     # Watch CI or print hint (uses SHA captured before post-release hooks).
     # Dry-run returns earlier (no push happens), but guard defensively.
