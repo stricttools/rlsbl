@@ -19,3 +19,4 @@
 {"commits":["8c52de955c48c1ce8098b6e92a84fa3c660989f8"],"user_facing":false}
 {"commits":["0945ab6861c1761f8b209723c8c77b0c3fcb305e"],"user_facing":true,"description":"**Fix.** Release no longer falsely aborts with 'unexpected modified files' when project_root is an absolute path.","type":"fix"}
 {"commits":["f5f657542657dd83f6b23b5308672d35b23eda8a"],"user_facing":false}
+{"commits":["0ae821a7dbe30d1c5798b70f465764d65fab791b"],"user_facing":false}
