@@ -201,6 +201,7 @@ class TestPrivatePublishGuardrail:
             "",                 # git status --porcelain (post-hook snapshot)
             # _run_release_mutating phase:
             "",                 # git status --porcelain (baseline snapshot)
+            "/tmp/fake-repo",   # git rev-parse --show-toplevel (for vpath)
             "",                 # git status --porcelain (re-check guard)
             "abc123",           # git rev-parse HEAD (pre_release_sha)
             "",                 # git tag v1.0.1
@@ -257,6 +258,7 @@ class TestPrivatePublishGuardrail:
             "",                 # git status --porcelain (post-hook snapshot)
             # _run_release_mutating phase:
             "",                 # git status --porcelain (baseline snapshot)
+            "/tmp/fake-repo",   # git rev-parse --show-toplevel (for vpath)
             "",                 # git status --porcelain (re-check guard)
             "abc123",           # git rev-parse HEAD (pre_release_sha)
             "",                 # git tag v1.0.1

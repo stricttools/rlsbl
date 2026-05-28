@@ -94,6 +94,7 @@ class TestReleaseValidatedCache(unittest.TestCase):
             "",               # git status --porcelain (post-hook snapshot)
             # _run_release_mutating phase:
             "",                 # git status --porcelain (baseline snapshot)
+            "/tmp/fake-repo",   # git rev-parse --show-toplevel (for vpath)
             porcelain_recheck,  # git status --porcelain (re-check guard)
             "package.json",     # git rev-parse HEAD (pre_release_sha)
             # new_version != current_version, so has_staged_or_modified is short-circuited
@@ -146,6 +147,7 @@ class TestReleaseValidatedCache(unittest.TestCase):
             "",               # git status --porcelain (post-hook snapshot)
             # _run_release_mutating phase:
             "",                 # git status --porcelain (baseline snapshot)
+            "/tmp/fake-repo",   # git rev-parse --show-toplevel (for vpath)
             porcelain_recheck,  # git status --porcelain (re-check guard) -- has rogue.txt
         ]
 

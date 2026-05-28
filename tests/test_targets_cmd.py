@@ -168,14 +168,15 @@ class TestMultiTargetRelease:
         # 5. git status --porcelain (pre-hook snapshot) -> ""
         # 6. git status --porcelain (post-hook snapshot) -> ""
         # 7. git status --porcelain (baseline snapshot) -> ""
-        # 8. git status --porcelain (re-check guard) -> ""
-        # 9. git rev-parse HEAD (pre_release_sha capture) -> "pre123"
+        # 8. git rev-parse --show-toplevel (for vpath) -> "/tmp/fake-repo"
+        # 9. git status --porcelain (re-check guard) -> ""
+        # 10. git rev-parse HEAD (pre_release_sha capture) -> "pre123"
         # commit_files is mocked separately (no git add/commit calls here)
-        # 10. git tag -> ""
-        # 11. git push origin tag -> ""
-        # 12. git rev-parse HEAD (pushed_sha) -> ""
-        # 13. gh release create -> "abc123"
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", "", "", "pre123", "", "", "", "abc123"]
+        # 11. git tag -> ""
+        # 12. git push origin tag -> ""
+        # 13. git rev-parse HEAD (pushed_sha) -> ""
+        # 14. gh release create -> "abc123"
+        mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", "", "/tmp/fake-repo", "", "pre123", "", "", "", "abc123"]
 
         # Mock the docs target's build and publish to track calls
         from rlsbl.targets import TARGETS
@@ -225,10 +226,10 @@ class TestMultiTargetRelease:
 
         # Same mock sequence as test_secondary_targets_called_when_detected:
         # 1. git fetch  2. git rev-list  3-4. tag -l x2
-        # 5-6. pre/post-hook snapshots  7-8. baseline + re-check guard
-        # 9. pre_release_sha  10. git tag  11. git push origin tag
-        # 12. pushed_sha  13. gh release create
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", "", "", "pre123", "", "", "", "abc123"]
+        # 5-6. pre/post-hook snapshots  7. baseline  8. rev-parse --show-toplevel
+        # 9. re-check guard  10. pre_release_sha  11. git tag  12. git push origin tag
+        # 13. pushed_sha  14. gh release create
+        mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", "", "/tmp/fake-repo", "", "pre123", "", "", "", "abc123"]
 
         from rlsbl.targets import TARGETS
         original_build = TARGETS["docs"].build

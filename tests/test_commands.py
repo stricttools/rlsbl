@@ -832,6 +832,7 @@ class TestReleaseCommitTrailers(unittest.TestCase):
             "",               # git status --porcelain (pre-hook snapshot)
             "",               # git status --porcelain (post-hook snapshot)
             "",               # git status --porcelain (baseline_dirty in _run_release_mutating)
+            "/tmp/fake-repo", # git rev-parse --show-toplevel (for vpath)
             "",               # git status --porcelain (re-check guard)
             "package.json",   # git diff --name-only -- package.json
             "M package.json", # git status --porcelain -- package.json
@@ -883,6 +884,7 @@ class TestReleaseCommitTrailers(unittest.TestCase):
             "",               # git status --porcelain (pre-hook snapshot)
             "",               # git status --porcelain (post-hook snapshot)
             "",               # git status --porcelain (baseline_dirty in _run_release_mutating)
+            "/tmp/fake-repo", # git rev-parse --show-toplevel (for vpath)
             "",               # git status --porcelain (re-check guard)
             "package.json",   # git diff --name-only -- package.json
             "M package.json", # git status --porcelain -- package.json

@@ -297,6 +297,8 @@ class TestWatchSHABeforePostHook:
                 if "v1.0.0" in joined:
                     return "v1.0.0"
                 return ""
+            if "rev-parse" in joined and "--show-toplevel" in joined:
+                return "/tmp/fake-repo"
             if "rev-parse" in joined:
                 # 1st call: pre_release_sha capture (before mutations)
                 # 2nd call: pushed_sha capture (after push, before post-release hook)

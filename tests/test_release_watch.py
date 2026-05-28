@@ -247,6 +247,7 @@ class TestWatchInvokedAfterRelease:
             "",       # pre-hook dirty snapshot
             "",       # post-hook dirty snapshot
             "",       # baseline dirty snapshot
+            "/tmp/fake-repo",  # git rev-parse --show-toplevel (for vpath)
             "",       # re-check dirty snapshot
             "pre123", # rev-parse HEAD (pre-release)
             "",       # git tag
@@ -329,6 +330,7 @@ class TestWatchInvokedAfterRelease:
             "",       # pre-hook status
             "",       # post-hook status
             "",       # baseline status
+            "/tmp/fake-repo",  # git rev-parse --show-toplevel (for vpath)
             "",       # re-check dirty status
             "pre123", # rev-parse HEAD (pre-release)
             "",       # git tag
