@@ -413,16 +413,18 @@ class TestReleaseRetry(unittest.TestCase):
     def test_auto_scaffold_when_no_retry_file(self, _gh_inst, _gh_auth, _ws_root,
                                                 mock_targets_dict, mock_detect,
                                                 _exists, mock_run, mock_cleanup):
-        """When retry_config is None and retry.toml doesn't exist, auto-scaffolds and proceeds."""
+        """When retry_config is None and retry.toml doesn't exist, auto-scaffolds then exits
+        because ref is empty and must be set by the user."""
         target = self._make_mock_target("0.41.7")
         entry = self._make_mock_entry()
         mock_detect.return_value = [entry]
         mock_targets_dict.__getitem__ = lambda self, key: target
         mock_run.side_effect = self._run_side_effect
 
-        scaffolded_config = _make_retry_config("0.41.7", dispatch=["publish.yml"])
+        # _scaffold_retry_file raises ValueError because ref is empty
+        scaffold_error = ValueError("ref must be set in retry.toml (e.g. a tag like v1.2.3 or a branch like main)")
 
-        with patch("rlsbl.commands.release_retry._scaffold_retry_file", return_value=scaffolded_config) as mock_scaffold, \
+        with patch("rlsbl.commands.release_retry._scaffold_retry_file", side_effect=scaffold_error) as mock_scaffold, \
              patch("rlsbl.commands.release_retry.get_retry_file_path", return_value="/fake/retry.toml"):
             def exists_side_effect(path):
                 if "retry.toml" in str(path):
@@ -430,14 +432,15 @@ class TestReleaseRetry(unittest.TestCase):
                 return True
             _exists.side_effect = exists_side_effect
 
-            with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-                run_cmd(None, {"yes": True})
+            with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
+                with self.assertRaises(SystemExit) as ctx:
+                    run_cmd(None, {"yes": True})
+
+        self.assertEqual(ctx.exception.code, 1)
+        self.assertIn("ref must be set", mock_stderr.getvalue())
 
         # _scaffold_retry_file was called
         mock_scaffold.assert_called_once()
-
-        # Release operations proceeded with scaffolded config
-        mock_run.assert_any_call("gh", ["release", "view", "v0.41.7"])
 
     @patch("rlsbl.commands.release_retry.read_retry_file")
     @patch("rlsbl.commands.release_retry.detect_targets")
@@ -578,6 +581,28 @@ class TestRetryConfig(unittest.TestCase):
         finally:
             os.unlink(path)
 
+    def test_read_retry_file_empty_ref(self):
+        """Empty ref field raises ValueError with helpful message."""
+        import tempfile
+        import tomlkit as tk
+
+        doc = tk.document()
+        doc.add("version", "1.2.3")
+        doc.add("dispatch", ["publish.yml"])
+        doc.add("ref", "")
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
+            tk.dump(doc, f)
+            path = f.name
+
+        try:
+            from rlsbl.release_file import read_retry_file
+            with self.assertRaises(ValueError) as ctx:
+                read_retry_file(path)
+            self.assertIn("ref must be set in retry.toml", str(ctx.exception))
+        finally:
+            os.unlink(path)
+
     def test_read_retry_file_missing_file(self):
         """Missing file raises FileNotFoundError."""
         from rlsbl.release_file import read_retry_file
@@ -600,8 +625,8 @@ class TestRetryConfig(unittest.TestCase):
 class TestScaffoldRetryFile(unittest.TestCase):
     """Tests for the _scaffold_retry_file helper."""
 
-    def test_scaffold_creates_file_with_correct_content(self):
-        """_scaffold_retry_file writes retry.toml with 3 fields and returns valid RetryConfig."""
+    def test_scaffold_creates_file_with_empty_ref(self):
+        """_scaffold_retry_file writes retry.toml with empty ref and a comment."""
         import tempfile
         import tomlkit as tk
         from rlsbl.commands.release_retry import _scaffold_retry_file
@@ -619,22 +644,24 @@ class TestScaffoldRetryFile(unittest.TestCase):
             with patch("rlsbl.commands.release_retry.detect_targets", return_value=[entry]), \
                  patch("rlsbl.commands.release_retry.TARGETS", {"pypi": target}), \
                  patch("rlsbl.commands.release_retry._find_dispatch_workflows", return_value=["publish.yml", "ci.yml"]):
-                with patch("sys.stdout", new_callable=StringIO):
-                    config = _scaffold_retry_file(
+                # read_retry_file will raise because ref is empty
+                with self.assertRaises(ValueError) as ctx:
+                    _scaffold_retry_file(
                         retry_path, ".", target, None, None, lambda msg: None,
                     )
+                self.assertIn("ref must be set", str(ctx.exception))
 
-            # Verify returned config
-            self.assertEqual(config.version, "2.0.0")
-            self.assertEqual(config.dispatch, ["publish.yml", "ci.yml"])
-            self.assertEqual(config.ref, "v2.0.0")
-
-            # Verify file on disk
+            # Verify file on disk has correct structure
             with open(retry_path) as f:
                 data = tk.load(f)
             self.assertEqual(data["version"], "2.0.0")
             self.assertEqual(list(data["dispatch"]), ["publish.yml", "ci.yml"])
-            self.assertEqual(data["ref"], "v2.0.0")
+            self.assertEqual(data["ref"], "")
+
+            # Verify the comment is present in the raw file
+            with open(retry_path) as f:
+                raw = f.read()
+            self.assertIn("# Git ref to dispatch CI against", raw)
             # No assets field
             self.assertNotIn("assets", data)
 

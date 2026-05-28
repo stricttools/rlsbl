@@ -4,9 +4,19 @@ import os
 from unittest.mock import patch
 
 import pytest
+import tomlkit
 
-from rlsbl.release_file import read_release_file
 from rlsbl.targets import TargetEntry
+
+
+def _read_scaffolded_toml(path):
+    """Read a scaffolded TOML file and return the raw tomlkit document.
+
+    Unlike read_release_file(), this does not validate field values,
+    so it works with the empty decision fields that scaffolding produces.
+    """
+    with open(path, "r", encoding="utf-8") as f:
+        return tomlkit.load(f)
 
 
 def _run_release_init(tmp_path, target_entries):
@@ -36,19 +46,23 @@ class TestReleaseInitSingleTarget:
         release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
         assert release_path.exists()
 
-        cfg = read_release_file(str(release_path))
-        assert cfg.bump == "patch"
-        assert cfg.include == ["pypi"]
-        assert cfg.exclude == []
-        assert cfg.targets == {}
+        data = _read_scaffolded_toml(str(release_path))
+        assert data["bump"] == ""
+        assert list(data["include"]) == ["pypi"]
+        assert list(data["exclude"]) == []
+        assert "targets" not in data
+
+        # Verify the comment is present in the raw file
+        raw = release_path.read_text()
+        assert "# Version bump type: patch, minor, or major" in raw
 
     def test_npm_target(self, tmp_path):
         entries = [TargetEntry(name="npm", path=str(tmp_path))]
         _run_release_init(tmp_path, entries)
 
         release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
-        cfg = read_release_file(str(release_path))
-        assert cfg.include == ["npm"]
+        data = _read_scaffolded_toml(str(release_path))
+        assert list(data["include"]) == ["npm"]
 
 
 class TestReleaseInitMultipleTargets:
@@ -62,10 +76,10 @@ class TestReleaseInitMultipleTargets:
         _run_release_init(tmp_path, entries)
 
         release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
-        cfg = read_release_file(str(release_path))
-        assert cfg.include == ["pypi", "npm"]
-        assert cfg.exclude == []
-        assert cfg.targets == {}
+        data = _read_scaffolded_toml(str(release_path))
+        assert list(data["include"]) == ["pypi", "npm"]
+        assert list(data["exclude"]) == []
+        assert "targets" not in data
 
     def test_three_targets(self, tmp_path):
         entries = [
@@ -76,8 +90,8 @@ class TestReleaseInitMultipleTargets:
         _run_release_init(tmp_path, entries)
 
         release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
-        cfg = read_release_file(str(release_path))
-        assert cfg.include == ["pypi", "npm", "go"]
+        data = _read_scaffolded_toml(str(release_path))
+        assert list(data["include"]) == ["pypi", "npm", "go"]
 
 
 class TestReleaseInitFlutterTargets:
@@ -88,17 +102,17 @@ class TestReleaseInitFlutterTargets:
         _run_release_init(tmp_path, entries)
 
         release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
-        cfg = read_release_file(str(release_path))
-        assert cfg.include == ["flutter-ios"]
-        assert cfg.targets == {"flutter-ios": {"mode": "build"}}
+        data = _read_scaffolded_toml(str(release_path))
+        assert list(data["include"]) == ["flutter-ios"]
+        assert data["targets"]["flutter-ios"]["mode"] == "build"
 
     def test_flutter_android(self, tmp_path):
         entries = [TargetEntry(name="flutter-android", path=str(tmp_path))]
         _run_release_init(tmp_path, entries)
 
         release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
-        cfg = read_release_file(str(release_path))
-        assert cfg.targets == {"flutter-android": {"mode": "build"}}
+        data = _read_scaffolded_toml(str(release_path))
+        assert data["targets"]["flutter-android"]["mode"] == "build"
 
     def test_mixed_flutter_and_regular(self, tmp_path):
         entries = [
@@ -109,15 +123,13 @@ class TestReleaseInitFlutterTargets:
         _run_release_init(tmp_path, entries)
 
         release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
-        cfg = read_release_file(str(release_path))
-        assert cfg.include == ["pypi", "flutter-ios", "flutter-android"]
-        assert cfg.exclude == []
-        assert cfg.targets == {
-            "flutter-ios": {"mode": "build"},
-            "flutter-android": {"mode": "build"},
-        }
+        data = _read_scaffolded_toml(str(release_path))
+        assert list(data["include"]) == ["pypi", "flutter-ios", "flutter-android"]
+        assert list(data["exclude"]) == []
+        assert data["targets"]["flutter-ios"]["mode"] == "build"
+        assert data["targets"]["flutter-android"]["mode"] == "build"
         # pypi should NOT have a targets section
-        assert "pypi" not in cfg.targets
+        assert "pypi" not in data["targets"]
 
 
 class TestReleaseInitAlreadyExists:
@@ -149,9 +161,9 @@ class TestReleaseInitEmptyFileAllowed:
 
         release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
         assert release_path.exists()
-        cfg = read_release_file(str(release_path))
-        assert cfg.bump == "patch"
-        assert cfg.include == ["pypi"]
+        data = _read_scaffolded_toml(str(release_path))
+        assert data["bump"] == ""
+        assert list(data["include"]) == ["pypi"]
 
     def test_whitespace_only_file_allows_overwrite(self, tmp_path):
         releases_dir = tmp_path / ".rlsbl" / "releases"
@@ -162,9 +174,9 @@ class TestReleaseInitEmptyFileAllowed:
         _run_release_init(tmp_path, entries)
 
         release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
-        cfg = read_release_file(str(release_path))
-        assert cfg.bump == "patch"
-        assert cfg.include == ["npm"]
+        data = _read_scaffolded_toml(str(release_path))
+        assert data["bump"] == ""
+        assert list(data["include"]) == ["npm"]
 
     def test_nonempty_file_still_blocks(self, tmp_path):
         releases_dir = tmp_path / ".rlsbl" / "releases"
@@ -177,18 +189,28 @@ class TestReleaseInitEmptyFileAllowed:
 
 
 class TestReleaseInitRoundTrip:
-    """Verify the generated file is valid by reading it back with read_release_file()."""
+    """Verify the generated file structure and that it requires editing before use."""
 
-    def test_roundtrip_simple(self, tmp_path):
+    def test_scaffolded_file_has_correct_structure(self, tmp_path):
         entries = [TargetEntry(name="cargo", path=str(tmp_path))]
         _run_release_init(tmp_path, entries)
 
         release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
-        cfg = read_release_file(str(release_path))
-        assert isinstance(cfg.bump, str)
-        assert isinstance(cfg.include, list)
-        assert isinstance(cfg.exclude, list)
-        assert isinstance(cfg.targets, dict)
+        data = _read_scaffolded_toml(str(release_path))
+        assert isinstance(data["bump"], str)
+        assert isinstance(data["include"], list)
+        assert isinstance(data["exclude"], list)
+
+    def test_scaffolded_file_rejected_without_editing(self, tmp_path):
+        """read_release_file rejects the scaffolded file because bump is empty."""
+        from rlsbl.release_file import read_release_file
+
+        entries = [TargetEntry(name="cargo", path=str(tmp_path))]
+        _run_release_init(tmp_path, entries)
+
+        release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
+        with pytest.raises(ValueError, match="bump must be set"):
+            read_release_file(str(release_path))
 
     def test_roundtrip_with_flutter(self, tmp_path):
         entries = [
@@ -198,14 +220,14 @@ class TestReleaseInitRoundTrip:
         _run_release_init(tmp_path, entries)
 
         release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
-        cfg = read_release_file(str(release_path))
-        assert cfg.bump == "patch"
-        assert cfg.include == ["flutter-ios", "flutter-android"]
-        assert cfg.exclude == []
-        assert "flutter-ios" in cfg.targets
-        assert "flutter-android" in cfg.targets
-        assert cfg.targets["flutter-ios"]["mode"] == "build"
-        assert cfg.targets["flutter-android"]["mode"] == "build"
+        data = _read_scaffolded_toml(str(release_path))
+        assert data["bump"] == ""
+        assert list(data["include"]) == ["flutter-ios", "flutter-android"]
+        assert list(data["exclude"]) == []
+        assert "flutter-ios" in data["targets"]
+        assert "flutter-android" in data["targets"]
+        assert data["targets"]["flutter-ios"]["mode"] == "build"
+        assert data["targets"]["flutter-android"]["mode"] == "build"
 
 
 class TestReleaseInitPrintsPath:
@@ -266,8 +288,7 @@ class TestReleaseInitMonorepo:
         root_release = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
         assert not root_release.exists()
 
-        # Verify the content is valid
-        from rlsbl.release_file import read_release_file
-        cfg = read_release_file(str(release_path))
-        assert cfg.bump == "patch"
-        assert cfg.include == ["pypi"]
+        # Verify the content has correct structure
+        data = _read_scaffolded_toml(str(release_path))
+        assert data["bump"] == ""
+        assert list(data["include"]) == ["pypi"]
