@@ -144,7 +144,7 @@
     "description": "92c829699be90c4ea09e05c6e0ff3830b755bdd05be47a9427e51074cedcb831"
   },
   "en/cli-index.md": {
-    "content": "dafe36d6402f1a79881befa11918ce71ed8ebec0e6e864e8456251d1aa02b773",
+    "content": "78f7b358caa667b604b9c069e31b0fda01f79965142d3cf232856d55f90c7949",
     "description": "0f01533cb10562a220aa70ea5e33e2500c0c1e4aa8e16b2f80c532449a68b7ea"
   },
   "en/cli-migrate.md": {
@@ -172,8 +172,8 @@
     "description": "728d53ed39a7f216758061237899c35db9b081c75e29c38d44b9d136c412b691"
   },
   "en/cli-release.md": {
-    "content": "3898dc3255ddb16a8e993747e430dfa13ff867f685583d1d2fb690d43d8cd21b",
-    "description": "78b096ab8634097254c64a4e3c8b144cfed9033a0b96209afc4f836471c0ceb2"
+    "content": "0af0613ad27731e2920e69d403a5cd5fd8e18db73ed35e809b5c4738dcd67661",
+    "description": "4437506314b7ca982c6cd8ae65c5f2be7e3f33143fc5f3f6aed9e64077bba20f"
   },
   "en/cli-scaffold.md": {
     "content": "abd160fa03e1a929fe87e20d855ac2fb3b13358c09433f16408a863bc958e876",
@@ -204,7 +204,7 @@
     "description": "f934ebcc70f1b9dc3c86b2020fcfac4db46bd2cd252d78e4d5989f59cc429886"
   },
   "en/configuration.md": {
-    "content": "c2df379b5e76e622caab83e4a82df94552bcf290546be9ced6b1b83ecc495450",
+    "content": "6d553b0c11abb28e54752cdc2e1789034843b5e1b69081f059d8a2ce1f646fb3",
     "description": "85a3ab93738e01a1b279590b81e3dcbc173e3df46161a6f75c68e3743eb53f04"
   },
   "en/gen-index.md": {
@@ -288,8 +288,8 @@
     "description": "77349d50382ca6c0faf97553b8abf8c24bb360c895f32005f7de62abdf1bbe75"
   },
   "en/rlsbl-commands-init_cmd.md": {
-    "content": "0fcf920a53de65975429242418f207e6417f3e0b509db486c37c2ff11432e22f",
-    "description": "0c13614aa11a0d178a7c0daee8e7fa6f8bf87a0a36d0e37f474a3d865cbbae64"
+    "content": "0198c035bb4ea852d5ebcbff028271e02b07e74364f5f915121b61cff3c4215f",
+    "description": "b4a7db2e3882de4af592870ee977b98522a4635188b12262d78e7441b533611c"
   },
   "en/rlsbl-commands-migrate.md": {
     "content": "e9491cc81e5db4d8805bda9691cf789321146328c993576e2929b70992553f8b",
@@ -476,8 +476,8 @@
     "description": "88a63e5447b718acc27b9f03247bc3ca398e81e8335c4c7d1048793ab1af0217"
   },
   "en/rlsbl-tagging.md": {
-    "content": "58a66c8c00cfd6416e637e261b0e0d98de2950cb771c1650c04999fca5c55e18",
-    "description": "1dab5473e391e8bb1f1cad9802c9de83079fd1461e8ce00a68091cfa332a2b31"
+    "content": "1dd6c751d4787dbfd4a7916cab8a5902e71aac05077ce0a0e0f895922bf231c7",
+    "description": "3266032dac809db8f09c10099004c4e51b3cb844eee75935bacd58ccd240ef85"
   },
   "en/rlsbl-targets-base.md": {
     "content": "8ae3cf2dab7274062d69fa74774d501941e59484c87ff3a317a51d5f040d1ed3",
