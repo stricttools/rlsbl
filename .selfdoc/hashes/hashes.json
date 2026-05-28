@@ -41,7 +41,7 @@
   },
   "cli-index.md": {
     "content": "dafe36d6402f1a79881befa11918ce71ed8ebec0e6e864e8456251d1aa02b773",
-    "description": "5291bac4c3f59b07f22ce183989a438fa6c9a2400045c9a3ed3ee2fd61cde16d"
+    "description": "0f01533cb10562a220aa70ea5e33e2500c0c1e4aa8e16b2f80c532449a68b7ea"
   },
   "cli-migrate.md": {
     "content": "070fbb1ca4eb8311168e539d6a8e55a21fb2a5e7bf3e275ee88014ba9d3f499a",
@@ -101,7 +101,7 @@
   },
   "configuration.md": {
     "content": "06b2eb5a7b45a7a85ea5e4d5c91c89b479cacc9a3afb269662d385c6a98e3159",
-    "description": "e548c1f92364364d71e5d1a6dfa67e05a75638b167b9691c103bb3df09721c32"
+    "description": "85a3ab93738e01a1b279590b81e3dcbc173e3df46161a6f75c68e3743eb53f04"
   },
   "en/ci-customization.md": {
     "content": "0017b4176bab0b709a10431f48880737dfa56c63924c63268a47d0289965fd2d",
@@ -929,7 +929,7 @@
   },
   "rlsbl-targets-plain.md": {
     "content": "6af64c2b3dfa5f100486d10fed79dbe322cd5e5a558d60589d1fbe0101fc747c",
-    "description": "3f9fea3c9d1bcf9ffe3f3cc7624f2d4fe79f945e28a309480bb2e73cd303ed3f"
+    "description": "f1c5b9ef00991b226a5d97b96a2ea0fa68ee0a35946a5a062eef2b67e74942af"
   },
   "rlsbl-targets-protocol.md": {
     "content": "f3351febb6765454b14c000043fc6404643777585a9f2951947b01efedfac592",
@@ -969,7 +969,7 @@
   },
   "rlsbl-utils.md": {
     "content": "caec2790ca709189c62f3ba4659dd17ffbf9bcacde926d1f69a98a26f0d64777",
-    "description": "0195dc369552b0d9e704fd296ef6b7ce1c07a44f1d0fc21d9b2ef70d26859114"
+    "description": "792fe47ae6871b00df2974a48b8915720f762635cbeb8b6c18cf43451966abe8"
   },
   "rlsbl-workspace.md": {
     "content": "562362ff9acba0645fe5ba7b0de43b8f4ea6a56f382a5daf9776d0b337bff902",
