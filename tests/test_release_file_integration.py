@@ -557,3 +557,75 @@ class TestMonorepoReleaseFilePath:
         assert str(pkg_dir) in versioned_release
         assert os.path.exists(release_file_path)
         assert os.path.getsize(release_file_path) == 0
+
+
+# ---------------------------------------------------------------------------
+# Monorepo directory scoping tests
+# ---------------------------------------------------------------------------
+
+class TestMonorepoDirectoryScoping:
+    """validate_unreleased receives the correct project dict in monorepo mode.
+
+    Regression test: previously, run_cmd called resolve_project(monorepo_root, ".")
+    AFTER os.chdir(monorepo_root), so "." resolved to the workspace root instead
+    of the package directory, causing resolve_project to return None.
+    """
+
+    @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.run")
+    @patch("rlsbl.commands.release.commit_files", return_value=True)
+    @patch("rlsbl.commands.release.get_current_branch", return_value="main")
+    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
+    @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
+    @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
+    @patch("rlsbl.commands.release.generate_changelog")
+    @patch("rlsbl.commands.release.validate_unreleased")
+    def test_validate_unreleased_receives_project_dict(
+        self,
+        mock_validate,
+        _gen_cl,
+        _gh_inst,
+        _gh_auth,
+        _clean,
+        _branch,
+        _commit_files,
+        mock_run,
+        _push,
+        monorepo_fixture,
+        monkeypatch,
+    ):
+        """In monorepo mode, validate_unreleased is called with project=<dict>, not None."""
+        mock_validate.return_value = {"passed": True, "checks": {}}
+        # mock_run: fetch, rev-list, tag -l (current), tag -l (bumped),
+        # pre/post hook snapshots
+        mock_run.side_effect = ["", "0", "mypylib@v0.1.0", "", "", ""]
+
+        # Create CHANGELOG.md so the post-validation fallback path succeeds
+        (monorepo_fixture.python_dir / "CHANGELOG.md").write_text(
+            "# Changelog\n\n## 0.1.1\n\nPatch release.\n"
+        )
+
+        # Chdir to the python subproject (simulates user running release there)
+        monkeypatch.chdir(monorepo_fixture.python_dir)
+
+        config = ReleaseConfig(
+            bump="patch",
+            include=["pypi"],
+            exclude=[],
+        )
+        run_cmd(config, {"dry-run": True, "quiet": False, "yes": True})
+
+        # Verify validate_unreleased was called with a non-None project dict
+        mock_validate.assert_called_once()
+        call_kwargs = mock_validate.call_args
+        project_arg = call_kwargs.kwargs.get("project") or call_kwargs[1].get("project")
+        # If passed as positional, check the second positional arg is not it;
+        # validate_unreleased(changes_dir, tag_glob=..., project=...)
+        if project_arg is None and len(call_kwargs.args) > 2:
+            project_arg = call_kwargs.args[2]
+        assert project_arg is not None, (
+            "validate_unreleased was called with project=None; "
+            "directory scoping is broken after os.chdir(monorepo_root)"
+        )
+        assert project_arg["name"] == "mypylib"
+        assert project_arg["path"] == "python"

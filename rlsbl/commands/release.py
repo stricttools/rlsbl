@@ -739,9 +739,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None):
     tag_glob = target.monorepo_tag_glob(monorepo_name, path=monorepo_project_path) if monorepo_name else None
     # In monorepo mode, pass the project dict so coverage/range checks
     # only consider commits touching this package's files.
-    monorepo_project = None
-    if monorepo_name and monorepo_project_path:
-        monorepo_project = resolve_project(monorepo_root, ".")
+    monorepo_project = project if monorepo_name else None
     validation = validate_unreleased(changes_dir, tag_glob=tag_glob, project=monorepo_project)
     if not validation["passed"]:
         print("Error: JSONL changelog validation failed:", file=sys.stderr)
