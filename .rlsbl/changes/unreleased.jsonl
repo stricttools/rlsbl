@@ -1,0 +1,1 @@
+{"commits":["f5aab6fc0109b7bb7e9d6666e5897b81d80086c1"],"user_facing":true,"description":"**Bug fix.** Scaffold now creates non-workflow files (like `.npmignore`) from all targets, not just the primary.","type":"fix"}
