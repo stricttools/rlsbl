@@ -138,6 +138,20 @@ def _print_workflow_audit(results):
     return missing_publish
 
 
+def _resolve_run_ids(run_ids):
+    """Resolve run IDs to run info dicts via gh run view."""
+    runs = []
+    for rid in run_ids:
+        try:
+            output = run("gh", ["run", "view", str(rid), "--json", "databaseId,name,status"])
+            info = json.loads(output)
+            runs.append(info)
+        except Exception as e:
+            print(f"Error: could not resolve run ID {rid}: {e}", file=sys.stderr)
+            sys.exit(1)
+    return runs
+
+
 def poll_runs(commit_sha, max_attempts=15, interval=2):
     """Poll gh run list until at least one run appears.
 
@@ -160,8 +174,46 @@ def run_cmd(registry, args, flags):
     """Watch all CI runs for a commit until they complete.
 
     Usage: rlsbl watch [<commit-sha>]
+           rlsbl watch --run-id <id> [--run-id <id2>]
     Defaults to HEAD if no commit SHA is provided.
     """
+    run_ids = flags.get("run-id", [])
+    if run_ids:
+        try:
+            runs = _resolve_run_ids(run_ids)
+            if not runs:
+                print("Error: no valid run IDs provided", file=sys.stderr)
+                sys.exit(1)
+
+            # Get repo info for display
+            try:
+                repo_info = json.loads(run("gh", ["repo", "view", "--json", "nameWithOwner,name"]))
+                repo_slug = repo_info.get("nameWithOwner", "")
+            except Exception:
+                print("Error: could not get repo info. Is gh installed and authenticated?", file=sys.stderr)
+                sys.exit(1)
+
+            label = f"run IDs {','.join(str(r) for r in run_ids)}"
+
+            print(f"rlsbl: {label}: watching {len(runs)} run(s)...", file=sys.stderr)
+            results = _watch_runs(runs, label, repo_slug)
+            _print_workflow_audit(results)
+
+            # Desktop notification with aggregated results
+            passed = sum(1 for r in results if r["passed"])
+            failed = len(results) - passed
+            if failed:
+                body = f"{passed}/{len(results)} passed, {failed} failed"
+                _notify(f"{label}: CI FAILED", body)
+            else:
+                body = f"{len(results)}/{len(results)} passed"
+                _notify(f"{label}: CI passed", body)
+
+            sys.exit(1 if failed else 0)
+        except KeyboardInterrupt:
+            print("\nWatch cancelled.", file=sys.stderr)
+            sys.exit(130)
+
     try:
         # Get commit SHA (resolve short SHAs -- gh requires full 40-char)
         if args:

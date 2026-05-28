@@ -1,4 +1,4 @@
-"""Tests for rlsbl.commands.watch — workflow audit reporting."""
+"""Tests for rlsbl.commands.watch — workflow audit reporting and --run-id flag."""
 
 import json
 import os
@@ -10,6 +10,7 @@ from rlsbl.commands.watch import (
     _has_publish_workflow_on_disk,
     _is_publish_workflow,
     _print_workflow_audit,
+    _resolve_run_ids,
     run_cmd,
 )
 
@@ -327,6 +328,156 @@ class TestRePoll:
         assert exc_info.value.code == 0
         # _watch_runs called only once (no late runs)
         assert mock_watch.call_count == 1
+
+
+class TestResolveRunIds:
+    """Tests for _resolve_run_ids that resolves run IDs via gh run view."""
+
+    @patch("rlsbl.commands.watch.run")
+    def test_resolves_single_run_id(self, mock_run):
+        """A single run ID is resolved to a run info dict."""
+        mock_run.return_value = json.dumps(
+            {"databaseId": 12345, "name": "CI", "status": "completed"}
+        )
+        result = _resolve_run_ids(["12345"])
+        assert len(result) == 1
+        assert result[0]["databaseId"] == 12345
+        assert result[0]["name"] == "CI"
+        mock_run.assert_called_once_with(
+            "gh", ["run", "view", "12345", "--json", "databaseId,name,status"]
+        )
+
+    @patch("rlsbl.commands.watch.run")
+    def test_resolves_multiple_run_ids(self, mock_run):
+        """Multiple run IDs are each resolved to a run info dict."""
+        mock_run.side_effect = [
+            json.dumps({"databaseId": 111, "name": "CI", "status": "completed"}),
+            json.dumps({"databaseId": 222, "name": "Publish", "status": "in_progress"}),
+        ]
+        result = _resolve_run_ids(["111", "222"])
+        assert len(result) == 2
+        assert result[0]["databaseId"] == 111
+        assert result[1]["databaseId"] == 222
+
+    @patch("rlsbl.commands.watch.run")
+    def test_invalid_run_id_exits(self, mock_run):
+        """An unresolvable run ID causes sys.exit(1)."""
+        mock_run.side_effect = Exception("not found")
+        with pytest.raises(SystemExit) as exc_info:
+            _resolve_run_ids(["99999"])
+        assert exc_info.value.code == 1
+
+
+class TestRunIdPath:
+    """Tests for the --run-id code path in run_cmd."""
+
+    @patch("rlsbl.commands.watch._notify")
+    @patch("rlsbl.commands.watch._print_workflow_audit", return_value=False)
+    @patch("rlsbl.commands.watch._watch_runs")
+    @patch("rlsbl.commands.watch._resolve_run_ids")
+    @patch("rlsbl.commands.watch.run")
+    def test_run_id_path_watches_resolved_runs(
+        self, mock_run, mock_resolve, mock_watch, mock_audit, mock_notify, capsys
+    ):
+        """--run-id resolves IDs and watches them, skipping SHA logic."""
+        mock_resolve.return_value = [
+            {"databaseId": 100, "name": "CI", "status": "in_progress"},
+        ]
+        mock_run.return_value = json.dumps(
+            {"nameWithOwner": "user/repo", "name": "repo"}
+        )
+        mock_watch.return_value = [{"name": "CI", "passed": True}]
+
+        with pytest.raises(SystemExit) as exc_info:
+            run_cmd(None, [], {"run-id": ["100"]})
+
+        assert exc_info.value.code == 0
+        mock_resolve.assert_called_once_with(["100"])
+        mock_watch.assert_called_once()
+        mock_audit.assert_called_once()
+
+    @patch("rlsbl.commands.watch._notify")
+    @patch("rlsbl.commands.watch._print_workflow_audit", return_value=False)
+    @patch("rlsbl.commands.watch._watch_runs")
+    @patch("rlsbl.commands.watch._resolve_run_ids")
+    @patch("rlsbl.commands.watch.run")
+    def test_run_id_path_failure_exits_1(
+        self, mock_run, mock_resolve, mock_watch, mock_audit, mock_notify
+    ):
+        """When a watched run fails, exit code is 1."""
+        mock_resolve.return_value = [
+            {"databaseId": 100, "name": "CI", "status": "in_progress"},
+        ]
+        mock_run.return_value = json.dumps(
+            {"nameWithOwner": "user/repo", "name": "repo"}
+        )
+        mock_watch.return_value = [{"name": "CI", "passed": False}]
+
+        with pytest.raises(SystemExit) as exc_info:
+            run_cmd(None, [], {"run-id": ["100"]})
+
+        assert exc_info.value.code == 1
+
+    @patch("rlsbl.commands.watch._notify")
+    @patch("rlsbl.commands.watch._print_workflow_audit", return_value=False)
+    @patch("rlsbl.commands.watch._watch_runs")
+    @patch("rlsbl.commands.watch._resolve_run_ids")
+    @patch("rlsbl.commands.watch.run")
+    def test_run_id_path_multiple_ids(
+        self, mock_run, mock_resolve, mock_watch, mock_audit, mock_notify, capsys
+    ):
+        """Multiple --run-id values are all resolved and watched."""
+        mock_resolve.return_value = [
+            {"databaseId": 100, "name": "CI", "status": "in_progress"},
+            {"databaseId": 200, "name": "Publish", "status": "in_progress"},
+        ]
+        mock_run.return_value = json.dumps(
+            {"nameWithOwner": "user/repo", "name": "repo"}
+        )
+        mock_watch.return_value = [
+            {"name": "CI", "passed": True},
+            {"name": "Publish", "passed": True},
+        ]
+
+        with pytest.raises(SystemExit) as exc_info:
+            run_cmd(None, [], {"run-id": ["100", "200"]})
+
+        assert exc_info.value.code == 0
+        mock_resolve.assert_called_once_with(["100", "200"])
+        err = capsys.readouterr().err
+        assert "watching 2 run(s)" in err
+
+    @patch("rlsbl.commands.watch.poll_runs")
+    @patch("rlsbl.commands.watch._resolve_run_ids")
+    def test_run_id_skips_sha_path(self, mock_resolve, mock_poll):
+        """When --run-id is provided, poll_runs (SHA path) is never called."""
+        mock_resolve.return_value = []
+
+        with pytest.raises(SystemExit):
+            run_cmd(None, [], {"run-id": ["100"]})
+
+        mock_poll.assert_not_called()
+
+    @patch("rlsbl.commands.watch._resolve_run_ids")
+    def test_empty_resolved_runs_exits(self, mock_resolve):
+        """When _resolve_run_ids returns empty, exit with error."""
+        mock_resolve.return_value = []
+
+        with pytest.raises(SystemExit) as exc_info:
+            run_cmd(None, [], {"run-id": ["100"]})
+
+        assert exc_info.value.code == 1
+
+
+class TestMutualExclusivity:
+    """Tests for SHA / --run-id mutual exclusivity at the CLI level."""
+
+    def test_sha_and_run_id_both_provided(self):
+        """cmd_watch rejects SHA + --run-id combination."""
+        import rlsbl
+        with pytest.raises(SystemExit) as exc_info:
+            rlsbl.cmd_watch(target="", run_id=["123"], sha="abc123")
+        assert exc_info.value.code == 1
 
 
 if __name__ == "__main__":

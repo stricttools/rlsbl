@@ -494,11 +494,16 @@ def cmd_discover(mine, **_kwargs):
 
 @app.command(name="watch", help="Poll GitHub Actions CI workflow runs for a specific commit SHA and report pass or fail status. Defaults to HEAD if no SHA is provided. Useful after rlsbl release to monitor the publish pipeline.")
 @strictcli.flag(name="target", type=str, help="Target a specific registry", default="")
+@strictcli.flag(name="run-id", type=str, help="CI workflow run ID to watch", repeatable=True)
 @strictcli.arg(name="sha", help="Commit SHA to watch (defaults to HEAD)", required=False)
-def cmd_watch(target, sha=None, **_kwargs):
+def cmd_watch(target, run_id, sha=None, **_kwargs):
+    if sha and run_id:
+        print("Error: cannot use both SHA and --run-id", file=sys.stderr)
+        sys.exit(1)
+    flags = {"run-id": run_id or []}
     args = [sha] if sha else []
     from .commands.watch import run_cmd
-    run_cmd(target or None, args, {})
+    run_cmd(target or None, args, flags)
 
 
 # ---------------------------------------------------------------------------
