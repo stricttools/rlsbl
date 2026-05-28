@@ -1,11 +1,12 @@
 """Tests for rlsbl.utils — bump_version, extract_changelog_entry, and timeout helpers."""
 
+import json
 import os
 import shutil
 import tempfile
 import unittest
 
-from rlsbl.utils import bump_version, extract_changelog_entry, get_hook_timeout
+from rlsbl.utils import bump_version, extract_changelog_entry, get_hook_timeout, get_push_timeout
 
 
 class TestBumpVersion(unittest.TestCase):
@@ -199,6 +200,83 @@ class TestGetHookTimeout(unittest.TestCase):
             self.assertIn("invalid RLSBL_HOOK_TIMEOUT", captured.getvalue())
         finally:
             del os.environ["RLSBL_HOOK_TIMEOUT"]
+
+
+class TestGetPushTimeout(unittest.TestCase):
+    """Tests for get_push_timeout() — env var > config > error."""
+
+    def setUp(self):
+        # Save and clear env var
+        self._saved_env = os.environ.pop("RLSBL_PUSH_TIMEOUT", None)
+        # Save cwd and switch to a temp dir with .rlsbl/config.json
+        self._orig_cwd = os.getcwd()
+        self._tmp_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        os.chdir(self._orig_cwd)
+        shutil.rmtree(self._tmp_dir)
+        if self._saved_env is not None:
+            os.environ["RLSBL_PUSH_TIMEOUT"] = self._saved_env
+        else:
+            os.environ.pop("RLSBL_PUSH_TIMEOUT", None)
+
+    def _write_config(self, data):
+        """Write a .rlsbl/config.json in the temp dir."""
+        config_dir = os.path.join(self._tmp_dir, ".rlsbl")
+        os.makedirs(config_dir, exist_ok=True)
+        with open(os.path.join(config_dir, "config.json"), "w") as f:
+            json.dump(data, f)
+
+    def test_env_var_returns_value(self):
+        os.environ["RLSBL_PUSH_TIMEOUT"] = "60"
+        os.chdir(self._tmp_dir)
+        self.assertEqual(get_push_timeout(), 60)
+
+    def test_config_returns_value(self):
+        self._write_config({"push_timeout": 90})
+        os.chdir(self._tmp_dir)
+        self.assertEqual(get_push_timeout(), 90)
+
+    def test_neither_raises_error(self):
+        self._write_config({})
+        os.chdir(self._tmp_dir)
+        with self.assertRaises(ValueError) as ctx:
+            get_push_timeout()
+        self.assertIn("push_timeout not configured", str(ctx.exception))
+
+    def test_env_var_takes_precedence_over_config(self):
+        os.environ["RLSBL_PUSH_TIMEOUT"] = "45"
+        self._write_config({"push_timeout": 200})
+        os.chdir(self._tmp_dir)
+        self.assertEqual(get_push_timeout(), 45)
+
+    def test_invalid_env_var_raises_error(self):
+        os.environ["RLSBL_PUSH_TIMEOUT"] = "not-a-number"
+        os.chdir(self._tmp_dir)
+        with self.assertRaises(ValueError) as ctx:
+            get_push_timeout()
+        self.assertIn("Invalid RLSBL_PUSH_TIMEOUT", str(ctx.exception))
+
+    def test_zero_env_var_raises_error(self):
+        os.environ["RLSBL_PUSH_TIMEOUT"] = "0"
+        os.chdir(self._tmp_dir)
+        with self.assertRaises(ValueError) as ctx:
+            get_push_timeout()
+        self.assertIn("Invalid RLSBL_PUSH_TIMEOUT", str(ctx.exception))
+
+    def test_invalid_config_value_raises_error(self):
+        self._write_config({"push_timeout": "slow"})
+        os.chdir(self._tmp_dir)
+        with self.assertRaises(ValueError) as ctx:
+            get_push_timeout()
+        self.assertIn("Invalid push_timeout", str(ctx.exception))
+
+    def test_negative_config_value_raises_error(self):
+        self._write_config({"push_timeout": -10})
+        os.chdir(self._tmp_dir)
+        with self.assertRaises(ValueError) as ctx:
+            get_push_timeout()
+        self.assertIn("Invalid push_timeout", str(ctx.exception))
 
 
 if __name__ == "__main__":

@@ -70,18 +70,39 @@ def get_current_branch():
 
 
 def get_push_timeout():
-    """Return the push timeout in seconds, from RLSBL_PUSH_TIMEOUT or default 120."""
+    """Return the push timeout in seconds.
+
+    Precedence: RLSBL_PUSH_TIMEOUT env var > config.json push_timeout.
+    Raises ValueError if neither is set (no implicit default).
+    """
+    from .config import read_project_config
+
     raw = os.environ.get("RLSBL_PUSH_TIMEOUT")
-    if raw is None:
-        return 120
-    try:
-        val = int(raw)
-        if val <= 0:
-            raise ValueError
-        return val
-    except ValueError:
-        print(f'Warning: invalid RLSBL_PUSH_TIMEOUT="{raw}", using default 120s', file=sys.stderr)
-        return 120
+    if raw is not None:
+        try:
+            val = int(raw)
+            if val <= 0:
+                raise ValueError
+            return val
+        except ValueError:
+            raise ValueError(
+                f'Invalid RLSBL_PUSH_TIMEOUT="{raw}". Must be a positive integer.'
+            )
+
+    config = read_project_config()
+    config_val = config.get("push_timeout")
+    if config_val is not None:
+        if not isinstance(config_val, int) or config_val <= 0:
+            raise ValueError(
+                f'Invalid push_timeout in .rlsbl/config.json: {config_val!r}. '
+                f'Must be a positive integer.'
+            )
+        return config_val
+
+    raise ValueError(
+        "push_timeout not configured. Set it in .rlsbl/config.json "
+        "or via RLSBL_PUSH_TIMEOUT env var."
+    )
 
 
 def get_hook_timeout():

@@ -1,6 +1,7 @@
 {
   "private": false,
   "env_file": "~/Projects/.env",
+  "push_timeout": 120,
   "batch_limits": {
     "exclusions": []
   },
