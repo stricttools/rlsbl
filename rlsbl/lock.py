@@ -10,7 +10,7 @@ from contextlib import contextmanager
 _lock_fd = None
 
 
-def acquire_lock(lock_dir=".rlsbl"):
+def acquire_lock(lock_dir=".rlsbl", project_root=None):
     """Acquire an exclusive advisory lock on <lock_dir>/lock.
 
     If another process holds the lock, prints a waiting message and
@@ -19,7 +19,10 @@ def acquire_lock(lock_dir=".rlsbl"):
 
     lock_dir: directory for the lock file (default ".rlsbl").
               In monorepo mode pass ".rlsbl-monorepo".
+    project_root: when provided, lock_dir is resolved relative to it.
     """
+    if project_root is not None:
+        lock_dir = os.path.join(str(project_root), lock_dir)
     global _lock_fd
 
     # Guard against double-acquire: if already holding the lock, return early
@@ -59,14 +62,18 @@ def release_lock():
             pass
 
 
-def is_stale(lock_path=None):
+def is_stale(lock_path=None, project_root=None):
     """Check if a lock file exists but no process holds it.
 
     Returns True if the file exists and is not held (stale).
     Returns False if the file doesn't exist or is actively held.
+
+    project_root: when provided and lock_path is None, build the default
+                  lock path relative to project_root.
     """
     if lock_path is None:
-        lock_path = os.path.join(".rlsbl", "lock")
+        base = str(project_root) if project_root else "."
+        lock_path = os.path.join(base, ".rlsbl", "lock")
 
     if not os.path.exists(lock_path):
         return False
@@ -87,9 +94,9 @@ def is_stale(lock_path=None):
 
 
 @contextmanager
-def rlsbl_lock(lock_dir=".rlsbl"):
+def rlsbl_lock(lock_dir=".rlsbl", project_root=None):
     """Context manager that acquires the lock on enter and releases on exit."""
-    acquire_lock(lock_dir=lock_dir)
+    acquire_lock(lock_dir=lock_dir, project_root=project_root)
     try:
         yield
     finally:

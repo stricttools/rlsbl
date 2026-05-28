@@ -12,8 +12,10 @@ import tomlkit
 from .utils import run
 
 
-def ensure_npm_keyword(dir_path=".", quiet=False):
+def ensure_npm_keyword(dir_path=".", quiet=False, project_root=None):
     """Add "rlsbl" to the keywords array in package.json if not already present."""
+    if project_root is not None and dir_path == ".":
+        dir_path = str(project_root)
     pkg_path = os.path.join(dir_path, "package.json")
     with open(pkg_path, "r", encoding="utf-8") as f:
         raw = f.read()
@@ -46,8 +48,10 @@ def ensure_npm_keyword(dir_path=".", quiet=False):
     return True
 
 
-def ensure_pypi_keyword(dir_path=".", quiet=False):
+def ensure_pypi_keyword(dir_path=".", quiet=False, project_root=None):
     """Add "rlsbl" to the keywords array in pyproject.toml if not already present."""
+    if project_root is not None and dir_path == ".":
+        dir_path = str(project_root)
     pyproject_path = os.path.join(dir_path, "pyproject.toml")
     with open(pyproject_path, "r", encoding="utf-8") as f:
         doc = tomlkit.parse(f.read())
@@ -151,12 +155,12 @@ def ensure_github_topic(quiet=False):
     return True
 
 
-def ensure_tags(registries, target_paths=None, quiet=False):
+def ensure_tags(registries, target_paths=None, quiet=False, project_root=None):
     """Tag manifests and GitHub repo based on detected registries."""
     if target_paths is None:
         target_paths = {}
     if "npm" in registries:
-        ensure_npm_keyword(target_paths.get("npm", "."), quiet=quiet)
+        ensure_npm_keyword(target_paths.get("npm", "."), quiet=quiet, project_root=project_root)
     if "pypi" in registries:
-        ensure_pypi_keyword(target_paths.get("pypi", "."), quiet=quiet)
+        ensure_pypi_keyword(target_paths.get("pypi", "."), quiet=quiet, project_root=project_root)
     ensure_github_topic(quiet=quiet)
