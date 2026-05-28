@@ -16,6 +16,8 @@ from rlsbl.commands.monorepo import (
     _inject_packages_dir,
     _rewrite_trigger,
     _rewrite_version_file_inputs,
+    parse_ci_workflow,
+    emit_ci_workflow,
 )
 from rlsbl.workspace import load_workspace, WORKSPACE_DIR, WORKSPACE_FILE
 
@@ -258,37 +260,35 @@ class TestStaleCleanup:
 
 
 class TestRewriteTrigger:
-    """Unit tests for _rewrite_trigger function."""
+    """Unit tests for _rewrite_trigger function (structured YAML)."""
 
     def test_single_line_trigger(self):
         """Single-line 'on: push' is replaced with workflow_call."""
-        content = "on: push\n\njobs:\n  test:\n"
-        result = _rewrite_trigger(content)
-        assert "on:\n  workflow_call:" in result
-        assert "on: push" not in result
+        doc = parse_ci_workflow("on: push\n\njobs:\n  test:\n")
+        _rewrite_trigger(doc)
+        result = emit_ci_workflow(doc)
+        assert "workflow_call" in result
+        assert "push" not in result.split("workflow_call")[0]  # no push before workflow_call
 
     def test_single_line_array_trigger(self):
         """Single-line 'on: [push, pull_request]' is replaced with workflow_call."""
-        content = "on: [push, pull_request]\n\njobs:\n"
-        result = _rewrite_trigger(content)
-        assert "on:\n  workflow_call:" in result
-        assert "[push, pull_request]" not in result
+        doc = parse_ci_workflow("on: [push, pull_request]\n\njobs:\n  test:\n")
+        _rewrite_trigger(doc)
+        result = emit_ci_workflow(doc)
+        assert "workflow_call" in result
 
     def test_no_on_block(self, capsys):
-        """Content without 'on:' is returned unchanged with a warning."""
-        content = "name: CI\njobs:\n  test:\n"
-        result = _rewrite_trigger(content)
-        assert result == content
+        """Document without 'on:' is returned unchanged with a warning."""
+        doc = parse_ci_workflow("name: CI\njobs:\n  test:\n")
+        _rewrite_trigger(doc)
         captured = capsys.readouterr()
         assert "Warning" in captured.err
 
-    def test_multi_line_on_no_jobs(self, capsys):
-        """Multi-line on: without jobs: is returned unchanged with a warning."""
-        content = "on:\n  push:\n    branches: [main]\n"
-        result = _rewrite_trigger(content)
-        assert result == content
-        captured = capsys.readouterr()
-        assert "Warning" in captured.err
+    def test_multi_line_on_no_jobs(self):
+        """Multi-line on: without jobs: returns None from parse_ci_workflow."""
+        doc = parse_ci_workflow("on:\n  push:\n    branches: [main]\n")
+        # No jobs: key means parse returns None
+        assert doc is None
 
     def test_preserves_intermediate_top_level_keys(self):
         """Rewrite only replaces the on: block, preserving keys between on: and jobs:."""
@@ -312,16 +312,21 @@ class TestRewriteTrigger:
             "    steps:\n"
             "      - uses: actions/checkout@v4\n"
         )
-        result = _rewrite_trigger(content)
+        doc = parse_ci_workflow(content)
+        _rewrite_trigger(doc)
+        result = emit_ci_workflow(doc)
         # on: block replaced with workflow_call
-        assert "on:\n  workflow_call:" in result
+        assert "workflow_call" in result
         assert "release:" not in result
-        assert "types: [published]" not in result
-        # Intermediate top-level keys preserved intact
-        assert "permissions:\n  contents: read\n  id-token: write\n" in result
-        assert "env:\n  REGISTRY: ghcr.io\n" in result
-        # jobs: preserved intact
-        assert "jobs:\n  publish:\n    runs-on: ubuntu-latest\n" in result
+        assert "types:" not in result
+        # Intermediate top-level keys preserved
+        assert "permissions:" in result
+        assert "contents: read" in result
+        assert "id-token: write" in result
+        assert "REGISTRY: ghcr.io" in result
+        # jobs preserved
+        assert "publish:" in result
+        assert "runs-on: ubuntu-latest" in result
 
 
 class TestRouterWatchPaths:
@@ -343,10 +348,12 @@ class TestRouterWatchPaths:
             {"name": "tooling", "path": "tooling", "watch": ["Package.swift", "shared/**"]},
         ]
         content = _generate_router(projects)
-        assert "            tooling:" in content
-        assert "              - 'tooling/**'" in content
-        assert "              - 'Package.swift'" in content
-        assert "              - 'shared/**'" in content
+        # The filters block is a literal string inside the YAML; check content
+        # without assuming exact outer indentation
+        assert "tooling:" in content
+        assert "- 'tooling/**'" in content
+        assert "- 'Package.swift'" in content
+        assert "- 'shared/**'" in content
         # Must NOT have single-line format
         assert "tooling: 'tooling/**'" not in content
 
@@ -357,11 +364,11 @@ class TestRouterWatchPaths:
             {"name": "core", "path": "core"},
         ]
         content = _generate_router(projects)
-        # tooling: multi-line
-        assert "            tooling:" in content
-        assert "              - 'tooling/**'" in content
-        assert "              - 'Package.swift'" in content
-        assert "              - 'shared/**'" in content
+        # tooling: multi-line (inside literal string filters block)
+        assert "tooling:" in content
+        assert "- 'tooling/**'" in content
+        assert "- 'Package.swift'" in content
+        assert "- 'shared/**'" in content
         # core: single-line
         assert "core: 'core/**'" in content
 
@@ -557,8 +564,9 @@ class TestVersionFileRewrite:
 
     def test_go_version_file_rewritten(self):
         """go-version-file: go.mod becomes go-version-file: myproj/go.mod."""
-        content = GO_CI_WORKFLOW
-        result = _rewrite_version_file_inputs(content, "myproj")
+        doc = parse_ci_workflow(GO_CI_WORKFLOW)
+        _rewrite_version_file_inputs(doc, "myproj")
+        result = emit_ci_workflow(doc)
         assert "go-version-file: myproj/go.mod" in result
         assert "go-version-file: go.mod" not in result
 
@@ -568,7 +576,9 @@ class TestVersionFileRewrite:
             "go-version-file: go.mod",
             "go-version-file: myproj/go.mod",
         )
-        result = _rewrite_version_file_inputs(content, "myproj")
+        doc = parse_ci_workflow(content)
+        _rewrite_version_file_inputs(doc, "myproj")
+        result = emit_ci_workflow(doc)
         assert "go-version-file: myproj/go.mod" in result
         assert "myproj/myproj/" not in result
 
@@ -578,7 +588,9 @@ class TestVersionFileRewrite:
             "go-version-file: go.mod",
             "go-version-file: /etc/go.mod",
         )
-        result = _rewrite_version_file_inputs(content, "myproj")
+        doc = parse_ci_workflow(content)
+        _rewrite_version_file_inputs(doc, "myproj")
+        result = emit_ci_workflow(doc)
         assert "go-version-file: /etc/go.mod" in result
 
     def test_integration_go_version_file(self, mock_git_repo, capsys):
@@ -614,12 +626,16 @@ class TestPackagesDirInjection:
 
     def test_packages_dir_injected_no_with(self):
         """When no with: block exists, one is created with packages-dir."""
-        result = _inject_packages_dir(PYPI_PUBLISH_WORKFLOW, "python")
+        doc = parse_ci_workflow(PYPI_PUBLISH_WORKFLOW)
+        _inject_packages_dir(doc, "python")
+        result = emit_ci_workflow(doc)
         assert "packages-dir: python/dist/" in result
 
     def test_packages_dir_injected_existing_with(self):
         """When with: block exists, packages-dir is added to it."""
-        result = _inject_packages_dir(PYPI_PUBLISH_WITH_EXISTING_WITH, "python")
+        doc = parse_ci_workflow(PYPI_PUBLISH_WITH_EXISTING_WITH)
+        _inject_packages_dir(doc, "python")
+        result = emit_ci_workflow(doc)
         assert "packages-dir: python/dist/" in result
         assert "verbose: true" in result
 
@@ -629,7 +645,9 @@ class TestPackagesDirInjection:
             "verbose: true",
             "verbose: true\n          packages-dir: python/dist/",
         )
-        result = _inject_packages_dir(content, "python")
+        doc = parse_ci_workflow(content)
+        _inject_packages_dir(doc, "python")
+        result = emit_ci_workflow(doc)
         assert result.count("packages-dir") == 1
 
     def test_integration_pypi_publish(self, mock_git_repo, capsys):

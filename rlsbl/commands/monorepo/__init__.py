@@ -23,6 +23,8 @@ from .snapshot_cmd import _cmd_snapshot
 
 from .sync import (
     _cmd_sync,
+    parse_ci_workflow,
+    emit_ci_workflow,
     _rewrite_trigger,
     _inject_working_directory,
     _rewrite_version_file_inputs,
@@ -49,6 +51,8 @@ __all__ = [
     "_parse_version_tuple",
     # sync
     "_cmd_sync",
+    "parse_ci_workflow",
+    "emit_ci_workflow",
     "_rewrite_trigger",
     "_inject_working_directory",
     "_rewrite_version_file_inputs",
