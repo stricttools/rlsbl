@@ -693,7 +693,7 @@ class TestReadDeployConfig:
         config_dir = tmp_path / ".rlsbl"
         config_dir.mkdir()
         (config_dir / "config.json").write_text(json.dumps({"tag": True}))
-        monkeypatch.setattr("rlsbl.config._project_config", lambda: str(config_dir / "config.json"))
+        monkeypatch.setattr("rlsbl.config._project_config", lambda project_root=None: str(config_dir / "config.json"))
 
         targets, errors = read_deploy_config()
         assert targets == []
@@ -707,7 +707,7 @@ class TestReadDeployConfig:
         config_dir.mkdir()
         config = {"deploy": [{"name": "prod"}]}  # Missing required fields
         (config_dir / "config.json").write_text(json.dumps(config))
-        monkeypatch.setattr("rlsbl.config._project_config", lambda: str(config_dir / "config.json"))
+        monkeypatch.setattr("rlsbl.config._project_config", lambda project_root=None: str(config_dir / "config.json"))
 
         targets, errors = read_deploy_config()
         assert len(targets) == 1
@@ -721,7 +721,7 @@ class TestReadDeployConfig:
         config_dir.mkdir()
         config = {"deploy": [_minimal_target()]}
         (config_dir / "config.json").write_text(json.dumps(config))
-        monkeypatch.setattr("rlsbl.config._project_config", lambda: str(config_dir / "config.json"))
+        monkeypatch.setattr("rlsbl.config._project_config", lambda project_root=None: str(config_dir / "config.json"))
 
         targets, errors = read_deploy_config()
         assert len(targets) == 1
