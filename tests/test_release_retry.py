@@ -71,8 +71,9 @@ class TestReleaseRetry(unittest.TestCase):
 
         config = _make_retry_config("0.41.7", dispatch=["publish.yml", "ci.yml"])
 
-        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            run_cmd(config, {"yes": True})
+        with patch("rlsbl.commands.release_retry.time.sleep"):
+            with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
+                run_cmd(config, {"yes": True})
 
         # gh release view was called to verify existence
         mock_run.assert_any_call("gh", ["release", "view", "v0.41.7"])
@@ -115,8 +116,9 @@ class TestReleaseRetry(unittest.TestCase):
             ref="v0.41.7",
         )
 
-        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            run_cmd(config, {"yes": True})
+        with patch("rlsbl.commands.release_retry.time.sleep"):
+            with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
+                run_cmd(config, {"yes": True})
 
         output = mock_stdout.getvalue()
         self.assertIn("Dispatching workflows", output)
@@ -153,8 +155,9 @@ class TestReleaseRetry(unittest.TestCase):
             ref="v0.41.7",
         )
 
-        with patch("sys.stdout", new_callable=StringIO):
-            run_cmd(config, {"yes": True})
+        with patch("rlsbl.commands.release_retry.time.sleep"):
+            with patch("sys.stdout", new_callable=StringIO):
+                run_cmd(config, {"yes": True})
 
         # Both workflows must be dispatched
         dispatch_calls = [c for c in mock_run.call_args_list
@@ -249,9 +252,10 @@ class TestReleaseRetry(unittest.TestCase):
 
         config = _make_retry_config("0.41.7")
 
-        with patch("builtins.input") as mock_input:
-            with patch("sys.stdout", new_callable=StringIO):
-                run_cmd(config, {"yes": True})
+        with patch("rlsbl.commands.release_retry.time.sleep"):
+            with patch("builtins.input") as mock_input:
+                with patch("sys.stdout", new_callable=StringIO):
+                    run_cmd(config, {"yes": True})
 
         # input() should never be called when --yes is set
         mock_input.assert_not_called()
@@ -294,8 +298,9 @@ class TestReleaseRetry(unittest.TestCase):
 
         config = _make_retry_config("0.41.7")
 
-        with patch("sys.stdout", new_callable=StringIO):
-            run_cmd(config, {"yes": True})
+        with patch("rlsbl.commands.release_retry.time.sleep"):
+            with patch("sys.stdout", new_callable=StringIO):
+                run_cmd(config, {"yes": True})
 
         # Monorepo tag format should be used
         target.monorepo_tag_format.assert_called_once_with("my-pkg", "0.41.7", path="packages/my-pkg")
@@ -321,7 +326,11 @@ class TestReleaseRetry(unittest.TestCase):
     def test_watch_flag_calls_watch_run_cmd(self, _gh_inst, _gh_auth, _ws_root,
                                              mock_targets_dict, mock_detect,
                                              _exists, mock_run, mock_cleanup):
-        """--watch flag calls watch.run_cmd after dispatch instead of printing a hint."""
+        """--watch flag calls watch.run_cmd after dispatch instead of printing a hint.
+
+        When no run IDs are captured (dispatch returns no URL, fallback polling
+        fails), falls back to SHA-based watching.
+        """
         target = self._make_mock_target()
         entry = self._make_mock_entry()
         mock_detect.return_value = [entry]
@@ -330,20 +339,21 @@ class TestReleaseRetry(unittest.TestCase):
 
         config = _make_retry_config("0.41.7")
 
-        with patch("rlsbl.commands.release_retry.watch_run_cmd") as mock_watch:
-            with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-                run_cmd(config, {"yes": True, "watch": True})
+        with patch("rlsbl.commands.release_retry.time.sleep"):
+            with patch("rlsbl.commands.release_retry.watch_run_cmd") as mock_watch:
+                with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
+                    run_cmd(config, {"yes": True, "watch": True})
 
-            # Watch was called with the commit SHA
-            mock_watch.assert_called_once_with(
-                None,
-                ["abc123def456789012345678901234567890abcd"],
-                {},
-            )
+                # Watch was called with the commit SHA (no run IDs captured)
+                mock_watch.assert_called_once_with(
+                    None,
+                    ["abc123def456789012345678901234567890abcd"],
+                    {},
+                )
 
-            # Watch hint should NOT be in output
-            output = mock_stdout.getvalue()
-            self.assertNotIn("Watch CI:", output)
+                # Watch hint should NOT be in output
+                output = mock_stdout.getvalue()
+                self.assertNotIn("Watch CI:", output)
 
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
@@ -469,7 +479,8 @@ class TestReleaseRetry(unittest.TestCase):
             with patch("rlsbl.commands.release_retry.get_retry_file_path", return_value=retry_path), \
                  patch("rlsbl.commands.release_retry.run") as mock_run, \
                  patch("os.path.exists", return_value=True), \
-                 patch("rlsbl.commands.release_retry._cleanup_retry_file"):
+                 patch("rlsbl.commands.release_retry._cleanup_retry_file"), \
+                 patch("rlsbl.commands.release_retry.time.sleep"):
                 mock_run.side_effect = self._run_side_effect
 
                 with patch("sys.stdout", new_callable=StringIO):
@@ -498,8 +509,9 @@ class TestReleaseRetry(unittest.TestCase):
 
         config = _make_retry_config("0.41.7")
 
-        with patch("sys.stdout", new_callable=StringIO):
-            run_cmd(config, {"yes": True})
+        with patch("rlsbl.commands.release_retry.time.sleep"):
+            with patch("sys.stdout", new_callable=StringIO):
+                run_cmd(config, {"yes": True})
 
         # _cleanup_retry_file was called (which uses saferm internally)
         mock_cleanup.assert_called_once()
@@ -663,6 +675,261 @@ class TestScaffoldRetryFile(unittest.TestCase):
             self.assertIn("# Git ref to dispatch CI against", raw)
             # No assets field
             self.assertNotIn("assets", data)
+
+
+class TestRunIdCapture(unittest.TestCase):
+    """Tests for capturing dispatched run IDs and passing them to watch."""
+
+    def _make_mock_target(self, version="0.41.7"):
+        target = MagicMock()
+        target.read_version.return_value = version
+        target.tag_format.side_effect = lambda v: f"v{v}"
+        target.monorepo_tag_format.side_effect = lambda name, v, path=None: f"{name}@v{v}"
+        return target
+
+    def _make_mock_entry(self, name="pypi", path="."):
+        entry = MagicMock()
+        entry.name = name
+        entry.path = path
+        return entry
+
+    @patch("rlsbl.commands.release_retry._cleanup_retry_file")
+    @patch("rlsbl.commands.release_retry.run")
+    @patch("os.path.exists", return_value=True)
+    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.TARGETS")
+    @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
+    @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
+    @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
+    def test_run_id_captured_from_dispatch_url(self, _gh_inst, _gh_auth, _ws_root,
+                                                mock_targets_dict, mock_detect,
+                                                _exists, mock_run, mock_cleanup):
+        """When gh workflow run returns a URL with a run ID, it is captured."""
+        target = self._make_mock_target()
+        entry = self._make_mock_entry()
+        mock_detect.return_value = [entry]
+        mock_targets_dict.__getitem__ = lambda self, key: target
+
+        def run_effect(*args, **kwargs):
+            cmd, cmd_args = args[0], args[1] if len(args) > 1 else []
+            if cmd == "gh" and cmd_args[:2] == ["release", "view"]:
+                return ""
+            if cmd == "gh" and cmd_args[:2] == ["workflow", "run"]:
+                return "https://github.com/owner/repo/actions/runs/98765"
+            if cmd == "git" and cmd_args[:2] == ["rev-list", "-1"]:
+                return "abc123def456789012345678901234567890abcd"
+            return ""
+
+        mock_run.side_effect = run_effect
+        config = _make_retry_config("0.41.7", dispatch=["publish.yml"])
+
+        with patch("rlsbl.commands.release_retry.watch_run_cmd") as mock_watch:
+            with patch("sys.stdout", new_callable=StringIO):
+                run_cmd(config, {"yes": True, "watch": True})
+
+            mock_watch.assert_called_once_with(None, [], {"run-id": ["98765"]})
+
+    @patch("rlsbl.commands.release_retry._cleanup_retry_file")
+    @patch("rlsbl.commands.release_retry.run")
+    @patch("os.path.exists", return_value=True)
+    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.TARGETS")
+    @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
+    @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
+    @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
+    def test_fallback_polling_when_no_url(self, _gh_inst, _gh_auth, _ws_root,
+                                           mock_targets_dict, mock_detect,
+                                           _exists, mock_run, mock_cleanup):
+        """When gh workflow run returns no URL, falls back to polling gh run list."""
+        target = self._make_mock_target()
+        entry = self._make_mock_entry()
+        mock_detect.return_value = [entry]
+        mock_targets_dict.__getitem__ = lambda self, key: target
+
+        def run_effect(*args, **kwargs):
+            cmd, cmd_args = args[0], args[1] if len(args) > 1 else []
+            if cmd == "gh" and cmd_args[:2] == ["release", "view"]:
+                return ""
+            if cmd == "gh" and cmd_args[:2] == ["workflow", "run"]:
+                return ""  # no URL returned
+            if cmd == "gh" and cmd_args[:2] == ["run", "list"]:
+                return '[{"databaseId": 55555}]'
+            if cmd == "git" and cmd_args[:2] == ["rev-list", "-1"]:
+                return "abc123def456789012345678901234567890abcd"
+            return ""
+
+        mock_run.side_effect = run_effect
+        config = _make_retry_config("0.41.7", dispatch=["ci.yml"])
+
+        with patch("rlsbl.commands.release_retry.time.sleep"):
+            with patch("rlsbl.commands.release_retry.watch_run_cmd") as mock_watch:
+                with patch("sys.stdout", new_callable=StringIO):
+                    run_cmd(config, {"yes": True, "watch": True})
+
+                mock_watch.assert_called_once_with(None, [], {"run-id": ["55555"]})
+
+    @patch("rlsbl.commands.release_retry._cleanup_retry_file")
+    @patch("rlsbl.commands.release_retry.run")
+    @patch("os.path.exists", return_value=True)
+    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.TARGETS")
+    @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
+    @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
+    @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
+    def test_sha_fallback_when_no_run_ids(self, _gh_inst, _gh_auth, _ws_root,
+                                            mock_targets_dict, mock_detect,
+                                            _exists, mock_run, mock_cleanup):
+        """When no run IDs are captured (dispatch returns nothing, polling fails), falls back to SHA-based watching."""
+        target = self._make_mock_target()
+        entry = self._make_mock_entry()
+        mock_detect.return_value = [entry]
+        mock_targets_dict.__getitem__ = lambda self, key: target
+
+        def run_effect(*args, **kwargs):
+            cmd, cmd_args = args[0], args[1] if len(args) > 1 else []
+            if cmd == "gh" and cmd_args[:2] == ["release", "view"]:
+                return ""
+            if cmd == "gh" and cmd_args[:2] == ["workflow", "run"]:
+                return ""  # no URL
+            if cmd == "gh" and cmd_args[:2] == ["run", "list"]:
+                return "[]"  # empty list
+            if cmd == "git" and cmd_args[:2] == ["rev-list", "-1"]:
+                return "abc123def456789012345678901234567890abcd"
+            return ""
+
+        mock_run.side_effect = run_effect
+        config = _make_retry_config("0.41.7", dispatch=["ci.yml"])
+
+        with patch("rlsbl.commands.release_retry.time.sleep"):
+            with patch("rlsbl.commands.release_retry.watch_run_cmd") as mock_watch:
+                with patch("sys.stdout", new_callable=StringIO):
+                    run_cmd(config, {"yes": True, "watch": True})
+
+                # Falls back to SHA-based watching
+                mock_watch.assert_called_once_with(
+                    None,
+                    ["abc123def456789012345678901234567890abcd"],
+                    {},
+                )
+
+    @patch("rlsbl.commands.release_retry._cleanup_retry_file")
+    @patch("rlsbl.commands.release_retry.run")
+    @patch("os.path.exists", return_value=True)
+    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.TARGETS")
+    @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
+    @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
+    @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
+    def test_hint_output_with_run_ids(self, _gh_inst, _gh_auth, _ws_root,
+                                       mock_targets_dict, mock_detect,
+                                       _exists, mock_run, mock_cleanup):
+        """When not watching and run IDs are captured, hint includes --run-id flags."""
+        target = self._make_mock_target()
+        entry = self._make_mock_entry()
+        mock_detect.return_value = [entry]
+        mock_targets_dict.__getitem__ = lambda self, key: target
+
+        def run_effect(*args, **kwargs):
+            cmd, cmd_args = args[0], args[1] if len(args) > 1 else []
+            if cmd == "gh" and cmd_args[:2] == ["release", "view"]:
+                return ""
+            if cmd == "gh" and cmd_args[:2] == ["workflow", "run"]:
+                # Return different URLs for different workflows
+                filename = cmd_args[2]
+                if filename == "publish.yml":
+                    return "https://github.com/owner/repo/actions/runs/111"
+                return "https://github.com/owner/repo/actions/runs/222"
+            if cmd == "git" and cmd_args[:2] == ["rev-list", "-1"]:
+                return "abc123def456789012345678901234567890abcd"
+            return ""
+
+        mock_run.side_effect = run_effect
+        config = _make_retry_config("0.41.7", dispatch=["publish.yml", "ci.yml"])
+
+        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
+            run_cmd(config, {"yes": True})
+
+        output = mock_stdout.getvalue()
+        self.assertIn("Watch CI: rlsbl watch --run-id 111 --run-id 222", output)
+
+    @patch("rlsbl.commands.release_retry._cleanup_retry_file")
+    @patch("rlsbl.commands.release_retry.run")
+    @patch("os.path.exists", return_value=True)
+    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.TARGETS")
+    @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
+    @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
+    @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
+    def test_hint_output_sha_fallback(self, _gh_inst, _gh_auth, _ws_root,
+                                       mock_targets_dict, mock_detect,
+                                       _exists, mock_run, mock_cleanup):
+        """When not watching and no run IDs captured, hint shows SHA."""
+        target = self._make_mock_target()
+        entry = self._make_mock_entry()
+        mock_detect.return_value = [entry]
+        mock_targets_dict.__getitem__ = lambda self, key: target
+
+        def run_effect(*args, **kwargs):
+            cmd, cmd_args = args[0], args[1] if len(args) > 1 else []
+            if cmd == "gh" and cmd_args[:2] == ["release", "view"]:
+                return ""
+            if cmd == "gh" and cmd_args[:2] == ["workflow", "run"]:
+                return ""
+            if cmd == "gh" and cmd_args[:2] == ["run", "list"]:
+                return "[]"
+            if cmd == "git" and cmd_args[:2] == ["rev-list", "-1"]:
+                return "abc123def456789012345678901234567890abcd"
+            return ""
+
+        mock_run.side_effect = run_effect
+        config = _make_retry_config("0.41.7", dispatch=["ci.yml"])
+
+        with patch("rlsbl.commands.release_retry.time.sleep"):
+            with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
+                run_cmd(config, {"yes": True})
+
+        output = mock_stdout.getvalue()
+        self.assertIn("Watch CI: rlsbl watch abc123def456789012345678901234567890abcd", output)
+        self.assertNotIn("--run-id", output)
+
+    @patch("rlsbl.commands.release_retry._cleanup_retry_file")
+    @patch("rlsbl.commands.release_retry.run")
+    @patch("os.path.exists", return_value=True)
+    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.TARGETS")
+    @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
+    @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
+    @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
+    def test_multiple_workflows_collect_multiple_run_ids(self, _gh_inst, _gh_auth, _ws_root,
+                                                          mock_targets_dict, mock_detect,
+                                                          _exists, mock_run, mock_cleanup):
+        """Multiple dispatched workflows each return a run ID -- all are collected."""
+        target = self._make_mock_target()
+        entry = self._make_mock_entry()
+        mock_detect.return_value = [entry]
+        mock_targets_dict.__getitem__ = lambda self, key: target
+
+        call_count = {"n": 0}
+
+        def run_effect(*args, **kwargs):
+            cmd, cmd_args = args[0], args[1] if len(args) > 1 else []
+            if cmd == "gh" and cmd_args[:2] == ["release", "view"]:
+                return ""
+            if cmd == "gh" and cmd_args[:2] == ["workflow", "run"]:
+                call_count["n"] += 1
+                return f"https://github.com/owner/repo/actions/runs/{1000 + call_count['n']}"
+            if cmd == "git" and cmd_args[:2] == ["rev-list", "-1"]:
+                return "abc123def456789012345678901234567890abcd"
+            return ""
+
+        mock_run.side_effect = run_effect
+        config = _make_retry_config("0.41.7", dispatch=["ci.yml", "publish.yml", "deploy.yml"])
+
+        with patch("rlsbl.commands.release_retry.watch_run_cmd") as mock_watch:
+            with patch("sys.stdout", new_callable=StringIO):
+                run_cmd(config, {"yes": True, "watch": True})
+
+            mock_watch.assert_called_once_with(None, [], {"run-id": ["1001", "1002", "1003"]})
 
 
 if __name__ == "__main__":

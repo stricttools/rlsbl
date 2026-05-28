@@ -9,9 +9,12 @@ configuration (version, dispatch, ref). If the file does not exist, it
 auto-scaffolds one from project state and proceeds.
 """
 
+import json
 import os
+import re
 import subprocess
 import sys
+import time
 
 import tomlkit
 
@@ -216,12 +219,27 @@ def run_cmd(retry_config, flags, project_root=None):
             print("Aborted.", file=sys.stderr)
             sys.exit(1)
 
-    # Dispatch all configured workflows
+    # Dispatch all configured workflows and capture run IDs
     log("Dispatching workflows...")
+    collected_run_ids = []
     for filename in dispatch:
         try:
-            run("gh", ["workflow", "run", filename, "--ref", retry_config.ref])
+            output = run("gh", ["workflow", "run", filename, "--ref", retry_config.ref])
             log(f"  Dispatched: {filename}")
+            # gh workflow run may return a URL like https://github.com/owner/repo/actions/runs/12345
+            match = re.search(r'/actions/runs/(\d+)', output)
+            if match:
+                collected_run_ids.append(match.group(1))
+            else:
+                # Fallback: poll for the most recent run of this workflow
+                time.sleep(2)  # brief delay for GitHub to register the run
+                try:
+                    poll_output = run("gh", ["run", "list", "--workflow", filename, "--limit", "1", "--json", "databaseId"])
+                    poll_data = json.loads(poll_output)
+                    if poll_data:
+                        collected_run_ids.append(str(poll_data[0]["databaseId"]))
+                except Exception:
+                    pass  # best-effort -- if polling fails, we fall back to SHA-based watching
         except Exception as e:
             print(f"  Warning: failed to dispatch {filename}: {e}", file=sys.stderr)
 
@@ -231,6 +249,12 @@ def run_cmd(retry_config, flags, project_root=None):
 
     # Watch CI or print hint
     if watch:
-        watch_run_cmd(None, [commit_sha], {})
+        if collected_run_ids:
+            watch_run_cmd(None, [], {"run-id": collected_run_ids})
+        else:
+            watch_run_cmd(None, [commit_sha], {})
     else:
-        log(f"Watch CI: rlsbl watch {commit_sha}")
+        if collected_run_ids:
+            log(f"Watch CI: rlsbl watch --run-id {' --run-id '.join(collected_run_ids)}")
+        else:
+            log(f"Watch CI: rlsbl watch {commit_sha}")
