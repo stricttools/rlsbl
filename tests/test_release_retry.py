@@ -9,32 +9,16 @@ from rlsbl.commands.release_retry import run_cmd, _find_dispatch_workflows
 from rlsbl.release_file import RetryConfig
 
 
-# Shared changelog content for tests
-CHANGELOG = """\
-# Changelog
-
-## 0.41.7
-
-### Features
-- Added retry command for CI failures
-
-## 0.41.6
-
-- Previous release
-"""
-
-
-def _make_retry_config(version="0.41.7", workflows=None, ci_ref=None, assets=False):
+def _make_retry_config(version="0.41.7", dispatch=None, ref=None):
     """Create a RetryConfig with sensible defaults."""
-    if workflows is None:
-        workflows = ["publish.yml"]
-    if ci_ref is None:
-        ci_ref = f"v{version}"
+    if dispatch is None:
+        dispatch = ["ci.yml"]
+    if ref is None:
+        ref = f"v{version}"
     return RetryConfig(
         version=version,
-        workflows=workflows,
-        ci_ref=ci_ref,
-        assets=assets,
+        dispatch=dispatch,
+        ref=ref,
     )
 
 
@@ -61,18 +45,14 @@ class TestReleaseRetry(unittest.TestCase):
         cmd, cmd_args = args[0], args[1] if len(args) > 1 else []
         if cmd == "gh" and cmd_args[:2] == ["release", "view"]:
             return ""
-        if cmd == "gh" and cmd_args[:2] == ["release", "delete"]:
-            return ""
-        if cmd == "gh" and cmd_args[:2] == ["release", "create"]:
+        if cmd == "gh" and cmd_args[:2] == ["workflow", "run"]:
             return ""
         if cmd == "git" and cmd_args[:2] == ["rev-list", "-1"]:
             return "abc123def456789012345678901234567890abcd"
         return ""
 
     @patch("rlsbl.commands.release_retry._cleanup_retry_file")
-    @patch("rlsbl.commands.release_retry.upload_release_assets")
     @patch("rlsbl.commands.release_retry.run")
-    @patch("rlsbl.commands.release_retry.extract_changelog_entry", return_value="### Features\n- Added retry command")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.release_retry.detect_targets")
     @patch("rlsbl.commands.release_retry.TARGETS")
@@ -81,57 +61,48 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
     def test_happy_path_with_retry_config(self, _gh_inst, _gh_auth, _ws_root,
                                            mock_targets_dict, mock_detect,
-                                           _exists, mock_extract, mock_run,
-                                           mock_upload, mock_cleanup):
-        """Happy path: RetryConfig provided, delete+create+watch hint."""
+                                           _exists, mock_run, mock_cleanup):
+        """Happy path: dispatch workflows, verify release exists, watch hint."""
         target = self._make_mock_target("0.41.7")
         entry = self._make_mock_entry()
         mock_detect.return_value = [entry]
         mock_targets_dict.__getitem__ = lambda self, key: target
         mock_run.side_effect = self._run_side_effect
 
-        config = _make_retry_config("0.41.7", assets=False)
+        config = _make_retry_config("0.41.7", dispatch=["publish.yml", "ci.yml"])
 
-        with patch("builtins.open", unittest.mock.mock_open()), \
-             patch("os.rename"), \
-             patch("os.unlink"):
-            with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-                run_cmd(config, {"yes": True})
+        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
+            run_cmd(config, {"yes": True})
 
         # gh release view was called to verify existence
         mock_run.assert_any_call("gh", ["release", "view", "v0.41.7"])
 
-        # gh release delete was called
-        mock_run.assert_any_call("gh", ["release", "delete", "v0.41.7", "--yes"])
+        # gh workflow run was called for each workflow in config.dispatch
+        dispatch_calls = [c for c in mock_run.call_args_list
+                          if len(c[0]) >= 2 and c[0][1][:2] == ["workflow", "run"]]
+        self.assertEqual(len(dispatch_calls), 2)
+        self.assertEqual(dispatch_calls[0][0][1], ["workflow", "run", "publish.yml", "--ref", "v0.41.7"])
+        self.assertEqual(dispatch_calls[1][0][1], ["workflow", "run", "ci.yml", "--ref", "v0.41.7"])
 
-        # gh release create was called
-        create_calls = [c for c in mock_run.call_args_list
-                        if len(c[0]) >= 2 and c[0][1][:2] == ["release", "create"]]
-        self.assertEqual(len(create_calls), 1)
-        self.assertIn("v0.41.7", create_calls[0][0][1])
-
-        # Assets NOT uploaded (assets=False)
-        mock_upload.assert_not_called()
+        # Cleanup (saferm) was called
+        mock_cleanup.assert_called_once()
 
         # Watch hint was printed (not watching since watch=False by default)
         output = mock_stdout.getvalue()
         self.assertIn("Watch CI:", output)
 
     @patch("rlsbl.commands.release_retry._cleanup_retry_file")
-    @patch("rlsbl.commands.release_retry.upload_release_assets")
     @patch("rlsbl.commands.release_retry.run")
-    @patch("rlsbl.commands.release_retry.extract_changelog_entry", return_value="### Features\n- Fix")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.release_retry.detect_targets")
     @patch("rlsbl.commands.release_retry.TARGETS")
     @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
-    def test_retry_config_uses_configured_workflows(self, _gh_inst, _gh_auth, _ws_root,
-                                                      mock_targets_dict, mock_detect,
-                                                      _exists, mock_extract, mock_run,
-                                                      mock_upload, mock_cleanup):
-        """RetryConfig workflows and ci_ref are always used for dispatch."""
+    def test_retry_config_uses_dispatch_and_ref(self, _gh_inst, _gh_auth, _ws_root,
+                                                  mock_targets_dict, mock_detect,
+                                                  _exists, mock_run, mock_cleanup):
+        """RetryConfig dispatch and ref fields are used for workflow dispatch."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
         mock_detect.return_value = [entry]
@@ -140,15 +111,12 @@ class TestReleaseRetry(unittest.TestCase):
 
         config = _make_retry_config(
             "0.41.7",
-            workflows=["publish.yml", "ci.yml"],
-            ci_ref="v0.41.7",
+            dispatch=["publish.yml", "ci.yml"],
+            ref="v0.41.7",
         )
 
-        with patch("builtins.open", unittest.mock.mock_open()), \
-             patch("os.rename"), \
-             patch("os.unlink"):
-            with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-                run_cmd(config, {"yes": True})
+        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
+            run_cmd(config, {"yes": True})
 
         output = mock_stdout.getvalue()
         self.assertIn("Dispatching workflows", output)
@@ -157,14 +125,12 @@ class TestReleaseRetry(unittest.TestCase):
         dispatch_calls = [c for c in mock_run.call_args_list
                           if len(c[0]) >= 2 and c[0][1][:2] == ["workflow", "run"]]
         self.assertEqual(len(dispatch_calls), 2)
-        # Verify ci_ref from config is used
+        # Verify ref from config is used
         self.assertEqual(dispatch_calls[0][0][1], ["workflow", "run", "publish.yml", "--ref", "v0.41.7"])
         self.assertEqual(dispatch_calls[1][0][1], ["workflow", "run", "ci.yml", "--ref", "v0.41.7"])
 
     @patch("rlsbl.commands.release_retry._cleanup_retry_file")
-    @patch("rlsbl.commands.release_retry.upload_release_assets")
     @patch("rlsbl.commands.release_retry.run")
-    @patch("rlsbl.commands.release_retry.extract_changelog_entry", return_value="### Features\n- Fix")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.release_retry.detect_targets")
     @patch("rlsbl.commands.release_retry.TARGETS")
@@ -173,9 +139,8 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
     def test_all_workflows_dispatched_unconditionally(self, _gh_inst, _gh_auth, _ws_root,
                                                        mock_targets_dict, mock_detect,
-                                                       _exists, mock_extract, mock_run,
-                                                       mock_upload, mock_cleanup):
-        """Both ci.yml and publish.yml are dispatched regardless of existing CI runs."""
+                                                       _exists, mock_run, mock_cleanup):
+        """All workflows in dispatch list are dispatched unconditionally."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
         mock_detect.return_value = [entry]
@@ -184,15 +149,12 @@ class TestReleaseRetry(unittest.TestCase):
 
         config = _make_retry_config(
             "0.41.7",
-            workflows=["ci.yml", "publish.yml"],
-            ci_ref="v0.41.7",
+            dispatch=["ci.yml", "publish.yml"],
+            ref="v0.41.7",
         )
 
-        with patch("builtins.open", unittest.mock.mock_open()), \
-             patch("os.rename"), \
-             patch("os.unlink"):
-            with patch("sys.stdout", new_callable=StringIO):
-                run_cmd(config, {"yes": True})
+        with patch("sys.stdout", new_callable=StringIO):
+            run_cmd(config, {"yes": True})
 
         # Both workflows must be dispatched
         dispatch_calls = [c for c in mock_run.call_args_list
@@ -201,7 +163,7 @@ class TestReleaseRetry(unittest.TestCase):
         dispatched_filenames = [c[0][1][2] for c in dispatch_calls]
         self.assertIn("ci.yml", dispatched_filenames)
         self.assertIn("publish.yml", dispatched_filenames)
-        # All dispatches use ci_ref
+        # All dispatches use ref from config
         for call in dispatch_calls:
             self.assertEqual(call[0][1][3:], ["--ref", "v0.41.7"])
 
@@ -234,7 +196,6 @@ class TestReleaseRetry(unittest.TestCase):
         self.assertIn("no GitHub Release found", mock_stderr.getvalue())
 
     @patch("rlsbl.commands.release_retry.run")
-    @patch("rlsbl.commands.release_retry.extract_changelog_entry", return_value="### Features\n- Fix")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.release_retry.detect_targets")
     @patch("rlsbl.commands.release_retry.TARGETS")
@@ -243,8 +204,8 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
     def test_dry_run_prints_plan_no_mutations(self, _gh_inst, _gh_auth, _ws_root,
                                                mock_targets_dict, mock_detect,
-                                               _exists, mock_extract, mock_run):
-        """--dry-run prints what would happen without deleting or creating."""
+                                               _exists, mock_run):
+        """--dry-run prints what would dispatch without actually dispatching."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
         mock_detect.return_value = [entry]
@@ -257,24 +218,19 @@ class TestReleaseRetry(unittest.TestCase):
             run_cmd(config, {"dry-run": True})
 
         output = mock_stdout.getvalue()
-        self.assertIn("Would delete and re-create", output)
+        self.assertIn("Would dispatch", output)
         self.assertIn("v0.41.7", output)
 
         # gh release view should be called (to verify existence)
         mock_run.assert_any_call("gh", ["release", "view", "v0.41.7"])
 
-        # gh release delete and create should NOT be called
-        delete_calls = [c for c in mock_run.call_args_list
-                        if len(c[0]) >= 2 and c[0][1][:2] == ["release", "delete"]]
-        self.assertEqual(len(delete_calls), 0)
-        create_calls = [c for c in mock_run.call_args_list
-                        if len(c[0]) >= 2 and c[0][1][:2] == ["release", "create"]]
-        self.assertEqual(len(create_calls), 0)
+        # gh workflow run should NOT be called in dry-run
+        dispatch_calls = [c for c in mock_run.call_args_list
+                          if len(c[0]) >= 2 and c[0][1][:2] == ["workflow", "run"]]
+        self.assertEqual(len(dispatch_calls), 0)
 
     @patch("rlsbl.commands.release_retry._cleanup_retry_file")
-    @patch("rlsbl.commands.release_retry.upload_release_assets")
     @patch("rlsbl.commands.release_retry.run")
-    @patch("rlsbl.commands.release_retry.extract_changelog_entry", return_value="### Features\n- Fix")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.release_retry.detect_targets")
     @patch("rlsbl.commands.release_retry.TARGETS")
@@ -283,8 +239,7 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
     def test_yes_skips_confirmation(self, _gh_inst, _gh_auth, _ws_root,
                                      mock_targets_dict, mock_detect,
-                                     _exists, mock_extract, mock_run,
-                                     mock_upload, mock_cleanup):
+                                     _exists, mock_run, mock_cleanup):
         """--yes flag skips the interactive confirmation prompt."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
@@ -294,91 +249,20 @@ class TestReleaseRetry(unittest.TestCase):
 
         config = _make_retry_config("0.41.7")
 
-        with patch("builtins.open", unittest.mock.mock_open()), \
-             patch("os.rename"), \
-             patch("os.unlink"), \
-             patch("builtins.input") as mock_input:
+        with patch("builtins.input") as mock_input:
             with patch("sys.stdout", new_callable=StringIO):
                 run_cmd(config, {"yes": True})
 
         # input() should never be called when --yes is set
         mock_input.assert_not_called()
 
-        # Release operations should proceed
-        mock_run.assert_any_call("gh", ["release", "delete", "v0.41.7", "--yes"])
+        # Dispatch should have proceeded
+        dispatch_calls = [c for c in mock_run.call_args_list
+                          if len(c[0]) >= 2 and c[0][1][:2] == ["workflow", "run"]]
+        self.assertGreater(len(dispatch_calls), 0)
 
     @patch("rlsbl.commands.release_retry._cleanup_retry_file")
-    @patch("rlsbl.commands.release_retry.upload_release_assets")
     @patch("rlsbl.commands.release_retry.run")
-    @patch("rlsbl.commands.release_retry.extract_changelog_entry", return_value="### Features\n- Fix")
-    @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.release_retry.detect_targets")
-    @patch("rlsbl.commands.release_retry.TARGETS")
-    @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
-    @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
-    @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
-    def test_asset_reupload_when_enabled(self, _gh_inst, _gh_auth, _ws_root,
-                                          mock_targets_dict, mock_detect,
-                                          _exists, mock_extract, mock_run,
-                                          mock_upload, mock_cleanup):
-        """Verify upload_release_assets is called when assets=True in config."""
-        target = self._make_mock_target()
-        entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
-        mock_targets_dict.__getitem__ = lambda self, key: target
-        mock_run.side_effect = self._run_side_effect
-
-        config = _make_retry_config("0.41.7", assets=True)
-
-        with patch("builtins.open", unittest.mock.mock_open()), \
-             patch("os.rename"), \
-             patch("os.unlink"):
-            with patch("sys.stdout", new_callable=StringIO):
-                run_cmd(config, {"yes": True})
-
-        mock_upload.assert_called_once_with(
-            "v0.41.7",  # tag
-            ".",         # version_dir
-            "0.41.7",   # version
-            unittest.mock.ANY,  # log function
-            {"yes": True},  # flags
-        )
-
-    @patch("rlsbl.commands.release_retry._cleanup_retry_file")
-    @patch("rlsbl.commands.release_retry.upload_release_assets")
-    @patch("rlsbl.commands.release_retry.run")
-    @patch("rlsbl.commands.release_retry.extract_changelog_entry", return_value="### Features\n- Fix")
-    @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.release_retry.detect_targets")
-    @patch("rlsbl.commands.release_retry.TARGETS")
-    @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
-    @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
-    @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
-    def test_asset_not_uploaded_when_disabled(self, _gh_inst, _gh_auth, _ws_root,
-                                               mock_targets_dict, mock_detect,
-                                               _exists, mock_extract, mock_run,
-                                               mock_upload, mock_cleanup):
-        """Verify upload_release_assets is NOT called when assets=False."""
-        target = self._make_mock_target()
-        entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
-        mock_targets_dict.__getitem__ = lambda self, key: target
-        mock_run.side_effect = self._run_side_effect
-
-        config = _make_retry_config("0.41.7", assets=False)
-
-        with patch("builtins.open", unittest.mock.mock_open()), \
-             patch("os.rename"), \
-             patch("os.unlink"):
-            with patch("sys.stdout", new_callable=StringIO):
-                run_cmd(config, {"yes": True})
-
-        mock_upload.assert_not_called()
-
-    @patch("rlsbl.commands.release_retry._cleanup_retry_file")
-    @patch("rlsbl.commands.release_retry.upload_release_assets")
-    @patch("rlsbl.commands.release_retry.run")
-    @patch("rlsbl.commands.release_retry.extract_changelog_entry", return_value="### Features\n- Fix")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.release_retry.detect_targets")
     @patch("rlsbl.commands.release_retry.TARGETS")
@@ -388,9 +272,8 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
     def test_monorepo_tag_format(self, _gh_inst, _gh_auth, _ws_root,
                                   mock_resolve, mock_targets_dict, mock_detect,
-                                  _exists, mock_extract, mock_run,
-                                  mock_upload, mock_cleanup):
-        """In monorepo context, uses monorepo_tag_format for the tag."""
+                                  _exists, mock_run, mock_cleanup):
+        """In monorepo context, uses monorepo_tag_format for the tag and dispatch ref."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
         mock_detect.return_value = [entry]
@@ -401,9 +284,7 @@ class TestReleaseRetry(unittest.TestCase):
             cmd, cmd_args = args[0], args[1] if len(args) > 1 else []
             if cmd == "gh" and cmd_args[:2] == ["release", "view"]:
                 return ""
-            if cmd == "gh" and cmd_args[:2] == ["release", "delete"]:
-                return ""
-            if cmd == "gh" and cmd_args[:2] == ["release", "create"]:
+            if cmd == "gh" and cmd_args[:2] == ["workflow", "run"]:
                 return ""
             if cmd == "git" and cmd_args[:2] == ["rev-list", "-1"]:
                 return "abc123def456"
@@ -413,10 +294,7 @@ class TestReleaseRetry(unittest.TestCase):
 
         config = _make_retry_config("0.41.7")
 
-        with patch("builtins.open", unittest.mock.mock_open()), \
-             patch("os.rename"), \
-             patch("os.unlink"), \
-             patch("os.chdir"):
+        with patch("os.chdir"):
             with patch("sys.stdout", new_callable=StringIO):
                 run_cmd(config, {"yes": True})
 
@@ -426,10 +304,15 @@ class TestReleaseRetry(unittest.TestCase):
         # gh release view should use the monorepo tag
         mock_run.assert_any_call("gh", ["release", "view", "my-pkg@v0.41.7"])
 
+        # Dispatch should use the ref from config
+        dispatch_calls = [c for c in mock_run.call_args_list
+                          if len(c[0]) >= 2 and c[0][1][:2] == ["workflow", "run"]]
+        self.assertGreater(len(dispatch_calls), 0)
+        for call in dispatch_calls:
+            self.assertEqual(call[0][1][3:], ["--ref", "v0.41.7"])
+
     @patch("rlsbl.commands.release_retry._cleanup_retry_file")
-    @patch("rlsbl.commands.release_retry.upload_release_assets")
     @patch("rlsbl.commands.release_retry.run")
-    @patch("rlsbl.commands.release_retry.extract_changelog_entry", return_value="### Features\n- Fix")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.release_retry.detect_targets")
     @patch("rlsbl.commands.release_retry.TARGETS")
@@ -438,9 +321,8 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
     def test_watch_flag_calls_watch_run_cmd(self, _gh_inst, _gh_auth, _ws_root,
                                              mock_targets_dict, mock_detect,
-                                             _exists, mock_extract, mock_run,
-                                             mock_upload, mock_cleanup):
-        """--watch flag calls watch.run_cmd instead of printing a hint."""
+                                             _exists, mock_run, mock_cleanup):
+        """--watch flag calls watch.run_cmd after dispatch instead of printing a hint."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
         mock_detect.return_value = [entry]
@@ -449,26 +331,22 @@ class TestReleaseRetry(unittest.TestCase):
 
         config = _make_retry_config("0.41.7")
 
-        with patch("builtins.open", unittest.mock.mock_open()), \
-             patch("os.rename"), \
-             patch("os.unlink"):
-            with patch("rlsbl.commands.release_retry.watch_run_cmd") as mock_watch:
-                with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-                    run_cmd(config, {"yes": True, "watch": True})
+        with patch("rlsbl.commands.release_retry.watch_run_cmd") as mock_watch:
+            with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
+                run_cmd(config, {"yes": True, "watch": True})
 
-                # Watch was called with the commit SHA
-                mock_watch.assert_called_once_with(
-                    None,
-                    ["abc123def456789012345678901234567890abcd"],
-                    {},
-                )
+            # Watch was called with the commit SHA
+            mock_watch.assert_called_once_with(
+                None,
+                ["abc123def456789012345678901234567890abcd"],
+                {},
+            )
 
-                # Watch hint should NOT be in output
-                output = mock_stdout.getvalue()
-                self.assertNotIn("Watch CI:", output)
+            # Watch hint should NOT be in output
+            output = mock_stdout.getvalue()
+            self.assertNotIn("Watch CI:", output)
 
     @patch("rlsbl.commands.release_retry.run")
-    @patch("rlsbl.commands.release_retry.extract_changelog_entry", return_value="### Features\n- Fix")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.release_retry.detect_targets")
     @patch("rlsbl.commands.release_retry.TARGETS")
@@ -477,8 +355,8 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
     def test_confirmation_prompt_abort(self, _gh_inst, _gh_auth, _ws_root,
                                         mock_targets_dict, mock_detect,
-                                        _exists, mock_extract, mock_run):
-        """User says 'n' at confirmation prompt -- aborts without mutating."""
+                                        _exists, mock_run):
+        """User says 'n' at 'Will dispatch' prompt -- aborts without dispatching."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
         mock_detect.return_value = [entry]
@@ -488,61 +366,22 @@ class TestReleaseRetry(unittest.TestCase):
         config = _make_retry_config("0.41.7")
 
         with patch("builtins.input", return_value="n"):
-            with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
-                with self.assertRaises(SystemExit) as ctx:
-                    run_cmd(config, {})
+            with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
+                with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
+                    with self.assertRaises(SystemExit) as ctx:
+                        run_cmd(config, {})
 
         self.assertEqual(ctx.exception.code, 1)
         self.assertIn("Aborted", mock_stderr.getvalue())
 
-        # No delete or create calls
-        delete_calls = [c for c in mock_run.call_args_list
-                        if len(c[0]) >= 2 and c[0][1][:2] == ["release", "delete"]]
-        self.assertEqual(len(delete_calls), 0)
+        # "Will dispatch" prompt should have been shown
+        output = mock_stdout.getvalue()
+        self.assertIn("Will dispatch", output)
 
-    @patch("rlsbl.commands.release_retry.run")
-    @patch("rlsbl.commands.release_retry.extract_changelog_entry", return_value="### Features\n- Fix")
-    @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.release_retry.detect_targets")
-    @patch("rlsbl.commands.release_retry.TARGETS")
-    @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
-    @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
-    @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
-    def test_delete_succeeds_create_fails_warns(self, _gh_inst, _gh_auth, _ws_root,
-                                                  mock_targets_dict, mock_detect,
-                                                  _exists, mock_extract, mock_run):
-        """Delete succeeds but create fails -- prints warning about deleted-but-not-recreated."""
-        target = self._make_mock_target()
-        entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
-        mock_targets_dict.__getitem__ = lambda self, key: target
-
-        def run_effect(*args, **kwargs):
-            cmd, cmd_args = args[0], args[1] if len(args) > 1 else []
-            if cmd == "gh" and cmd_args[:2] == ["release", "view"]:
-                return ""
-            if cmd == "gh" and cmd_args[:2] == ["release", "delete"]:
-                return ""
-            if cmd == "gh" and cmd_args[:2] == ["release", "create"]:
-                raise Exception("API error")
-            if cmd == "git" and cmd_args[:2] == ["rev-list", "-1"]:
-                return "abc123def456"
-            return ""
-
-        mock_run.side_effect = run_effect
-
-        config = _make_retry_config("0.41.7")
-
-        with patch("builtins.open", unittest.mock.mock_open()), \
-             patch("os.rename"), \
-             patch("os.unlink"):
-            with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
-                with self.assertRaises(SystemExit) as ctx:
-                    run_cmd(config, {"yes": True})
-
-        self.assertEqual(ctx.exception.code, 1)
-        stderr_output = mock_stderr.getvalue()
-        self.assertIn("was deleted but re-creation failed", stderr_output)
+        # No dispatch calls
+        dispatch_calls = [c for c in mock_run.call_args_list
+                          if len(c[0]) >= 2 and c[0][1][:2] == ["workflow", "run"]]
+        self.assertEqual(len(dispatch_calls), 0)
 
     def test_no_gh_installed_exits(self):
         """Missing gh CLI exits with error."""
@@ -564,9 +403,7 @@ class TestReleaseRetry(unittest.TestCase):
             self.assertIn("gh CLI is not authenticated", mock_stderr.getvalue())
 
     @patch("rlsbl.commands.release_retry._cleanup_retry_file")
-    @patch("rlsbl.commands.release_retry.upload_release_assets")
     @patch("rlsbl.commands.release_retry.run")
-    @patch("rlsbl.commands.release_retry.extract_changelog_entry", return_value="### Features\n- Fix")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.release_retry.detect_targets")
     @patch("rlsbl.commands.release_retry.TARGETS")
@@ -575,8 +412,7 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
     def test_auto_scaffold_when_no_retry_file(self, _gh_inst, _gh_auth, _ws_root,
                                                 mock_targets_dict, mock_detect,
-                                                _exists, mock_extract, mock_run,
-                                                mock_upload, mock_cleanup):
+                                                _exists, mock_run, mock_cleanup):
         """When retry_config is None and retry.toml doesn't exist, auto-scaffolds and proceeds."""
         target = self._make_mock_target("0.41.7")
         entry = self._make_mock_entry()
@@ -584,24 +420,18 @@ class TestReleaseRetry(unittest.TestCase):
         mock_targets_dict.__getitem__ = lambda self, key: target
         mock_run.side_effect = self._run_side_effect
 
-        scaffolded_config = _make_retry_config("0.41.7", workflows=["publish.yml"])
+        scaffolded_config = _make_retry_config("0.41.7", dispatch=["publish.yml"])
 
         with patch("rlsbl.commands.release_retry._scaffold_retry_file", return_value=scaffolded_config) as mock_scaffold, \
              patch("rlsbl.commands.release_retry.get_retry_file_path", return_value="/fake/retry.toml"):
-            # os.path.exists returns True for changelog etc, but we need it False
-            # for the retry path specifically to trigger scaffold
-            real_exists = os.path.exists
             def exists_side_effect(path):
                 if "retry.toml" in str(path):
                     return False
                 return True
             _exists.side_effect = exists_side_effect
 
-            with patch("builtins.open", unittest.mock.mock_open()), \
-                 patch("os.rename"), \
-                 patch("os.unlink"):
-                with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-                    run_cmd(None, {"yes": True})
+            with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
+                run_cmd(None, {"yes": True})
 
         # _scaffold_retry_file was called
         mock_scaffold.assert_called_once()
@@ -624,7 +454,7 @@ class TestReleaseRetry(unittest.TestCase):
         mock_detect.return_value = [entry]
         mock_targets_dict.__getitem__ = lambda self, key: target
 
-        existing_config = _make_retry_config("0.41.7", workflows=["custom.yml"])
+        existing_config = _make_retry_config("0.41.7", dispatch=["custom.yml"])
         mock_read_retry.return_value = existing_config
 
         import tempfile
@@ -636,25 +466,18 @@ class TestReleaseRetry(unittest.TestCase):
 
             with patch("rlsbl.commands.release_retry.get_retry_file_path", return_value=retry_path), \
                  patch("rlsbl.commands.release_retry.run") as mock_run, \
-                 patch("rlsbl.commands.release_retry.extract_changelog_entry", return_value="### Features\n- Fix"), \
                  patch("os.path.exists", return_value=True), \
-                 patch("rlsbl.commands.release_retry.upload_release_assets"), \
                  patch("rlsbl.commands.release_retry._cleanup_retry_file"):
                 mock_run.side_effect = self._run_side_effect
 
-                with patch("builtins.open", unittest.mock.mock_open()), \
-                     patch("os.rename"), \
-                     patch("os.unlink"):
-                    with patch("sys.stdout", new_callable=StringIO):
-                        run_cmd(None, {"yes": True})
+                with patch("sys.stdout", new_callable=StringIO):
+                    run_cmd(None, {"yes": True})
 
             # read_retry_file was called (existing file was read, not overwritten)
             mock_read_retry.assert_called_once_with(retry_path)
 
     @patch("rlsbl.commands.release_retry._cleanup_retry_file")
-    @patch("rlsbl.commands.release_retry.upload_release_assets")
     @patch("rlsbl.commands.release_retry.run")
-    @patch("rlsbl.commands.release_retry.extract_changelog_entry", return_value="### Features\n- Fix")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.release_retry.detect_targets")
     @patch("rlsbl.commands.release_retry.TARGETS")
@@ -663,8 +486,7 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
     def test_retry_file_deleted_after_success(self, _gh_inst, _gh_auth, _ws_root,
                                                 mock_targets_dict, mock_detect,
-                                                _exists, mock_extract, mock_run,
-                                                mock_upload, mock_cleanup):
+                                                _exists, mock_run, mock_cleanup):
         """retry.toml is deleted via saferm after successful retry."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
@@ -674,11 +496,8 @@ class TestReleaseRetry(unittest.TestCase):
 
         config = _make_retry_config("0.41.7")
 
-        with patch("builtins.open", unittest.mock.mock_open()), \
-             patch("os.rename"), \
-             patch("os.unlink"):
-            with patch("sys.stdout", new_callable=StringIO):
-                run_cmd(config, {"yes": True})
+        with patch("sys.stdout", new_callable=StringIO):
+            run_cmd(config, {"yes": True})
 
         # _cleanup_retry_file was called (which uses saferm internally)
         mock_cleanup.assert_called_once()
@@ -716,15 +535,14 @@ class TestRetryConfig(unittest.TestCase):
     """Tests for RetryConfig and read_retry_file."""
 
     def test_read_retry_file_valid(self):
-        """Valid retry.toml is read correctly."""
+        """Valid retry.toml with 3 fields is read correctly."""
         import tempfile
         import tomlkit as tk
 
         doc = tk.document()
         doc.add("version", "1.2.3")
-        doc.add("workflows", ["publish.yml", "ci.yml"])
-        doc.add("ci_ref", "v1.2.3")
-        doc.add("assets", True)
+        doc.add("dispatch", ["publish.yml", "ci.yml"])
+        doc.add("ref", "v1.2.3")
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
             tk.dump(doc, f)
@@ -734,9 +552,8 @@ class TestRetryConfig(unittest.TestCase):
             from rlsbl.release_file import read_retry_file
             config = read_retry_file(path)
             self.assertEqual(config.version, "1.2.3")
-            self.assertEqual(config.workflows, ["publish.yml", "ci.yml"])
-            self.assertEqual(config.ci_ref, "v1.2.3")
-            self.assertTrue(config.assets)
+            self.assertEqual(config.dispatch, ["publish.yml", "ci.yml"])
+            self.assertEqual(config.ref, "v1.2.3")
         finally:
             os.unlink(path)
 
@@ -746,9 +563,8 @@ class TestRetryConfig(unittest.TestCase):
         import tomlkit as tk
 
         doc = tk.document()
-        doc.add("workflows", ["publish.yml"])
-        doc.add("ci_ref", "v1.2.3")
-        doc.add("assets", False)
+        doc.add("dispatch", ["publish.yml"])
+        doc.add("ref", "v1.2.3")
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
             tk.dump(doc, f)
@@ -785,7 +601,7 @@ class TestScaffoldRetryFile(unittest.TestCase):
     """Tests for the _scaffold_retry_file helper."""
 
     def test_scaffold_creates_file_with_correct_content(self):
-        """_scaffold_retry_file writes retry.toml and returns valid RetryConfig."""
+        """_scaffold_retry_file writes retry.toml with 3 fields and returns valid RetryConfig."""
         import tempfile
         import tomlkit as tk
         from rlsbl.commands.release_retry import _scaffold_retry_file
@@ -802,8 +618,7 @@ class TestScaffoldRetryFile(unittest.TestCase):
 
             with patch("rlsbl.commands.release_retry.detect_targets", return_value=[entry]), \
                  patch("rlsbl.commands.release_retry.TARGETS", {"pypi": target}), \
-                 patch("rlsbl.commands.release_retry._find_dispatch_workflows", return_value=["publish.yml", "ci.yml"]), \
-                 patch("rlsbl.commands.release_retry._has_assets_config", return_value=True):
+                 patch("rlsbl.commands.release_retry._find_dispatch_workflows", return_value=["publish.yml", "ci.yml"]):
                 with patch("sys.stdout", new_callable=StringIO):
                     config = _scaffold_retry_file(
                         retry_path, ".", target, None, None, lambda msg: None,
@@ -811,17 +626,17 @@ class TestScaffoldRetryFile(unittest.TestCase):
 
             # Verify returned config
             self.assertEqual(config.version, "2.0.0")
-            self.assertEqual(config.workflows, ["publish.yml", "ci.yml"])
-            self.assertEqual(config.ci_ref, "v2.0.0")
-            self.assertTrue(config.assets)
+            self.assertEqual(config.dispatch, ["publish.yml", "ci.yml"])
+            self.assertEqual(config.ref, "v2.0.0")
 
             # Verify file on disk
             with open(retry_path) as f:
                 data = tk.load(f)
             self.assertEqual(data["version"], "2.0.0")
-            self.assertEqual(list(data["workflows"]), ["publish.yml", "ci.yml"])
-            self.assertEqual(data["ci_ref"], "v2.0.0")
-            self.assertEqual(data["assets"], True)
+            self.assertEqual(list(data["dispatch"]), ["publish.yml", "ci.yml"])
+            self.assertEqual(data["ref"], "v2.0.0")
+            # No assets field
+            self.assertNotIn("assets", data)
 
 
 if __name__ == "__main__":
