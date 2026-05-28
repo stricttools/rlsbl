@@ -12,7 +12,7 @@ Built in Python 3.11+ with ruamel-yaml, tomlkit, strictcli, and tree-sitter. Als
 | --- | --- |
 | `check` | Run project checks |
 | `status` | Display the current project version, branch, last release tag, unreleased commit count, and changelog coverage. Outputs plain text by default or structured JSON with the --json flag. |
-| `scaffold` | Generate or update CI/CD workflows, git hooks, changelog, and license files for the detected release target. Use --update for three-way merge preserving customizations, or --force to overwrite all files. |
+| `scaffold` | Generate or update CI/CD workflows, git hooks, changelog, and license files. Safe to run repeatedly -- merges template changes with your customizations. Use --force to overwrite all files. |
 | `check-name` | Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks. |
 | `discover` | Search GitHub for repositories tagged with the rlsbl topic and list them. Use --mine to filter results to only your own repositories. Requires the gh CLI to be authenticated. |
 | `watch` | Poll GitHub Actions CI workflow runs for a specific commit SHA and report pass or fail status. Defaults to HEAD if no SHA is provided. Useful after rlsbl release to monitor the publish pipeline. |
@@ -114,7 +114,7 @@ During `rlsbl release run`, the validation and build steps run in this order:
 
 ## CI customization
 
-Add custom GitHub Actions jobs via the user-owned `.github/workflows/ci-custom.yml` and `publish-custom.yml` files. Scaffold never touches them, so they survive `scaffold --update`'s three-way merge. See `docs/ci-customization.md` for the pattern.
+Add custom GitHub Actions jobs via the user-owned `.github/workflows/ci-custom.yml` and `publish-custom.yml` files. Scaffold never touches them, so they survive `scaffold`'s three-way merge. See `docs/ci-customization.md` for the pattern.
 
 ## Pre-push hook
 

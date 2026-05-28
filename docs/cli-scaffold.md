@@ -17,7 +17,6 @@ Generate or update CI/CD workflows, git hooks, changelog, and license files. Saf
 |------|-------|------|---------|-----|-------------|
 | `--target` |  | str |  |  | Target a specific registry (auto-detected if omitted) |
 | `--force` |  | bool |  |  | Overwrite all files (ignore user customizations) |
-| `--update` |  | bool |  |  | (Legacy, now the default) Update scaffolding via three-way merge |
 | `--private` |  | bool |  |  | Scaffold for private repos (skip publish) |
 | `--no-commit` |  | bool |  |  | Skip auto-commit of scaffolded files |
 | `--skip-shared` |  | bool |  |  | Skip shared template processing |

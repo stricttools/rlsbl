@@ -41,7 +41,7 @@ All commands auto-detect registries from project files (`package.json`, `pyproje
 | --- | --- |
 | `check` | Run project checks |
 | `status` | Display the current project version, branch, last release tag, unreleased commit count, and changelog coverage. Outputs plain text by default or structured JSON with the --json flag. |
-| `scaffold` | Generate or update CI/CD workflows, git hooks, changelog, and license files for the detected release target. Use --update for three-way merge preserving customizations, or --force to overwrite all files. |
+| `scaffold` | Generate or update CI/CD workflows, git hooks, changelog, and license files. Safe to run repeatedly -- merges template changes with your customizations. Use --force to overwrite all files. |
 | `check-name` | Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks. |
 | `discover` | Search GitHub for repositories tagged with the rlsbl topic and list them. Use --mine to filter results to only your own repositories. Requires the gh CLI to be authenticated. |
 | `watch` | Poll GitHub Actions CI workflow runs for a specific commit SHA and report pass or fail status. Defaults to HEAD if no SHA is provided. Useful after rlsbl release to monitor the publish pipeline. |
@@ -118,8 +118,7 @@ Pre-release versions (e.g. `1.0.0-beta.1`) are supported.
 ## Scaffold
 
 ```
-rlsbl scaffold              # create CI/CD for all detected registries
-rlsbl scaffold --update     # three-way merge template updates with user customizations
+rlsbl scaffold              # create or update CI/CD for all detected registries
 rlsbl scaffold --force      # overwrite managed files (user-owned files still preserved)
 rlsbl scaffold --no-commit  # skip auto-commit of scaffolded files
 ```
@@ -139,13 +138,13 @@ Created files are committed automatically by default.
 | `.rlsbl/hooks/pre-release.sh` | User-customizable pre-release validation |
 | `.rlsbl/hooks/post-release.sh` | User-customizable post-release actions |
 | `.git/hooks/pre-push` | One-liner: `exec rlsbl pre-push-check "$@"` |
-| `.rlsbl/bases/` | Three-way merge bases for `--update` |
+| `.rlsbl/bases/` | Three-way merge bases for scaffold |
 
-**Three-way merge (`--update`):** Bases are stored at scaffold time. On `--update`, user customizations and template updates merge via `git merge-file`. Conflicts get git-style conflict markers.
+**Three-way merge:** Bases are stored at scaffold time. On re-run, user customizations and template updates merge via `git merge-file`. Conflicts get git-style conflict markers.
 
 **User-owned files** (CHANGELOG.md, LICENSE, hooks) are never overwritten, even with `--force`.
 
-**Customizing CI without conflicts:** Instead of editing `ci.yml` or `publish.yml` (which can produce merge conflicts on `--update`), put extra jobs in a separate workflow file scaffold never touches:
+**Customizing CI without conflicts:** Instead of editing `ci.yml` or `publish.yml` (which can produce merge conflicts on re-scaffold), put extra jobs in a separate workflow file scaffold never touches:
 
 - `.github/workflows/ci-custom.yml` -- runs alongside `ci.yml`
 - `.github/workflows/publish-custom.yml` -- runs alongside `publish.yml`
