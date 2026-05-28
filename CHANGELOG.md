@@ -2,6 +2,12 @@
 
 # Changelog
 
+## 0.46.0
+
+### Breaking
+
+- **Breaking.** `--update` flag removed from `scaffold`. Bare `rlsbl scaffold` is now idempotent — creates what's missing, three-way merges what exists. Run it anytime.
+
 ## 0.45.1
 
 ### Fixes
