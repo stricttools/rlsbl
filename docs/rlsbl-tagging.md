@@ -1,6 +1,6 @@
 ---
 title: rlsbl.tagging
-description: "Ecosystem keyword injection that adds the rlsbl tag to package manifests (package.json, pyproject.toml, etc.) and GitHub repository topics."
+description: "Ecosystem keyword injection that adds the rlsbl keyword to package.json, pyproject.toml, and GitHub repository topics during scaffold."
 generated: true
 nav_group: "API Reference"
 nav_order: 66

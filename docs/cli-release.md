@@ -1,6 +1,6 @@
 ---
 title: rlsbl release
-description: "Release orchestration command group with 6 subcommands: run, init, retry, edit, undo, and yank for managing the full release lifecycle."
+description: "Release lifecycle commands: bump and publish versions, scaffold release files, retry CI, sync release notes, undo, and yank past releases."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 13
