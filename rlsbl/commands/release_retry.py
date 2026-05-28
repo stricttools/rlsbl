@@ -73,7 +73,8 @@ def _scaffold_retry_file(retry_path, version_dir, target, monorepo_name, monorep
     doc = tomlkit.document()
     doc.add("version", version)
     doc.add("dispatch", dispatch)
-    doc.add("ref", tag)
+    doc.add(tomlkit.comment("Git ref to dispatch CI against. Examples: v1.2.3 (tag), main (branch)"))
+    doc.add("ref", "")
 
     os.makedirs(os.path.dirname(retry_path), exist_ok=True)
     tmp_path = retry_path + ".writing"
@@ -163,10 +164,14 @@ def run_cmd(retry_config, flags):
                 print(f"Error in retry file: {e}", file=sys.stderr)
                 sys.exit(1)
         else:
-            retry_config = _scaffold_retry_file(
-                retry_path, version_dir, target,
-                monorepo_name, monorepo_project_path, log,
-            )
+            try:
+                retry_config = _scaffold_retry_file(
+                    retry_path, version_dir, target,
+                    monorepo_name, monorepo_project_path, log,
+                )
+            except ValueError as e:
+                print(f"Error in retry file: {e}", file=sys.stderr)
+                sys.exit(1)
 
     # Use config values
     version = retry_config.version
