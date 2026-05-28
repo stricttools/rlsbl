@@ -632,7 +632,7 @@ def cmd_chlog_add(commits, description, type, no_user_facing, no_commit, **_kwar
         "no-commit": no_commit,
     }
     from .commands.changelog_cmd import cmd_add
-    cmd_add(flags)
+    cmd_add(flags, project_root=ctx.project_root)
 
 
 
@@ -643,7 +643,7 @@ def cmd_chlog_generate(dry_run, no_commit, **_kwargs):
     ctx = create_context(root)
     flags = {"dry-run": dry_run, "no-commit": no_commit}
     from .commands.changelog_cmd import cmd_generate
-    cmd_generate(flags)
+    cmd_generate(flags, project_root=ctx.project_root)
 
 
 @chlog.command(name="amend", help="Append a changelog entry to a released version's JSONL file. Temporarily unlocks the read-only file, appends the entry, re-locks it, regenerates CHANGELOG.md, and syncs GitHub Release notes. Use --no-resolve to skip hash validation for old or amended commits.")
@@ -665,7 +665,7 @@ def cmd_chlog_amend(version, commits, description, type, no_user_facing, no_reso
         "no-resolve": no_resolve,
     }
     from .commands.changelog_cmd import cmd_amend
-    cmd_amend(flags)
+    cmd_amend(flags, project_root=ctx.project_root)
 
 
 # ---------------------------------------------------------------------------
