@@ -22,7 +22,7 @@ from ..utils import (
 from ..workspace import find_workspace_root, load_workspace, resolve_project
 
 
-def _collect_status(registry, target_path=".", tag_glob=None):
+def _collect_status(registry, target_path=".", tag_glob=None, project_root=None):
     """Collect status data as a dict.
 
     When tag_glob is set (monorepo mode), it is forwarded to
@@ -30,6 +30,8 @@ def _collect_status(registry, target_path=".", tag_glob=None):
 
     Returns None and prints an error if the project does not exist.
     """
+    if project_root is None:
+        project_root = "."
     reg = TARGETS[registry]
 
     if not reg.check_project_exists(target_path):
@@ -39,6 +41,8 @@ def _collect_status(registry, target_path=".", tag_glob=None):
     version = reg.read_version(target_path)
     vars_dict = reg.template_vars(target_path)
     name = vars_dict.get("name") or "(unknown)"
+
+    root_str = str(project_root)
 
     # Git branch
     try:
@@ -59,7 +63,7 @@ def _collect_status(registry, target_path=".", tag_glob=None):
         clean = None
 
     # Changelog (generated from JSONL)
-    changelog_path = "CHANGELOG.md"
+    changelog_path = os.path.join(root_str, "CHANGELOG.md")
     if os.path.exists(changelog_path):
         entry = extract_changelog_entry(changelog_path, version)
         changelog = bool(entry)
@@ -130,9 +134,9 @@ def _collect_status(registry, target_path=".", tag_glob=None):
             pass
 
     # CI workflows
-    ci = os.path.exists(".github/workflows/ci.yml")
-    publish = os.path.exists(".github/workflows/publish.yml") or os.path.exists(
-        ".github/workflows/workflow.yml"
+    ci = os.path.exists(os.path.join(root_str, ".github", "workflows", "ci.yml"))
+    publish = os.path.exists(os.path.join(root_str, ".github", "workflows", "publish.yml")) or os.path.exists(
+        os.path.join(root_str, ".github", "workflows", "workflow.yml")
     )
 
     return {
@@ -151,28 +155,32 @@ def _collect_status(registry, target_path=".", tag_glob=None):
     }
 
 
-def run_cmd(registry, args, flags):
+def run_cmd(registry, args, flags, project_root=None):
     """Status command handler.
 
     Shows a quick 'where am I' summary: package info, git state, changelog, CI.
     With --json, outputs machine-readable JSON instead.
     """
+    if project_root is None:
+        project_root = "."
+    root_str = str(project_root)
+
     # Build per-target path mapping from detect_targets
-    target_entries = detect_targets(".")
+    target_entries = detect_targets(root_str)
     target_paths = {entry.name: entry.path for entry in target_entries}
 
     # Use per-target path for the primary registry
-    primary_path = target_paths.get(registry, ".")
+    primary_path = target_paths.get(registry, root_str)
 
     # Detect monorepo context early so coverage uses scoped tags
     monorepo_project = None
     monorepo_count = None
     try:
-        ws_root = find_workspace_root(".")
+        ws_root = find_workspace_root(root_str)
         if ws_root is not None:
             ws_projects = load_workspace(ws_root)
             monorepo_count = len(ws_projects)
-            monorepo_project = resolve_project(ws_root, ".")
+            monorepo_project = resolve_project(ws_root, root_str)
     except Exception:
         pass
 
@@ -181,7 +189,7 @@ def run_cmd(registry, args, flags):
         tag_glob = target.monorepo_tag_glob(monorepo_project["name"], path=monorepo_project["path"])
     else:
         tag_glob = None
-    data = _collect_status(registry, primary_path, tag_glob=tag_glob)
+    data = _collect_status(registry, primary_path, tag_glob=tag_glob, project_root=project_root)
 
     if flags.get("json"):
         print(_json.dumps(data, indent=2))

@@ -7,7 +7,7 @@ from ..deploy import deploy_target
 from ..utils import get_current_branch
 
 
-def run_cmd(registry, args, flags):
+def run_cmd(registry, args, flags, project_root=None):
     """Deploy to configured targets.
 
     Usage:
@@ -16,7 +16,7 @@ def run_cmd(registry, args, flags):
         rlsbl deploy --force      Override branch restrictions
     """
     # 1. Read deploy config
-    targets, errors = read_deploy_config()
+    targets, errors = read_deploy_config(project_root)
 
     if not targets:
         print("Error: No deploy targets configured in .rlsbl/config.json", file=sys.stderr)

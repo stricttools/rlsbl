@@ -58,11 +58,15 @@ def _get_commits_since(tag):
 
 
 
-def run_cmd(registry, args, flags):
+def run_cmd(registry, args, flags, project_root=None):
     """List unreleased commits and their changelog coverage.
 
     Usage: rlsbl unreleased [--json]
     """
+    if project_root is None:
+        project_root = "."
+    root_str = str(project_root)
+
     tag = _get_last_tag()
     commits = _get_commits_since(tag)
 
@@ -74,14 +78,14 @@ def run_cmd(registry, args, flags):
         sys.exit(0)
 
     # Cross-reference each commit against JSONL changelog
-    if not changes_dir_exists("."):
+    if not changes_dir_exists(root_str):
         print(
             "Error: JSONL changelog not set up. Run 'rlsbl scaffold' to create .rlsbl/changes/",
             file=sys.stderr,
         )
         sys.exit(1)
 
-    changes_dir = get_changes_dir(".")
+    changes_dir = get_changes_dir(root_str)
     entries = read_unreleased(changes_dir)
     all_hashes = []
     for entry in entries:

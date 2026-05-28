@@ -399,7 +399,7 @@ def _run_monorepo_check(workspace_root, projects, changed_files, refs=None):
     sys.exit(1)
 
 
-def run_cmd(registry, args, flags):
+def run_cmd(registry, args, flags, project_root=None):
     """Check that CHANGELOG.md has an entry for the current project version.
 
     In monorepo mode (when a workspace root is detected), parses the pushed
@@ -410,6 +410,10 @@ def run_cmd(registry, args, flags):
 
     Exits 1 if any changelog entry is missing; exits 0 silently on success.
     """
+    if project_root is None:
+        project_root = "."
+    root_str = str(project_root)
+
     # Read stdin once -- used for tag detection and ref parsing
     stdin_lines = _read_stdin_lines()
 
@@ -424,7 +428,7 @@ def run_cmd(registry, args, flags):
     _warn_if_manual_release_push(stdin_lines)
 
     # Detect monorepo context
-    workspace_root = find_workspace_root(".")
+    workspace_root = find_workspace_root(root_str)
     if workspace_root:
         refs = _parse_stdin_refs(stdin_lines)
         if refs is not None:
@@ -437,12 +441,12 @@ def run_cmd(registry, args, flags):
     # Single-project fallback
 
     # Gitignore guard: block push if rlsbl-managed files are gitignored
-    gitignore_error = _check_gitignore_guard(".")
+    gitignore_error = _check_gitignore_guard(root_str)
     if gitignore_error:
         print(f"Error: {gitignore_error}", file=sys.stderr)
         sys.exit(1)
 
-    if not changes_dir_exists("."):
+    if not changes_dir_exists(root_str):
         # JSONL changelog not set up -- warn but don't block
         print("Warning: JSONL changelog not set up. Run 'rlsbl scaffold' to create .rlsbl/changes/", file=sys.stderr)
         sys.exit(0)
@@ -450,7 +454,7 @@ def run_cmd(registry, args, flags):
     # JSONL mode: check commit coverage
     refs = _parse_stdin_refs(stdin_lines)
     if refs is not None:
-        error = _check_jsonl_changelog(".", refs)
+        error = _check_jsonl_changelog(root_str, refs)
         if error is None:
             sys.exit(0)
         print(f"Error: {error}.", file=sys.stderr)

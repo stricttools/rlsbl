@@ -315,7 +315,7 @@ def cmd_status(target, json, **_kwargs):
     registry = _resolve_target(target or None)
     flags = {"json": json}
     from .commands.status import run_cmd
-    run_cmd(registry, [], flags)
+    run_cmd(registry, [], flags, project_root=ctx.project_root)
 
 
 # ---------------------------------------------------------------------------
@@ -514,7 +514,7 @@ def cmd_pre_push_check(**_kwargs):
     monorepo_root = find_workspace_root(str(root))
     ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     from .commands.pre_push_check import run_cmd
-    run_cmd(None, [], {})
+    run_cmd(None, [], {}, project_root=ctx.project_root)
 
 
 # ---------------------------------------------------------------------------
@@ -538,7 +538,7 @@ def cmd_unreleased(json, **_kwargs):
     ctx = create_context(root)
     flags = {"json": json}
     from .commands.unreleased import run_cmd
-    run_cmd(None, [], flags)
+    run_cmd(None, [], flags, project_root=ctx.project_root)
 
 
 # ---------------------------------------------------------------------------
@@ -550,7 +550,7 @@ def cmd_targets(**_kwargs):
     root = _require_project_root()
     ctx = create_context(root)
     from .commands.targets_cmd import run_cmd
-    run_cmd(None, [], {})
+    run_cmd(None, [], {}, project_root=ctx.project_root)
 
 
 # ---------------------------------------------------------------------------
@@ -567,7 +567,7 @@ def cmd_record_gif(width, height, font_size, duration, **_kwargs):
     ctx = create_context(root)
     flags = {"width": width, "height": height, "font-size": font_size, "duration": duration}
     from .commands.record_gif import run_cmd
-    run_cmd(None, [], flags)
+    run_cmd(None, [], flags, project_root=ctx.project_root)
 
 
 # ---------------------------------------------------------------------------
@@ -597,7 +597,7 @@ def cmd_deploy(target, dry_run, force, target_name=None, **_kwargs):
     args = [target_name] if target_name else []
     flags = {"dry-run": dry_run, "force": force}
     from .commands.deploy_cmd import run_cmd
-    run_cmd(target or None, args, flags)
+    run_cmd(target or None, args, flags, project_root=ctx.project_root)
 
 
 # ---------------------------------------------------------------------------
@@ -861,7 +861,7 @@ def cmd_dev_install(all, include, exclude, uninstall, global_, venv, **_kwargs):
         "venv": venv,
     }
     from .commands.dev import run_install
-    rc = run_install(flags)
+    rc = run_install(flags, project_root=ctx.project_root)
     if rc:
         sys.exit(rc)
 

@@ -5,9 +5,11 @@ import sys
 from ..targets import TARGETS, detect_targets
 
 
-def run_cmd(registry, args, flags):
+def run_cmd(registry, args, flags, project_root=None):
     """List all available targets with their detection status and version file."""
-    dir_path = "."
+    if project_root is None:
+        project_root = "."
+    dir_path = str(project_root)
     detected = detect_targets(dir_path)
     detected_names = {entry.name for entry in detected}
 

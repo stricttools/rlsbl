@@ -19,9 +19,10 @@ def _parse_int_flag(flags, name, default):
         sys.exit(1)
 
 
-def _get_bin_command():
+def _get_bin_command(project_root=None):
     """Auto-detect the project's binary command name via registry template vars."""
-    target_entries = detect_targets()
+    dir_path = str(project_root) if project_root is not None else "."
+    target_entries = detect_targets(dir_path)
     if not target_entries:
         return None
     # Use the first detected target
@@ -36,18 +37,22 @@ def _get_bin_command():
         return None
 
 
-def run_cmd(registry, args, flags):
+def run_cmd(registry, args, flags, project_root=None):
     """Record a demo GIF of '<binCommand> --help' using vhs.
 
     Requires vhs (https://github.com/charmbracelet/vhs) to be installed.
     Output is saved to assets/demo.gif.
     """
+    if project_root is None:
+        project_root = "."
+    root_str = str(project_root)
+
     if not require_tool("vhs", fatal=False):
         print("Error: vhs is required.", file=sys.stderr)
         print("Install: go install github.com/charmbracelet/vhs@latest", file=sys.stderr)
         sys.exit(1)
 
-    bin_command = _get_bin_command()
+    bin_command = _get_bin_command(project_root)
     if not bin_command:
         print("Error: could not detect project binary command.", file=sys.stderr)
         print("Ensure package.json, pyproject.toml, or go.mod exists with a CLI entry point.", file=sys.stderr)
@@ -59,7 +64,7 @@ def run_cmd(registry, args, flags):
     font_size = _parse_int_flag(flags, "font-size", 24)
     duration = _parse_int_flag(flags, "duration", 10)
 
-    assets_dir = "assets"
+    assets_dir = os.path.join(root_str, "assets")
     os.makedirs(assets_dir, exist_ok=True)
 
     # Create a temporary VHS tape file in the project directory
@@ -74,7 +79,7 @@ def run_cmd(registry, args, flags):
         f"Sleep {duration}s\n"
     )
 
-    tape_fd, tape_path = tempfile.mkstemp(suffix=".tape", dir=".")
+    tape_fd, tape_path = tempfile.mkstemp(suffix=".tape", dir=root_str)
     try:
         with os.fdopen(tape_fd, "w") as f:
             f.write(tape_content)
