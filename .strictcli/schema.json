@@ -33,7 +33,7 @@
     }
   },
   "name": "rlsbl",
-  "version": "0.44.0",
+  "version": "0.45.0",
   "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 14 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, and more). Ships 32 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
   "global_flags": [
     {
@@ -380,7 +380,7 @@
         },
         "retry": {
           "name": "retry",
-          "help": "Dispatch CI/CD workflows for a completed release. Reads configuration from .rlsbl/releases/retry.toml (auto-scaffolded if missing). Verifies the GitHub Release exists, then dispatches each workflow via gh workflow run.",
+          "help": "Re-create a GitHub Release to re-trigger CI/CD workflows. Reads configuration from .rlsbl/releases/retry.toml, which is auto-scaffolded if missing. Verifies the release exists, deletes it, and re-creates it with the same changelog notes, firing a new release published event. Re-uploads assets if configured. Falls back to gh workflow run if no CI runs appear.",
           "flags": [
             {
               "name": "watch",
