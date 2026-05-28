@@ -1,29 +1,24 @@
-"""Release retry command that re-creates a GitHub Release to re-trigger CI/CD workflows.
+"""Release retry command that dispatches CI/CD workflows for an existing GitHub Release.
 
 When a GitHub Release exists but CI/CD never ran (e.g., GitHub Actions outage),
-this command deletes the release and re-creates it with the correct release notes.
-This fires a new ``release: published`` event, re-triggering the Publish workflow.
-It also re-uploads release assets if configured, and dispatches all workflows
-listed in ``retry.toml`` via ``gh workflow run``.
+this command dispatches all workflows listed in ``retry.toml`` via
+``gh workflow run``. The GitHub Release itself is left untouched.
 
 The command is file-driven: it reads ``.rlsbl/releases/retry.toml`` for
-configuration (version, workflows, ci_ref, assets). If the file does not
-exist, it auto-scaffolds one from project state and proceeds.
+configuration (version, dispatch, ref). If the file does not exist, it
+auto-scaffolds one from project state and proceeds.
 """
 
 import os
 import subprocess
 import sys
-import time
 
 import tomlkit
 
-from ..config import read_project_config
 from ..release_file import RetryConfig, get_retry_file_path, read_retry_file
 from ..targets import TARGETS, detect_targets
-from ..utils import check_gh_auth, check_gh_installed, extract_changelog_entry, run
+from ..utils import check_gh_auth, check_gh_installed, run
 from ..workspace import find_workspace_root, resolve_project
-from .release import upload_release_assets
 from .watch import run_cmd as watch_run_cmd
 
 
@@ -50,18 +45,6 @@ def _find_dispatch_workflows():
     return results
 
 
-def _has_assets_config():
-    """Check whether any target has assets enabled in .rlsbl/config.json."""
-    config = read_project_config()
-    publish = config.get("publish", {})
-    if not isinstance(publish, dict):
-        return False
-    for _target_name, target_cfg in publish.items():
-        if isinstance(target_cfg, dict) and target_cfg.get("assets"):
-            return True
-    return False
-
-
 def _scaffold_retry_file(retry_path, version_dir, target, monorepo_name, monorepo_project_path, log):
     """Auto-scaffold retry.toml from project state.
 
@@ -84,17 +67,13 @@ def _scaffold_retry_file(retry_path, version_dir, target, monorepo_name, monorep
         tag = tgt.tag_format(version)
 
     # Auto-detect dispatchable workflows
-    workflows = _find_dispatch_workflows()
-
-    # Assets from config
-    assets = _has_assets_config()
+    dispatch = _find_dispatch_workflows()
 
     # Write retry.toml
     doc = tomlkit.document()
     doc.add("version", version)
-    doc.add("workflows", workflows)
-    doc.add("ci_ref", tag)
-    doc.add("assets", assets)
+    doc.add("dispatch", dispatch)
+    doc.add("ref", tag)
 
     os.makedirs(os.path.dirname(retry_path), exist_ok=True)
     tmp_path = retry_path + ".writing"
@@ -125,12 +104,11 @@ def _cleanup_retry_file(retry_path, log):
 
 
 def run_cmd(retry_config, flags):
-    """Re-create a GitHub Release to re-trigger CI/CD workflows.
+    """Dispatch CI/CD workflows for an existing GitHub Release.
 
-    Deletes the existing GitHub Release for the configured version
-    and re-creates it with the same changelog notes. This fires a new
-    ``release: published`` event. Re-uploads release assets if configured.
-    Dispatches all workflows listed in retry config via ``gh workflow run``.
+    Verifies the GitHub Release exists for the configured version, then
+    dispatches all workflows listed in the retry config via
+    ``gh workflow run``. The release itself is not modified.
 
     Args:
         retry_config: RetryConfig instance, or None to auto-scaffold.
@@ -192,6 +170,7 @@ def run_cmd(retry_config, flags):
 
     # Use config values
     version = retry_config.version
+    dispatch = retry_config.dispatch
 
     # Build the tag: monorepo format or standalone
     if monorepo_name:
@@ -206,34 +185,21 @@ def run_cmd(retry_config, flags):
         print(f"Error: no GitHub Release found for {tag}.", file=sys.stderr)
         sys.exit(1)
 
-    # Extract changelog entry
-    changelog_path = os.path.join(version_dir, "CHANGELOG.md")
-    if not os.path.exists(changelog_path):
-        print("Error: CHANGELOG.md not found.", file=sys.stderr)
-        sys.exit(1)
-
-    changelog_entry = extract_changelog_entry(changelog_path, version)
-    if not changelog_entry:
-        print(
-            f"Error: no changelog entry found for version {version} in CHANGELOG.md.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
     # Get commit SHA for the tag (needed for watch later)
     commit_sha = run("git", ["rev-list", "-1", tag])
 
     if dry_run:
-        log(f"Would delete and re-create GitHub Release for {tag}")
+        log(f"Would dispatch {len(dispatch)} workflow(s) for {tag}")
         log(f"Tag commit: {commit_sha[:12]}")
-        log(f"Changelog entry:\n{changelog_entry}")
+        for filename in dispatch:
+            log(f"  {filename}")
         return
 
     # Confirmation prompt
     if not flags.get("yes"):
-        log(f"Will delete and re-create GitHub Release for {tag}.")
+        log(f"Will dispatch {len(dispatch)} workflow(s) for {tag}. Continue? [y/N]")
         try:
-            answer = input("Continue? [y/N] ").strip().lower()
+            answer = input("").strip().lower()
         except (EOFError, KeyboardInterrupt):
             print("\nAborted.", file=sys.stderr)
             sys.exit(1)
@@ -241,52 +207,14 @@ def run_cmd(retry_config, flags):
             print("Aborted.", file=sys.stderr)
             sys.exit(1)
 
-    # Delete the existing GitHub Release
-    try:
-        run("gh", ["release", "delete", tag, "--yes"])
-        log(f"Deleted GitHub Release: {tag}")
-    except Exception as e:
-        print(f"Error: failed to delete GitHub Release for {tag}: {e}", file=sys.stderr)
-        sys.exit(1)
-
-    # Re-create the GitHub Release
-    notes_file = f".rlsbl-notes-{int(time.time() * 1000)}.tmp"
-    writing_file = notes_file + ".writing"
-    try:
-        with open(writing_file, "w", encoding="utf-8") as f:
-            f.write(changelog_entry)
-        os.rename(writing_file, notes_file)
-        run("gh", ["release", "create", tag, "--title", tag, "--notes-file", notes_file])
-        log(f"Created GitHub Release: {tag}")
-    except Exception as e:
-        print(
-            f"Warning: GitHub Release for {tag} was deleted but re-creation failed: {e}",
-            file=sys.stderr,
-        )
-        print(
-            f"You can manually re-create it with:\n"
-            f"  gh release create {tag} --title {tag} --notes-file <notes-file>",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-    finally:
-        for tmp in (notes_file, writing_file):
-            if os.path.exists(tmp):
-                os.unlink(tmp)
-
-    # Re-upload release assets (gated by config.assets)
-    if retry_config.assets:
-        upload_release_assets(tag, version_dir, version, log, flags)
-
     # Dispatch all configured workflows
-    if retry_config.workflows:
-        log("Dispatching workflows...")
-        for filename in retry_config.workflows:
-            try:
-                run("gh", ["workflow", "run", filename, "--ref", retry_config.ci_ref])
-                log(f"  Dispatched: {filename}")
-            except Exception as e:
-                print(f"  Warning: failed to dispatch {filename}: {e}", file=sys.stderr)
+    log("Dispatching workflows...")
+    for filename in dispatch:
+        try:
+            run("gh", ["workflow", "run", filename, "--ref", retry_config.ref])
+            log(f"  Dispatched: {filename}")
+        except Exception as e:
+            print(f"  Warning: failed to dispatch {filename}: {e}", file=sys.stderr)
 
     # Clean up retry.toml after successful retry
     if os.path.exists(retry_path):
