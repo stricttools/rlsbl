@@ -33,7 +33,7 @@
     }
   },
   "name": "rlsbl",
-  "version": "0.45.0",
+  "version": "0.45.1",
   "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 14 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, and more). Ships 32 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
   "global_flags": [
     {
@@ -134,7 +134,7 @@
     },
     "scaffold": {
       "name": "scaffold",
-      "help": "Generate or update CI/CD workflows, git hooks, changelog, and license files for the detected release target. Use --update for three-way merge preserving customizations, or --force to overwrite all files.",
+      "help": "Generate or update CI/CD workflows, git hooks, changelog, and license files. Safe to run repeatedly -- merges template changes with your customizations. Use --force to overwrite all files.",
       "flags": [
         {
           "name": "target",
@@ -146,13 +146,6 @@
           "name": "force",
           "type": "bool",
           "help": "Overwrite all files (ignore user customizations)",
-          "default": false,
-          "negatable": true
-        },
-        {
-          "name": "update",
-          "type": "bool",
-          "help": "Update scaffolding via three-way merge",
           "default": false,
           "negatable": true
         },
