@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.plain
-description: "Plain release target for projects with no build system, using a VERSION file for version tracking with tagging and GitHub Releases only."
+description: "Plain release target for projects with no build system. Tracks version in a VERSION file and optionally bumps pyproject.toml if present."
 generated: true
 nav_group: "API Reference"
 nav_order: 82
