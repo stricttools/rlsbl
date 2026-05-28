@@ -5,7 +5,7 @@ import json
 import pytest
 
 from conftest import FakeResponse
-from rlsbl.tagging import ensure_github_topic, ensure_npm_keyword, ensure_pypi_keyword
+from rlsbl.tagging import ensure_github_topic, ensure_npm_keyword, ensure_pypi_keyword, ensure_tags
 
 
 class TestEnsureNpmKeyword:
@@ -181,6 +181,70 @@ class TestEnsureGithubTopic:
         monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
         result = ensure_github_topic(quiet=True)
         assert result is False
+
+
+class TestEnsureTagsTargetPaths:
+    """Tests for ensure_tags with target_paths routing."""
+
+    def test_npm_keyword_uses_target_path(self, tmp_path, monkeypatch):
+        """ensure_tags routes npm keyword injection to the configured subdirectory."""
+        npm_dir = tmp_path / "npm"
+        npm_dir.mkdir()
+        pkg = {"name": "sub-pkg", "version": "1.0.0"}
+        (npm_dir / "package.json").write_text(json.dumps(pkg, indent=2) + "\n")
+
+        # No package.json at root -- should NOT raise FileNotFoundError
+        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+        monkeypatch.setattr("rlsbl.tagging.run", _raise_file_not_found)
+
+        ensure_tags(["npm"], target_paths={"npm": str(npm_dir)}, quiet=True)
+
+        data = json.loads((npm_dir / "package.json").read_text())
+        assert "rlsbl" in data["keywords"]
+
+    def test_pypi_keyword_uses_target_path(self, tmp_path, monkeypatch):
+        """ensure_tags routes pypi keyword injection to the configured subdirectory."""
+        pypi_dir = tmp_path / "pypi"
+        pypi_dir.mkdir()
+        content = '[project]\nname = "sub-pkg"\nversion = "1.0.0"\n'
+        (pypi_dir / "pyproject.toml").write_text(content)
+
+        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+        monkeypatch.setattr("rlsbl.tagging.run", _raise_file_not_found)
+
+        ensure_tags(["pypi"], target_paths={"pypi": str(pypi_dir)}, quiet=True)
+
+        updated = (pypi_dir / "pyproject.toml").read_text()
+        assert '"rlsbl"' in updated
+
+    def test_defaults_to_dot_when_target_paths_none(self, tmp_path, monkeypatch):
+        """ensure_tags defaults to '.' when target_paths is None."""
+        pkg = {"name": "root-pkg", "version": "1.0.0"}
+        (tmp_path / "package.json").write_text(json.dumps(pkg, indent=2) + "\n")
+
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+        monkeypatch.setattr("rlsbl.tagging.run", _raise_file_not_found)
+
+        ensure_tags(["npm"], quiet=True)
+
+        data = json.loads((tmp_path / "package.json").read_text())
+        assert "rlsbl" in data["keywords"]
+
+    def test_defaults_to_dot_when_target_not_in_paths(self, tmp_path, monkeypatch):
+        """ensure_tags falls back to '.' when registry is not in target_paths."""
+        pkg = {"name": "root-pkg", "version": "1.0.0"}
+        (tmp_path / "package.json").write_text(json.dumps(pkg, indent=2) + "\n")
+
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+        monkeypatch.setattr("rlsbl.tagging.run", _raise_file_not_found)
+
+        # Pass target_paths without an npm entry
+        ensure_tags(["npm"], target_paths={"pypi": "/some/path"}, quiet=True)
+
+        data = json.loads((tmp_path / "package.json").read_text())
+        assert "rlsbl" in data["keywords"]
 
 
 def _raise_file_not_found(cmd, args):

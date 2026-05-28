@@ -151,10 +151,12 @@ def ensure_github_topic(quiet=False):
     return True
 
 
-def ensure_tags(registries, dir_path=".", quiet=False):
+def ensure_tags(registries, target_paths=None, quiet=False):
     """Tag manifests and GitHub repo based on detected registries."""
+    if target_paths is None:
+        target_paths = {}
     if "npm" in registries:
-        ensure_npm_keyword(dir_path, quiet=quiet)
+        ensure_npm_keyword(target_paths.get("npm", "."), quiet=quiet)
     if "pypi" in registries:
-        ensure_pypi_keyword(dir_path, quiet=quiet)
+        ensure_pypi_keyword(target_paths.get("pypi", "."), quiet=quiet)
     ensure_github_topic(quiet=quiet)

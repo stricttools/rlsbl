@@ -12,6 +12,7 @@ from rlsbl.commands.init_cmd import (
     _generate_merged_publish,
     _parse_on_triggers,
     _merge_on_triggers,
+    _check_npm_lockfile_missing,
 )
 
 
@@ -407,3 +408,109 @@ class TestOnTriggerParsing:
         t2 = {"release": ["    types: [created]\n"]}
         result = _merge_on_triggers([t1, t2])
         assert "published" in result["release"][0]
+
+
+class TestCheckNpmLockfileMissing:
+    """Tests for _check_npm_lockfile_missing with start_dir parameter."""
+
+    def test_finds_lockfile_in_start_dir(self, mock_git_repo):
+        """Returns False when a lockfile exists in start_dir."""
+        (mock_git_repo / "package-lock.json").write_text("{}\n")
+        assert _check_npm_lockfile_missing(str(mock_git_repo)) is False
+
+    def test_finds_lockfile_in_subdirectory_start(self, mock_git_repo):
+        """Returns False when lockfile is in a subdirectory used as start_dir."""
+        npm_dir = mock_git_repo / "npm"
+        npm_dir.mkdir()
+        (npm_dir / "package-lock.json").write_text("{}\n")
+        assert _check_npm_lockfile_missing(str(npm_dir)) is False
+
+    def test_walks_up_to_git_root(self, mock_git_repo):
+        """Returns False when lockfile is at git root but start_dir is a subdirectory."""
+        (mock_git_repo / "package-lock.json").write_text("{}\n")
+        sub = mock_git_repo / "sub"
+        sub.mkdir()
+        assert _check_npm_lockfile_missing(str(sub)) is False
+
+    def test_missing_lockfile_warns(self, mock_git_repo):
+        """Returns True and warns when no lockfile is found from start_dir to git root."""
+        sub = mock_git_repo / "sub"
+        sub.mkdir()
+        assert _check_npm_lockfile_missing(str(sub)) is True
+
+    def test_default_start_dir(self, mock_git_repo):
+        """Default start_dir='.' works as before."""
+        (mock_git_repo / "package-lock.json").write_text("{}\n")
+        assert _check_npm_lockfile_missing() is False
+
+
+class TestSubdirectoryNpmTarget:
+    """Tests for scaffold with npm target in a subdirectory."""
+
+    @pytest.fixture
+    def npm_subdir_project(self, mock_git_repo):
+        """Set up a project with npm target in a subdirectory."""
+        root = mock_git_repo
+
+        # npm in subdirectory
+        npm_dir = root / "npm"
+        npm_dir.mkdir()
+        pkg = {
+            "name": "sub-npm-pkg",
+            "version": "0.1.0",
+            "bin": {"sub-npm-pkg": "./bin/cli.js"},
+        }
+        (npm_dir / "package.json").write_text(json.dumps(pkg, indent=2) + "\n")
+
+        # pypi at root
+        pyproject = (
+            "[project]\n"
+            'name = "sub-npm-pkg"\n'
+            'version = "0.1.0"\n'
+        )
+        (root / "pyproject.toml").write_text(pyproject)
+
+        # Configure targets so detect_targets finds npm in subdirectory
+        rlsbl_dir = root / ".rlsbl"
+        rlsbl_dir.mkdir(exist_ok=True)
+        config = {
+            "targets": [
+                "pypi",
+                {"name": "npm", "path": "npm"},
+            ],
+            "private": False,
+        }
+        (rlsbl_dir / "config.json").write_text(json.dumps(config, indent=2) + "\n")
+
+        return root
+
+    def test_scaffold_with_npm_in_subdirectory(self, npm_subdir_project):
+        """Scaffold with npm in a subdirectory does not raise FileNotFoundError.
+
+        Regression: scaffold functions hardcoded '.' for npm paths, causing
+        FileNotFoundError when package.json was in a subdirectory.
+        """
+        with patch("sys.stdout", new_callable=StringIO):
+            # Should not raise FileNotFoundError
+            run_cmd_multi(["pypi", "npm"], [], {})
+
+        # Verify scaffold completed successfully
+        ci_path = os.path.join(".github", "workflows", "ci.yml")
+        assert os.path.exists(ci_path)
+
+    def test_ensure_npm_keyword_in_subdirectory(self, npm_subdir_project):
+        """ensure_npm_keyword modifies the correct package.json in subdirectory.
+
+        When npm target is in npm/, ensure_tags must write to npm/package.json
+        not ./package.json.
+        """
+        npm_dir = npm_subdir_project / "npm"
+        from rlsbl.tagging import ensure_npm_keyword
+
+        ensure_npm_keyword(str(npm_dir), quiet=True)
+
+        data = json.loads((npm_dir / "package.json").read_text())
+        assert "rlsbl" in data["keywords"]
+
+        # Root should NOT have a package.json
+        assert not (npm_subdir_project / "package.json").exists()
