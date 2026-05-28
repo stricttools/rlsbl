@@ -58,16 +58,12 @@ def register_checks(app):
         """Detect stale lock files."""
         from .lock import is_stale
 
-        original_cwd = os.getcwd()
-        try:
-            os.chdir(ctx.project_root)
-            stale_paths = []
-            if is_stale():
-                stale_paths.append(".rlsbl/lock")
-            if is_stale(lock_path=os.path.join(".rlsbl-monorepo", "lock")):
-                stale_paths.append(".rlsbl-monorepo/lock")
-        finally:
-            os.chdir(original_cwd)
+        root_str = str(ctx.project_root)
+        stale_paths = []
+        if is_stale(lock_path=os.path.join(root_str, ".rlsbl", "lock")):
+            stale_paths.append(".rlsbl/lock")
+        if is_stale(lock_path=os.path.join(root_str, ".rlsbl-monorepo", "lock")):
+            stale_paths.append(".rlsbl-monorepo/lock")
 
         if stale_paths:
             return CheckResult("warn", f"stale lock file exists at {', '.join(stale_paths)}")
@@ -285,12 +281,7 @@ def register_checks(app):
         if not tag:
             return CheckResult("skip", "no version detected")
 
-        original_cwd = os.getcwd()
-        try:
-            os.chdir(ctx.project_root)
-            output = run("git", ["tag", "-l", tag])
-        finally:
-            os.chdir(original_cwd)
+        output = run("git", ["tag", "-l", tag], cwd=str(ctx.project_root))
 
         if output:
             return CheckResult("pass", f"{tag} exists")
@@ -305,12 +296,7 @@ def register_checks(app):
         if not tag:
             return CheckResult("skip", "no version detected")
 
-        original_cwd = os.getcwd()
-        try:
-            os.chdir(ctx.project_root)
-            output = run("git", ["ls-remote", "--tags", "origin", tag])
-        finally:
-            os.chdir(original_cwd)
+        output = run("git", ["ls-remote", "--tags", "origin", tag], cwd=str(ctx.project_root))
 
         if output:
             return CheckResult("pass", f"{tag} on origin")
@@ -330,32 +316,24 @@ def register_checks(app):
         if not check_gh_auth():
             return CheckResult("fail", "gh CLI is not authenticated")
 
-        original_cwd = os.getcwd()
         try:
-            os.chdir(ctx.project_root)
-            run("gh", ["release", "view", tag])
+            run("gh", ["release", "view", tag], cwd=str(ctx.project_root))
             return CheckResult("pass", f"{tag} exists")
         except subprocess.CalledProcessError:
             return CheckResult("warn", f"{tag} not found on GitHub")
-        finally:
-            os.chdir(original_cwd)
 
     @app.check("branch-sync")
     def check_branch_sync(ctx):
         """Local branch must be in sync with origin."""
         from .utils import get_current_branch, run
 
-        original_cwd = os.getcwd()
+        root_str = str(ctx.project_root)
+        branch = get_current_branch()
         try:
-            os.chdir(ctx.project_root)
-            branch = get_current_branch()
-            try:
-                output = run("git", ["rev-list", "--left-right", "--count",
-                                      f"origin/{branch}...HEAD"])
-            except subprocess.CalledProcessError:
-                return CheckResult("warn", f"no remote tracking for {branch}")
-        finally:
-            os.chdir(original_cwd)
+            output = run("git", ["rev-list", "--left-right", "--count",
+                                  f"origin/{branch}...HEAD"], cwd=root_str)
+        except subprocess.CalledProcessError:
+            return CheckResult("warn", f"no remote tracking for {branch}")
 
         parts = output.split("\t")
         if len(parts) != 2:
@@ -490,12 +468,7 @@ def register_checks(app):
             return CheckResult("skip", "no .rlsbl/changes/ directory")
         _changes_dir, _tag_glob, _project, entries = info
 
-        original_cwd = os.getcwd()
-        try:
-            os.chdir(ctx.project_root)
-            passed, details = check_hashes_resolve(entries)
-        finally:
-            os.chdir(original_cwd)
+        passed, details = check_hashes_resolve(entries)
 
         if passed:
             return CheckResult("pass", "all hashes resolve")
@@ -511,12 +484,7 @@ def register_checks(app):
             return CheckResult("skip", "no .rlsbl/changes/ directory")
         _changes_dir, tag_glob, project, entries = info
 
-        original_cwd = os.getcwd()
-        try:
-            os.chdir(ctx.project_root)
-            passed, details = check_in_range(entries, tag_glob, project=project)
-        finally:
-            os.chdir(original_cwd)
+        passed, details = check_in_range(entries, tag_glob, project=project)
 
         if passed:
             return CheckResult("pass", "all hashes in unreleased range")
@@ -532,12 +500,7 @@ def register_checks(app):
             return CheckResult("skip", "no .rlsbl/changes/ directory")
         _changes_dir, tag_glob, project, entries = info
 
-        original_cwd = os.getcwd()
-        try:
-            os.chdir(ctx.project_root)
-            passed, details = check_coverage(entries, tag_glob, project=project)
-        finally:
-            os.chdir(original_cwd)
+        passed, details = check_coverage(entries, tag_glob, project=project)
 
         if passed:
             return CheckResult("pass", "all unreleased commits covered")
@@ -555,12 +518,7 @@ def register_checks(app):
             return CheckResult("skip", "no .rlsbl/changes/ directory")
         _changes_dir, _tag_glob, _project, entries = info
 
-        original_cwd = os.getcwd()
-        try:
-            os.chdir(ctx.project_root)
-            passed, details = check_no_orphans(entries)
-        finally:
-            os.chdir(original_cwd)
+        passed, details = check_no_orphans(entries)
 
         if passed:
             return CheckResult("pass", "no orphaned entries")
@@ -606,12 +564,7 @@ def register_checks(app):
             return CheckResult("skip", "no .rlsbl/changes/ directory")
         _changes_dir, _tag_glob, _project, entries = info
 
-        original_cwd = os.getcwd()
-        try:
-            os.chdir(ctx.project_root)
-            batch_config = _get_batch_limits_config(ctx.project_root)
-        finally:
-            os.chdir(original_cwd)
+        batch_config = _get_batch_limits_config(ctx.project_root)
 
         passed, details = check_batch_size_commits(entries, batch_config, version="unreleased")
         if passed:
@@ -632,13 +585,8 @@ def register_checks(app):
             return CheckResult("skip", "no .rlsbl/changes/ directory")
         changes_dir, _tag_glob, _project, _entries = info
 
-        original_cwd = os.getcwd()
-        try:
-            os.chdir(ctx.project_root)
-            batch_config = _get_batch_limits_config(ctx.project_root)
-            entries_by_version = _read_all_versioned_entries(changes_dir)
-        finally:
-            os.chdir(original_cwd)
+        batch_config = _get_batch_limits_config(ctx.project_root)
+        entries_by_version = _read_all_versioned_entries(changes_dir)
 
         passed, details = check_batch_size_entries(entries_by_version, batch_config)
         if passed:
