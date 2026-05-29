@@ -50,17 +50,11 @@ def test_release_allows_reacquire(tmp_path, monkeypatch):
     acquire_lock(project_root=tmp_path)
     release_lock()
 
-    # Should be able to acquire again without blocking
-    lock_path = os.path.join(str(tmp_path), ".rlsbl", "lock")
-    fd = open(lock_path, "w")
-    try:
-        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        # Success: lock is free
-        fcntl.flock(fd, fcntl.LOCK_UN)
-    except (OSError, BlockingIOError):
-        assert False, "Lock should be free after release_lock()"
-    finally:
-        fd.close()
+    # Should be able to acquire again without blocking.
+    # Use acquire_lock directly since release_lock may clean up the
+    # empty directory (defensive rmdir for spurious lock dirs).
+    acquire_lock(project_root=tmp_path)
+    release_lock()
 
 
 def test_context_manager(tmp_path, monkeypatch):
@@ -81,15 +75,11 @@ def test_context_manager(tmp_path, monkeypatch):
         finally:
             fd.close()
 
-    # Lock should be free after exiting the context
-    fd = open(lock_path, "w")
-    try:
-        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        fcntl.flock(fd, fcntl.LOCK_UN)
-    except (OSError, BlockingIOError):
-        assert False, "Lock should be free after context manager exits"
-    finally:
-        fd.close()
+    # Lock should be free after exiting the context.
+    # Re-acquire via acquire_lock since release_lock may clean up the
+    # empty directory (defensive rmdir for spurious lock dirs).
+    acquire_lock(project_root=tmp_path)
+    release_lock()
 
 
 def test_atexit_registered_on_acquire(tmp_path, monkeypatch):

@@ -60,6 +60,12 @@ def release_lock():
             os.unlink(lock_path)
         except FileNotFoundError:
             pass
+        # Remove the containing directory if empty (cleans up spurious
+        # dirs created by the bug where lock_root pointed at the wrong path).
+        try:
+            os.rmdir(os.path.dirname(lock_path))
+        except OSError:
+            pass
 
 
 def is_stale(lock_path=None, *, project_root):
