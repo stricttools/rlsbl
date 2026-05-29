@@ -159,6 +159,12 @@ def mock_git_repo(tmp_project):
 
 
 @pytest.fixture
+def project_context(mock_git_repo):
+    from rlsbl.context import create_context
+    return create_context(mock_git_repo)
+
+
+@pytest.fixture
 def mock_gh(monkeypatch):
     """Patch common gh/GitHub-related calls to prevent real API access.
 
