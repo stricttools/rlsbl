@@ -1262,7 +1262,14 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
         dirty_output = run("git", ["status", "--porcelain"])
         if dirty_output:
             dirty_files = parse_porcelain_paths(dirty_output)
-            expected_files = set(files_to_commit)
+            # Normalize all files_to_commit to git-relative paths.
+            # Some callers (e.g. _sync_lockfiles, _refresh_selfdoc_hashes)
+            # add absolute paths via os.path.normpath(); git status
+            # --porcelain outputs repo-relative paths, so we must match.
+            expected_files = {
+                os.path.relpath(os.path.abspath(f), _git_root) if os.path.isabs(f) else f
+                for f in files_to_commit
+            }
             expected_files.add(vpath(os.path.join(lock_dir, "lock")))
             # The .validated cache is written by changelog validation earlier in the
             # release flow.  It may be tracked (dirty) or gitignored (invisible to
@@ -1270,6 +1277,8 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
             validated_file = os.path.normpath(
                 os.path.join(get_changes_dir(version_dir), ".validated")
             )
+            if os.path.isabs(validated_file):
+                validated_file = os.path.relpath(validated_file, _git_root)
             expected_files.add(validated_file)
             # When --allow-dirty was used, files that were already dirty before the
             # release started are not "unexpected" -- only genuinely new modifications
