@@ -4,3 +4,4 @@
 {"commits":["53ee363d97d3a5ef483de29ddd6c2dec777435ac"],"user_facing":true,"description":"**Internal.** Added release integration tests exercising the full release flow against real git repos (no mocked subprocess calls).","type":"feature"}
 {"commits":["33bf27bc71c3a6bed014e38211ee9ef5c37028f0","527a12b5c77903b19914f83e2a9152c526ea2e69","f38b0116f1f2154de65f52190aee14594e35eac1"],"user_facing":false}
 {"commits":["1f53973c3504d79d130062f3c6c30cfa1fa76958"],"user_facing":true,"description":"**Fix.** Monorepo release lock file now uses the correct root path.","type":"fix"}
+{"commits":["6f0eff14ac32ceb11a7a165bf555988c737b41a7"],"user_facing":false}
