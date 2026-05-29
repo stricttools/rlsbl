@@ -60,10 +60,11 @@ class TestReadJsonConfig:
     def test_returns_empty_dict_on_missing_file(self, tmp_path):
         assert read_json_config(str(tmp_path / "missing.json")) == {}
 
-    def test_returns_empty_dict_on_malformed_json(self, tmp_path):
+    def test_raises_value_error_on_malformed_json(self, tmp_path):
         bad_file = tmp_path / "bad.json"
         bad_file.write_text("{not valid json!!")
-        assert read_json_config(str(bad_file)) == {}
+        with pytest.raises(ValueError, match="Malformed JSON"):
+            read_json_config(str(bad_file))
 
 
 class TestWriteProjectConfig:
