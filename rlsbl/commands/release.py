@@ -118,7 +118,7 @@ def resolve_release_targets(primary, flags, version_dir="."):
     return baseline
 
 
-def _run_builtin_tests(registry, flags, project_dir=None, project_root=None):
+def _run_builtin_tests(registry, flags, *, project_dir=None, project_root):
     """Run built-in tests for the detected project type.
 
     Detects the project type from registry and runs the appropriate test command.
@@ -466,8 +466,8 @@ def _update_last_build_release(version_dir, version):
     os.replace(tmp_path, config_path)
 
 
-def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None,
-            project_root=None, monorepo_root=None):
+def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
+            project_root, monorepo_root):
     """Release command handler.
 
     Accepts a ReleaseConfig instance (from the release file) and an optional
@@ -499,7 +499,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None,
             sys.exit(1)
 
     # Validate exhaustiveness: include + exclude must cover all detected targets
-    detected = {entry.name for entry in detect_targets(str(project_root) if project_root else ".")}
+    detected = {entry.name for entry in detect_targets(str(project_root))}
     declared = set(release_config.include) | set(release_config.exclude)
     missing = detected - declared
     extra = declared - detected
@@ -529,7 +529,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None,
         if ota_targets:
             from ..targets.native_changes import detect_native_changes
             # Find last build release tag for native change detection
-            _ota_root = str(project_root) if project_root else "."
+            _ota_root = str(project_root)
             config = read_json_config(os.path.join(_ota_root, ".rlsbl", "config.json"))
             last_build = config.get("last_build_release")
             if last_build:
@@ -667,13 +667,13 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None,
 
     # Monorepo context detection
     if monorepo_root is None:
-        monorepo_root = find_workspace_root(str(project_root) if project_root else ".")
+        monorepo_root = find_workspace_root(str(project_root))
     monorepo_name = None
     monorepo_project_path = None
     is_library = False
 
     if monorepo_root:
-        project = resolve_project(monorepo_root, str(project_root) if project_root else ".")
+        project = resolve_project(monorepo_root, str(project_root))
         if project is None:
             print("Error: current directory is inside a monorepo but not inside any project.", file=sys.stderr)
             print("Run 'rlsbl monorepo status' to see registered projects.", file=sys.stderr)
@@ -688,7 +688,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None,
     if monorepo_name:
         version_dir = os.path.join(monorepo_root, monorepo_project_path)
     else:
-        version_dir = str(project_root) if project_root else "."
+        version_dir = str(project_root)
 
     # Get target instance for tag_format/build/publish
     target = TARGETS[registry]
@@ -982,7 +982,7 @@ def _print_stale_dep_advisory(monorepo_name, new_version, version_dir, monorepo_
         pass
 
 
-def upload_release_assets(tag, version_dir, new_version, log, flags, project_root=None):
+def upload_release_assets(tag, version_dir, new_version, log, flags, project_root):
     """Build and upload release assets for targets with ``publish.<target>.assets: true``.
 
     For each detected target that has assets enabled in its publish config:
@@ -1073,7 +1073,7 @@ def upload_release_assets(tag, version_dir, new_version, log, flags, project_roo
 
 
 def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current_version,
-                          bump_type, tag, branch, changelog_entry, target,
+                          bump_type, tag, branch, changelog_entry, target, *,
                           secondary_targets=None, monorepo_name=None,
                           monorepo_project_path=None,
                           version_dir=".", commit_msg=None,
@@ -1082,8 +1082,8 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                           pre_existing_dirty=None,
                           abs_project_dir=None,
                           hook_generated=None,
-                          project_root=None,
-                          monorepo_root=None):
+                          project_root,
+                          monorepo_root):
     """Inner release logic that runs under the advisory lock (mutating phase)."""
     # Snapshot dirty files BEFORE any version-bump writes. This captures
     # everything dirtied by prior stages (generate_changelog, hooks, lint,
