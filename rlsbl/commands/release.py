@@ -1278,11 +1278,9 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
             # The .validated cache is written by changelog validation earlier in the
             # release flow.  It may be tracked (dirty) or gitignored (invisible to
             # git status).  Either way it is not a concurrent-change signal.
-            validated_file = os.path.normpath(
-                os.path.join(get_changes_dir(version_dir), ".validated")
+            validated_file = os.path.relpath(
+                os.path.join(get_changes_dir(version_dir), ".validated"), _git_root
             )
-            if os.path.isabs(validated_file):
-                validated_file = os.path.relpath(validated_file, _git_root)
             expected_files.add(validated_file)
             # When --allow-dirty was used, files that were already dirty before the
             # release started are not "unexpected" -- only genuinely new modifications
@@ -1321,10 +1319,10 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
         generate_version_file(changes_dir, new_version)
         log(f"Finalized JSONL changelog for {new_version}")
         # Commit the finalized JSONL file and the new empty unreleased.jsonl
-        jsonl_finalized = os.path.normpath(os.path.join(changes_dir, f"{new_version}.jsonl"))
-        jsonl_unreleased = os.path.normpath(os.path.join(changes_dir, "unreleased.jsonl"))
+        jsonl_finalized = os.path.relpath(os.path.join(changes_dir, f"{new_version}.jsonl"), _git_root)
+        jsonl_unreleased = os.path.relpath(os.path.join(changes_dir, "unreleased.jsonl"), _git_root)
         # Also commit the generated per-version .md file if it exists
-        jsonl_md = os.path.normpath(os.path.join(changes_dir, f"{new_version}.md"))
+        jsonl_md = os.path.relpath(os.path.join(changes_dir, f"{new_version}.md"), _git_root)
         changelog_file = vpath("CHANGELOG.md")
         finalize_files = [jsonl_finalized, jsonl_unreleased, changelog_file]
         if os.path.exists(jsonl_md):
@@ -1338,17 +1336,15 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
         release_file_path = get_release_file_path(version_dir)
         if os.path.exists(release_file_path):
             releases_dir = os.path.dirname(release_file_path)
-            versioned_release = os.path.normpath(
-                os.path.join(releases_dir, f"v{new_version}.toml")
-            )
+            versioned_release = os.path.join(releases_dir, f"v{new_version}.toml")
             os.rename(release_file_path, versioned_release)
             os.chmod(versioned_release, 0o444)
             # Create a fresh empty unreleased.toml
             with open(release_file_path, "w", encoding="utf-8") as f:
                 pass  # empty file
             release_finalize_files = [
-                os.path.normpath(versioned_release),
-                os.path.normpath(release_file_path),
+                os.path.relpath(versioned_release, _git_root),
+                os.path.relpath(release_file_path, _git_root),
             ]
             commit_files(f"chore: finalize release file for {new_version}", release_finalize_files, cwd=_git_root)
             log(f"Finalized release file for {new_version}")
