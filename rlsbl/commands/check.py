@@ -167,7 +167,7 @@ def check_npm_availability(name):
     try:
         subprocess.run(
             ["npm", "view", name, "name"],
-            capture_output=True, text=True, check=True, timeout=10,
+            capture_output=True, text=True, check=True, timeout=30,
         )
         return {"status": "taken"}
     except subprocess.TimeoutExpired:
