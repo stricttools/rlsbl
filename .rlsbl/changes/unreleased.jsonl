@@ -4,4 +4,5 @@
 {"commits":["f1af133917acb2eff690aba9354f35752c657381","19e699fd484b025de19d23a4778a45d150d4b112"],"user_facing":false}
 {"commits":["815abba715656b00b30548ef905d4daf51874413"],"user_facing":false}
 {"commits":["5a0ed5e6882841d5e0948d59e33fc819d0cb5e9b"],"user_facing":true,"description":"**Fix.** Adapted check system bootstrap for strictcli v0.11 API (required `app` field in checks.toml).","type":"fix"}
-{"commits":["f6b66379097b9ae714e85f312ef1248753676d50","76ccc2b2a4cf03d429ae6b2adece3b8348fe37f6","4041b2c58d4df95965156ececf5294170904be49","d715eff10c3f1c41ad3d0dee631077a482be827c","447c59d7d6c973d1a4af7c21d5c7d972e2c5601a","3aafff6866223c52a178a93db55101a1bc189172"],"user_facing":false}
+{"commits":["f6b66379097b9ae714e85f312ef1248753676d50","76ccc2b2a4cf03d429ae6b2adece3b8348fe37f6","4041b2c58d4df95965156ececf5294170904be49"],"user_facing":false}
+{"commits":["d715eff10c3f1c41ad3d0dee631077a482be827c","447c59d7d6c973d1a4af7c21d5c7d972e2c5601a","3aafff6866223c52a178a93db55101a1bc189172"],"user_facing":false}
