@@ -1,6 +1,6 @@
 [project]
 name = "rlsbl"
-version = "0.49.2"
+version = "0.50.0"
 description = "Release orchestration and project scaffolding for npm, PyPI, and Go"
 license = "MIT"
 authors = [{ name = "smm-h" }]
