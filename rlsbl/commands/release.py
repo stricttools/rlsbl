@@ -21,7 +21,7 @@ from ..lock import acquire_lock, release_lock
 from ..targets import TARGETS, detect_targets, _parse_target_entry
 from ..tagging import ensure_github_topic, ensure_npm_keyword, ensure_pypi_keyword
 from ..strictcli_detect import detect_strictcli
-from ..workspace import find_workspace_root, load_workspace, resolve_project
+from ..workspace import load_workspace, resolve_project
 from ..utils import (
     bump_version,
     check_gh_auth,
@@ -666,8 +666,6 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
             sys.exit(1)
 
     # Monorepo context detection
-    if monorepo_root is None:
-        monorepo_root = find_workspace_root(str(project_root))
     monorepo_name = None
     monorepo_project_path = None
     is_library = False

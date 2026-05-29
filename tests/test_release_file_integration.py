@@ -616,7 +616,7 @@ class TestMonorepoDirectoryScoping:
             include=["pypi"],
             exclude=[],
         )
-        run_cmd(config, {"dry-run": True, "quiet": False, "yes": True}, project_root=".", monorepo_root=None)
+        run_cmd(config, {"dry-run": True, "quiet": False, "yes": True}, project_root=".", monorepo_root=str(monorepo_fixture.root))
 
         # Verify validate_unreleased was called with a non-None project dict
         mock_validate.assert_called_once()

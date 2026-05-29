@@ -597,7 +597,7 @@ class TestHookCwdMonorepo:
 
             from rlsbl.commands.release import run_cmd
 
-            run_cmd(_rc(include=["pypi"]), {"dry-run": True, "quiet": True, "yes": True}, project_root=".", monorepo_root=None)
+            run_cmd(_rc(include=["pypi"]), {"dry-run": True, "quiet": True, "yes": True}, project_root=".", monorepo_root=str(ns.root))
 
             # Find the pre-checks hook call
             pre_checks_calls = [
@@ -659,7 +659,7 @@ class TestHookCwdMonorepo:
 
             from rlsbl.commands.release import run_cmd
 
-            run_cmd(_rc(include=["pypi"]), {"dry-run": True, "quiet": True, "yes": True}, project_root=".", monorepo_root=None)
+            run_cmd(_rc(include=["pypi"]), {"dry-run": True, "quiet": True, "yes": True}, project_root=".", monorepo_root=str(ns.root))
 
             # Find the pre-release hook call
             pre_release_calls = [
@@ -741,7 +741,7 @@ class TestHookCwdMonorepo:
 
             from rlsbl.commands.release import run_cmd
 
-            run_cmd(_rc(include=["pypi"]), {"quiet": True, "yes": True}, project_root=".", monorepo_root=None)
+            run_cmd(_rc(include=["pypi"]), {"quiet": True, "yes": True}, project_root=".", monorepo_root=str(ns.root))
 
             # Find the post-release hook call
             post_release_calls = [
