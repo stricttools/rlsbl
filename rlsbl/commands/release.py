@@ -43,6 +43,14 @@ from ..utils import (
 VALID_BUMP_TYPES = ("patch", "minor", "major")
 
 
+def _rel_to_git_root(path, git_root):
+    """Normalize path; make relative to git root if absolute."""
+    n = os.path.normpath(path)
+    if os.path.isabs(n):
+        return os.path.relpath(n, git_root)
+    return n
+
+
 class ReleaseAbortError(Exception):
     """Raised when the release must abort (e.g., unexpected dirty files)."""
 
@@ -1110,17 +1118,11 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
 
     def vpath(filename):
         """Join filename with version_dir, return relative to git root."""
-        full = os.path.normpath(os.path.join(version_dir, filename))
-        if os.path.isabs(full):
-            return os.path.relpath(full, _git_root)
-        return full
+        return _rel_to_git_root(os.path.join(version_dir, filename), _git_root)
 
     def target_vpath(t_path, filename):
         """Join filename with a target's resolved path, return relative to git root."""
-        full = os.path.normpath(os.path.join(t_path, filename))
-        if os.path.isabs(full):
-            return os.path.relpath(full, _git_root)
-        return full
+        return _rel_to_git_root(os.path.join(t_path, filename), _git_root)
 
     # Pre-compute expected version files for the confirmation prompt display.
     # The actual files_to_commit list is built from write_version() return
@@ -1320,14 +1322,10 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
         generate_version_file(changes_dir, new_version)
         log(f"Finalized JSONL changelog for {new_version}")
         # Commit the finalized JSONL file and the new empty unreleased.jsonl
-        def _rel_path(p):
-            n = os.path.normpath(p)
-            return os.path.relpath(n, _git_root) if os.path.isabs(n) else n
-
-        jsonl_finalized = _rel_path(os.path.join(changes_dir, f"{new_version}.jsonl"))
-        jsonl_unreleased = _rel_path(os.path.join(changes_dir, "unreleased.jsonl"))
+        jsonl_finalized = _rel_to_git_root(os.path.join(changes_dir, f"{new_version}.jsonl"), _git_root)
+        jsonl_unreleased = _rel_to_git_root(os.path.join(changes_dir, "unreleased.jsonl"), _git_root)
         # Also commit the generated per-version .md file if it exists
-        jsonl_md = _rel_path(os.path.join(changes_dir, f"{new_version}.md"))
+        jsonl_md = _rel_to_git_root(os.path.join(changes_dir, f"{new_version}.md"), _git_root)
         changelog_file = vpath("CHANGELOG.md")
         finalize_files = [jsonl_finalized, jsonl_unreleased, changelog_file]
         if os.path.exists(jsonl_md):
@@ -1348,8 +1346,8 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
             with open(release_file_path, "w", encoding="utf-8") as f:
                 pass  # empty file
             release_finalize_files = [
-                _rel_path(versioned_release),
-                _rel_path(release_file_path),
+                _rel_to_git_root(versioned_release, _git_root),
+                _rel_to_git_root(release_file_path, _git_root),
             ]
             commit_files(f"chore: finalize release file for {new_version}", release_finalize_files, cwd=_git_root)
             log(f"Finalized release file for {new_version}")
