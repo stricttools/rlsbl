@@ -108,6 +108,8 @@ class TestReleaseWithDeployTargets:
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, project_root: None,
             })(),
+            project_root=str(mock_git_repo),
+            monorepo_root=None,
         )
 
         assert len(deploy_calls) == 1
@@ -203,6 +205,8 @@ class TestReleaseDeployFailureContinues:
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, project_root: None,
             })(),
+            project_root=str(mock_git_repo),
+            monorepo_root=None,
         )
 
         captured = capsys.readouterr()
@@ -273,6 +277,8 @@ class TestReleaseNoDeployConfig:
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, project_root: None,
             })(),
+            project_root=str(mock_git_repo),
+            monorepo_root=None,
         )
 
         # deploy_target should never have been called
@@ -344,6 +350,8 @@ class TestReleaseDeployConfigErrors:
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, project_root: None,
             })(),
+            project_root=str(mock_git_repo),
+            monorepo_root=None,
         )
 
         # deploy_target should never have been called (config has errors)
@@ -419,6 +427,8 @@ class TestReleaseStopsAtFirstDeployFailure:
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, project_root: None,
             })(),
+            project_root=str(mock_git_repo),
+            monorepo_root=None,
         )
 
         # Only staging was attempted; prod was NOT attempted

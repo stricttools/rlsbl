@@ -86,7 +86,7 @@ class TestBuiltinTestRunner:
             mock_which.return_value = "/usr/bin/uv"
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
 
-            result = _run_builtin_tests("pypi", {})
+            result = _run_builtin_tests("pypi", {}, project_root=str(tmp_project))
 
             assert result is True
             # Should have called uv sync --quiet then uv run pytest
@@ -115,7 +115,7 @@ class TestBuiltinTestRunner:
             mock_which.side_effect = which_side_effect
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
 
-            result = _run_builtin_tests("pypi", {})
+            result = _run_builtin_tests("pypi", {}, project_root=str(tmp_project))
 
             assert result is True
             assert mock_run.call_count == 1
@@ -128,7 +128,7 @@ class TestBuiltinTestRunner:
         with patch("rlsbl.commands.release.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
 
-            result = _run_builtin_tests("go", {})
+            result = _run_builtin_tests("go", {}, project_root=str(tmp_project))
 
             assert result is True
             assert mock_run.call_count == 1
@@ -143,7 +143,7 @@ class TestBuiltinTestRunner:
         with patch("rlsbl.commands.release.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
 
-            result = _run_builtin_tests("npm", {})
+            result = _run_builtin_tests("npm", {}, project_root=str(tmp_project))
 
             assert result is True
             assert mock_run.call_count == 1
@@ -154,7 +154,7 @@ class TestBuiltinTestRunner:
         _setup_npm_project(tmp_project, test_script=None)
 
         with patch("rlsbl.commands.release.subprocess.run") as mock_run:
-            result = _run_builtin_tests("npm", {})
+            result = _run_builtin_tests("npm", {}, project_root=str(tmp_project))
 
             assert result is True
             mock_run.assert_not_called()
@@ -169,7 +169,7 @@ class TestBuiltinTestRunner:
             )
 
             with pytest.raises(SystemExit) as exc_info:
-                _run_builtin_tests("npm", {})
+                _run_builtin_tests("npm", {}, project_root=str(tmp_project))
 
             assert exc_info.value.code == 1
 
@@ -178,7 +178,7 @@ class TestBuiltinTestRunner:
         _setup_npm_project(tmp_project, test_script="jest")
 
         with patch("rlsbl.commands.release.subprocess.run") as mock_run:
-            result = _run_builtin_tests("npm", {"dry-run": True})
+            result = _run_builtin_tests("npm", {"dry-run": True}, project_root=str(tmp_project))
 
             assert result is True
             mock_run.assert_not_called()
@@ -203,7 +203,7 @@ class TestBuiltinTestRunnerCwd:
             mock_which.return_value = "/usr/bin/uv"
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
 
-            _run_builtin_tests("pypi", {})
+            _run_builtin_tests("pypi", {}, project_root=str(tmp_project))
 
             for c in mock_run.call_args_list:
                 assert c.kwargs.get("cwd") is None
@@ -221,7 +221,7 @@ class TestBuiltinTestRunnerCwd:
             mock_which.return_value = "/usr/bin/uv"
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
 
-            _run_builtin_tests("pypi", {}, project_dir=project_dir)
+            _run_builtin_tests("pypi", {}, project_dir=project_dir, project_root=str(tmp_project))
 
             assert mock_run.call_count == 2
             for c in mock_run.call_args_list:
@@ -247,7 +247,7 @@ class TestBuiltinTestRunnerCwd:
             mock_which.side_effect = which_side_effect
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
 
-            _run_builtin_tests("pypi", {}, project_dir=project_dir)
+            _run_builtin_tests("pypi", {}, project_dir=project_dir, project_root=str(tmp_project))
 
             assert mock_run.call_count == 1
             assert mock_run.call_args.kwargs.get("cwd") == project_dir
@@ -260,7 +260,7 @@ class TestBuiltinTestRunnerCwd:
         with patch("rlsbl.commands.release.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
 
-            _run_builtin_tests("go", {}, project_dir=project_dir)
+            _run_builtin_tests("go", {}, project_dir=project_dir, project_root=str(tmp_project))
 
             assert mock_run.call_count == 1
             assert mock_run.call_args.kwargs.get("cwd") == project_dir
@@ -272,7 +272,7 @@ class TestBuiltinTestRunnerCwd:
         with patch("rlsbl.commands.release.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
 
-            _run_builtin_tests("go", {})
+            _run_builtin_tests("go", {}, project_root=str(tmp_project))
 
             assert mock_run.call_count == 1
             assert mock_run.call_args.kwargs.get("cwd") is None
@@ -287,7 +287,7 @@ class TestBuiltinTestRunnerCwd:
         with patch("rlsbl.commands.release.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
 
-            _run_builtin_tests("npm", {}, project_dir=str(project_dir))
+            _run_builtin_tests("npm", {}, project_dir=str(project_dir), project_root=str(tmp_project))
 
             assert mock_run.call_count == 1
             assert mock_run.call_args.kwargs.get("cwd") == str(project_dir)
@@ -299,7 +299,7 @@ class TestBuiltinTestRunnerCwd:
         with patch("rlsbl.commands.release.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
 
-            _run_builtin_tests("npm", {})
+            _run_builtin_tests("npm", {}, project_root=str(tmp_project))
 
             assert mock_run.call_count == 1
             assert mock_run.call_args.kwargs.get("cwd") is None
@@ -315,7 +315,7 @@ class TestBuiltinTestRunnerCwd:
         with patch("rlsbl.commands.release.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
 
-            result = _run_builtin_tests("npm", {}, project_dir=str(project_dir))
+            result = _run_builtin_tests("npm", {}, project_dir=str(project_dir), project_root=str(tmp_project))
 
             assert result is True
             assert mock_run.call_count == 1
@@ -673,7 +673,7 @@ class TestTwoHookModel:
 
             from rlsbl.commands.release import run_cmd
 
-            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True})
+            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, project_root=str(tmp_project), monorepo_root=None)
 
             # The hook should have actually run and created the marker
             assert marker.exists(), "pre-checks.sh should have created the marker file"
@@ -724,7 +724,7 @@ class TestTwoHookModel:
 
             from rlsbl.commands.release import run_cmd
 
-            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True})
+            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, project_root=str(tmp_project), monorepo_root=None)
 
             # pre-release hook runs after tests/lint but is still executed for dry-run
             # (based on the code, pre-release hook runs before dry-run return)
@@ -770,7 +770,7 @@ class TestTwoHookModel:
             from rlsbl.commands.release import run_cmd
 
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(_rc(), {"quiet": True, "yes": True})
+                run_cmd(_rc(), {"quiet": True, "yes": True}, project_root=str(tmp_project), monorepo_root=None)
 
             assert exc_info.value.code == 1
             # Tests and lint should NOT have been called
@@ -831,7 +831,7 @@ class TestFullFlowOrder:
         original_tests = _run_builtin_tests
         original_lint = _run_builtin_lint
 
-        def tracking_tests(registry, flags, project_dir=None, project_root=None):
+        def tracking_tests(registry, flags, *, project_dir=None, project_root):
             execution_order.append("tests")
             return True
 
@@ -845,7 +845,7 @@ class TestFullFlowOrder:
         ):
             from rlsbl.commands.release import run_cmd
 
-            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True})
+            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, project_root=str(tmp_project), monorepo_root=None)
 
         # Read hook execution order from the file
         assert order_file.exists(), "Hooks should have written to order file"

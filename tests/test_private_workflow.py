@@ -89,7 +89,7 @@ class TestPrivateFlagScaffold:
 
         with patch("sys.stdout", new_callable=StringIO):
             with patch("rlsbl.commands.init_cmd.is_private_repo", return_value=True):
-                run_cmd("npm", [], {"private": True, "no-tag": True})
+                run_cmd("npm", [], {"private": True, "no-tag": True}, project_root=str(mock_git_repo))
 
         publish_path = os.path.join(".github", "workflows", "publish.yml")
         assert not os.path.exists(publish_path), "publish.yml should not exist for private repos"
@@ -105,7 +105,7 @@ class TestPrivateFlagScaffold:
 
         with patch("sys.stdout", new_callable=StringIO):
             with patch("rlsbl.commands.init_cmd.is_private_repo", return_value=True):
-                run_cmd("npm", [], {"no-tag": True})
+                run_cmd("npm", [], {"no-tag": True}, project_root=str(mock_git_repo))
 
         publish_path = os.path.join(".github", "workflows", "publish.yml")
         assert not os.path.exists(publish_path), "publish.yml should not exist for auto-detected private repos"
@@ -117,7 +117,7 @@ class TestPrivateFlagScaffold:
 
         with patch("sys.stdout", new_callable=StringIO):
             with patch("rlsbl.commands.init_cmd.is_private_repo", return_value=True):
-                run_cmd("npm", [], {"private": True, "no-tag": True})
+                run_cmd("npm", [], {"private": True, "no-tag": True}, project_root=str(mock_git_repo))
 
         hook_path = os.path.join(".rlsbl", "hooks", "post-release.sh")
         assert os.path.exists(hook_path)
@@ -136,7 +136,7 @@ class TestPrivateFlagScaffold:
 
         with patch("sys.stdout", new_callable=StringIO):
             with patch("rlsbl.commands.init_cmd.is_private_repo", return_value=True):
-                run_cmd("npm", [], {"private": True, "no-tag": True})
+                run_cmd("npm", [], {"private": True, "no-tag": True}, project_root=str(mock_git_repo))
 
         config = read_project_config(str(mock_git_repo))
         assert config.get("private") is True
@@ -148,7 +148,7 @@ class TestPrivateFlagScaffold:
 
         with patch("sys.stdout", new_callable=StringIO):
             with patch("rlsbl.commands.init_cmd.is_private_repo", return_value=False):
-                run_cmd("npm", [], {"no-tag": True})
+                run_cmd("npm", [], {"no-tag": True}, project_root=str(mock_git_repo))
 
         publish_path = os.path.join(".github", "workflows", "publish.yml")
         assert os.path.exists(publish_path), "publish.yml should exist for public repos"
@@ -161,7 +161,7 @@ class TestPrivateFlagScaffold:
         # First scaffold with --private
         with patch("sys.stdout", new_callable=StringIO):
             with patch("rlsbl.commands.init_cmd.is_private_repo", return_value=None):
-                run_cmd("npm", [], {"private": True, "no-tag": True})
+                run_cmd("npm", [], {"private": True, "no-tag": True}, project_root=str(mock_git_repo))
 
         # Remove publish.yml tracking and CI to force re-creation scenario
         publish_path = os.path.join(".github", "workflows", "publish.yml")
@@ -170,7 +170,7 @@ class TestPrivateFlagScaffold:
         # Second scaffold without --private flag, but config remembers
         with patch("sys.stdout", new_callable=StringIO):
             with patch("rlsbl.commands.init_cmd.is_private_repo", return_value=None):
-                run_cmd("npm", [], {"force": True, "no-tag": True})
+                run_cmd("npm", [], {"force": True, "no-tag": True}, project_root=str(mock_git_repo))
 
         assert not os.path.exists(publish_path), "publish.yml should still not exist (config remembers private)"
 
