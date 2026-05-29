@@ -1205,7 +1205,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
             npm_path = target_paths.get("npm", version_dir)
             try:
                 if TARGETS["npm"].check_project_exists(npm_path):
-                    if ensure_npm_keyword(npm_path, quiet=quiet):
+                    if ensure_npm_keyword(npm_path, quiet=quiet, project_root=project_root):
                         pkg_path = target_vpath(npm_path, "package.json")
                         if pkg_path not in files_to_commit:
                             files_to_commit.append(pkg_path)
@@ -1214,7 +1214,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
             pypi_path = target_paths.get("pypi", version_dir)
             try:
                 if TARGETS["pypi"].check_project_exists(pypi_path):
-                    if ensure_pypi_keyword(pypi_path, quiet=quiet):
+                    if ensure_pypi_keyword(pypi_path, quiet=quiet, project_root=project_root):
                         pyproject_path = target_vpath(pypi_path, "pyproject.toml")
                         if pyproject_path not in files_to_commit:
                             files_to_commit.append(pyproject_path)
