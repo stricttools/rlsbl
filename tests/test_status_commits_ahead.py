@@ -205,7 +205,7 @@ class TestStatusCommitsAheadMonorepo:
     not some other project's tag.
     """
 
-    def test_monorepo_warning_uses_scoped_tag(self, mock_git_repo, capsys):
+    def test_monorepo_warning_uses_scoped_tag(self, mock_git_repo, monkeypatch, capsys):
         """Inside a monorepo project, warning references the scoped tag."""
         # Two projects: core (tagged) and tools (also tagged later)
         _cmd_init({}, project_root=".")
@@ -222,7 +222,7 @@ class TestStatusCommitsAheadMonorepo:
         _commit_file(mock_git_repo, "core/file.txt", message="post-release core change")
 
         capsys.readouterr()
-        os.chdir(str(core_dir))
+        monkeypatch.chdir(str(core_dir))
         from rlsbl.commands.status import run_cmd
         run_cmd("npm", [], {}, project_root=".")
         out = capsys.readouterr().out
@@ -232,7 +232,7 @@ class TestStatusCommitsAheadMonorepo:
         assert "core@v1.0.0" in warning_lines[0]
         assert "commit ahead" in warning_lines[0] or "commits ahead" in warning_lines[0]
 
-    def test_monorepo_project_with_no_unreleased_no_warning(self, mock_git_repo, capsys):
+    def test_monorepo_project_with_no_unreleased_no_warning(self, mock_git_repo, monkeypatch, capsys):
         """A monorepo project at its tagged version (no commits ahead) prints no warning."""
         _cmd_init({}, project_root=".")
         proj_dir = mock_git_repo / "alpha"
@@ -243,7 +243,7 @@ class TestStatusCommitsAheadMonorepo:
         subprocess.run(["git", "tag", "alpha@v1.0.0"], cwd=str(mock_git_repo), check=True)
 
         capsys.readouterr()
-        os.chdir(str(proj_dir))
+        monkeypatch.chdir(str(proj_dir))
         from rlsbl.commands.status import run_cmd
         run_cmd("npm", [], {}, project_root=".")
         out = capsys.readouterr().out
@@ -251,7 +251,7 @@ class TestStatusCommitsAheadMonorepo:
         assert "commits ahead" not in out
         assert not any(line.startswith(WARN_PREFIX) for line in out.splitlines())
 
-    def test_monorepo_directory_filtering_excludes_other_projects(self, mock_git_repo, capsys):
+    def test_monorepo_directory_filtering_excludes_other_projects(self, mock_git_repo, monkeypatch, capsys):
         """Commits touching only another project's files are excluded from the count.
 
         alpha and beta both tagged, then commits are added touching only
@@ -284,7 +284,7 @@ class TestStatusCommitsAheadMonorepo:
 
         # alpha: no commits touch its files -> no warning
         capsys.readouterr()
-        os.chdir(str(alpha))
+        monkeypatch.chdir(str(alpha))
         run_cmd("npm", [], {}, project_root=".")
         alpha_out = capsys.readouterr().out
         alpha_warnings = [l for l in alpha_out.splitlines() if l.startswith(WARN_PREFIX)]
@@ -295,14 +295,14 @@ class TestStatusCommitsAheadMonorepo:
 
         # beta: 2 commits touch its files -> warning
         capsys.readouterr()
-        os.chdir(str(beta))
+        monkeypatch.chdir(str(beta))
         run_cmd("npm", [], {}, project_root=".")
         beta_out = capsys.readouterr().out
         beta_warnings = [l for l in beta_out.splitlines() if l.startswith(WARN_PREFIX)]
         assert len(beta_warnings) == 1
         assert "2 commits ahead" in beta_warnings[0]
 
-    def test_monorepo_directory_filtering_json(self, mock_git_repo, capsys):
+    def test_monorepo_directory_filtering_json(self, mock_git_repo, monkeypatch, capsys):
         """JSON output reflects directory-filtered commit counts."""
         _cmd_init({}, project_root=".")
 
@@ -329,18 +329,18 @@ class TestStatusCommitsAheadMonorepo:
         from rlsbl.commands.status import run_cmd
 
         capsys.readouterr()
-        os.chdir(str(alpha))
+        monkeypatch.chdir(str(alpha))
         run_cmd("npm", [], {"json": True}, project_root=".")
         data = json.loads(capsys.readouterr().out)
         assert data["commits_ahead"] == 1
 
         capsys.readouterr()
-        os.chdir(str(beta))
+        monkeypatch.chdir(str(beta))
         run_cmd("npm", [], {"json": True}, project_root=".")
         data = json.loads(capsys.readouterr().out)
         assert data["commits_ahead"] == 2
 
-    def test_monorepo_warns_only_for_projects_with_unreleased_commits(self, mock_git_repo, capsys):
+    def test_monorepo_warns_only_for_projects_with_unreleased_commits(self, mock_git_repo, monkeypatch, capsys):
         """Two projects: only the one whose tag is behind HEAD shows the warning.
 
         Each project uses its own scoped tag (alpha@v* vs beta@v*), so a
@@ -376,7 +376,7 @@ class TestStatusCommitsAheadMonorepo:
 
         # alpha shows warning -- 2 commits ahead of alpha@v1.0.0
         capsys.readouterr()
-        os.chdir(str(alpha))
+        monkeypatch.chdir(str(alpha))
         run_cmd("npm", [], {}, project_root=".")
         alpha_out = capsys.readouterr().out
         alpha_warnings = [l for l in alpha_out.splitlines() if l.startswith(WARN_PREFIX)]
@@ -386,7 +386,7 @@ class TestStatusCommitsAheadMonorepo:
 
         # beta does not show warning -- its tag is at HEAD
         capsys.readouterr()
-        os.chdir(str(beta))
+        monkeypatch.chdir(str(beta))
         run_cmd("npm", [], {}, project_root=".")
         beta_out = capsys.readouterr().out
         beta_warnings = [l for l in beta_out.splitlines() if l.startswith(WARN_PREFIX)]

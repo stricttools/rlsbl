@@ -158,7 +158,7 @@ class TestGetLastTagWithGlob:
 class TestUnreleasedMonorepo:
     """Tests for monorepo awareness in the unreleased command."""
 
-    def test_monorepo_uses_scoped_tag(self, mock_git_repo, capsys):
+    def test_monorepo_uses_scoped_tag(self, mock_git_repo, monkeypatch, capsys):
         """In a monorepo project, unreleased uses the project's scoped tag."""
         _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "alpha", version="1.0.0")
@@ -177,7 +177,7 @@ class TestUnreleasedMonorepo:
         # Add a commit touching alpha
         _commit_file(mock_git_repo, "alpha/new.txt", message="alpha feature")
 
-        os.chdir(str(mock_git_repo / "alpha"))
+        monkeypatch.chdir(str(mock_git_repo / "alpha"))
         capsys.readouterr()
         with pytest.raises(SystemExit) as exc_info:
             run_cmd("npm", [], {"json": True}, project_root=str(mock_git_repo / "alpha"))
@@ -186,7 +186,7 @@ class TestUnreleasedMonorepo:
         # Should use scoped tag
         assert data["tag"] == "alpha@v1.0.0"
 
-    def test_monorepo_filters_commits_by_directory(self, mock_git_repo, capsys):
+    def test_monorepo_filters_commits_by_directory(self, mock_git_repo, monkeypatch, capsys):
         """Commits touching only another project's files are excluded."""
         _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "alpha", version="1.0.0")
@@ -210,7 +210,7 @@ class TestUnreleasedMonorepo:
         _commit_file(mock_git_repo, "beta/b2.txt", message="beta change 2")
 
         # Check alpha: should see only 1 commit
-        os.chdir(str(mock_git_repo / "alpha"))
+        monkeypatch.chdir(str(mock_git_repo / "alpha"))
         capsys.readouterr()
         with pytest.raises(SystemExit) as exc_info:
             run_cmd("npm", [], {"json": True}, project_root=str(mock_git_repo / "alpha"))
@@ -219,7 +219,7 @@ class TestUnreleasedMonorepo:
         assert alpha_data["coverage"]["total"] == 1
 
         # Check beta: should see only 2 commits
-        os.chdir(str(mock_git_repo / "beta"))
+        monkeypatch.chdir(str(mock_git_repo / "beta"))
         capsys.readouterr()
         with pytest.raises(SystemExit) as exc_info:
             run_cmd("npm", [], {"json": True}, project_root=str(mock_git_repo / "beta"))
@@ -227,7 +227,7 @@ class TestUnreleasedMonorepo:
         beta_data = json.loads(capsys.readouterr().out)
         assert beta_data["coverage"]["total"] == 2
 
-    def test_monorepo_no_commits_for_project(self, mock_git_repo, capsys):
+    def test_monorepo_no_commits_for_project(self, mock_git_repo, monkeypatch, capsys):
         """When all commits touch other projects, shows no unreleased commits."""
         _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "alpha", version="1.0.0")
@@ -243,7 +243,7 @@ class TestUnreleasedMonorepo:
         _commit_file(mock_git_repo, "beta/b.txt", message="beta only")
 
         # Check alpha: should see no unreleased commits
-        os.chdir(str(mock_git_repo / "alpha"))
+        monkeypatch.chdir(str(mock_git_repo / "alpha"))
         capsys.readouterr()
         with pytest.raises(SystemExit) as exc_info:
             run_cmd("npm", [], {}, project_root=str(mock_git_repo / "alpha"))

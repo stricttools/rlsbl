@@ -166,7 +166,7 @@ class TestMonorepoStatusChangelog:
 class TestStatusMonorepoAware:
     """Tests for monorepo awareness in 'rlsbl status'."""
 
-    def test_status_shows_monorepo_hint(self, mock_git_repo, capsys):
+    def test_status_shows_monorepo_hint(self, mock_git_repo, monkeypatch, capsys):
         """When inside a monorepo project, status output includes the hint."""
         # Set up monorepo workspace
         _cmd_init({}, project_root=".")
@@ -175,7 +175,7 @@ class TestStatusMonorepoAware:
         capsys.readouterr()
 
         # Change into the project directory
-        os.chdir(str(mock_git_repo / "core"))
+        monkeypatch.chdir(str(mock_git_repo / "core"))
 
         from rlsbl.commands.status import run_cmd
         run_cmd("npm", [], {}, project_root=".")
@@ -239,7 +239,7 @@ class TestStatusTagScoping:
 
         capsys.readouterr()
 
-        os.chdir(str(mock_git_repo / "mylib"))
+        monkeypatch.chdir(str(mock_git_repo / "mylib"))
 
         captured_calls = []
         original_unreleased_range = _unreleased_range

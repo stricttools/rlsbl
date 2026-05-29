@@ -128,12 +128,13 @@ class TestMonorepoReleaseLockPlacement:
         self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run,
         _commit_files, _push,
         mock_git_repo,
+        monkeypatch,
     ):
         """Monorepo release puts lock in .rlsbl-monorepo/, not .rlsbl/ at repo root."""
         from rlsbl.commands.release import run_cmd
 
         proj_dir = self._setup_monorepo(mock_git_repo, "tooling", "tooling")
-        os.chdir(str(proj_dir))
+        monkeypatch.chdir(str(proj_dir))
 
         lock_acquired_in = []
 

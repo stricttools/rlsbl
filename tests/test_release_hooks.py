@@ -571,6 +571,7 @@ class TestHookCwdMonorepo:
         mock_run,
         _push,
         monorepo_fixture,
+        monkeypatch,
     ):
         """In monorepo mode, pre-checks hook subprocess.run gets cwd=project_dir."""
         ns = monorepo_fixture
@@ -585,7 +586,7 @@ class TestHookCwdMonorepo:
         )
 
         # chdir to the python subproject (run_cmd detects monorepo from here)
-        os.chdir(ns.python_dir)
+        monkeypatch.chdir(ns.python_dir)
 
         mock_run.side_effect = ["", "0", "mypylib@v0.1.0", "", "", ""]
 
@@ -635,6 +636,7 @@ class TestHookCwdMonorepo:
         mock_run,
         _push,
         monorepo_fixture,
+        monkeypatch,
     ):
         """In monorepo mode, pre-release hook subprocess.run gets cwd=project_dir."""
         ns = monorepo_fixture
@@ -646,7 +648,7 @@ class TestHookCwdMonorepo:
             "# Changelog\n\n## 0.1.1\n\nPatch release.\n"
         )
 
-        os.chdir(ns.python_dir)
+        monkeypatch.chdir(ns.python_dir)
 
         mock_run.side_effect = ["", "0", "mypylib@v0.1.0", "", "", ""]
 
@@ -698,6 +700,7 @@ class TestHookCwdMonorepo:
         _should_tag,
         _deploy,
         monorepo_fixture,
+        monkeypatch,
     ):
         """In monorepo mode, post-release hook subprocess.run gets cwd=project_dir."""
         ns = monorepo_fixture
@@ -709,7 +712,7 @@ class TestHookCwdMonorepo:
             "# Changelog\n\n## 0.1.1\n\nPatch release.\n"
         )
 
-        os.chdir(ns.python_dir)
+        monkeypatch.chdir(ns.python_dir)
 
         def fake_run(cmd, args=None, timeout=120, env=None):
             full = [cmd] + (args or [])

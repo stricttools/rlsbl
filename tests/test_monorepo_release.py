@@ -93,11 +93,11 @@ class TestMonorepoRelease:
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_dry_run_shows_monorepo_tag(
         self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run,
-        mock_git_repo, capsys,
+        mock_git_repo, monkeypatch, capsys,
     ):
         """Dry-run in a monorepo project shows prefixed tag."""
         proj_dir = self._setup_monorepo(mock_git_repo, "tooling", "tooling")
-        os.chdir(str(proj_dir))
+        monkeypatch.chdir(str(proj_dir))
 
         # mock_run side effects:
         # 1. git fetch origin --quiet
@@ -122,11 +122,11 @@ class TestMonorepoRelease:
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_dry_run_shows_monorepo_commit_message(
         self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run,
-        mock_git_repo, capsys,
+        mock_git_repo, monkeypatch, capsys,
     ):
         """Commit message uses 'name: release v...' format in monorepo mode."""
         proj_dir = self._setup_monorepo(mock_git_repo, "tooling", "tooling")
-        os.chdir(str(proj_dir))
+        monkeypatch.chdir(str(proj_dir))
 
         # First release (no existing tag)
         mock_run.side_effect = ["", "0", "", "", "", ""]
@@ -147,13 +147,13 @@ class TestMonorepoRelease:
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_dry_run_bump_shows_monorepo_tag(
         self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run,
-        mock_git_repo, capsys,
+        mock_git_repo, monkeypatch, capsys,
     ):
         """When bumping an existing version in monorepo, tag is name@vX.Y.Z."""
         proj_dir = self._setup_monorepo(
             mock_git_repo, "tooling", "tooling", changelog_version="1.0.1",
         )
-        os.chdir(str(proj_dir))
+        monkeypatch.chdir(str(proj_dir))
 
         # Current tag exists -> bump
         # 1. git fetch origin --quiet
@@ -178,11 +178,11 @@ class TestMonorepoRelease:
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_dry_run_shows_project_info(
         self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run,
-        mock_git_repo, capsys,
+        mock_git_repo, monkeypatch, capsys,
     ):
         """Dry-run output includes project name and path."""
         proj_dir = self._setup_monorepo(mock_git_repo, "tooling", "tooling")
-        os.chdir(str(proj_dir))
+        monkeypatch.chdir(str(proj_dir))
 
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
@@ -286,7 +286,7 @@ class TestMonorepoRelease:
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_monorepo_reads_version_from_project_subdir(
         self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run,
-        mock_git_repo, capsys,
+        mock_git_repo, monkeypatch, capsys,
     ):
         """Version is read from the project subdirectory, not the repo root."""
         # Create workspace with project at "libs/core"
@@ -302,7 +302,7 @@ class TestMonorepoRelease:
             cwd=str(mock_git_repo), check=True,
         )
 
-        os.chdir(str(proj_dir))
+        monkeypatch.chdir(str(proj_dir))
 
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
@@ -322,7 +322,7 @@ class TestMonorepoRelease:
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_monorepo_reads_changelog_from_project_subdir(
         self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run,
-        mock_git_repo, capsys,
+        mock_git_repo, monkeypatch, capsys,
     ):
         """Changelog is read from the project subdirectory."""
         proj_dir = self._setup_monorepo(mock_git_repo, "core", "core")
@@ -337,7 +337,7 @@ class TestMonorepoRelease:
             cwd=str(mock_git_repo), check=True,
         )
 
-        os.chdir(str(proj_dir))
+        monkeypatch.chdir(str(proj_dir))
 
         # First release -- tag doesn't exist
         mock_run.side_effect = ["", "0", "", "", "", ""]
@@ -400,14 +400,14 @@ class TestSubtreePublish:
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_release_calls_subtree_push(
         self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run,
-        mock_git_repo, capsys,
+        mock_git_repo, monkeypatch, capsys,
     ):
         """Dry-run with subtree_remote shows subtree info in output."""
         proj_dir = self._setup_monorepo_with_subtree(
             mock_git_repo, "tooling", "tooling",
             subtree_remote="git@github.com:user/tooling.git",
         )
-        os.chdir(str(proj_dir))
+        monkeypatch.chdir(str(proj_dir))
 
         # First release: tag doesn't exist
         mock_run.side_effect = ["", "0", "", "", "", ""]
@@ -429,13 +429,13 @@ class TestSubtreePublish:
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_release_skips_subtree_without_config(
         self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run,
-        mock_git_repo, capsys,
+        mock_git_repo, monkeypatch, capsys,
     ):
         """Dry-run without subtree_remote does not show subtree info."""
         proj_dir = self._setup_monorepo_with_subtree(
             mock_git_repo, "tooling", "tooling",
         )
-        os.chdir(str(proj_dir))
+        monkeypatch.chdir(str(proj_dir))
 
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
@@ -457,14 +457,14 @@ class TestSubtreePublish:
     def test_subtree_push_failure_nonfatal(
         self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run,
         _commit_files, _push,
-        mock_git_repo, capsys,
+        mock_git_repo, monkeypatch, capsys,
     ):
         """Subtree push failure does not abort the release."""
         proj_dir = self._setup_monorepo_with_subtree(
             mock_git_repo, "tooling", "tooling",
             subtree_remote="git@github.com:user/tooling.git",
         )
-        os.chdir(str(proj_dir))
+        monkeypatch.chdir(str(proj_dir))
 
         def mock_run_side_effect(cmd, args, **kwargs):
             if "rev-list" in args:
