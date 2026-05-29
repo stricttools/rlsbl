@@ -95,8 +95,8 @@ class TestReleaseValidatedCache(unittest.TestCase):
             # _run_release_mutating phase:
             "",                 # git status --porcelain (baseline snapshot)
             "/tmp/fake-repo",   # git rev-parse --show-toplevel (for vpath)
+            "abc123def456",     # git rev-parse HEAD (pre_release_sha -- before version bump)
             porcelain_recheck,  # git status --porcelain (re-check guard)
-            "package.json",     # git rev-parse HEAD (pre_release_sha)
             # new_version != current_version, so has_staged_or_modified is short-circuited
             # commit_files is mocked separately
             "M package.json",   # git tag v1.0.1
@@ -148,7 +148,9 @@ class TestReleaseValidatedCache(unittest.TestCase):
             # _run_release_mutating phase:
             "",                 # git status --porcelain (baseline snapshot)
             "/tmp/fake-repo",   # git rev-parse --show-toplevel (for vpath)
+            "abc123def456",     # git rev-parse HEAD (pre_release_sha -- before version bump)
             porcelain_recheck,  # git status --porcelain (re-check guard) -- has rogue.txt
+            "",                 # git reset --hard (rollback after ReleaseAbortError)
         ]
 
         with patch("sys.stdout", new_callable=StringIO):

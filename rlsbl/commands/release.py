@@ -43,6 +43,10 @@ from ..utils import (
 VALID_BUMP_TYPES = ("patch", "minor", "major")
 
 
+class ReleaseAbortError(Exception):
+    """Raised when the release must abort (e.g., unexpected dirty files)."""
+
+
 def parse_porcelain_paths(porcelain_output):
     """Parse file paths from `git status --porcelain` output.
 
@@ -1150,140 +1154,144 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
             print("Aborted.")
             sys.exit(0)
 
-    # Write new version to version files (skip if version didn't change, e.g. first release)
-    # Build files_to_commit from the paths actually modified by write_version().
-    files_to_commit = []
-    if new_version != current_version:
-        modified = reg.write_version(primary_path, new_version)
-        for rel in modified:
-            files_to_commit.append(target_vpath(primary_path, rel))
-        if modified:
-            log(f"Updated version in {', '.join(target_vpath(primary_path, r) for r in modified)}")
-
-        # Sync version to other configured/detected targets (per-target paths)
-        for t_name, t_path in target_paths.items():
-            if t_name == registry:
-                continue
-            other_reg = TARGETS.get(t_name)
-            if other_reg and other_reg.check_project_exists(t_path):
-                other_modified = other_reg.write_version(t_path, new_version)
-                for rel in other_modified:
-                    files_to_commit.append(target_vpath(t_path, rel))
-                if other_modified:
-                    log(f"Synced version to {', '.join(target_vpath(t_path, r) for r in other_modified)}")
-
-        # Ensure selfdoc.json is bumped even when "docs" is not in the
-        # explicit targets list.  DocsTarget.detect() checks for the file.
-        bumped_files = set(files_to_commit)
-        selfdoc_path = os.path.join(version_dir, "selfdoc.json")
-        if os.path.exists(selfdoc_path) and "docs" not in target_paths:
-            from ..targets.docs import DocsTarget
-            docs_modified = DocsTarget().write_version(version_dir, new_version)
-            for rel in docs_modified:
-                fpath = vpath(rel)
-                if fpath not in bumped_files:
-                    files_to_commit.append(fpath)
-            if docs_modified:
-                log(f"Synced version to {', '.join(vpath(r) for r in docs_modified)}")
-
-    # Ecosystem tagging: add keyword to manifests if enabled
-    if should_tag(flags, project_root):
-        npm_path = target_paths.get("npm", version_dir)
-        try:
-            if TARGETS["npm"].check_project_exists(npm_path):
-                if ensure_npm_keyword(npm_path, quiet=quiet):
-                    pkg_path = target_vpath(npm_path, "package.json")
-                    if pkg_path not in files_to_commit:
-                        files_to_commit.append(pkg_path)
-        except Exception:
-            pass
-        pypi_path = target_paths.get("pypi", version_dir)
-        try:
-            if TARGETS["pypi"].check_project_exists(pypi_path):
-                if ensure_pypi_keyword(pypi_path, quiet=quiet):
-                    pyproject_path = target_vpath(pypi_path, "pyproject.toml")
-                    if pyproject_path not in files_to_commit:
-                        files_to_commit.append(pyproject_path)
-        except Exception:
-            pass
-
-    # Sync lockfiles after version bumps so they reflect the new version
-    _sync_lockfiles(target_paths, files_to_commit, log)
-
-    # Update .rlsbl/version marker so it's included in the release commit
-    rlsbl_version_marker = vpath(os.path.join(".rlsbl", "version"))
-    if os.path.exists(os.path.dirname(rlsbl_version_marker)):
-        try:
-            from .. import __version__ as rlsbl_ver
-            with open(rlsbl_version_marker, "w") as f:
-                f.write(rlsbl_ver + "\n")
-            if rlsbl_version_marker not in files_to_commit:
-                files_to_commit.append(rlsbl_version_marker)
-        except Exception:
-            pass
-
-    # Re-run selfdoc check to refresh hashes after version bump
-    _refresh_selfdoc_hashes(files_to_commit, log, version_dir=version_dir, project_dir=abs_project_dir)
-
-    # Include the generated CHANGELOG.md in the commit
-    changelog_file = vpath("CHANGELOG.md")
-    if changelog_file not in files_to_commit:
-        files_to_commit.append(changelog_file)
-
-    # Include hook-generated files (created or modified by pre-checks/pre-release hooks)
-    if hook_generated:
-        for hf in sorted(hook_generated):
-            if hf not in files_to_commit:
-                files_to_commit.append(hf)
-                log(f"Including hook-generated file: {hf}")
-
-    # Build step (no-op for npm/pypi/go targets)
-    try:
-        target.build(primary_path, new_version)
-    except Exception as e:
-        print(f"Warning: target build step failed: {e}", file=sys.stderr)
-
-    # Re-check working tree: abort if files outside our expected set were modified
-    # (guards against concurrent processes dirtying the tree after our initial check)
-    dirty_output = run("git", ["status", "--porcelain"])
-    if dirty_output:
-        dirty_files = parse_porcelain_paths(dirty_output)
-        expected_files = set(files_to_commit)
-        expected_files.add(vpath(os.path.join(lock_dir, "lock")))
-        # The .validated cache is written by changelog validation earlier in the
-        # release flow.  It may be tracked (dirty) or gitignored (invisible to
-        # git status).  Either way it is not a concurrent-change signal.
-        validated_file = os.path.normpath(
-            os.path.join(get_changes_dir(version_dir), ".validated")
-        )
-        expected_files.add(validated_file)
-        # When --allow-dirty was used, files that were already dirty before the
-        # release started are not "unexpected" -- only genuinely new modifications
-        # (from e.g. concurrent processes) should trigger the abort.
-        if pre_existing_dirty:
-            expected_files |= pre_existing_dirty
-        # Subtract the baseline snapshot taken at the start of the mutating
-        # phase.  This covers files written by intermediate stages that ran
-        # BEFORE version-bump writes (generate_changelog, hooks, lint) which
-        # are not in files_to_commit or pre_existing_dirty.
-        unexpected = dirty_files - expected_files - baseline_dirty
-        if unexpected:
-            unexpected_list = ", ".join(sorted(unexpected))
-            print(
-                f"Unexpected modified files detected (possible concurrent change): {unexpected_list}. Aborting release.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-
-    # Commit if any of the files we track actually have changes.
-    # Don't use is_clean_tree() as a proxy — the advisory lock file (.rlsbl/lock)
-    # makes the tree appear dirty even when no release-relevant files changed.
-
-    # Capture HEAD before any git mutations so we can roll back on failure
+    # Capture HEAD before any version-bump writes so we can roll back on failure.
+    # This must happen before write_version() so that git reset --hard reverts
+    # the uncommitted version-bumped files if the release aborts.
     pre_release_sha = run("git", ["rev-parse", "HEAD"])
 
-    needs_commit = new_version != current_version or has_staged_or_modified(files_to_commit)
+    # Everything from version-bump writes through commit/tag/push is wrapped
+    # in a single try block so that any failure (including ReleaseAbortError
+    # from the unexpected-files check) triggers rollback of version-bumped
+    # files via git reset --hard.
     try:
+        # Write new version to version files (skip if version didn't change, e.g. first release)
+        # Build files_to_commit from the paths actually modified by write_version().
+        files_to_commit = []
+        if new_version != current_version:
+            modified = reg.write_version(primary_path, new_version)
+            for rel in modified:
+                files_to_commit.append(target_vpath(primary_path, rel))
+            if modified:
+                log(f"Updated version in {', '.join(target_vpath(primary_path, r) for r in modified)}")
+
+            # Sync version to other configured/detected targets (per-target paths)
+            for t_name, t_path in target_paths.items():
+                if t_name == registry:
+                    continue
+                other_reg = TARGETS.get(t_name)
+                if other_reg and other_reg.check_project_exists(t_path):
+                    other_modified = other_reg.write_version(t_path, new_version)
+                    for rel in other_modified:
+                        files_to_commit.append(target_vpath(t_path, rel))
+                    if other_modified:
+                        log(f"Synced version to {', '.join(target_vpath(t_path, r) for r in other_modified)}")
+
+            # Ensure selfdoc.json is bumped even when "docs" is not in the
+            # explicit targets list.  DocsTarget.detect() checks for the file.
+            bumped_files = set(files_to_commit)
+            selfdoc_path = os.path.join(version_dir, "selfdoc.json")
+            if os.path.exists(selfdoc_path) and "docs" not in target_paths:
+                from ..targets.docs import DocsTarget
+                docs_modified = DocsTarget().write_version(version_dir, new_version)
+                for rel in docs_modified:
+                    fpath = vpath(rel)
+                    if fpath not in bumped_files:
+                        files_to_commit.append(fpath)
+                if docs_modified:
+                    log(f"Synced version to {', '.join(vpath(r) for r in docs_modified)}")
+
+        # Ecosystem tagging: add keyword to manifests if enabled
+        if should_tag(flags, project_root):
+            npm_path = target_paths.get("npm", version_dir)
+            try:
+                if TARGETS["npm"].check_project_exists(npm_path):
+                    if ensure_npm_keyword(npm_path, quiet=quiet):
+                        pkg_path = target_vpath(npm_path, "package.json")
+                        if pkg_path not in files_to_commit:
+                            files_to_commit.append(pkg_path)
+            except Exception:
+                pass
+            pypi_path = target_paths.get("pypi", version_dir)
+            try:
+                if TARGETS["pypi"].check_project_exists(pypi_path):
+                    if ensure_pypi_keyword(pypi_path, quiet=quiet):
+                        pyproject_path = target_vpath(pypi_path, "pyproject.toml")
+                        if pyproject_path not in files_to_commit:
+                            files_to_commit.append(pyproject_path)
+            except Exception:
+                pass
+
+        # Sync lockfiles after version bumps so they reflect the new version
+        _sync_lockfiles(target_paths, files_to_commit, log)
+
+        # Update .rlsbl/version marker so it's included in the release commit
+        rlsbl_version_marker = vpath(os.path.join(".rlsbl", "version"))
+        if os.path.exists(os.path.dirname(rlsbl_version_marker)):
+            try:
+                from .. import __version__ as rlsbl_ver
+                with open(rlsbl_version_marker, "w") as f:
+                    f.write(rlsbl_ver + "\n")
+                if rlsbl_version_marker not in files_to_commit:
+                    files_to_commit.append(rlsbl_version_marker)
+            except Exception:
+                pass
+
+        # Re-run selfdoc check to refresh hashes after version bump
+        _refresh_selfdoc_hashes(files_to_commit, log, version_dir=version_dir, project_dir=abs_project_dir)
+
+        # Include the generated CHANGELOG.md in the commit
+        changelog_file = vpath("CHANGELOG.md")
+        if changelog_file not in files_to_commit:
+            files_to_commit.append(changelog_file)
+
+        # Include hook-generated files (created or modified by pre-checks/pre-release hooks)
+        if hook_generated:
+            for hf in sorted(hook_generated):
+                if hf not in files_to_commit:
+                    files_to_commit.append(hf)
+                    log(f"Including hook-generated file: {hf}")
+
+        # Build step (no-op for npm/pypi/go targets)
+        try:
+            target.build(primary_path, new_version)
+        except Exception as e:
+            print(f"Warning: target build step failed: {e}", file=sys.stderr)
+
+        # Re-check working tree: abort if files outside our expected set were modified
+        # (guards against concurrent processes dirtying the tree after our initial check)
+        dirty_output = run("git", ["status", "--porcelain"])
+        if dirty_output:
+            dirty_files = parse_porcelain_paths(dirty_output)
+            expected_files = set(files_to_commit)
+            expected_files.add(vpath(os.path.join(lock_dir, "lock")))
+            # The .validated cache is written by changelog validation earlier in the
+            # release flow.  It may be tracked (dirty) or gitignored (invisible to
+            # git status).  Either way it is not a concurrent-change signal.
+            validated_file = os.path.normpath(
+                os.path.join(get_changes_dir(version_dir), ".validated")
+            )
+            expected_files.add(validated_file)
+            # When --allow-dirty was used, files that were already dirty before the
+            # release started are not "unexpected" -- only genuinely new modifications
+            # (from e.g. concurrent processes) should trigger the abort.
+            if pre_existing_dirty:
+                expected_files |= pre_existing_dirty
+            # Subtract the baseline snapshot taken at the start of the mutating
+            # phase.  This covers files written by intermediate stages that ran
+            # BEFORE version-bump writes (generate_changelog, hooks, lint) which
+            # are not in files_to_commit or pre_existing_dirty.
+            unexpected = dirty_files - expected_files - baseline_dirty
+            if unexpected:
+                unexpected_list = ", ".join(sorted(unexpected))
+                raise ReleaseAbortError(
+                    f"Unexpected modified files detected (possible concurrent change): {unexpected_list}. Aborting release."
+                )
+
+        # Commit if any of the files we track actually have changes.
+        # Don't use is_clean_tree() as a proxy — the advisory lock file (.rlsbl/lock)
+        # makes the tree appear dirty even when no release-relevant files changed.
+
+        needs_commit = new_version != current_version or has_staged_or_modified(files_to_commit)
         if files_to_commit and needs_commit:
             commit_files(commit_msg, files_to_commit)
             log(f"Committed: {commit_msg}")
@@ -1346,6 +1354,16 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
         push_if_needed(branch, env=push_env, project_root=project_root)
         run("git", ["push", "origin", tag], timeout=push_timeout, env=push_env)
         log(f"Pushed to origin/{branch}")
+    except ReleaseAbortError as e:
+        # Release was explicitly aborted (e.g., unexpected dirty files).
+        # Roll back version-bumped files so the working tree is clean.
+        run("git", ["reset", "--hard", pre_release_sha])
+        print(str(e), file=sys.stderr)
+        print(
+            f"Local state has been rolled back to {pre_release_sha[:10]}.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     except Exception:
         # Roll back local mutations: delete tag (may not exist yet) and
         # reset commits so the working tree looks like it did before the
