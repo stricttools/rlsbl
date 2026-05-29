@@ -124,7 +124,7 @@ def _make_ctx(repo):
     """Build a ProjectContext pointing at repo."""
     return ProjectContext(
         project_root=Path(str(repo)),
-        monorepo_root=None,
+        workspace_root=None,
         config={"private": False},
     )
 

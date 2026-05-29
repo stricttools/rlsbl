@@ -3,14 +3,15 @@
 import json
 from pathlib import Path
 
-from rlsbl.check_context import ProjectCheckContext, WorkspaceCheckContext
+from rlsbl.context import ProjectContext
+from rlsbl.check_context import WorkspaceCheckContext
 from rlsbl.workspace_graph import WorkspaceGraph
 
 from conftest import make_workspace, run_git
 
 
-def test_project_check_context_has_project_root():
-    ctx = ProjectCheckContext(project_root=Path("/tmp/proj"))
+def test_project_context_has_project_root():
+    ctx = ProjectContext(project_root=Path("/tmp/proj"), workspace_root=None, config={})
     assert ctx.project_root == Path("/tmp/proj")
 
 
@@ -18,6 +19,7 @@ def test_workspace_check_context_has_all_attributes():
     ctx = WorkspaceCheckContext(
         project_root=Path("/tmp/proj"),
         workspace_root=Path("/tmp/ws"),
+        config={},
         projects=[{"path": "a", "name": "a"}],
         graph=object(),
     )
@@ -27,14 +29,15 @@ def test_workspace_check_context_has_all_attributes():
 
 
 def test_workspace_check_context_is_subclass_of_project():
-    assert issubclass(WorkspaceCheckContext, ProjectCheckContext)
+    assert issubclass(WorkspaceCheckContext, ProjectContext)
     ctx = WorkspaceCheckContext(
         project_root=Path("/tmp/proj"),
         workspace_root=Path("/tmp/ws"),
+        config={},
         projects=[],
         graph=None,
     )
-    assert isinstance(ctx, ProjectCheckContext)
+    assert isinstance(ctx, ProjectContext)
 
 
 def test_check_context_factory_passes_workspace_root(tmp_path, monkeypatch):
@@ -103,6 +106,7 @@ def test_get_changelog_context_uses_target_specific_tag_glob(tmp_path, monkeypat
     ctx = WorkspaceCheckContext(
         project_root=go_dir.resolve(),
         workspace_root=tmp_path.resolve(),
+        config={},
         projects=projects,
         graph=None,
     )

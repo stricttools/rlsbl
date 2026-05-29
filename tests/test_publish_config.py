@@ -51,7 +51,7 @@ def _ctx(tmp_path, config=None):
             config = json.loads(cfg_path.read_text())
         else:
             config = {}
-    return ProjectContext(project_root=Path(str(tmp_path)), monorepo_root=None, config=config)
+    return ProjectContext(project_root=Path(str(tmp_path)), workspace_root=None, config=config)
 
 
 def _clear_token_env(monkeypatch, *names):

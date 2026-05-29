@@ -15,7 +15,7 @@ from rlsbl.context import ProjectContext
 def _ctx(root="."):
     """Create a minimal ProjectContext for scaffold tests."""
     from pathlib import Path
-    return ProjectContext(project_root=Path(root), monorepo_root=None, config={})
+    return ProjectContext(project_root=Path(root), workspace_root=None, config={})
 
 
 @pytest.fixture

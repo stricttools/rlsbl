@@ -49,7 +49,7 @@ class TestNoAssetsConfigured:
         log = lambda msg: messages.append(msg)
 
         with patch("rlsbl.commands.release.run") as mock_run:
-            ctx = ProjectContext(project_root=Path("."), monorepo_root=None, config={
+            ctx = ProjectContext(project_root=Path("."), workspace_root=None, config={
                 "targets": ["npm"],
                 "publish": {"npm": {"local": False}},
             })
@@ -67,7 +67,7 @@ class TestNoAssetsConfigured:
             json.dump({"name": "test", "version": "1.0.0"}, f)
 
         with patch("rlsbl.commands.release.run") as mock_run:
-            ctx = ProjectContext(project_root=Path("."), monorepo_root=None, config={"targets": ["npm"]})
+            ctx = ProjectContext(project_root=Path("."), workspace_root=None, config={"targets": ["npm"]})
             upload_release_assets("v1.0.0", ".", "1.0.0", lambda m: None, {}, ctx=ctx)
             mock_run.assert_not_called()
 
@@ -81,7 +81,7 @@ class TestNoAssetsConfigured:
             json.dump({"name": "test", "version": "1.0.0"}, f)
 
         with patch("rlsbl.commands.release.run") as mock_run:
-            ctx = ProjectContext(project_root=Path("."), monorepo_root=None, config={
+            ctx = ProjectContext(project_root=Path("."), workspace_root=None, config={
                 "targets": ["npm"],
                 "publish": {"npm": {"assets": False}},
             })
@@ -122,7 +122,7 @@ class TestAssetBuildAndUpload:
         messages = []
         log = lambda msg: messages.append(msg)
 
-        ctx = ProjectContext(project_root=Path("."), monorepo_root=None, config={
+        ctx = ProjectContext(project_root=Path("."), workspace_root=None, config={
             "targets": ["npm"],
             "publish": {"npm": {"assets": True, "max_asset_size_mb": 50}},
         })
@@ -156,7 +156,7 @@ class TestAssetBuildAndUpload:
         messages = []
         log = lambda msg: messages.append(msg)
 
-        ctx = ProjectContext(project_root=Path("."), monorepo_root=None, config={
+        ctx = ProjectContext(project_root=Path("."), workspace_root=None, config={
             "targets": ["npm"],
             "publish": {"npm": {"assets": True, "max_asset_size_mb": 50}},
         })
@@ -198,7 +198,7 @@ class TestAssetSizeExceeded:
 
         mock_target.build_assets.side_effect = fake_build_assets
 
-        ctx = ProjectContext(project_root=Path("."), monorepo_root=None, config={
+        ctx = ProjectContext(project_root=Path("."), workspace_root=None, config={
             "targets": ["pypi"],
             "publish": {"pypi": {"assets": True, "max_asset_size_mb": 1}},
         })
@@ -234,7 +234,7 @@ class TestBuildAssetsNotImplemented:
         mock_target = MagicMock()
         mock_target.build_assets.side_effect = NotImplementedError("not supported")
 
-        ctx = ProjectContext(project_root=Path("."), monorepo_root=None, config={
+        ctx = ProjectContext(project_root=Path("."), workspace_root=None, config={
             "targets": ["npm"],
             "publish": {"npm": {"assets": True, "max_asset_size_mb": 50}},
         })
@@ -271,7 +271,7 @@ class TestDryRun:
         messages = []
         log = lambda msg: messages.append(msg)
 
-        ctx = ProjectContext(project_root=Path("."), monorepo_root=None, config={
+        ctx = ProjectContext(project_root=Path("."), workspace_root=None, config={
             "targets": ["npm"],
             "publish": {"npm": {"assets": True, "max_asset_size_mb": 50}},
         })

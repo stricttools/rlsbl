@@ -160,7 +160,7 @@ class TestMonorepoReleaseLockPlacement:
 
         with patch("rlsbl.commands.release.acquire_lock", spy_acquire):
             with patch("sys.stdout", new_callable=StringIO):
-                run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), monorepo_root=Path(str(mock_git_repo)), config={"private": False}))
+                run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False}))
 
         assert lock_acquired_in == [".rlsbl-monorepo"]
         # .rlsbl/ should NOT exist at the repo root (only .rlsbl-monorepo/ should)

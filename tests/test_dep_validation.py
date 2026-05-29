@@ -327,10 +327,10 @@ class TestDepsChecksIntegration:
         """deps-unused skips when context is not a workspace."""
         from strictcli import CheckResult
 
-        from rlsbl.check_context import ProjectCheckContext
+        from rlsbl.context import ProjectContext
 
         captured = self._capture_checks()
-        ctx = ProjectCheckContext(project_root=Path("/tmp/fake"))
+        ctx = ProjectContext(project_root=Path("/tmp/fake"), workspace_root=None, config={})
         result = captured["deps-unused"](ctx)
         assert result.status == "skip"
 
@@ -338,10 +338,10 @@ class TestDepsChecksIntegration:
         """deps-undeclared skips when context is not a workspace."""
         from strictcli import CheckResult
 
-        from rlsbl.check_context import ProjectCheckContext
+        from rlsbl.context import ProjectContext
 
         captured = self._capture_checks()
-        ctx = ProjectCheckContext(project_root=Path("/tmp/fake"))
+        ctx = ProjectContext(project_root=Path("/tmp/fake"), workspace_root=None, config={})
         result = captured["deps-undeclared"](ctx)
         assert result.status == "skip"
 
@@ -383,6 +383,7 @@ class TestDepsChecksIntegration:
         ctx = WorkspaceCheckContext(
             project_root=Path(tmp_path),
             workspace_root=Path(tmp_path),
+            config={},
             projects=projects,
             graph=graph,
         )
@@ -427,6 +428,7 @@ class TestDepsChecksIntegration:
         ctx = WorkspaceCheckContext(
             project_root=Path(tmp_path),
             workspace_root=Path(tmp_path),
+            config={},
             projects=projects,
             graph=graph,
         )
@@ -473,6 +475,7 @@ class TestDepsChecksIntegration:
         ctx = WorkspaceCheckContext(
             project_root=Path(tmp_path),
             workspace_root=Path(tmp_path),
+            config={},
             projects=projects,
             graph=graph,
         )

@@ -134,7 +134,7 @@ class TestReleaseFinalizeMd:
                     "quiet": True,
                 },
             
-                ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"private": False}),
+                ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False}),
 )
 
         changes_dir = tmp_project / ".rlsbl" / "changes"

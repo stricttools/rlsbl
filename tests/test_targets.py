@@ -25,7 +25,7 @@ def _ctx(project_root=".", config=None):
     """Build a ProjectContext for tests with no config by default."""
     if config is None:
         config = {}
-    return ProjectContext(project_root=Path(str(project_root)), monorepo_root=None, config=config)
+    return ProjectContext(project_root=Path(str(project_root)), workspace_root=None, config=config)
 
 
 class TestNpmTarget:

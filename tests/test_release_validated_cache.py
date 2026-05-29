@@ -110,7 +110,7 @@ class TestReleaseValidatedCache:
                 "yes": True,
                 "quiet": False,
             },
-            ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"private": False}),
+            ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False}),
 )
 
     @patch("rlsbl.commands.release.release_lock")
@@ -159,6 +159,6 @@ class TestReleaseValidatedCache:
                     "yes": True,
                     "quiet": False,
                 },
-                ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"private": False}),
+                ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False}),
 )
             assert ctx.value.code == 1

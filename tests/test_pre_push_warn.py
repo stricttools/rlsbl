@@ -92,7 +92,7 @@ class TestWarnSuppressedWhenEnvSet:
         with patch("sys.stdin", StringIO(stdin_data)), \
              patch("sys.stdin.isatty", return_value=False):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
+                run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
 
         captured = capsys.readouterr()
         assert WARN_MARKER not in captured.err
@@ -111,7 +111,7 @@ class TestWarnOnManualMainPush:
         with patch("sys.stdin", StringIO(stdin_data)), \
              patch("sys.stdin.isatty", return_value=False):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
+                run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
 
         captured = capsys.readouterr()
         assert WARN_MARKER in captured.err
@@ -126,7 +126,7 @@ class TestWarnOnManualMainPush:
         with patch("sys.stdin", StringIO(stdin_data)), \
              patch("sys.stdin.isatty", return_value=False):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
+                run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
 
         captured = capsys.readouterr()
         assert WARN_MARKER in captured.err
@@ -144,7 +144,7 @@ class TestNoWarnOnFeatureBranch:
         with patch("sys.stdin", StringIO(stdin_data)), \
              patch("sys.stdin.isatty", return_value=False):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
+                run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
 
         captured = capsys.readouterr()
         assert WARN_MARKER not in captured.err
@@ -162,7 +162,7 @@ class TestWarningGoesToStderr:
         with patch("sys.stdin", StringIO(stdin_data)), \
              patch("sys.stdin.isatty", return_value=False):
             with pytest.raises(SystemExit):
-                run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
+                run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
 
         captured = capsys.readouterr()
         assert WARN_MARKER in captured.err
@@ -180,7 +180,7 @@ class TestExitsZeroWhenWarning:
         with patch("sys.stdin", StringIO(stdin_data)), \
              patch("sys.stdin.isatty", return_value=False):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
+                run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
 
         captured = capsys.readouterr()
         assert WARN_MARKER in captured.err
@@ -202,7 +202,7 @@ class TestTagOnlyPushNoWarning:
         with patch("sys.stdin", StringIO(stdin_data)), \
              patch("sys.stdin.isatty", return_value=False):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
+                run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
 
         captured = capsys.readouterr()
         assert WARN_MARKER not in captured.err
@@ -218,7 +218,7 @@ class TestTagOnlyPushNoWarning:
         with patch("sys.stdin", StringIO(stdin_data)), \
              patch("sys.stdin.isatty", return_value=False):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
+                run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
 
         captured = capsys.readouterr()
         assert WARN_MARKER not in captured.err
@@ -237,7 +237,7 @@ class TestReleaseBranchesConfigOverride:
         with patch("sys.stdin", StringIO(stdin_data)), \
              patch("sys.stdin.isatty", return_value=False):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"release_branches": ["develop"]}))
+                run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"release_branches": ["develop"]}))
 
         captured = capsys.readouterr()
         assert WARN_MARKER not in captured.err
@@ -252,7 +252,7 @@ class TestReleaseBranchesConfigOverride:
         with patch("sys.stdin", StringIO(stdin_data)), \
              patch("sys.stdin.isatty", return_value=False):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"release_branches": ["develop"]}))
+                run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"release_branches": ["develop"]}))
 
         captured = capsys.readouterr()
         assert WARN_MARKER in captured.err
@@ -263,13 +263,13 @@ class TestGetReleaseBranches:
     """Unit tests for the _get_release_branches helper."""
 
     def test_default_when_no_config(self, tmp_project):
-        assert _get_release_branches(ProjectContext(project_root=Path("."), monorepo_root=None, config={})) == ["main", "master"]
+        assert _get_release_branches(ProjectContext(project_root=Path("."), workspace_root=None, config={})) == ["main", "master"]
 
     def test_default_when_key_missing(self, tmp_project):
-        assert _get_release_branches(ProjectContext(project_root=Path("."), monorepo_root=None, config={"other": 1})) == ["main", "master"]
+        assert _get_release_branches(ProjectContext(project_root=Path("."), workspace_root=None, config={"other": 1})) == ["main", "master"]
 
     def test_override(self, tmp_project):
-        assert _get_release_branches(ProjectContext(project_root=Path("."), monorepo_root=None, config={"release_branches": ["trunk", "stable"]})) == ["trunk", "stable"]
+        assert _get_release_branches(ProjectContext(project_root=Path("."), workspace_root=None, config={"release_branches": ["trunk", "stable"]})) == ["trunk", "stable"]
 
     def test_empty_list_raises(self, tmp_project):
         """An empty list would silently disable the warning entirely.
@@ -277,7 +277,7 @@ class TestGetReleaseBranches:
         to opt back into the default, or list at least one branch.
         """
         with pytest.raises(ValueError) as excinfo:
-            _get_release_branches(ProjectContext(project_root=Path("."), monorepo_root=None, config={"release_branches": []}))
+            _get_release_branches(ProjectContext(project_root=Path("."), workspace_root=None, config={"release_branches": []}))
         msg = str(excinfo.value)
         assert ".rlsbl/config.json" in msg
         assert "release_branches" in msg
@@ -288,7 +288,7 @@ class TestGetReleaseBranches:
     def test_non_list_raises(self, tmp_project):
         """A non-list value (string, dict, int) is also a configuration error."""
         with pytest.raises(ValueError) as excinfo:
-            _get_release_branches(ProjectContext(project_root=Path("."), monorepo_root=None, config={"release_branches": "main"}))
+            _get_release_branches(ProjectContext(project_root=Path("."), workspace_root=None, config={"release_branches": "main"}))
         msg = str(excinfo.value)
         assert ".rlsbl/config.json" in msg
         assert "release_branches" in msg
@@ -302,16 +302,16 @@ class TestWarnHelperDirect:
         monkeypatch.setenv("RLSBL_RELEASE_PUSH", "1")
         _warn_if_manual_release_push(
             ["refs/heads/main abc refs/heads/main def"],
-            ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}),
+            ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}),
         )
         assert WARN_MARKER not in capsys.readouterr().err
 
     def test_empty_lines_no_warn(self, monkeypatch, capsys):
         monkeypatch.delenv("RLSBL_RELEASE_PUSH", raising=False)
-        _warn_if_manual_release_push([], ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
+        _warn_if_manual_release_push([], ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
         assert WARN_MARKER not in capsys.readouterr().err
 
     def test_none_lines_no_warn(self, monkeypatch, capsys):
         monkeypatch.delenv("RLSBL_RELEASE_PUSH", raising=False)
-        _warn_if_manual_release_push(None, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
+        _warn_if_manual_release_push(None, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
         assert WARN_MARKER not in capsys.readouterr().err

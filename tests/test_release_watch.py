@@ -125,7 +125,7 @@ class TestNoWatchPrintsHint:
             _rc(),
             {"dry-run": True, "quiet": False, "yes": True, "watch": False},
         
-            ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"private": False}),
+            ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False}),
 )
 
         captured = capsys.readouterr()
@@ -175,7 +175,7 @@ class TestWatchInvokesWatchCmd:
             _rc(),
             {"dry-run": True, "quiet": False, "yes": True, "watch": True},
         
-            ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"private": False}),
+            ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False}),
 )
 
         captured = capsys.readouterr()
@@ -269,7 +269,7 @@ class TestWatchInvokedAfterRelease:
                 _rc(),
                 {"yes": True, "quiet": False, "watch": True},
             
-                ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"private": False}),
+                ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False}),
 )
             mock_watch.assert_called_once_with(None, [fake_sha], {})
 
@@ -349,7 +349,7 @@ class TestWatchInvokedAfterRelease:
                 _rc(),
                 {"yes": True, "quiet": False, "watch": False},
             
-                ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"private": False}),
+                ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False}),
 )
             mock_watch.assert_not_called()
 

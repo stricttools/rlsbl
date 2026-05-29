@@ -110,7 +110,7 @@ class TestReleaseWithDeployTargets:
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, ctx: None,
             })(),
-            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), monorepo_root=None, config={"private": False, "deploy": deploy_targets}),
+            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False, "deploy": deploy_targets}),
         )
 
         assert len(deploy_calls) == 1
@@ -206,7 +206,7 @@ class TestReleaseDeployFailureContinues:
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, ctx: None,
             })(),
-            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), monorepo_root=None, config={"private": False, "deploy": deploy_targets}),
+            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False, "deploy": deploy_targets}),
         )
 
         captured = capsys.readouterr()
@@ -277,7 +277,7 @@ class TestReleaseNoDeployConfig:
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, ctx: None,
             })(),
-            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), monorepo_root=None, config={"private": False}),
+            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False}),
         )
 
         # deploy_target should never have been called
@@ -349,7 +349,7 @@ class TestReleaseDeployConfigErrors:
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, ctx: None,
             })(),
-            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), monorepo_root=None, config={"private": False, "deploy": deploy_targets}),
+            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False, "deploy": deploy_targets}),
         )
 
         # deploy_target should never have been called (config has errors)
@@ -424,7 +424,7 @@ class TestReleaseStopsAtFirstDeployFailure:
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, ctx: None,
             })(),
-            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), monorepo_root=None, config={"private": False, "deploy": deploy_targets}),
+            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False, "deploy": deploy_targets}),
         )
 
         # Only staging was attempted; prod was NOT attempted

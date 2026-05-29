@@ -63,7 +63,7 @@ class TestPrivateConfigRequired:
         from rlsbl.commands.release import run_cmd
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(_rc(), {"quiet": True}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"targets": ["npm"]}))
+            run_cmd(_rc(), {"quiet": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"targets": ["npm"]}))
         assert exc_info.value.code == 1
 
         captured = capsys.readouterr()
@@ -83,7 +83,7 @@ class TestPrivateConfigRequired:
         from rlsbl.commands.release import run_cmd
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(_rc(), {"quiet": True}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"private": True, "publish": {"npm": {"local": True}}}))
+            run_cmd(_rc(), {"quiet": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": True, "publish": {"npm": {"local": True}}}))
         assert exc_info.value.code == 1
 
         captured = capsys.readouterr()
@@ -111,7 +111,7 @@ class TestPrivateConfigRequired:
 
         with patch("sys.stdout", new_callable=StringIO):
             # Should not raise SystemExit
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"private": True}))
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": True}))
 
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
@@ -135,7 +135,7 @@ class TestPrivateConfigRequired:
 
         with patch("sys.stdout", new_callable=StringIO):
             # Should not raise SystemExit
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"private": False}))
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False}))
 
 
 class TestPrivatePublishGuardrail:
@@ -204,7 +204,7 @@ class TestPrivatePublishGuardrail:
 
         with patch("sys.stdout", new_callable=StringIO):
             with patch.object(NpmTarget, "publish") as mock_publish:
-                run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"private": True}))
+                run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": True}))
                 # publish() must NOT be called for private repos
                 mock_publish.assert_not_called()
 
@@ -260,7 +260,7 @@ class TestPrivatePublishGuardrail:
         ]
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"private": True, "publish": {"npm": {"assets": True, "max_asset_size_mb": 50}}}))
+            run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": True, "publish": {"npm": {"assets": True, "max_asset_size_mb": 50}}}))
 
         # upload_release_assets must be called even for private repos
         mock_upload_assets.assert_called_once()

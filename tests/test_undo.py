@@ -42,7 +42,7 @@ class TestUndoHappyPath(unittest.TestCase):
 
         # Run with --yes to skip interactive prompts; suppress stdout
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
+            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
 
         # Verify all expected subprocess commands were issued
         expected_calls = [
@@ -86,7 +86,7 @@ class TestUndoMonorepo(unittest.TestCase):
         ]
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
+            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
 
         # Verify tag discovery uses project-scoped match pattern
         expected_calls = [
@@ -124,7 +124,7 @@ class TestUndoMonorepo(unittest.TestCase):
         ]
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
+            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
 
         # Only 5 calls: no revert issued
         self.assertEqual(mock_run.call_count, 5)
@@ -141,7 +141,7 @@ class TestUndoMonorepo(unittest.TestCase):
 
         with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
             with self.assertRaises(SystemExit) as ctx:
-                run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
+                run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
 
         self.assertEqual(ctx.exception.code, 1)
         self.assertIn("not inside any project", mock_stderr.getvalue())
@@ -168,7 +168,7 @@ class TestUndoMonorepo(unittest.TestCase):
         ]
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
+            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
 
         # Only 5 calls: no revert issued
         self.assertEqual(mock_run.call_count, 5)
@@ -220,7 +220,7 @@ class TestUndoTwoCommitPattern(unittest.TestCase):
         ]
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
+            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
 
         # Both the finalize commit and the version-bump commit should be reverted,
         # then changelog restoration commits

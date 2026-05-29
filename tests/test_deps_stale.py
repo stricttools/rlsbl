@@ -12,7 +12,8 @@ import pytest
 from strictcli import CheckResult
 
 from rlsbl import app
-from rlsbl.check_context import ProjectCheckContext, WorkspaceCheckContext
+from rlsbl.context import ProjectContext
+from rlsbl.check_context import WorkspaceCheckContext
 from rlsbl.workspace_graph import Dependency, WorkspaceGraph
 
 from conftest import make_workspace, run_git
@@ -52,7 +53,7 @@ class TestDepsStaleCheck:
 
     def test_skip_for_non_workspace(self, mock_git_repo):
         """Non-workspace context -> skip."""
-        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["deps-stale"].impl(ctx)
         assert result.status == "skip"
         assert "not a monorepo" in result.message
@@ -90,6 +91,7 @@ class TestDepsStaleCheck:
         ctx = WorkspaceCheckContext(
             project_root=mock_git_repo,
             workspace_root=mock_git_repo,
+            config={},
             projects=projects,
             graph=graph,
         )
@@ -129,6 +131,7 @@ class TestDepsStaleCheck:
         ctx = WorkspaceCheckContext(
             project_root=mock_git_repo,
             workspace_root=mock_git_repo,
+            config={},
             projects=projects,
             graph=graph,
         )
@@ -155,6 +158,7 @@ class TestDepsStaleCheck:
         ctx = WorkspaceCheckContext(
             project_root=mock_git_repo,
             workspace_root=mock_git_repo,
+            config={},
             projects=projects,
             graph=graph,
         )
@@ -190,6 +194,7 @@ class TestDepsStaleCheck:
         ctx = WorkspaceCheckContext(
             project_root=mock_git_repo,
             workspace_root=mock_git_repo,
+            config={},
             projects=projects,
             graph=graph,
         )

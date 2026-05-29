@@ -11,7 +11,8 @@ import pytest
 from strictcli import CheckResult
 
 from rlsbl import app
-from rlsbl.check_context import ProjectCheckContext, WorkspaceCheckContext
+from rlsbl.context import ProjectContext
+from rlsbl.check_context import WorkspaceCheckContext
 
 
 # ---------------------------------------------------------------------------
@@ -141,7 +142,7 @@ class TestLockCheck:
 
     def test_lock_pass_no_lock_file(self, mock_git_repo):
         """No lock file -> pass."""
-        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["lock"].impl(ctx)
         assert result.status == "pass"
         assert "no lock file" in result.message
@@ -152,7 +153,7 @@ class TestLockCheck:
         lock_dir.mkdir(parents=True, exist_ok=True)
         (lock_dir / "lock").write_text("")
 
-        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["lock"].impl(ctx)
         assert result.status == "warn"
         assert "stale" in result.message
@@ -170,14 +171,14 @@ class TestVersionConsistencyCheck:
         pkg = {"name": "test-pkg", "version": "1.2.3"}
         (mock_git_repo / "package.json").write_text(json.dumps(pkg))
 
-        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["version-consistency"].impl(ctx)
         assert result.status == "pass"
         assert "1.2.3" in result.message
 
     def test_version_warn_no_targets(self, mock_git_repo):
         """No targets detected -> warn."""
-        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["version-consistency"].impl(ctx)
         assert result.status == "warn"
         assert "no targets" in result.message
@@ -195,7 +196,7 @@ class TestVersionConsistencyCheck:
             json.dumps({"version": "1.0.0"})
         )
 
-        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["version-consistency"].impl(ctx)
         assert result.status == "pass"
         assert "1.0.0" in result.message
@@ -209,7 +210,7 @@ class TestVersionConsistencyCheck:
             json.dumps({"version": "0.5.0"})
         )
 
-        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["version-consistency"].impl(ctx)
         assert result.status == "fail"
         assert "mismatch" in result.message
@@ -230,7 +231,7 @@ class TestChangelogEntryCheck:
             "# Changelog\n\n## 2.0.0\n\nSome changes.\n"
         )
 
-        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["changelog-entry"].impl(ctx)
         assert result.status == "pass"
         assert "2.0.0" in result.message
@@ -240,13 +241,13 @@ class TestChangelogEntryCheck:
         pkg = {"name": "test-pkg", "version": "2.0.0"}
         (mock_git_repo / "package.json").write_text(json.dumps(pkg))
 
-        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["changelog-entry"].impl(ctx)
         assert result.status == "warn"
 
     def test_changelog_skip_no_version(self, mock_git_repo):
         """No version detected -> skip."""
-        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["changelog-entry"].impl(ctx)
         assert result.status == "skip"
 
@@ -268,7 +269,7 @@ class TestLocalTagCheck:
             check=True,
         )
 
-        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["local-tag"].impl(ctx)
         assert result.status == "pass"
         assert "v1.0.0" in result.message
@@ -278,14 +279,14 @@ class TestLocalTagCheck:
         pkg = {"name": "test-pkg", "version": "9.9.9"}
         (mock_git_repo / "package.json").write_text(json.dumps(pkg))
 
-        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["local-tag"].impl(ctx)
         assert result.status == "warn"
         assert "not found" in result.message
 
     def test_local_tag_skip_no_version(self, mock_git_repo):
         """No version detected -> skip."""
-        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["local-tag"].impl(ctx)
         assert result.status == "skip"
 
@@ -299,7 +300,7 @@ class TestBranchSyncCheck:
 
     def test_branch_sync_warn_no_remote(self, mock_git_repo):
         """No remote tracking branch -> warn."""
-        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["branch-sync"].impl(ctx)
         assert result.status == "warn"
         assert "no remote tracking" in result.message
@@ -412,7 +413,7 @@ class TestChangelogSchemaCheck:
         (changes / "unreleased.jsonl").write_text(
             f'{{"commits":["{head}"],"user_facing":true,"description":"A feature.","type":"feature"}}\n'
         )
-        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["changelog-schema"].impl(ctx)
         assert result.status == "pass"
 
@@ -427,14 +428,14 @@ class TestChangelogSchemaCheck:
         (changes / "unreleased.jsonl").write_text(
             f'{{"commits":["{head}"],"user_facing":true}}\n'
         )
-        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["changelog-schema"].impl(ctx)
         assert result.status == "fail"
         assert len(result.details) > 0
 
     def test_schema_skip_no_changes_dir(self, mock_git_repo):
         """No .rlsbl/changes/ -> skip."""
-        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["changelog-schema"].impl(ctx)
         assert result.status == "skip"
 
@@ -443,7 +444,7 @@ class TestChangelogSchemaCheck:
         changes = mock_git_repo / ".rlsbl" / "changes"
         changes.mkdir(parents=True)
         (changes / "unreleased.jsonl").write_text("")
-        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["changelog-schema"].impl(ctx)
         assert result.status == "pass"
 
@@ -466,7 +467,7 @@ class TestChangelogHashesCheck:
         (changes / "unreleased.jsonl").write_text(
             f'{{"commits":["{head[:7]}"],"user_facing":false}}\n'
         )
-        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["changelog-hashes"].impl(ctx)
         assert result.status == "pass"
 
@@ -477,7 +478,7 @@ class TestChangelogHashesCheck:
         (changes / "unreleased.jsonl").write_text(
             '{"commits":["deadbeef0000000"],"user_facing":false}\n'
         )
-        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["changelog-hashes"].impl(ctx)
         assert result.status == "fail"
         assert len(result.details) > 0
@@ -498,7 +499,7 @@ class TestWorkspaceChecksSkipForNonWorkspace:
         "workspace-stale-entries",
     ])
     def test_skip_for_project_context(self, mock_git_repo, name):
-        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs[name].impl(ctx)
         assert result.status == "skip"
         assert "not a monorepo" in result.message
@@ -515,6 +516,7 @@ class TestWorkspaceCiRouterCheck:
         ctx = WorkspaceCheckContext(
             project_root=mock_git_repo,
             workspace_root=mock_git_repo,
+            config={},
             projects=[],
             graph=None,
         )
@@ -526,6 +528,7 @@ class TestWorkspaceCiRouterCheck:
         ctx = WorkspaceCheckContext(
             project_root=mock_git_repo,
             workspace_root=mock_git_repo,
+            config={},
             projects=[],
             graph=None,
         )
@@ -544,6 +547,7 @@ class TestWorkspaceStaleEntriesCheck:
         ctx = WorkspaceCheckContext(
             project_root=mock_git_repo,
             workspace_root=mock_git_repo,
+            config={},
             projects=[{"path": "mylib", "name": "mylib"}],
             graph=None,
         )
@@ -555,6 +559,7 @@ class TestWorkspaceStaleEntriesCheck:
         ctx = WorkspaceCheckContext(
             project_root=mock_git_repo,
             workspace_root=mock_git_repo,
+            config={},
             projects=[{"path": "nonexistent", "name": "ghost"}],
             graph=None,
         )
@@ -579,7 +584,7 @@ class TestPrivateHookStaleCheck:
             "# Post-release hook for private repositories.\n"
             "gh release upload \"v$version\" ./dist/* --clobber\n"
         )
-        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["private-hook-stale"].impl(ctx)
         assert result.status == "fail"
         assert "legacy private asset upload" in result.message
@@ -594,13 +599,13 @@ class TestPrivateHookStaleCheck:
             "# Built-in checks handle tests and lint.\n"
             "echo 'post-release'\n"
         )
-        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["private-hook-stale"].impl(ctx)
         assert result.status == "pass"
 
     def test_no_hook_file_passes(self, mock_git_repo):
         """No post-release.sh at all -> pass."""
-        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["private-hook-stale"].impl(ctx)
         assert result.status == "pass"
         assert "no post-release hook" in result.message
@@ -615,7 +620,7 @@ class TestLibraryLintCheck:
 
     def test_standalone_project_skips(self, mock_git_repo):
         """Standalone (non-monorepo) project -> skip."""
-        ctx = ProjectCheckContext(project_root=mock_git_repo)
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["library-lint"].impl(ctx)
         assert result.status == "skip"
         assert "not a library" in result.message

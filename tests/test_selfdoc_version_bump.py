@@ -15,7 +15,7 @@ import pytest
 from strictcli import CheckResult
 
 from rlsbl import app
-from rlsbl.check_context import ProjectCheckContext
+from rlsbl.context import ProjectContext
 
 
 # ---------------------------------------------------------------------------
@@ -175,7 +175,7 @@ class TestVersionConsistencySelfdoc:
         )
         monkeypatch.chdir(tmp_path)
 
-        ctx = ProjectCheckContext(project_root=tmp_path)
+        ctx = ProjectContext(project_root=tmp_path, workspace_root=None, config={})
         result = app._check_defs["version-consistency"].impl(ctx)
         assert result.status == "fail"
         assert "mismatch" in result.message
@@ -190,7 +190,7 @@ class TestVersionConsistencySelfdoc:
         )
         monkeypatch.chdir(tmp_path)
 
-        ctx = ProjectCheckContext(project_root=tmp_path)
+        ctx = ProjectContext(project_root=tmp_path, workspace_root=None, config={})
         result = app._check_defs["version-consistency"].impl(ctx)
         assert result.status == "pass"
         assert "1.0.0" in result.message
@@ -205,7 +205,7 @@ class TestVersionConsistencySelfdoc:
         )
         monkeypatch.chdir(tmp_path)
 
-        ctx = ProjectCheckContext(project_root=tmp_path)
+        ctx = ProjectContext(project_root=tmp_path, workspace_root=None, config={})
         result = app._check_defs["version-consistency"].impl(ctx)
         assert result.status == "pass"
         assert "2.0.0" in result.message
@@ -220,7 +220,7 @@ class TestVersionConsistencySelfdoc:
         )
         monkeypatch.chdir(tmp_path)
 
-        ctx = ProjectCheckContext(project_root=tmp_path)
+        ctx = ProjectContext(project_root=tmp_path, workspace_root=None, config={})
         result = app._check_defs["version-consistency"].impl(ctx)
         assert result.status == "fail"
         assert "mismatch" in result.message

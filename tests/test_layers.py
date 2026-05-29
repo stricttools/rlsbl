@@ -457,6 +457,7 @@ class TestLayersViolationsCheck:
         ctx = WorkspaceCheckContext(
             project_root=Path(tmp_path),
             workspace_root=Path(tmp_path),
+            config={},
             projects=projects,
             graph=graph,
         )
@@ -488,9 +489,9 @@ class TestLayersViolationsCheck:
 
         from strictcli import CheckResult
 
-        from rlsbl.check_context import ProjectCheckContext
+        from rlsbl.context import ProjectContext
 
-        ctx = ProjectCheckContext(project_root=Path("/tmp/fake"))
+        ctx = ProjectContext(project_root=Path("/tmp/fake"), workspace_root=None, config={})
 
         captured = {}
 
@@ -530,6 +531,7 @@ class TestLayersViolationsCheck:
         ctx = WorkspaceCheckContext(
             project_root=Path(tmp_path),
             workspace_root=Path(tmp_path),
+            config={},
             projects=projects,
             graph=graph,
         )
@@ -584,6 +586,7 @@ class TestLayersViolationsCheck:
         ctx = WorkspaceCheckContext(
             project_root=Path(tmp_path),
             workspace_root=Path(tmp_path),
+            config={},
             projects=projects,
             graph=graph,
         )
