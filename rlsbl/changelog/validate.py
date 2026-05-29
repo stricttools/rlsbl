@@ -517,7 +517,7 @@ def _read_all_versioned_entries(changes_dir: str) -> dict[str, list[ChangelogEnt
 # Combined validation
 # ---------------------------------------------------------------------------
 
-def validate_unreleased(changes_dir: str, tag_glob: str | None = None, project: dict | None = None) -> dict:
+def validate_unreleased(changes_dir: str, tag_glob: str | None = None, project: dict | None = None, project_root=None) -> dict:
     """Run all 8 validation checks on unreleased.jsonl.
 
     Returns a dict with:
@@ -538,7 +538,7 @@ def validate_unreleased(changes_dir: str, tag_glob: str | None = None, project: 
     that appear in too many entries across versions.
     """
     entries = read_unreleased(changes_dir)
-    batch_config = _get_batch_limits_config()
+    batch_config = _get_batch_limits_config(project_root)
 
     # Check cache
     if _is_cache_valid(changes_dir):

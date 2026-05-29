@@ -753,7 +753,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None,
     # In monorepo mode, pass the project dict so coverage/range checks
     # only consider commits touching this package's files.
     monorepo_project = project if monorepo_name else None
-    validation = validate_unreleased(changes_dir, tag_glob=tag_glob, project=monorepo_project)
+    validation = validate_unreleased(changes_dir, tag_glob=tag_glob, project=monorepo_project, project_root=project_root)
     if not validation["passed"]:
         print("Error: JSONL changelog validation failed:", file=sys.stderr)
         for check_name, (passed, details) in validation["checks"].items():
