@@ -97,6 +97,7 @@ def _ensure_target_in_config(registry_name, ctx):
     if registry_name not in existing_names:
         targets.append(registry_name)
     write_project_config("targets", targets, ctx.project_root)
+    # Scaffold runs single-threaded; update ctx.config in place after disk write
     ctx.config["targets"] = targets
 
 
@@ -952,6 +953,7 @@ def run_cmd(registry, args, flags, ctx):
         private = _resolve_private(flags, ctx=ctx)
         if not dry_run:
             write_project_config("private", private, project_root)
+            # Scaffold runs single-threaded; update ctx.config in place after disk write
             ctx.config["private"] = private
 
         # Gather template variables
@@ -1447,6 +1449,7 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         private = _resolve_private(flags, ctx=ctx)
         if not dry_run:
             write_project_config("private", private, project_root)
+            # Scaffold runs single-threaded; update ctx.config in place after disk write
             ctx.config["private"] = private
 
         print(f"Multiple registries detected: {', '.join(registries_list)}")
