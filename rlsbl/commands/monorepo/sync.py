@@ -197,8 +197,8 @@ def _get_monorepo_tag_prefix(project, root):
 
 
 
-def _cmd_sync(flags, project_root=None):
-    start = str(project_root) if project_root else "."
+def _cmd_sync(flags, project_root):
+    start = str(project_root)
     root = find_workspace_root(start)
     if root is None:
         print("Error: No workspace found. Run 'rlsbl monorepo init' first.", file=sys.stderr)

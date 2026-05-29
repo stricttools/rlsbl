@@ -126,9 +126,9 @@ def _render_text_subtree(name, packages, lines, indent, visited):
         _render_text_subtree(dep, packages, lines, indent + 1, visited)
 
 
-def _cmd_graph(flags, project_root=None):
+def _cmd_graph(flags, project_root):
     """Export the monorepo dependency graph."""
-    start = str(project_root) if project_root else "."
+    start = str(project_root)
     root = find_workspace_root(start)
     if root is None:
         print("Error: No workspace found. Run 'rlsbl monorepo init' first.", file=sys.stderr)

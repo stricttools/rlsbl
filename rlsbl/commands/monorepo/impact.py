@@ -132,9 +132,9 @@ def _render_json(impact_data):
     return json.dumps(impact_data, indent=2)
 
 
-def _cmd_impact(args, flags, project_root=None):
+def _cmd_impact(args, flags, project_root):
     """Analyze the impact of changes on the monorepo dependency graph."""
-    start = str(project_root) if project_root else "."
+    start = str(project_root)
     root = find_workspace_root(start)
     if root is None:
         print(

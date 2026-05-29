@@ -20,9 +20,9 @@ from ...workspace import find_workspace_root, load_workspace
 from ...workspace_graph import CycleError, WorkspaceGraph
 
 
-def _cmd_batch_release(flags, project_root=None):
+def _cmd_batch_release(flags, project_root):
     """Execute a batch release of multiple monorepo packages."""
-    start = str(project_root) if project_root else "."
+    start = str(project_root)
     workspace_root = find_workspace_root(start)
     if workspace_root is None:
         print(
@@ -105,7 +105,7 @@ def _cmd_batch_release(flags, project_root=None):
                 "allow-dirty": flags.get("allow-dirty", False),
             }
             from pathlib import Path
-            run_cmd(release_config, release_flags, project_root=Path(project_dir))
+            run_cmd(release_config, release_flags, project_root=Path(project_dir), monorepo_root=workspace_root)
             released.append(pkg_name)
         except SystemExit as e:
             if e.code != 0:
