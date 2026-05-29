@@ -139,9 +139,9 @@ class TestMonorepoReleaseLockPlacement:
 
         original_acquire = acquire_lock
 
-        def spy_acquire(lock_dir=".rlsbl"):
+        def spy_acquire(lock_dir=".rlsbl", project_root=None):
             lock_acquired_in.append(lock_dir)
-            return original_acquire(lock_dir=lock_dir)
+            return original_acquire(lock_dir=lock_dir, project_root=project_root)
 
         def mock_run_side_effect(cmd, args, **kwargs):
             if "rev-list" in args:
