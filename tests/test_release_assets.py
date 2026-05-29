@@ -10,9 +10,7 @@ Verifies:
 
 import json
 import os
-import shutil
-import tempfile
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -30,14 +28,10 @@ def _write_config(tmp_dir, config):
 class TestNoAssetsConfigured:
     """When no targets have ``assets: true``, the step is a no-op."""
 
-    def setup_method(self):
-        self.orig_dir = os.getcwd()
-        self.tmp_dir = tempfile.mkdtemp()
-        os.chdir(self.tmp_dir)
-
-    def teardown_method(self):
-        os.chdir(self.orig_dir)
-        shutil.rmtree(self.tmp_dir)
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        self.tmp_dir = str(tmp_path)
 
     def test_no_assets_config_skips_silently(self):
         """No targets with assets: true means nothing happens."""
@@ -87,14 +81,10 @@ class TestNoAssetsConfigured:
 class TestAssetBuildAndUpload:
     """When assets: true, build_assets() is called and artifacts are uploaded."""
 
-    def setup_method(self):
-        self.orig_dir = os.getcwd()
-        self.tmp_dir = tempfile.mkdtemp()
-        os.chdir(self.tmp_dir)
-
-    def teardown_method(self):
-        os.chdir(self.orig_dir)
-        shutil.rmtree(self.tmp_dir)
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        self.tmp_dir = str(tmp_path)
 
     def test_build_and_upload(self):
         """Assets are built, size-checked, and uploaded via gh release upload."""
@@ -162,14 +152,10 @@ class TestAssetBuildAndUpload:
 class TestAssetSizeExceeded:
     """When an artifact exceeds max_asset_size_mb, the upload is aborted."""
 
-    def setup_method(self):
-        self.orig_dir = os.getcwd()
-        self.tmp_dir = tempfile.mkdtemp()
-        os.chdir(self.tmp_dir)
-
-    def teardown_method(self):
-        os.chdir(self.orig_dir)
-        shutil.rmtree(self.tmp_dir)
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        self.tmp_dir = str(tmp_path)
 
     def test_oversized_artifact_aborts(self, capsys):
         """An artifact exceeding the size limit causes sys.exit(1)."""
@@ -208,14 +194,10 @@ class TestAssetSizeExceeded:
 class TestBuildAssetsNotImplemented:
     """When build_assets() raises NotImplementedError, the target is skipped."""
 
-    def setup_method(self):
-        self.orig_dir = os.getcwd()
-        self.tmp_dir = tempfile.mkdtemp()
-        os.chdir(self.tmp_dir)
-
-    def teardown_method(self):
-        os.chdir(self.orig_dir)
-        shutil.rmtree(self.tmp_dir)
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        self.tmp_dir = str(tmp_path)
 
     def test_not_implemented_warns_and_skips(self, capsys):
         """NotImplementedError prints a warning and skips the target."""
@@ -243,14 +225,10 @@ class TestBuildAssetsNotImplemented:
 class TestDryRun:
     """Dry-run prints what would happen without building or uploading."""
 
-    def setup_method(self):
-        self.orig_dir = os.getcwd()
-        self.tmp_dir = tempfile.mkdtemp()
-        os.chdir(self.tmp_dir)
-
-    def teardown_method(self):
-        os.chdir(self.orig_dir)
-        shutil.rmtree(self.tmp_dir)
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        self.tmp_dir = str(tmp_path)
 
     def test_dry_run_logs_without_action(self):
         """Dry-run mode logs intent but does not build or upload."""

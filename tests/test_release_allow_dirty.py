@@ -2,11 +2,10 @@
 
 import json
 import os
-import shutil
-import tempfile
-import unittest
 from io import StringIO
-from unittest.mock import patch, call
+from unittest.mock import patch
+
+import pytest
 
 from rlsbl.release_file import ReleaseConfig
 
@@ -20,13 +19,13 @@ def _rc(bump="patch", include=None, exclude=None):
     )
 
 
-class TestReleaseAllowDirty(unittest.TestCase):
+class TestReleaseAllowDirty:
     """Tests that --allow-dirty skips the clean-tree check."""
 
-    def setUp(self):
-        self.orig_dir = os.getcwd()
-        self.tmp_dir = tempfile.mkdtemp()
-        os.chdir(self.tmp_dir)
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        self.tmp_dir = str(tmp_path)
         # Create package.json so npm registry is detected
         with open("package.json", "w") as f:
             json.dump({"name": "test-pkg", "version": "1.0.0"}, f, indent=2)
@@ -41,10 +40,6 @@ class TestReleaseAllowDirty(unittest.TestCase):
         with open(os.path.join(".rlsbl", "config.json"), "w") as f:
             json.dump({"private": False}, f)
 
-    def tearDown(self):
-        os.chdir(self.orig_dir)
-        shutil.rmtree(self.tmp_dir)
-
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.is_clean_tree", return_value=False)
@@ -52,9 +47,9 @@ class TestReleaseAllowDirty(unittest.TestCase):
         """Without --allow-dirty, a dirty tree should cause SystemExit."""
         from rlsbl.commands.release import run_cmd
 
-        with self.assertRaises(SystemExit) as ctx:
+        with pytest.raises(SystemExit) as exc_info:
             run_cmd(_rc(), {"quiet": True}, project_root=".", monorepo_root=None)
-        self.assertEqual(ctx.exception.code, 1)
+        assert exc_info.value.code == 1
 
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
@@ -203,7 +198,7 @@ class TestReleaseAllowDirty(unittest.TestCase):
         ]
 
         with patch("sys.stdout", new_callable=StringIO):
-            with self.assertRaises(SystemExit) as ctx:
+            with pytest.raises(SystemExit) as exc_info:
                 run_cmd(_rc(), {
                     "allow-dirty": True,
                     "yes": True,
@@ -212,8 +207,4 @@ class TestReleaseAllowDirty(unittest.TestCase):
                 project_root=".",
                 monorepo_root=None,
 )
-            self.assertEqual(ctx.exception.code, 1)
-
-
-if __name__ == "__main__":
-    unittest.main()
+            assert exc_info.value.code == 1

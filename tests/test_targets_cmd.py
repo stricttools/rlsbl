@@ -2,8 +2,6 @@
 
 import json
 import os
-import shutil
-import tempfile
 from io import StringIO
 from unittest.mock import patch, MagicMock
 
@@ -24,14 +22,10 @@ def _rc(bump="patch", include=None, exclude=None):
 class TestTargetsCommand:
     """Tests for the `rlsbl targets` command output."""
 
-    def setup_method(self):
-        self.orig_dir = os.getcwd()
-        self.tmp_dir = tempfile.mkdtemp()
-        os.chdir(self.tmp_dir)
-
-    def teardown_method(self):
-        os.chdir(self.orig_dir)
-        shutil.rmtree(self.tmp_dir)
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        self.tmp_dir = str(tmp_path)
 
     def test_lists_all_targets(self):
         """Command output includes all registered targets."""
@@ -115,10 +109,10 @@ class TestTargetsCommand:
 class TestMultiTargetRelease:
     """Tests for multi-target release: secondary targets get build/publish called."""
 
-    def setup_method(self):
-        self.orig_dir = os.getcwd()
-        self.tmp_dir = tempfile.mkdtemp()
-        os.chdir(self.tmp_dir)
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        self.tmp_dir = str(tmp_path)
         # Create package.json so npm is the primary target
         with open("package.json", "w") as f:
             json.dump({"name": "test-pkg", "version": "1.0.0"}, f, indent=2)
@@ -132,10 +126,6 @@ class TestMultiTargetRelease:
             f.write("")
         with open(os.path.join(".rlsbl", "config.json"), "w") as f:
             json.dump({"private": False}, f)
-
-    def teardown_method(self):
-        os.chdir(self.orig_dir)
-        shutil.rmtree(self.tmp_dir)
 
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")

@@ -3,10 +3,7 @@
 import hashlib
 import json
 import os
-import shutil
 import subprocess
-import tempfile
-import unittest
 from io import StringIO
 from unittest.mock import patch
 
@@ -38,7 +35,7 @@ def _rc(bump="patch", include=None, exclude=None):
     )
 
 
-class TestProcessTemplate(unittest.TestCase):
+class TestProcessTemplate:
     """Tests for template variable replacement."""
 
     def test_replaces_known_variables(self):
@@ -46,68 +43,60 @@ class TestProcessTemplate(unittest.TestCase):
             "Hello {{name}}, version {{version}}!",
             {"name": "my-pkg", "version": "1.0.0"},
         )
-        self.assertEqual(content, "Hello my-pkg, version 1.0.0!")
-        self.assertEqual(unreplaced, [])
+        assert content == "Hello my-pkg, version 1.0.0!"
+        assert unreplaced == []
 
     def test_leaves_unknown_variables_and_reports_them(self):
         content, unreplaced = process_template(
             "{{name}} uses {{unknownVar}}",
             {"name": "my-pkg"},
         )
-        self.assertEqual(content, "my-pkg uses {{unknownVar}}")
-        self.assertEqual(unreplaced, ["unknownVar"])
+        assert content == "my-pkg uses {{unknownVar}}"
+        assert unreplaced == ["unknownVar"]
 
     def test_replaces_multiple_occurrences(self):
         content, _ = process_template(
             "{{name}} is {{name}}",
             {"name": "x"},
         )
-        self.assertEqual(content, "x is x")
+        assert content == "x is x"
 
     def test_no_variables_returns_unchanged(self):
         content, unreplaced = process_template("plain text", {})
-        self.assertEqual(content, "plain text")
-        self.assertEqual(unreplaced, [])
+        assert content == "plain text"
+        assert unreplaced == []
 
 
-class TestBaseStorage(unittest.TestCase):
+class TestBaseStorage:
     """Tests for _save_base / _load_base helpers."""
 
-    def setUp(self):
-        self.orig_dir = os.getcwd()
-        self.tmp_dir = tempfile.mkdtemp()
-        os.chdir(self.tmp_dir)
-
-    def tearDown(self):
-        os.chdir(self.orig_dir)
-        shutil.rmtree(self.tmp_dir)
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        self.tmp_dir = str(tmp_path)
 
     def test_save_and_load_roundtrip(self):
         _save_base("foo/bar.txt", "hello world\n")
-        self.assertEqual(_load_base("foo/bar.txt"), "hello world\n")
+        assert _load_base("foo/bar.txt") == "hello world\n"
 
     def test_load_missing_returns_none(self):
-        self.assertIsNone(_load_base("nonexistent.txt"))
+        assert _load_base("nonexistent.txt") is None
 
     def test_save_creates_parent_dirs(self):
         _save_base("a/b/c.txt", "content")
         base_path = os.path.join(BASES_DIR, "a", "b", "c.txt")
-        self.assertTrue(os.path.exists(base_path))
+        assert os.path.exists(base_path)
 
 
-class TestThreeWayMerge(unittest.TestCase):
+class TestThreeWayMerge:
     """Tests for _three_way_merge using git merge-file."""
 
-    def setUp(self):
-        self.orig_dir = os.getcwd()
-        self.tmp_dir = tempfile.mkdtemp()
-        os.chdir(self.tmp_dir)
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        self.tmp_dir = str(tmp_path)
         # git merge-file needs to be able to run; init a repo for safety
         os.system("git init -q .")
-
-    def tearDown(self):
-        os.chdir(self.orig_dir)
-        shutil.rmtree(self.tmp_dir)
 
     def test_clean_merge_no_conflicts(self):
         # Changes must be non-adjacent so git merge-file resolves them cleanly
@@ -115,27 +104,27 @@ class TestThreeWayMerge(unittest.TestCase):
         ours = "line1\nline2 modified by user\nline3\nline4\nline5\n"
         theirs = "line1\nline2\nline3\nline4 modified by template\nline5\n"
         merged, has_conflicts = _three_way_merge(ours, base, theirs)
-        self.assertFalse(has_conflicts)
-        self.assertIn("line2 modified by user", merged)
-        self.assertIn("line4 modified by template", merged)
+        assert not has_conflicts
+        assert "line2 modified by user" in merged
+        assert "line4 modified by template" in merged
 
     def test_conflict_detected(self):
         base = "line1\nline2\nline3\n"
         ours = "line1\nline2 user version\nline3\n"
         theirs = "line1\nline2 template version\nline3\n"
         merged, has_conflicts = _three_way_merge(ours, base, theirs)
-        self.assertTrue(has_conflicts)
-        self.assertIn("<<<<<<<", merged)
-        self.assertIn("=======", merged)
-        self.assertIn(">>>>>>>", merged)
+        assert has_conflicts
+        assert "<<<<<<<" in merged
+        assert "=======" in merged
+        assert ">>>>>>>" in merged
 
     def test_identical_changes_no_conflict(self):
         base = "line1\nline2\nline3\n"
         ours = "line1\nline2 same change\nline3\n"
         theirs = "line1\nline2 same change\nline3\n"
         merged, has_conflicts = _three_way_merge(ours, base, theirs)
-        self.assertFalse(has_conflicts)
-        self.assertEqual(merged, "line1\nline2 same change\nline3\n")
+        assert not has_conflicts
+        assert merged == "line1\nline2 same change\nline3\n"
 
     def test_temp_files_cleaned_up(self):
         base = "a\n"
@@ -144,25 +133,21 @@ class TestThreeWayMerge(unittest.TestCase):
         _three_way_merge(ours, base, theirs)
         # No leftover .ours/.base/.theirs files
         leftover = [f for f in os.listdir(".") if f.endswith((".ours", ".base", ".theirs"))]
-        self.assertEqual(leftover, [])
+        assert leftover == []
 
 
-class TestScaffold(unittest.TestCase):
+class TestScaffold:
     """Integration tests for the scaffold (init) command."""
 
-    def setUp(self):
-        self.orig_dir = os.getcwd()
-        self.tmp_dir = tempfile.mkdtemp()
-        os.chdir(self.tmp_dir)
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        self.tmp_dir = str(tmp_path)
         # git init so git merge-file works
         os.system("git init -q .")
         # Create minimal package.json so npm registry is detected
         with open("package.json", "w") as f:
             json.dump({"name": "test-pkg", "version": "0.1.0"}, f)
-
-    def tearDown(self):
-        os.chdir(self.orig_dir)
-        shutil.rmtree(self.tmp_dir)
 
     def _run_scaffold(self, force=False):
         """Run scaffold for npm with stdout suppressed."""
@@ -174,29 +159,29 @@ class TestScaffold(unittest.TestCase):
 
     def test_creates_changelog(self):
         self._run_scaffold()
-        self.assertTrue(os.path.exists("CHANGELOG.md"))
+        assert os.path.exists("CHANGELOG.md")
         with open("CHANGELOG.md") as f:
-            self.assertIn("0.1.0", f.read())
+            assert "0.1.0" in f.read()
 
     def test_creates_gitignore(self):
         self._run_scaffold()
-        self.assertTrue(os.path.exists(".gitignore"))
+        assert os.path.exists(".gitignore")
 
     def test_creates_ci_workflow(self):
         self._run_scaffold()
-        self.assertTrue(os.path.exists(".github/workflows/ci.yml"))
+        assert os.path.exists(".github/workflows/ci.yml")
 
     def test_creates_publish_workflow(self):
         self._run_scaffold()
-        self.assertTrue(os.path.exists(".github/workflows/publish.yml"))
+        assert os.path.exists(".github/workflows/publish.yml")
 
     def test_template_variable_replacement(self):
         """Verify {{name}} and {{version}} are replaced in generated files."""
         self._run_scaffold()
         with open("CHANGELOG.md") as f:
             content = f.read()
-        self.assertIn("0.1.0", content)
-        self.assertNotIn("{{version}}", content)
+        assert "0.1.0" in content
+        assert "{{version}}" not in content
 
     def test_unreplaced_variables_emit_warning(self):
         """Scaffold with a template containing unknown vars should warn."""
@@ -209,11 +194,9 @@ class TestScaffold(unittest.TestCase):
         created, skipped, warnings, hashes = process_mappings(
             tpl_dir, mappings, {"name": "test-pkg"}, force=False,
         )
-        self.assertIn(("output.txt", "created"), created)
-        self.assertTrue(
-            any("planet" in w for w in warnings),
-            f"Expected warning about 'planet', got: {warnings}",
-        )
+        assert ("output.txt", "created") in created
+        assert any("planet" in w for w in warnings), \
+            f"Expected warning about 'planet', got: {warnings}"
 
     # -- Base storage tests --
 
@@ -222,8 +205,8 @@ class TestScaffold(unittest.TestCase):
         self._run_scaffold()
         # CI workflow should have a base stored
         ci_base = _load_base(".github/workflows/ci.yml")
-        self.assertIsNotNone(ci_base)
-        self.assertGreater(len(ci_base), 0)
+        assert ci_base is not None
+        assert len(ci_base) > 0
 
     def test_bases_match_generated_files(self):
         """Stored bases should match the rendered template content (identical to file on first scaffold)."""
@@ -232,7 +215,7 @@ class TestScaffold(unittest.TestCase):
         with open(ci_path) as f:
             file_content = f.read()
         base_content = _load_base(ci_path)
-        self.assertEqual(file_content, base_content)
+        assert file_content == base_content
 
     # -- Three-way merge integration tests --
 
@@ -246,7 +229,7 @@ class TestScaffold(unittest.TestCase):
         self._run_scaffold()
         with open(ci_path) as f:
             after = f.read()
-        self.assertEqual(original, after)
+        assert original == after
 
     def test_three_way_merge_preserves_user_additions(self):
         """Three-way merge should preserve user additions when template changes elsewhere."""
@@ -275,9 +258,9 @@ class TestScaffold(unittest.TestCase):
             result = f.read()
 
         # Both changes should be present (clean merge)
-        self.assertIn("line2 user edit", result)
-        self.assertIn("line4 template update", result)
-        self.assertTrue(any(s == "merged" for _, s in created))
+        assert "line2 user edit" in result
+        assert "line4 template update" in result
+        assert any(s == "merged" for _, s in created)
 
     def test_three_way_merge_detects_conflicts(self):
         """Three-way merge should detect conflicts when both sides change the same line."""
@@ -304,9 +287,9 @@ class TestScaffold(unittest.TestCase):
         with open("output.txt") as f:
             result = f.read()
 
-        self.assertIn("<<<<<<<", result)
-        self.assertTrue(any("CONFLICTS" in s for _, s in created))
-        self.assertTrue(any("conflict" in w.lower() for w in warnings))
+        assert "<<<<<<<" in result
+        assert any("CONFLICTS" in s for _, s in created)
+        assert any("conflict" in w.lower() for w in warnings)
 
     def test_no_base_skips_with_warning(self):
         """When no base is stored (legacy project), skip with a warning."""
@@ -323,11 +306,9 @@ class TestScaffold(unittest.TestCase):
         mappings = [{"template": "test.tpl", "target": "output.txt"}]
         created, skipped, warnings, _ = process_mappings(tpl_dir, mappings, {}, force=False)
 
-        self.assertTrue(any(t == "output.txt" for t, _ in skipped))
-        self.assertTrue(
-            any("no base stored" in w for w in warnings),
-            f"Expected 'no base stored' warning, got: {warnings}",
-        )
+        assert any(t == "output.txt" for t, _ in skipped)
+        assert any("no base stored" in w for w in warnings), \
+            f"Expected 'no base stored' warning, got: {warnings}"
 
     def test_no_base_identical_content_skips_silently(self):
         """When no base is stored but file matches template, skip without warning."""
@@ -343,9 +324,9 @@ class TestScaffold(unittest.TestCase):
         mappings = [{"template": "test.tpl", "target": "output.txt"}]
         created, skipped, warnings, _ = process_mappings(tpl_dir, mappings, {}, force=False)
 
-        self.assertTrue(any(t == "output.txt" for t, _ in skipped))
+        assert any(t == "output.txt" for t, _ in skipped)
         # No warning because content matches
-        self.assertFalse(any("no base stored" in w for w in warnings))
+        assert not any("no base stored" in w for w in warnings)
 
     def test_template_unchanged_skips(self):
         """When template hasn't changed (base == theirs), skip even if user modified file."""
@@ -365,11 +346,11 @@ class TestScaffold(unittest.TestCase):
 
         # Re-run with same template -- should skip (template unchanged)
         created, skipped, warnings, _ = process_mappings(tpl_dir, mappings, {}, force=False)
-        self.assertTrue(any(t == "output.txt" for t, _ in skipped))
+        assert any(t == "output.txt" for t, _ in skipped)
 
         # Verify user customization is preserved
         with open("output.txt") as f:
-            self.assertIn("customized", f.read())
+            assert "customized" in f.read()
 
     # -- --force tests --
 
@@ -383,7 +364,7 @@ class TestScaffold(unittest.TestCase):
         with open("CHANGELOG.md") as f:
             content = f.read()
         # User-owned files must be preserved even with --force
-        self.assertIn("My custom changelog", content)
+        assert "My custom changelog" in content
 
     def test_force_updates_base(self):
         """With --force, the base should be updated to the new template content."""
@@ -392,19 +373,19 @@ class TestScaffold(unittest.TestCase):
         self._run_scaffold(force=True)
         ci_base_after = _load_base(".github/workflows/ci.yml")
         # Base should exist after force
-        self.assertIsNotNone(ci_base_after)
+        assert ci_base_after is not None
         # Content should match (template hasn't changed)
-        self.assertEqual(ci_base_before, ci_base_after)
+        assert ci_base_before == ci_base_after
 
     # -- Hash tests --
 
     def test_hashes_saved_after_scaffolding(self):
         """After scaffolding, .rlsbl/hashes.json should exist with entries."""
         self._run_scaffold()
-        self.assertTrue(os.path.exists(HASHES_FILE))
+        assert os.path.exists(HASHES_FILE)
         hashes = load_hashes()
-        self.assertIsInstance(hashes, dict)
-        self.assertGreater(len(hashes), 0)
+        assert isinstance(hashes, dict)
+        assert len(hashes) > 0
 
     def test_hashes_match_actual_file_contents(self):
         """Stored hashes should match SHA-256 of the generated files."""
@@ -412,11 +393,7 @@ class TestScaffold(unittest.TestCase):
         hashes = load_hashes()
         for path, stored_hash in hashes.items():
             if os.path.exists(path):
-                self.assertEqual(
-                    stored_hash,
-                    file_hash(path),
-                    f"Hash mismatch for {path}",
-                )
+                assert stored_hash == file_hash(path), f"Hash mismatch for {path}"
 
     # -- merge tests --
 
@@ -426,17 +403,17 @@ class TestScaffold(unittest.TestCase):
 
         ci_path = ".github/workflows/ci.yml"
         hashes_before = load_hashes()
-        self.assertIn(ci_path, hashes_before)
+        assert ci_path in hashes_before
 
-        with patch("sys.stdout", new_callable=StringIO) as mock_out:
+        with patch("sys.stdout", new_callable=StringIO):
             run_cmd("npm", [], {}, project_root=".")
 
-        self.assertTrue(os.path.exists(ci_path))
+        assert os.path.exists(ci_path)
 
     def test_hooks_not_user_owned(self):
         """Hooks should not be in USER_OWNED, allowing scaffold to merge them."""
-        self.assertNotIn(".rlsbl/hooks/pre-release.sh", USER_OWNED)
-        self.assertNotIn(".rlsbl/hooks/post-release.sh", USER_OWNED)
+        assert ".rlsbl/hooks/pre-release.sh" not in USER_OWNED
+        assert ".rlsbl/hooks/post-release.sh" not in USER_OWNED
 
     def test_update_merges_hook_changes(self):
         """scaffold should three-way merge pre-release.sh when template changes."""
@@ -490,23 +467,19 @@ class TestScaffold(unittest.TestCase):
             result = f.read()
 
         # Both user customization and template update should be present
-        self.assertIn("echo user_start", result)
-        self.assertIn("echo finished", result)
-        self.assertTrue(any(s == "merged" for _, s in created))
+        assert "echo user_start" in result
+        assert "echo finished" in result
+        assert any(s == "merged" for _, s in created)
 
 
-class TestGitignoreSetUnionMerge(unittest.TestCase):
+class TestGitignoreSetUnionMerge:
     """Tests for .gitignore set-union merge in scaffold."""
 
-    def setUp(self):
-        self.orig_dir = os.getcwd()
-        self.tmp_dir = tempfile.mkdtemp()
-        os.chdir(self.tmp_dir)
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        self.tmp_dir = str(tmp_path)
         os.system("git init -q .")
-
-    def tearDown(self):
-        os.chdir(self.orig_dir)
-        shutil.rmtree(self.tmp_dir)
 
     def test_gitignore_appends_new_entries(self):
         """Scaffold on .gitignore appends new entries without conflicts."""
@@ -530,18 +503,18 @@ class TestGitignoreSetUnionMerge(unittest.TestCase):
             result = f.read()
 
         # User entries preserved
-        self.assertIn("node_modules/", result)
-        self.assertIn(".env", result)
+        assert "node_modules/" in result
+        assert ".env" in result
         # New entries added
-        self.assertIn("dist/", result)
-        self.assertIn(".credentials.json", result)
+        assert "dist/" in result
+        assert ".credentials.json" in result
         # No conflict markers
-        self.assertNotIn("<<<<<<<", result)
-        self.assertNotIn("=======", result)
-        self.assertNotIn(">>>>>>>", result)
+        assert "<<<<<<<" not in result
+        assert "=======" not in result
+        assert ">>>>>>>" not in result
         # Should report as updated
-        self.assertTrue(any("updated" in s for _, s in created),
-                        f"Expected 'updated' status, got created={created}")
+        assert any("updated" in s for _, s in created), \
+            f"Expected 'updated' status, got created={created}"
 
     def test_gitignore_no_duplicates(self):
         """Entries already in .gitignore are not duplicated."""
@@ -563,11 +536,11 @@ class TestGitignoreSetUnionMerge(unittest.TestCase):
             result = f.read()
 
         # Count occurrences
-        self.assertEqual(result.count("node_modules/"), 1)
-        self.assertEqual(result.count("dist/"), 1)
+        assert result.count("node_modules/") == 1
+        assert result.count("dist/") == 1
         # Should be skipped (unchanged)
-        self.assertTrue(any(t == ".gitignore" for t, _ in skipped),
-                        f"Expected .gitignore in skipped, got skipped={skipped}")
+        assert any(t == ".gitignore" for t, _ in skipped), \
+            f"Expected .gitignore in skipped, got skipped={skipped}"
 
     def test_gitignore_preserves_user_comments(self):
         """User comments and formatting are preserved in the existing file."""
@@ -587,10 +560,10 @@ class TestGitignoreSetUnionMerge(unittest.TestCase):
             result = f.read()
 
         # User comments preserved
-        self.assertIn("# My project ignores", result)
-        self.assertIn("# Build output", result)
+        assert "# My project ignores" in result
+        assert "# Build output" in result
         # New entry added
-        self.assertIn(".rlsbl/lock", result)
+        assert ".rlsbl/lock" in result
 
     def test_gitignore_force_overwrites(self):
         """With --force, .gitignore should be overwritten entirely."""
@@ -612,37 +585,33 @@ class TestGitignoreSetUnionMerge(unittest.TestCase):
             result = f.read()
 
         # Force should overwrite completely
-        self.assertIn("dist/", result)
-        self.assertNotIn(".env", result)
-        self.assertTrue(any(s == "overwritten" for _, s in created))
+        assert "dist/" in result
+        assert ".env" not in result
+        assert any(s == "overwritten" for _, s in created)
 
 
-class TestHashFunctions(unittest.TestCase):
+class TestHashFunctions:
     """Tests for hash utility functions."""
 
-    def setUp(self):
-        self.orig_dir = os.getcwd()
-        self.tmp_dir = tempfile.mkdtemp()
-        os.chdir(self.tmp_dir)
-
-    def tearDown(self):
-        os.chdir(self.orig_dir)
-        shutil.rmtree(self.tmp_dir)
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        self.tmp_dir = str(tmp_path)
 
     def test_file_hash_returns_sha256(self):
         with open("test.txt", "w") as f:
             f.write("hello world")
         expected = hashlib.sha256(b"hello world").hexdigest()
-        self.assertEqual(file_hash("test.txt"), expected)
+        assert file_hash("test.txt") == expected
 
     def test_save_and_load_hashes_roundtrip(self):
         data = {"file1.txt": "abc123", "dir/file2.txt": "def456"}
         save_hashes(data)
         loaded = load_hashes()
-        self.assertEqual(loaded, data)
+        assert loaded == data
 
     def test_load_hashes_returns_empty_dict_when_no_file(self):
-        self.assertEqual(load_hashes(), {})
+        assert load_hashes() == {}
 
 
 # ---------------------------------------------------------------------------
@@ -650,13 +619,13 @@ class TestHashFunctions(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
-class TestRelease(unittest.TestCase):
+class TestRelease:
     """Tests for rlsbl.commands.release."""
 
-    def setUp(self):
-        self.orig_dir = os.getcwd()
-        self.tmp_dir = tempfile.mkdtemp()
-        os.chdir(self.tmp_dir)
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        self.tmp_dir = str(tmp_path)
         # Create package.json so npm registry is detected
         with open("package.json", "w") as f:
             json.dump({"name": "test-pkg", "version": "1.0.0"}, f, indent=2)
@@ -671,10 +640,6 @@ class TestRelease(unittest.TestCase):
         # Config with required private key
         with open(os.path.join(".rlsbl", "config.json"), "w") as f:
             json.dump({"private": False}, f)
-
-    def tearDown(self):
-        os.chdir(self.orig_dir)
-        shutil.rmtree(self.tmp_dir)
 
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
@@ -709,9 +674,9 @@ class TestRelease(unittest.TestCase):
 
         # Files should be unchanged
         with open("package.json") as f:
-            self.assertEqual(f.read(), orig_pkg)
+            assert f.read() == orig_pkg
         with open("CHANGELOG.md") as f:
-            self.assertEqual(f.read(), orig_cl)
+            assert f.read() == orig_cl
 
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
@@ -720,9 +685,9 @@ class TestRelease(unittest.TestCase):
         """Dirty working tree should cause SystemExit."""
         from rlsbl.commands.release import run_cmd
 
-        with self.assertRaises(SystemExit) as ctx:
+        with pytest.raises(SystemExit) as exc_info:
             run_cmd(_rc(), {"quiet": True}, project_root=".", monorepo_root=None)
-        self.assertEqual(ctx.exception.code, 1)
+        assert exc_info.value.code == 1
 
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -740,9 +705,9 @@ class TestRelease(unittest.TestCase):
             "3",  # git rev-list --count HEAD..origin/main
         ]
 
-        with self.assertRaises(SystemExit) as ctx:
+        with pytest.raises(SystemExit) as exc_info:
             run_cmd(_rc(), {"quiet": True}, project_root=".", monorepo_root=None)
-        self.assertEqual(ctx.exception.code, 1)
+        assert exc_info.value.code == 1
 
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -776,13 +741,13 @@ class TestRelease(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
-class TestReleaseCommitTrailers(unittest.TestCase):
+class TestReleaseCommitTrailers:
     """Tests that release commits pass correct autogenerated flag to commit_files."""
 
-    def setUp(self):
-        self.orig_dir = os.getcwd()
-        self.tmp_dir = tempfile.mkdtemp()
-        os.chdir(self.tmp_dir)
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        self.tmp_dir = str(tmp_path)
         with open("package.json", "w") as f:
             json.dump({"name": "test-pkg", "version": "1.0.0"}, f, indent=2)
             f.write("\n")
@@ -793,10 +758,6 @@ class TestReleaseCommitTrailers(unittest.TestCase):
             f.write('{"commits":["abc1234"],"user_facing":true,"description":"Bugfix","type":"fix"}\n')
         with open(os.path.join(".rlsbl", "config.json"), "w") as f:
             json.dump({"private": False}, f)
-
-    def tearDown(self):
-        os.chdir(self.orig_dir)
-        shutil.rmtree(self.tmp_dir)
 
     @patch("rlsbl.commands.release.release_lock")
     @patch("rlsbl.commands.release.acquire_lock")
@@ -847,8 +808,8 @@ class TestReleaseCommitTrailers(unittest.TestCase):
 
         # First call is the version-bump commit -- should be autogenerated
         version_bump_call = mock_commit_files.call_args_list[0]
-        self.assertIn("v1.0.1", version_bump_call[0][0])
-        self.assertTrue(version_bump_call[1].get("autogenerated", True))
+        assert "v1.0.1" in version_bump_call[0][0]
+        assert version_bump_call[1].get("autogenerated", True)
 
     @patch("rlsbl.commands.release.release_lock")
     @patch("rlsbl.commands.release.acquire_lock")
@@ -899,8 +860,8 @@ class TestReleaseCommitTrailers(unittest.TestCase):
 
         # Second call is the finalization commit -- should have autogenerated=True
         finalize_call = mock_commit_files.call_args_list[1]
-        self.assertIn("chore: finalize changelog", finalize_call[0][0])
-        self.assertTrue(finalize_call[1].get("autogenerated", True))
+        assert "chore: finalize changelog" in finalize_call[0][0]
+        assert finalize_call[1].get("autogenerated", True)
 
 
 # ---------------------------------------------------------------------------
@@ -908,7 +869,7 @@ class TestReleaseCommitTrailers(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
-class TestPorcelainParsing(unittest.TestCase):
+class TestPorcelainParsing:
     """Tests for parse_porcelain_paths in rlsbl.commands.release."""
 
     def test_stripped_leading_space_on_first_line(self):
@@ -925,7 +886,7 @@ class TestPorcelainParsing(unittest.TestCase):
         # After run().strip(): "M package.json\n M pyproject.toml\n?? .rlsbl/lock"
         porcelain = "M package.json\n M pyproject.toml\n?? .rlsbl/lock"
         result = parse_porcelain_paths(porcelain)
-        self.assertEqual(result, {"package.json", "pyproject.toml", ".rlsbl/lock"})
+        assert result == {"package.json", "pyproject.toml", ".rlsbl/lock"}
 
     def test_rename_entry(self):
         """Rename entries use 'R old -> new' format; parser should extract new path."""
@@ -933,14 +894,14 @@ class TestPorcelainParsing(unittest.TestCase):
 
         porcelain = "R  old.txt -> new.txt\nM  other.txt"
         result = parse_porcelain_paths(porcelain)
-        self.assertIn("new.txt", result)
-        self.assertIn("other.txt", result)
+        assert "new.txt" in result
+        assert "other.txt" in result
 
     def test_empty_output(self):
         """Empty porcelain output returns empty set."""
         from rlsbl.commands.release import parse_porcelain_paths
 
-        self.assertEqual(parse_porcelain_paths(""), set())
+        assert parse_porcelain_paths("") == set()
 
     def test_blank_lines_ignored(self):
         """Blank lines in output are safely ignored."""
@@ -948,7 +909,7 @@ class TestPorcelainParsing(unittest.TestCase):
 
         porcelain = "M  file.txt\n\n?? untracked.txt"
         result = parse_porcelain_paths(porcelain)
-        self.assertEqual(result, {"file.txt", "untracked.txt"})
+        assert result == {"file.txt", "untracked.txt"}
 
 
 # ---------------------------------------------------------------------------
@@ -956,17 +917,13 @@ class TestPorcelainParsing(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
-class TestUndo(unittest.TestCase):
+class TestUndo:
     """Tests for rlsbl.commands.undo."""
 
-    def setUp(self):
-        self.orig_dir = os.getcwd()
-        self.tmp_dir = tempfile.mkdtemp()
-        os.chdir(self.tmp_dir)
-
-    def tearDown(self):
-        os.chdir(self.orig_dir)
-        shutil.rmtree(self.tmp_dir)
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        self.tmp_dir = str(tmp_path)
 
     @patch("rlsbl.commands.undo.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.undo.check_gh_auth", return_value=True)
@@ -978,9 +935,9 @@ class TestUndo(unittest.TestCase):
 
         from rlsbl.commands.undo import run_cmd
 
-        with self.assertRaises(SystemExit) as ctx:
+        with pytest.raises(SystemExit) as exc_info:
             run_cmd("npm", [], {"yes": True}, project_root=".")
-        self.assertEqual(ctx.exception.code, 1)
+        assert exc_info.value.code == 1
 
     @patch("rlsbl.commands.undo.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.undo.check_gh_installed", return_value=True)
@@ -989,9 +946,9 @@ class TestUndo(unittest.TestCase):
         """Dirty working tree should cause SystemExit."""
         from rlsbl.commands.undo import run_cmd
 
-        with self.assertRaises(SystemExit) as ctx:
+        with pytest.raises(SystemExit) as exc_info:
             run_cmd("npm", [], {"yes": True}, project_root=".")
-        self.assertEqual(ctx.exception.code, 1)
+        assert exc_info.value.code == 1
 
 
 # ---------------------------------------------------------------------------
@@ -999,8 +956,8 @@ class TestUndo(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
-class TestCheck(unittest.TestCase):
-    """Tests for rlsbl.commands.check — npm availability checks."""
+class TestCheck:
+    """Tests for rlsbl.commands.check -- npm availability checks."""
 
     @patch("rlsbl.commands.check.subprocess.run")
     def test_check_npm_available(self, mock_subprocess_run):
@@ -1011,7 +968,7 @@ class TestCheck(unittest.TestCase):
             1, "npm", stderr="E404 Not Found"
         )
         result = check_npm_availability("nonexistent-pkg-xyz")
-        self.assertEqual(result["status"], "available")
+        assert result["status"] == "available"
 
     @patch("rlsbl.commands.check.subprocess.run")
     def test_check_npm_taken(self, mock_subprocess_run):
@@ -1025,7 +982,7 @@ class TestCheck(unittest.TestCase):
             stderr="",
         )
         result = check_npm_availability("express")
-        self.assertEqual(result["status"], "taken")
+        assert result["status"] == "taken"
 
 
 # ---------------------------------------------------------------------------
@@ -1033,17 +990,13 @@ class TestCheck(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
-class TestPrePushCheck(unittest.TestCase):
-    """Tests for rlsbl.commands.pre_push_check — version detection."""
+class TestPrePushCheck:
+    """Tests for rlsbl.commands.pre_push_check -- version detection."""
 
-    def setUp(self):
-        self.orig_dir = os.getcwd()
-        self.tmp_dir = tempfile.mkdtemp()
-        os.chdir(self.tmp_dir)
-
-    def tearDown(self):
-        os.chdir(self.orig_dir)
-        shutil.rmtree(self.tmp_dir)
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        self.tmp_dir = str(tmp_path)
 
     def test_detects_npm_version(self):
         """Detects version from package.json."""
@@ -1053,8 +1006,8 @@ class TestPrePushCheck(unittest.TestCase):
         from rlsbl.commands.pre_push_check import _detect_version
 
         version, reg_name = _detect_version()
-        self.assertEqual(version, "2.3.4")
-        self.assertEqual(reg_name, "npm")
+        assert version == "2.3.4"
+        assert reg_name == "npm"
 
     def test_detects_pypi_version(self):
         """Detects version from pyproject.toml."""
@@ -1064,8 +1017,8 @@ class TestPrePushCheck(unittest.TestCase):
         from rlsbl.commands.pre_push_check import _detect_version
 
         version, reg_name = _detect_version()
-        self.assertEqual(version, "0.5.0")
-        self.assertEqual(reg_name, "pypi")
+        assert version == "0.5.0"
+        assert reg_name == "pypi"
 
     def test_detects_go_version(self):
         """Detects version from go.mod + VERSION file."""
@@ -1077,16 +1030,16 @@ class TestPrePushCheck(unittest.TestCase):
         from rlsbl.commands.pre_push_check import _detect_version
 
         version, reg_name = _detect_version()
-        self.assertEqual(version, "1.4.0")
-        self.assertEqual(reg_name, "go")
+        assert version == "1.4.0"
+        assert reg_name == "go"
 
     def test_no_project(self):
         """Empty directory should return (None, None)."""
         from rlsbl.commands.pre_push_check import _detect_version
 
         version, reg_name = _detect_version()
-        self.assertIsNone(version)
-        self.assertIsNone(reg_name)
+        assert version is None
+        assert reg_name is None
 
 
 # ---------------------------------------------------------------------------
@@ -1094,17 +1047,13 @@ class TestPrePushCheck(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
-class TestResolveReleaseTargets(unittest.TestCase):
+class TestResolveReleaseTargets:
     """Tests for resolve_release_targets: config-based secondary target resolution."""
 
-    def setUp(self):
-        self.orig_dir = os.getcwd()
-        self.tmp_dir = tempfile.mkdtemp()
-        os.chdir(self.tmp_dir)
-
-    def tearDown(self):
-        os.chdir(self.orig_dir)
-        shutil.rmtree(self.tmp_dir)
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        self.tmp_dir = str(tmp_path)
 
     def test_missing_config_falls_back_to_auto_detect(self):
         """Without release_targets in config, auto-detect all detected targets."""
@@ -1116,9 +1065,9 @@ class TestResolveReleaseTargets(unittest.TestCase):
 
         result = resolve_release_targets("npm", {})
         # docs is detected via selfdoc.json
-        self.assertIn("docs", result)
+        assert "docs" in result
         # npm is the primary and must be excluded from secondaries
-        self.assertNotIn("npm", result)
+        assert "npm" not in result
 
     def test_config_release_targets_restricts_secondaries(self):
         """release_targets in config restricts which secondaries run."""
@@ -1134,10 +1083,10 @@ class TestResolveReleaseTargets(unittest.TestCase):
 
         result = resolve_release_targets("npm", {})
         # docs is NOT in the configured list, so it should not appear
-        self.assertNotIn("docs", result)
+        assert "docs" not in result
         # npm is primary, excluded from secondaries
-        self.assertNotIn("npm", result)
-        self.assertEqual(result, {})
+        assert "npm" not in result
+        assert result == {}
 
     def test_config_release_targets_includes_docs(self):
         """release_targets listing docs includes it even without auto-detect."""
@@ -1148,8 +1097,8 @@ class TestResolveReleaseTargets(unittest.TestCase):
         from rlsbl.commands.release import resolve_release_targets
 
         result = resolve_release_targets("npm", {})
-        self.assertIn("docs", result)
-        self.assertNotIn("npm", result)
+        assert "docs" in result
+        assert "npm" not in result
 
     def test_primary_always_excluded_from_secondaries(self):
         """The primary target is never in the secondary set, even if config lists it."""
@@ -1160,7 +1109,7 @@ class TestResolveReleaseTargets(unittest.TestCase):
         from rlsbl.commands.release import resolve_release_targets
 
         result = resolve_release_targets("npm", {})
-        self.assertNotIn("npm", result)
+        assert "npm" not in result
 
     def test_unknown_target_in_config_ignored(self):
         """Unknown target names in config are silently filtered out."""
@@ -1171,17 +1120,17 @@ class TestResolveReleaseTargets(unittest.TestCase):
         from rlsbl.commands.release import resolve_release_targets
 
         result = resolve_release_targets("npm", {})
-        self.assertIn("docs", result)
-        self.assertNotIn("nonexistent", result)
+        assert "docs" in result
+        assert "nonexistent" not in result
 
 
-class TestStatusJson(unittest.TestCase):
+class TestStatusJson:
     """Tests for rlsbl.commands.status --json flag."""
 
-    def setUp(self):
-        self.orig_dir = os.getcwd()
-        self.tmp_dir = tempfile.mkdtemp()
-        os.chdir(self.tmp_dir)
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        self.tmp_dir = str(tmp_path)
         # Create a git repo
         os.system("git init -q .")
         os.system("git config user.email test@test.local")
@@ -1194,10 +1143,6 @@ class TestStatusJson(unittest.TestCase):
             f.write("# Changelog\n\n## 0.1.0\n\nInitial release.\n")
         os.system("git add package.json CHANGELOG.md")
         os.system("git commit -q -m initial")
-
-    def tearDown(self):
-        os.chdir(self.orig_dir)
-        shutil.rmtree(self.tmp_dir)
 
     def test_status_json_output(self):
         """With --json, status should output valid JSON with expected keys."""
@@ -1212,21 +1157,21 @@ class TestStatusJson(unittest.TestCase):
                          "clean", "changelog", "jsonl_coverage",
                          "commits_ahead", "commits_ahead_tag",
                          "ci", "publish"}
-        self.assertEqual(set(data.keys()), expected_keys)
-        self.assertEqual(data["name"], "test-pkg")
-        self.assertEqual(data["version"], "0.1.0")
-        self.assertEqual(data["target"], "npm")
-        self.assertTrue(data["clean"])
-        self.assertTrue(data["changelog"])
+        assert set(data.keys()) == expected_keys
+        assert data["name"] == "test-pkg"
+        assert data["version"] == "0.1.0"
+        assert data["target"] == "npm"
+        assert data["clean"]
+        assert data["changelog"]
 
 
-class TestStatusChangelogExemption(unittest.TestCase):
+class TestStatusChangelogExemption:
     """Tests for status exempting autogenerated commits from coverage."""
 
-    def setUp(self):
-        self.orig_dir = os.getcwd()
-        self.tmp_dir = tempfile.mkdtemp()
-        os.chdir(self.tmp_dir)
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        self.tmp_dir = str(tmp_path)
         # Create a git repo
         subprocess.run(["git", "init", "-q", "."], check=True)
         subprocess.run(["git", "config", "user.email", "test@test.local"], check=True)
@@ -1240,10 +1185,6 @@ class TestStatusChangelogExemption(unittest.TestCase):
         subprocess.run(["git", "add", "package.json", "CHANGELOG.md"], check=True)
         subprocess.run(["git", "commit", "-q", "-m", "initial"], check=True)
         subprocess.run(["git", "tag", "v0.1.0"], check=True)
-
-    def tearDown(self):
-        os.chdir(self.orig_dir)
-        shutil.rmtree(self.tmp_dir)
 
     def test_autogenerated_commits_exempted_from_coverage(self):
         """Commits with Autogenerated: true trailer should not show as uncovered."""
@@ -1281,8 +1222,8 @@ class TestStatusChangelogExemption(unittest.TestCase):
         # The autogenerated commit should be exempted.
         data = _collect_status("npm", project_root=".")
         # Coverage should show 1/1 (the autogenerated commit exempted)
-        self.assertIn("1/1", data["jsonl_coverage"])
-        self.assertIn("1 exempted", data["jsonl_coverage"])
+        assert "1/1" in data["jsonl_coverage"]
+        assert "1 exempted" in data["jsonl_coverage"]
 
     def test_no_exemption_annotation_when_no_autogenerated_commits(self):
         """When there are no autogenerated commits, no exemption note is shown."""
@@ -1314,11 +1255,11 @@ class TestStatusChangelogExemption(unittest.TestCase):
         # Actually, we need the JSONL file on disk but not as a separate commit
         data = _collect_status("npm", project_root=".")
         # Should show 1/1 without exemption note
-        self.assertIn("1/1", data["jsonl_coverage"])
-        self.assertNotIn("exempted", data["jsonl_coverage"])
+        assert "1/1" in data["jsonl_coverage"]
+        assert "exempted" not in data["jsonl_coverage"]
 
 
-class TestMigrateCommand(unittest.TestCase):
+class TestMigrateCommand:
     """Tests for rlsbl.commands.migrate."""
 
     @patch("rlsbl.commands.migrate.subprocess.run")
@@ -1328,16 +1269,16 @@ class TestMigrateCommand(unittest.TestCase):
 
         from rlsbl.commands.migrate import run_cmd
 
-        with self.assertRaises(SystemExit) as ctx:
+        with pytest.raises(SystemExit) as exc_info:
             run_cmd(None, [], {})
-        self.assertEqual(ctx.exception.code, 1)
+        assert exc_info.value.code == 1
 
     def test_migrate_shows_help_text(self):
         """The migrate command should appear in the CLI help output."""
         from rlsbl import app
 
         result = app.test(["--help"])
-        self.assertIn("migrate", result.stdout)
+        assert "migrate" in result.stdout
 
 
 class TestScaffoldAutoDetection:
@@ -1359,13 +1300,13 @@ class TestScaffoldAutoDetection:
         assert config["targets"] == ["npm"], f"expected ['npm'], got {config['targets']}"
 
 
-class TestScaffoldUntrack(unittest.TestCase):
+class TestScaffoldUntrack:
     """Tests for scaffold untracking files added to .gitignore."""
 
-    def setUp(self):
-        self.orig_dir = os.getcwd()
-        self.tmp_dir = tempfile.mkdtemp()
-        os.chdir(self.tmp_dir)
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        self.tmp_dir = str(tmp_path)
         # Create a full git repo with initial commit
         subprocess.run(["git", "init", "-q", "."], check=True)
         subprocess.run(["git", "config", "user.email", "test@test.local"], check=True)
@@ -1375,10 +1316,6 @@ class TestScaffoldUntrack(unittest.TestCase):
             json.dump({"name": "test-pkg", "version": "0.1.0"}, f)
         subprocess.run(["git", "add", "package.json"], check=True)
         subprocess.run(["git", "commit", "-q", "-m", "initial"], check=True)
-
-    def tearDown(self):
-        os.chdir(self.orig_dir)
-        shutil.rmtree(self.tmp_dir)
 
     def test_scaffold_untracks_gitignored_files(self):
         """Scaffold should untrack files that match .gitignore patterns."""
@@ -1396,7 +1333,7 @@ class TestScaffoldUntrack(unittest.TestCase):
             ["git", "ls-files", "--cached", target_file],
             capture_output=True, text=True,
         )
-        self.assertEqual(result.stdout.strip(), target_file)
+        assert result.stdout.strip() == target_file
 
         # Run scaffold (which writes .gitignore containing .credentials.json)
         with patch("sys.stdout", new_callable=StringIO):
@@ -1407,20 +1344,20 @@ class TestScaffoldUntrack(unittest.TestCase):
             ["git", "ls-files", "--cached", target_file],
             capture_output=True, text=True,
         )
-        self.assertEqual(result.stdout.strip(), "",
-                         f"{target_file} should no longer be tracked after scaffold")
+        assert result.stdout.strip() == "", \
+            f"{target_file} should no longer be tracked after scaffold"
 
         # Verify the file still exists on disk (untracked, not deleted)
-        self.assertTrue(os.path.exists(target_file),
-                        f"{target_file} should still exist on disk")
+        assert os.path.exists(target_file), \
+            f"{target_file} should still exist on disk"
 
         # Verify the untrack was committed (not just staged)
         status = subprocess.run(
             ["git", "status", "--porcelain", target_file],
             capture_output=True, text=True,
         )
-        self.assertEqual(status.stdout.strip(), "",
-                         f"{target_file} removal should be committed, not just staged")
+        assert status.stdout.strip() == "", \
+            f"{target_file} removal should be committed, not just staged"
 
 
 # ---------------------------------------------------------------------------
@@ -1428,13 +1365,13 @@ class TestScaffoldUntrack(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
-class TestReleaseRollbackOnPushFailure(unittest.TestCase):
+class TestReleaseRollbackOnPushFailure:
     """Tests that a failed push during release rolls back local commits and tags."""
 
-    def setUp(self):
-        self.orig_dir = os.getcwd()
-        self.tmp_dir = tempfile.mkdtemp()
-        os.chdir(self.tmp_dir)
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        self.tmp_dir = str(tmp_path)
 
         # Initialize a real git repo
         subprocess.run(["git", "init", "-q", "."], check=True)
@@ -1469,10 +1406,6 @@ class TestReleaseRollbackOnPushFailure(unittest.TestCase):
             capture_output=True, text=True, check=True,
         ).stdout.strip()
 
-    def tearDown(self):
-        os.chdir(self.orig_dir)
-        shutil.rmtree(self.tmp_dir)
-
     @patch("rlsbl.commands.release.push_if_needed",
            side_effect=subprocess.CalledProcessError(1, "git push"))
     @patch("rlsbl.commands.release.read_deploy_config", return_value=([], []))
@@ -1489,7 +1422,7 @@ class TestReleaseRollbackOnPushFailure(unittest.TestCase):
         from rlsbl.commands.release import run_cmd
 
         # Run release -- push_if_needed raises CalledProcessError
-        with self.assertRaises(subprocess.CalledProcessError):
+        with pytest.raises(subprocess.CalledProcessError):
             with patch("sys.stdout", new_callable=StringIO):
                 run_cmd(_rc(), {
                     "yes": True,
@@ -1505,17 +1438,13 @@ class TestReleaseRollbackOnPushFailure(unittest.TestCase):
             ["git", "rev-parse", "HEAD"],
             capture_output=True, text=True, check=True,
         ).stdout.strip()
-        self.assertEqual(post_sha, self.pre_release_sha,
-                         "HEAD should be rolled back to pre-release position")
+        assert post_sha == self.pre_release_sha, \
+            "HEAD should be rolled back to pre-release position"
 
         # The tag for the attempted version should not exist locally
         tag_check = subprocess.run(
             ["git", "tag", "-l", "v1.0.1"],
             capture_output=True, text=True, check=True,
         ).stdout.strip()
-        self.assertEqual(tag_check, "",
-                         "Tag v1.0.1 should not exist after failed push")
-
-
-if __name__ == "__main__":
-    unittest.main()
+        assert tag_check == "", \
+            "Tag v1.0.1 should not exist after failed push"

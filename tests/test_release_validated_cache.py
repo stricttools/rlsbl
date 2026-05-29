@@ -8,11 +8,10 @@ file may be gitignored and should not be committed as part of the release).
 
 import json
 import os
-import shutil
-import tempfile
-import unittest
 from io import StringIO
 from unittest.mock import patch
+
+import pytest
 
 from rlsbl.release_file import ReleaseConfig
 
@@ -26,13 +25,13 @@ def _rc(bump="patch", include=None, exclude=None):
     )
 
 
-class TestReleaseValidatedCache(unittest.TestCase):
+class TestReleaseValidatedCache:
     """Tests that .validated is expected by the dirty-tree guard."""
 
-    def setUp(self):
-        self.orig_dir = os.getcwd()
-        self.tmp_dir = tempfile.mkdtemp()
-        os.chdir(self.tmp_dir)
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        self.tmp_dir = str(tmp_path)
         # Create package.json so npm registry is detected
         with open("package.json", "w") as f:
             json.dump({"name": "test-pkg", "version": "1.0.0"}, f, indent=2)
@@ -50,10 +49,6 @@ class TestReleaseValidatedCache(unittest.TestCase):
             f.write("fakehash123\n")
         with open(os.path.join(".rlsbl", "config.json"), "w") as f:
             json.dump({"private": False}, f)
-
-    def tearDown(self):
-        os.chdir(self.orig_dir)
-        shutil.rmtree(self.tmp_dir)
 
     @patch("rlsbl.commands.release.release_lock")
     @patch("rlsbl.commands.release.acquire_lock")
@@ -157,7 +152,7 @@ class TestReleaseValidatedCache(unittest.TestCase):
         ]
 
         with patch("sys.stdout", new_callable=StringIO):
-            with self.assertRaises(SystemExit) as ctx:
+            with pytest.raises(SystemExit) as ctx:
                 run_cmd(_rc(), {
                     "yes": True,
                     "quiet": False,
@@ -165,8 +160,4 @@ class TestReleaseValidatedCache(unittest.TestCase):
                 project_root=".",
                 monorepo_root=None,
 )
-            self.assertEqual(ctx.exception.code, 1)
-
-
-if __name__ == "__main__":
-    unittest.main()
+            assert ctx.value.code == 1

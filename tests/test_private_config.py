@@ -11,8 +11,6 @@ Verifies:
 
 import json
 import os
-import shutil
-import tempfile
 from io import StringIO
 from unittest.mock import patch
 
@@ -41,10 +39,10 @@ def _write_config(tmp_dir, config):
 class TestPrivateConfigRequired:
     """Tests that release enforces the ``private`` config key."""
 
-    def setup_method(self):
-        self.orig_dir = os.getcwd()
-        self.tmp_dir = tempfile.mkdtemp()
-        os.chdir(self.tmp_dir)
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        self.tmp_dir = str(tmp_path)
         # Minimal npm project
         with open("package.json", "w") as f:
             json.dump({"name": "test-pkg", "version": "1.0.0"}, f, indent=2)
@@ -54,10 +52,6 @@ class TestPrivateConfigRequired:
         os.makedirs(os.path.join(".rlsbl", "changes"), exist_ok=True)
         with open(os.path.join(".rlsbl", "changes", "unreleased.jsonl"), "w") as f:
             f.write('{"commits":["abc1234"],"user_facing":true,"description":"Bugfix","type":"fix"}\n')
-
-    def teardown_method(self):
-        os.chdir(self.orig_dir)
-        shutil.rmtree(self.tmp_dir)
 
     def test_release_aborts_when_private_key_missing(self, capsys):
         """Release exits with error when ``private`` is absent from config."""
@@ -145,10 +139,10 @@ class TestPrivateConfigRequired:
 class TestPrivatePublishGuardrail:
     """Tests that private repos skip target.publish() but still allow asset upload."""
 
-    def setup_method(self):
-        self.orig_dir = os.getcwd()
-        self.tmp_dir = tempfile.mkdtemp()
-        os.chdir(self.tmp_dir)
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        self.tmp_dir = str(tmp_path)
         # Minimal npm project
         with open("package.json", "w") as f:
             json.dump({"name": "test-pkg", "version": "1.0.0"}, f, indent=2)
@@ -158,10 +152,6 @@ class TestPrivatePublishGuardrail:
         os.makedirs(os.path.join(".rlsbl", "changes"), exist_ok=True)
         with open(os.path.join(".rlsbl", "changes", "unreleased.jsonl"), "w") as f:
             f.write('{"commits":["abc1234"],"user_facing":true,"description":"Bugfix","type":"fix"}\n')
-
-    def teardown_method(self):
-        os.chdir(self.orig_dir)
-        shutil.rmtree(self.tmp_dir)
 
     @patch("rlsbl.commands.release.release_lock")
     @patch("rlsbl.commands.release.acquire_lock")
