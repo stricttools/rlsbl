@@ -210,7 +210,7 @@ def test_scaffold_auto_commits_files(mock_git_repo, capsys):
         registry=None,
         flags={"no-tag": True},
         registries=[],
-    )
+        project_root=".")
 
     captured = capsys.readouterr()
     assert "Committed scaffold changes." in captured.out
@@ -251,7 +251,7 @@ def test_scaffold_no_commit_flag_skips_commit(mock_git_repo, capsys):
         registry=None,
         flags={"no-commit": True, "no-tag": True},
         registries=[],
-    )
+        project_root=".")
 
     captured = capsys.readouterr()
     assert "Skipping commit (--no-commit)." in captured.out
@@ -277,7 +277,7 @@ def test_pre_push_hook_does_not_pass_args(mock_git_repo, capsys):
         registry=None,
         flags={"no-commit": True, "no-tag": True},
         registries=[],
-    )
+        project_root=".")
 
     hook_path = mock_git_repo / ".git" / "hooks" / "pre-push"
     assert hook_path.exists(), "pre-push hook should be installed"

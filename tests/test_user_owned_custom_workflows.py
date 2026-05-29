@@ -144,7 +144,7 @@ def test_conflict_tip_printed_for_ci_yml(mock_git_repo, capsys):
         registry=None,
         flags={"no-tag": True, "no-commit": True},
         registries=[],
-    )
+        project_root=".")
 
     captured = capsys.readouterr()
     assert "ci-custom.yml" in captured.out
@@ -167,7 +167,7 @@ def test_conflict_tip_printed_for_publish_yml(mock_git_repo, capsys):
         registry=None,
         flags={"no-tag": True, "no-commit": True},
         registries=[],
-    )
+        project_root=".")
 
     captured = capsys.readouterr()
     assert "publish-custom.yml" in captured.out
@@ -189,7 +189,7 @@ def test_conflict_tip_not_printed_when_no_conflict(mock_git_repo, capsys):
         registry=None,
         flags={"no-tag": True, "no-commit": True},
         registries=[],
-    )
+        project_root=".")
 
     captured = capsys.readouterr()
     # The tip text is unique enough to assert its absence.
@@ -210,7 +210,7 @@ def test_conflict_tip_not_printed_for_other_conflicts(mock_git_repo, capsys):
         registry=None,
         flags={"no-tag": True, "no-commit": True},
         registries=[],
-    )
+        project_root=".")
 
     captured = capsys.readouterr()
     assert "ci-custom.yml" not in captured.out

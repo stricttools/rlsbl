@@ -146,7 +146,7 @@ class TestCmdImpactPackageMode:
     def test_package_input(self, tmp_path, monkeypatch, capsys):
         monkeypatch.chdir(tmp_path)
         _make_impact_workspace(tmp_path)
-        _cmd_impact(["models"], {"format": "text"})
+        _cmd_impact(["models"], {"format": "text"}, project_root=".")
         out = capsys.readouterr().out
         assert "Impact analysis for: models" in out
         assert "marketplace_contract" in out
@@ -158,12 +158,12 @@ class TestCmdImpactPackageMode:
         monkeypatch.chdir(tmp_path)
         _make_impact_workspace(tmp_path)
         with pytest.raises(SystemExit):
-            _cmd_impact(["nonexistent"], {"format": "text"})
+            _cmd_impact(["nonexistent"], {"format": "text"}, project_root=".")
 
     def test_leaf_package_no_dependents(self, tmp_path, monkeypatch, capsys):
         monkeypatch.chdir(tmp_path)
         _make_impact_workspace(tmp_path)
-        _cmd_impact(["app"], {"format": "text"})
+        _cmd_impact(["app"], {"format": "text"}, project_root=".")
         out = capsys.readouterr().out
         assert "Direct dependents (0):" in out
         assert "(none)" in out
@@ -171,7 +171,7 @@ class TestCmdImpactPackageMode:
     def test_depth_flag(self, tmp_path, monkeypatch, capsys):
         monkeypatch.chdir(tmp_path)
         _make_impact_workspace(tmp_path)
-        _cmd_impact(["models"], {"format": "text", "depth": 1})
+        _cmd_impact(["models"], {"format": "text", "depth": 1}, project_root=".")
         out = capsys.readouterr().out
         # depth=1: only direct dependents in transitive list
         assert "Transitive dependents (2):" in out
@@ -188,7 +188,7 @@ class TestCmdImpactFileMode:
         src_dir.mkdir(parents=True, exist_ok=True)
         (src_dir / "money.dart").write_text("// money model\n")
 
-        _cmd_impact(["packages/models/src/money.dart"], {"format": "text"})
+        _cmd_impact(["packages/models/src/money.dart"], {"format": "text"}, project_root=".")
         out = capsys.readouterr().out
         assert "Impact analysis for: models" in out
         assert "marketplace_contract" in out
@@ -196,7 +196,7 @@ class TestCmdImpactFileMode:
     def test_file_not_in_any_package(self, tmp_path, monkeypatch, capsys):
         monkeypatch.chdir(tmp_path)
         _make_impact_workspace(tmp_path)
-        _cmd_impact(["outside/dir/file.dart"], {"format": "text"})
+        _cmd_impact(["outside/dir/file.dart"], {"format": "text"}, project_root=".")
         err = capsys.readouterr().err
         assert "does not belong to any workspace package" in err
 
@@ -209,8 +209,7 @@ class TestCmdImpactFileMode:
                 "packages/models/src/file.dart",
                 "packages/flow_order/lib/main.dart",
             ],
-            {"format": "text"},
-        )
+            {"format": "text"}, project_root=".")
         out = capsys.readouterr().out
         # Should union impacts of models and flow_order
         assert "models" in out
@@ -259,7 +258,7 @@ class TestCmdImpactGitMode:
             capture_output=True,
         )
 
-        _cmd_impact([], {"format": "text", "since": base_ref})
+        _cmd_impact([], {"format": "text", "since": base_ref}, project_root=".")
         out = capsys.readouterr().out
         assert "Impact analysis for: models" in out
         assert "marketplace_contract" in out
@@ -269,7 +268,7 @@ class TestCmdImpactJsonFormat:
     def test_json_output(self, tmp_path, monkeypatch, capsys):
         monkeypatch.chdir(tmp_path)
         _make_impact_workspace(tmp_path)
-        _cmd_impact(["models"], {"format": "json"})
+        _cmd_impact(["models"], {"format": "json"}, project_root=".")
         out = capsys.readouterr().out
         data = json.loads(out)
         assert data["input"] == "models"
@@ -285,7 +284,7 @@ class TestCmdImpactJsonFormat:
     def test_json_leaf_package(self, tmp_path, monkeypatch, capsys):
         monkeypatch.chdir(tmp_path)
         _make_impact_workspace(tmp_path)
-        _cmd_impact(["app"], {"format": "json"})
+        _cmd_impact(["app"], {"format": "json"}, project_root=".")
         out = capsys.readouterr().out
         data = json.loads(out)
         assert data["direct_dependents"] == []
@@ -296,16 +295,16 @@ class TestCmdImpactErrors:
     def test_no_workspace(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         with pytest.raises(SystemExit):
-            _cmd_impact(["models"], {"format": "text"})
+            _cmd_impact(["models"], {"format": "text"}, project_root=".")
 
     def test_no_args_no_since(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         _make_impact_workspace(tmp_path)
         with pytest.raises(SystemExit):
-            _cmd_impact([], {"format": "text"})
+            _cmd_impact([], {"format": "text"}, project_root=".")
 
     def test_unknown_format(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         _make_impact_workspace(tmp_path)
         with pytest.raises(SystemExit):
-            _cmd_impact(["models"], {"format": "yaml"})
+            _cmd_impact(["models"], {"format": "yaml"}, project_root=".")
