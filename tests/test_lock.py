@@ -13,7 +13,7 @@ def test_lock_file_created(tmp_path, monkeypatch):
     """acquire_lock creates .rlsbl/lock if it doesn't exist."""
     monkeypatch.chdir(tmp_path)
 
-    acquire_lock()
+    acquire_lock(project_root=tmp_path)
     try:
         lock_path = tmp_path / ".rlsbl" / "lock"
         assert lock_path.exists()
@@ -25,7 +25,7 @@ def test_nonblocking_acquire_fails_when_held(tmp_path, monkeypatch):
     """A second non-blocking flock attempt raises when the lock is already held."""
     monkeypatch.chdir(tmp_path)
 
-    acquire_lock()
+    acquire_lock(project_root=tmp_path)
     try:
         # Manually try a second non-blocking acquire on the same lock file
         lock_path = os.path.join(str(tmp_path), ".rlsbl", "lock")
@@ -47,7 +47,7 @@ def test_release_allows_reacquire(tmp_path, monkeypatch):
     """After release_lock(), a new non-blocking acquire succeeds."""
     monkeypatch.chdir(tmp_path)
 
-    acquire_lock()
+    acquire_lock(project_root=tmp_path)
     release_lock()
 
     # Should be able to acquire again without blocking
@@ -67,7 +67,7 @@ def test_context_manager(tmp_path, monkeypatch):
     """rlsbl_lock context manager acquires and releases correctly."""
     monkeypatch.chdir(tmp_path)
 
-    with rlsbl_lock():
+    with rlsbl_lock(project_root=tmp_path):
         lock_path = os.path.join(str(tmp_path), ".rlsbl", "lock")
         assert os.path.exists(lock_path)
 
@@ -97,7 +97,7 @@ def test_atexit_registered_on_acquire(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
 
     with patch("rlsbl.lock.atexit.register") as mock_register:
-        acquire_lock()
+        acquire_lock(project_root=tmp_path)
         try:
             mock_register.assert_called_once_with(release_lock)
         finally:
@@ -128,7 +128,7 @@ def test_cross_process_lock(tmp_path, monkeypatch):
     """Lock held in parent process blocks a child process from acquiring it."""
     monkeypatch.chdir(tmp_path)
 
-    acquire_lock()
+    acquire_lock(project_root=tmp_path)
     try:
         result_queue = multiprocessing.Queue()
         child = multiprocessing.Process(
@@ -149,7 +149,7 @@ def test_is_stale_no_file(tmp_path, monkeypatch):
     """is_stale returns False when no lock file exists."""
     monkeypatch.chdir(tmp_path)
 
-    assert is_stale() is False
+    assert is_stale(project_root=tmp_path) is False
 
 
 def test_is_stale_with_stale_file(tmp_path, monkeypatch):
@@ -161,7 +161,7 @@ def test_is_stale_with_stale_file(tmp_path, monkeypatch):
     lock_file = lock_dir / "lock"
     lock_file.write_text("")
 
-    assert is_stale() is True
+    assert is_stale(project_root=tmp_path) is True
 
 
 # NOTE: testing is_stale() with a held lock requires a subprocess because

@@ -61,14 +61,14 @@ def _write_config(repo, batch_limits):
 
 class TestGetBatchLimitsConfig:
     def test_defaults_when_no_config(self, git_repo):
-        cfg = _get_batch_limits_config()
+        cfg = _get_batch_limits_config(git_repo)
         assert cfg["max_commits_per_entry"] == 5
         assert cfg["max_entries_per_commit"] == 5
         assert cfg["exclusions"] == []
 
     def test_defaults_when_partial_config(self, git_repo):
         _write_config(git_repo, {"max_commits_per_entry": 7})
-        cfg = _get_batch_limits_config()
+        cfg = _get_batch_limits_config(git_repo)
         assert cfg["max_commits_per_entry"] == 7
         assert cfg["max_entries_per_commit"] == 5
         assert cfg["exclusions"] == []
@@ -82,7 +82,7 @@ class TestGetBatchLimitsConfig:
                 "exclusions": [{"reason": "x", "commits": ["abc"]}],
             },
         )
-        cfg = _get_batch_limits_config()
+        cfg = _get_batch_limits_config(git_repo)
         assert cfg["max_commits_per_entry"] == 10
         assert cfg["max_entries_per_commit"] == 4
         assert cfg["exclusions"] == [{"reason": "x", "commits": ["abc"]}]
@@ -95,7 +95,7 @@ class TestGetBatchLimitsConfig:
                 "exclusions": "not-a-list",
             },
         )
-        cfg = _get_batch_limits_config()
+        cfg = _get_batch_limits_config(git_repo)
         assert cfg["max_commits_per_entry"] == 5
         assert cfg["exclusions"] == []
         err = capsys.readouterr().err
@@ -275,7 +275,7 @@ class TestValidateUnreleasedIntegration:
             commits=[sha], user_facing=True, description="New feature", type="feature",
         ))
 
-        result = validate_unreleased(changes)
+        result = validate_unreleased(changes, project_root=git_repo)
         assert result["passed"] is True
         for key in (
             "hashes_resolve",
@@ -297,7 +297,7 @@ class TestValidateUnreleasedIntegration:
         shas = [_make_commit(git_repo, f"f{i}.txt") for i in range(6)]
         append_entry(changes, ChangelogEntry(commits=shas, user_facing=False))
 
-        result = validate_unreleased(changes)
+        result = validate_unreleased(changes, project_root=git_repo)
         assert result["passed"] is False
         passed, details = result["checks"]["batch_size_commits"]
         assert passed is False
@@ -310,7 +310,7 @@ class TestValidateUnreleasedIntegration:
         for _ in range(6):
             append_entry(changes, ChangelogEntry(commits=[sha], user_facing=False))
 
-        result = validate_unreleased(changes)
+        result = validate_unreleased(changes, project_root=git_repo)
         assert result["passed"] is False
         passed, details = result["checks"]["batch_size_entries"]
         assert passed is False
@@ -335,7 +335,7 @@ class TestValidateUnreleasedIntegration:
         # And unreleased references it once more (total 6 > max 5).
         append_entry(str(changes), ChangelogEntry(commits=[sha], user_facing=False))
 
-        result = validate_unreleased(str(changes))
+        result = validate_unreleased(str(changes), project_root=git_repo)
         passed, details = result["checks"]["batch_size_entries"]
         assert passed is False
         assert "6 entries" in details[0]
@@ -361,6 +361,6 @@ class TestValidateUnreleasedIntegration:
         # Write a config that exempts this commit.
         _write_config(git_repo, {"exclusions": [{"reason": "test", "commits": [sha]}]})
 
-        result = validate_unreleased(str(changes))
+        result = validate_unreleased(str(changes), project_root=git_repo)
         passed, _ = result["checks"]["batch_size_entries"]
         assert passed is True

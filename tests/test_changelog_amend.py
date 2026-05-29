@@ -84,7 +84,7 @@ class TestCmdAmend:
         }
         with mock.patch("rlsbl.commands.changelog_cmd.commit_files"):
             with mock.patch("rlsbl.commands.changelog_cmd._sync_github_release"):
-                cmd_amend(flags)
+                cmd_amend(flags, project_root=rlsbl_repo)
 
         # Entry was appended
         entries = parse_jsonl(str(jsonl_path))
@@ -114,7 +114,7 @@ class TestCmdAmend:
         }
         with mock.patch("rlsbl.commands.changelog_cmd.commit_files"):
             with mock.patch("rlsbl.commands.changelog_cmd._sync_github_release"):
-                cmd_amend(flags)
+                cmd_amend(flags, project_root=rlsbl_repo)
 
         changes_dir = get_changes_dir(".")
         entries = parse_jsonl(os.path.join(changes_dir, "1.0.0.jsonl"))
@@ -132,7 +132,7 @@ class TestCmdAmend:
             "no-resolve": True,
         }
         with pytest.raises(SystemExit) as exc_info:
-            cmd_amend(flags)
+            cmd_amend(flags, project_root=rlsbl_repo)
         assert exc_info.value.code == 1
 
     def test_file_relocked_on_error(self, rlsbl_repo):
@@ -157,7 +157,7 @@ class TestCmdAmend:
             side_effect=RuntimeError("simulated failure"),
         ):
             with pytest.raises(RuntimeError, match="simulated failure"):
-                cmd_amend(flags)
+                cmd_amend(flags, project_root=rlsbl_repo)
 
         # File must still be locked after error
         assert is_read_only(str(jsonl_path))
@@ -180,7 +180,7 @@ class TestCmdAmend:
         }
         with mock.patch("rlsbl.commands.changelog_cmd.commit_files"):
             with mock.patch("rlsbl.commands.changelog_cmd._sync_github_release"):
-                cmd_amend(flags)
+                cmd_amend(flags, project_root=rlsbl_repo)
 
         changelog_path = rlsbl_repo / "CHANGELOG.md"
         assert changelog_path.exists()

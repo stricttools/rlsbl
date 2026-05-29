@@ -91,7 +91,7 @@ class TestReleaseWithDeployTargets:
                 "version_file": lambda self: None,
                 "write_version": lambda self, p, v: [],
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, project_root=None: None,
+                "publish": lambda self, p, v, project_root: None,
                 "tag_format": lambda self, v: f"v{v}",
             })(),
             flags={"yes": True, "no-tag": True},
@@ -106,7 +106,7 @@ class TestReleaseWithDeployTargets:
             target=type("FakeTarget", (), {
                 "tag_format": lambda self, v: f"v{v}",
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, project_root=None: None,
+                "publish": lambda self, p, v, project_root: None,
             })(),
         )
 
@@ -186,7 +186,7 @@ class TestReleaseDeployFailureContinues:
                 "version_file": lambda self: None,
                 "write_version": lambda self, p, v: [],
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, project_root=None: None,
+                "publish": lambda self, p, v, project_root: None,
                 "tag_format": lambda self, v: f"v{v}",
             })(),
             flags={"yes": True, "no-tag": True},
@@ -201,7 +201,7 @@ class TestReleaseDeployFailureContinues:
             target=type("FakeTarget", (), {
                 "tag_format": lambda self, v: f"v{v}",
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, project_root=None: None,
+                "publish": lambda self, p, v, project_root: None,
             })(),
         )
 
@@ -256,7 +256,7 @@ class TestReleaseNoDeployConfig:
                 "version_file": lambda self: None,
                 "write_version": lambda self, p, v: [],
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, project_root=None: None,
+                "publish": lambda self, p, v, project_root: None,
                 "tag_format": lambda self, v: f"v{v}",
             })(),
             flags={"yes": True, "no-tag": True},
@@ -271,7 +271,7 @@ class TestReleaseNoDeployConfig:
             target=type("FakeTarget", (), {
                 "tag_format": lambda self, v: f"v{v}",
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, project_root=None: None,
+                "publish": lambda self, p, v, project_root: None,
             })(),
         )
 
@@ -327,7 +327,7 @@ class TestReleaseDeployConfigErrors:
                 "version_file": lambda self: None,
                 "write_version": lambda self, p, v: [],
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, project_root=None: None,
+                "publish": lambda self, p, v, project_root: None,
                 "tag_format": lambda self, v: f"v{v}",
             })(),
             flags={"yes": True, "no-tag": True},
@@ -342,7 +342,7 @@ class TestReleaseDeployConfigErrors:
             target=type("FakeTarget", (), {
                 "tag_format": lambda self, v: f"v{v}",
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, project_root=None: None,
+                "publish": lambda self, p, v, project_root: None,
             })(),
         )
 
@@ -402,7 +402,7 @@ class TestReleaseStopsAtFirstDeployFailure:
                 "version_file": lambda self: None,
                 "write_version": lambda self, p, v: [],
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, project_root=None: None,
+                "publish": lambda self, p, v, project_root: None,
                 "tag_format": lambda self, v: f"v{v}",
             })(),
             flags={"yes": True, "no-tag": True},
@@ -417,7 +417,7 @@ class TestReleaseStopsAtFirstDeployFailure:
             target=type("FakeTarget", (), {
                 "tag_format": lambda self, v: f"v{v}",
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, project_root=None: None,
+                "publish": lambda self, p, v, project_root: None,
             })(),
         )
 

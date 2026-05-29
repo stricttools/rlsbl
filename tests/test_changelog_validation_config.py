@@ -23,19 +23,19 @@ def _write_config(tmp_path, payload):
 class TestGetChangelogValidationConfig:
     def test_empty_when_config_file_missing(self, tmp_project):
         # No .rlsbl/config.json at all
-        assert get_changelog_validation_config() == {}
+        assert get_changelog_validation_config(str(tmp_project)) == {}
 
     def test_empty_when_batch_limits_absent(self, tmp_project):
         _write_config(tmp_project, {"publish": {"pypi": {"local": True}}})
-        assert get_changelog_validation_config() == {}
+        assert get_changelog_validation_config(str(tmp_project)) == {}
 
     def test_empty_when_batch_limits_not_dict(self, tmp_project):
         _write_config(tmp_project, {"batch_limits": "not-a-dict"})
-        assert get_changelog_validation_config() == {}
+        assert get_changelog_validation_config(str(tmp_project)) == {}
 
     def test_empty_when_batch_limits_is_list(self, tmp_project):
         _write_config(tmp_project, {"batch_limits": [1, 2, 3]})
-        assert get_changelog_validation_config() == {}
+        assert get_changelog_validation_config(str(tmp_project)) == {}
 
     def test_returns_configured_dict(self, tmp_project):
         payload = {
@@ -47,9 +47,9 @@ class TestGetChangelogValidationConfig:
             }
         }
         _write_config(tmp_project, payload)
-        assert get_changelog_validation_config() == payload["batch_limits"]
+        assert get_changelog_validation_config(str(tmp_project)) == payload["batch_limits"]
 
     def test_returns_partial_dict_without_applying_defaults(self, tmp_project):
         """Caller is responsible for per-key defaults; helper passes through as-is."""
         _write_config(tmp_project, {"batch_limits": {"max_commits_per_entry": 7}})
-        assert get_changelog_validation_config() == {"max_commits_per_entry": 7}
+        assert get_changelog_validation_config(str(tmp_project)) == {"max_commits_per_entry": 7}

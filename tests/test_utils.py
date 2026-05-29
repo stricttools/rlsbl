@@ -230,52 +230,52 @@ class TestGetPushTimeout(unittest.TestCase):
     def test_env_var_returns_value(self):
         os.environ["RLSBL_PUSH_TIMEOUT"] = "60"
         os.chdir(self._tmp_dir)
-        self.assertEqual(get_push_timeout(), 60)
+        self.assertEqual(get_push_timeout(self._tmp_dir), 60)
 
     def test_config_returns_value(self):
         self._write_config({"push_timeout": 90})
         os.chdir(self._tmp_dir)
-        self.assertEqual(get_push_timeout(), 90)
+        self.assertEqual(get_push_timeout(self._tmp_dir), 90)
 
     def test_neither_raises_error(self):
         self._write_config({})
         os.chdir(self._tmp_dir)
         with self.assertRaises(ValueError) as ctx:
-            get_push_timeout()
+            get_push_timeout(self._tmp_dir)
         self.assertIn("push_timeout not configured", str(ctx.exception))
 
     def test_env_var_takes_precedence_over_config(self):
         os.environ["RLSBL_PUSH_TIMEOUT"] = "45"
         self._write_config({"push_timeout": 200})
         os.chdir(self._tmp_dir)
-        self.assertEqual(get_push_timeout(), 45)
+        self.assertEqual(get_push_timeout(self._tmp_dir), 45)
 
     def test_invalid_env_var_raises_error(self):
         os.environ["RLSBL_PUSH_TIMEOUT"] = "not-a-number"
         os.chdir(self._tmp_dir)
         with self.assertRaises(ValueError) as ctx:
-            get_push_timeout()
+            get_push_timeout(self._tmp_dir)
         self.assertIn("Invalid RLSBL_PUSH_TIMEOUT", str(ctx.exception))
 
     def test_zero_env_var_raises_error(self):
         os.environ["RLSBL_PUSH_TIMEOUT"] = "0"
         os.chdir(self._tmp_dir)
         with self.assertRaises(ValueError) as ctx:
-            get_push_timeout()
+            get_push_timeout(self._tmp_dir)
         self.assertIn("Invalid RLSBL_PUSH_TIMEOUT", str(ctx.exception))
 
     def test_invalid_config_value_raises_error(self):
         self._write_config({"push_timeout": "slow"})
         os.chdir(self._tmp_dir)
         with self.assertRaises(ValueError) as ctx:
-            get_push_timeout()
+            get_push_timeout(self._tmp_dir)
         self.assertIn("Invalid push_timeout", str(ctx.exception))
 
     def test_negative_config_value_raises_error(self):
         self._write_config({"push_timeout": -10})
         os.chdir(self._tmp_dir)
         with self.assertRaises(ValueError) as ctx:
-            get_push_timeout()
+            get_push_timeout(self._tmp_dir)
         self.assertIn("Invalid push_timeout", str(ctx.exception))
 
 

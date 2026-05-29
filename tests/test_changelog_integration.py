@@ -247,7 +247,7 @@ class TestPrePushWithoutJsonl:
         from rlsbl.commands.pre_push_check import run_cmd
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {})
+            run_cmd(None, [], {}, project_root=tmp_project)
 
         assert exc_info.value.code == 0
         captured = capsys.readouterr()
@@ -276,7 +276,7 @@ class TestUnreleasedWithJsonl:
         from rlsbl.commands.unreleased import run_cmd
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {})
+            run_cmd(None, [], {}, project_root=mock_git_repo)
         assert exc_info.value.code == 0
         captured = capsys.readouterr()
         assert "[COVERED]" in captured.out
@@ -297,7 +297,7 @@ class TestUnreleasedWithJsonl:
         from rlsbl.commands.unreleased import run_cmd
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {})
+            run_cmd(None, [], {}, project_root=mock_git_repo)
         assert exc_info.value.code == 0
         captured = capsys.readouterr()
         assert "[COVERED]" in captured.out
@@ -318,7 +318,7 @@ class TestUnreleasedWithJsonl:
         from rlsbl.commands.unreleased import run_cmd
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {"json": True})
+            run_cmd(None, [], {"json": True}, project_root=mock_git_repo)
         assert exc_info.value.code == 0
         captured = capsys.readouterr()
         data = json.loads(captured.out)
@@ -341,7 +341,7 @@ class TestUnreleasedWithoutJsonl:
         from rlsbl.commands.unreleased import run_cmd
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {})
+            run_cmd(None, [], {}, project_root=mock_git_repo)
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
         assert "JSONL changelog not set up" in captured.err
@@ -373,7 +373,7 @@ class TestStatusWithJsonl:
 
         from rlsbl.commands.status import _collect_status
 
-        data = _collect_status("npm")
+        data = _collect_status("npm", project_root=".")
         # jsonl_coverage should be set (non-None)
         assert data["jsonl_coverage"] is not None
         assert "covered" in data["jsonl_coverage"] or "entries" in data["jsonl_coverage"]
@@ -396,7 +396,7 @@ class TestStatusWithJsonl:
 
         from rlsbl.commands.status import run_cmd
 
-        run_cmd("npm", [], {"json": True})
+        run_cmd("npm", [], {"json": True}, project_root=mock_git_repo)
         captured = capsys.readouterr()
         data = json.loads(captured.out)
         assert "jsonl_coverage" in data
@@ -419,7 +419,7 @@ class TestStatusWithJsonl:
 
         from rlsbl.commands.status import run_cmd
 
-        run_cmd("npm", [], {})
+        run_cmd("npm", [], {}, project_root=mock_git_repo)
         captured = capsys.readouterr()
         assert "JSONL:" in captured.out
 
@@ -437,7 +437,7 @@ class TestStatusWithoutJsonl:
 
         from rlsbl.commands.status import _collect_status
 
-        data = _collect_status("npm")
+        data = _collect_status("npm", project_root=".")
         assert data["jsonl_coverage"] == "not set up"
 
     def test_text_output_shows_not_set_up(self, mock_git_repo, capsys):
@@ -448,6 +448,6 @@ class TestStatusWithoutJsonl:
 
         from rlsbl.commands.status import run_cmd
 
-        run_cmd("npm", [], {})
+        run_cmd("npm", [], {}, project_root=mock_git_repo)
         captured = capsys.readouterr()
         assert "JSONL:     not set up" in captured.out

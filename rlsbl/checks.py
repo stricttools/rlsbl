@@ -60,9 +60,9 @@ def register_checks(app):
 
         root_str = str(ctx.project_root)
         stale_paths = []
-        if is_stale(lock_path=os.path.join(root_str, ".rlsbl", "lock")):
+        if is_stale(lock_path=os.path.join(root_str, ".rlsbl", "lock"), project_root=ctx.project_root):
             stale_paths.append(".rlsbl/lock")
-        if is_stale(lock_path=os.path.join(root_str, ".rlsbl-monorepo", "lock")):
+        if is_stale(lock_path=os.path.join(root_str, ".rlsbl-monorepo", "lock"), project_root=ctx.project_root):
             stale_paths.append(".rlsbl-monorepo/lock")
 
         if stale_paths:

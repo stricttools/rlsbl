@@ -14,11 +14,11 @@ class TestShouldTag:
         monkeypatch.chdir(tmp_path)
         # No config files exist, empty flags -> default True
         monkeypatch.setattr("rlsbl.config.USER_CONFIG", str(tmp_path / "nope.json"))
-        assert should_tag({}) is True
+        assert should_tag({}, str(tmp_path)) is True
 
     def test_returns_false_when_no_tag_flag_set(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        assert should_tag({"no-tag": True}) is False
+        assert should_tag({"no-tag": True}, str(tmp_path)) is False
 
     def test_reads_project_config_tag_false(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -27,18 +27,18 @@ class TestShouldTag:
         config_dir = tmp_path / ".rlsbl"
         config_dir.mkdir()
         (config_dir / "config.json").write_text(json.dumps({"tag": False}))
-        monkeypatch.setattr("rlsbl.config._project_config", lambda project_root=None: str(config_dir / "config.json"))
-        assert should_tag({}) is False
+        monkeypatch.setattr("rlsbl.config._project_config", lambda project_root: str(config_dir / "config.json"))
+        assert should_tag({}, str(tmp_path)) is False
 
     def test_reads_user_config_as_fallback(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         # No project config
-        monkeypatch.setattr("rlsbl.config._project_config", lambda project_root=None: str(tmp_path / "no_project.json"))
+        monkeypatch.setattr("rlsbl.config._project_config", lambda project_root: str(tmp_path / "no_project.json"))
         # User config says tag: false
         user_config = tmp_path / "user_config.json"
         user_config.write_text(json.dumps({"tag": False}))
         monkeypatch.setattr("rlsbl.config.USER_CONFIG", str(user_config))
-        assert should_tag({}) is False
+        assert should_tag({}, str(tmp_path)) is False
 
     def test_project_config_overrides_user_config(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -46,12 +46,12 @@ class TestShouldTag:
         config_dir = tmp_path / ".rlsbl"
         config_dir.mkdir()
         (config_dir / "config.json").write_text(json.dumps({"tag": True}))
-        monkeypatch.setattr("rlsbl.config._project_config", lambda project_root=None: str(config_dir / "config.json"))
+        monkeypatch.setattr("rlsbl.config._project_config", lambda project_root: str(config_dir / "config.json"))
         # User config says tag: false
         user_config = tmp_path / "user_config.json"
         user_config.write_text(json.dumps({"tag": False}))
         monkeypatch.setattr("rlsbl.config.USER_CONFIG", str(user_config))
-        assert should_tag({}) is True
+        assert should_tag({}, str(tmp_path)) is True
 
 
 class TestReadJsonConfig:
@@ -73,14 +73,14 @@ class TestWriteProjectConfig:
     def test_creates_dir_and_file_and_preserves_existing_keys(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         config_path = str(tmp_path / ".rlsbl" / "config.json")
-        monkeypatch.setattr("rlsbl.config._project_config", lambda project_root=None: config_path)
+        monkeypatch.setattr("rlsbl.config._project_config", lambda project_root: config_path)
 
         # First write
-        write_project_config("tag", False)
+        write_project_config("tag", False, str(tmp_path))
         data = json.loads(open(config_path).read())
         assert data == {"tag": False}
 
         # Second write should preserve "tag" key
-        write_project_config("other_key", "hello")
+        write_project_config("other_key", "hello", str(tmp_path))
         data = json.loads(open(config_path).read())
         assert data == {"tag": False, "other_key": "hello"}

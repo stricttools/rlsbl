@@ -138,7 +138,7 @@ class TestPrivateFlagScaffold:
             with patch("rlsbl.commands.init_cmd.is_private_repo", return_value=True):
                 run_cmd("npm", [], {"private": True, "no-tag": True})
 
-        config = read_project_config()
+        config = read_project_config(str(mock_git_repo))
         assert config.get("private") is True
 
     def test_public_repo_creates_publish(self, mock_git_repo):
