@@ -1,4 +1,0 @@
-{"commits":["b5b753f958020873f0ace44af88d41af1bce7801"],"user_facing":false}
-{"commits":["433038188570263efb52e89f78374962223e0e38"],"user_facing":true,"description":"**Fix.** Lockfile modifications from version bump no longer falsely flagged as concurrent changes during release.","type":"fix"}
-{"commits":["5069351073c807aaa6a980d6efafdf476b954b31"],"user_facing":false}
-{"commits":["58c024a3dcde24a6e3430ec0dc1e5b2040f29bc9"],"user_facing":false}
