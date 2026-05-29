@@ -9,7 +9,7 @@ import sys
 import tempfile
 
 from ..action_versions import format_action, UnknownActionError
-from ..config import read_deploy_config, should_tag, read_project_config, write_project_config
+from ..config import read_deploy_config, should_tag, write_project_config
 from ..lock import acquire_lock, release_lock
 from ..targets import TARGETS, detect_targets
 from ..tagging import ensure_tags
@@ -82,10 +82,9 @@ def save_hashes(hashes):
         f.write("\n")
 
 
-def _ensure_target_in_config(registry_name, project_root):
+def _ensure_target_in_config(registry_name, ctx):
     """Add registry_name to the targets array in .rlsbl/config.json if not already present."""
-    config = read_project_config(project_root)
-    targets = config.get("targets", [])
+    targets = ctx.config.get("targets", [])
     if not isinstance(targets, list):
         targets = []
     # Check if name is already in targets (as string or dict)
@@ -97,7 +96,8 @@ def _ensure_target_in_config(registry_name, project_root):
             existing_names.append(t.get("name", ""))
     if registry_name not in existing_names:
         targets.append(registry_name)
-    write_project_config("targets", targets, project_root)
+    write_project_config("targets", targets, ctx.project_root)
+    ctx.config["targets"] = targets
 
 
 NEXT_STEPS = {
@@ -839,7 +839,7 @@ def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnin
         print("Committed scaffold changes.")
 
 
-def _resolve_private(flags, project_root):
+def _resolve_private(flags, ctx):
     """Determine if this is a private repository.
 
     Checks --private flag first, then saved config, then auto-detects via GitHub API.
@@ -851,9 +851,8 @@ def _resolve_private(flags, project_root):
         return True
 
     # Check saved config
-    config = read_project_config(project_root)
-    if "private" in config:
-        return bool(config["private"])
+    if "private" in ctx.config:
+        return bool(ctx.config["private"])
 
     # Auto-detect via GitHub API
     detected = is_private_repo()
@@ -918,12 +917,13 @@ def _trigger_monorepo_sync(no_commit=False):
             pass
 
 
-def run_cmd(registry, args, flags, project_root):
+def run_cmd(registry, args, flags, ctx):
     """Init command handler.
 
     Scaffolds release infrastructure (CI, publish workflows, changelog, etc.)
     from templates.
     """
+    project_root = ctx.project_root if ctx else None
     reg = TARGETS[registry]
 
     # Check that a project file exists
@@ -946,12 +946,13 @@ def run_cmd(registry, args, flags, project_root):
         # Register this target in .rlsbl/config.json targets array
         # (skipped under --dry-run -- we don't write config)
         if not dry_run:
-            _ensure_target_in_config(registry, project_root=project_root)
+            _ensure_target_in_config(registry, ctx=ctx)
 
         # Determine if this is a private repository
-        private = _resolve_private(flags, project_root=project_root)
+        private = _resolve_private(flags, ctx=ctx)
         if not dry_run:
             write_project_config("private", private, project_root)
+            ctx.config["private"] = private
 
         # Gather template variables
         vars_dict = reg.template_vars(".", project_root)
@@ -1407,12 +1408,13 @@ def _plan_merged_publish(publish_target, merged_content, force):
     }
 
 
-def run_cmd_multi(registries_list, args, flags, project_root):
+def run_cmd_multi(registries_list, args, flags, ctx):
     """Scaffold for multiple registries with a merged publish workflow.
 
     Uses the primary registry for template vars and CI, then writes a merged
     publish.yml that contains jobs for all detected registries.
     """
+    project_root = ctx.project_root if ctx else None
     primary = registries_list[0]
     reg = TARGETS[primary]
 
@@ -1439,12 +1441,13 @@ def run_cmd_multi(registries_list, args, flags, project_root):
         # (skipped under --dry-run -- we don't write config)
         if not dry_run:
             for r in registries_list:
-                _ensure_target_in_config(r, project_root=project_root)
+                _ensure_target_in_config(r, ctx=ctx)
 
         # Determine if this is a private repository
-        private = _resolve_private(flags, project_root=project_root)
+        private = _resolve_private(flags, ctx=ctx)
         if not dry_run:
             write_project_config("private", private, project_root)
+            ctx.config["private"] = private
 
         print(f"Multiple registries detected: {', '.join(registries_list)}")
         if private:
