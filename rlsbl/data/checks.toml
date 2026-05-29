@@ -1,3 +1,5 @@
+app = "rlsbl"
+
 [checks.lock]
 tags = ["project"]
 severity = "warn"

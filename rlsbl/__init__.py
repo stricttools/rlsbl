@@ -132,6 +132,7 @@ app = strictcli.App(
         strictcli.Flag(name="yes", type=bool, short="y", help="Skip confirmation prompts"),
         strictcli.Flag(name="quiet", type=bool, help="Suppress non-essential output"),
     ],
+    checks_path=Path(__file__).parent / "data" / "checks.toml",
 )
 
 
@@ -163,28 +164,9 @@ def _check_context_factory():
 
 app.set_check_context(_check_context_factory)
 
-# Register project checks on the strictcli check system.
-# The check definitions live in rlsbl/data/checks.toml (shipped with the
-# package) rather than .strictcli/checks.toml at CWD, because rlsbl is a CLI
-# tool that runs from arbitrary directories -- CWD-based discovery would only
-# work when running from the rlsbl source tree.  We load the definitions
-# explicitly and wire them into the app.
-def _bootstrap_checks():
-    from pathlib import Path
-    from strictcli import _load_checks_toml
-    checks_path = Path(__file__).parent / "data" / "checks.toml"
-    if not checks_path.is_file():
-        return
-    defs = _load_checks_toml(checks_path)
-    app._check_defs = defs
-    app._checks_enabled = True
-    if "check" not in app._commands:
-        app._register_check_command()
-    from .checks import register_checks
-    register_checks(app)
-
-_bootstrap_checks()
-del _bootstrap_checks
+# Register check implementations on the strictcli check system.
+from .checks import register_checks
+register_checks(app)
 
 
 # ---------------------------------------------------------------------------
