@@ -2,6 +2,12 @@
 
 # Changelog
 
+## 0.48.2
+
+### Fixes
+
+- **Fix.** Lockfile modifications from version bump no longer falsely flagged as concurrent changes during release.
+
 ## 0.48.1
 
 ### Fixes
