@@ -144,7 +144,7 @@
     "description": "92c829699be90c4ea09e05c6e0ff3830b755bdd05be47a9427e51074cedcb831"
   },
   "en/cli-index.md": {
-    "content": "a94979c632405a3b779fb08fd051b61f5aabbf0d236f151c943f90cb5c333e3f",
+    "content": "212c4531a835c79db4ac7860a109bc7f3705d681bc3f449d13357d49574fd67e",
     "description": "0f01533cb10562a220aa70ea5e33e2500c0c1e4aa8e16b2f80c532449a68b7ea"
   },
   "en/cli-migrate.md": {
@@ -204,7 +204,7 @@
     "description": "f934ebcc70f1b9dc3c86b2020fcfac4db46bd2cd252d78e4d5989f59cc429886"
   },
   "en/configuration.md": {
-    "content": "5291ff7aa1e622e3b5212590f556002bbf4e9de36f9ab027f7d74f4169a72862",
+    "content": "936523410bd7d1b2bc7fdd527b607fedddb48ef174fcc90c45a72f948650f2d0",
     "description": "2b299140b2d961d153c7d61904667008c1a2e33081bb58950272063a9eb3c519"
   },
   "en/gen-index.md": {
@@ -288,7 +288,7 @@
     "description": "77349d50382ca6c0faf97553b8abf8c24bb360c895f32005f7de62abdf1bbe75"
   },
   "en/rlsbl-commands-init_cmd.md": {
-    "content": "2db9fd0b36a3556f870c2c31fdc5853f6ff959db3a05f46496880f5ae11ba778",
+    "content": "c1803ea50a78b22d07731f277900f829dbd2712513a043619f76c0bea018d144",
     "description": "b4a7db2e3882de4af592870ee977b98522a4635188b12262d78e7441b533611c"
   },
   "en/rlsbl-commands-migrate.md": {
@@ -484,11 +484,11 @@
     "description": "3266032dac809db8f09c10099004c4e51b3cb844eee75935bacd58ccd240ef85"
   },
   "en/rlsbl-targets-base.md": {
-    "content": "116451af00043f9deb28f51e3f8aa850461e1b78650adc8bd325e6054b1bed26",
+    "content": "97bc6fec3756eed0be4f64b2a067ff0c76306e1029602a69c8e7e3a4ebc601f2",
     "description": "9c45f2d173069765b86d5b12cc6ace11871012cf64a449c29879627cba6d68d1"
   },
   "en/rlsbl-targets-cargo.md": {
-    "content": "2c877a4c14206962203a9640007fdde2285d446189bee7dec5acd13748ec43f2",
+    "content": "b89364dd91a8b1be8e88648da6aa807eaec017ee18448e613737bef95be8e55b",
     "description": "27abe540c3addc3fe385af67ad58acc34db997ff89a028fcdae8a2e78c2b41e4"
   },
   "en/rlsbl-targets-dart.md": {
@@ -496,7 +496,7 @@
     "description": "df505dec2d0e66ad6c0962286c923baf8fb9bad45d8a243ad825e490740aa7a7"
   },
   "en/rlsbl-targets-deno.md": {
-    "content": "c5a5579e7cd5be499386686cc5767d6835786969e010faa494645d331637dddf",
+    "content": "312b1610bcc92a53167d84e4fc229840e5b1ae75d3874862e497e43d46a834ce",
     "description": "8982097fe00d57557550d0794f71182544daa6a75caea3e4ed48375a1f7dcbbc"
   },
   "en/rlsbl-targets-docker.md": {
@@ -520,11 +520,11 @@
     "description": "9d42427937256cf18c6f9b2c34b668350ddfdc06e661a50d0b39f1259f13380d"
   },
   "en/rlsbl-targets-hex.md": {
-    "content": "55fb8ab2ba3bfd250fd9d194fcff585558d102fe97059ccc810adbf3c0306a94",
+    "content": "367764ecedd747d8120903fd51f23a99d1529c79f9d9cd672608fbae3964b904",
     "description": "8916f87d3ea421f479a169c9a16ecd405e23b0a029367cdeac9d4960eb975144"
   },
   "en/rlsbl-targets-maven.md": {
-    "content": "d3b89e04e7e8cce7d1dd44542447802475e6d50862a840ed64e15d00bb698f90",
+    "content": "f6809f99f244c021b024babeb2df83cd5617e547e042c81af30671ea180916cb",
     "description": "0c61d194e83652f219ad7c15f3d849779cbd0272fc6d53c7daaaa46d2258b851"
   },
   "en/rlsbl-targets-native_changes.md": {
@@ -532,35 +532,35 @@
     "description": "a01fb003aac1ef1791a6a50b56833d1717e6dc54b9486209b7118c2e6c9c5bbf"
   },
   "en/rlsbl-targets-npm.md": {
-    "content": "3ac12ab28d00132dda0a661f604702d7e9e1019470ff7280625e04f137e869a2",
+    "content": "179d6ae86563143d7728ffbd6af24c91e646d852d7b711d44fbd9d33a6837dc1",
     "description": "c3b1baee52612dc981379bd297c5b6c229d27ad606d0d514baff62f2ee71c360"
   },
   "en/rlsbl-targets-pgdesign.md": {
-    "content": "b8cd679e0284edac7e9d19bff6546e3852ffa27ad4ea1598f8ccc2487ec11b0d",
+    "content": "16663a4c30487d377d27f98a513d3cb795b026ed05766a54041ca028a95a60aa",
     "description": "f3ceb031c3e6601abbe13292c63e4d0eeb6da1a568fb774c6f7fb4c5625aeeef"
   },
   "en/rlsbl-targets-plain.md": {
-    "content": "6af64c2b3dfa5f100486d10fed79dbe322cd5e5a558d60589d1fbe0101fc747c",
+    "content": "1071706d20d633f441e8e56a8a7139557bb5659a8f216e4823013cd8e5fe8389",
     "description": "f1c5b9ef00991b226a5d97b96a2ea0fa68ee0a35946a5a062eef2b67e74942af"
   },
   "en/rlsbl-targets-protocol.md": {
-    "content": "a90c76712b18289a94a096c08f7084296f7e75a93360f3a2d31964693d8e04bd",
+    "content": "9ef07570c415402cf438c59c779cac7281d7d8a6da86df6fbec2b634ad373292",
     "description": "5732af4332c5b53a141aac2b4bb87cc90dbf1bf26dd06235dd2a9dbb92d7d20d"
   },
   "en/rlsbl-targets-pypi.md": {
-    "content": "619af0c90d5b9963c8a8701aaa67eb5776d3bad548094e318c65d1f369f1aa50",
+    "content": "d41ae9b3332087f17add96cb2959366c8f4085b4a191bfb56558b976338e6fba",
     "description": "08730d9c6f4b56924c278f9df4f1739470c2b2edc610266ec247ea3658fee261"
   },
   "en/rlsbl-targets-spec.md": {
-    "content": "aeccf1016c2cd09c29b3377f1d3e64f2609a0fcbd40ddbcf1c7b1043fe0390dd",
+    "content": "1b41387f3096db4eae917b3b7721a040239fdf8333c82fcae504a7cf649e78f3",
     "description": "12124ce50311fb3753a7ef338dc6af459d0e6e7869b4a8f58608b8afa0b42bd0"
   },
   "en/rlsbl-targets-swift.md": {
-    "content": "4764cbd33e385dafd08b7c7d0d1f3371dd336aa6769c1564909d5c119983e849",
+    "content": "f3707beb69bc7a2b6506ba84af71550b6e49a0f1641aeb77ae03b6b53bade294",
     "description": "7e1734648734143d96661d5336d695ad34c415500624166458835c1dfc3ab219"
   },
   "en/rlsbl-targets-swift_apple.md": {
-    "content": "c7bfb63260db5fcaf6f88781f5992b260702d2ebb0563c10a91ae0a5d629bb1f",
+    "content": "dbab170ca7b87cc98f0a7c85cc7e5a7576dd3ee1c8648fcb2286839d39f7013c",
     "description": "8ed5ea6efc94661a60570314c16634163e5332e19c9cf0e1cc1ec4060dab1fd1"
   },
   "en/rlsbl-targets-utils.md": {
@@ -596,7 +596,7 @@
     "description": "846d7106c20777b824e0116e8e62127eb6c86ab277fe4904e1cbecc2e9839d43"
   },
   "en/targets.md": {
-    "content": "d5d8d9d8c997c6622d6bf1e682e3b58761ee31667e8ff05235936a71449201bc",
+    "content": "5752a9d64b145325ebb963661433985c17809da4b031f315782790c4825c3212",
     "description": "aaac1c918883d7bea3f3dfa477b0c778186be1f7d744efd66e44326a53fbfff6"
   },
   "gen-index.md": {
