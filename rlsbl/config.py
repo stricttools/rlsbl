@@ -52,16 +52,19 @@ def read_json_config(path):
         raise ValueError(f"Malformed JSON in {path}: {e}") from e
 
 
-def should_tag(flags, project_root):
-    """Returns True if tagging is enabled, checking flag > project > user > default."""
+def should_tag(flags, config):
+    """Returns True if tagging is enabled, checking flag > project > user > default.
+
+    ``config`` is the project config dict (already loaded).
+    User-level config is still read from disk.
+    """
     # CLI flag takes highest precedence
     if flags.get("no-tag"):
         return False
 
     # Project-level config
-    project = read_json_config(_project_config(project_root))
-    if "tag" in project:
-        return bool(project["tag"])
+    if "tag" in config:
+        return bool(config["tag"])
 
     # User-level config
     user = read_json_config(USER_CONFIG)
@@ -77,11 +80,10 @@ def read_project_config(project_root):
     return read_json_config(_project_config(project_root))
 
 
-def read_deploy_config(project_root):
-    """Read and validate deploy targets from project config. Returns (targets, errors)."""
+def read_deploy_config(config):
+    """Read and validate deploy targets from project config dict. Returns (targets, errors)."""
     from rlsbl.deploy import validate_deploy_config
 
-    config = read_project_config(project_root)
     targets = config.get("deploy", [])
     if not targets:
         return [], []
@@ -89,13 +91,12 @@ def read_deploy_config(project_root):
     return targets, errors
 
 
-def get_publish_config(target_name, project_root):
-    """Read per-target publish config from .rlsbl/config.json.
+def get_publish_config(target_name, config):
+    """Read per-target publish config from a project config dict.
 
     Returns a dict like {"local": True, "token_var": "PYPI_TOKEN"}.
     Returns empty dict if no config exists for this target.
     """
-    config = read_project_config(project_root)
     publish = config.get("publish", {})
     if not isinstance(publish, dict):
         return {}
@@ -134,8 +135,8 @@ def validate_publish_config(config, target_name):
         )
 
 
-def get_changelog_validation_config(project_root):
-    """Read changelog validation config from .rlsbl/config.json.
+def get_changelog_validation_config(config):
+    """Read changelog validation config from a project config dict.
 
     Returns the batch_limits section as a dict like
     {"max_commits_per_entry": 5, "max_entries_per_commit": 2,
@@ -148,7 +149,6 @@ def get_changelog_validation_config(project_root):
 
     Returns an empty dict if no config or malformed.
     """
-    config = read_project_config(project_root)
     batch_limits = config.get("batch_limits", {})
     if not isinstance(batch_limits, dict):
         return {}
@@ -157,7 +157,10 @@ def get_changelog_validation_config(project_root):
 
 
 def write_project_config(key, value, project_root):
-    """Write or update a key in .rlsbl/config.json (creates dir if needed)."""
+    """Write or update a key in .rlsbl/config.json (creates dir if needed).
+
+    Returns the updated config dict after writing to disk.
+    """
     config_path = _project_config(project_root)
     os.makedirs(os.path.dirname(config_path), exist_ok=True)
     existing = read_json_config(config_path)
@@ -165,3 +168,4 @@ def write_project_config(key, value, project_root):
     with open(config_path, "w", encoding="utf-8") as f:
         json.dump(existing, f, indent=2)
         f.write("\n")
+    return existing

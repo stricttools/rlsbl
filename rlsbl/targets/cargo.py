@@ -10,7 +10,7 @@ import sys
 import tomlkit
 
 from .base import BaseTarget
-from ..config import get_publish_config
+from ..config import get_publish_config, read_project_config
 from ..utils import run
 
 
@@ -195,7 +195,7 @@ class CargoTarget(BaseTarget):
 
     def publish(self, dir_path, version, project_root):
         """Publish to crates.io based on per-target config and token availability."""
-        pub_config = get_publish_config(self.name, project_root)
+        pub_config = get_publish_config(self.name, read_project_config(project_root))
 
         if pub_config.get("local") is False:
             print(f"Skipping local {self.name} publish (config: local=false). CI will handle it.")

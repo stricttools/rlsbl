@@ -759,7 +759,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
     # In monorepo mode, pass the project dict so coverage/range checks
     # only consider commits touching this package's files.
     monorepo_project = project if monorepo_name else None
-    validation = validate_unreleased(changes_dir, tag_glob=tag_glob, project=monorepo_project, project_root=project_root)
+    validation = validate_unreleased(changes_dir, tag_glob=tag_glob, project=monorepo_project, config=config)
     if not validation["passed"]:
         print("Error: JSONL changelog validation failed:", file=sys.stderr)
         for check_name, (passed, details) in validation["checks"].items():
@@ -1024,7 +1024,7 @@ def upload_release_assets(tag, version_dir, new_version, log, flags, *, ctx):
         if target_obj is None:
             continue
 
-        pub_cfg = get_publish_config(entry.name, ctx.project_root)
+        pub_cfg = get_publish_config(entry.name, ctx.config)
         max_size_mb = pub_cfg.get("max_asset_size_mb")
 
         dist_dir = os.path.join(version_dir, ".rlsbl", "dist", entry.name)
@@ -1149,7 +1149,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
             print(f"  Files: {', '.join(preview_files)}")
         else:
             print("  Files: (none -- version is the git tag)")
-        if should_tag(flags, project_root):
+        if should_tag(flags, ctx.config):
             print("  Will add 'rlsbl' keyword to project manifests")
         try:
             answer = input("Proceed? [y/N] ").strip().lower()
@@ -1207,7 +1207,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                     log(f"Synced version to {', '.join(vpath(r) for r in docs_modified)}")
 
         # Ecosystem tagging: add keyword to manifests if enabled
-        if should_tag(flags, project_root):
+        if should_tag(flags, ctx.config):
             npm_path = target_paths.get("npm", version_dir)
             try:
                 if TARGETS["npm"].check_project_exists(npm_path):
@@ -1357,13 +1357,13 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
         log(f"Tagged: {tag}")
 
         # Push commits and tag
-        push_timeout = get_push_timeout(project_root)
+        push_timeout = get_push_timeout(ctx.config)
         if push_timeout != 120:
             log(f"Push timeout: {push_timeout}s (from RLSBL_PUSH_TIMEOUT)")
         # Mark pushes as release-authorized so the pre-push hook skips its
         # "manual push" warning. The hook still runs JSONL coverage checks.
         push_env = {**os.environ, "RLSBL_RELEASE_PUSH": "1"}
-        push_if_needed(branch, env=push_env, project_root=project_root)
+        push_if_needed(branch, env=push_env, config=ctx.config)
         run("git", ["push", "origin", tag], timeout=push_timeout, env=push_env)
         log(f"Pushed to origin/{branch}")
     except ReleaseAbortError as e:
@@ -1482,7 +1482,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                     print(f"Warning: {sec_name} target publish failed: {e}", file=sys.stderr)
 
     # Deploy phase (after publish, before post-release hook)
-    deploy_targets, deploy_errors = read_deploy_config(project_root)
+    deploy_targets, deploy_errors = read_deploy_config(ctx.config)
     if deploy_targets and not deploy_errors:
         current_branch = get_current_branch()
         for target_config in deploy_targets:
@@ -1503,7 +1503,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
     # If no deploy targets configured, silently skip (most projects don't have deploy)
 
     # Ecosystem tagging: add GitHub topic after release is created
-    if should_tag(flags, project_root):
+    if should_tag(flags, ctx.config):
         ensure_github_topic(quiet=quiet)
 
     # Run post-release hook if present (non-fatal: release is already complete)

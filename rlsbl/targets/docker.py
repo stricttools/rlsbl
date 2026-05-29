@@ -63,7 +63,7 @@ class DockerTarget(BaseTarget):
 
     def publish(self, dir_path, version, project_root):
         """Build and push Docker image to the configured registry."""
-        pub_config = get_publish_config(self.name, project_root)
+        pub_config = get_publish_config(self.name, read_project_config(project_root))
 
         if pub_config.get("local") is False:
             print(f"Skipping local {self.name} publish (config: local=false). CI will handle it.")

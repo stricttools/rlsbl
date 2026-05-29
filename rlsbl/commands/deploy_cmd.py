@@ -17,7 +17,7 @@ def run_cmd(registry, args, flags, *, ctx):
         rlsbl deploy --force      Override branch restrictions
     """
     # 1. Read deploy config
-    targets, errors = read_deploy_config(ctx.project_root)
+    targets, errors = read_deploy_config(ctx.config)
 
     if not targets:
         print("Error: No deploy targets configured in .rlsbl/config.json", file=sys.stderr)

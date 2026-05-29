@@ -50,6 +50,7 @@ def test_finalize_excludes_conflicted_files_from_commit(mock_git_repo, capsys):
         flags={"no-tag": True},
         registries=[],
         project_root=".",
+        config={},
     )
 
     captured = capsys.readouterr()
@@ -84,6 +85,7 @@ def test_finalize_handles_only_conflicted_files(mock_git_repo, capsys):
         flags={"no-tag": True},
         registries=[],
         project_root=".",
+        config={},
     )
 
     captured = capsys.readouterr()
@@ -118,6 +120,7 @@ def test_finalize_commits_only_clean_files_when_mix(mock_git_repo, capsys):
         flags={"no-tag": True},
         registries=[],
         project_root=".",
+        config={},
     )
 
     captured = capsys.readouterr()

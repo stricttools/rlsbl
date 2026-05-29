@@ -50,7 +50,7 @@ class TestReleaseWithDeployTargets:
     """Deploy targets configured and valid: deploy_target gets called after publish."""
 
     def test_release_with_deploy_targets(self, mock_git_repo, monkeypatch, capsys):
-        _write_deploy_config(mock_git_repo, [_minimal_target()])
+        deploy_targets = [_minimal_target()]
 
         deploy_calls = []
 
@@ -110,7 +110,7 @@ class TestReleaseWithDeployTargets:
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, project_root: None,
             })(),
-            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), monorepo_root=None, config={"private": False}),
+            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), monorepo_root=None, config={"private": False, "deploy": deploy_targets}),
         )
 
         assert len(deploy_calls) == 1
@@ -124,7 +124,7 @@ class TestReleaseDeployFailureContinues:
     """Deploy fails but release still completes (post-release hook runs)."""
 
     def test_release_deploy_failure_continues(self, mock_git_repo, monkeypatch, capsys):
-        _write_deploy_config(mock_git_repo, [_minimal_target()])
+        deploy_targets = [_minimal_target()]
 
         def mock_deploy_target(target_config, current_branch):
             return DeployResult("prod", False, "Step 1 failed (exit 1): connection refused")
@@ -206,7 +206,7 @@ class TestReleaseDeployFailureContinues:
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, project_root: None,
             })(),
-            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), monorepo_root=None, config={"private": False}),
+            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), monorepo_root=None, config={"private": False, "deploy": deploy_targets}),
         )
 
         captured = capsys.readouterr()
@@ -293,8 +293,8 @@ class TestReleaseDeployConfigErrors:
     """Invalid deploy config: warning printed, deploy skipped."""
 
     def test_release_deploy_config_errors(self, mock_git_repo, monkeypatch, capsys):
-        # Write config with invalid deploy target (missing required fields)
-        _write_config(mock_git_repo, {"deploy": [{"name": "broken"}]})
+        # Config with invalid deploy target (missing required fields)
+        deploy_targets = [{"name": "broken"}]
 
         deploy_calls = []
 
@@ -349,7 +349,7 @@ class TestReleaseDeployConfigErrors:
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, project_root: None,
             })(),
-            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), monorepo_root=None, config={"private": False}),
+            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), monorepo_root=None, config={"private": False, "deploy": deploy_targets}),
         )
 
         # deploy_target should never have been called (config has errors)
@@ -364,11 +364,10 @@ class TestReleaseStopsAtFirstDeployFailure:
     """Multiple targets: first fails, second not attempted."""
 
     def test_release_stops_at_first_deploy_failure(self, mock_git_repo, monkeypatch, capsys):
-        targets = [
+        deploy_targets = [
             _minimal_target(name="staging", only_on=["main"]),
             _minimal_target(name="prod", only_on=["main"]),
         ]
-        _write_deploy_config(mock_git_repo, targets)
 
         deploy_calls = []
 
@@ -425,7 +424,7 @@ class TestReleaseStopsAtFirstDeployFailure:
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, project_root: None,
             })(),
-            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), monorepo_root=None, config={"private": False}),
+            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), monorepo_root=None, config={"private": False, "deploy": deploy_targets}),
         )
 
         # Only staging was attempted; prod was NOT attempted

@@ -22,9 +22,10 @@ _BATCH_LIMITS_DEFAULTS = {
 }
 
 
-def _get_batch_limits_config(project_root) -> dict:
+def _get_batch_limits_config(config) -> dict:
     """Return the resolved batch_limits config with defaults applied.
 
+    ``config`` is the project config dict (already loaded).
     Reads the raw ``batch_limits`` section via
     :func:`get_changelog_validation_config` and guarantees that all three
     expected keys are present with sane types:
@@ -36,7 +37,7 @@ def _get_batch_limits_config(project_root) -> dict:
     If any key is missing or has the wrong type, the default is used and a
     warning is emitted on stderr.
     """
-    raw = get_changelog_validation_config(project_root) or {}
+    raw = get_changelog_validation_config(config) or {}
     resolved: dict = {}
 
     for key, default in _BATCH_LIMITS_DEFAULTS.items():
@@ -517,7 +518,7 @@ def _read_all_versioned_entries(changes_dir: str) -> dict[str, list[ChangelogEnt
 # Combined validation
 # ---------------------------------------------------------------------------
 
-def validate_unreleased(changes_dir: str, tag_glob: str | None = None, project: dict | None = None, *, project_root: str) -> dict:
+def validate_unreleased(changes_dir: str, tag_glob: str | None = None, project: dict | None = None, *, config: dict) -> dict:
     """Run all 8 validation checks on unreleased.jsonl.
 
     Returns a dict with:
@@ -531,14 +532,14 @@ def validate_unreleased(changes_dir: str, tag_glob: str | None = None, project: 
     checks only consider commits touching the project's files.
 
     The two batch_limits checks (``batch_size_commits`` and
-    ``batch_size_entries``) read configuration from
-    ``.rlsbl/config.json`` via :func:`_get_batch_limits_config`. The
+    ``batch_size_entries``) read configuration via
+    :func:`_get_batch_limits_config` from the provided config dict. The
     cross-version ``batch_size_entries`` check reads every
     ``x.y.z.jsonl`` file in ``changes_dir`` so it can detect commits
     that appear in too many entries across versions.
     """
     entries = read_unreleased(changes_dir)
-    batch_config = _get_batch_limits_config(project_root)
+    batch_config = _get_batch_limits_config(config)
 
     # Check cache
     if _is_cache_valid(changes_dir):

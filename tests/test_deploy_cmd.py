@@ -58,7 +58,7 @@ class TestDeployAutoSelectSingleTarget:
 
     def test_deploy_auto_select_single_target(self, mock_git_repo, monkeypatch, capsys):
         """One target configured, no name arg -> auto-selects."""
-        _write_deploy_config(mock_git_repo, [_minimal_target()])
+        targets = [_minimal_target()]
 
         deploy_calls = []
 
@@ -69,7 +69,7 @@ class TestDeployAutoSelectSingleTarget:
         monkeypatch.setattr("rlsbl.commands.deploy_cmd.deploy_target", mock_deploy_target)
         monkeypatch.setattr("rlsbl.commands.deploy_cmd.get_current_branch", lambda: "main")
 
-        run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
+        run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"deploy": targets}))
 
         assert len(deploy_calls) == 1
         assert deploy_calls[0][0] == "prod"
@@ -83,7 +83,6 @@ class TestDeploySelectByName:
             _minimal_target(name="staging", only_on=["main", "develop"]),
             _minimal_target(name="prod"),
         ]
-        _write_deploy_config(mock_git_repo, targets)
 
         deploy_calls = []
 
@@ -94,7 +93,7 @@ class TestDeploySelectByName:
         monkeypatch.setattr("rlsbl.commands.deploy_cmd.deploy_target", mock_deploy_target)
         monkeypatch.setattr("rlsbl.commands.deploy_cmd.get_current_branch", lambda: "main")
 
-        run_cmd(None, ["staging"], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
+        run_cmd(None, ["staging"], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"deploy": targets}))
 
         assert len(deploy_calls) == 1
         assert deploy_calls[0] == "staging"
@@ -108,10 +107,9 @@ class TestDeployAmbiguousNoName:
             _minimal_target(name="staging"),
             _minimal_target(name="prod"),
         ]
-        _write_deploy_config(mock_git_repo, targets)
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
+            run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"deploy": targets}))
 
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
@@ -124,10 +122,10 @@ class TestDeployUnknownName:
 
     def test_deploy_unknown_name(self, mock_git_repo, capsys):
         """Name arg doesn't match any target -> error."""
-        _write_deploy_config(mock_git_repo, [_minimal_target(name="prod")])
+        targets = [_minimal_target(name="prod")]
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, ["nonexistent"], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
+            run_cmd(None, ["nonexistent"], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"deploy": targets}))
 
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
@@ -144,7 +142,6 @@ class TestDeployDryRun:
             directory="/opt/app",
             health={"type": "http", "url": "http://localhost/health"},
         )
-        _write_deploy_config(mock_git_repo, [target])
 
         deploy_calls = []
 
@@ -155,7 +152,7 @@ class TestDeployDryRun:
         monkeypatch.setattr("rlsbl.commands.deploy_cmd.deploy_target", mock_deploy_target)
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {"dry-run": True}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
+            run_cmd(None, [], {"dry-run": True}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"deploy": [target]}))
 
         assert exc_info.value.code == 0
         # deploy_target should NOT have been called
@@ -174,7 +171,7 @@ class TestDeployBranchRestriction:
 
     def test_deploy_branch_restriction(self, mock_git_repo, monkeypatch, capsys):
         """Wrong branch without --force -> error."""
-        _write_deploy_config(mock_git_repo, [_minimal_target(only_on=["production"])])
+        targets = [_minimal_target(only_on=["production"])]
 
         # Current branch is "main" (from mock_git_repo), not "production"
         deploy_calls = []
@@ -186,7 +183,7 @@ class TestDeployBranchRestriction:
         monkeypatch.setattr("rlsbl.commands.deploy_cmd.deploy_target", mock_deploy_target)
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
+            run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"deploy": targets}))
 
         assert exc_info.value.code == 1
         assert len(deploy_calls) == 0
@@ -199,7 +196,7 @@ class TestDeployForceOverridesBranch:
 
     def test_deploy_force_overrides_branch(self, mock_git_repo, monkeypatch, capsys):
         """Wrong branch with --force -> deploys anyway."""
-        _write_deploy_config(mock_git_repo, [_minimal_target(only_on=["production"])])
+        targets = [_minimal_target(only_on=["production"])]
 
         deploy_calls = []
 
@@ -209,7 +206,7 @@ class TestDeployForceOverridesBranch:
 
         monkeypatch.setattr("rlsbl.commands.deploy_cmd.deploy_target", mock_deploy_target)
 
-        run_cmd(None, [], {"force": True}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
+        run_cmd(None, [], {"force": True}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"deploy": targets}))
 
         assert len(deploy_calls) == 1
 
@@ -218,7 +215,7 @@ class TestDeploySuccess:
 
     def test_deploy_success(self, mock_git_repo, monkeypatch, capsys):
         """Happy path with mocked deploy_target."""
-        _write_deploy_config(mock_git_repo, [_minimal_target()])
+        targets = [_minimal_target()]
 
         def mock_deploy_target(target_config, current_branch):
             return DeployResult("prod", True, "All steps passed, health OK")
@@ -226,7 +223,7 @@ class TestDeploySuccess:
         monkeypatch.setattr("rlsbl.commands.deploy_cmd.deploy_target", mock_deploy_target)
         monkeypatch.setattr("rlsbl.commands.deploy_cmd.get_current_branch", lambda: "main")
 
-        run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
+        run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"deploy": targets}))
 
         captured = capsys.readouterr()
         assert "[prod]" in captured.out
@@ -237,7 +234,7 @@ class TestDeployFailure:
 
     def test_deploy_failure(self, mock_git_repo, monkeypatch, capsys):
         """Step fails -> exit 1."""
-        _write_deploy_config(mock_git_repo, [_minimal_target()])
+        targets = [_minimal_target()]
 
         def mock_deploy_target(target_config, current_branch):
             return DeployResult("prod", False, "Step 1 failed (exit 1): connection refused")
@@ -246,7 +243,7 @@ class TestDeployFailure:
         monkeypatch.setattr("rlsbl.commands.deploy_cmd.get_current_branch", lambda: "main")
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
+            run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"deploy": targets}))
 
         assert exc_info.value.code == 1
         captured = capsys.readouterr()

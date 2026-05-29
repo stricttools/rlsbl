@@ -11,7 +11,7 @@ import sys
 import tempfile
 
 from ..base import BaseTarget
-from ...config import get_publish_config
+from ...config import get_publish_config, read_project_config
 from ...utils import require_tool
 
 
@@ -94,7 +94,7 @@ class DocsTarget(BaseTarget):
         - no config: only attempt if both CF_ACCOUNT_ID and CF_PAGES_API_TOKEN
           are set (and selfdoc is available); otherwise skip silently
         """
-        pub_config = get_publish_config(self.name, project_root)
+        pub_config = get_publish_config(self.name, read_project_config(project_root))
 
         if pub_config.get("local") is False:
             print(f"Skipping local {self.name} publish (config: local=false). CI will handle it.")

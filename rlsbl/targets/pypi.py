@@ -12,7 +12,7 @@ import tomllib
 import tomlkit
 
 from .base import BaseTarget
-from ..config import get_publish_config
+from ..config import get_publish_config, read_project_config
 from ..utils import run
 
 _MIN_VERSION_RE = re.compile(r">=\s*(\d+\.\d+(?:\.\d+)?)")
@@ -294,7 +294,7 @@ class PypiTarget(BaseTarget):
         Without config, accepts either PYPI_TOKEN or TWINE_PASSWORD. With
         config that sets token_var, only the named variable is consulted.
         """
-        pub_config = get_publish_config(self.name, project_root)
+        pub_config = get_publish_config(self.name, read_project_config(project_root))
 
         if pub_config.get("local") is False:
             print(f"Skipping local {self.name} publish (config: local=false). CI will handle it.")

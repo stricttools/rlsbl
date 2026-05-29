@@ -48,32 +48,27 @@ def _clear_token_env(monkeypatch, *names):
 
 
 class TestGetPublishConfig:
-    def test_returns_target_dict(self, tmp_project):
-        _write_config(
-            tmp_project,
-            {"publish": {"pypi": {"local": True, "token_var": "PYPI_TOKEN"}}},
-        )
-        assert get_publish_config("pypi", str(tmp_project)) == {"local": True, "token_var": "PYPI_TOKEN"}
+    def test_returns_target_dict(self):
+        config = {"publish": {"pypi": {"local": True, "token_var": "PYPI_TOKEN"}}}
+        assert get_publish_config("pypi", config) == {"local": True, "token_var": "PYPI_TOKEN"}
 
-    def test_empty_when_no_publish_section(self, tmp_project):
-        _write_config(tmp_project, {})
-        assert get_publish_config("pypi", str(tmp_project)) == {}
+    def test_empty_when_no_publish_section(self):
+        assert get_publish_config("pypi", {}) == {}
 
-    def test_empty_when_target_absent(self, tmp_project):
-        _write_config(tmp_project, {"publish": {"npm": {"local": False}}})
-        assert get_publish_config("pypi", str(tmp_project)) == {}
+    def test_empty_when_target_absent(self):
+        config = {"publish": {"npm": {"local": False}}}
+        assert get_publish_config("pypi", config) == {}
 
-    def test_empty_when_config_file_missing(self, tmp_project):
-        # No .rlsbl/config.json at all
-        assert get_publish_config("pypi", str(tmp_project)) == {}
+    def test_empty_when_config_empty(self):
+        assert get_publish_config("pypi", {}) == {}
 
-    def test_empty_when_publish_not_dict(self, tmp_project):
-        _write_config(tmp_project, {"publish": "not-a-dict"})
-        assert get_publish_config("pypi", str(tmp_project)) == {}
+    def test_empty_when_publish_not_dict(self):
+        config = {"publish": "not-a-dict"}
+        assert get_publish_config("pypi", config) == {}
 
-    def test_empty_when_target_entry_not_dict(self, tmp_project):
-        _write_config(tmp_project, {"publish": {"pypi": "garbage"}})
-        assert get_publish_config("pypi", str(tmp_project)) == {}
+    def test_empty_when_target_entry_not_dict(self):
+        config = {"publish": {"pypi": "garbage"}}
+        assert get_publish_config("pypi", config) == {}
 
 
 # ---------------------------------------------------------------------------

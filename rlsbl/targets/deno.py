@@ -7,7 +7,7 @@ import subprocess
 import sys
 
 from .base import BaseTarget
-from ..config import get_publish_config
+from ..config import get_publish_config, read_project_config
 from ..utils import run
 
 
@@ -154,7 +154,7 @@ class DenoTarget(BaseTarget):
         Without config, accepts DENO_TOKEN or JSR_TOKEN. With config that sets
         token_var, only the named variable is consulted.
         """
-        pub_config = get_publish_config(self.name, project_root)
+        pub_config = get_publish_config(self.name, read_project_config(project_root))
 
         if pub_config.get("local") is False:
             print(f"Skipping local {self.name} publish (config: local=false). CI will handle it.")

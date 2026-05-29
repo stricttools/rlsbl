@@ -96,9 +96,7 @@ def _ensure_target_in_config(registry_name, ctx):
             existing_names.append(t.get("name", ""))
     if registry_name not in existing_names:
         targets.append(registry_name)
-    write_project_config("targets", targets, ctx.project_root)
-    # Scaffold runs single-threaded; update ctx.config in place after disk write
-    ctx.config["targets"] = targets
+    ctx.config = write_project_config("targets", targets, ctx.project_root)
 
 
 NEXT_STEPS = {
@@ -684,7 +682,7 @@ def _install_or_update_pre_push_hook():
 def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnings, *,
                        registry=None, flags=None, registries=None,
                        npm_lockfile_missing=False, target_paths=None,
-                       project_root):
+                       project_root, config):
     """Shared post-processing for scaffold: chmod, hooks, version marker, hashes, tagging, summary.
 
     all_hash_dicts is a list of dicts to merge into existing_hashes.
@@ -729,7 +727,7 @@ def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnin
     save_hashes(existing_hashes)
 
     # Ecosystem tagging
-    if should_tag(flags, project_root):
+    if should_tag(flags, config):
         ensure_tags(registries, target_paths=target_paths, project_root=project_root)
 
     # Print unified file list with dot-padded status column
@@ -868,9 +866,9 @@ def _filter_mappings_for_private(mappings):
     return [m for m in mappings if "publish" not in m["template"]]
 
 
-def _append_deploy_workflow_if_configured(mappings, project_root):
+def _append_deploy_workflow_if_configured(mappings, config):
     """Add deploy workflow template to mappings if deploy config exists."""
-    deploy_targets, _ = read_deploy_config(project_root)
+    deploy_targets, _ = read_deploy_config(config)
     if deploy_targets:
         mappings = list(mappings)
         mappings.append({
@@ -952,9 +950,7 @@ def run_cmd(registry, args, flags, ctx):
         # Determine if this is a private repository
         private = _resolve_private(flags, ctx=ctx)
         if not dry_run:
-            write_project_config("private", private, project_root)
-            # Scaffold runs single-threaded; update ctx.config in place after disk write
-            ctx.config["private"] = private
+            ctx.config = write_project_config("private", private, project_root)
 
         # Gather template variables
         vars_dict = reg.template_vars(".", project_root)
@@ -977,7 +973,7 @@ def run_cmd(registry, args, flags, ctx):
         shared_plans = []
         if not flags.get("skip-shared"):
             shared_mappings = reg.shared_template_mappings(project_root)
-            shared_mappings = _append_deploy_workflow_if_configured(shared_mappings, project_root=project_root)
+            shared_mappings = _append_deploy_workflow_if_configured(shared_mappings, ctx.config)
             shared_plans = plan_mappings(
                 reg.shared_template_dir(), shared_mappings, vars_dict, force,
             )
@@ -1011,6 +1007,7 @@ def run_cmd(registry, args, flags, ctx):
             npm_lockfile_missing=npm_lockfile_missing,
             target_paths={registry: "."},
             project_root=project_root,
+            config=ctx.config,
         )
 
         if private:
@@ -1448,9 +1445,7 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         # Determine if this is a private repository
         private = _resolve_private(flags, ctx=ctx)
         if not dry_run:
-            write_project_config("private", private, project_root)
-            # Scaffold runs single-threaded; update ctx.config in place after disk write
-            ctx.config["private"] = private
+            ctx.config = write_project_config("private", private, project_root)
 
         print(f"Multiple registries detected: {', '.join(registries_list)}")
         if private:
@@ -1501,7 +1496,7 @@ def run_cmd_multi(registries_list, args, flags, ctx):
 
         # Plan shared templates (once)
         shared_mappings = reg.shared_template_mappings(project_root)
-        shared_mappings = _append_deploy_workflow_if_configured(shared_mappings, project_root=project_root)
+        shared_mappings = _append_deploy_workflow_if_configured(shared_mappings, ctx.config)
         shared_plans = plan_mappings(
             reg.shared_template_dir(), shared_mappings, vars_dict, force,
         )
@@ -1528,6 +1523,7 @@ def run_cmd_multi(registries_list, args, flags, ctx):
             flags=flags, registries=registries_list,
             target_paths=target_paths,
             project_root=project_root,
+            config=ctx.config,
         )
 
         if private:

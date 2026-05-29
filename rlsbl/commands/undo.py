@@ -101,7 +101,7 @@ def run_cmd(registry, args, flags, *, ctx):
     # release flow, so the pre-push hook shouldn't warn about a manual push).
     try:
         undo_push_env = {**os.environ, "RLSBL_RELEASE_PUSH": "1"}
-        run("git", ["push", "origin", f":{tag}"], timeout=get_push_timeout(project_root=ctx.project_root), env=undo_push_env)
+        run("git", ["push", "origin", f":{tag}"], timeout=get_push_timeout(ctx.config), env=undo_push_env)
         results.append(("Delete remote tag", OK, "-"))
     except Exception:
         results.append(("Delete remote tag", FAILED, f"git push origin :{tag}"))
@@ -195,7 +195,7 @@ def run_cmd(registry, args, flags, *, ctx):
                 # hook doesn't warn about a "manual push" to the release
                 # branch -- undo is part of the release flow.
                 push_env = {**os.environ, "RLSBL_RELEASE_PUSH": "1"}
-                push_if_needed(branch, env=push_env, project_root=ctx.project_root)
+                push_if_needed(branch, env=push_env, config=ctx.config)
                 results.append(("Push", OK, "-"))
             except Exception:
                 results.append(("Push", FAILED, "git push"))

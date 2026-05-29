@@ -686,44 +686,26 @@ class TestDeployResult:
 
 class TestReadDeployConfig:
 
-    def test_returns_empty_when_no_deploy_key(self, tmp_path, monkeypatch):
-        import json
+    def test_returns_empty_when_no_deploy_key(self):
         from rlsbl.config import read_deploy_config
 
-        config_dir = tmp_path / ".rlsbl"
-        config_dir.mkdir()
-        (config_dir / "config.json").write_text(json.dumps({"tag": True}))
-        monkeypatch.setattr("rlsbl.config._project_config", lambda project_root: str(config_dir / "config.json"))
-
-        targets, errors = read_deploy_config(str(tmp_path))
+        targets, errors = read_deploy_config({"tag": True})
         assert targets == []
         assert errors == []
 
-    def test_returns_targets_and_errors(self, tmp_path, monkeypatch):
-        import json
+    def test_returns_targets_and_errors(self):
         from rlsbl.config import read_deploy_config
 
-        config_dir = tmp_path / ".rlsbl"
-        config_dir.mkdir()
         config = {"deploy": [{"name": "prod"}]}  # Missing required fields
-        (config_dir / "config.json").write_text(json.dumps(config))
-        monkeypatch.setattr("rlsbl.config._project_config", lambda project_root: str(config_dir / "config.json"))
-
-        targets, errors = read_deploy_config(str(tmp_path))
+        targets, errors = read_deploy_config(config)
         assert len(targets) == 1
         assert len(errors) > 0
 
-    def test_valid_deploy_config(self, tmp_path, monkeypatch):
-        import json
+    def test_valid_deploy_config(self):
         from rlsbl.config import read_deploy_config
 
-        config_dir = tmp_path / ".rlsbl"
-        config_dir.mkdir()
         config = {"deploy": [_minimal_target()]}
-        (config_dir / "config.json").write_text(json.dumps(config))
-        monkeypatch.setattr("rlsbl.config._project_config", lambda project_root: str(config_dir / "config.json"))
-
-        targets, errors = read_deploy_config(str(tmp_path))
+        targets, errors = read_deploy_config(config)
         assert len(targets) == 1
         assert errors == []
 
