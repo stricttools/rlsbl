@@ -32,3 +32,6 @@ build-backend = "hatchling.build"
 dev = [
     "pytest>=9.0.3",
 ]
+
+[tool.uv.sources]
+strictcli = { path = "/home/m/Projects/strictcli/python", editable = true }
