@@ -13,6 +13,9 @@ from unittest.mock import patch
 
 import pytest
 
+from pathlib import Path
+from rlsbl.context import ProjectContext
+
 from rlsbl.release_file import ReleaseConfig
 
 
@@ -107,8 +110,7 @@ class TestReleaseValidatedCache:
                 "yes": True,
                 "quiet": False,
             },
-            project_root=".",
-            monorepo_root=None,
+            ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"private": False}),
 )
 
     @patch("rlsbl.commands.release.release_lock")
@@ -157,7 +159,6 @@ class TestReleaseValidatedCache:
                     "yes": True,
                     "quiet": False,
                 },
-                project_root=".",
-                monorepo_root=None,
+                ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"private": False}),
 )
             assert ctx.value.code == 1

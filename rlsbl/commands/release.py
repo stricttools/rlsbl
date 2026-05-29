@@ -15,7 +15,7 @@ from ..changelog import (
     get_changes_dir,
     validate_unreleased,
 )
-from ..config import get_publish_config, read_deploy_config, read_json_config, read_project_config, should_tag, validate_publish_config
+from ..config import get_publish_config, read_deploy_config, read_json_config, should_tag, validate_publish_config
 from ..deploy import deploy_target
 from ..lock import acquire_lock, release_lock
 from ..targets import TARGETS, detect_targets, _parse_target_entry
@@ -118,7 +118,7 @@ def resolve_release_targets(primary, flags, version_dir="."):
     return baseline
 
 
-def _run_builtin_tests(registry, flags, *, project_dir=None, project_root):
+def _run_builtin_tests(registry, flags, *, project_dir=None, ctx):
     """Run built-in tests for the detected project type.
 
     Detects the project type from registry and runs the appropriate test command.
@@ -132,7 +132,7 @@ def _run_builtin_tests(registry, flags, *, project_dir=None, project_root):
     print("Running tests...")
 
     if registry == "pypi":
-        config = read_project_config(project_root)
+        config = ctx.config
         uv_verbose = config.get("uv_sync_verbose", False)
         if require_tool("uv", fatal=False):
             sync_cmd = ["uv", "sync"]
@@ -467,21 +467,21 @@ def _update_last_build_release(version_dir, version):
 
 
 def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
-            project_root, monorepo_root):
+            ctx):
     """Release command handler.
 
     Accepts a ReleaseConfig instance (from the release file) and an optional
     flags dict.  Bumps version, commits, pushes, and creates a GitHub Release.
 
-    project_root: explicit project root path (transitional -- falls back to
-    CWD-relative paths when None).
-    monorepo_root: explicit monorepo root path (transitional -- auto-detected
-    when None).
+    ctx: ProjectContext carrying project_root, monorepo_root, and config.
     """
     from ..release_file import ReleaseConfig
 
     if flags is None:
         flags = {}
+
+    project_root = ctx.project_root
+    monorepo_root = ctx.monorepo_root
 
     if not release_config.include:
         print("Error: release file has an empty include list. Add at least one target.", file=sys.stderr)
@@ -567,7 +567,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
             print(msg)
 
     # Load env file if configured
-    config = read_project_config(project_root)
+    config = ctx.config
 
     # Require explicit "private" key in config
     if "private" not in config:
@@ -815,7 +815,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
     _run_selfdoc_check(flags, project_dir=abs_project_dir, docs_excluded=docs_excluded)
 
     # Built-in test runner
-    _run_builtin_tests(registry, flags, project_dir=abs_project_dir, project_root=project_root)
+    _run_builtin_tests(registry, flags, project_dir=abs_project_dir, ctx=ctx)
 
     # Built-in lint runner
     _run_builtin_lint(flags, is_library=is_library, project_dir=abs_project_dir)
@@ -919,8 +919,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
             pre_existing_dirty=pre_existing_dirty,
             abs_project_dir=abs_project_dir,
             hook_generated=hook_generated,
-            project_root=project_root,
-            monorepo_root=monorepo_root,
+            ctx=ctx,
         )
     finally:
         release_lock()
@@ -980,7 +979,7 @@ def _print_stale_dep_advisory(monorepo_name, new_version, version_dir, monorepo_
         pass
 
 
-def upload_release_assets(tag, version_dir, new_version, log, flags, project_root):
+def upload_release_assets(tag, version_dir, new_version, log, flags, *, ctx):
     """Build and upload release assets for targets with ``publish.<target>.assets: true``.
 
     For each detected target that has assets enabled in its publish config:
@@ -992,9 +991,11 @@ def upload_release_assets(tag, version_dir, new_version, log, flags, project_roo
 
     Skips silently if no targets have assets enabled.
     Warns and skips targets whose ``build_assets()`` raises ``NotImplementedError``.
+
+    ctx: ProjectContext carrying project_root, monorepo_root, and config.
     """
     entries = detect_targets(version_dir)
-    config = read_project_config(project_root)
+    config = ctx.config
 
     targets_with_assets = []
     for entry in entries:
@@ -1014,7 +1015,7 @@ def upload_release_assets(tag, version_dir, new_version, log, flags, project_roo
         if target_obj is None:
             continue
 
-        pub_cfg = get_publish_config(entry.name, project_root)
+        pub_cfg = get_publish_config(entry.name, ctx.project_root)
         max_size_mb = pub_cfg.get("max_asset_size_mb")
 
         dist_dir = os.path.join(version_dir, ".rlsbl", "dist", entry.name)
@@ -1080,9 +1081,13 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                           pre_existing_dirty=None,
                           abs_project_dir=None,
                           hook_generated=None,
-                          project_root,
-                          monorepo_root):
-    """Inner release logic that runs under the advisory lock (mutating phase)."""
+                          ctx):
+    """Inner release logic that runs under the advisory lock (mutating phase).
+
+    ctx: ProjectContext carrying project_root, monorepo_root, and config.
+    """
+    project_root = ctx.project_root
+    monorepo_root = ctx.monorepo_root
     # Snapshot dirty files BEFORE any version-bump writes. This captures
     # everything dirtied by prior stages (generate_changelog, hooks, lint,
     # --allow-dirty pre-existing files, etc.). Only files that become dirty
@@ -1449,10 +1454,10 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                 os.unlink(tmp)
 
     # Upload release assets for targets with publish.<target>.assets: true
-    upload_release_assets(tag, version_dir, new_version, log, flags, project_root=project_root)
+    upload_release_assets(tag, version_dir, new_version, log, flags, ctx=ctx)
 
     # Publish step: skip for private repos (they don't publish to registries)
-    is_private = read_project_config(project_root).get("private", False)
+    is_private = ctx.config.get("private", False)
     if not is_private:
         try:
             target.publish(primary_path, new_version, project_root=project_root)

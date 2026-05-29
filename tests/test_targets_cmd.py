@@ -3,10 +3,12 @@
 import json
 import os
 from io import StringIO
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 import pytest
 
+from rlsbl.context import ProjectContext
 from rlsbl.release_file import ReleaseConfig
 
 
@@ -181,11 +183,11 @@ class TestMultiTargetRelease:
             from rlsbl.commands.release import run_cmd
 
             with patch("sys.stdout", StringIO()):
-                run_cmd(_rc(include=["npm", "docs"]), {"yes": True, "quiet": False}, project_root=".", monorepo_root=None)
+                run_cmd(_rc(include=["npm", "docs"]), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"private": False}))
 
             # Verify docs target build/publish were called
             build_mock.assert_called_once_with(".", "1.0.1")
-            publish_mock.assert_called_once_with(".", "1.0.1", project_root=".")
+            publish_mock.assert_called_once_with(".", "1.0.1", project_root=Path("."))
         finally:
             # Restore original methods
             TARGETS["docs"].build = original_build
@@ -233,7 +235,7 @@ class TestMultiTargetRelease:
             # Should not raise -- secondary failures are non-fatal
             buf = StringIO()
             with patch("sys.stdout", StringIO()), patch("sys.stderr", buf):
-                run_cmd(_rc(include=["npm", "docs"]), {"yes": True, "quiet": False}, project_root=".", monorepo_root=None)
+                run_cmd(_rc(include=["npm", "docs"]), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"private": False}))
 
             # Verify warnings were emitted
             stderr_output = buf.getvalue()

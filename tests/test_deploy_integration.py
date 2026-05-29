@@ -2,10 +2,12 @@
 
 import json
 import sys
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
+from rlsbl.context import ProjectContext
 from rlsbl.deploy import DeployResult
 
 
@@ -108,8 +110,7 @@ class TestReleaseWithDeployTargets:
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, project_root: None,
             })(),
-            project_root=str(mock_git_repo),
-            monorepo_root=None,
+            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), monorepo_root=None, config={"private": False}),
         )
 
         assert len(deploy_calls) == 1
@@ -205,8 +206,7 @@ class TestReleaseDeployFailureContinues:
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, project_root: None,
             })(),
-            project_root=str(mock_git_repo),
-            monorepo_root=None,
+            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), monorepo_root=None, config={"private": False}),
         )
 
         captured = capsys.readouterr()
@@ -277,8 +277,7 @@ class TestReleaseNoDeployConfig:
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, project_root: None,
             })(),
-            project_root=str(mock_git_repo),
-            monorepo_root=None,
+            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), monorepo_root=None, config={"private": False}),
         )
 
         # deploy_target should never have been called
@@ -350,8 +349,7 @@ class TestReleaseDeployConfigErrors:
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, project_root: None,
             })(),
-            project_root=str(mock_git_repo),
-            monorepo_root=None,
+            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), monorepo_root=None, config={"private": False}),
         )
 
         # deploy_target should never have been called (config has errors)
@@ -427,8 +425,7 @@ class TestReleaseStopsAtFirstDeployFailure:
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, project_root: None,
             })(),
-            project_root=str(mock_git_repo),
-            monorepo_root=None,
+            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), monorepo_root=None, config={"private": False}),
         )
 
         # Only staging was attempted; prod was NOT attempted

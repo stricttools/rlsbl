@@ -13,6 +13,9 @@ from unittest.mock import patch
 
 import pytest
 
+from pathlib import Path
+from rlsbl.context import ProjectContext
+
 from rlsbl.release_file import ReleaseConfig
 
 
@@ -131,8 +134,7 @@ class TestReleaseFinalizeMd:
                     "quiet": True,
                 },
             
-                project_root=".",
-                monorepo_root=None,
+                ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"private": False}),
 )
 
         changes_dir = tmp_project / ".rlsbl" / "changes"

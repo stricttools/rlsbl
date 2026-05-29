@@ -4,11 +4,13 @@ import json
 import os
 import subprocess
 from io import StringIO
+from pathlib import Path
 from unittest.mock import patch, call
 
 import pytest
 
 from rlsbl.commands.release import run_cmd
+from rlsbl.context import ProjectContext
 from rlsbl.release_file import ReleaseConfig
 from rlsbl.targets.base import BaseTarget
 
@@ -107,7 +109,7 @@ class TestMonorepoRelease:
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, project_root=".", monorepo_root=str(mock_git_repo))
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), monorepo_root=Path(str(mock_git_repo)), config={"private": False}))
 
         output = mock_out.getvalue()
         assert "tooling@v1.0.0" in output
@@ -132,7 +134,7 @@ class TestMonorepoRelease:
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, project_root=".", monorepo_root=str(mock_git_repo))
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), monorepo_root=Path(str(mock_git_repo)), config={"private": False}))
 
         output = mock_out.getvalue()
         assert "tooling: release v1.0.0" in output
@@ -163,7 +165,7 @@ class TestMonorepoRelease:
         mock_run.side_effect = ["", "0", "tooling@v1.0.0", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, project_root=".", monorepo_root=str(mock_git_repo))
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), monorepo_root=Path(str(mock_git_repo)), config={"private": False}))
 
         output = mock_out.getvalue()
         assert "tooling@v1.0.1" in output
@@ -187,7 +189,7 @@ class TestMonorepoRelease:
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, project_root=".", monorepo_root=str(mock_git_repo))
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), monorepo_root=Path(str(mock_git_repo)), config={"private": False}))
 
         output = mock_out.getvalue()
         assert "Project:   tooling (tooling)" in output
@@ -226,8 +228,7 @@ class TestMonorepoRelease:
             run_cmd(_rc(), {
                 "dry-run": True, "quiet": True,
             },
-            project_root=".",
-            monorepo_root=str(mock_git_repo),
+            ctx=ProjectContext(project_root=Path("."), monorepo_root=Path(str(mock_git_repo)), config={"private": False}),
 )
         assert exc_info.value.code == 1
 
@@ -269,7 +270,7 @@ class TestMonorepoRelease:
         mock_run.side_effect = ["", "0", "v2.0.0", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, project_root=".", monorepo_root=None)
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"private": False}))
 
         output = mock_out.getvalue()
         assert "Tag:       v2.0.1" in output
@@ -307,7 +308,7 @@ class TestMonorepoRelease:
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, project_root=".", monorepo_root=str(mock_git_repo))
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), monorepo_root=Path(str(mock_git_repo)), config={"private": False}))
 
         output = mock_out.getvalue()
         # Should read 1.0.0 from libs/core/package.json, not 9.9.9 from root
@@ -343,7 +344,7 @@ class TestMonorepoRelease:
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, project_root=".", monorepo_root=str(mock_git_repo))
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), monorepo_root=Path(str(mock_git_repo)), config={"private": False}))
 
         output = mock_out.getvalue()
         assert "Initial release of core component" in output
@@ -413,7 +414,7 @@ class TestSubtreePublish:
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, project_root=".", monorepo_root=str(mock_git_repo))
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), monorepo_root=Path(str(mock_git_repo)), config={"private": False}))
 
         output = mock_out.getvalue()
         assert "Subtree:" in output
@@ -440,7 +441,7 @@ class TestSubtreePublish:
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, project_root=".", monorepo_root=str(mock_git_repo))
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), monorepo_root=Path(str(mock_git_repo)), config={"private": False}))
 
         output = mock_out.getvalue()
         assert "Subtree:" not in output
@@ -481,4 +482,4 @@ class TestSubtreePublish:
 
         # The release should complete without raising, despite subtree failure
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd(_rc(), {"yes": True, "quiet": False}, project_root=".", monorepo_root=str(mock_git_repo))
+            run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), monorepo_root=Path(str(mock_git_repo)), config={"private": False}))

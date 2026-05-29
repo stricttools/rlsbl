@@ -17,6 +17,9 @@ from unittest.mock import patch
 
 import pytest
 
+from pathlib import Path
+from rlsbl.context import ProjectContext
+
 from rlsbl.release_file import ReleaseConfig
 
 
@@ -165,8 +168,7 @@ class TestReleaseUnexpectedFiles:
                     "quiet": True,
                 },
             
-                project_root=".",
-                monorepo_root=None,
+                ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"private": False}),
 )
 
         # Verify the release actually completed: the version was bumped
@@ -228,8 +230,7 @@ class TestReleaseUnexpectedFiles:
                         "quiet": True,
                     },
                 
-                    project_root=".",
-                    monorepo_root=None,
+                    ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"private": False}),
 )
 
         assert exc_info.value.code == 1, (

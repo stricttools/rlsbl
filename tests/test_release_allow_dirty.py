@@ -7,6 +7,9 @@ from unittest.mock import patch
 
 import pytest
 
+from pathlib import Path
+from rlsbl.context import ProjectContext
+
 from rlsbl.release_file import ReleaseConfig
 
 
@@ -48,7 +51,7 @@ class TestReleaseAllowDirty:
         from rlsbl.commands.release import run_cmd
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(_rc(), {"quiet": True}, project_root=".", monorepo_root=None)
+            run_cmd(_rc(), {"quiet": True}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"private": False}))
         assert exc_info.value.code == 1
 
     @patch("rlsbl.commands.release.push_if_needed")
@@ -81,8 +84,7 @@ class TestReleaseAllowDirty:
                 "dry-run": True,
                 "quiet": False,
             },
-            project_root=".",
-            monorepo_root=None,
+            ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"private": False}),
 )
 
     @patch("rlsbl.commands.release.release_lock")
@@ -149,8 +151,7 @@ class TestReleaseAllowDirty:
                 "yes": True,
                 "quiet": False,
             },
-            project_root=".",
-            monorepo_root=None,
+            ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"private": False}),
 )
 
     @patch("rlsbl.commands.release.release_lock")
@@ -204,7 +205,6 @@ class TestReleaseAllowDirty:
                     "yes": True,
                     "quiet": False,
                 },
-                project_root=".",
-                monorepo_root=None,
+                ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"private": False}),
 )
             assert exc_info.value.code == 1

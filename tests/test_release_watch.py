@@ -13,6 +13,9 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
+from pathlib import Path
+from rlsbl.context import ProjectContext
+
 from rlsbl import app
 from rlsbl.commands.release import run_cmd
 from rlsbl.release_file import ReleaseConfig
@@ -122,8 +125,7 @@ class TestNoWatchPrintsHint:
             _rc(),
             {"dry-run": True, "quiet": False, "yes": True, "watch": False},
         
-            project_root=".",
-            monorepo_root=None,
+            ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"private": False}),
 )
 
         captured = capsys.readouterr()
@@ -173,8 +175,7 @@ class TestWatchInvokesWatchCmd:
             _rc(),
             {"dry-run": True, "quiet": False, "yes": True, "watch": True},
         
-            project_root=".",
-            monorepo_root=None,
+            ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"private": False}),
 )
 
         captured = capsys.readouterr()
@@ -202,14 +203,12 @@ class TestWatchInvokedAfterRelease:
     @patch("rlsbl.commands.release.generate_version_file")
     @patch("rlsbl.commands.release.read_deploy_config", return_value=([], []))
     @patch("rlsbl.commands.release.should_tag", return_value=False)
-    @patch("rlsbl.commands.release.read_project_config")
     @patch("rlsbl.commands.release.upload_release_assets")
     @patch("rlsbl.commands.release.get_publish_config", return_value={})
     def test_watch_flag_invokes_watch_run_cmd(
         self,
         _pub_cfg,
         _upload,
-        mock_config,
         _tag,
         _deploy,
         _gen_ver,
@@ -227,13 +226,9 @@ class TestWatchInvokedAfterRelease:
         _push,
         tmp_project,
         capsys,
-    
-        project_root=".",
-        monorepo_root=None,
-):
+    ):
         """After a successful release with --watch, watch.run_cmd is called."""
         _setup_npm_project(tmp_project)
-        mock_config.return_value = {"private": False}
 
         # Create release file so finalization doesn't error
         releases_dir = tmp_project / ".rlsbl" / "releases"
@@ -274,8 +269,7 @@ class TestWatchInvokedAfterRelease:
                 _rc(),
                 {"yes": True, "quiet": False, "watch": True},
             
-                project_root=".",
-                monorepo_root=None,
+                ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"private": False}),
 )
             mock_watch.assert_called_once_with(None, [fake_sha], {})
 
@@ -297,14 +291,12 @@ class TestWatchInvokedAfterRelease:
     @patch("rlsbl.commands.release.generate_version_file")
     @patch("rlsbl.commands.release.read_deploy_config", return_value=([], []))
     @patch("rlsbl.commands.release.should_tag", return_value=False)
-    @patch("rlsbl.commands.release.read_project_config")
     @patch("rlsbl.commands.release.upload_release_assets")
     @patch("rlsbl.commands.release.get_publish_config", return_value={})
     def test_no_watch_flag_prints_hint(
         self,
         _pub_cfg,
         _upload,
-        mock_config,
         _tag,
         _deploy,
         _gen_ver,
@@ -325,7 +317,6 @@ class TestWatchInvokedAfterRelease:
     ):
         """After a successful release with --no-watch, the hint is printed."""
         _setup_npm_project(tmp_project)
-        mock_config.return_value = {"private": False}
 
         releases_dir = tmp_project / ".rlsbl" / "releases"
         releases_dir.mkdir(parents=True, exist_ok=True)
@@ -358,8 +349,7 @@ class TestWatchInvokedAfterRelease:
                 _rc(),
                 {"yes": True, "quiet": False, "watch": False},
             
-                project_root=".",
-                monorepo_root=None,
+                ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={"private": False}),
 )
             mock_watch.assert_not_called()
 

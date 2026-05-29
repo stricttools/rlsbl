@@ -10,11 +10,13 @@ Verifies:
 
 import json
 import os
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from rlsbl.commands.release import upload_release_assets
+from rlsbl.context import ProjectContext
 
 
 def _write_config(tmp_dir, config):
@@ -47,7 +49,11 @@ class TestNoAssetsConfigured:
         log = lambda msg: messages.append(msg)
 
         with patch("rlsbl.commands.release.run") as mock_run:
-            upload_release_assets("v1.0.0", ".", "1.0.0", log, {}, project_root=".")
+            ctx = ProjectContext(project_root=Path("."), monorepo_root=None, config={
+                "targets": ["npm"],
+                "publish": {"npm": {"local": False}},
+            })
+            upload_release_assets("v1.0.0", ".", "1.0.0", log, {}, ctx=ctx)
             # gh release upload should never be called
             mock_run.assert_not_called()
 
@@ -61,7 +67,8 @@ class TestNoAssetsConfigured:
             json.dump({"name": "test", "version": "1.0.0"}, f)
 
         with patch("rlsbl.commands.release.run") as mock_run:
-            upload_release_assets("v1.0.0", ".", "1.0.0", lambda m: None, {}, project_root=".")
+            ctx = ProjectContext(project_root=Path("."), monorepo_root=None, config={"targets": ["npm"]})
+            upload_release_assets("v1.0.0", ".", "1.0.0", lambda m: None, {}, ctx=ctx)
             mock_run.assert_not_called()
 
     def test_assets_false_skips(self):
@@ -74,7 +81,11 @@ class TestNoAssetsConfigured:
             json.dump({"name": "test", "version": "1.0.0"}, f)
 
         with patch("rlsbl.commands.release.run") as mock_run:
-            upload_release_assets("v1.0.0", ".", "1.0.0", lambda m: None, {}, project_root=".")
+            ctx = ProjectContext(project_root=Path("."), monorepo_root=None, config={
+                "targets": ["npm"],
+                "publish": {"npm": {"assets": False}},
+            })
+            upload_release_assets("v1.0.0", ".", "1.0.0", lambda m: None, {}, ctx=ctx)
             mock_run.assert_not_called()
 
 
@@ -111,9 +122,13 @@ class TestAssetBuildAndUpload:
         messages = []
         log = lambda msg: messages.append(msg)
 
+        ctx = ProjectContext(project_root=Path("."), monorepo_root=None, config={
+            "targets": ["npm"],
+            "publish": {"npm": {"assets": True, "max_asset_size_mb": 50}},
+        })
         with patch("rlsbl.commands.release.TARGETS", {"npm": mock_target}):
             with patch("rlsbl.commands.release.run") as mock_run:
-                upload_release_assets("v1.0.0", ".", "1.0.0", log, {}, project_root=".")
+                upload_release_assets("v1.0.0", ".", "1.0.0", log, {}, ctx=ctx)
 
                 # gh release upload should be called with --clobber
                 mock_run.assert_called_once()
@@ -141,9 +156,13 @@ class TestAssetBuildAndUpload:
         messages = []
         log = lambda msg: messages.append(msg)
 
+        ctx = ProjectContext(project_root=Path("."), monorepo_root=None, config={
+            "targets": ["npm"],
+            "publish": {"npm": {"assets": True, "max_asset_size_mb": 50}},
+        })
         with patch("rlsbl.commands.release.TARGETS", {"npm": mock_target}):
             with patch("rlsbl.commands.release.run") as mock_run:
-                upload_release_assets("v1.0.0", ".", "1.0.0", log, {}, project_root=".")
+                upload_release_assets("v1.0.0", ".", "1.0.0", log, {}, ctx=ctx)
                 mock_run.assert_not_called()
 
         assert any("No artifacts" in m for m in messages)
@@ -179,10 +198,14 @@ class TestAssetSizeExceeded:
 
         mock_target.build_assets.side_effect = fake_build_assets
 
+        ctx = ProjectContext(project_root=Path("."), monorepo_root=None, config={
+            "targets": ["pypi"],
+            "publish": {"pypi": {"assets": True, "max_asset_size_mb": 1}},
+        })
         with patch("rlsbl.commands.release.TARGETS", {"pypi": mock_target}):
             with patch("rlsbl.commands.release.run"):
                 with pytest.raises(SystemExit) as exc_info:
-                    upload_release_assets("v1.0.0", ".", "1.0.0", lambda m: None, {}, project_root=".")
+                    upload_release_assets("v1.0.0", ".", "1.0.0", lambda m: None, {}, ctx=ctx)
                 assert exc_info.value.code == 1
 
         captured = capsys.readouterr()
@@ -211,10 +234,14 @@ class TestBuildAssetsNotImplemented:
         mock_target = MagicMock()
         mock_target.build_assets.side_effect = NotImplementedError("not supported")
 
+        ctx = ProjectContext(project_root=Path("."), monorepo_root=None, config={
+            "targets": ["npm"],
+            "publish": {"npm": {"assets": True, "max_asset_size_mb": 50}},
+        })
         with patch("rlsbl.commands.release.TARGETS", {"npm": mock_target}):
             with patch("rlsbl.commands.release.run") as mock_run:
                 # Should not raise
-                upload_release_assets("v1.0.0", ".", "1.0.0", lambda m: None, {}, project_root=".")
+                upload_release_assets("v1.0.0", ".", "1.0.0", lambda m: None, {}, ctx=ctx)
                 # No upload call
                 mock_run.assert_not_called()
 
@@ -244,9 +271,13 @@ class TestDryRun:
         messages = []
         log = lambda msg: messages.append(msg)
 
+        ctx = ProjectContext(project_root=Path("."), monorepo_root=None, config={
+            "targets": ["npm"],
+            "publish": {"npm": {"assets": True, "max_asset_size_mb": 50}},
+        })
         with patch("rlsbl.commands.release.TARGETS", {"npm": mock_target}):
             with patch("rlsbl.commands.release.run") as mock_run:
-                upload_release_assets("v1.0.0", ".", "1.0.0", log, {"dry-run": True}, project_root=".")
+                upload_release_assets("v1.0.0", ".", "1.0.0", log, {"dry-run": True}, ctx=ctx)
                 # No build_assets or upload calls
                 mock_target.build_assets.assert_not_called()
                 mock_run.assert_not_called()

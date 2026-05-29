@@ -249,7 +249,7 @@ def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, no_watch, **_kwargs
         "watch": bool(watch),
     }
     from .commands.release import run_cmd
-    run_cmd(release_config, flags, project_root=ctx.project_root, monorepo_root=ctx.monorepo_root)
+    run_cmd(release_config, flags, ctx=ctx)
 
 
 @release_group.command(name="init", help="Scaffold a .rlsbl/releases/unreleased.toml file by auto-detecting project targets. The generated file contains a default bump type (patch), an include list of all detected targets, and per-target configuration sections for Flutter targets.")

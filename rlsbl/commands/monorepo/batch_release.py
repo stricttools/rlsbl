@@ -96,6 +96,9 @@ def _cmd_batch_release(flags, project_root):
         log(f"--- Releasing {pkg_name} ({release_config.bump}) ---")
 
         try:
+            from pathlib import Path
+
+            from ...context import create_context
             from ..release import run_cmd
 
             release_flags = {
@@ -104,8 +107,8 @@ def _cmd_batch_release(flags, project_root):
                 "quiet": quiet,
                 "allow-dirty": flags.get("allow-dirty", False),
             }
-            from pathlib import Path
-            run_cmd(release_config, release_flags, project_root=Path(project_dir), monorepo_root=workspace_root)
+            pkg_ctx = create_context(Path(project_dir), Path(workspace_root))
+            run_cmd(release_config, release_flags, ctx=pkg_ctx)
             released.append(pkg_name)
         except SystemExit as e:
             if e.code != 0:
