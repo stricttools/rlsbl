@@ -1,8 +1,0 @@
-{"commits":["70b15477347dff693793142349a9a58a696cacea"],"user_facing":true,"description":"**Fix.** Increased npm check-name timeout from 10s to 30s to reduce CI flakiness on cold-cache runners.","type":"fix"}
-{"commits":["cf1bfb666c304626fdcfe0dbf56a3d56f638770d"],"user_facing":true,"description":"**Fix.** Changelog finalization now uses git-relative paths consistently, matching the version-bump commit's path format.","type":"fix"}
-{"commits":["3e6f7dfb52be1b8b142a7c0e92420818ca0298d9","a9fef92a84d6249a9b235ba78f6dd8e1487756f9"],"user_facing":true,"description":"**Internal.** Commands that don't read config no longer load it at startup. Scaffold commands use `ProjectContext` for direct config access.","type":"feature"}
-{"commits":["53ee363d97d3a5ef483de29ddd6c2dec777435ac"],"user_facing":true,"description":"**Internal.** Added release integration tests exercising the full release flow against real git repos (no mocked subprocess calls).","type":"feature"}
-{"commits":["33bf27bc71c3a6bed014e38211ee9ef5c37028f0","527a12b5c77903b19914f83e2a9152c526ea2e69","f38b0116f1f2154de65f52190aee14594e35eac1"],"user_facing":false}
-{"commits":["1f53973c3504d79d130062f3c6c30cfa1fa76958"],"user_facing":true,"description":"**Fix.** Monorepo release lock file now uses the correct root path.","type":"fix"}
-{"commits":["6f0eff14ac32ceb11a7a165bf555988c737b41a7"],"user_facing":false}
-{"commits":["5d64e3a8afb242de7a43b2c8af6487007683084f"],"user_facing":false}
