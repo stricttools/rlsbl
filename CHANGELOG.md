@@ -2,6 +2,12 @@
 
 # Changelog
 
+## 0.48.1
+
+### Fixes
+
+- **Fix.** `rlsbl scaffold` no longer crashes for Go, Zig, and Docker projects (missing `project_root` argument in `template_vars`/`shared_template_mappings`).
+
 ## 0.48.0
 
 ### Breaking
