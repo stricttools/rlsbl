@@ -1,0 +1,17 @@
+{"commits":["39528966e1c2852211a02c00bce8493f711d9c5b","994ff2e23322d5e8a5fa6a2f4224784015e9bb75","c833ecacdd0648b565334935a44ca8ba575b36df","de262a7c729facd456d344985d4aaf4124fd8386","2a52551fe451d6033d4e9b9e7eba2c1198609c9f"],"user_facing":true,"description":"**Breaking.** All internal APIs now require explicit `project_root` parameter (no silent CWD fallback). Eliminates the last footgun from the os.chdir removal.","type":"breaking"}
+{"commits":["3ec538a664843260124e86dac2875f4d1ad2f6d4"],"user_facing":true,"description":"**Fix.** Release aborts (e.g., unexpected dirty files) now revert version-bumped files instead of leaving the working tree dirty. Prevents selfdoc hash oscillation on subsequent releases.","type":"fix"}
+{"commits":["4a32da779331902a7ab81d8bdd80cb026ca693c8"],"user_facing":true,"description":"**Fix.** Corrupt `.rlsbl/config.json` now raises a clear error with the file path instead of silently returning empty config.","type":"fix"}
+{"commits":["725c7dc4ec6f0588b059d732ab9763592c3f1d34"],"user_facing":true,"description":"**Fix.** Release lock file is now created relative to the project root, not CWD.","type":"fix"}
+{"commits":["cbef20fe67033f01b8e43ac909fe0032ff104473"],"user_facing":false}
+{"commits":["9b9beb2461daa548991da140baf183c0d00b975f","1af7ebc53d254fafd35289d02edcf1fa76697dd4","ca516cd84cee7f12d7b4166df6b1b30aa3663170"],"user_facing":false}
+{"commits":["163dc29131ce7fb3664ab2f284cad375c7dbf061","9df382e84ea87be0496459a87fbf0514c2a4ed40"],"user_facing":false}
+{"commits":["74ec8a4eee6640df6fc57f4bda98b88a2e66ec76","d7aa8c515f456bacf316a9d9c94eea481ea0c439","788cbef53da9d30d7f0c7c4a42b9c43aa458c3df","f93318fb2c41d2ddd2a8a3690f1e4f796325e63d"],"user_facing":false}
+{"commits":["da1c3a350c4fd4b6fd85ea6535e9cfc768e3c064","abb6173c830dc0e6a415ddf2e1b5b28329f0539c","fb896204116fcf2d027eeb5257e4c0cb8a77fc73","e8e5f90c6a09952acd70d874777d0fd802df476a","b8a081ecc9ba5cbd01c8959679439b1f76e4caa3"],"user_facing":false}
+{"commits":["6a771e3fe2209b512c6f867a9950379dcd3499c8","f458904267ce84ab90148221f22a3f1b053546ae","1ba1ded4901f96e281f04bbcd3380d39aaf00897","39528966e1c2852211a02c00bce8493f711d9c5b"],"user_facing":false}
+{"commits":["88c27bc59fdf8bfb452d868bcbb0ea20f601d793","ddc6ece7bd639aaa8c49972d6a2c731470ed16f0"],"user_facing":false}
+{"commits":["bf6e62c6c16ce402fbfd3fdb05a5a870624e3daa","3eef7d7db5a0c7d7fc95b4ce52a413e1f7127cf5","a5f51db671db84bd08693230039a685c9da27c74"],"user_facing":false}
+{"commits":["59a29d01955e104dc166b55357237a73ff9ac183"],"user_facing":false}
+{"commits":["62e8dcd0de96d8ec5a4f38dd983a057e9099274e"],"user_facing":false}
+{"commits":["5d0a42efb66b0bc80dba3589cf8be8cc8a7e3689"],"user_facing":false}
+{"commits":["c4cf0bd113259fe84d4f98b4ebea7e3ed78de5b1"],"user_facing":false}
+{"commits":["f4fc379a40f3077b354d8a632d580a0f0bade9fb"],"user_facing":false}
