@@ -2,6 +2,12 @@
 
 # Changelog
 
+## 0.49.1
+
+### Fixes
+
+- **Fix.** Monorepo release commits now use correct relative paths for version-bumped files.
+
 ## 0.49.0
 
 ### Breaking
