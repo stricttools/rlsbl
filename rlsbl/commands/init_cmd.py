@@ -918,7 +918,7 @@ def _trigger_monorepo_sync(no_commit=False):
             pass
 
 
-def run_cmd(registry, args, flags):
+def run_cmd(registry, args, flags, project_root=None):
     """Init command handler.
 
     Scaffolds release infrastructure (CI, publish workflows, changelog, etc.)
@@ -940,18 +940,18 @@ def run_cmd(registry, args, flags):
     dry_run = flags.get("dry-run", False)
 
     # Acquire advisory lock to prevent concurrent rlsbl operations
-    acquire_lock()
+    acquire_lock(project_root=project_root)
 
     try:
         # Register this target in .rlsbl/config.json targets array
         # (skipped under --dry-run -- we don't write config)
         if not dry_run:
-            _ensure_target_in_config(registry)
+            _ensure_target_in_config(registry, project_root=project_root)
 
         # Determine if this is a private repository
-        private = _resolve_private(flags)
+        private = _resolve_private(flags, project_root=project_root)
         if not dry_run:
-            write_project_config("private", private)
+            write_project_config("private", private, project_root)
 
         # Gather template variables
         vars_dict = reg.template_vars(".")
@@ -974,7 +974,7 @@ def run_cmd(registry, args, flags):
         shared_plans = []
         if not flags.get("skip-shared"):
             shared_mappings = reg.shared_template_mappings()
-            shared_mappings = _append_deploy_workflow_if_configured(shared_mappings)
+            shared_mappings = _append_deploy_workflow_if_configured(shared_mappings, project_root=project_root)
             shared_plans = plan_mappings(
                 reg.shared_template_dir(), shared_mappings, vars_dict, force,
             )
@@ -1007,6 +1007,7 @@ def run_cmd(registry, args, flags):
             flags=flags, registries=[registry],
             npm_lockfile_missing=npm_lockfile_missing,
             target_paths={registry: "."},
+            project_root=project_root,
         )
 
         if private:
@@ -1406,7 +1407,7 @@ def _plan_merged_publish(publish_target, merged_content, force):
     }
 
 
-def run_cmd_multi(registries_list, args, flags):
+def run_cmd_multi(registries_list, args, flags, project_root=None):
     """Scaffold for multiple registries with a merged publish workflow.
 
     Uses the primary registry for template vars and CI, then writes a merged
@@ -1431,19 +1432,19 @@ def run_cmd_multi(registries_list, args, flags):
     dry_run = flags.get("dry-run", False)
 
     # Acquire advisory lock to prevent concurrent rlsbl operations
-    acquire_lock()
+    acquire_lock(project_root=project_root)
 
     try:
         # Register all targets in .rlsbl/config.json targets array
         # (skipped under --dry-run -- we don't write config)
         if not dry_run:
             for r in registries_list:
-                _ensure_target_in_config(r)
+                _ensure_target_in_config(r, project_root=project_root)
 
         # Determine if this is a private repository
-        private = _resolve_private(flags)
+        private = _resolve_private(flags, project_root=project_root)
         if not dry_run:
-            write_project_config("private", private)
+            write_project_config("private", private, project_root)
 
         print(f"Multiple registries detected: {', '.join(registries_list)}")
         if private:
@@ -1494,7 +1495,7 @@ def run_cmd_multi(registries_list, args, flags):
 
         # Plan shared templates (once)
         shared_mappings = reg.shared_template_mappings()
-        shared_mappings = _append_deploy_workflow_if_configured(shared_mappings)
+        shared_mappings = _append_deploy_workflow_if_configured(shared_mappings, project_root=project_root)
         shared_plans = plan_mappings(
             reg.shared_template_dir(), shared_mappings, vars_dict, force,
         )
@@ -1520,6 +1521,7 @@ def run_cmd_multi(registries_list, args, flags):
             created, skipped, warnings,
             flags=flags, registries=registries_list,
             target_paths=target_paths,
+            project_root=project_root,
         )
 
         if private:

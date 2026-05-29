@@ -364,7 +364,7 @@ def cmd_scaffold(target, force, private, no_commit, skip_shared, no_tag, dry_run
             )
             sys.exit(1)
         from .commands.init_cmd import run_cmd
-        run_cmd(resolved_target, [], flags)
+        run_cmd(resolved_target, [], flags, project_root=scaffold_root)
     else:
         regs = detect_registries()
         if not regs:
@@ -381,10 +381,10 @@ def cmd_scaffold(target, force, private, no_commit, skip_shared, no_tag, dry_run
             )
         if len(regs) > 1:
             from .commands.init_cmd import run_cmd_multi
-            run_cmd_multi(regs, [], flags)
+            run_cmd_multi(regs, [], flags, project_root=scaffold_root)
         else:
             from .commands.init_cmd import run_cmd
-            run_cmd(regs[0], [], flags)
+            run_cmd(regs[0], [], flags, project_root=scaffold_root)
 
 
 # ---------------------------------------------------------------------------
