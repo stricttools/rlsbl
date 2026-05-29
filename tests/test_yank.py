@@ -29,7 +29,7 @@ class TestSoftYank(unittest.TestCase):
 
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout, \
              patch("builtins.open", unittest.mock.mock_open()):
-            run_cmd(["0.9.1"], {"yes": True})
+            run_cmd(["0.9.1"], {"yes": True}, project_root=".")
 
         output = mock_stdout.getvalue()
         self.assertIn("Yanked v0.9.1", output)
@@ -61,7 +61,7 @@ class TestSoftYank(unittest.TestCase):
         mock_open = unittest.mock.mock_open()
         with patch("sys.stdout", new_callable=StringIO), \
              patch("builtins.open", mock_open):
-            run_cmd(["0.9.1"], {"reason": "broken on macOS", "use": "0.9.2", "yes": True})
+            run_cmd(["0.9.1"], {"reason": "broken on macOS", "use": "0.9.2", "yes": True}, project_root=".")
 
         # Check what was written to the notes file
         written = "".join(
@@ -92,7 +92,7 @@ class TestHardYank(unittest.TestCase):
         ]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            run_cmd(["0.9.1"], {"hard": True, "yes": True})
+            run_cmd(["0.9.1"], {"hard": True, "yes": True}, project_root=".")
 
         output = mock_stdout.getvalue()
         self.assertIn("Deleted GitHub Release v0.9.1", output)
@@ -118,7 +118,7 @@ class TestDryRun(unittest.TestCase):
         ]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            run_cmd(["0.9.1"], {"dry-run": True})
+            run_cmd(["0.9.1"], {"dry-run": True}, project_root=".")
 
         output = mock_stdout.getvalue()
         self.assertIn("Would mark v0.9.1 as pre-release", output)
@@ -141,7 +141,7 @@ class TestDryRun(unittest.TestCase):
         ]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            run_cmd(["0.9.1"], {"hard": True, "dry-run": True})
+            run_cmd(["0.9.1"], {"hard": True, "dry-run": True}, project_root=".")
 
         output = mock_stdout.getvalue()
         self.assertIn("Would delete GitHub Release v0.9.1", output)
@@ -166,7 +166,7 @@ class TestErrorCases(unittest.TestCase):
 
         with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
             with self.assertRaises(SystemExit) as ctx:
-                run_cmd(["0.99.0"], {})
+                run_cmd(["0.99.0"], {}, project_root=".")
 
         self.assertEqual(ctx.exception.code, 1)
         self.assertIn("not found", mock_stderr.getvalue())
@@ -185,7 +185,7 @@ class TestErrorCases(unittest.TestCase):
 
         with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
             with self.assertRaises(SystemExit) as ctx:
-                run_cmd(["1.0.0"], {})
+                run_cmd(["1.0.0"], {}, project_root=".")
 
         self.assertEqual(ctx.exception.code, 1)
         self.assertIn("latest release", mock_stderr.getvalue())
@@ -209,7 +209,7 @@ class TestVersionNormalization(unittest.TestCase):
         ]
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd(["0.9.1"], {"hard": True, "yes": True})
+            run_cmd(["0.9.1"], {"hard": True, "yes": True}, project_root=".")
 
         mock_run.assert_any_call("gh", ["release", "view", "v0.9.1"])
         mock_run.assert_any_call("gh", ["release", "delete", "v0.9.1", "--yes"])
@@ -228,7 +228,7 @@ class TestVersionNormalization(unittest.TestCase):
         ]
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd(["v0.9.1"], {"hard": True, "yes": True})
+            run_cmd(["v0.9.1"], {"hard": True, "yes": True}, project_root=".")
 
         mock_run.assert_any_call("gh", ["release", "view", "v0.9.1"])
         mock_run.assert_any_call("gh", ["release", "delete", "v0.9.1", "--yes"])

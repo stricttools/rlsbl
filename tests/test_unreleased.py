@@ -77,7 +77,7 @@ class TestRunCmd:
     def test_no_unreleased_commits(self, mock_git_repo, capsys):
         subprocess.run(["git", "tag", "v1.0.0"], cwd=str(mock_git_repo), check=True)
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {})
+            run_cmd(None, [], {}, project_root=".")
         assert exc_info.value.code == 0
         captured = capsys.readouterr()
         assert "No unreleased commits." in captured.out
@@ -92,7 +92,7 @@ class TestRunCmd:
             cwd=str(mock_git_repo), check=True,
         )
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {})
+            run_cmd(None, [], {}, project_root=".")
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
         assert "JSONL changelog not set up" in captured.err
@@ -100,7 +100,7 @@ class TestRunCmd:
     def test_json_output_no_commits(self, mock_git_repo, capsys):
         subprocess.run(["git", "tag", "v1.0.0"], cwd=str(mock_git_repo), check=True)
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {"json": True})
+            run_cmd(None, [], {"json": True}, project_root=".")
         assert exc_info.value.code == 0
         captured = capsys.readouterr()
         data = json.loads(captured.out)
@@ -160,11 +160,11 @@ class TestUnreleasedMonorepo:
 
     def test_monorepo_uses_scoped_tag(self, mock_git_repo, capsys):
         """In a monorepo project, unreleased uses the project's scoped tag."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "alpha", version="1.0.0")
         _make_npm_project(mock_git_repo, "beta", version="1.0.0")
-        _cmd_add(["alpha"], {})
-        _cmd_add(["beta"], {})
+        _cmd_add(["alpha"], {}, project_root=".")
+        _cmd_add(["beta"], {}, project_root=".")
 
         # Set up JSONL changelog for alpha
         changes_dir = mock_git_repo / "alpha" / ".rlsbl" / "changes"
@@ -188,11 +188,11 @@ class TestUnreleasedMonorepo:
 
     def test_monorepo_filters_commits_by_directory(self, mock_git_repo, capsys):
         """Commits touching only another project's files are excluded."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "alpha", version="1.0.0")
         _make_npm_project(mock_git_repo, "beta", version="1.0.0")
-        _cmd_add(["alpha"], {})
-        _cmd_add(["beta"], {})
+        _cmd_add(["alpha"], {}, project_root=".")
+        _cmd_add(["beta"], {}, project_root=".")
 
         # Set up JSONL changelogs for both
         for proj in ["alpha", "beta"]:
@@ -229,11 +229,11 @@ class TestUnreleasedMonorepo:
 
     def test_monorepo_no_commits_for_project(self, mock_git_repo, capsys):
         """When all commits touch other projects, shows no unreleased commits."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "alpha", version="1.0.0")
         _make_npm_project(mock_git_repo, "beta", version="1.0.0")
-        _cmd_add(["alpha"], {})
-        _cmd_add(["beta"], {})
+        _cmd_add(["alpha"], {}, project_root=".")
+        _cmd_add(["beta"], {}, project_root=".")
 
         # Tag both
         subprocess.run(["git", "tag", "alpha@v1.0.0"], cwd=str(mock_git_repo), check=True)
@@ -268,7 +268,7 @@ class TestUnreleasedMonorepo:
 
         capsys.readouterr()
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd("npm", [], {"json": True})
+            run_cmd("npm", [], {"json": True}, project_root=".")
         assert exc_info.value.code == 0
         data = json.loads(capsys.readouterr().out)
         assert data["tag"] == "v1.0.0"

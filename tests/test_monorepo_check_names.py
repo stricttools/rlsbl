@@ -22,10 +22,10 @@ def _make_npm_project(base_path, subdir):
 
 def _setup_workspace(mock_git_repo, project_names):
     """Initialize workspace and add projects with the given names."""
-    _cmd_init({})
+    _cmd_init({}, project_root=".")
     for name in project_names:
         _make_npm_project(mock_git_repo, name)
-        _cmd_add([name], {})
+        _cmd_add([name], {}, project_root=".")
 
 
 class TestMissingTarget:
@@ -33,7 +33,7 @@ class TestMissingTarget:
         """Missing --target should print error to stderr and exit 1."""
         _setup_workspace(mock_git_repo, ["core"])
         with pytest.raises(SystemExit) as exc_info:
-            _cmd_check_names([], {})
+            _cmd_check_names([], {}, project_root=".")
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
         assert "--target is required" in captured.err
@@ -56,7 +56,7 @@ class TestBasicCheckNames:
              "variants": [], "github_count": 0},
         ]
 
-        _cmd_check_names([], {"target": "npm"})
+        _cmd_check_names([], {"target": "npm"}, project_root=".")
 
         captured = capsys.readouterr()
         lines = captured.out.strip().split("\n")
@@ -102,7 +102,7 @@ class TestPrefix:
              "variants": [], "github_count": 0},
         ]
 
-        _cmd_check_names([], {"target": "npm", "prefix": "www-"})
+        _cmd_check_names([], {"target": "npm", "prefix": "www-"}, project_root=".")
 
         # Verify names were prefixed
         mock_check.assert_any_call("www-core", "npm")
@@ -128,7 +128,7 @@ class TestSuffix:
              "variants": [], "github_count": 0},
         ]
 
-        _cmd_check_names([], {"target": "npm", "suffix": "-js"})
+        _cmd_check_names([], {"target": "npm", "suffix": "-js"}, project_root=".")
 
         mock_check.assert_any_call("core-js", "npm")
         mock_check.assert_any_call("api-js", "npm")
@@ -151,7 +151,7 @@ class TestPrefixAndSuffix:
              "variants": [], "github_count": 0},
         ]
 
-        _cmd_check_names([], {"target": "npm", "prefix": "@scope/", "suffix": "-lib"})
+        _cmd_check_names([], {"target": "npm", "prefix": "@scope/", "suffix": "-lib"}, project_root=".")
 
         mock_check.assert_called_once_with("@scope/core-lib", "npm")
 
@@ -177,7 +177,7 @@ class TestDelay:
              "variants": [], "github_count": 0},
         ]
 
-        _cmd_check_names([], {"target": "npm", "delay": "500"})
+        _cmd_check_names([], {"target": "npm", "delay": "500"}, project_root=".")
 
         # 3 projects -> 2 delays between them
         assert mock_sleep.call_count == 2
@@ -198,7 +198,7 @@ class TestDelay:
              "variants": [], "github_count": 0},
         ]
 
-        _cmd_check_names([], {"target": "npm"})
+        _cmd_check_names([], {"target": "npm"}, project_root=".")
 
         assert mock_sleep.call_count == 1
         mock_sleep.assert_called_once_with(0.2)

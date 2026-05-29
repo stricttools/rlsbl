@@ -53,7 +53,7 @@ class TestReleaseAllowDirty(unittest.TestCase):
         from rlsbl.commands.release import run_cmd
 
         with self.assertRaises(SystemExit) as ctx:
-            run_cmd(_rc(), {"quiet": True})
+            run_cmd(_rc(), {"quiet": True}, project_root=".", monorepo_root=None)
         self.assertEqual(ctx.exception.code, 1)
 
     @patch("rlsbl.commands.release.push_if_needed")
@@ -85,7 +85,10 @@ class TestReleaseAllowDirty(unittest.TestCase):
                 "allow-dirty": True,
                 "dry-run": True,
                 "quiet": False,
-            })
+            },
+            project_root=".",
+            monorepo_root=None,
+)
 
     @patch("rlsbl.commands.release.release_lock")
     @patch("rlsbl.commands.release.acquire_lock")
@@ -150,7 +153,10 @@ class TestReleaseAllowDirty(unittest.TestCase):
                 "allow-dirty": True,
                 "yes": True,
                 "quiet": False,
-            })
+            },
+            project_root=".",
+            monorepo_root=None,
+)
 
     @patch("rlsbl.commands.release.release_lock")
     @patch("rlsbl.commands.release.acquire_lock")
@@ -202,7 +208,10 @@ class TestReleaseAllowDirty(unittest.TestCase):
                     "allow-dirty": True,
                     "yes": True,
                     "quiet": False,
-                })
+                },
+                project_root=".",
+                monorepo_root=None,
+)
             self.assertEqual(ctx.exception.code, 1)
 
 

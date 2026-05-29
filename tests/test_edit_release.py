@@ -59,7 +59,7 @@ class TestEditRelease(unittest.TestCase):
              patch("os.rename"), \
              patch("os.unlink"):
             with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-                run_cmd(["0.23.0"], {})
+                run_cmd(["0.23.0"], {}, project_root=".")
 
         # Verify gh release view was called to check existence
         mock_run.assert_any_call("gh", ["release", "view", "v0.23.0"])
@@ -92,7 +92,7 @@ class TestEditRelease(unittest.TestCase):
              patch("os.rename"), \
              patch("os.unlink"):
             with patch("sys.stdout", new_callable=StringIO):
-                run_cmd([], {})
+                run_cmd([], {}, project_root=".")
 
         target.read_version.assert_called_once_with(".")
         mock_extract.assert_called_once()
@@ -117,7 +117,7 @@ class TestEditRelease(unittest.TestCase):
              patch("os.rename"), \
              patch("os.unlink"):
             with patch("sys.stdout", new_callable=StringIO):
-                run_cmd(["0.23.0"], {})
+                run_cmd(["0.23.0"], {}, project_root=".")
 
         # read_version should NOT be called when version is explicit
         target.read_version.assert_not_called()
@@ -142,7 +142,7 @@ class TestEditRelease(unittest.TestCase):
              patch("os.rename"), \
              patch("os.unlink"):
             with patch("sys.stdout", new_callable=StringIO):
-                run_cmd(["v0.23.0"], {})
+                run_cmd(["v0.23.0"], {}, project_root=".")
 
         # Changelog lookup should use "0.23.0" (without "v")
         mock_extract.assert_called_once()
@@ -166,7 +166,7 @@ class TestEditRelease(unittest.TestCase):
 
         with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
             with self.assertRaises(SystemExit) as ctx:
-                run_cmd(["0.99.0"], {})
+                run_cmd(["0.99.0"], {}, project_root=".")
 
         self.assertEqual(ctx.exception.code, 1)
         self.assertIn("no changelog entry found", mock_stderr.getvalue())
@@ -191,7 +191,7 @@ class TestEditRelease(unittest.TestCase):
 
         with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
             with self.assertRaises(SystemExit) as ctx:
-                run_cmd(["0.23.0"], {})
+                run_cmd(["0.23.0"], {}, project_root=".")
 
         self.assertEqual(ctx.exception.code, 1)
         self.assertIn("not found", mock_stderr.getvalue())
@@ -212,7 +212,7 @@ class TestEditRelease(unittest.TestCase):
         mock_targets_dict.__getitem__ = lambda self, key: target
 
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            run_cmd(["0.23.0"], {"dry-run": True})
+            run_cmd(["0.23.0"], {"dry-run": True}, project_root=".")
 
         output = mock_stdout.getvalue()
         self.assertIn("Would update", output)

@@ -45,7 +45,7 @@ class TestDeployNoConfig:
         (config_dir / "config.json").write_text(json.dumps({}))
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {})
+            run_cmd(None, [], {}, project_root=".")
 
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
@@ -67,7 +67,7 @@ class TestDeployAutoSelectSingleTarget:
         monkeypatch.setattr("rlsbl.commands.deploy_cmd.deploy_target", mock_deploy_target)
         monkeypatch.setattr("rlsbl.commands.deploy_cmd.get_current_branch", lambda: "main")
 
-        run_cmd(None, [], {})
+        run_cmd(None, [], {}, project_root=".")
 
         assert len(deploy_calls) == 1
         assert deploy_calls[0][0] == "prod"
@@ -92,7 +92,7 @@ class TestDeploySelectByName:
         monkeypatch.setattr("rlsbl.commands.deploy_cmd.deploy_target", mock_deploy_target)
         monkeypatch.setattr("rlsbl.commands.deploy_cmd.get_current_branch", lambda: "main")
 
-        run_cmd(None, ["staging"], {})
+        run_cmd(None, ["staging"], {}, project_root=".")
 
         assert len(deploy_calls) == 1
         assert deploy_calls[0] == "staging"
@@ -109,7 +109,7 @@ class TestDeployAmbiguousNoName:
         _write_deploy_config(mock_git_repo, targets)
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {})
+            run_cmd(None, [], {}, project_root=".")
 
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
@@ -125,7 +125,7 @@ class TestDeployUnknownName:
         _write_deploy_config(mock_git_repo, [_minimal_target(name="prod")])
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, ["nonexistent"], {})
+            run_cmd(None, ["nonexistent"], {}, project_root=".")
 
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
@@ -153,7 +153,7 @@ class TestDeployDryRun:
         monkeypatch.setattr("rlsbl.commands.deploy_cmd.deploy_target", mock_deploy_target)
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {"dry-run": True})
+            run_cmd(None, [], {"dry-run": True}, project_root=".")
 
         assert exc_info.value.code == 0
         # deploy_target should NOT have been called
@@ -184,7 +184,7 @@ class TestDeployBranchRestriction:
         monkeypatch.setattr("rlsbl.commands.deploy_cmd.deploy_target", mock_deploy_target)
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {})
+            run_cmd(None, [], {}, project_root=".")
 
         assert exc_info.value.code == 1
         assert len(deploy_calls) == 0
@@ -207,7 +207,7 @@ class TestDeployForceOverridesBranch:
 
         monkeypatch.setattr("rlsbl.commands.deploy_cmd.deploy_target", mock_deploy_target)
 
-        run_cmd(None, [], {"force": True})
+        run_cmd(None, [], {"force": True}, project_root=".")
 
         assert len(deploy_calls) == 1
 
@@ -224,7 +224,7 @@ class TestDeploySuccess:
         monkeypatch.setattr("rlsbl.commands.deploy_cmd.deploy_target", mock_deploy_target)
         monkeypatch.setattr("rlsbl.commands.deploy_cmd.get_current_branch", lambda: "main")
 
-        run_cmd(None, [], {})
+        run_cmd(None, [], {}, project_root=".")
 
         captured = capsys.readouterr()
         assert "[prod]" in captured.out
@@ -244,7 +244,7 @@ class TestDeployFailure:
         monkeypatch.setattr("rlsbl.commands.deploy_cmd.get_current_branch", lambda: "main")
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {})
+            run_cmd(None, [], {}, project_root=".")
 
         assert exc_info.value.code == 1
         captured = capsys.readouterr()

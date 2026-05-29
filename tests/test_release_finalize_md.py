@@ -130,7 +130,10 @@ class TestReleaseFinalizeMd:
                     "yes": True,
                     "quiet": True,
                 },
-            )
+            
+                project_root=".",
+                monorepo_root=None,
+)
 
         changes_dir = tmp_project / ".rlsbl" / "changes"
 

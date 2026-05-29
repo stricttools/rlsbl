@@ -164,7 +164,10 @@ class TestReleaseUnexpectedFiles:
                     "yes": True,
                     "quiet": True,
                 },
-            )
+            
+                project_root=".",
+                monorepo_root=None,
+)
 
         # Verify the release actually completed: the version was bumped
         pkg = json.loads((tmp_project / "package.json").read_text())
@@ -224,7 +227,10 @@ class TestReleaseUnexpectedFiles:
                         "yes": True,
                         "quiet": True,
                     },
-                )
+                
+                    project_root=".",
+                    monorepo_root=None,
+)
 
         assert exc_info.value.code == 1, (
             "release should exit 1 when unexpected files are detected"

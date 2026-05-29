@@ -43,7 +43,7 @@ class TestDryRunFreshProject:
 
     def test_dry_run_writes_no_files(self, npm_project, capsys):
         """No template-target files exist after dry-run."""
-        run_cmd("npm", [], {"dry-run": True, "no-tag": True})
+        run_cmd("npm", [], {"dry-run": True, "no-tag": True}, project_root=".")
 
         # Confirm no scaffold-generated files exist
         assert not os.path.exists(".github/workflows/ci.yml")
@@ -56,7 +56,7 @@ class TestDryRunFreshProject:
 
     def test_dry_run_prints_planned_files(self, npm_project, capsys):
         """Output contains the planned file status table and a DRY RUN banner."""
-        run_cmd("npm", [], {"dry-run": True, "no-tag": True})
+        run_cmd("npm", [], {"dry-run": True, "no-tag": True}, project_root=".")
 
         out = capsys.readouterr().out
         assert "DRY RUN" in out
@@ -67,7 +67,7 @@ class TestDryRunFreshProject:
 
     def test_dry_run_does_not_create_rlsbl_config(self, npm_project):
         """--dry-run must NOT create or write .rlsbl/config.json."""
-        run_cmd("npm", [], {"dry-run": True, "no-tag": True})
+        run_cmd("npm", [], {"dry-run": True, "no-tag": True}, project_root=".")
 
         assert not os.path.exists(".rlsbl/config.json")
 
@@ -76,7 +76,7 @@ class TestDryRunFreshProject:
         hook_path = npm_project / ".git" / "hooks" / "pre-push"
         assert not hook_path.exists()  # baseline
 
-        run_cmd("npm", [], {"dry-run": True, "no-tag": True})
+        run_cmd("npm", [], {"dry-run": True, "no-tag": True}, project_root=".")
 
         assert not hook_path.exists(), "Dry run must not install hooks"
 
@@ -91,7 +91,7 @@ class TestDryRunFreshProject:
             capture_output=True, text=True, check=True,
         ).stdout
 
-        run_cmd("npm", [], {"dry-run": True, "no-tag": True})
+        run_cmd("npm", [], {"dry-run": True, "no-tag": True}, project_root=".")
 
         after = subprocess.run(
             ["git", "log", "--oneline"], cwd=str(npm_project),
@@ -109,7 +109,7 @@ class TestDryRunExistingProject:
         but does not change the file.
         """
         # First, run a real scaffold (no dry-run) to populate
-        run_cmd("npm", [], {"no-tag": True, "no-commit": True})
+        run_cmd("npm", [], {"no-tag": True, "no-commit": True}, project_root=".")
 
         ci_path = npm_project / ".github" / "workflows" / "ci.yml"
         assert ci_path.exists()
@@ -118,7 +118,7 @@ class TestDryRunExistingProject:
         # Verify dry-run on a clean scaffolded project doesn't rewrite anything.
         # scaffold always uses the merge path.
         capsys.readouterr()  # drain previous output
-        run_cmd("npm", [], {"dry-run": True, "no-tag": True})
+        run_cmd("npm", [], {"dry-run": True, "no-tag": True}, project_root=".")
 
         # File content must be untouched
         assert ci_path.read_text() == original_content
@@ -129,7 +129,7 @@ class TestDryRunExistingProject:
     def test_dry_run_does_not_modify_existing_config(self, npm_project):
         """If .rlsbl/config.json exists, --dry-run must not modify it."""
         # Run real scaffold first to populate config
-        run_cmd("npm", [], {"no-tag": True, "no-commit": True})
+        run_cmd("npm", [], {"no-tag": True, "no-commit": True}, project_root=".")
 
         config_path = npm_project / ".rlsbl" / "config.json"
         assert config_path.exists()
@@ -140,7 +140,7 @@ class TestDryRunExistingProject:
         import time
         time.sleep(0.01)
 
-        run_cmd("npm", [], {"dry-run": True, "no-tag": True})
+        run_cmd("npm", [], {"dry-run": True, "no-tag": True}, project_root=".")
 
         assert config_path.read_text() == original_content
 
@@ -150,7 +150,7 @@ class TestDryRunMulti:
 
     def test_dry_run_multi_writes_no_publish(self, dual_registry_project, capsys):
         """--dry-run on a dual-registry project plans publish.yml without writing it."""
-        run_cmd_multi(["npm", "pypi"], [], {"dry-run": True, "no-tag": True})
+        run_cmd_multi(["npm", "pypi"], [], {"dry-run": True, "no-tag": True}, project_root=".")
 
         publish_path = dual_registry_project / ".github" / "workflows" / "publish.yml"
         assert not publish_path.exists()

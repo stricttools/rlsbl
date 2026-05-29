@@ -43,7 +43,7 @@ class TestGraphJSON:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_graph({"format": "json"})
+        _cmd_graph({"format": "json"}, project_root=".")
         captured = capsys.readouterr()
         data = json.loads(captured.out)
 
@@ -89,7 +89,7 @@ class TestGraphJSON:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_graph({"format": "json"})
+        _cmd_graph({"format": "json"}, project_root=".")
         captured = capsys.readouterr()
         data = json.loads(captured.out)
 
@@ -115,7 +115,7 @@ class TestGraphDOT:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_graph({"format": "dot"})
+        _cmd_graph({"format": "dot"}, project_root=".")
         captured = capsys.readouterr()
         output = captured.out.strip()
 
@@ -133,7 +133,7 @@ class TestGraphDOT:
         projects = [{"path": "solo", "name": "solo"}]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_graph({"format": "dot"})
+        _cmd_graph({"format": "dot"}, project_root=".")
         captured = capsys.readouterr()
         output = captured.out.strip()
 
@@ -159,7 +159,7 @@ class TestGraphText:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_graph({"format": "text"})
+        _cmd_graph({"format": "text"}, project_root=".")
         captured = capsys.readouterr()
         lines = captured.out.strip().split("\n")
 
@@ -197,7 +197,7 @@ class TestGraphText:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_graph({"format": "text"})
+        _cmd_graph({"format": "text"}, project_root=".")
         captured = capsys.readouterr()
         lines = [l for l in captured.out.strip().split("\n") if l.strip()]
 
@@ -222,7 +222,7 @@ class TestGraphRootFilter:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_graph({"format": "json", "root": "A"})
+        _cmd_graph({"format": "json", "root": "A"}, project_root=".")
         captured = capsys.readouterr()
         data = json.loads(captured.out)
 
@@ -237,7 +237,7 @@ class TestGraphRootFilter:
         _init_workspace(mock_git_repo, projects)
 
         with pytest.raises(SystemExit) as exc_info:
-            _cmd_graph({"format": "json", "root": "nonexistent"})
+            _cmd_graph({"format": "json", "root": "nonexistent"}, project_root=".")
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
         assert "nonexistent" in captured.err
@@ -261,7 +261,7 @@ class TestGraphReverseFilter:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_graph({"format": "json", "reverse": "C"})
+        _cmd_graph({"format": "json", "reverse": "C"}, project_root=".")
         captured = capsys.readouterr()
         data = json.loads(captured.out)
 
@@ -285,7 +285,7 @@ class TestGraphDepthLimit:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_graph({"format": "json", "root": "A", "depth": 1})
+        _cmd_graph({"format": "json", "root": "A", "depth": 1}, project_root=".")
         captured = capsys.readouterr()
         data = json.loads(captured.out)
 
@@ -306,7 +306,7 @@ class TestGraphDepthLimit:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_graph({"format": "json", "reverse": "C", "depth": 1})
+        _cmd_graph({"format": "json", "reverse": "C", "depth": 1}, project_root=".")
         captured = capsys.readouterr()
         data = json.loads(captured.out)
 
@@ -330,7 +330,7 @@ class TestGraphOutputFile:
         _init_workspace(mock_git_repo, projects)
 
         output_path = os.path.join(str(mock_git_repo), "graph.json")
-        _cmd_graph({"format": "json", "output": output_path})
+        _cmd_graph({"format": "json", "output": output_path}, project_root=".")
 
         assert os.path.isfile(output_path)
         with open(output_path) as f:
@@ -352,7 +352,7 @@ class TestGraphOutputFile:
         _init_workspace(mock_git_repo, projects)
 
         output_path = os.path.join(str(mock_git_repo), "graph.dot")
-        _cmd_graph({"format": "dot", "output": output_path})
+        _cmd_graph({"format": "dot", "output": output_path}, project_root=".")
 
         assert os.path.isfile(output_path)
         with open(output_path) as f:
@@ -366,14 +366,14 @@ class TestGraphEdgeCases:
 
     def test_empty_workspace(self, mock_git_repo, capsys):
         """Empty workspace prints message and returns."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         capsys.readouterr()
 
-        _cmd_graph({"format": "json"})
+        _cmd_graph({"format": "json"}, project_root=".")
         captured = capsys.readouterr()
         assert "No projects in workspace." in captured.out
 
     def test_no_workspace(self, mock_git_repo):
         """No workspace should error and exit 1."""
         with pytest.raises(SystemExit):
-            _cmd_graph({"format": "json"})
+            _cmd_graph({"format": "json"}, project_root=".")

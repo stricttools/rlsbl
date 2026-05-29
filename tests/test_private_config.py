@@ -67,7 +67,7 @@ class TestPrivateConfigRequired:
         from rlsbl.commands.release import run_cmd
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(_rc(), {"quiet": True})
+            run_cmd(_rc(), {"quiet": True}, project_root=".", monorepo_root=None)
         assert exc_info.value.code == 1
 
         captured = capsys.readouterr()
@@ -87,7 +87,7 @@ class TestPrivateConfigRequired:
         from rlsbl.commands.release import run_cmd
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(_rc(), {"quiet": True})
+            run_cmd(_rc(), {"quiet": True}, project_root=".", monorepo_root=None)
         assert exc_info.value.code == 1
 
         captured = capsys.readouterr()
@@ -115,7 +115,7 @@ class TestPrivateConfigRequired:
 
         with patch("sys.stdout", new_callable=StringIO):
             # Should not raise SystemExit
-            run_cmd(_rc(), {"dry-run": True, "quiet": False})
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, project_root=".", monorepo_root=None)
 
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
@@ -139,7 +139,7 @@ class TestPrivateConfigRequired:
 
         with patch("sys.stdout", new_callable=StringIO):
             # Should not raise SystemExit
-            run_cmd(_rc(), {"dry-run": True, "quiet": False})
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, project_root=".", monorepo_root=None)
 
 
 class TestPrivatePublishGuardrail:
@@ -212,7 +212,7 @@ class TestPrivatePublishGuardrail:
 
         with patch("sys.stdout", new_callable=StringIO):
             with patch.object(NpmTarget, "publish") as mock_publish:
-                run_cmd(_rc(), {"yes": True, "quiet": False})
+                run_cmd(_rc(), {"yes": True, "quiet": False}, project_root=".", monorepo_root=None)
                 # publish() must NOT be called for private repos
                 mock_publish.assert_not_called()
 
@@ -268,7 +268,7 @@ class TestPrivatePublishGuardrail:
         ]
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd(_rc(), {"yes": True, "quiet": False})
+            run_cmd(_rc(), {"yes": True, "quiet": False}, project_root=".", monorepo_root=None)
 
         # upload_release_assets must be called even for private repos
         mock_upload_assets.assert_called_once()

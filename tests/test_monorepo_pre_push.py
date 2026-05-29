@@ -158,14 +158,14 @@ class TestSingleProjectWithoutJsonl:
         )
         (tmp_project / "CHANGELOG.md").write_text("# Changelog\n\n## 1.0.0\n\n- Initial\n")
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {})
+            run_cmd(None, [], {}, project_root=".")
         assert exc_info.value.code == 0
         captured = capsys.readouterr()
         assert "JSONL changelog not set up" in captured.err
 
     def test_exits_zero_with_no_project(self, tmp_project):
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {})
+            run_cmd(None, [], {}, project_root=".")
         assert exc_info.value.code == 0
 
 
@@ -211,7 +211,7 @@ class TestMonorepoPrePush:
              patch("rlsbl.commands.pre_push_check._get_changed_files",
                    return_value=changed_files):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {})
+                run_cmd(None, [], {}, project_root=".")
             assert exc_info.value.code == 0
 
     def test_touching_a_and_b_checks_both(self, tmp_project, capsys):
@@ -229,7 +229,7 @@ class TestMonorepoPrePush:
              patch("rlsbl.commands.pre_push_check._get_changed_files",
                    return_value=changed_files):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {})
+                run_cmd(None, [], {}, project_root=".")
             assert exc_info.value.code == 0
 
     def test_touching_a_does_not_check_b(self, tmp_project, capsys):
@@ -247,7 +247,7 @@ class TestMonorepoPrePush:
              patch("rlsbl.commands.pre_push_check._get_changed_files",
                    return_value=changed_files):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {})
+                run_cmd(None, [], {}, project_root=".")
             # Should pass because B is not checked
             assert exc_info.value.code == 0
 
@@ -265,7 +265,7 @@ class TestMonorepoPrePush:
              patch("rlsbl.commands.pre_push_check._get_changed_files",
                    return_value=changed_files):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {})
+                run_cmd(None, [], {}, project_root=".")
             assert exc_info.value.code == 0
 
     def test_all_changelogs_valid_exits_zero(self, tmp_project, capsys):
@@ -284,7 +284,7 @@ class TestMonorepoPrePush:
              patch("rlsbl.commands.pre_push_check._get_changed_files",
                    return_value=changed_files):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {})
+                run_cmd(None, [], {}, project_root=".")
             assert exc_info.value.code == 0
 
     def test_projects_without_jsonl_skipped(self, tmp_project, capsys):
@@ -303,7 +303,7 @@ class TestMonorepoPrePush:
              patch("rlsbl.commands.pre_push_check._get_changed_files",
                    return_value=changed_files):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {})
+                run_cmd(None, [], {}, project_root=".")
             assert exc_info.value.code == 0
 
     def test_no_stdin_falls_back_to_single_project(self, tmp_project, capsys):
@@ -322,7 +322,7 @@ class TestMonorepoPrePush:
         mock_stdin.isatty.return_value = True
         with patch("sys.stdin", mock_stdin):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {})
+                run_cmd(None, [], {}, project_root=".")
             assert exc_info.value.code == 0
 
     def test_watch_glob_triggers_check(self, tmp_project, capsys):
@@ -346,7 +346,7 @@ class TestMonorepoPrePush:
              patch("rlsbl.commands.pre_push_check._get_changed_files",
                    return_value=changed_files):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {})
+                run_cmd(None, [], {}, project_root=".")
             # Project has no JSONL changelog, so it's skipped
             assert exc_info.value.code == 0
 
@@ -365,7 +365,7 @@ class TestMonorepoPrePush:
              patch("rlsbl.commands.pre_push_check._get_changed_files",
                    return_value=changed_files):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {})
+                run_cmd(None, [], {}, project_root=".")
             # No projects affected, so exit 0
             assert exc_info.value.code == 0
 

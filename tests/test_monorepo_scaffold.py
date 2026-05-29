@@ -68,7 +68,7 @@ def _scaffold_project(base_path, subdir):
 class TestScaffoldTriggersSync:
     def test_trigger_calls_sync_in_monorepo(self, mock_git_repo):
         """_trigger_monorepo_sync runs sync subprocess when inside a monorepo."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         # _cmd_init auto-commits workspace.toml, so workspace is ready
 
         calls = []
@@ -104,7 +104,7 @@ class TestScaffoldTriggersSync:
 
     def test_trigger_ignores_sync_failure(self, mock_git_repo):
         """_trigger_monorepo_sync silently ignores sync failures."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         # _cmd_init auto-commits workspace.toml, so workspace is ready
 
         def failing_run(cmd, *args, **kwargs):
@@ -118,7 +118,7 @@ class TestScaffoldTriggersSync:
 class TestAddAutoScaffolds:
     def test_add_auto_scaffolds_unscaffolded_project(self, mock_git_repo):
         """monorepo add runs scaffold when project has no .rlsbl/config.json."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project_with_ci(mock_git_repo, "pkg-a")
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
@@ -141,14 +141,14 @@ class TestAddAutoScaffolds:
             return original_run(cmd, *args, **kwargs)
 
         with patch("subprocess.run", side_effect=tracking_run):
-            _cmd_add(["pkg-a"], {})
+            _cmd_add(["pkg-a"], {}, project_root=".")
 
         assert len(scaffold_calls) == 1
         assert len(sync_calls) == 1
 
     def test_add_skips_scaffold_if_already_done(self, mock_git_repo, capsys):
         """monorepo add does NOT re-scaffold when .rlsbl/config.json exists."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project_with_ci(mock_git_repo, "pkg-a")
         _scaffold_project(mock_git_repo, "pkg-a")
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
@@ -170,7 +170,7 @@ class TestAddAutoScaffolds:
             return original_run(cmd, *args, **kwargs)
 
         with patch("subprocess.run", side_effect=tracking_run):
-            _cmd_add(["pkg-a"], {})
+            _cmd_add(["pkg-a"], {}, project_root=".")
 
         # Scaffold should NOT have been called
         assert len(scaffold_calls) == 0
@@ -182,7 +182,7 @@ class TestAddCommitsWorkspace:
     def test_add_commits_workspace_toml(self, mock_git_repo):
         """monorepo add commits workspace.toml after adding a project."""
         with patch("rlsbl.utils.find_commit_tool", return_value="git"):
-            _cmd_init({})
+            _cmd_init({}, project_root=".")
         _make_npm_project_with_ci(mock_git_repo, "pkg-a")
         _scaffold_project(mock_git_repo, "pkg-a")
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
@@ -201,7 +201,7 @@ class TestAddCommitsWorkspace:
 
         with patch("rlsbl.utils.find_commit_tool", return_value="git"), \
              patch("subprocess.run", side_effect=tracking_run):
-            _cmd_add(["pkg-a"], {})
+            _cmd_add(["pkg-a"], {}, project_root=".")
 
         # Check that workspace.toml was committed
         result = subprocess.run(
@@ -216,7 +216,7 @@ class TestInitCommitsWorkspace:
     def test_init_commits_workspace_toml(self, mock_git_repo):
         """monorepo init commits workspace.toml."""
         with patch("rlsbl.utils.find_commit_tool", return_value="git"):
-            _cmd_init({})
+            _cmd_init({}, project_root=".")
 
         result = subprocess.run(
             ["git", "log", "--oneline", "--all"],
@@ -228,7 +228,7 @@ class TestInitCommitsWorkspace:
     def test_init_workspace_is_committed(self, mock_git_repo):
         """After init, workspace.toml should not show up as untracked or modified."""
         with patch("rlsbl.utils.find_commit_tool", return_value="git"):
-            _cmd_init({})
+            _cmd_init({}, project_root=".")
 
         result = subprocess.run(
             ["git", "status", "--porcelain"],

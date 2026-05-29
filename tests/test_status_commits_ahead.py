@@ -55,7 +55,7 @@ class TestStatusCommitsAheadStandalone:
 
         capsys.readouterr()
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {})
+        run_cmd("npm", [], {}, project_root=".")
         out = capsys.readouterr().out
 
         assert "commits ahead" not in out
@@ -76,7 +76,7 @@ class TestStatusCommitsAheadStandalone:
 
         capsys.readouterr()
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {})
+        run_cmd("npm", [], {}, project_root=".")
         out = capsys.readouterr().out
 
         # Find the warning line
@@ -99,7 +99,7 @@ class TestStatusCommitsAheadStandalone:
 
         capsys.readouterr()
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {})
+        run_cmd("npm", [], {}, project_root=".")
         out = capsys.readouterr().out
 
         warning_lines = [l for l in out.splitlines() if l.startswith(WARN_PREFIX)]
@@ -117,7 +117,7 @@ class TestStatusCommitsAheadStandalone:
 
         capsys.readouterr()
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {})
+        run_cmd("npm", [], {}, project_root=".")
         out = capsys.readouterr().out
 
         assert "commits ahead" not in out
@@ -134,7 +134,7 @@ class TestStatusCommitsAheadStandalone:
 
         capsys.readouterr()
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {})
+        run_cmd("npm", [], {}, project_root=".")
         captured = capsys.readouterr()
 
         assert "2 commits ahead of v1.0.0" in captured.out
@@ -151,7 +151,7 @@ class TestStatusCommitsAheadStandalone:
 
         capsys.readouterr()
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {})
+        run_cmd("npm", [], {}, project_root=".")
         out = capsys.readouterr().out
         lines = out.splitlines()
 
@@ -174,7 +174,7 @@ class TestStatusCommitsAheadStandalone:
 
         capsys.readouterr()
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {"json": True})
+        run_cmd("npm", [], {"json": True}, project_root=".")
         out = capsys.readouterr().out
         data = json.loads(out)
 
@@ -189,7 +189,7 @@ class TestStatusCommitsAheadStandalone:
 
         capsys.readouterr()
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {"json": True})
+        run_cmd("npm", [], {"json": True}, project_root=".")
         out = capsys.readouterr().out
         data = json.loads(out)
 
@@ -208,12 +208,12 @@ class TestStatusCommitsAheadMonorepo:
     def test_monorepo_warning_uses_scoped_tag(self, mock_git_repo, capsys):
         """Inside a monorepo project, warning references the scoped tag."""
         # Two projects: core (tagged) and tools (also tagged later)
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         core_dir = mock_git_repo / "core"
         core_dir.mkdir()
         with open(core_dir / "package.json", "w") as f:
             json.dump({"name": "core", "version": "1.0.0"}, f)
-        _cmd_add(["core"], {})
+        _cmd_add(["core"], {}, project_root=".")
 
         # Tag core
         subprocess.run(["git", "tag", "core@v1.0.0"], cwd=str(mock_git_repo), check=True)
@@ -224,7 +224,7 @@ class TestStatusCommitsAheadMonorepo:
         capsys.readouterr()
         os.chdir(str(core_dir))
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {})
+        run_cmd("npm", [], {}, project_root=".")
         out = capsys.readouterr().out
 
         warning_lines = [l for l in out.splitlines() if l.startswith(WARN_PREFIX)]
@@ -234,18 +234,18 @@ class TestStatusCommitsAheadMonorepo:
 
     def test_monorepo_project_with_no_unreleased_no_warning(self, mock_git_repo, capsys):
         """A monorepo project at its tagged version (no commits ahead) prints no warning."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         proj_dir = mock_git_repo / "alpha"
         proj_dir.mkdir()
         with open(proj_dir / "package.json", "w") as f:
             json.dump({"name": "alpha", "version": "1.0.0"}, f)
-        _cmd_add(["alpha"], {})
+        _cmd_add(["alpha"], {}, project_root=".")
         subprocess.run(["git", "tag", "alpha@v1.0.0"], cwd=str(mock_git_repo), check=True)
 
         capsys.readouterr()
         os.chdir(str(proj_dir))
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {})
+        run_cmd("npm", [], {}, project_root=".")
         out = capsys.readouterr().out
 
         assert "commits ahead" not in out
@@ -258,19 +258,19 @@ class TestStatusCommitsAheadMonorepo:
         beta's files. alpha should show 0 commits ahead (no warning),
         not count beta's commits.
         """
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
 
         alpha = mock_git_repo / "alpha"
         alpha.mkdir()
         with open(alpha / "package.json", "w") as f:
             json.dump({"name": "alpha", "version": "1.0.0"}, f)
-        _cmd_add(["alpha"], {})
+        _cmd_add(["alpha"], {}, project_root=".")
 
         beta = mock_git_repo / "beta"
         beta.mkdir()
         with open(beta / "package.json", "w") as f:
             json.dump({"name": "beta", "version": "1.0.0"}, f)
-        _cmd_add(["beta"], {})
+        _cmd_add(["beta"], {}, project_root=".")
 
         # Tag both at the same commit
         subprocess.run(["git", "tag", "alpha@v1.0.0"], cwd=str(mock_git_repo), check=True)
@@ -285,7 +285,7 @@ class TestStatusCommitsAheadMonorepo:
         # alpha: no commits touch its files -> no warning
         capsys.readouterr()
         os.chdir(str(alpha))
-        run_cmd("npm", [], {})
+        run_cmd("npm", [], {}, project_root=".")
         alpha_out = capsys.readouterr().out
         alpha_warnings = [l for l in alpha_out.splitlines() if l.startswith(WARN_PREFIX)]
         assert len(alpha_warnings) == 0, (
@@ -296,7 +296,7 @@ class TestStatusCommitsAheadMonorepo:
         # beta: 2 commits touch its files -> warning
         capsys.readouterr()
         os.chdir(str(beta))
-        run_cmd("npm", [], {})
+        run_cmd("npm", [], {}, project_root=".")
         beta_out = capsys.readouterr().out
         beta_warnings = [l for l in beta_out.splitlines() if l.startswith(WARN_PREFIX)]
         assert len(beta_warnings) == 1
@@ -304,19 +304,19 @@ class TestStatusCommitsAheadMonorepo:
 
     def test_monorepo_directory_filtering_json(self, mock_git_repo, capsys):
         """JSON output reflects directory-filtered commit counts."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
 
         alpha = mock_git_repo / "alpha"
         alpha.mkdir()
         with open(alpha / "package.json", "w") as f:
             json.dump({"name": "alpha", "version": "1.0.0"}, f)
-        _cmd_add(["alpha"], {})
+        _cmd_add(["alpha"], {}, project_root=".")
 
         beta = mock_git_repo / "beta"
         beta.mkdir()
         with open(beta / "package.json", "w") as f:
             json.dump({"name": "beta", "version": "1.0.0"}, f)
-        _cmd_add(["beta"], {})
+        _cmd_add(["beta"], {}, project_root=".")
 
         subprocess.run(["git", "tag", "alpha@v1.0.0"], cwd=str(mock_git_repo), check=True)
         subprocess.run(["git", "tag", "beta@v1.0.0"], cwd=str(mock_git_repo), check=True)
@@ -330,13 +330,13 @@ class TestStatusCommitsAheadMonorepo:
 
         capsys.readouterr()
         os.chdir(str(alpha))
-        run_cmd("npm", [], {"json": True})
+        run_cmd("npm", [], {"json": True}, project_root=".")
         data = json.loads(capsys.readouterr().out)
         assert data["commits_ahead"] == 1
 
         capsys.readouterr()
         os.chdir(str(beta))
-        run_cmd("npm", [], {"json": True})
+        run_cmd("npm", [], {"json": True}, project_root=".")
         data = json.loads(capsys.readouterr().out)
         assert data["commits_ahead"] == 2
 
@@ -348,13 +348,13 @@ class TestStatusCommitsAheadMonorepo:
         whose tag is older has commits ahead. Directory filtering ensures
         only commits touching the project's files are counted.
         """
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         # alpha: older tag, will have unreleased commits
         alpha = mock_git_repo / "alpha"
         alpha.mkdir()
         with open(alpha / "package.json", "w") as f:
             json.dump({"name": "alpha", "version": "1.0.0"}, f)
-        _cmd_add(["alpha"], {})
+        _cmd_add(["alpha"], {}, project_root=".")
 
         # Tag alpha now, before more commits
         subprocess.run(["git", "tag", "alpha@v1.0.0"], cwd=str(mock_git_repo), check=True)
@@ -368,7 +368,7 @@ class TestStatusCommitsAheadMonorepo:
         beta.mkdir()
         with open(beta / "package.json", "w") as f:
             json.dump({"name": "beta", "version": "1.0.0"}, f)
-        _cmd_add(["beta"], {})
+        _cmd_add(["beta"], {}, project_root=".")
         # Tag beta at current HEAD (after all commits)
         subprocess.run(["git", "tag", "beta@v1.0.0"], cwd=str(mock_git_repo), check=True)
 
@@ -377,7 +377,7 @@ class TestStatusCommitsAheadMonorepo:
         # alpha shows warning -- 2 commits ahead of alpha@v1.0.0
         capsys.readouterr()
         os.chdir(str(alpha))
-        run_cmd("npm", [], {})
+        run_cmd("npm", [], {}, project_root=".")
         alpha_out = capsys.readouterr().out
         alpha_warnings = [l for l in alpha_out.splitlines() if l.startswith(WARN_PREFIX)]
         assert len(alpha_warnings) == 1
@@ -387,7 +387,7 @@ class TestStatusCommitsAheadMonorepo:
         # beta does not show warning -- its tag is at HEAD
         capsys.readouterr()
         os.chdir(str(beta))
-        run_cmd("npm", [], {})
+        run_cmd("npm", [], {}, project_root=".")
         beta_out = capsys.readouterr().out
         beta_warnings = [l for l in beta_out.splitlines() if l.startswith(WARN_PREFIX)]
         assert len(beta_warnings) == 0

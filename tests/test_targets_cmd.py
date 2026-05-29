@@ -39,7 +39,7 @@ class TestTargetsCommand:
 
         buf = StringIO()
         with patch("sys.stdout", buf):
-            run_cmd(None, [], {})
+            run_cmd(None, [], {}, project_root=".")
 
         output = buf.getvalue()
         assert "npm" in output
@@ -53,7 +53,7 @@ class TestTargetsCommand:
 
         buf = StringIO()
         with patch("sys.stdout", buf):
-            run_cmd(None, [], {})
+            run_cmd(None, [], {}, project_root=".")
 
         lines = buf.getvalue().splitlines()
         header = lines[0]
@@ -70,7 +70,7 @@ class TestTargetsCommand:
 
         buf = StringIO()
         with patch("sys.stdout", buf):
-            run_cmd(None, [], {})
+            run_cmd(None, [], {}, project_root=".")
 
         output = buf.getvalue()
         # Find the npm line and verify it says "yes"
@@ -88,7 +88,7 @@ class TestTargetsCommand:
 
         buf = StringIO()
         with patch("sys.stdout", buf):
-            run_cmd(None, [], {})
+            run_cmd(None, [], {}, project_root=".")
 
         output = buf.getvalue()
         lines = output.splitlines()[1:]  # skip header
@@ -101,7 +101,7 @@ class TestTargetsCommand:
 
         buf = StringIO()
         with patch("sys.stdout", buf):
-            run_cmd(None, [], {})
+            run_cmd(None, [], {}, project_root=".")
 
         output = buf.getvalue()
         for line in output.splitlines():
@@ -191,11 +191,11 @@ class TestMultiTargetRelease:
             from rlsbl.commands.release import run_cmd
 
             with patch("sys.stdout", StringIO()):
-                run_cmd(_rc(include=["npm", "docs"]), {"yes": True, "quiet": False})
+                run_cmd(_rc(include=["npm", "docs"]), {"yes": True, "quiet": False}, project_root=".", monorepo_root=None)
 
             # Verify docs target build/publish were called
             build_mock.assert_called_once_with(".", "1.0.1")
-            publish_mock.assert_called_once_with(".", "1.0.1", project_root=None)
+            publish_mock.assert_called_once_with(".", "1.0.1", project_root=".")
         finally:
             # Restore original methods
             TARGETS["docs"].build = original_build
@@ -243,7 +243,7 @@ class TestMultiTargetRelease:
             # Should not raise -- secondary failures are non-fatal
             buf = StringIO()
             with patch("sys.stdout", StringIO()), patch("sys.stderr", buf):
-                run_cmd(_rc(include=["npm", "docs"]), {"yes": True, "quiet": False})
+                run_cmd(_rc(include=["npm", "docs"]), {"yes": True, "quiet": False}, project_root=".", monorepo_root=None)
 
             # Verify warnings were emitted
             stderr_output = buf.getvalue()

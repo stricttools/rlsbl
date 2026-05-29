@@ -24,18 +24,18 @@ class TestMonorepoStatus:
     """Tests for the 'rlsbl monorepo status' subcommand."""
 
     def test_status_empty_workspace(self, mock_git_repo, capsys):
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         capsys.readouterr()
-        _cmd_status({})
+        _cmd_status({}, project_root=".")
         captured = capsys.readouterr()
         assert "No projects in workspace." in captured.out
 
     def test_status_with_projects(self, mock_git_repo, capsys):
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "pkg-a", version="1.0.0")
-        _cmd_add(["pkg-a"], {})
+        _cmd_add(["pkg-a"], {}, project_root=".")
         capsys.readouterr()
-        _cmd_status({})
+        _cmd_status({}, project_root=".")
         captured = capsys.readouterr()
         # Header
         assert "Project" in captured.out
@@ -51,19 +51,19 @@ class TestMonorepoStatus:
 
     def test_status_shows_unreleased(self, mock_git_repo, capsys):
         """Project with no tag shows (none) for tag and info in Unreleased column."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "mylib", version="0.2.0")
-        _cmd_add(["mylib"], {})
+        _cmd_add(["mylib"], {}, project_root=".")
         capsys.readouterr()
-        _cmd_status({})
+        _cmd_status({}, project_root=".")
         captured = capsys.readouterr()
         assert "(none)" in captured.out
 
     def test_status_shows_released(self, mock_git_repo, capsys):
         """Project with a tag matching its version shows 'released'."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "mylib", version="1.0.0")
-        _cmd_add(["mylib"], {})
+        _cmd_add(["mylib"], {}, project_root=".")
         # Create a matching tag
         subprocess.run(
             ["git", "tag", "mylib@v1.0.0"],
@@ -71,7 +71,7 @@ class TestMonorepoStatus:
             check=True,
         )
         capsys.readouterr()
-        _cmd_status({})
+        _cmd_status({}, project_root=".")
         captured = capsys.readouterr()
         assert "released" in captured.out
         assert "mylib@v1.0.0" in captured.out
@@ -79,15 +79,15 @@ class TestMonorepoStatus:
     def test_status_no_workspace(self, mock_git_repo, capsys):
         """Without an initialized workspace, status should error."""
         with pytest.raises(SystemExit):
-            _cmd_status({})
+            _cmd_status({}, project_root=".")
 
     def test_status_multiple_projects(self, mock_git_repo, capsys):
         """Status displays all projects in the workspace."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "alpha", version="1.0.0")
         _make_npm_project(mock_git_repo, "beta", version="2.0.0")
-        _cmd_add(["alpha"], {})
-        _cmd_add(["beta"], {})
+        _cmd_add(["alpha"], {}, project_root=".")
+        _cmd_add(["beta"], {}, project_root=".")
         # Tag only alpha
         subprocess.run(
             ["git", "tag", "alpha@v1.0.0"],
@@ -95,7 +95,7 @@ class TestMonorepoStatus:
             check=True,
         )
         capsys.readouterr()
-        _cmd_status({})
+        _cmd_status({}, project_root=".")
         captured = capsys.readouterr()
         lines = captured.out.strip().split("\n")
         # Header + 2 project rows
@@ -109,35 +109,35 @@ class TestMonorepoStatusChangelog:
 
     def test_no_changelog_file(self, mock_git_repo, capsys):
         """Project with no CHANGELOG.md shows 'no changelog'."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "pkg-a", version="0.1.0")
-        _cmd_add(["pkg-a"], {})
+        _cmd_add(["pkg-a"], {}, project_root=".")
         # Auto-scaffold creates CHANGELOG.md; remove it to test the missing case
         changelog = os.path.join(str(mock_git_repo), "pkg-a", "CHANGELOG.md")
         if os.path.exists(changelog):
             os.remove(changelog)
         capsys.readouterr()
-        _cmd_status({})
+        _cmd_status({}, project_root=".")
         captured = capsys.readouterr()
         assert "no changelog" in captured.out
 
     def test_changelog_with_entries_no_tag(self, mock_git_repo, capsys):
         """Changelog with bullets and no git tag shows entry count."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "pkg-b", version="0.1.0")
-        _cmd_add(["pkg-b"], {})
+        _cmd_add(["pkg-b"], {}, project_root=".")
         changelog = mock_git_repo / "pkg-b" / "CHANGELOG.md"
         changelog.write_text("## 0.1.0\n- Added X\n- Added Y\n")
         capsys.readouterr()
-        _cmd_status({})
+        _cmd_status({}, project_root=".")
         captured = capsys.readouterr()
         assert "2 entries" in captured.out
 
     def test_changelog_entries_above_tagged_version(self, mock_git_repo, capsys):
         """Only bullets above the tagged version heading are counted."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "proj", version="0.2.0")
-        _cmd_add(["proj"], {})
+        _cmd_add(["proj"], {}, project_root=".")
         changelog = mock_git_repo / "proj" / "CHANGELOG.md"
         changelog.write_text("## 0.2.0\n- New feature\n## 0.1.0\n- Initial\n")
         # Create tag matching version 0.1.0
@@ -147,17 +147,17 @@ class TestMonorepoStatusChangelog:
             check=True,
         )
         capsys.readouterr()
-        _cmd_status({})
+        _cmd_status({}, project_root=".")
         captured = capsys.readouterr()
         assert "1 entry" in captured.out
 
     def test_column_header_is_unreleased(self, mock_git_repo, capsys):
         """The column header should be 'Unreleased', not 'Status'."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "pkg-c", version="0.1.0")
-        _cmd_add(["pkg-c"], {})
+        _cmd_add(["pkg-c"], {}, project_root=".")
         capsys.readouterr()
-        _cmd_status({})
+        _cmd_status({}, project_root=".")
         captured = capsys.readouterr()
         header_line = captured.out.strip().split("\n")[0]
         assert "Unreleased" in header_line
@@ -169,16 +169,16 @@ class TestStatusMonorepoAware:
     def test_status_shows_monorepo_hint(self, mock_git_repo, capsys):
         """When inside a monorepo project, status output includes the hint."""
         # Set up monorepo workspace
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "core", version="1.0.0")
-        _cmd_add(["core"], {})
+        _cmd_add(["core"], {}, project_root=".")
         capsys.readouterr()
 
         # Change into the project directory
         os.chdir(str(mock_git_repo / "core"))
 
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {})
+        run_cmd("npm", [], {}, project_root=".")
         captured = capsys.readouterr()
 
         assert "Part of monorepo" in captured.out
@@ -192,7 +192,7 @@ class TestStatusMonorepoAware:
             json.dump({"name": "standalone", "version": "1.0.0"}, f)
 
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {})
+        run_cmd("npm", [], {}, project_root=".")
         captured = capsys.readouterr()
 
         assert "Part of monorepo" not in captured.out
@@ -203,9 +203,9 @@ class TestStatusMonorepoAware:
 
     def test_status_monorepo_root_shows_hint_only(self, mock_git_repo, capsys):
         """At monorepo root (not inside a project), show hint without scoped tag."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "core", version="1.0.0")
-        _cmd_add(["core"], {})
+        _cmd_add(["core"], {}, project_root=".")
         capsys.readouterr()
 
         # Create a package.json at root so status command works
@@ -213,7 +213,7 @@ class TestStatusMonorepoAware:
             json.dump({"name": "monorepo-root", "version": "0.0.1"}, f)
 
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {})
+        run_cmd("npm", [], {}, project_root=".")
         captured = capsys.readouterr()
 
         assert "Part of monorepo" in captured.out
@@ -228,9 +228,9 @@ class TestStatusTagScoping:
         """In a monorepo project, _unreleased_range receives the computed tag_glob."""
         from unittest.mock import patch
 
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "mylib", version="1.0.0")
-        _cmd_add(["mylib"], {})
+        _cmd_add(["mylib"], {}, project_root=".")
 
         # Set up .rlsbl/changes so coverage code path is triggered
         changes_dir = mock_git_repo / "mylib" / ".rlsbl" / "changes"
@@ -253,7 +253,7 @@ class TestStatusTagScoping:
             side_effect=spy_unreleased_range,
         ):
             from rlsbl.commands.status import run_cmd
-            run_cmd("npm", [], {})
+            run_cmd("npm", [], {}, project_root=".")
 
         assert len(captured_calls) == 1
         assert captured_calls[0] == "mylib@v*"
@@ -285,7 +285,7 @@ class TestStatusTagScoping:
             side_effect=spy_unreleased_range,
         ):
             from rlsbl.commands.status import run_cmd
-            run_cmd("npm", [], {})
+            run_cmd("npm", [], {}, project_root=".")
 
         assert len(captured_calls) == 1
         assert captured_calls[0] is None
@@ -314,7 +314,7 @@ class TestStatusTagScoping:
             side_effect=spy_unreleased_range,
         ):
             from rlsbl.commands.status import _collect_status
-            _collect_status("npm", ".", tag_glob="my-project@v*")
+            _collect_status("npm", ".", tag_glob="my-project@v*", project_root=".")
 
         assert len(captured_calls) == 1
         assert captured_calls[0] == "my-project@v*"
@@ -323,9 +323,9 @@ class TestStatusTagScoping:
         """At monorepo root (not a registered project), tag_glob is None."""
         from unittest.mock import patch
 
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "core", version="1.0.0")
-        _cmd_add(["core"], {})
+        _cmd_add(["core"], {}, project_root=".")
 
         # Create a package.json at root so status works
         with open(str(mock_git_repo / "package.json"), "w") as f:
@@ -350,7 +350,7 @@ class TestStatusTagScoping:
             side_effect=spy_unreleased_range,
         ):
             from rlsbl.commands.status import run_cmd
-            run_cmd("npm", [], {})
+            run_cmd("npm", [], {}, project_root=".")
 
         assert len(captured_calls) == 1
         # Root is not a project in the workspace, so no tag glob
@@ -362,9 +362,9 @@ class TestMonorepoStatusWatch:
 
     def test_status_shows_watch_count(self, mock_git_repo, capsys):
         """Project with watch paths shows count in Watch column."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "tooling", version="1.0.0")
-        _cmd_add(["tooling"], {})
+        _cmd_add(["tooling"], {}, project_root=".")
 
         # Add watch paths to workspace
         projects = load_workspace(".")
@@ -374,18 +374,18 @@ class TestMonorepoStatusWatch:
         save_workspace(".", projects)
 
         capsys.readouterr()
-        _cmd_status({})
+        _cmd_status({}, project_root=".")
         captured = capsys.readouterr()
         assert "Watch" in captured.out
         assert "2 paths" in captured.out
 
     def test_status_no_watch_shows_dash(self, mock_git_repo, capsys):
         """Project without watch paths shows '-' when Watch column is present."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "tooling", version="1.0.0")
         _make_npm_project(mock_git_repo, "core", version="1.0.0")
-        _cmd_add(["tooling"], {})
-        _cmd_add(["core"], {})
+        _cmd_add(["tooling"], {}, project_root=".")
+        _cmd_add(["core"], {}, project_root=".")
 
         # Add watch only to tooling
         projects = load_workspace(".")
@@ -395,7 +395,7 @@ class TestMonorepoStatusWatch:
         save_workspace(".", projects)
 
         capsys.readouterr()
-        _cmd_status({})
+        _cmd_status({}, project_root=".")
         captured = capsys.readouterr()
         assert "Watch" in captured.out
         assert "1 paths" in captured.out
@@ -406,11 +406,11 @@ class TestMonorepoStatusWatch:
 
     def test_status_no_watch_column_when_none(self, mock_git_repo, capsys):
         """Watch column is omitted when no project has watch paths."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "tooling", version="1.0.0")
-        _cmd_add(["tooling"], {})
+        _cmd_add(["tooling"], {}, project_root=".")
         capsys.readouterr()
-        _cmd_status({})
+        _cmd_status({}, project_root=".")
         captured = capsys.readouterr()
         assert "Watch" not in captured.out
 
@@ -420,9 +420,9 @@ class TestMonorepoStatusRemote:
 
     def test_status_shows_remote_column(self, mock_git_repo, capsys):
         """Project with subtree_remote shows Remote column with URL."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "tooling", version="1.0.0")
-        _cmd_add(["tooling"], {})
+        _cmd_add(["tooling"], {}, project_root=".")
 
         # Add subtree_remote to workspace
         projects = load_workspace(".")
@@ -432,18 +432,18 @@ class TestMonorepoStatusRemote:
         save_workspace(".", projects)
 
         capsys.readouterr()
-        _cmd_status({})
+        _cmd_status({}, project_root=".")
         captured = capsys.readouterr()
         assert "Remote" in captured.out
         assert "git@github.com:user/tooling.git" in captured.out
 
     def test_status_no_remote_shows_dash(self, mock_git_repo, capsys):
         """Project without subtree_remote shows '-' when Remote column is present."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "tooling", version="1.0.0")
         _make_npm_project(mock_git_repo, "core", version="1.0.0")
-        _cmd_add(["tooling"], {})
-        _cmd_add(["core"], {})
+        _cmd_add(["tooling"], {}, project_root=".")
+        _cmd_add(["core"], {}, project_root=".")
 
         # Add subtree_remote only to tooling
         projects = load_workspace(".")
@@ -453,7 +453,7 @@ class TestMonorepoStatusRemote:
         save_workspace(".", projects)
 
         capsys.readouterr()
-        _cmd_status({})
+        _cmd_status({}, project_root=".")
         captured = capsys.readouterr()
         assert "Remote" in captured.out
         # core should show "-" in the Remote column
@@ -502,11 +502,11 @@ class TestMonorepoStatusLibrary:
 
     def test_library_column_shown_when_project_is_library(self, mock_git_repo, capsys):
         """Library column appears with 'yes' when a project has library = true."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "mylib", version="1.0.0")
-        _cmd_add(["mylib"], {"library": "true"})
+        _cmd_add(["mylib"], {"library": "true"}, project_root=".")
         capsys.readouterr()
-        _cmd_status({})
+        _cmd_status({}, project_root=".")
         captured = capsys.readouterr()
         header_line = captured.out.strip().split("\n")[0]
         assert "Library" in header_line
@@ -515,26 +515,26 @@ class TestMonorepoStatusLibrary:
 
     def test_library_column_hidden_when_no_library_projects(self, mock_git_repo, capsys):
         """Library column is omitted when no project has library = true."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "app-a", version="1.0.0")
         _make_npm_project(mock_git_repo, "app-b", version="2.0.0")
-        _cmd_add(["app-a"], {})
-        _cmd_add(["app-b"], {})
+        _cmd_add(["app-a"], {}, project_root=".")
+        _cmd_add(["app-b"], {}, project_root=".")
         capsys.readouterr()
-        _cmd_status({})
+        _cmd_status({}, project_root=".")
         captured = capsys.readouterr()
         header_line = captured.out.strip().split("\n")[0]
         assert "Library" not in header_line
 
     def test_library_column_mixed_workspace(self, mock_git_repo, capsys):
         """Mixed workspace: column shown, 'yes' for library projects, blank for others."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "mylib", version="1.0.0")
         _make_npm_project(mock_git_repo, "myapp", version="2.0.0")
-        _cmd_add(["mylib"], {"library": "true"})
-        _cmd_add(["myapp"], {})
+        _cmd_add(["mylib"], {"library": "true"}, project_root=".")
+        _cmd_add(["myapp"], {}, project_root=".")
         capsys.readouterr()
-        _cmd_status({})
+        _cmd_status({}, project_root=".")
         captured = capsys.readouterr()
         header_line = captured.out.strip().split("\n")[0]
         assert "Library" in header_line
@@ -557,7 +557,7 @@ class TestMonorepoStatusDeps:
         """Deps and Rdeps columns appear when projects have intra-workspace deps."""
         _setup_workspace_with_deps(mock_git_repo)
         capsys.readouterr()
-        _cmd_status({})
+        _cmd_status({}, project_root=".")
         captured = capsys.readouterr()
         header_line = captured.out.strip().split("\n")[0]
         assert "Deps" in header_line
@@ -565,13 +565,13 @@ class TestMonorepoStatusDeps:
 
     def test_deps_rdeps_columns_hidden_when_no_deps(self, mock_git_repo, capsys):
         """Deps and Rdeps columns are hidden when no intra-workspace deps exist."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "standalone-a", version="1.0.0")
         _make_npm_project(mock_git_repo, "standalone-b", version="1.0.0")
-        _cmd_add(["standalone-a"], {})
-        _cmd_add(["standalone-b"], {})
+        _cmd_add(["standalone-a"], {}, project_root=".")
+        _cmd_add(["standalone-b"], {}, project_root=".")
         capsys.readouterr()
-        _cmd_status({})
+        _cmd_status({}, project_root=".")
         captured = capsys.readouterr()
         header_line = captured.out.strip().split("\n")[0]
         assert "Deps" not in header_line
@@ -586,7 +586,7 @@ class TestMonorepoStatusDeps:
         """
         _setup_workspace_with_deps(mock_git_repo)
         capsys.readouterr()
-        _cmd_status({})
+        _cmd_status({}, project_root=".")
         captured = capsys.readouterr()
         lines = captured.out.strip().split("\n")
         header = lines[0]
@@ -639,7 +639,7 @@ class TestMonorepoStatusDeps:
         save_workspace(".", projects)
 
         capsys.readouterr()
-        _cmd_status({})
+        _cmd_status({}, project_root=".")
         captured = capsys.readouterr()
         header_line = captured.out.strip().split("\n")[0]
 

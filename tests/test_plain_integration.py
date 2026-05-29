@@ -123,13 +123,13 @@ class TestSyncSkipsPlain:
 
     def _setup_mixed_workspace(self, mock_git_repo):
         """Set up a workspace with one npm project and one plain project."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "web-app", ci=True, publish=True)
         _make_plain_project(mock_git_repo, "shared-config", version="1.0.0")
 
         # Add projects via _cmd_add
-        _cmd_add(["web-app"], {})
-        _cmd_add(["shared-config"], {"target": "plain"})
+        _cmd_add(["web-app"], {}, project_root=".")
+        _cmd_add(["shared-config"], {"target": "plain"}, project_root=".")
         _commit_all(mock_git_repo, "setup mixed workspace")
 
     def test_no_ci_workflow_for_plain(self, mock_git_repo, capsys):
@@ -138,7 +138,7 @@ class TestSyncSkipsPlain:
         capsys.readouterr()
         from unittest.mock import patch
         with patch("rlsbl.utils.find_commit_tool", return_value="git"):
-            _cmd_sync({})
+            _cmd_sync({}, project_root=".")
         dest = mock_git_repo / ".github" / "workflows" / "shared-config-ci.yml"
         assert not dest.exists(), "Plain project should not have a generated CI workflow"
 
@@ -148,7 +148,7 @@ class TestSyncSkipsPlain:
         capsys.readouterr()
         from unittest.mock import patch
         with patch("rlsbl.utils.find_commit_tool", return_value="git"):
-            _cmd_sync({})
+            _cmd_sync({}, project_root=".")
         dest = mock_git_repo / ".github" / "workflows" / "shared-config-publish.yml"
         assert not dest.exists(), "Plain project should not have a generated publish workflow"
 
@@ -158,7 +158,7 @@ class TestSyncSkipsPlain:
         capsys.readouterr()
         from unittest.mock import patch
         with patch("rlsbl.utils.find_commit_tool", return_value="git"):
-            _cmd_sync({})
+            _cmd_sync({}, project_root=".")
         ci_dest = mock_git_repo / ".github" / "workflows" / "web-app-ci.yml"
         assert ci_dest.exists(), "npm project should have a generated CI workflow"
         # Per-project publish wrappers are no longer generated; publish jobs are
@@ -176,7 +176,7 @@ class TestSyncSkipsPlain:
         capsys.readouterr()
         from unittest.mock import patch
         with patch("rlsbl.utils.find_commit_tool", return_value="git"):
-            _cmd_sync({})
+            _cmd_sync({}, project_root=".")
         router = mock_git_repo / ".github" / "workflows" / "ci-router.yml"
         assert router.exists(), "CI router should be generated"
         content = router.read_text()
@@ -192,7 +192,7 @@ class TestSyncSkipsPlain:
         capsys.readouterr()
         from unittest.mock import patch
         with patch("rlsbl.utils.find_commit_tool", return_value="git"):
-            _cmd_sync({})
+            _cmd_sync({}, project_root=".")
         router = mock_git_repo / ".github" / "workflows" / "publish.yml"
         assert router.exists(), "Publish router should be generated (npm has publish)"
         content = router.read_text()
@@ -210,12 +210,12 @@ class TestStatusShowsPlain:
 
     def test_status_shows_plain_project(self, mock_git_repo, capsys):
         """Plain project appears in status output with correct target and version."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_plain_project(mock_git_repo, "my-config", version="1.2.3")
-        _cmd_add(["my-config"], {"target": "plain"})
+        _cmd_add(["my-config"], {"target": "plain"}, project_root=".")
         capsys.readouterr()
 
-        _cmd_status({})
+        _cmd_status({}, project_root=".")
         captured = capsys.readouterr()
 
         # Header columns
@@ -230,14 +230,14 @@ class TestStatusShowsPlain:
 
     def test_status_plain_and_npm_mixed(self, mock_git_repo, capsys):
         """Both plain and npm projects show up in status with correct targets."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "webapp", version="2.0.0", ci=False)
         _make_plain_project(mock_git_repo, "specs", version="0.5.0")
-        _cmd_add(["webapp"], {})
-        _cmd_add(["specs"], {"target": "plain"})
+        _cmd_add(["webapp"], {}, project_root=".")
+        _cmd_add(["specs"], {"target": "plain"}, project_root=".")
         capsys.readouterr()
 
-        _cmd_status({})
+        _cmd_status({}, project_root=".")
         captured = capsys.readouterr()
 
         lines = captured.out.strip().split("\n")

@@ -56,20 +56,20 @@ class TestInitNoCommit:
     def test_init_no_commit_does_not_create_commit(self, mock_git_repo, capsys):
         """`monorepo init --no-commit` must not create a git commit."""
         before = _git_log_count(mock_git_repo)
-        _cmd_init({"no-commit": True})
+        _cmd_init({"no-commit": True}, project_root=".")
         after = _git_log_count(mock_git_repo)
         assert after == before, "init --no-commit should not create a commit"
 
     def test_init_default_creates_commit(self, mock_git_repo, capsys):
         """`monorepo init` (no flag) must still auto-commit (backward compat)."""
         before = _git_log_count(mock_git_repo)
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         after = _git_log_count(mock_git_repo)
         assert after == before + 1, "default init should produce exactly one commit"
 
     def test_init_no_commit_prints_message(self, mock_git_repo, capsys):
         """`monorepo init --no-commit` must print a clear skip message."""
-        _cmd_init({"no-commit": True})
+        _cmd_init({"no-commit": True}, project_root=".")
         captured = capsys.readouterr()
         assert "--no-commit" in captured.out
         assert "safegit commit" in captured.out
@@ -79,10 +79,10 @@ class TestAddNoCommit:
     def test_add_no_commit_does_not_create_commit(self, mock_git_repo, capsys):
         """`monorepo add --no-commit` must not create any commit, including
         from the auto-triggered scaffold and sync sub-commands."""
-        _cmd_init({})  # default init creates a commit; record after that
+        _cmd_init({}, project_root=".")  # default init creates a commit; record after that
         before = _git_log_count(mock_git_repo)
         _make_npm_project(mock_git_repo, "pkg-a", with_ci=True)
-        _cmd_add(["pkg-a"], {"no-commit": True})
+        _cmd_add(["pkg-a"], {"no-commit": True}, project_root=".")
         after = _git_log_count(mock_git_repo)
         assert after == before, (
             f"add --no-commit should produce zero commits "
@@ -91,10 +91,10 @@ class TestAddNoCommit:
 
     def test_add_default_creates_commit(self, mock_git_repo, capsys):
         """`monorepo add` (no flag) must still auto-commit workspace.toml."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         before = _git_log_count(mock_git_repo)
         _make_npm_project(mock_git_repo, "pkg-a", with_ci=True)
-        _cmd_add(["pkg-a"], {})
+        _cmd_add(["pkg-a"], {}, project_root=".")
         after = _git_log_count(mock_git_repo)
         # We expect at least one commit (workspace.toml add). The auto-triggered
         # scaffold and sync may also commit. Either way, count must increase.
@@ -102,10 +102,10 @@ class TestAddNoCommit:
 
     def test_add_no_commit_prints_message(self, mock_git_repo, capsys):
         """`monorepo add --no-commit` must print the skip message."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "pkg-a", with_ci=True)
         capsys.readouterr()  # drain prior output
-        _cmd_add(["pkg-a"], {"no-commit": True})
+        _cmd_add(["pkg-a"], {"no-commit": True}, project_root=".")
         captured = capsys.readouterr()
         assert "--no-commit" in captured.out
         assert "safegit commit" in captured.out
@@ -114,9 +114,9 @@ class TestAddNoCommit:
 class TestSyncNoCommit:
     def _setup_workspace(self, mock_git_repo):
         """Create init + one project + one CI workflow, all committed."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "pkg-a", with_ci=True)
-        _cmd_add(["pkg-a"], {})
+        _cmd_add(["pkg-a"], {}, project_root=".")
         # Commit any remaining untracked files from auto-scaffold so the
         # working tree is clean before testing sync.
         subprocess.run(["git", "add", "-A"], cwd=str(mock_git_repo), check=True)
@@ -151,7 +151,7 @@ class TestSyncNoCommit:
                     cwd=str(mock_git_repo), check=True,
                 )
         before = _git_log_count(mock_git_repo)
-        _cmd_sync({"no-commit": True})
+        _cmd_sync({"no-commit": True}, project_root=".")
         after = _git_log_count(mock_git_repo)
         assert after == before, "sync --no-commit should not create a commit"
 
@@ -159,7 +159,7 @@ class TestSyncNoCommit:
         """`monorepo sync --no-commit` must print the skip message."""
         self._setup_workspace(mock_git_repo)
         capsys.readouterr()  # drain prior output
-        _cmd_sync({"no-commit": True})
+        _cmd_sync({"no-commit": True}, project_root=".")
         captured = capsys.readouterr()
         assert "--no-commit" in captured.out
         assert "safegit commit" in captured.out
@@ -184,7 +184,7 @@ class TestSyncNoCommit:
                     cwd=str(mock_git_repo), check=True,
                 )
         before = _git_log_count(mock_git_repo)
-        _cmd_sync({})
+        _cmd_sync({}, project_root=".")
         after = _git_log_count(mock_git_repo)
         assert after == before + 1, (
             f"default sync should produce one commit when files are written, "

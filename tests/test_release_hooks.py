@@ -89,7 +89,7 @@ class TestPreReleaseHookOutput:
             from rlsbl.commands.release import run_cmd
 
             # dry-run to avoid needing full release mocks
-            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True})
+            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, project_root=".", monorepo_root=None)
 
             # Verify subprocess.run was called for the hook
             assert mock_sp.run.call_count == 1
@@ -134,7 +134,7 @@ class TestPreReleaseHookOutput:
             from rlsbl.commands.release import run_cmd
 
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(_rc(), {"quiet": True, "yes": True})
+                run_cmd(_rc(), {"quiet": True, "yes": True}, project_root=".", monorepo_root=None)
 
             assert exc_info.value.code == 1
             captured = capsys.readouterr()
@@ -175,7 +175,7 @@ class TestPreReleaseHookOutput:
             from rlsbl.commands.release import run_cmd
 
             # dry-run: should complete without subprocess.run being called for hooks
-            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True})
+            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, project_root=".", monorepo_root=None)
             mock_sp.run.assert_not_called()
 
 
@@ -246,7 +246,7 @@ class TestPostReleaseHookOutput:
             from rlsbl.commands.release import run_cmd
 
             # Should NOT raise -- post-release hook failure is non-fatal
-            run_cmd(_rc(), {"quiet": True, "yes": True})
+            run_cmd(_rc(), {"quiet": True, "yes": True}, project_root=".", monorepo_root=None)
 
         captured = capsys.readouterr()
         assert "exited with code 3" in captured.err
@@ -326,7 +326,7 @@ class TestWatchSHABeforePostHook:
 
             from rlsbl.commands.release import run_cmd
 
-            run_cmd(_rc(), {"yes": True})
+            run_cmd(_rc(), {"yes": True}, project_root=".", monorepo_root=None)
 
         captured = capsys.readouterr()
         # The watch message must use the SHA captured before the post-release hook
@@ -388,7 +388,7 @@ class TestHookTimeout:
             from rlsbl.commands.release import run_cmd
 
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(_rc(), {"quiet": True, "yes": True})
+                run_cmd(_rc(), {"quiet": True, "yes": True}, project_root=".", monorepo_root=None)
 
             assert exc_info.value.code == 1
             captured = capsys.readouterr()
@@ -431,7 +431,7 @@ class TestHookCwdStandalone:
 
             from rlsbl.commands.release import run_cmd
 
-            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True})
+            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, project_root=".", monorepo_root=None)
 
             assert mock_sp.run.call_count >= 1
             # The pre-checks hook call should have cwd=None
@@ -471,7 +471,7 @@ class TestHookCwdStandalone:
 
             from rlsbl.commands.release import run_cmd
 
-            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True})
+            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, project_root=".", monorepo_root=None)
 
             assert mock_sp.run.call_count >= 1
             # The pre-release hook call should have cwd=None
@@ -532,7 +532,7 @@ class TestHookCwdStandalone:
 
             from rlsbl.commands.release import run_cmd
 
-            run_cmd(_rc(), {"quiet": True, "yes": True})
+            run_cmd(_rc(), {"quiet": True, "yes": True}, project_root=".", monorepo_root=None)
 
             # Find the post-release hook call (it's the one with post-release.sh in args)
             post_release_calls = [
@@ -596,7 +596,7 @@ class TestHookCwdMonorepo:
 
             from rlsbl.commands.release import run_cmd
 
-            run_cmd(_rc(include=["pypi"]), {"dry-run": True, "quiet": True, "yes": True})
+            run_cmd(_rc(include=["pypi"]), {"dry-run": True, "quiet": True, "yes": True}, project_root=".", monorepo_root=None)
 
             # Find the pre-checks hook call
             pre_checks_calls = [
@@ -657,7 +657,7 @@ class TestHookCwdMonorepo:
 
             from rlsbl.commands.release import run_cmd
 
-            run_cmd(_rc(include=["pypi"]), {"dry-run": True, "quiet": True, "yes": True})
+            run_cmd(_rc(include=["pypi"]), {"dry-run": True, "quiet": True, "yes": True}, project_root=".", monorepo_root=None)
 
             # Find the pre-release hook call
             pre_release_calls = [
@@ -738,7 +738,7 @@ class TestHookCwdMonorepo:
 
             from rlsbl.commands.release import run_cmd
 
-            run_cmd(_rc(include=["pypi"]), {"quiet": True, "yes": True})
+            run_cmd(_rc(include=["pypi"]), {"quiet": True, "yes": True}, project_root=".", monorepo_root=None)
 
             # Find the post-release hook call
             post_release_calls = [
@@ -896,7 +896,7 @@ class TestHookGeneratedFiles:
             patch("rlsbl.commands.release.push_if_needed"),
             patch("rlsbl.commands.release.run", side_effect=_fake_run_intercepting_remote),
         ):
-            run_cmd(_rc(), {"yes": True})
+            run_cmd(_rc(), {"yes": True}, project_root=".", monorepo_root=None)
 
         # Verify the release commit includes schema.json
         # The release commit is HEAD~1 (before the finalize commit)
@@ -940,7 +940,7 @@ class TestHookGeneratedFiles:
             patch("rlsbl.commands.release.push_if_needed"),
             patch("rlsbl.commands.release.run", side_effect=_fake_run_intercepting_remote),
         ):
-            run_cmd(_rc(), {"yes": True})
+            run_cmd(_rc(), {"yes": True}, project_root=".", monorepo_root=None)
 
         # Find the release commit
         result = subprocess.run(
@@ -1013,7 +1013,7 @@ class TestHookGeneratedFiles:
             patch("rlsbl.commands.release.push_if_needed"),
             patch("rlsbl.commands.release.run", side_effect=_fake_run_intercepting_remote),
         ):
-            run_cmd(_rc(), {"yes": True, "quiet": True})
+            run_cmd(_rc(), {"yes": True, "quiet": True}, project_root=".", monorepo_root=None)
 
         # Verify that the release completed
         pkg = json.loads((tmp_project / "package.json").read_text())
@@ -1076,7 +1076,10 @@ class TestHookGeneratedFiles:
             run_cmd(
                 _rc(),
                 {"yes": True, "quiet": True, "allow-dirty": True},
-            )
+            
+                project_root=".",
+                monorepo_root=None,
+)
 
         # Verify the release completed
         pkg = json.loads((tmp_project / "package.json").read_text())

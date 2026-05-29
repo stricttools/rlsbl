@@ -152,7 +152,10 @@ class TestReleaseAbortCleanup:
                         "yes": True,
                         "quiet": True,
                     },
-                )
+                
+                    project_root=".",
+                    monorepo_root=None,
+)
 
         assert exc_info.value.code == 1, "release should exit 1 on hook failure"
 
@@ -201,7 +204,10 @@ class TestReleaseAbortCleanup:
                         "yes": True,
                         "quiet": True,
                     },
-                )
+                
+                    project_root=".",
+                    monorepo_root=None,
+)
 
         assert exc_info.value.code == 1
         # .validated may be written by changelog validation; tolerate that
@@ -280,7 +286,10 @@ class TestReleaseAbortCleanup:
                         "yes": True,
                         "quiet": True,
                     },
-                )
+                
+                    project_root=".",
+                    monorepo_root=None,
+)
 
         # .validated may be written by changelog validation; tolerate that
         # specific file but require nothing else changed.

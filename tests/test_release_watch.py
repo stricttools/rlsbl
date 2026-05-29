@@ -121,7 +121,10 @@ class TestNoWatchPrintsHint:
         run_cmd(
             _rc(),
             {"dry-run": True, "quiet": False, "yes": True, "watch": False},
-        )
+        
+            project_root=".",
+            monorepo_root=None,
+)
 
         captured = capsys.readouterr()
         # Dry-run exits before the watch/hint logic, so we just verify it
@@ -169,7 +172,10 @@ class TestWatchInvokesWatchCmd:
         run_cmd(
             _rc(),
             {"dry-run": True, "quiet": False, "yes": True, "watch": True},
-        )
+        
+            project_root=".",
+            monorepo_root=None,
+)
 
         captured = capsys.readouterr()
         assert "Dry run" in captured.out
@@ -221,7 +227,10 @@ class TestWatchInvokedAfterRelease:
         _push,
         tmp_project,
         capsys,
-    ):
+    
+        project_root=".",
+        monorepo_root=None,
+):
         """After a successful release with --watch, watch.run_cmd is called."""
         _setup_npm_project(tmp_project)
         mock_config.return_value = {"private": False}
@@ -264,7 +273,10 @@ class TestWatchInvokedAfterRelease:
             run_cmd(
                 _rc(),
                 {"yes": True, "quiet": False, "watch": True},
-            )
+            
+                project_root=".",
+                monorepo_root=None,
+)
             mock_watch.assert_called_once_with(None, [fake_sha], {})
 
     @patch("rlsbl.commands.release.push_if_needed")
@@ -345,7 +357,10 @@ class TestWatchInvokedAfterRelease:
             run_cmd(
                 _rc(),
                 {"yes": True, "quiet": False, "watch": False},
-            )
+            
+                project_root=".",
+                monorepo_root=None,
+)
             mock_watch.assert_not_called()
 
         captured = capsys.readouterr()

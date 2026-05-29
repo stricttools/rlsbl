@@ -90,7 +90,7 @@ class TestWarnSuppressedWhenEnvSet:
         with patch("sys.stdin", StringIO(stdin_data)), \
              patch("sys.stdin.isatty", return_value=False):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {})
+                run_cmd(None, [], {}, project_root=".")
 
         captured = capsys.readouterr()
         assert WARN_MARKER not in captured.err
@@ -109,7 +109,7 @@ class TestWarnOnManualMainPush:
         with patch("sys.stdin", StringIO(stdin_data)), \
              patch("sys.stdin.isatty", return_value=False):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {})
+                run_cmd(None, [], {}, project_root=".")
 
         captured = capsys.readouterr()
         assert WARN_MARKER in captured.err
@@ -124,7 +124,7 @@ class TestWarnOnManualMainPush:
         with patch("sys.stdin", StringIO(stdin_data)), \
              patch("sys.stdin.isatty", return_value=False):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {})
+                run_cmd(None, [], {}, project_root=".")
 
         captured = capsys.readouterr()
         assert WARN_MARKER in captured.err
@@ -142,7 +142,7 @@ class TestNoWarnOnFeatureBranch:
         with patch("sys.stdin", StringIO(stdin_data)), \
              patch("sys.stdin.isatty", return_value=False):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {})
+                run_cmd(None, [], {}, project_root=".")
 
         captured = capsys.readouterr()
         assert WARN_MARKER not in captured.err
@@ -160,7 +160,7 @@ class TestWarningGoesToStderr:
         with patch("sys.stdin", StringIO(stdin_data)), \
              patch("sys.stdin.isatty", return_value=False):
             with pytest.raises(SystemExit):
-                run_cmd(None, [], {})
+                run_cmd(None, [], {}, project_root=".")
 
         captured = capsys.readouterr()
         assert WARN_MARKER in captured.err
@@ -178,7 +178,7 @@ class TestExitsZeroWhenWarning:
         with patch("sys.stdin", StringIO(stdin_data)), \
              patch("sys.stdin.isatty", return_value=False):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {})
+                run_cmd(None, [], {}, project_root=".")
 
         captured = capsys.readouterr()
         assert WARN_MARKER in captured.err
@@ -200,7 +200,7 @@ class TestTagOnlyPushNoWarning:
         with patch("sys.stdin", StringIO(stdin_data)), \
              patch("sys.stdin.isatty", return_value=False):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {})
+                run_cmd(None, [], {}, project_root=".")
 
         captured = capsys.readouterr()
         assert WARN_MARKER not in captured.err
@@ -216,7 +216,7 @@ class TestTagOnlyPushNoWarning:
         with patch("sys.stdin", StringIO(stdin_data)), \
              patch("sys.stdin.isatty", return_value=False):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {})
+                run_cmd(None, [], {}, project_root=".")
 
         captured = capsys.readouterr()
         assert WARN_MARKER not in captured.err
@@ -241,7 +241,7 @@ class TestReleaseBranchesConfigOverride:
         with patch("sys.stdin", StringIO(stdin_data)), \
              patch("sys.stdin.isatty", return_value=False):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {})
+                run_cmd(None, [], {}, project_root=".")
 
         captured = capsys.readouterr()
         assert WARN_MARKER not in captured.err
@@ -261,7 +261,7 @@ class TestReleaseBranchesConfigOverride:
         with patch("sys.stdin", StringIO(stdin_data)), \
              patch("sys.stdin.isatty", return_value=False):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {})
+                run_cmd(None, [], {}, project_root=".")
 
         captured = capsys.readouterr()
         assert WARN_MARKER in captured.err
@@ -272,19 +272,19 @@ class TestGetReleaseBranches:
     """Unit tests for the _get_release_branches helper."""
 
     def test_default_when_no_config(self, tmp_project):
-        assert _get_release_branches() == ["main", "master"]
+        assert _get_release_branches(project_root=".") == ["main", "master"]
 
     def test_default_when_key_missing(self, tmp_project):
         (tmp_project / ".rlsbl").mkdir()
         (tmp_project / ".rlsbl" / "config.json").write_text(json.dumps({"other": 1}))
-        assert _get_release_branches() == ["main", "master"]
+        assert _get_release_branches(project_root=".") == ["main", "master"]
 
     def test_override(self, tmp_project):
         (tmp_project / ".rlsbl").mkdir()
         (tmp_project / ".rlsbl" / "config.json").write_text(
             json.dumps({"release_branches": ["trunk", "stable"]})
         )
-        assert _get_release_branches() == ["trunk", "stable"]
+        assert _get_release_branches(project_root=".") == ["trunk", "stable"]
 
     def test_empty_list_raises(self, tmp_project):
         """An empty list would silently disable the warning entirely.
@@ -296,7 +296,7 @@ class TestGetReleaseBranches:
             json.dumps({"release_branches": []})
         )
         with pytest.raises(ValueError) as excinfo:
-            _get_release_branches()
+            _get_release_branches(project_root=".")
         msg = str(excinfo.value)
         assert ".rlsbl/config.json" in msg
         assert "release_branches" in msg
@@ -311,7 +311,7 @@ class TestGetReleaseBranches:
             json.dumps({"release_branches": "main"})
         )
         with pytest.raises(ValueError) as excinfo:
-            _get_release_branches()
+            _get_release_branches(project_root=".")
         msg = str(excinfo.value)
         assert ".rlsbl/config.json" in msg
         assert "release_branches" in msg
@@ -324,16 +324,17 @@ class TestWarnHelperDirect:
     def test_env_set_skips(self, monkeypatch, capsys):
         monkeypatch.setenv("RLSBL_RELEASE_PUSH", "1")
         _warn_if_manual_release_push(
-            ["refs/heads/main abc refs/heads/main def"]
+            ["refs/heads/main abc refs/heads/main def"],
+            project_root=".",
         )
         assert WARN_MARKER not in capsys.readouterr().err
 
     def test_empty_lines_no_warn(self, monkeypatch, capsys):
         monkeypatch.delenv("RLSBL_RELEASE_PUSH", raising=False)
-        _warn_if_manual_release_push([])
+        _warn_if_manual_release_push([], project_root=".")
         assert WARN_MARKER not in capsys.readouterr().err
 
     def test_none_lines_no_warn(self, monkeypatch, capsys):
         monkeypatch.delenv("RLSBL_RELEASE_PUSH", raising=False)
-        _warn_if_manual_release_push(None)
+        _warn_if_manual_release_push(None, project_root=".")
         assert WARN_MARKER not in capsys.readouterr().err

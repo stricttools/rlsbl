@@ -1,7 +1,7 @@
 """Tests for release file integration with rlsbl release.
 
 Verifies that:
-- run_cmd(ReleaseConfig, flags) works (dry-run mode)
+- run_cmd(ReleaseConfig, flags, project_root=".", monorepo_root=None) works (dry-run mode)
 - Missing release file gives correct error in cmd_release
 - Include/exclude validation catches mismatches with detected targets
 """
@@ -64,7 +64,7 @@ def _setup_multi_target_project(tmp_path, targets):
 # ---------------------------------------------------------------------------
 
 class TestRunCmdWithReleaseConfig:
-    """run_cmd(ReleaseConfig, flags) works correctly in dry-run mode."""
+    """run_cmd(ReleaseConfig, flags, project_root=".", monorepo_root=None) works correctly in dry-run mode."""
 
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
@@ -103,7 +103,7 @@ class TestRunCmdWithReleaseConfig:
             include=["npm"],
             exclude=[],
         )
-        run_cmd(config, {"dry-run": True, "quiet": False, "yes": True})
+        run_cmd(config, {"dry-run": True, "quiet": False, "yes": True}, project_root=".", monorepo_root=None)
 
         captured = capsys.readouterr()
         assert "1.0.1" in captured.out
@@ -145,7 +145,7 @@ class TestRunCmdWithReleaseConfig:
             include=["npm"],
             exclude=[],
         )
-        run_cmd(config, {"dry-run": True, "quiet": False, "yes": True})
+        run_cmd(config, {"dry-run": True, "quiet": False, "yes": True}, project_root=".", monorepo_root=None)
 
         captured = capsys.readouterr()
         assert "1.1.0" in captured.out
@@ -186,7 +186,7 @@ class TestRunCmdWithReleaseConfig:
             include=["npm"],
             exclude=[],
         )
-        run_cmd(config, {"dry-run": True, "quiet": False, "yes": True})
+        run_cmd(config, {"dry-run": True, "quiet": False, "yes": True}, project_root=".", monorepo_root=None)
 
         captured = capsys.readouterr()
         assert "2.0.0" in captured.out
@@ -223,7 +223,7 @@ class TestTargetExhaustivenessValidation:
             exclude=[],
         )
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(config, {"dry-run": True, "quiet": True, "yes": True})
+            run_cmd(config, {"dry-run": True, "quiet": True, "yes": True}, project_root=".", monorepo_root=None)
 
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
@@ -266,7 +266,7 @@ class TestTargetExhaustivenessValidation:
             exclude=["pypi"],
         )
         # Should succeed without SystemExit
-        run_cmd(config, {"dry-run": True, "quiet": False, "yes": True})
+        run_cmd(config, {"dry-run": True, "quiet": False, "yes": True}, project_root=".", monorepo_root=None)
 
         captured = capsys.readouterr()
         assert "Dry run" in captured.out
@@ -281,7 +281,7 @@ class TestTargetExhaustivenessValidation:
             exclude=[],
         )
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(config, {"dry-run": True, "quiet": True, "yes": True})
+            run_cmd(config, {"dry-run": True, "quiet": True, "yes": True}, project_root=".", monorepo_root=None)
 
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
@@ -324,7 +324,7 @@ class TestTargetExhaustivenessValidation:
             exclude=["pypi"],  # pypi not detected but listed in exclude
         )
         # Should succeed (warning, not error)
-        run_cmd(config, {"dry-run": True, "quiet": False, "yes": True})
+        run_cmd(config, {"dry-run": True, "quiet": False, "yes": True}, project_root=".", monorepo_root=None)
 
         captured = capsys.readouterr()
         assert "not detected in project" in captured.err
@@ -342,7 +342,7 @@ class TestTargetExhaustivenessValidation:
             exclude=["npm"],
         )
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(config, {"dry-run": True, "quiet": True, "yes": True})
+            run_cmd(config, {"dry-run": True, "quiet": True, "yes": True}, project_root=".", monorepo_root=None)
 
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
@@ -413,7 +413,7 @@ class TestCmdReleaseInvalidFile:
 # ---------------------------------------------------------------------------
 
 class TestReleaseConfigSignature:
-    """run_cmd(ReleaseConfig, flags) is the only supported calling convention."""
+    """run_cmd(ReleaseConfig, flags, project_root=".", monorepo_root=None) is the only supported calling convention."""
 
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
@@ -441,14 +441,17 @@ class TestReleaseConfigSignature:
         tmp_project,
         capsys,
     ):
-        """run_cmd(ReleaseConfig, flags) works in dry-run mode."""
+        """run_cmd(ReleaseConfig, flags, project_root=".", monorepo_root=None) works in dry-run mode."""
         _setup_npm_project(tmp_project)
         mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
 
         run_cmd(
             ReleaseConfig(bump="patch", include=["npm"], exclude=[]),
             {"dry-run": True, "quiet": False, "yes": True},
-        )
+        
+            project_root=".",
+            monorepo_root=None,
+)
 
         captured = capsys.readouterr()
         assert "1.0.1" in captured.out
@@ -613,7 +616,7 @@ class TestMonorepoDirectoryScoping:
             include=["pypi"],
             exclude=[],
         )
-        run_cmd(config, {"dry-run": True, "quiet": False, "yes": True})
+        run_cmd(config, {"dry-run": True, "quiet": False, "yes": True}, project_root=".", monorepo_root=None)
 
         # Verify validate_unreleased was called with a non-None project dict
         mock_validate.assert_called_once()

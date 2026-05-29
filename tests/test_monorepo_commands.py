@@ -20,7 +20,7 @@ def _make_npm_project(base_path, subdir):
 
 class TestInit:
     def test_creates_workspace(self, mock_git_repo, capsys):
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         ws_file = mock_git_repo / WORKSPACE_DIR / WORKSPACE_FILE
         assert ws_file.exists()
         projects = load_workspace(str(mock_git_repo))
@@ -29,16 +29,16 @@ class TestInit:
         assert "Initialized monorepo workspace" in captured.out
 
     def test_refuses_reinit(self, mock_git_repo):
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         with pytest.raises(SystemExit):
-            _cmd_init({})
+            _cmd_init({}, project_root=".")
 
 
 class TestAdd:
     def test_adds_project(self, mock_git_repo, capsys):
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "pkg-a")
-        _cmd_add(["pkg-a"], {})
+        _cmd_add(["pkg-a"], {}, project_root=".")
         projects = load_workspace(str(mock_git_repo))
         assert len(projects) == 1
         assert projects[0]["path"] == "pkg-a"
@@ -47,182 +47,182 @@ class TestAdd:
         assert "Added project 'pkg-a' at pkg-a" in captured.out
 
     def test_uses_name_flag(self, mock_git_repo, capsys):
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "libs/core")
-        _cmd_add(["libs/core"], {"name": "core-lib"})
+        _cmd_add(["libs/core"], {"name": "core-lib"}, project_root=".")
         projects = load_workspace(str(mock_git_repo))
         assert projects[0]["name"] == "core-lib"
         captured = capsys.readouterr()
         assert "core-lib" in captured.out
 
     def test_refuses_no_args(self, mock_git_repo):
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         with pytest.raises(SystemExit):
-            _cmd_add([], {})
+            _cmd_add([], {}, project_root=".")
 
     def test_refuses_nonexistent_path(self, mock_git_repo):
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         with pytest.raises(SystemExit):
-            _cmd_add(["nonexistent"], {})
+            _cmd_add(["nonexistent"], {}, project_root=".")
 
     def test_refuses_no_target(self, mock_git_repo):
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         os.makedirs(str(mock_git_repo / "empty-dir"))
         with pytest.raises(SystemExit):
-            _cmd_add(["empty-dir"], {})
+            _cmd_add(["empty-dir"], {}, project_root=".")
 
     def test_refuses_duplicate_path(self, mock_git_repo):
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "pkg-a")
-        _cmd_add(["pkg-a"], {})
+        _cmd_add(["pkg-a"], {}, project_root=".")
         with pytest.raises(SystemExit):
-            _cmd_add(["pkg-a"], {})
+            _cmd_add(["pkg-a"], {}, project_root=".")
 
     def test_refuses_duplicate_name(self, mock_git_repo):
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "pkg-a")
         _make_npm_project(mock_git_repo, "pkg-b")
-        _cmd_add(["pkg-a"], {"name": "shared"})
+        _cmd_add(["pkg-a"], {"name": "shared"}, project_root=".")
         with pytest.raises(SystemExit):
-            _cmd_add(["pkg-b"], {"name": "shared"})
+            _cmd_add(["pkg-b"], {"name": "shared"}, project_root=".")
 
     def test_refuses_without_init(self, mock_git_repo):
         _make_npm_project(mock_git_repo, "pkg-a")
         with pytest.raises(SystemExit):
-            _cmd_add(["pkg-a"], {})
+            _cmd_add(["pkg-a"], {}, project_root=".")
 
     def test_watch_flag_creates_watch_list(self, mock_git_repo, capsys):
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "myproject")
-        _cmd_add(["myproject"], {"watch": "Package.swift,shared/**"})
+        _cmd_add(["myproject"], {"watch": "Package.swift,shared/**"}, project_root=".")
         projects = load_workspace(str(mock_git_repo))
         assert len(projects) == 1
         assert projects[0]["watch"] == ["Package.swift", "shared/**"]
 
     def test_subtree_remote_flag(self, mock_git_repo, capsys):
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "myproject")
-        _cmd_add(["myproject"], {"subtree-remote": "git@github.com:user/pkg.git"})
+        _cmd_add(["myproject"], {"subtree-remote": "git@github.com:user/pkg.git"}, project_root=".")
         projects = load_workspace(str(mock_git_repo))
         assert len(projects) == 1
         assert projects[0]["subtree_remote"] == "git@github.com:user/pkg.git"
 
     def test_depends_on_flag(self, mock_git_repo, capsys):
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "core")
         _make_npm_project(mock_git_repo, "utils")
         _make_npm_project(mock_git_repo, "app")
-        _cmd_add(["core"], {})
-        _cmd_add(["utils"], {})
+        _cmd_add(["core"], {}, project_root=".")
+        _cmd_add(["utils"], {}, project_root=".")
         capsys.readouterr()
-        _cmd_add(["app"], {"depends-on": "core,utils"})
+        _cmd_add(["app"], {"depends-on": "core,utils"}, project_root=".")
         projects = load_workspace(str(mock_git_repo))
         app_proj = [p for p in projects if p["name"] == "app"][0]
         assert app_proj["depends_on"] == ["core", "utils"]
 
     def test_depends_on_nonexistent_errors(self, mock_git_repo, capsys):
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "app")
         with pytest.raises(SystemExit):
-            _cmd_add(["app"], {"depends-on": "nonexistent"})
+            _cmd_add(["app"], {"depends-on": "nonexistent"}, project_root=".")
         captured = capsys.readouterr()
         assert "does not exist" in captured.err
 
     def test_no_depends_on_omits_field(self, mock_git_repo, capsys):
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "standalone")
-        _cmd_add(["standalone"], {})
+        _cmd_add(["standalone"], {}, project_root=".")
         projects = load_workspace(str(mock_git_repo))
         assert "depends_on" not in projects[0]
 
     def test_library_true_sets_field(self, mock_git_repo, capsys):
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "mylib")
-        _cmd_add(["mylib"], {"library": "true"})
+        _cmd_add(["mylib"], {"library": "true"}, project_root=".")
         projects = load_workspace(str(mock_git_repo))
         assert projects[0]["library"] is True
 
     def test_library_false_omits_field(self, mock_git_repo, capsys):
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "myapp")
-        _cmd_add(["myapp"], {"library": "false"})
+        _cmd_add(["myapp"], {"library": "false"}, project_root=".")
         projects = load_workspace(str(mock_git_repo))
         assert "library" not in projects[0]
 
     def test_no_library_flag_omits_field(self, mock_git_repo, capsys):
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "noflag")
-        _cmd_add(["noflag"], {})
+        _cmd_add(["noflag"], {}, project_root=".")
         projects = load_workspace(str(mock_git_repo))
         assert "library" not in projects[0]
 
     def test_library_invalid_errors(self, mock_git_repo, capsys):
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "badlib")
         with pytest.raises(SystemExit):
-            _cmd_add(["badlib"], {"library": "invalid"})
+            _cmd_add(["badlib"], {"library": "invalid"}, project_root=".")
         captured = capsys.readouterr()
         assert "--library must be 'true' or 'false'" in captured.err
 
 
 class TestRemove:
     def test_removes_project(self, mock_git_repo, capsys):
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "pkg-a")
-        _cmd_add(["pkg-a"], {})
+        _cmd_add(["pkg-a"], {}, project_root=".")
         capsys.readouterr()  # clear
-        _cmd_remove(["pkg-a"], {})
+        _cmd_remove(["pkg-a"], {}, project_root=".")
         projects = load_workspace(str(mock_git_repo))
         assert len(projects) == 0
         captured = capsys.readouterr()
         assert "Removed project at pkg-a" in captured.out
 
     def test_warning_on_missing_project(self, mock_git_repo, capsys):
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         # Should NOT raise SystemExit -- just warn
-        _cmd_remove(["nonexistent"], {})
+        _cmd_remove(["nonexistent"], {}, project_root=".")
         captured = capsys.readouterr()
         assert "Warning:" in captured.err
 
     def test_normalizes_trailing_slash(self, mock_git_repo, capsys):
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "pkg-a")
-        _cmd_add(["pkg-a"], {})
+        _cmd_add(["pkg-a"], {}, project_root=".")
         capsys.readouterr()
-        _cmd_remove(["pkg-a/"], {})
+        _cmd_remove(["pkg-a/"], {}, project_root=".")
         projects = load_workspace(str(mock_git_repo))
         assert len(projects) == 0
 
     def test_refuses_no_args(self, mock_git_repo):
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         with pytest.raises(SystemExit):
-            _cmd_remove([], {})
+            _cmd_remove([], {}, project_root=".")
 
     def test_refuses_without_init(self, mock_git_repo):
         with pytest.raises(SystemExit):
-            _cmd_remove(["pkg-a"], {})
+            _cmd_remove(["pkg-a"], {}, project_root=".")
 
     def test_nonexistent_path_warns_without_exit(self, mock_git_repo, capsys):
         """Removing a path not in the workspace prints a warning, does not sys.exit."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "pkg-a")
-        _cmd_add(["pkg-a"], {})
+        _cmd_add(["pkg-a"], {}, project_root=".")
         capsys.readouterr()
         # Should NOT raise SystemExit
-        _cmd_remove(["nonexistent"], {})
+        _cmd_remove(["nonexistent"], {}, project_root=".")
         captured = capsys.readouterr()
         assert "Warning:" in captured.err
 
 
 class TestList:
     def test_lists_projects(self, mock_git_repo, capsys):
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "tooling")
         _make_npm_project(mock_git_repo, "core")
-        _cmd_add(["tooling"], {})
-        _cmd_add(["core"], {})
+        _cmd_add(["tooling"], {}, project_root=".")
+        _cmd_add(["core"], {}, project_root=".")
         capsys.readouterr()
-        _cmd_list({})
+        _cmd_list({}, project_root=".")
         captured = capsys.readouterr()
         assert "Name" in captured.out
         assert "Path" in captured.out
@@ -230,24 +230,24 @@ class TestList:
         assert "core" in captured.out
 
     def test_empty_workspace_message(self, mock_git_repo, capsys):
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         capsys.readouterr()
-        _cmd_list({})
+        _cmd_list({}, project_root=".")
         captured = capsys.readouterr()
         assert "No projects in workspace." in captured.out
 
     def test_refuses_without_init(self, mock_git_repo):
         with pytest.raises(SystemExit):
-            _cmd_list({})
+            _cmd_list({}, project_root=".")
 
     def test_column_alignment(self, mock_git_repo, capsys):
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         _make_npm_project(mock_git_repo, "a")
         _make_npm_project(mock_git_repo, "longname")
-        _cmd_add(["a"], {"name": "short"})
-        _cmd_add(["longname"], {"name": "very-long-name"})
+        _cmd_add(["a"], {"name": "short"}, project_root=".")
+        _cmd_add(["longname"], {"name": "very-long-name"}, project_root=".")
         capsys.readouterr()
-        _cmd_list({})
+        _cmd_list({}, project_root=".")
         captured = capsys.readouterr()
         lines = captured.out.strip().split("\n")
         assert len(lines) == 3  # header + 2 projects

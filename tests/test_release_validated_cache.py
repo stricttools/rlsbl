@@ -111,7 +111,10 @@ class TestReleaseValidatedCache(unittest.TestCase):
             run_cmd(_rc(), {
                 "yes": True,
                 "quiet": False,
-            })
+            },
+            project_root=".",
+            monorepo_root=None,
+)
 
     @patch("rlsbl.commands.release.release_lock")
     @patch("rlsbl.commands.release.acquire_lock")
@@ -158,7 +161,10 @@ class TestReleaseValidatedCache(unittest.TestCase):
                 run_cmd(_rc(), {
                     "yes": True,
                     "quiet": False,
-                })
+                },
+                project_root=".",
+                monorepo_root=None,
+)
             self.assertEqual(ctx.exception.code, 1)
 
 

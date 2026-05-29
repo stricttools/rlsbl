@@ -332,7 +332,7 @@ class TestCmdSnapshot:
         monkeypatch.setattr(snap_mod, "commit_files_if_changed", lambda *a, **kw: committed.append(a))
 
         from rlsbl.commands.monorepo import _cmd_snapshot
-        _cmd_snapshot({"check": False})
+        _cmd_snapshot({"check": False}, project_root=".")
 
         captured = capsys.readouterr()
         assert "Wrote" in captured.out
@@ -366,7 +366,7 @@ class TestCmdSnapshot:
         write_snapshot(root, snapshot)
 
         from rlsbl.commands.monorepo import _cmd_snapshot
-        _cmd_snapshot({"check": True})
+        _cmd_snapshot({"check": True}, project_root=".")
 
         captured = capsys.readouterr()
         assert "up-to-date" in captured.out
@@ -394,7 +394,7 @@ class TestCmdSnapshot:
 
         from rlsbl.commands.monorepo import _cmd_snapshot
         with pytest.raises(SystemExit) as exc_info:
-            _cmd_snapshot({"check": True})
+            _cmd_snapshot({"check": True}, project_root=".")
 
         assert exc_info.value.code == 1
         captured = capsys.readouterr()

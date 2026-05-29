@@ -43,7 +43,7 @@ class TestReleaseOrderWithDeps:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_release_order({})
+        _cmd_release_order({}, project_root=".")
         captured = capsys.readouterr()
 
         assert "Release order (leaves first):" in captured.out
@@ -68,7 +68,7 @@ class TestReleaseOrderWithDeps:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_release_order({})
+        _cmd_release_order({}, project_root=".")
         captured = capsys.readouterr()
 
         lines = [l.strip() for l in captured.out.strip().split("\n") if l.strip() and l.strip()[0].isdigit()]
@@ -98,7 +98,7 @@ class TestReleaseOrderIndependent:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_release_order({})
+        _cmd_release_order({}, project_root=".")
         captured = capsys.readouterr()
 
         assert "All projects are independent (no intra-workspace dependencies)." in captured.out
@@ -124,7 +124,7 @@ class TestReleaseOrderCycle:
         _init_workspace(mock_git_repo, projects)
 
         with pytest.raises(SystemExit) as exc_info:
-            _cmd_release_order({})
+            _cmd_release_order({}, project_root=".")
 
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
@@ -136,14 +136,14 @@ class TestReleaseOrderEdgeCases:
 
     def test_empty_workspace(self, mock_git_repo, capsys):
         """Empty workspace prints a message and returns."""
-        _cmd_init({})
+        _cmd_init({}, project_root=".")
         capsys.readouterr()
 
-        _cmd_release_order({})
+        _cmd_release_order({}, project_root=".")
         captured = capsys.readouterr()
         assert "No projects in workspace." in captured.out
 
     def test_no_workspace(self, mock_git_repo):
         """No workspace should error and exit 1."""
         with pytest.raises(SystemExit):
-            _cmd_release_order({})
+            _cmd_release_order({}, project_root=".")

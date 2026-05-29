@@ -154,7 +154,7 @@ class TestMonorepoReleaseLockPlacement:
 
         with patch("rlsbl.commands.release.acquire_lock", spy_acquire):
             with patch("sys.stdout", new_callable=StringIO):
-                run_cmd(_rc(), {"yes": True, "quiet": False})
+                run_cmd(_rc(), {"yes": True, "quiet": False}, project_root=".", monorepo_root=None)
 
         assert lock_acquired_in == [".rlsbl-monorepo"]
         # .rlsbl/ should NOT exist at the repo root (only .rlsbl-monorepo/ should)

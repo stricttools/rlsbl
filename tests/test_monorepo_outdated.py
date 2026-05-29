@@ -46,7 +46,7 @@ class TestOutdatedNoDeps:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_outdated({})
+        _cmd_outdated({}, project_root=".")
         captured = capsys.readouterr()
         assert "No intra-workspace dependencies found." in captured.out
 
@@ -54,14 +54,14 @@ class TestOutdatedNoDeps:
         """Empty workspace prints a message."""
         _init_workspace(mock_git_repo, [])
 
-        _cmd_outdated({})
+        _cmd_outdated({}, project_root=".")
         captured = capsys.readouterr()
         assert "No projects in workspace." in captured.out
 
     def test_no_workspace(self, mock_git_repo):
         """No workspace should error and exit 1."""
         with pytest.raises(SystemExit):
-            _cmd_outdated({})
+            _cmd_outdated({}, project_root=".")
 
 
 class TestOutdatedVersioned:
@@ -78,7 +78,7 @@ class TestOutdatedVersioned:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_outdated({})
+        _cmd_outdated({}, project_root=".")
         captured = capsys.readouterr()
         assert "api" in captured.out
         assert "core" in captured.out
@@ -97,7 +97,7 @@ class TestOutdatedVersioned:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_outdated({})
+        _cmd_outdated({}, project_root=".")
         captured = capsys.readouterr()
         assert "outdated" in captured.out
 
@@ -112,7 +112,7 @@ class TestOutdatedVersioned:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_outdated({})
+        _cmd_outdated({}, project_root=".")
         captured = capsys.readouterr()
         assert "ok" in captured.out
 
@@ -127,7 +127,7 @@ class TestOutdatedVersioned:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_outdated({})
+        _cmd_outdated({}, project_root=".")
         captured = capsys.readouterr()
         assert "outdated" in captured.out
 
@@ -146,7 +146,7 @@ class TestOutdatedWorkspace:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_outdated({})
+        _cmd_outdated({}, project_root=".")
         captured = capsys.readouterr()
         assert "workspace" in captured.out
         assert "workspace:*" in captured.out
@@ -166,7 +166,7 @@ class TestOutdatedPath:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_outdated({})
+        _cmd_outdated({}, project_root=".")
         captured = capsys.readouterr()
         assert "path" in captured.out
         assert "file:../core" in captured.out
@@ -186,7 +186,7 @@ class TestOutdatedExplicit:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_outdated({})
+        _cmd_outdated({}, project_root=".")
         captured = capsys.readouterr()
         assert "explicit" in captured.out
         assert "(explicit)" in captured.out
@@ -202,7 +202,7 @@ class TestOutdatedExplicit:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_outdated({})
+        _cmd_outdated({}, project_root=".")
         captured = capsys.readouterr()
         assert "3.7.2" in captured.out
         assert "frontend" in captured.out
@@ -232,7 +232,7 @@ class TestOutdatedMixed:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_outdated({})
+        _cmd_outdated({}, project_root=".")
         captured = capsys.readouterr()
 
         # All three types should appear
@@ -270,7 +270,7 @@ class TestOutdatedColumnAlignment:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_outdated({})
+        _cmd_outdated({}, project_root=".")
         captured = capsys.readouterr()
         lines = captured.out.strip().split("\n")
         assert len(lines) == 2  # header + 1 row
