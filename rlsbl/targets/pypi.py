@@ -288,13 +288,13 @@ class PypiTarget(BaseTarget):
         run("uv", ["build", "--out-dir", dist_dir], env=os.environ, cwd=dir_path)
         return sorted(glob.glob(os.path.join(dist_dir, "*")))
 
-    def publish(self, dir_path, version):
+    def publish(self, dir_path, version, project_root=None):
         """Publish to PyPI based on per-target config and token availability.
 
         Without config, accepts either PYPI_TOKEN or TWINE_PASSWORD. With
         config that sets token_var, only the named variable is consulted.
         """
-        pub_config = get_publish_config(self.name)
+        pub_config = get_publish_config(self.name, project_root)
 
         if pub_config.get("local") is False:
             print(f"Skipping local {self.name} publish (config: local=false). CI will handle it.")

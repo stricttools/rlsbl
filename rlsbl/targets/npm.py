@@ -195,9 +195,9 @@ class NpmTarget(BaseTarget):
         run("npm", ["pack", "--pack-destination", dist_dir], cwd=dir_path)
         return sorted(glob.glob(os.path.join(dist_dir, "*.tgz")))
 
-    def publish(self, dir_path, version):
+    def publish(self, dir_path, version, project_root=None):
         """Publish to npm based on per-target config and NPM_TOKEN availability."""
-        pub_config = get_publish_config(self.name)
+        pub_config = get_publish_config(self.name, project_root)
 
         if pub_config.get("local") is False:
             print(f"Skipping local {self.name} publish (config: local=false). CI will handle it.")

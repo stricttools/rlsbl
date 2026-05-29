@@ -84,7 +84,7 @@ class DocsTarget(BaseTarget):
             return
         subprocess.run(["selfdoc", "build"], cwd=dir_path, check=True, timeout=300)
 
-    def publish(self, dir_path, version):
+    def publish(self, dir_path, version, project_root=None):
         """Delegate to selfdoc deploy, gated by per-target config and credentials.
 
         Behaviour:
@@ -94,7 +94,7 @@ class DocsTarget(BaseTarget):
         - no config: only attempt if both CF_ACCOUNT_ID and CF_PAGES_API_TOKEN
           are set (and selfdoc is available); otherwise skip silently
         """
-        pub_config = get_publish_config(self.name)
+        pub_config = get_publish_config(self.name, project_root)
 
         if pub_config.get("local") is False:
             print(f"Skipping local {self.name} publish (config: local=false). CI will handle it.")

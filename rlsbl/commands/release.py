@@ -1448,7 +1448,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
     is_private = read_project_config(project_root).get("private", False)
     if not is_private:
         try:
-            target.publish(primary_path, new_version)
+            target.publish(primary_path, new_version, project_root=project_root)
         except Exception as e:
             print(f"Warning: target publish step failed: {e}", file=sys.stderr)
 
@@ -1465,7 +1465,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                 except Exception as e:
                     print(f"Warning: {sec_name} target build failed: {e}", file=sys.stderr)
                 try:
-                    sec_target.publish(sec_path, new_version)
+                    sec_target.publish(sec_path, new_version, project_root=project_root)
                 except Exception as e:
                     print(f"Warning: {sec_name} target publish failed: {e}", file=sys.stderr)
 

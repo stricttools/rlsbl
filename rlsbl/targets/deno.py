@@ -148,13 +148,13 @@ class DenoTarget(BaseTarget):
             {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
         ]
 
-    def publish(self, dir_path, version):
+    def publish(self, dir_path, version, project_root=None):
         """Publish to JSR based on per-target config and token availability.
 
         Without config, accepts DENO_TOKEN or JSR_TOKEN. With config that sets
         token_var, only the named variable is consulted.
         """
-        pub_config = get_publish_config(self.name)
+        pub_config = get_publish_config(self.name, project_root)
 
         if pub_config.get("local") is False:
             print(f"Skipping local {self.name} publish (config: local=false). CI will handle it.")

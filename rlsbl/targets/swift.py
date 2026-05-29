@@ -61,7 +61,7 @@ class SwiftTarget(BaseTarget):
     def tag_format(self, version):
         return f"v{version}"
 
-    def publish(self, dir_path, version):
+    def publish(self, dir_path, version, project_root=None):
         """No-op: the git tag IS the publication for SPM."""
         pass
 

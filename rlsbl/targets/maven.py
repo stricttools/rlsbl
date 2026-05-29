@@ -272,9 +272,9 @@ class MavenTarget(BaseTarget):
             {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
         ]
 
-    def publish(self, dir_path, version):
+    def publish(self, dir_path, version, project_root=None):
         """Publish via Gradle or Maven based on per-target config and token availability."""
-        pub_config = get_publish_config(self.name)
+        pub_config = get_publish_config(self.name, project_root)
 
         if pub_config.get("local") is False:
             print(f"Skipping local {self.name} publish (config: local=false). CI will handle it.")
