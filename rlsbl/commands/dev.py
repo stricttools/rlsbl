@@ -62,7 +62,7 @@ def _install_single(project_dir, flags):
             if template is None:
                 print(f"Skipping {name} uninstall: not supported for this target")
                 continue
-            pkg_name = _resolve_project_name(project_dir, name)
+            pkg_name = _resolve_project_name(project_dir, name, project_dir)
             dir_name = os.path.basename(os.path.abspath(project_dir))
             args = [a.format(name=pkg_name, dir=dir_name) for a in template]
         else:
@@ -131,7 +131,7 @@ def _split_csv(value):
     return [s.strip() for s in value.split(",") if s.strip()]
 
 
-def _resolve_project_name(project_dir, target_name, project_root=None):
+def _resolve_project_name(project_dir, target_name, project_root):
     """Read the package name from the target's manifest, falling back to dir basename."""
     target = TARGETS.get(target_name)
     if target is not None:

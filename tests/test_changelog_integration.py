@@ -90,7 +90,7 @@ class TestReleaseWithJsonl:
         changes_dir = get_changes_dir(".")
 
         # Validate should pass
-        result = validate_unreleased(changes_dir)
+        result = validate_unreleased(changes_dir, project_root=str(repo))
         # Validation uses v0.0.0..HEAD range to find unreleased commits
 
         # Generate should produce CHANGELOG.md
@@ -142,7 +142,7 @@ class TestReleaseJsonlValidationFails:
 
         from rlsbl.changelog import validate_unreleased
 
-        result = validate_unreleased(changes_dir)
+        result = validate_unreleased(changes_dir, project_root=str(repo))
         # Coverage check should fail since no entries cover the commit
         passed, details = result["checks"]["coverage"]
         assert not passed

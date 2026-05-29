@@ -71,7 +71,7 @@ class BaseTarget:
     def build(self, dir_path, version):
         pass
 
-    def publish(self, dir_path, version, project_root=None):
+    def publish(self, dir_path, version, project_root):
         pass
 
     def build_assets(self, dir_path, version, dist_dir):

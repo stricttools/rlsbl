@@ -88,7 +88,7 @@ class ReleaseTarget(Protocol):
         """Pre-publish build step (e.g. generate docs). No-op by default."""
         pass
 
-    def publish(self, dir_path: str, version: str, project_root=None) -> None:
+    def publish(self, dir_path: str, version: str, project_root: str) -> None:
         """Post-push publish/deploy step. No-op by default."""
         pass
 

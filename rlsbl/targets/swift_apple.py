@@ -59,7 +59,7 @@ class SwiftAppleTarget(BaseTarget):
     def version_file(self):
         return VERSION_FILE
 
-    def publish(self, dir_path, version, project_root=None):
+    def publish(self, dir_path, version, project_root):
         """No-op: the git tag IS the publication for SPM."""
         pass
 

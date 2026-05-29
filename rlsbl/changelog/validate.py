@@ -517,7 +517,7 @@ def _read_all_versioned_entries(changes_dir: str) -> dict[str, list[ChangelogEnt
 # Combined validation
 # ---------------------------------------------------------------------------
 
-def validate_unreleased(changes_dir: str, tag_glob: str | None = None, project: dict | None = None, project_root=None) -> dict:
+def validate_unreleased(changes_dir: str, tag_glob: str | None = None, project: dict | None = None, *, project_root: str) -> dict:
     """Run all 8 validation checks on unreleased.jsonl.
 
     Returns a dict with:
