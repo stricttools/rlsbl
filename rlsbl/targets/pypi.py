@@ -288,7 +288,7 @@ class PypiTarget(BaseTarget):
         run("uv", ["build", "--out-dir", dist_dir], env=os.environ, cwd=dir_path)
         return sorted(glob.glob(os.path.join(dist_dir, "*")))
 
-    def publish(self, dir_path, version, project_root=None):
+    def publish(self, dir_path, version, project_root):
         """Publish to PyPI based on per-target config and token availability.
 
         Without config, accepts either PYPI_TOKEN or TWINE_PASSWORD. With

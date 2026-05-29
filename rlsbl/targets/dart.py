@@ -41,7 +41,7 @@ class DartTarget(BaseTarget):
         # Strip build number: "1.2.3+4" -> "1.2.3"
         return version.split("+")[0]
 
-    def write_version(self, dir_path, version, project_root=None):
+    def write_version(self, dir_path, version, project_root):
         """Write a new version to pubspec.yaml, preserving comments and formatting.
 
         Handles build number (+N) based on .rlsbl/config.json:
@@ -66,7 +66,7 @@ class DartTarget(BaseTarget):
         os.replace(tmp_path, pubspec)
         return [self.version_file()]
 
-    def _compute_version_with_build_number(self, old_version, new_semver, dir_path, project_root=None):
+    def _compute_version_with_build_number(self, old_version, new_semver, dir_path, project_root):
         """Determine the full version string including build number handling."""
         config = read_project_config(project_root)
         build_config = config.get("build_number", {})

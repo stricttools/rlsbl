@@ -272,7 +272,7 @@ class MavenTarget(BaseTarget):
             {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
         ]
 
-    def publish(self, dir_path, version, project_root=None):
+    def publish(self, dir_path, version, project_root):
         """Publish via Gradle or Maven based on per-target config and token availability."""
         pub_config = get_publish_config(self.name, project_root)
 

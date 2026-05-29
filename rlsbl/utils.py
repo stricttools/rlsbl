@@ -69,7 +69,7 @@ def get_current_branch():
     return run("git", ["rev-parse", "--abbrev-ref", "HEAD"])
 
 
-def get_push_timeout(project_root=None):
+def get_push_timeout(project_root):
     """Return the push timeout in seconds.
 
     Precedence: RLSBL_PUSH_TIMEOUT env var > config.json push_timeout.
@@ -125,7 +125,7 @@ def get_hook_timeout():
         return None
 
 
-def push_if_needed(branch, env=None, project_root=None):
+def push_if_needed(branch, env=None, *, project_root):
     """Push the branch to origin if local is ahead of remote.
 
     Args:
@@ -133,7 +133,7 @@ def push_if_needed(branch, env=None, project_root=None):
         env: optional environment dict passed to the push subprocess (e.g. to
             set ``RLSBL_RELEASE_PUSH=1`` so the pre-push hook recognises the
             push as release-authorized). Defaults to None (inherit current env).
-        project_root: optional project root path forwarded to get_push_timeout.
+        project_root: project root path forwarded to get_push_timeout.
     """
     timeout = get_push_timeout(project_root)
     local = run("git", ["rev-parse", branch])

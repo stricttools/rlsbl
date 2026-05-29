@@ -195,7 +195,7 @@ class NpmTarget(BaseTarget):
         run("npm", ["pack", "--pack-destination", dist_dir], cwd=dir_path)
         return sorted(glob.glob(os.path.join(dist_dir, "*.tgz")))
 
-    def publish(self, dir_path, version, project_root=None):
+    def publish(self, dir_path, version, project_root):
         """Publish to npm based on per-target config and NPM_TOKEN availability."""
         pub_config = get_publish_config(self.name, project_root)
 

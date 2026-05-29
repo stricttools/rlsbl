@@ -157,7 +157,7 @@ class GoTarget(BaseTarget):
                     artifacts.append(dest)
         return sorted(artifacts)
 
-    def publish(self, dir_path, version, project_root=None):
+    def publish(self, dir_path, version, project_root):
         """Notify the Go module proxy so the new version is immediately available."""
         module_path = self._read_module_path(dir_path)
         if not module_path:
@@ -242,7 +242,7 @@ class GoTarget(BaseTarget):
             os.path.dirname(os.path.dirname(__file__)), "templates", "go"
         )
 
-    def template_vars(self, dir_path, project_root=None):
+    def template_vars(self, dir_path, project_root):
         """Extract template variables from go.mod and .rlsbl/config.json."""
         config = read_project_config(project_root)
         name = self._read_module_path(dir_path)
@@ -371,7 +371,7 @@ class GoTarget(BaseTarget):
             # npm wrapper scaffolding is in shared_template_mappings()
         return mappings
 
-    def shared_template_mappings(self, project_root=None):
+    def shared_template_mappings(self, project_root):
         mappings = super().shared_template_mappings()
         if not self._is_library("."):
             config = read_project_config(project_root)

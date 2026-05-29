@@ -103,7 +103,7 @@ class HexTarget(BaseTarget):
             {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
         ]
 
-    def publish(self, dir_path, version, project_root=None):
+    def publish(self, dir_path, version, project_root):
         """Publish to Hex based on per-target config and HEX_API_KEY availability."""
         pub_config = get_publish_config(self.name, project_root)
 

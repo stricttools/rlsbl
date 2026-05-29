@@ -148,7 +148,7 @@ class DenoTarget(BaseTarget):
             {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
         ]
 
-    def publish(self, dir_path, version, project_root=None):
+    def publish(self, dir_path, version, project_root):
         """Publish to JSR based on per-target config and token availability.
 
         Without config, accepts DENO_TOKEN or JSR_TOKEN. With config that sets

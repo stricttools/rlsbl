@@ -12,7 +12,7 @@ import tomlkit
 from .utils import run
 
 
-def ensure_npm_keyword(dir_path=".", quiet=False, project_root=None):
+def ensure_npm_keyword(dir_path=".", quiet=False, *, project_root):
     """Add "rlsbl" to the keywords array in package.json if not already present."""
     if project_root is not None and dir_path == ".":
         dir_path = str(project_root)
@@ -48,7 +48,7 @@ def ensure_npm_keyword(dir_path=".", quiet=False, project_root=None):
     return True
 
 
-def ensure_pypi_keyword(dir_path=".", quiet=False, project_root=None):
+def ensure_pypi_keyword(dir_path=".", quiet=False, *, project_root):
     """Add "rlsbl" to the keywords array in pyproject.toml if not already present."""
     if project_root is not None and dir_path == ".":
         dir_path = str(project_root)
@@ -155,7 +155,7 @@ def ensure_github_topic(quiet=False):
     return True
 
 
-def ensure_tags(registries, target_paths=None, quiet=False, project_root=None):
+def ensure_tags(registries, target_paths=None, quiet=False, *, project_root):
     """Tag manifests and GitHub repo based on detected registries."""
     if target_paths is None:
         target_paths = {}

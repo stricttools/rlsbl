@@ -193,7 +193,7 @@ class CargoTarget(BaseTarget):
 
         return sorted(glob.glob(os.path.join(dist_dir, "*")))
 
-    def publish(self, dir_path, version, project_root=None):
+    def publish(self, dir_path, version, project_root):
         """Publish to crates.io based on per-target config and token availability."""
         pub_config = get_publish_config(self.name, project_root)
 

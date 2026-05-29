@@ -84,7 +84,7 @@ class DocsTarget(BaseTarget):
             return
         subprocess.run(["selfdoc", "build"], cwd=dir_path, check=True, timeout=300)
 
-    def publish(self, dir_path, version, project_root=None):
+    def publish(self, dir_path, version, project_root):
         """Delegate to selfdoc deploy, gated by per-target config and credentials.
 
         Behaviour:

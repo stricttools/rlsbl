@@ -100,7 +100,7 @@ class ZigTarget(BaseTarget):
             content = f.read()
         return not bool(_BUILD_EXE_RE.search(content))
 
-    def template_vars(self, dir_path, project_root=None):
+    def template_vars(self, dir_path, project_root):
         """Extract template variables from build.zig.zon and build.zig."""
         config = read_project_config(project_root)
         name = self._read_zon_field(dir_path, _ZON_NAME_RE)
@@ -147,7 +147,7 @@ class ZigTarget(BaseTarget):
             {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
         ]
 
-    def shared_template_mappings(self, project_root=None):
+    def shared_template_mappings(self, project_root):
         mappings = super().shared_template_mappings()
         if not self._is_library("."):
             config = read_project_config(project_root)

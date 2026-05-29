@@ -10,7 +10,7 @@ from contextlib import contextmanager
 _lock_fd = None
 
 
-def acquire_lock(lock_dir=".rlsbl", project_root=None):
+def acquire_lock(lock_dir=".rlsbl", *, project_root):
     """Acquire an exclusive advisory lock on <lock_dir>/lock.
 
     If another process holds the lock, prints a waiting message and
@@ -62,18 +62,17 @@ def release_lock():
             pass
 
 
-def is_stale(lock_path=None, project_root=None):
+def is_stale(lock_path=None, *, project_root):
     """Check if a lock file exists but no process holds it.
 
     Returns True if the file exists and is not held (stale).
     Returns False if the file doesn't exist or is actively held.
 
-    project_root: when provided and lock_path is None, build the default
+    project_root: when lock_path is None, build the default
                   lock path relative to project_root.
     """
     if lock_path is None:
-        base = str(project_root) if project_root else "."
-        lock_path = os.path.join(base, ".rlsbl", "lock")
+        lock_path = os.path.join(str(project_root), ".rlsbl", "lock")
 
     if not os.path.exists(lock_path):
         return False
@@ -94,7 +93,7 @@ def is_stale(lock_path=None, project_root=None):
 
 
 @contextmanager
-def rlsbl_lock(lock_dir=".rlsbl", project_root=None):
+def rlsbl_lock(lock_dir=".rlsbl", *, project_root):
     """Context manager that acquires the lock on enter and releases on exit."""
     acquire_lock(lock_dir=lock_dir, project_root=project_root)
     try:

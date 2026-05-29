@@ -31,15 +31,12 @@ def load_env_file(path):
             os.environ[key] = value
 
 
-def _project_config(project_root=None):
+def _project_config(project_root):
     """Resolve project config path at call time.
 
-    When project_root is provided, returns an absolute path based on it.
-    When None, falls back to a relative path (legacy callers).
+    Returns an absolute path based on project_root.
     """
-    if project_root is not None:
-        return os.path.join(str(project_root), ".rlsbl", "config.json")
-    return os.path.join(".rlsbl", "config.json")
+    return os.path.join(str(project_root), ".rlsbl", "config.json")
 
 USER_CONFIG = os.path.expanduser("~/.rlsbl/config.json")
 
@@ -55,7 +52,7 @@ def read_json_config(path):
         raise ValueError(f"Malformed JSON in {path}: {e}") from e
 
 
-def should_tag(flags, project_root=None):
+def should_tag(flags, project_root):
     """Returns True if tagging is enabled, checking flag > project > user > default."""
     # CLI flag takes highest precedence
     if flags.get("no-tag"):
@@ -75,12 +72,12 @@ def should_tag(flags, project_root=None):
     return True
 
 
-def read_project_config(project_root=None):
+def read_project_config(project_root):
     """Read .rlsbl/config.json, return dict or empty dict if missing/malformed."""
     return read_json_config(_project_config(project_root))
 
 
-def read_deploy_config(project_root=None):
+def read_deploy_config(project_root):
     """Read and validate deploy targets from project config. Returns (targets, errors)."""
     from rlsbl.deploy import validate_deploy_config
 
@@ -92,7 +89,7 @@ def read_deploy_config(project_root=None):
     return targets, errors
 
 
-def get_publish_config(target_name, project_root=None):
+def get_publish_config(target_name, project_root):
     """Read per-target publish config from .rlsbl/config.json.
 
     Returns a dict like {"local": True, "token_var": "PYPI_TOKEN"}.
@@ -137,7 +134,7 @@ def validate_publish_config(config, target_name):
         )
 
 
-def get_changelog_validation_config(project_root=None):
+def get_changelog_validation_config(project_root):
     """Read changelog validation config from .rlsbl/config.json.
 
     Returns the batch_limits section as a dict like
@@ -159,7 +156,7 @@ def get_changelog_validation_config(project_root=None):
 
 
 
-def write_project_config(key, value, project_root=None):
+def write_project_config(key, value, project_root):
     """Write or update a key in .rlsbl/config.json (creates dir if needed)."""
     config_path = _project_config(project_root)
     os.makedirs(os.path.dirname(config_path), exist_ok=True)

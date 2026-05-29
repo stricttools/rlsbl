@@ -22,7 +22,7 @@ _BATCH_LIMITS_DEFAULTS = {
 }
 
 
-def _get_batch_limits_config(project_root=None) -> dict:
+def _get_batch_limits_config(project_root) -> dict:
     """Return the resolved batch_limits config with defaults applied.
 
     Reads the raw ``batch_limits`` section via
