@@ -1,0 +1,4 @@
+{"commits":["660454f23f81d84a8e97bad976d097fa4c40ab9a","9aa8c60f72243138f13135a595e80079af554384"],"user_facing":true,"description":"**Breaking.** Release, pre-push check, deploy, and undo commands now receive `ProjectContext` instead of bare `project_root`. Config is read once at startup via `ctx.config` instead of re-reading from disk at each call site.","type":"breaking"}
+{"commits":["7a80924e64ecd485324f0593ed563bdd484c2a09"],"user_facing":true,"description":"**Fix.** Configuration docs no longer trigger stale-description warnings on every release. The `version` field is excluded from the selfdoc.json schema table.","type":"fix"}
+{"commits":["d1564e2194606d24561d1ec108161c26749be04d"],"user_facing":false}
+{"commits":["f1af133917acb2eff690aba9354f35752c657381","19e699fd484b025de19d23a4778a45d150d4b112"],"user_facing":false}
