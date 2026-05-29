@@ -93,7 +93,7 @@ class TestReleaseWithDeployTargets:
                 "version_file": lambda self: None,
                 "write_version": lambda self, p, v: [],
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, project_root: None,
+                "publish": lambda self, p, v, ctx: None,
                 "tag_format": lambda self, v: f"v{v}",
             })(),
             flags={"yes": True, "no-tag": True},
@@ -108,7 +108,7 @@ class TestReleaseWithDeployTargets:
             target=type("FakeTarget", (), {
                 "tag_format": lambda self, v: f"v{v}",
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, project_root: None,
+                "publish": lambda self, p, v, ctx: None,
             })(),
             ctx=ProjectContext(project_root=Path(str(mock_git_repo)), monorepo_root=None, config={"private": False, "deploy": deploy_targets}),
         )
@@ -189,7 +189,7 @@ class TestReleaseDeployFailureContinues:
                 "version_file": lambda self: None,
                 "write_version": lambda self, p, v: [],
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, project_root: None,
+                "publish": lambda self, p, v, ctx: None,
                 "tag_format": lambda self, v: f"v{v}",
             })(),
             flags={"yes": True, "no-tag": True},
@@ -204,7 +204,7 @@ class TestReleaseDeployFailureContinues:
             target=type("FakeTarget", (), {
                 "tag_format": lambda self, v: f"v{v}",
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, project_root: None,
+                "publish": lambda self, p, v, ctx: None,
             })(),
             ctx=ProjectContext(project_root=Path(str(mock_git_repo)), monorepo_root=None, config={"private": False, "deploy": deploy_targets}),
         )
@@ -260,7 +260,7 @@ class TestReleaseNoDeployConfig:
                 "version_file": lambda self: None,
                 "write_version": lambda self, p, v: [],
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, project_root: None,
+                "publish": lambda self, p, v, ctx: None,
                 "tag_format": lambda self, v: f"v{v}",
             })(),
             flags={"yes": True, "no-tag": True},
@@ -275,7 +275,7 @@ class TestReleaseNoDeployConfig:
             target=type("FakeTarget", (), {
                 "tag_format": lambda self, v: f"v{v}",
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, project_root: None,
+                "publish": lambda self, p, v, ctx: None,
             })(),
             ctx=ProjectContext(project_root=Path(str(mock_git_repo)), monorepo_root=None, config={"private": False}),
         )
@@ -332,7 +332,7 @@ class TestReleaseDeployConfigErrors:
                 "version_file": lambda self: None,
                 "write_version": lambda self, p, v: [],
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, project_root: None,
+                "publish": lambda self, p, v, ctx: None,
                 "tag_format": lambda self, v: f"v{v}",
             })(),
             flags={"yes": True, "no-tag": True},
@@ -347,7 +347,7 @@ class TestReleaseDeployConfigErrors:
             target=type("FakeTarget", (), {
                 "tag_format": lambda self, v: f"v{v}",
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, project_root: None,
+                "publish": lambda self, p, v, ctx: None,
             })(),
             ctx=ProjectContext(project_root=Path(str(mock_git_repo)), monorepo_root=None, config={"private": False, "deploy": deploy_targets}),
         )
@@ -407,7 +407,7 @@ class TestReleaseStopsAtFirstDeployFailure:
                 "version_file": lambda self: None,
                 "write_version": lambda self, p, v: [],
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, project_root: None,
+                "publish": lambda self, p, v, ctx: None,
                 "tag_format": lambda self, v: f"v{v}",
             })(),
             flags={"yes": True, "no-tag": True},
@@ -422,7 +422,7 @@ class TestReleaseStopsAtFirstDeployFailure:
             target=type("FakeTarget", (), {
                 "tag_format": lambda self, v: f"v{v}",
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, project_root: None,
+                "publish": lambda self, p, v, ctx: None,
             })(),
             ctx=ProjectContext(project_root=Path(str(mock_git_repo)), monorepo_root=None, config={"private": False, "deploy": deploy_targets}),
         )

@@ -4,8 +4,10 @@ import json
 import os
 import tempfile
 import unittest.mock
+from pathlib import Path
 from unittest.mock import patch
 
+from rlsbl.context import ProjectContext
 from rlsbl.targets.protocol import ReleaseTarget
 from rlsbl.targets.npm import NpmTarget
 from rlsbl.targets.pypi import PypiTarget
@@ -17,6 +19,13 @@ from rlsbl.targets.hex import HexTarget
 from rlsbl.targets.deno import DenoTarget
 from rlsbl.targets.cargo import CargoTarget
 from rlsbl.targets import TARGETS, detect_targets
+
+
+def _ctx(project_root=".", config=None):
+    """Build a ProjectContext for tests with no config by default."""
+    if config is None:
+        config = {}
+    return ProjectContext(project_root=Path(str(project_root)), monorepo_root=None, config=config)
 
 
 class TestNpmTarget:
@@ -273,7 +282,7 @@ class TestTargetRegistryIntegration:
         """TARGETS['go'].publish() without go.mod is effectively a no-op (prints warning)."""
         with tempfile.TemporaryDirectory() as d:
             # Should complete without raising (prints warning about missing go.mod)
-            TARGETS["go"].publish(d, "1.0.0", d)
+            TARGETS["go"].publish(d, "1.0.0", _ctx(d))
 
 
 class TestDetectTargetsConfig:
@@ -339,7 +348,7 @@ class TestNpmPublish:
         target = NpmTarget()
         with patch.dict(os.environ, {"NPM_TOKEN": "fake-token"}):
             with patch("rlsbl.targets.npm.run") as mock_run:
-                target.publish(".", "1.2.3", ".")
+                target.publish(".", "1.2.3", _ctx())
                 mock_run.assert_called_once()
                 call_args = mock_run.call_args
                 assert call_args[0][0] == "npm"
@@ -354,7 +363,7 @@ class TestNpmPublish:
         env = os.environ.copy()
         env.pop("NPM_TOKEN", None)
         with patch.dict(os.environ, env, clear=True):
-            target.publish(".", "1.2.3", ".")
+            target.publish(".", "1.2.3", _ctx())
         captured = capsys.readouterr()
         assert "Skipping local npm publish (no NPM_TOKEN). CI will handle it." in captured.out
 
@@ -367,7 +376,7 @@ class TestPypiPublish:
         target = PypiTarget()
         with patch.dict(os.environ, {"PYPI_TOKEN": "fake-pypi-token"}, clear=False):
             with patch("rlsbl.targets.pypi.run") as mock_run:
-                target.publish(".", "2.0.0", ".")
+                target.publish(".", "2.0.0", _ctx())
                 assert mock_run.call_count == 2
                 # First call: uv build
                 first_call = mock_run.call_args_list[0]
@@ -389,7 +398,7 @@ class TestPypiPublish:
         env["TWINE_PASSWORD"] = "twine-secret"
         with patch.dict(os.environ, env, clear=True):
             with patch("rlsbl.targets.pypi.run") as mock_run:
-                target.publish(".", "2.0.0", ".")
+                target.publish(".", "2.0.0", _ctx())
                 assert mock_run.call_count == 2
                 second_call = mock_run.call_args_list[1]
                 assert second_call[1]["env"]["UV_PUBLISH_TOKEN"] == "twine-secret"
@@ -401,7 +410,7 @@ class TestPypiPublish:
         env.pop("PYPI_TOKEN", None)
         env.pop("TWINE_PASSWORD", None)
         with patch.dict(os.environ, env, clear=True):
-            target.publish(".", "2.0.0", ".")
+            target.publish(".", "2.0.0", _ctx())
         captured = capsys.readouterr()
         assert (
             "Skipping local PyPI publish (no PYPI_TOKEN or TWINE_PASSWORD). "
@@ -506,13 +515,13 @@ class TestHexTarget:
         monkeypatch.setenv("HEX_API_KEY", "test-key")
         target = HexTarget()
         with unittest.mock.patch("rlsbl.targets.hex.run") as mock_run:
-            target.publish(str(tmp_path), "1.0.0", str(tmp_path))
+            target.publish(str(tmp_path), "1.0.0", _ctx(tmp_path))
             mock_run.assert_called_once()
 
     def test_publish_without_token(self, tmp_path, monkeypatch, capsys):
         monkeypatch.delenv("HEX_API_KEY", raising=False)
         target = HexTarget()
-        target.publish(str(tmp_path), "1.0.0", str(tmp_path))
+        target.publish(str(tmp_path), "1.0.0", _ctx(tmp_path))
         captured = capsys.readouterr()
         assert "Skipping local Hex publish (no HEX_API_KEY)" in captured.out
 
@@ -559,14 +568,14 @@ class TestDenoTarget:
         monkeypatch.setenv("DENO_TOKEN", "test-token")
         target = DenoTarget()
         with unittest.mock.patch("rlsbl.targets.deno.run") as mock_run:
-            target.publish(str(tmp_path), "1.0.0", str(tmp_path))
+            target.publish(str(tmp_path), "1.0.0", _ctx(tmp_path))
             mock_run.assert_called_once()
 
     def test_publish_without_token(self, tmp_path, monkeypatch, capsys):
         monkeypatch.delenv("DENO_TOKEN", raising=False)
         monkeypatch.delenv("JSR_TOKEN", raising=False)
         target = DenoTarget()
-        target.publish(str(tmp_path), "1.0.0", str(tmp_path))
+        target.publish(str(tmp_path), "1.0.0", _ctx(tmp_path))
         captured = capsys.readouterr()
         assert "Skipping local Deno publish (no DENO_TOKEN/JSR_TOKEN)" in captured.out
 
@@ -613,12 +622,12 @@ class TestCargoTarget:
         monkeypatch.setenv("CARGO_REGISTRY_TOKEN", "test-token")
         target = CargoTarget()
         with unittest.mock.patch("rlsbl.targets.cargo.run") as mock_run:
-            target.publish(str(tmp_path), "1.0.0", str(tmp_path))
+            target.publish(str(tmp_path), "1.0.0", _ctx(tmp_path))
             mock_run.assert_called_once()
 
     def test_publish_without_token(self, tmp_path, monkeypatch, capsys):
         monkeypatch.delenv("CARGO_REGISTRY_TOKEN", raising=False)
-        CargoTarget().publish(str(tmp_path), "1.0.0", str(tmp_path))
+        CargoTarget().publish(str(tmp_path), "1.0.0", _ctx(tmp_path))
         assert "Skipping" in capsys.readouterr().out
 
     def test_is_library_with_lib_section(self, tmp_path):
@@ -673,7 +682,7 @@ class TestDockerTarget:
         monkeypatch.delenv("DOCKER_USERNAME", raising=False)
         monkeypatch.delenv("DOCKER_PASSWORD", raising=False)
         target = DockerTarget()
-        target.publish(str(tmp_path), "1.0.0", str(tmp_path))
+        target.publish(str(tmp_path), "1.0.0", _ctx(tmp_path))
         captured = capsys.readouterr()
         assert "Skipping local docker publish (no DOCKER_USERNAME/DOCKER_PASSWORD)" in captured.out
 
@@ -690,7 +699,7 @@ class TestDockerTarget:
         import io, sys
         captured = io.StringIO()
         monkeypatch.setattr(sys, "stdout", captured)
-        target.publish(str(tmp_path), "1.0.0", str(tmp_path))
+        target.publish(str(tmp_path), "1.0.0", _ctx(tmp_path))
         output = captured.getvalue()
         # Should mention missing docker config
         assert "docker" in output.lower() or "image" in output.lower() or "config" in output.lower()
@@ -708,7 +717,7 @@ class TestDockerTarget:
         target = DockerTarget()
         with unittest.mock.patch("shutil.which", return_value="/usr/bin/docker"):
             with unittest.mock.patch("rlsbl.targets.docker.run") as mock_run:
-                target.publish(str(tmp_path), "1.0.0", str(tmp_path))
+                target.publish(str(tmp_path), "1.0.0", _ctx(tmp_path, config=config))
                 # Should have called docker build and docker push
                 assert mock_run.call_count >= 2
 
@@ -774,13 +783,13 @@ class TestMavenTarget:
         os.chmod(tmp_path / "gradlew", 0o755)
         target = MavenTarget()
         with unittest.mock.patch("rlsbl.targets.maven.run") as mock_run:
-            target.publish(str(tmp_path), "1.0.0", str(tmp_path))
+            target.publish(str(tmp_path), "1.0.0", _ctx(tmp_path))
             mock_run.assert_called_once()
 
     def test_publish_without_token(self, tmp_path, monkeypatch, capsys):
         from rlsbl.targets.maven import MavenTarget
         monkeypatch.delenv("GITHUB_TOKEN", raising=False)
-        MavenTarget().publish(str(tmp_path), "1.0.0", str(tmp_path))
+        MavenTarget().publish(str(tmp_path), "1.0.0", _ctx(tmp_path))
         captured = capsys.readouterr()
         assert "Skipping local Maven/Gradle publish (no GITHUB_TOKEN)" in captured.out
 

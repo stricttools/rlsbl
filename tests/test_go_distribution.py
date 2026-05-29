@@ -8,11 +8,13 @@ no-config baseline behavior, and publish-time go install for CLI projects.
 import json
 import os
 import subprocess
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 import pytest
 
 from rlsbl.commands.init_cmd import process_template
+from rlsbl.context import ProjectContext
 from rlsbl.targets import TARGETS
 from rlsbl.targets.go import GoTarget
 
@@ -374,7 +376,7 @@ class TestGoPublishInstall:
             mock_subprocess_run.return_value = subprocess.CompletedProcess(
                 args=["go", "install", "."], returncode=0
             )
-            target.publish(str(tmp_path), "1.0.0", str(tmp_path))
+            target.publish(str(tmp_path), "1.0.0", ProjectContext(project_root=Path(str(tmp_path)), monorepo_root=None, config={}))
 
             # Verify go install was called with "."
             mock_subprocess_run.assert_called_once_with(
@@ -397,7 +399,7 @@ class TestGoPublishInstall:
             mock_subprocess_run.return_value = subprocess.CompletedProcess(
                 args=["go", "install", "./cmd/mycli"], returncode=0
             )
-            target.publish(str(tmp_path), "1.0.0", str(tmp_path))
+            target.publish(str(tmp_path), "1.0.0", ProjectContext(project_root=Path(str(tmp_path)), monorepo_root=None, config={}))
 
             mock_subprocess_run.assert_called_once_with(
                 ["go", "install", "./cmd/mycli"],
@@ -414,7 +416,7 @@ class TestGoPublishInstall:
         with patch("rlsbl.targets.go.run") as mock_run, \
              patch("subprocess.run") as mock_subprocess_run, \
              patch("shutil.which", return_value="/usr/bin/go"):
-            target.publish(str(tmp_path), "1.0.0", str(tmp_path))
+            target.publish(str(tmp_path), "1.0.0", ProjectContext(project_root=Path(str(tmp_path)), monorepo_root=None, config={}))
 
             # subprocess.run should NOT have been called (go install is skipped)
             mock_subprocess_run.assert_not_called()
@@ -432,7 +434,7 @@ class TestGoPublishInstall:
                 1, ["go", "install", "."]
             )
             # Should not raise
-            target.publish(str(tmp_path), "1.0.0", str(tmp_path))
+            target.publish(str(tmp_path), "1.0.0", ProjectContext(project_root=Path(str(tmp_path)), monorepo_root=None, config={}))
 
         captured = capsys.readouterr()
         assert "Warning: go install failed" in captured.out
