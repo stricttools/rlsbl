@@ -7,7 +7,26 @@ import time
 
 import pytest
 
+from rlsbl.context import ProjectContext
 from rlsbl.workspace import WORKSPACE_DIR, WORKSPACE_FILE
+
+
+def make_ctx(project_root, config=None):
+    """Create a minimal ProjectContext for tests.
+
+    If config is not provided, reads .rlsbl/config.json from project_root
+    (returning {} if the file doesn't exist).
+    """
+    if isinstance(project_root, str):
+        from pathlib import Path
+        project_root = Path(project_root)
+    if config is None:
+        config_path = project_root / ".rlsbl" / "config.json"
+        if config_path.exists():
+            config = json.loads(config_path.read_text())
+        else:
+            config = {}
+    return ProjectContext(project_root=project_root, workspace_root=None, config=config)
 
 
 # ---------------------------------------------------------------------------

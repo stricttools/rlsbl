@@ -363,10 +363,10 @@ class TestReleaseAbortCleanup:
 
         original_write_version = NpmTarget.write_version
 
-        def rogue_write_version(self, dir_path, version):
+        def rogue_write_version(self, dir_path, version, ctx=None):
             """Write version normally, then modify a tracked file to
             simulate a concurrent process dirtying the tree."""
-            result = original_write_version(self, dir_path, version)
+            result = original_write_version(self, dir_path, version, ctx=ctx)
             # feature.txt is tracked -- modifying it makes it show up
             # as unexpected in the dirty-files guard.
             with open(os.path.join(dir_path, "feature.txt"), "a") as f:

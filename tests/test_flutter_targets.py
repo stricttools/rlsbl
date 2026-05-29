@@ -7,6 +7,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
+from conftest import make_ctx
 from rlsbl.targets.flutter_ios import FlutterIosTarget
 from rlsbl.targets.flutter_android import FlutterAndroidTarget
 from rlsbl.targets.dart import DartTarget
@@ -204,7 +205,7 @@ class TestFlutterVersionInheritance:
         target = FlutterIosTarget()
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "pubspec.yaml"), SAMPLE_FLUTTER_PUBSPEC)
-            modified = target.write_version(d, "2.0.0", d)
+            modified = target.write_version(d, "2.0.0", make_ctx(d))
             assert modified == ["pubspec.yaml"]
             assert target.read_version(d) == "2.0.0"
 
@@ -212,7 +213,7 @@ class TestFlutterVersionInheritance:
         target = FlutterAndroidTarget()
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "pubspec.yaml"), SAMPLE_FLUTTER_PUBSPEC)
-            modified = target.write_version(d, "2.0.0", d)
+            modified = target.write_version(d, "2.0.0", make_ctx(d))
             assert modified == ["pubspec.yaml"]
             assert target.read_version(d) == "2.0.0"
 

@@ -187,11 +187,10 @@ class TestResolveReleaseTargetsSubdirectory:
         monkeypatch.chdir(tmp_path)
         config_dir = tmp_path / ".rlsbl"
         config_dir.mkdir()
-        (config_dir / "config.json").write_text(
-            '{"targets": ["npm", "pypi"], "release_targets": ["npm"]}'
-        )
+        config = {"targets": ["npm", "pypi"], "release_targets": ["npm"]}
+        (config_dir / "config.json").write_text(json.dumps(config))
         (tmp_path / "package.json").write_text('{"name": "test", "version": "1.0.0"}')
-        result = resolve_release_targets("pypi", {}, version_dir=str(tmp_path))
+        result = resolve_release_targets("pypi", {}, version_dir=str(tmp_path), config=config)
         assert isinstance(result, dict)
         assert "npm" in result
 
@@ -203,11 +202,10 @@ class TestResolveReleaseTargetsSubdirectory:
         npm_dir = tmp_path / "npm"
         npm_dir.mkdir()
         (npm_dir / "package.json").write_text('{"name": "test", "version": "1.0.0"}')
-        (config_dir / "config.json").write_text(
-            '{"targets": [{"name": "npm", "path": "npm"}], '
-            '"release_targets": [{"name": "npm", "path": "npm"}]}'
-        )
-        result = resolve_release_targets("pypi", {}, version_dir=str(tmp_path))
+        config = {"targets": [{"name": "npm", "path": "npm"}],
+                  "release_targets": [{"name": "npm", "path": "npm"}]}
+        (config_dir / "config.json").write_text(json.dumps(config))
+        result = resolve_release_targets("pypi", {}, version_dir=str(tmp_path), config=config)
         assert "npm" in result
         assert result["npm"] == str(npm_dir)
 

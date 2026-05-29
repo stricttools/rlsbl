@@ -198,9 +198,9 @@ class TestReleaseUnexpectedFiles:
 
         original_write_version = NpmTarget.write_version
 
-        def rogue_write_version(self, dir_path, version):
+        def rogue_write_version(self, dir_path, version, ctx=None):
             """Write version normally, then create an unexpected file."""
-            result = original_write_version(self, dir_path, version)
+            result = original_write_version(self, dir_path, version, ctx=ctx)
             # Simulate a concurrent process writing a rogue file
             rogue_path = os.path.join(dir_path, "rogue_concurrent.txt")
             with open(rogue_path, "w") as f:

@@ -3,6 +3,7 @@
 import os
 import tempfile
 
+from conftest import make_ctx
 from rlsbl.targets.zig import ZigTarget, ZIG_TARGET_MAP, _zig_archive_fn
 from rlsbl.targets.protocol import ReleaseTarget
 from rlsbl.targets import TARGETS
@@ -194,7 +195,7 @@ class TestZigTargetTemplateVars:
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "build.zig.zon"), SAMPLE_ZON)
             _write(os.path.join(d, "VERSION"), "0.1.0\n")
-            vars = target.template_vars(d, d)
+            vars = target.template_vars(d, make_ctx(d))
             assert vars["name"] == "my-zig-project"
             assert vars["zig.projectName"] == "my-zig-project"
 
@@ -203,27 +204,27 @@ class TestZigTargetTemplateVars:
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "build.zig.zon"), SAMPLE_ZON)
             _write(os.path.join(d, "VERSION"), "0.1.0\n")
-            vars = target.template_vars(d, d)
+            vars = target.template_vars(d, make_ctx(d))
             assert vars["zig.minRequiredZig"] == "0.13.0"
 
     def test_fallback_name_to_dirname(self):
         target = ZigTarget()
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "VERSION"), "0.1.0\n")
-            vars = target.template_vars(d, d)
+            vars = target.template_vars(d, make_ctx(d))
             assert vars["name"] == os.path.basename(d)
 
     def test_fallback_version(self):
         target = ZigTarget()
         with tempfile.TemporaryDirectory() as d:
-            vars = target.template_vars(d, d)
+            vars = target.template_vars(d, make_ctx(d))
             assert vars["version"] == "0.0.0"
 
     def test_fallback_min_zig_version(self):
         target = ZigTarget()
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "build.zig.zon"), SAMPLE_ZON_NO_MIN_ZIG)
-            vars = target.template_vars(d, d)
+            vars = target.template_vars(d, make_ctx(d))
             assert vars["zig.minRequiredZig"] == "0.14.0"
 
     def test_detects_binary(self):
@@ -232,7 +233,7 @@ class TestZigTargetTemplateVars:
             _write(os.path.join(d, "build.zig.zon"), SAMPLE_ZON)
             _write(os.path.join(d, "build.zig"), BUILD_ZIG_BINARY)
             _write(os.path.join(d, "VERSION"), "0.1.0\n")
-            vars = target.template_vars(d, d)
+            vars = target.template_vars(d, make_ctx(d))
             assert vars["zig.isLibrary"] is False
 
     def test_detects_library(self):
@@ -241,7 +242,7 @@ class TestZigTargetTemplateVars:
             _write(os.path.join(d, "build.zig.zon"), SAMPLE_ZON)
             _write(os.path.join(d, "build.zig"), BUILD_ZIG_LIBRARY)
             _write(os.path.join(d, "VERSION"), "0.1.0\n")
-            vars = target.template_vars(d, d)
+            vars = target.template_vars(d, make_ctx(d))
             assert vars["zig.isLibrary"] is True
 
     def test_detects_binary_exe_call(self):
@@ -251,7 +252,7 @@ class TestZigTargetTemplateVars:
             _write(os.path.join(d, "build.zig.zon"), SAMPLE_ZON)
             _write(os.path.join(d, "build.zig"), BUILD_ZIG_EXE_CALL)
             _write(os.path.join(d, "VERSION"), "0.1.0\n")
-            vars = target.template_vars(d, d)
+            vars = target.template_vars(d, make_ctx(d))
             assert vars["zig.isLibrary"] is False
 
     def test_library_when_no_build_zig(self):
@@ -260,14 +261,14 @@ class TestZigTargetTemplateVars:
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "build.zig.zon"), SAMPLE_ZON)
             _write(os.path.join(d, "VERSION"), "0.1.0\n")
-            vars = target.template_vars(d, d)
+            vars = target.template_vars(d, make_ctx(d))
             assert vars["zig.isLibrary"] is True
 
     def test_malformed_zon_uses_fallbacks(self):
         target = ZigTarget()
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "build.zig.zon"), SAMPLE_ZON_MALFORMED)
-            vars = target.template_vars(d, d)
+            vars = target.template_vars(d, make_ctx(d))
             assert vars["name"] == os.path.basename(d)
             assert vars["version"] == "0.0.0"
             assert vars["zig.minRequiredZig"] == "0.14.0"
@@ -395,7 +396,7 @@ class TestZigNpmWrapperTemplateVars:
         with tempfile.TemporaryDirectory() as d:
             self._setup_zig_binary_project(d)
             monkeypatch.chdir(d)
-            vars_ = target.template_vars(d, d)
+            vars_ = target.template_vars(d, make_ctx(d))
             assert vars_.get("npmPublishJobs", "") == ""
             assert vars_.get("npmScope", "") == ""
 
@@ -411,7 +412,7 @@ class TestZigNpmWrapperTemplateVars:
                 '{"npm_wrapper": {"scope": "@ziguser"}}',
             )
             monkeypatch.chdir(d)
-            vars_ = target.template_vars(d, d)
+            vars_ = target.template_vars(d, make_ctx(d))
             assert vars_["npmScope"] == "@ziguser"
 
     def test_npm_publish_jobs_with_config(self, monkeypatch):
@@ -426,7 +427,7 @@ class TestZigNpmWrapperTemplateVars:
                 '{"npm_wrapper": {"scope": "@ziguser"}}',
             )
             monkeypatch.chdir(d)
-            vars_ = target.template_vars(d, d)
+            vars_ = target.template_vars(d, make_ctx(d))
             jobs = vars_.get("npmPublishJobs", "")
             assert "npm publish" in jobs
             assert "npm-publish:" in jobs
@@ -447,7 +448,7 @@ class TestZigNpmWrapperTemplateVars:
                 '{"npm_wrapper": {"scope": "@ziguser"}}',
             )
             monkeypatch.chdir(d)
-            vars_ = target.template_vars(d, d)
+            vars_ = target.template_vars(d, make_ctx(d))
             assert vars_.get("npmPublishJobs", "") == ""
 
 
@@ -468,7 +469,7 @@ class TestZigNpmWrapperTemplateMappings:
                 '{"npm_wrapper": {"scope": "@ziguser"}}',
             )
             monkeypatch.chdir(d)
-            mappings = target.shared_template_mappings(d)
+            mappings = target.shared_template_mappings(make_ctx(d))
             targets = [m["target"] for m in mappings]
             assert "npm-wrapper/package.json" in targets
             assert "npm-wrapper/bin/index.js" in targets
@@ -483,7 +484,7 @@ class TestZigNpmWrapperTemplateMappings:
             _write(os.path.join(d, "build.zig"), BUILD_ZIG_BINARY)
             _write(os.path.join(d, "VERSION"), "0.1.0\n")
             monkeypatch.chdir(d)
-            mappings = target.shared_template_mappings(d)
+            mappings = target.shared_template_mappings(make_ctx(d))
             targets = [m["target"] for m in mappings]
             assert "npm-wrapper/package.json" not in targets
 
@@ -501,6 +502,6 @@ class TestZigNpmWrapperTemplateMappings:
                 '{"npm_wrapper": {"scope": "@ziguser"}}',
             )
             monkeypatch.chdir(d)
-            mappings = target.shared_template_mappings(d)
+            mappings = target.shared_template_mappings(make_ctx(d))
             targets = [m["target"] for m in mappings]
             assert "npm-wrapper/package.json" not in targets

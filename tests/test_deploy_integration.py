@@ -91,7 +91,7 @@ class TestReleaseWithDeployTargets:
             registry="npm",
             reg=type("FakeReg", (), {
                 "version_file": lambda self: None,
-                "write_version": lambda self, p, v: [],
+                "write_version": lambda self, p, v, ctx=None: [],
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, ctx: None,
                 "tag_format": lambda self, v: f"v{v}",
@@ -187,7 +187,7 @@ class TestReleaseDeployFailureContinues:
             registry="npm",
             reg=type("FakeReg", (), {
                 "version_file": lambda self: None,
-                "write_version": lambda self, p, v: [],
+                "write_version": lambda self, p, v, ctx=None: [],
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, ctx: None,
                 "tag_format": lambda self, v: f"v{v}",
@@ -258,7 +258,7 @@ class TestReleaseNoDeployConfig:
             registry="npm",
             reg=type("FakeReg", (), {
                 "version_file": lambda self: None,
-                "write_version": lambda self, p, v: [],
+                "write_version": lambda self, p, v, ctx=None: [],
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, ctx: None,
                 "tag_format": lambda self, v: f"v{v}",
@@ -330,7 +330,7 @@ class TestReleaseDeployConfigErrors:
             registry="npm",
             reg=type("FakeReg", (), {
                 "version_file": lambda self: None,
-                "write_version": lambda self, p, v: [],
+                "write_version": lambda self, p, v, ctx=None: [],
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, ctx: None,
                 "tag_format": lambda self, v: f"v{v}",
@@ -405,7 +405,7 @@ class TestReleaseStopsAtFirstDeployFailure:
             registry="npm",
             reg=type("FakeReg", (), {
                 "version_file": lambda self: None,
-                "write_version": lambda self, p, v: [],
+                "write_version": lambda self, p, v, ctx=None: [],
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, ctx: None,
                 "tag_format": lambda self, v: f"v{v}",

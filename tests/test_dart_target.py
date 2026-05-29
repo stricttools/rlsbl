@@ -4,6 +4,7 @@ import json
 import os
 import tempfile
 
+from conftest import make_ctx
 from rlsbl.targets.dart import DartTarget
 from rlsbl.targets.protocol import ReleaseTarget
 from rlsbl.targets import TARGETS
@@ -128,7 +129,7 @@ class TestDartTargetWriteVersion:
         target = DartTarget()
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "pubspec.yaml"), SAMPLE_PUBSPEC)
-            modified = target.write_version(d, "2.0.0", d)
+            modified = target.write_version(d, "2.0.0", make_ctx(d))
             assert modified == ["pubspec.yaml"]
             assert target.read_version(d) == "2.0.0"
 
@@ -136,7 +137,7 @@ class TestDartTargetWriteVersion:
         target = DartTarget()
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "pubspec.yaml"), SAMPLE_PUBSPEC)
-            target.write_version(d, "3.0.0", d)
+            target.write_version(d, "3.0.0", make_ctx(d))
             content = _read(os.path.join(d, "pubspec.yaml"))
             assert "name: my_dart_app" in content
             assert "http:" in content
@@ -145,7 +146,7 @@ class TestDartTargetWriteVersion:
         target = DartTarget()
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "pubspec.yaml"), SAMPLE_PUBSPEC_WITH_COMMENT)
-            target.write_version(d, "3.0.0", d)
+            target.write_version(d, "3.0.0", make_ctx(d))
             content = _read(os.path.join(d, "pubspec.yaml"))
             assert "# This is the app version" in content
             assert "3.0.0" in content
@@ -155,7 +156,7 @@ class TestDartTargetWriteVersion:
         target = DartTarget()
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "pubspec.yaml"), SAMPLE_PUBSPEC_WITH_BUILD)
-            target.write_version(d, "2.0.0", d)
+            target.write_version(d, "2.0.0", make_ctx(d))
             from ruamel.yaml import YAML
             yaml = YAML(typ="safe")
             with open(os.path.join(d, "pubspec.yaml"), "r") as f:
@@ -167,7 +168,7 @@ class TestDartTargetWriteVersion:
         target = DartTarget()
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "pubspec.yaml"), SAMPLE_PUBSPEC)
-            target.write_version(d, "2.0.0", d)
+            target.write_version(d, "2.0.0", make_ctx(d))
             from ruamel.yaml import YAML
             yaml = YAML(typ="safe")
             with open(os.path.join(d, "pubspec.yaml"), "r") as f:
@@ -178,7 +179,7 @@ class TestDartTargetWriteVersion:
         target = DartTarget()
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "pubspec.yaml"), SAMPLE_PUBSPEC)
-            target.write_version(d, "2.0.0", d)
+            target.write_version(d, "2.0.0", make_ctx(d))
             files = os.listdir(d)
             assert "pubspec.yaml.tmp" not in files
 
@@ -197,7 +198,7 @@ class TestDartTargetWriteVersionBuildNumber:
                 "build_number": {"enabled": True, "strategy": "increment"}
             }))
             monkeypatch.chdir(d)
-            target.write_version(d, "2.0.0", d)
+            target.write_version(d, "2.0.0", make_ctx(d))
             from ruamel.yaml import YAML
             yaml = YAML(typ="safe")
             with open(os.path.join(d, "pubspec.yaml"), "r") as f:
@@ -216,7 +217,7 @@ class TestDartTargetWriteVersionBuildNumber:
                 "build_number": {"enabled": True, "strategy": "increment"}
             }))
             monkeypatch.chdir(d)
-            target.write_version(d, "2.0.0", d)
+            target.write_version(d, "2.0.0", make_ctx(d))
             from ruamel.yaml import YAML
             yaml = YAML(typ="safe")
             with open(os.path.join(d, "pubspec.yaml"), "r") as f:

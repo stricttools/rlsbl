@@ -29,7 +29,7 @@ def test_unreleased_jsonl_in_shared_mappings():
     """shared_template_mappings() must include the unreleased.jsonl mapping."""
     from rlsbl.targets.base import BaseTarget
 
-    mappings = BaseTarget().shared_template_mappings(".")
+    mappings = BaseTarget().shared_template_mappings(None)
     targets = {m["target"] for m in mappings}
     assert ".rlsbl/changes/unreleased.jsonl" in targets
 
@@ -40,7 +40,7 @@ def test_scaffold_creates_unreleased_jsonl(tmp_project):
 
     base = BaseTarget()
     tpl_dir = base.shared_template_dir()
-    mappings = [m for m in base.shared_template_mappings(".")
+    mappings = [m for m in base.shared_template_mappings(None)
                 if m["target"] == ".rlsbl/changes/unreleased.jsonl"]
 
     created, skipped, warnings, _ = process_mappings(
@@ -67,7 +67,7 @@ def test_scaffold_update_does_not_overwrite_unreleased_jsonl(tmp_project):
 
     base = BaseTarget()
     tpl_dir = base.shared_template_dir()
-    mappings = [m for m in base.shared_template_mappings(".")
+    mappings = [m for m in base.shared_template_mappings(None)
                 if m["target"] == ".rlsbl/changes/unreleased.jsonl"]
 
     created, skipped, warnings, _ = process_mappings(
@@ -94,7 +94,7 @@ def test_scaffold_force_does_not_overwrite_unreleased_jsonl(tmp_project):
 
     base = BaseTarget()
     tpl_dir = base.shared_template_dir()
-    mappings = [m for m in base.shared_template_mappings(".")
+    mappings = [m for m in base.shared_template_mappings(None)
                 if m["target"] == ".rlsbl/changes/unreleased.jsonl"]
 
     created, skipped, warnings, _ = process_mappings(

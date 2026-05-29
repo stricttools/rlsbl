@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 import pytest
 
+from conftest import make_ctx
 from rlsbl.commands.init_cmd import (
     process_template,
     process_mappings,
@@ -105,48 +106,48 @@ class TestMinVersionExtraction:
         (tmp_path / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "1.0.0"\nrequires-python = ">=3.11"\n'
         )
-        vars_ = TARGETS["pypi"].template_vars(str(tmp_path), str(tmp_path))
+        vars_ = TARGETS["pypi"].template_vars(str(tmp_path), make_ctx(tmp_path))
         assert vars_["minRequiredPython"] == "3.11"
 
     def test_pypi_min_python_with_upper_bound(self, tmp_path):
         (tmp_path / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "1.0.0"\nrequires-python = ">=3.11,<4"\n'
         )
-        vars_ = TARGETS["pypi"].template_vars(str(tmp_path), str(tmp_path))
+        vars_ = TARGETS["pypi"].template_vars(str(tmp_path), make_ctx(tmp_path))
         assert vars_["minRequiredPython"] == "3.11"
 
     def test_pypi_no_requires_python(self, tmp_path):
         (tmp_path / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "1.0.0"\n'
         )
-        vars_ = TARGETS["pypi"].template_vars(str(tmp_path), str(tmp_path))
+        vars_ = TARGETS["pypi"].template_vars(str(tmp_path), make_ctx(tmp_path))
         assert "minRequiredPython" not in vars_
 
     def test_npm_min_node(self, tmp_path):
         (tmp_path / "package.json").write_text(
             '{"name": "test", "version": "1.0.0", "engines": {"node": ">=18"}}'
         )
-        vars_ = TARGETS["npm"].template_vars(str(tmp_path), str(tmp_path))
+        vars_ = TARGETS["npm"].template_vars(str(tmp_path), make_ctx(tmp_path))
         assert vars_["minRequiredNode"] == "18"
 
     def test_npm_min_node_with_minor(self, tmp_path):
         (tmp_path / "package.json").write_text(
             '{"name": "test", "version": "1.0.0", "engines": {"node": ">=18.0.0"}}'
         )
-        vars_ = TARGETS["npm"].template_vars(str(tmp_path), str(tmp_path))
+        vars_ = TARGETS["npm"].template_vars(str(tmp_path), make_ctx(tmp_path))
         assert vars_["minRequiredNode"] == "18.0.0"
 
     def test_npm_no_engines(self, tmp_path):
         (tmp_path / "package.json").write_text(
             '{"name": "test", "version": "1.0.0"}'
         )
-        vars_ = TARGETS["npm"].template_vars(str(tmp_path), str(tmp_path))
+        vars_ = TARGETS["npm"].template_vars(str(tmp_path), make_ctx(tmp_path))
         assert "minRequiredNode" not in vars_
 
     def test_go_min_version(self, tmp_path):
         (tmp_path / "go.mod").write_text("module github.com/user/test\n\ngo 1.21\n")
         (tmp_path / "VERSION").write_text("1.0.0")
-        vars_ = TARGETS["go"].template_vars(str(tmp_path), str(tmp_path))
+        vars_ = TARGETS["go"].template_vars(str(tmp_path), make_ctx(tmp_path))
         assert vars_["minRequiredGo"] == "1.21"
 
     def test_cargo_min_rust(self, tmp_path):
@@ -154,7 +155,7 @@ class TestMinVersionExtraction:
             '[package]\nname = "test"\nversion = "1.0.0"\n'
             'rust-version = "1.70"\nedition = "2021"\n'
         )
-        vars_ = TARGETS["cargo"].template_vars(str(tmp_path), str(tmp_path))
+        vars_ = TARGETS["cargo"].template_vars(str(tmp_path), make_ctx(tmp_path))
         assert vars_["minRequiredRust"] == "1.70"
         assert vars_["edition"] == "2021"
 
@@ -236,7 +237,7 @@ class TestMergeTemplateVars:
             'requires-python = ">=3.11"\n'
         )
         target_paths = {"npm": str(tmp_path), "pypi": str(tmp_path)}
-        merged = _merge_template_vars(["npm", "pypi"], "npm", target_paths, str(tmp_path))
+        merged = _merge_template_vars(["npm", "pypi"], "npm", target_paths, make_ctx(tmp_path))
         # Primary (npm) vars are un-namespaced
         assert "name" in merged
         # All vars are namespaced
@@ -249,7 +250,7 @@ class TestMergeTemplateVars:
             '{"name": "test", "version": "1.0.0"}'
         )
         target_paths = {"npm": str(tmp_path)}
-        merged = _merge_template_vars(["npm"], "npm", target_paths, str(tmp_path))
+        merged = _merge_template_vars(["npm"], "npm", target_paths, make_ctx(tmp_path))
         # year is added by the caller, not _merge_template_vars
         assert "year" not in merged
 

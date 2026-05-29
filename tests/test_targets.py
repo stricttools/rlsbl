@@ -11,6 +11,7 @@ from rlsbl.context import ProjectContext
 from rlsbl.targets.protocol import ReleaseTarget
 from rlsbl.targets.npm import NpmTarget
 from rlsbl.targets.pypi import PypiTarget
+from conftest import make_ctx
 from rlsbl.targets.go import GoTarget
 from rlsbl.targets.swift import SwiftTarget
 from rlsbl.targets.swift_apple import SwiftAppleTarget
@@ -819,7 +820,7 @@ class TestGoScaffoldTemplates:
         (tmp_project / "go.mod").write_text("module github.com/user/myapp\n\ngo 1.21\n")
         (tmp_project / "main.go").write_text("package main\n\nfunc main() {}\n")
         (tmp_project / "VERSION").write_text("0.1.0\n")
-        vars = target.template_vars(str(tmp_project), str(tmp_project))
+        vars = target.template_vars(str(tmp_project), make_ctx(tmp_project))
         assert vars["goreleaserMain"] == "."
 
     def test_goreleaser_main_cmd(self, tmp_project):
@@ -830,7 +831,7 @@ class TestGoScaffoldTemplates:
         cmd_dir.mkdir(parents=True)
         (cmd_dir / "main.go").write_text("package main\n\nfunc main() {}\n")
         (tmp_project / "VERSION").write_text("0.1.0\n")
-        vars = target.template_vars(str(tmp_project), str(tmp_project))
+        vars = target.template_vars(str(tmp_project), make_ctx(tmp_project))
         assert vars["goreleaserMain"] == "./cmd/myapp"
 
     def test_goreleaser_main_fallback(self, tmp_project):
@@ -838,7 +839,7 @@ class TestGoScaffoldTemplates:
         target = GoTarget()
         (tmp_project / "go.mod").write_text("module github.com/user/mylib\n\ngo 1.21\n")
         (tmp_project / "VERSION").write_text("0.1.0\n")
-        vars = target.template_vars(str(tmp_project), str(tmp_project))
+        vars = target.template_vars(str(tmp_project), make_ctx(tmp_project))
         assert vars["goreleaserMain"] == "."
 
     def test_version_go_in_binary_mappings(self, tmp_project):
@@ -914,7 +915,7 @@ class TestNpmRegistryUrl:
         target = NpmTarget()
         pkg = {"name": "test-pkg", "version": "1.0.0"}
         (tmp_path / "package.json").write_text(json.dumps(pkg))
-        vars = target.template_vars(str(tmp_path), str(tmp_path))
+        vars = target.template_vars(str(tmp_path), make_ctx(tmp_path))
         assert vars["registryUrl"] == "https://registry.npmjs.org"
 
     def test_custom_registry_url(self, tmp_path):
@@ -926,7 +927,7 @@ class TestNpmRegistryUrl:
             "publishConfig": {"registry": "https://npm.pkg.github.com"},
         }
         (tmp_path / "package.json").write_text(json.dumps(pkg))
-        vars = target.template_vars(str(tmp_path), str(tmp_path))
+        vars = target.template_vars(str(tmp_path), make_ctx(tmp_path))
         assert vars["registryUrl"] == "https://npm.pkg.github.com"
 
 

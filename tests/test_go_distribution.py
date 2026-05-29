@@ -13,6 +13,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
+from conftest import make_ctx
 from rlsbl.commands.init_cmd import process_template
 from rlsbl.context import ProjectContext
 from rlsbl.targets import TARGETS
@@ -61,7 +62,7 @@ class TestGoConfigReading:
         """githubOwner is extracted from repoName."""
         monkeypatch.chdir(tmp_path)
         _setup_go_project(tmp_path)
-        vars_ = TARGETS["go"].template_vars(str(tmp_path), str(tmp_path))
+        vars_ = TARGETS["go"].template_vars(str(tmp_path), make_ctx(tmp_path))
         assert vars_["githubOwner"] == "testuser"
 
     def test_github_owner_empty_without_slash(self, tmp_path, monkeypatch):
@@ -70,7 +71,7 @@ class TestGoConfigReading:
         (tmp_path / "go.mod").write_text("module testproject\n\ngo 1.21\n")
         (tmp_path / "VERSION").write_text("1.0.0")
         (tmp_path / "main.go").write_text("package main\n")
-        vars_ = TARGETS["go"].template_vars(str(tmp_path), str(tmp_path))
+        vars_ = TARGETS["go"].template_vars(str(tmp_path), make_ctx(tmp_path))
         assert vars_["githubOwner"] == ""
 
 
@@ -91,7 +92,7 @@ class TestHomebrewTemplateVars:
         (config_dir / "config.json").write_text(
             '{"homebrew": {"tap": "homebrew-tap"}}'
         )
-        vars_ = TARGETS["go"].template_vars(str(tmp_path), str(tmp_path))
+        vars_ = TARGETS["go"].template_vars(str(tmp_path), make_ctx(tmp_path))
         assert "brews:" in vars_["brewsSection"]
         assert "homebrew-tap" in vars_["brewsSection"]
         assert "HOMEBREW_TAP_TOKEN" in vars_["brewsSection"]
@@ -100,7 +101,7 @@ class TestHomebrewTemplateVars:
         """brewsSection is empty when homebrew not configured."""
         monkeypatch.chdir(tmp_path)
         _setup_go_project(tmp_path)
-        vars_ = TARGETS["go"].template_vars(str(tmp_path), str(tmp_path))
+        vars_ = TARGETS["go"].template_vars(str(tmp_path), make_ctx(tmp_path))
         assert vars_["brewsSection"] == ""
 
     def test_homebrew_env_with_config(self, tmp_path, monkeypatch):
@@ -112,14 +113,14 @@ class TestHomebrewTemplateVars:
         (config_dir / "config.json").write_text(
             '{"homebrew": {"tap": "homebrew-tap"}}'
         )
-        vars_ = TARGETS["go"].template_vars(str(tmp_path), str(tmp_path))
+        vars_ = TARGETS["go"].template_vars(str(tmp_path), make_ctx(tmp_path))
         assert "HOMEBREW_TAP_TOKEN" in vars_["homebrewEnv"]
 
     def test_homebrew_env_empty_without_config(self, tmp_path, monkeypatch):
         """homebrewEnv is empty when homebrew not configured."""
         monkeypatch.chdir(tmp_path)
         _setup_go_project(tmp_path)
-        vars_ = TARGETS["go"].template_vars(str(tmp_path), str(tmp_path))
+        vars_ = TARGETS["go"].template_vars(str(tmp_path), make_ctx(tmp_path))
         assert vars_["homebrewEnv"] == ""
 
 
@@ -191,14 +192,14 @@ class TestNpmWrapperTemplateVars:
         (config_dir / "config.json").write_text(
             '{"npm_wrapper": {"scope": "@testuser"}}'
         )
-        vars_ = TARGETS["go"].template_vars(str(tmp_path), str(tmp_path))
+        vars_ = TARGETS["go"].template_vars(str(tmp_path), make_ctx(tmp_path))
         assert vars_["npmScope"] == "@testuser"
 
     def test_npm_scope_empty_without_config(self, tmp_path, monkeypatch):
         """npmScope is empty when npm_wrapper not configured."""
         monkeypatch.chdir(tmp_path)
         _setup_go_project(tmp_path)
-        vars_ = TARGETS["go"].template_vars(str(tmp_path), str(tmp_path))
+        vars_ = TARGETS["go"].template_vars(str(tmp_path), make_ctx(tmp_path))
         assert vars_.get("npmScope", "") == ""
 
     def test_npm_publish_jobs_with_config(self, tmp_path, monkeypatch):
@@ -210,7 +211,7 @@ class TestNpmWrapperTemplateVars:
         (config_dir / "config.json").write_text(
             '{"npm_wrapper": {"scope": "@testuser"}}'
         )
-        vars_ = TARGETS["go"].template_vars(str(tmp_path), str(tmp_path))
+        vars_ = TARGETS["go"].template_vars(str(tmp_path), make_ctx(tmp_path))
         assert "npm publish" in vars_.get("npmPublishJobs", "")
         assert "needs:" in vars_.get("npmPublishJobs", "")
 
@@ -218,7 +219,7 @@ class TestNpmWrapperTemplateVars:
         """npmPublishJobs is empty when npm_wrapper not configured."""
         monkeypatch.chdir(tmp_path)
         _setup_go_project(tmp_path)
-        vars_ = TARGETS["go"].template_vars(str(tmp_path), str(tmp_path))
+        vars_ = TARGETS["go"].template_vars(str(tmp_path), make_ctx(tmp_path))
         assert vars_.get("npmPublishJobs", "") == ""
 
 
@@ -241,7 +242,7 @@ class TestNpmWrapperTemplateMappings:
         (config_dir / "config.json").write_text(
             '{"npm_wrapper": {"scope": "@testuser"}}'
         )
-        mappings = TARGETS["go"].shared_template_mappings(str(tmp_path))
+        mappings = TARGETS["go"].shared_template_mappings(make_ctx(tmp_path))
         targets = [m["target"] for m in mappings]
         assert "npm-wrapper/package.json" in targets
         assert "npm-wrapper/bin/index.js" in targets
@@ -254,7 +255,7 @@ class TestNpmWrapperTemplateMappings:
         """npm wrapper mappings excluded from shared_template_mappings when not configured."""
         monkeypatch.chdir(tmp_path)
         _setup_go_project(tmp_path)
-        mappings = TARGETS["go"].shared_template_mappings(str(tmp_path))
+        mappings = TARGETS["go"].shared_template_mappings(make_ctx(tmp_path))
         targets = [m["target"] for m in mappings]
         assert "npm-wrapper/package.json" not in targets
 
@@ -274,7 +275,7 @@ class TestNpmWrapperTemplateMappings:
         (config_dir / "config.json").write_text(
             '{"npm_wrapper": {"scope": "@user"}}'
         )
-        mappings = TARGETS["go"].shared_template_mappings(str(tmp_path))
+        mappings = TARGETS["go"].shared_template_mappings(make_ctx(tmp_path))
         targets = [m["target"] for m in mappings]
         assert "npm-wrapper/package.json" not in targets
 
@@ -332,7 +333,7 @@ class TestNoConfigBaseline:
         """Without homebrew config, goreleaser output has no brews section."""
         monkeypatch.chdir(tmp_path)
         _setup_go_project(tmp_path)
-        vars_ = TARGETS["go"].template_vars(str(tmp_path), str(tmp_path))
+        vars_ = TARGETS["go"].template_vars(str(tmp_path), make_ctx(tmp_path))
         template = open(_template_path("goreleaser.yml.tpl")).read()
         content, _ = process_template(template, vars_)
         assert "brews:" not in content
@@ -341,7 +342,7 @@ class TestNoConfigBaseline:
         """Without config, publish has no HOMEBREW_TAP_TOKEN."""
         monkeypatch.chdir(tmp_path)
         _setup_go_project(tmp_path)
-        vars_ = TARGETS["go"].template_vars(str(tmp_path), str(tmp_path))
+        vars_ = TARGETS["go"].template_vars(str(tmp_path), make_ctx(tmp_path))
         template = open(_template_path("publish.yml.tpl")).read()
         content, _ = process_template(template, vars_)
         assert "HOMEBREW_TAP_TOKEN" not in content
@@ -350,7 +351,7 @@ class TestNoConfigBaseline:
         """Without config, publish has no npm publish jobs."""
         monkeypatch.chdir(tmp_path)
         _setup_go_project(tmp_path)
-        vars_ = TARGETS["go"].template_vars(str(tmp_path), str(tmp_path))
+        vars_ = TARGETS["go"].template_vars(str(tmp_path), make_ctx(tmp_path))
         template = open(_template_path("publish.yml.tpl")).read()
         content, _ = process_template(template, vars_)
         assert "npm publish" not in content
