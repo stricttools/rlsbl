@@ -80,7 +80,7 @@ class SpecTarget(BaseTarget):
     def tag_format(self, version):
         return f"spec-v{version}"
 
-    def publish(self, dir_path, version, project_root):
+    def publish(self, dir_path, version, ctx):
         """No-op: the git tag IS the publication."""
         pass
 

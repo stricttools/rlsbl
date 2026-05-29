@@ -7,7 +7,7 @@ import sys
 import xml.etree.ElementTree as ET
 
 from .base import BaseTarget
-from ..config import get_publish_config, read_project_config
+from ..config import get_publish_config
 from ..utils import run
 
 
@@ -272,9 +272,12 @@ class MavenTarget(BaseTarget):
             {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
         ]
 
-    def publish(self, dir_path, version, project_root):
-        """Publish via Gradle or Maven based on per-target config and token availability."""
-        pub_config = get_publish_config(self.name, read_project_config(project_root))
+    def publish(self, dir_path, version, ctx):
+        """Publish via Gradle or Maven based on per-target config and token availability.
+
+        ctx: ProjectContext carrying project_root, monorepo_root, and config.
+        """
+        pub_config = get_publish_config(self.name, ctx.config)
 
         if pub_config.get("local") is False:
             print(f"Skipping local {self.name} publish (config: local=false). CI will handle it.")

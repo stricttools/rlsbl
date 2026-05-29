@@ -61,9 +61,12 @@ class DockerTarget(BaseTarget):
     def tag_format(self, version):
         return f"v{version}"
 
-    def publish(self, dir_path, version, project_root):
-        """Build and push Docker image to the configured registry."""
-        pub_config = get_publish_config(self.name, read_project_config(project_root))
+    def publish(self, dir_path, version, ctx):
+        """Build and push Docker image to the configured registry.
+
+        ctx: ProjectContext carrying project_root, monorepo_root, and config.
+        """
+        pub_config = get_publish_config(self.name, ctx.config)
 
         if pub_config.get("local") is False:
             print(f"Skipping local {self.name} publish (config: local=false). CI will handle it.")
@@ -85,8 +88,7 @@ class DockerTarget(BaseTarget):
             print(f"Skipping local docker publish (no {username_var}/{password_var}). CI will handle it.")
             return
 
-        config = read_project_config(project_root)
-        docker_config = config.get("docker", {})
+        docker_config = ctx.config.get("docker", {})
         image = docker_config.get("image")
         registry = docker_config.get("registry")
 

@@ -157,7 +157,7 @@ class GoTarget(BaseTarget):
                     artifacts.append(dest)
         return sorted(artifacts)
 
-    def publish(self, dir_path, version, project_root):
+    def publish(self, dir_path, version, ctx):
         """Notify the Go module proxy so the new version is immediately available."""
         module_path = self._read_module_path(dir_path)
         if not module_path:

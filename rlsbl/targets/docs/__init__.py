@@ -11,7 +11,7 @@ import sys
 import tempfile
 
 from ..base import BaseTarget
-from ...config import get_publish_config, read_project_config
+from ...config import get_publish_config
 from ...utils import require_tool
 
 
@@ -84,7 +84,7 @@ class DocsTarget(BaseTarget):
             return
         subprocess.run(["selfdoc", "build"], cwd=dir_path, check=True, timeout=300)
 
-    def publish(self, dir_path, version, project_root):
+    def publish(self, dir_path, version, ctx):
         """Delegate to selfdoc deploy, gated by per-target config and credentials.
 
         Behaviour:
@@ -93,8 +93,10 @@ class DocsTarget(BaseTarget):
         - config local=true and selfdoc present: run `selfdoc deploy`
         - no config: only attempt if both CF_ACCOUNT_ID and CF_PAGES_API_TOKEN
           are set (and selfdoc is available); otherwise skip silently
+
+        ctx: ProjectContext carrying project_root, monorepo_root, and config.
         """
-        pub_config = get_publish_config(self.name, read_project_config(project_root))
+        pub_config = get_publish_config(self.name, ctx.config)
 
         if pub_config.get("local") is False:
             print(f"Skipping local {self.name} publish (config: local=false). CI will handle it.")

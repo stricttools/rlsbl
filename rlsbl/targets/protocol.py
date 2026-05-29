@@ -88,8 +88,11 @@ class ReleaseTarget(Protocol):
         """Pre-publish build step (e.g. generate docs). No-op by default."""
         pass
 
-    def publish(self, dir_path: str, version: str, project_root: str) -> None:
-        """Post-push publish/deploy step. No-op by default."""
+    def publish(self, dir_path: str, version: str, ctx) -> None:
+        """Post-push publish/deploy step. No-op by default.
+
+        ctx: ProjectContext carrying project_root, monorepo_root, and config.
+        """
         pass
 
     def build_assets(self, dir_path: str, version: str, dist_dir: str) -> list[str]:
