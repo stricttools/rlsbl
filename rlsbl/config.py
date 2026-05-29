@@ -45,12 +45,14 @@ USER_CONFIG = os.path.expanduser("~/.rlsbl/config.json")
 
 
 def read_json_config(path):
-    """Safely read a JSON file, returning {} on missing or malformed."""
+    """Safely read a JSON file, returning {} on missing."""
     try:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
+    except FileNotFoundError:
         return {}
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Malformed JSON in {path}: {e}") from e
 
 
 def should_tag(flags, project_root=None):
