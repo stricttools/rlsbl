@@ -133,7 +133,7 @@ def _split_csv(value):
     return [s.strip() for s in value.split(",") if s.strip()]
 
 
-def _resolve_project_name(project_dir, target_name):
+def _resolve_project_name(project_dir, target_name, project_root=None):
     """Read the package name from the target's manifest, falling back to dir basename."""
     target = TARGETS.get(target_name)
     if target is not None:
