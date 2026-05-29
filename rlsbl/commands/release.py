@@ -489,7 +489,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
         flags = {}
 
     project_root = ctx.project_root
-    monorepo_root = ctx.monorepo_root
+    monorepo_root = ctx.workspace_root
 
     if not release_config.include:
         print("Error: release file has an empty include list. Add at least one target.", file=sys.stderr)
@@ -1096,7 +1096,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
     ctx: ProjectContext carrying project_root, monorepo_root, and config.
     """
     project_root = ctx.project_root
-    monorepo_root = ctx.monorepo_root
+    monorepo_root = ctx.workspace_root
     # Snapshot dirty files BEFORE any version-bump writes. This captures
     # everything dirtied by prior stages (generate_changelog, hooks, lint,
     # --allow-dirty pre-existing files, etc.). Only files that become dirty

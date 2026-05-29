@@ -7,14 +7,14 @@ from pathlib import Path
 
 @dataclass
 class ProjectContext:
-    """Context object carrying project root, optional monorepo root, and loaded config."""
+    """Context object carrying project root, optional workspace root, and loaded config."""
 
     project_root: Path
-    monorepo_root: Path | None
+    workspace_root: Path | None
     config: dict
 
 
-def create_context(root: Path, monorepo_root: Path | None = None) -> ProjectContext:
+def create_context(root: Path, workspace_root: Path | None = None) -> ProjectContext:
     """Create a ProjectContext, loading config from .rlsbl/config.json.
 
     Returns an empty dict for config if the file doesn't exist.
@@ -25,4 +25,4 @@ def create_context(root: Path, monorepo_root: Path | None = None) -> ProjectCont
             config = json.load(f)
     except FileNotFoundError:
         config = {}
-    return ProjectContext(project_root=root, monorepo_root=monorepo_root, config=config)
+    return ProjectContext(project_root=root, workspace_root=workspace_root, config=config)

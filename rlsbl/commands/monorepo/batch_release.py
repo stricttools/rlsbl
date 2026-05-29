@@ -107,7 +107,7 @@ def _cmd_batch_release(flags, project_root):
                 "quiet": quiet,
                 "allow-dirty": flags.get("allow-dirty", False),
             }
-            pkg_ctx = create_context(Path(project_dir), Path(workspace_root))
+            pkg_ctx = create_context(Path(project_dir), workspace_root=Path(workspace_root))
             run_cmd(release_config, release_flags, ctx=pkg_ctx)
             released.append(pkg_name)
         except SystemExit as e:

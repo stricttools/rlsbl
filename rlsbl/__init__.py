@@ -196,7 +196,7 @@ def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, no_watch, **_kwargs
     # In monorepo mode, the release file lives in the package's directory
     project_dir = "."
     monorepo_root = find_workspace_root(str(root))
-    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
+    ctx = create_context(root, workspace_root=Path(monorepo_root) if monorepo_root else None)
     if monorepo_root:
         project = resolve_project(monorepo_root, ".")
         if project is None:
@@ -414,7 +414,7 @@ def cmd_release_undo(target, yes, **_kwargs):
     root = _require_project_root()
     from .workspace import find_workspace_root
     monorepo_root = find_workspace_root(str(root))
-    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
+    ctx = create_context(root, workspace_root=Path(monorepo_root) if monorepo_root else None)
     flags = {"yes": yes}
     from .commands.undo import run_cmd
     run_cmd(target or None, [], flags, ctx=ctx)
@@ -482,7 +482,7 @@ def cmd_pre_push_check(**_kwargs):
     root = _require_project_root()
     from .workspace import find_workspace_root
     monorepo_root = find_workspace_root(str(root))
-    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
+    ctx = create_context(root, workspace_root=Path(monorepo_root) if monorepo_root else None)
     from .commands.pre_push_check import run_cmd
     run_cmd(None, [], {}, ctx=ctx)
 
