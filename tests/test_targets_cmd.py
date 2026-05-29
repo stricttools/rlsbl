@@ -195,7 +195,7 @@ class TestMultiTargetRelease:
 
             # Verify docs target build/publish were called
             build_mock.assert_called_once_with(".", "1.0.1")
-            publish_mock.assert_called_once_with(".", "1.0.1")
+            publish_mock.assert_called_once_with(".", "1.0.1", project_root=None)
         finally:
             # Restore original methods
             TARGETS["docs"].build = original_build
