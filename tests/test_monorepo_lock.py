@@ -150,6 +150,8 @@ class TestMonorepoReleaseLockPlacement:
         def mock_run_side_effect(cmd, args, **kwargs):
             if "rev-list" in args:
                 return "0"
+            if "rev-parse" in args and "--show-toplevel" in args:
+                return str(mock_git_repo)
             if "rev-parse" in args and "HEAD" in args:
                 return "abc123"
             return ""
