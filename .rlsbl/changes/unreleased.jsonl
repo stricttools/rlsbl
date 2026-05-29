@@ -1,0 +1,1 @@
+{"commits":["70b15477347dff693793142349a9a58a696cacea"],"user_facing":true,"description":"**Fix.** Increased npm check-name timeout from 10s to 30s to reduce CI flakiness on cold-cache runners.","type":"fix"}
