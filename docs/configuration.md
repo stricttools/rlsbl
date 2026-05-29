@@ -31,4 +31,4 @@ The file uses TOML format with a `[[projects]]` array. Each entry has a `path` k
 
 When present in the project root, this file enables the `docs` release target and configures documentation builds. It specifies the source directories to scan, the output path for generated pages, the base URL for the published site, and an optional deploy provider such as Cloudflare Pages. See the [selfdoc documentation](https://github.com/smm-h/selfdoc) for the full schema.
 
-:-: table-schema path="selfdoc.json"
+:-: table-schema path="selfdoc.json" exclude="version,versions"
