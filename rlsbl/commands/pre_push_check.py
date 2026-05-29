@@ -53,7 +53,7 @@ def _get_release_branches(project_root=None):
     return [str(b) for b in branches]
 
 
-def _warn_if_manual_release_push(stdin_lines):
+def _warn_if_manual_release_push(stdin_lines, project_root=None):
     """Print a warning when a manual push targets a release branch.
 
     Fires only when ``RLSBL_RELEASE_PUSH`` is NOT set (i.e. the push didn't
@@ -66,7 +66,7 @@ def _warn_if_manual_release_push(stdin_lines):
     if not stdin_lines:
         return
 
-    release_branches = _get_release_branches()
+    release_branches = _get_release_branches(project_root)
     pushed_release_branches = []
     for line in stdin_lines:
         parts = line.split()
@@ -425,7 +425,7 @@ def run_cmd(registry, args, flags, project_root=None):
 
     # Warn if this looks like a manual push to a release branch (the env
     # marker is only set by `rlsbl release run` and `rlsbl release undo`). Non-blocking.
-    _warn_if_manual_release_push(stdin_lines)
+    _warn_if_manual_release_push(stdin_lines, project_root=project_root)
 
     # Detect monorepo context
     workspace_root = find_workspace_root(root_str)
