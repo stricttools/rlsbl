@@ -1,6 +1,6 @@
 ---
 title: rlsbl.context
-description: "Project context for general command use."
+description: "ProjectContext dataclass holding project_root, monorepo_root, and config for threading explicit paths through rlsbl command flows."
 generated: true
 nav_group: "API Reference"
 nav_order: 43
