@@ -9,7 +9,7 @@ from ..utils import run, check_gh_installed, check_gh_auth
 from ..workspace import find_workspace_root, resolve_project
 
 
-def run_cmd(args, flags, project_root=None):
+def run_cmd(args, flags, project_root):
     """Yank a past GitHub Release.
 
     Default (soft): mark as pre-release and prepend a deprecation notice.
@@ -39,7 +39,7 @@ def run_cmd(args, flags, project_root=None):
     # Detect monorepo context and build tag accordingly
     monorepo_name = None
     monorepo_project_path = None
-    start_path = str(project_root) if project_root else "."
+    start_path = str(project_root)
     monorepo_root = find_workspace_root(start_path)
     if monorepo_root:
         project = resolve_project(monorepo_root, start_path)

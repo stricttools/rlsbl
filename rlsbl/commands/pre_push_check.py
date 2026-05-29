@@ -21,7 +21,7 @@ _filter_commits_for_project = filter_commits_for_project
 DEFAULT_RELEASE_BRANCHES = ["main", "master"]
 
 
-def _get_release_branches(project_root=None):
+def _get_release_branches(project_root):
     """Return the configured release-branch list.
 
     Reads ``release_branches`` from ``.rlsbl/config.json`` if present;
@@ -53,7 +53,7 @@ def _get_release_branches(project_root=None):
     return [str(b) for b in branches]
 
 
-def _warn_if_manual_release_push(stdin_lines, project_root=None):
+def _warn_if_manual_release_push(stdin_lines, project_root):
     """Print a warning when a manual push targets a release branch.
 
     Fires only when ``RLSBL_RELEASE_PUSH`` is NOT set (i.e. the push didn't
@@ -399,7 +399,7 @@ def _run_monorepo_check(workspace_root, projects, changed_files, refs=None):
     sys.exit(1)
 
 
-def run_cmd(registry, args, flags, project_root=None):
+def run_cmd(registry, args, flags, project_root):
     """Check that CHANGELOG.md has an entry for the current project version.
 
     In monorepo mode (when a workspace root is detected), parses the pushed
@@ -410,8 +410,6 @@ def run_cmd(registry, args, flags, project_root=None):
 
     Exits 1 if any changelog entry is missing; exits 0 silently on success.
     """
-    if project_root is None:
-        project_root = "."
     root_str = str(project_root)
 
     # Read stdin once -- used for tag detection and ref parsing

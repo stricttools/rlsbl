@@ -29,7 +29,7 @@ def _print_summary(results):
         print(f"{step_name:<{step_width}}  {status:<{status_width}}  {remediation}")
 
 
-def run_cmd(registry, args, flags, project_root=None):
+def run_cmd(registry, args, flags, project_root):
     if not check_gh_installed():
         print("Error: gh CLI is not installed.", file=sys.stderr)
         sys.exit(1)
@@ -44,7 +44,7 @@ def run_cmd(registry, args, flags, project_root=None):
     # Monorepo detection
     monorepo_name = None
     monorepo_project_path = None
-    start_path = str(project_root) if project_root else "."
+    start_path = str(project_root)
     ws_root = find_workspace_root(start_path)
     if ws_root:
         project = resolve_project(ws_root, start_path)

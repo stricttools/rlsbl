@@ -45,15 +45,13 @@ def _check_duplicate_commits(existing_entries, new_entry):
                     )
 
 
-def cmd_add(flags, project_root=None):
+def cmd_add(flags, project_root):
     """Add a changelog entry to unreleased.jsonl.
 
     Required flags:
     - --commits: comma-separated commit hashes
     - --description and --type: required unless --no-user-facing is set
     """
-    if project_root is None:
-        project_root = "."
     commits_raw = flags.get("commits", "")
     if not commits_raw:
         print("Error: --commits is required.", file=sys.stderr)
@@ -123,10 +121,8 @@ def cmd_add(flags, project_root=None):
 
 
 
-def cmd_generate(flags, project_root=None):
+def cmd_generate(flags, project_root):
     """Generate CHANGELOG.md from JSONL changelog files."""
-    if project_root is None:
-        project_root = "."
 
     if not changes_dir_exists(project_root):
         print("Error: .rlsbl/changes/ does not exist.", file=sys.stderr)
@@ -177,7 +173,7 @@ def cmd_generate(flags, project_root=None):
                 )
 
 
-def cmd_amend(flags, project_root=None):
+def cmd_amend(flags, project_root):
     """Amend a released version's JSONL changelog by appending a new entry.
 
     Unlocks the read-only versioned JSONL file, appends the entry, re-locks it,
@@ -192,8 +188,6 @@ def cmd_amend(flags, project_root=None):
     - --no-user-facing: mark entry as non-user-facing
     - --no-resolve: skip hash validation (for old/amended commits)
     """
-    if project_root is None:
-        project_root = "."
     version = flags.get("version", "")
     if not version:
         print("Error: --version is required.", file=sys.stderr)

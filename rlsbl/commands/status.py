@@ -23,7 +23,7 @@ from ..utils import (
 from ..workspace import find_workspace_root, load_workspace, resolve_project
 
 
-def _collect_status(registry, target_path=".", tag_glob=None, project_root=None, project=None):
+def _collect_status(registry, target_path=".", *, tag_glob=None, project_root, project=None):
     """Collect status data as a dict.
 
     When tag_glob is set (monorepo mode), it is forwarded to
@@ -35,8 +35,6 @@ def _collect_status(registry, target_path=".", tag_glob=None, project_root=None,
 
     Returns None and prints an error if the project does not exist.
     """
-    if project_root is None:
-        project_root = "."
     reg = TARGETS[registry]
 
     if not reg.check_project_exists(target_path):
@@ -169,14 +167,12 @@ def _collect_status(registry, target_path=".", tag_glob=None, project_root=None,
     }
 
 
-def run_cmd(registry, args, flags, project_root=None):
+def run_cmd(registry, args, flags, project_root):
     """Status command handler.
 
     Shows a quick 'where am I' summary: package info, git state, changelog, CI.
     With --json, outputs machine-readable JSON instead.
     """
-    if project_root is None:
-        project_root = "."
     root_str = str(project_root)
 
     # Build per-target path mapping from detect_targets

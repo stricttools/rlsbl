@@ -107,7 +107,7 @@ def _cleanup_retry_file(retry_path, log):
         print(f"Warning: failed to clean up {retry_path}: {e}", file=sys.stderr)
 
 
-def run_cmd(retry_config, flags, project_root=None):
+def run_cmd(retry_config, flags, project_root):
     """Dispatch CI/CD workflows for an existing GitHub Release.
 
     Verifies the GitHub Release exists for the configured version, then
@@ -138,7 +138,7 @@ def run_cmd(retry_config, flags, project_root=None):
     # Detect monorepo context
     monorepo_name = None
     monorepo_project_path = None
-    start_path = str(project_root) if project_root else "."
+    start_path = str(project_root)
     monorepo_root = find_workspace_root(start_path)
     if monorepo_root:
         project = resolve_project(monorepo_root, start_path)

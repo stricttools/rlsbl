@@ -9,14 +9,12 @@ from ..utils import require_tool
 from ..workspace import find_workspace_root, load_workspace
 
 
-def run_install(flags, project_root=None):
+def run_install(flags, project_root):
     """Entry point for `rlsbl dev install`.
 
     Detects whether we're in a monorepo (via workspace.toml) and dispatches
     to either the single-project or multi-project installer.
     """
-    if project_root is None:
-        project_root = "."
     root_str = str(project_root)
 
     workspace_root = find_workspace_root(root_str)

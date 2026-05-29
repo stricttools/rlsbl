@@ -9,7 +9,7 @@ from ..utils import check_gh_auth, check_gh_installed, extract_changelog_entry, 
 from ..workspace import find_workspace_root, resolve_project
 
 
-def run_cmd(args, flags, project_root=None):
+def run_cmd(args, flags, project_root):
     """Update GitHub Release notes from the changelog entry for a version.
 
     If no version is given, detects the current version from the project's
@@ -35,7 +35,7 @@ def run_cmd(args, flags, project_root=None):
     # Detect monorepo context
     monorepo_name = None
     monorepo_project_path = None
-    start_path = str(project_root) if project_root else "."
+    start_path = str(project_root)
     monorepo_root = find_workspace_root(start_path)
     if monorepo_root:
         project = resolve_project(monorepo_root, start_path)

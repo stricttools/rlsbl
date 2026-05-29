@@ -19,9 +19,9 @@ def _parse_int_flag(flags, name, default):
         sys.exit(1)
 
 
-def _get_bin_command(project_root=None):
+def _get_bin_command(project_root):
     """Auto-detect the project's binary command name via registry template vars."""
-    dir_path = str(project_root) if project_root is not None else "."
+    dir_path = str(project_root)
     target_entries = detect_targets(dir_path)
     if not target_entries:
         return None
@@ -37,14 +37,12 @@ def _get_bin_command(project_root=None):
         return None
 
 
-def run_cmd(registry, args, flags, project_root=None):
+def run_cmd(registry, args, flags, project_root):
     """Record a demo GIF of '<binCommand> --help' using vhs.
 
     Requires vhs (https://github.com/charmbracelet/vhs) to be installed.
     Output is saved to assets/demo.gif.
     """
-    if project_root is None:
-        project_root = "."
     root_str = str(project_root)
 
     if not require_tool("vhs", fatal=False):

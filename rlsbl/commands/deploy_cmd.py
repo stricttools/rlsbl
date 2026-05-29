@@ -7,7 +7,7 @@ from ..deploy import deploy_target
 from ..utils import get_current_branch
 
 
-def run_cmd(registry, args, flags, project_root=None):
+def run_cmd(registry, args, flags, project_root):
     """Deploy to configured targets.
 
     Usage:

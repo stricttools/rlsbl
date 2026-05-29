@@ -68,13 +68,11 @@ def _get_commits_since(tag):
 
 
 
-def run_cmd(registry, args, flags, project_root=None):
+def run_cmd(registry, args, flags, project_root):
     """List unreleased commits and their changelog coverage.
 
     Usage: rlsbl unreleased [--json]
     """
-    if project_root is None:
-        project_root = "."
     root_str = str(project_root)
 
     # Detect monorepo context for scoped tags and directory filtering

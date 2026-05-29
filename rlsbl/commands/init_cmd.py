@@ -82,7 +82,7 @@ def save_hashes(hashes):
         f.write("\n")
 
 
-def _ensure_target_in_config(registry_name, project_root=None):
+def _ensure_target_in_config(registry_name, project_root):
     """Add registry_name to the targets array in .rlsbl/config.json if not already present."""
     config = read_project_config(project_root)
     targets = config.get("targets", [])
@@ -680,10 +680,10 @@ def _install_or_update_pre_push_hook():
     )
 
 
-def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnings,
+def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnings, *,
                        registry=None, flags=None, registries=None,
                        npm_lockfile_missing=False, target_paths=None,
-                       project_root=None):
+                       project_root):
     """Shared post-processing for scaffold: chmod, hooks, version marker, hashes, tagging, summary.
 
     all_hash_dicts is a list of dicts to merge into existing_hashes.
@@ -729,7 +729,7 @@ def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnin
 
     # Ecosystem tagging
     if should_tag(flags, project_root):
-        ensure_tags(registries, target_paths=target_paths)
+        ensure_tags(registries, target_paths=target_paths, project_root=project_root)
 
     # Print unified file list with dot-padded status column
     _print_file_status_table(created, skipped)
@@ -839,7 +839,7 @@ def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnin
         print("Committed scaffold changes.")
 
 
-def _resolve_private(flags, project_root=None):
+def _resolve_private(flags, project_root):
     """Determine if this is a private repository.
 
     Checks --private flag first, then saved config, then auto-detects via GitHub API.
@@ -868,7 +868,7 @@ def _filter_mappings_for_private(mappings):
     return [m for m in mappings if "publish" not in m["template"]]
 
 
-def _append_deploy_workflow_if_configured(mappings, project_root=None):
+def _append_deploy_workflow_if_configured(mappings, project_root):
     """Add deploy workflow template to mappings if deploy config exists."""
     deploy_targets, _ = read_deploy_config(project_root)
     if deploy_targets:
@@ -918,7 +918,7 @@ def _trigger_monorepo_sync(no_commit=False):
             pass
 
 
-def run_cmd(registry, args, flags, project_root=None):
+def run_cmd(registry, args, flags, project_root):
     """Init command handler.
 
     Scaffolds release infrastructure (CI, publish workflows, changelog, etc.)
@@ -1407,7 +1407,7 @@ def _plan_merged_publish(publish_target, merged_content, force):
     }
 
 
-def run_cmd_multi(registries_list, args, flags, project_root=None):
+def run_cmd_multi(registries_list, args, flags, project_root):
     """Scaffold for multiple registries with a merged publish workflow.
 
     Uses the primary registry for template vars and CI, then writes a merged
