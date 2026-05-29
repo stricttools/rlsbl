@@ -892,7 +892,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None,
     # In monorepo mode the lock goes in .rlsbl-monorepo/ (the workspace
     # config dir) instead of .rlsbl/ to avoid creating a spurious directory.
     lock_dir = ".rlsbl-monorepo" if monorepo_name else ".rlsbl"
-    acquire_lock(lock_dir=lock_dir)
+    acquire_lock(lock_dir=lock_dir, project_root=project_root)
 
     # Pre-release checks all passed; now safe to materialize CHANGELOG.md and
     # per-version .md files on disk. The version-bump commit below includes
