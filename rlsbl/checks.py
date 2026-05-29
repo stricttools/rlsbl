@@ -1,7 +1,7 @@
 """Project checks registered on the strictcli check system.
 
 Each check is registered via ``@app.check("name")`` and receives a
-:class:`~rlsbl.check_context.ProjectCheckContext` (or its
+:class:`~rlsbl.context.ProjectContext` (or its
 :class:`~rlsbl.check_context.WorkspaceCheckContext` subclass).
 
 The check functions return :class:`strictcli.CheckResult` with lowercase
@@ -558,14 +558,13 @@ def register_checks(app):
     def check_changelog_batch_commits(ctx):
         """No entry should have more commits than max_commits_per_entry."""
         from .changelog.validate import check_batch_size_commits, _get_batch_limits_config
-        from .config import read_project_config
 
         info = _get_changelog_context(ctx)
         if info is None:
             return CheckResult("skip", "no .rlsbl/changes/ directory")
         _changes_dir, _tag_glob, _project, entries = info
 
-        batch_config = _get_batch_limits_config(read_project_config(ctx.project_root))
+        batch_config = _get_batch_limits_config(ctx.config)
 
         passed, details = check_batch_size_commits(entries, batch_config, version="unreleased")
         if passed:
@@ -580,14 +579,13 @@ def register_checks(app):
             _get_batch_limits_config,
             _read_all_versioned_entries,
         )
-        from .config import read_project_config
 
         info = _get_changelog_context(ctx)
         if info is None:
             return CheckResult("skip", "no .rlsbl/changes/ directory")
         changes_dir, _tag_glob, _project, _entries = info
 
-        batch_config = _get_batch_limits_config(read_project_config(ctx.project_root))
+        batch_config = _get_batch_limits_config(ctx.config)
         entries_by_version = _read_all_versioned_entries(changes_dir)
 
         passed, details = check_batch_size_entries(entries_by_version, batch_config)

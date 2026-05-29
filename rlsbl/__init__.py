@@ -144,7 +144,8 @@ def _check_context_factory():
     """
     from pathlib import Path
 
-    from .check_context import ProjectCheckContext, WorkspaceCheckContext
+    from .check_context import WorkspaceCheckContext
+    from .context import ProjectContext, create_context
     from .workspace import find_workspace_root, load_workspace
 
     workspace_root = find_workspace_root()
@@ -153,13 +154,15 @@ def _check_context_factory():
 
         projects = load_workspace(workspace_root)
         graph = WorkspaceGraph(workspace_root, projects)
+        ctx = create_context(Path.cwd(), workspace_root=Path(workspace_root))
         return WorkspaceCheckContext(
-            project_root=Path.cwd(),
-            workspace_root=Path(workspace_root),
+            project_root=ctx.project_root,
+            workspace_root=ctx.workspace_root,
+            config=ctx.config,
             projects=projects,
             graph=graph,
         )
-    return ProjectCheckContext(project_root=Path.cwd())
+    return create_context(Path.cwd())
 
 
 app.set_check_context(_check_context_factory)
