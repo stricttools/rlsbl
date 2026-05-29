@@ -244,10 +244,12 @@ class TestPrePushWithoutJsonl:
 
         assert not changes_dir_exists(".")
 
+        from pathlib import Path
         from rlsbl.commands.pre_push_check import run_cmd
+        from rlsbl.context import ProjectContext
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {}, project_root=tmp_project)
+            run_cmd(None, [], {}, ctx=ProjectContext(project_root=tmp_project, monorepo_root=None, config={}))
 
         assert exc_info.value.code == 0
         captured = capsys.readouterr()

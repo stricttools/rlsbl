@@ -6,6 +6,7 @@ import sys
 
 from ..changelog.files import get_changes_dir, unfinalize_version
 from ..changelog.generate import generate_changelog
+from ..context import ProjectContext
 from ..targets import TARGETS, detect_targets
 from ..utils import run, check_gh_installed, check_gh_auth, get_push_timeout, get_current_branch, push_if_needed, is_clean_tree
 from ..workspace import find_workspace_root, resolve_project
@@ -29,7 +30,7 @@ def _print_summary(results):
         print(f"{step_name:<{step_width}}  {status:<{status_width}}  {remediation}")
 
 
-def run_cmd(registry, args, flags, project_root):
+def run_cmd(registry, args, flags, *, ctx):
     if not check_gh_installed():
         print("Error: gh CLI is not installed.", file=sys.stderr)
         sys.exit(1)
@@ -44,7 +45,7 @@ def run_cmd(registry, args, flags, project_root):
     # Monorepo detection
     monorepo_name = None
     monorepo_project_path = None
-    start_path = str(project_root)
+    start_path = str(ctx.project_root)
     ws_root = find_workspace_root(start_path)
     if ws_root:
         project = resolve_project(ws_root, start_path)
@@ -100,7 +101,7 @@ def run_cmd(registry, args, flags, project_root):
     # release flow, so the pre-push hook shouldn't warn about a manual push).
     try:
         undo_push_env = {**os.environ, "RLSBL_RELEASE_PUSH": "1"}
-        run("git", ["push", "origin", f":{tag}"], timeout=get_push_timeout(project_root=project_root), env=undo_push_env)
+        run("git", ["push", "origin", f":{tag}"], timeout=get_push_timeout(project_root=ctx.project_root), env=undo_push_env)
         results.append(("Delete remote tag", OK, "-"))
     except Exception:
         results.append(("Delete remote tag", FAILED, f"git push origin :{tag}"))
@@ -166,7 +167,7 @@ def run_cmd(registry, args, flags, project_root):
     # Restore changelog state if we reverted a finalize commit
     if finalize_reverted:
         try:
-            project_path = os.path.join(ws_root, monorepo_project_path) if monorepo_name else str(project_root or ".")
+            project_path = os.path.join(ws_root, monorepo_project_path) if monorepo_name else str(ctx.project_root or ".")
             changes_dir = get_changes_dir(project_path)
             unfinalize_version(changes_dir, bare_version)
             generate_changelog(project_path)
@@ -194,7 +195,7 @@ def run_cmd(registry, args, flags, project_root):
                 # hook doesn't warn about a "manual push" to the release
                 # branch -- undo is part of the release flow.
                 push_env = {**os.environ, "RLSBL_RELEASE_PUSH": "1"}
-                push_if_needed(branch, env=push_env, project_root=project_root)
+                push_if_needed(branch, env=push_env, project_root=ctx.project_root)
                 results.append(("Push", OK, "-"))
             except Exception:
                 results.append(("Push", FAILED, "git push"))

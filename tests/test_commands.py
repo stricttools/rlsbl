@@ -936,10 +936,12 @@ class TestUndo:
         """When git describe raises, undo should exit with 'no tags found'."""
         mock_run.side_effect = Exception("no tags")
 
+        from pathlib import Path
         from rlsbl.commands.undo import run_cmd
+        from rlsbl.context import ProjectContext
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd("npm", [], {"yes": True}, project_root=".")
+            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
         assert exc_info.value.code == 1
 
     @patch("rlsbl.commands.undo.check_gh_auth", return_value=True)
@@ -947,10 +949,12 @@ class TestUndo:
     @patch("rlsbl.commands.undo.is_clean_tree", return_value=False)
     def test_undo_dirty_tree(self, _clean, _gh_auth, _gh_inst):
         """Dirty working tree should cause SystemExit."""
+        from pathlib import Path
         from rlsbl.commands.undo import run_cmd
+        from rlsbl.context import ProjectContext
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd("npm", [], {"yes": True}, project_root=".")
+            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
         assert exc_info.value.code == 1
 
 

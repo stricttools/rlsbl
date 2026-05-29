@@ -447,7 +447,7 @@ def cmd_release_undo(target, yes, **_kwargs):
     ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     flags = {"yes": yes}
     from .commands.undo import run_cmd
-    run_cmd(target or None, [], flags, project_root=ctx.project_root)
+    run_cmd(target or None, [], flags, ctx=ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -517,7 +517,7 @@ def cmd_pre_push_check(**_kwargs):
     monorepo_root = find_workspace_root(str(root))
     ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     from .commands.pre_push_check import run_cmd
-    run_cmd(None, [], {}, project_root=ctx.project_root)
+    run_cmd(None, [], {}, ctx=ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -600,7 +600,7 @@ def cmd_deploy(target, dry_run, force, target_name=None, **_kwargs):
     args = [target_name] if target_name else []
     flags = {"dry-run": dry_run, "force": force}
     from .commands.deploy_cmd import run_cmd
-    run_cmd(target or None, args, flags, project_root=ctx.project_root)
+    run_cmd(target or None, args, flags, ctx=ctx)
 
 
 # ---------------------------------------------------------------------------

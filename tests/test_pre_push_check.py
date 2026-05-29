@@ -2,6 +2,7 @@
 
 import json
 from io import StringIO
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -13,6 +14,7 @@ from rlsbl.commands.pre_push_check import (
     _has_version_tag_push,
     run_cmd,
 )
+from rlsbl.context import ProjectContext
 
 
 @pytest.fixture
@@ -52,7 +54,7 @@ class TestRunCmdEntryExists:
         (tmp_project / "CHANGELOG.md").write_text("# Changelog\n\n## 1.0.0\n\n- Initial release\n")
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {}, project_root=".")
+            run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
 
         assert exc_info.value.code == 0
 
@@ -67,7 +69,7 @@ class TestRunCmdWithoutJsonl:
         (tmp_project / "CHANGELOG.md").write_text("# Changelog\n\n## 0.9.0\n\n- Old stuff\n")
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {}, project_root=".")
+            run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
 
         assert exc_info.value.code == 0
         captured = capsys.readouterr()
@@ -79,7 +81,7 @@ class TestRunCmdWithoutJsonl:
         )
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {}, project_root=".")
+            run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
 
         assert exc_info.value.code == 0
 
@@ -89,7 +91,7 @@ class TestRunCmdNoProjectFiles:
 
     def test_exits_zero(self, tmp_project):
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {}, project_root=".")
+            run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
 
         assert exc_info.value.code == 0
 
@@ -247,7 +249,7 @@ class TestVersionTagPushSkipsCheck:
         with patch("sys.stdin", StringIO(stdin_data)), \
              patch("sys.stdin.isatty", return_value=False):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {}, project_root=".")
+                run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
             assert exc_info.value.code == 0
 
     def test_monorepo_tag_skips_jsonl_check(self, jsonl_git_repo):
@@ -264,7 +266,7 @@ class TestVersionTagPushSkipsCheck:
         with patch("sys.stdin", StringIO(stdin_data)), \
              patch("sys.stdin.isatty", return_value=False):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {}, project_root=".")
+                run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
             assert exc_info.value.code == 0
 
     def test_branch_push_still_checks(self, jsonl_git_repo):
@@ -283,7 +285,7 @@ class TestVersionTagPushSkipsCheck:
         with patch("sys.stdin", StringIO(stdin_data)), \
              patch("sys.stdin.isatty", return_value=False):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {}, project_root=".")
+                run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
             # Should fail because the commit has no JSONL coverage
             assert exc_info.value.code == 1
 
@@ -301,7 +303,7 @@ class TestVersionTagPushSkipsCheck:
         with patch("sys.stdin", StringIO(stdin_data)), \
              patch("sys.stdin.isatty", return_value=False):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {}, project_root=".")
+                run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
             # Should fail -- non-version tag doesn't skip the check
             assert exc_info.value.code == 1
 
@@ -447,5 +449,5 @@ class TestGitignoreGuardIntegration:
         _run_git(mock_git_repo, "commit", "-q", "-m", "add gitignore")
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {}, project_root=".")
+            run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
         assert exc_info.value.code == 1

@@ -2,9 +2,11 @@
 
 import unittest
 from io import StringIO
+from pathlib import Path
 from unittest.mock import ANY, patch, call
 
 from rlsbl.commands.undo import run_cmd
+from rlsbl.context import ProjectContext
 
 
 class TestUndoHappyPath(unittest.TestCase):
@@ -40,7 +42,7 @@ class TestUndoHappyPath(unittest.TestCase):
 
         # Run with --yes to skip interactive prompts; suppress stdout
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd("npm", [], {"yes": True}, project_root=None)
+            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
 
         # Verify all expected subprocess commands were issued
         expected_calls = [
@@ -55,7 +57,7 @@ class TestUndoHappyPath(unittest.TestCase):
         self.assertEqual(mock_run.call_count, 6)
 
         # Verify push_if_needed was called with the current branch
-        mock_push.assert_called_once_with("main", env=ANY, project_root=None)
+        mock_push.assert_called_once_with("main", env=ANY, project_root=Path("."))
 
 
 class TestUndoMonorepo(unittest.TestCase):
@@ -84,7 +86,7 @@ class TestUndoMonorepo(unittest.TestCase):
         ]
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd("npm", [], {"yes": True}, project_root=None)
+            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
 
         # Verify tag discovery uses project-scoped match pattern
         expected_calls = [
@@ -97,7 +99,7 @@ class TestUndoMonorepo(unittest.TestCase):
         ]
         mock_run.assert_has_calls(expected_calls, any_order=False)
         self.assertEqual(mock_run.call_count, 6)
-        mock_push.assert_called_once_with("main", env=ANY, project_root=None)
+        mock_push.assert_called_once_with("main", env=ANY, project_root=Path("."))
 
     @patch("rlsbl.commands.undo.find_workspace_root", return_value="/fake/monorepo")
     @patch("rlsbl.commands.undo.resolve_project", return_value={"name": "mylib", "path": "packages/mylib"})
@@ -122,7 +124,7 @@ class TestUndoMonorepo(unittest.TestCase):
         ]
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd("npm", [], {"yes": True}, project_root=None)
+            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
 
         # Only 5 calls: no revert issued
         self.assertEqual(mock_run.call_count, 5)
@@ -139,7 +141,7 @@ class TestUndoMonorepo(unittest.TestCase):
 
         with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
             with self.assertRaises(SystemExit) as ctx:
-                run_cmd("npm", [], {"yes": True}, project_root=None)
+                run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
 
         self.assertEqual(ctx.exception.code, 1)
         self.assertIn("not inside any project", mock_stderr.getvalue())
@@ -166,7 +168,7 @@ class TestUndoMonorepo(unittest.TestCase):
         ]
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd("npm", [], {"yes": True}, project_root=None)
+            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
 
         # Only 5 calls: no revert issued
         self.assertEqual(mock_run.call_count, 5)
@@ -218,7 +220,7 @@ class TestUndoTwoCommitPattern(unittest.TestCase):
         ]
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd("npm", [], {"yes": True}, project_root=None)
+            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
 
         # Both the finalize commit and the version-bump commit should be reverted,
         # then changelog restoration commits
@@ -241,7 +243,7 @@ class TestUndoTwoCommitPattern(unittest.TestCase):
         mock_generate.assert_called_once()
 
         # Push should still be called after reverting
-        mock_push.assert_called_once_with("main", env=ANY, project_root=None)
+        mock_push.assert_called_once_with("main", env=ANY, project_root=Path("."))
 
 
 if __name__ == "__main__":
