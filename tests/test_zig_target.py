@@ -389,21 +389,17 @@ class TestZigNpmWrapperTemplateVars:
         _write(os.path.join(d, "build.zig"), BUILD_ZIG_LIBRARY)
         _write(os.path.join(d, "VERSION"), "0.1.0\n")
 
-    def test_npm_publish_jobs_empty_without_config(self):
+    def test_npm_publish_jobs_empty_without_config(self, monkeypatch):
         """npmPublishJobs is empty when npm_wrapper not configured."""
         target = ZigTarget()
         with tempfile.TemporaryDirectory() as d:
             self._setup_zig_binary_project(d)
-            old_cwd = os.getcwd()
-            try:
-                os.chdir(d)
-                vars_ = target.template_vars(d, d)
-            finally:
-                os.chdir(old_cwd)
+            monkeypatch.chdir(d)
+            vars_ = target.template_vars(d, d)
             assert vars_.get("npmPublishJobs", "") == ""
             assert vars_.get("npmScope", "") == ""
 
-    def test_npm_scope_with_config(self):
+    def test_npm_scope_with_config(self, monkeypatch):
         """npmScope set when npm_wrapper.scope configured."""
         target = ZigTarget()
         with tempfile.TemporaryDirectory() as d:
@@ -414,15 +410,11 @@ class TestZigNpmWrapperTemplateVars:
                 os.path.join(config_dir, "config.json"),
                 '{"npm_wrapper": {"scope": "@ziguser"}}',
             )
-            old_cwd = os.getcwd()
-            try:
-                os.chdir(d)
-                vars_ = target.template_vars(d, d)
-            finally:
-                os.chdir(old_cwd)
+            monkeypatch.chdir(d)
+            vars_ = target.template_vars(d, d)
             assert vars_["npmScope"] == "@ziguser"
 
-    def test_npm_publish_jobs_with_config(self):
+    def test_npm_publish_jobs_with_config(self, monkeypatch):
         """npmPublishJobs generated when npm_wrapper.scope configured."""
         target = ZigTarget()
         with tempfile.TemporaryDirectory() as d:
@@ -433,12 +425,8 @@ class TestZigNpmWrapperTemplateVars:
                 os.path.join(config_dir, "config.json"),
                 '{"npm_wrapper": {"scope": "@ziguser"}}',
             )
-            old_cwd = os.getcwd()
-            try:
-                os.chdir(d)
-                vars_ = target.template_vars(d, d)
-            finally:
-                os.chdir(old_cwd)
+            monkeypatch.chdir(d)
+            vars_ = target.template_vars(d, d)
             jobs = vars_.get("npmPublishJobs", "")
             assert "npm publish" in jobs
             assert "npm-publish:" in jobs
@@ -447,7 +435,7 @@ class TestZigNpmWrapperTemplateVars:
             assert "cp my-zig-project-aarch64-macos npm-wrapper/darwin-arm64/" in jobs
             assert "cp my-zig-project-x86_64-windows.exe npm-wrapper/win32-x64/" in jobs
 
-    def test_library_no_npm_wrapper_even_with_config(self):
+    def test_library_no_npm_wrapper_even_with_config(self, monkeypatch):
         """Library projects don't get npm wrapper even with config."""
         target = ZigTarget()
         with tempfile.TemporaryDirectory() as d:
@@ -458,19 +446,15 @@ class TestZigNpmWrapperTemplateVars:
                 os.path.join(config_dir, "config.json"),
                 '{"npm_wrapper": {"scope": "@ziguser"}}',
             )
-            old_cwd = os.getcwd()
-            try:
-                os.chdir(d)
-                vars_ = target.template_vars(d, d)
-            finally:
-                os.chdir(old_cwd)
+            monkeypatch.chdir(d)
+            vars_ = target.template_vars(d, d)
             assert vars_.get("npmPublishJobs", "") == ""
 
 
 class TestZigNpmWrapperTemplateMappings:
     """Test shared_template_mappings includes npm wrapper when configured."""
 
-    def test_mappings_include_npm_wrapper_when_configured(self):
+    def test_mappings_include_npm_wrapper_when_configured(self, monkeypatch):
         """npm wrapper mappings included in shared_template_mappings when configured."""
         target = ZigTarget()
         with tempfile.TemporaryDirectory() as d:
@@ -483,35 +467,27 @@ class TestZigNpmWrapperTemplateMappings:
                 os.path.join(config_dir, "config.json"),
                 '{"npm_wrapper": {"scope": "@ziguser"}}',
             )
-            old_cwd = os.getcwd()
-            try:
-                os.chdir(d)
-                mappings = target.shared_template_mappings(d)
-            finally:
-                os.chdir(old_cwd)
+            monkeypatch.chdir(d)
+            mappings = target.shared_template_mappings(d)
             targets = [m["target"] for m in mappings]
             assert "npm-wrapper/package.json" in targets
             assert "npm-wrapper/bin/index.js" in targets
             assert "npm-wrapper/linux-x64/package.json" in targets
             assert "npm-wrapper/win32-x64/package.json" in targets
 
-    def test_mappings_exclude_npm_wrapper_when_not_configured(self):
+    def test_mappings_exclude_npm_wrapper_when_not_configured(self, monkeypatch):
         """npm wrapper mappings excluded from shared_template_mappings when not configured."""
         target = ZigTarget()
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "build.zig.zon"), SAMPLE_ZON)
             _write(os.path.join(d, "build.zig"), BUILD_ZIG_BINARY)
             _write(os.path.join(d, "VERSION"), "0.1.0\n")
-            old_cwd = os.getcwd()
-            try:
-                os.chdir(d)
-                mappings = target.shared_template_mappings(d)
-            finally:
-                os.chdir(old_cwd)
+            monkeypatch.chdir(d)
+            mappings = target.shared_template_mappings(d)
             targets = [m["target"] for m in mappings]
             assert "npm-wrapper/package.json" not in targets
 
-    def test_mappings_exclude_npm_wrapper_for_libraries(self):
+    def test_mappings_exclude_npm_wrapper_for_libraries(self, monkeypatch):
         """npm wrapper mappings excluded for Zig libraries."""
         target = ZigTarget()
         with tempfile.TemporaryDirectory() as d:
@@ -524,11 +500,7 @@ class TestZigNpmWrapperTemplateMappings:
                 os.path.join(config_dir, "config.json"),
                 '{"npm_wrapper": {"scope": "@ziguser"}}',
             )
-            old_cwd = os.getcwd()
-            try:
-                os.chdir(d)
-                mappings = target.shared_template_mappings(d)
-            finally:
-                os.chdir(old_cwd)
+            monkeypatch.chdir(d)
+            mappings = target.shared_template_mappings(d)
             targets = [m["target"] for m in mappings]
             assert "npm-wrapper/package.json" not in targets

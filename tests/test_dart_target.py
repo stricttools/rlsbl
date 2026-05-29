@@ -186,7 +186,7 @@ class TestDartTargetWriteVersion:
 class TestDartTargetWriteVersionBuildNumber:
     """write_version with build_number config enabled."""
 
-    def test_build_number_increment(self):
+    def test_build_number_increment(self, monkeypatch):
         target = DartTarget()
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "pubspec.yaml"), SAMPLE_PUBSPEC_WITH_BUILD)
@@ -196,12 +196,8 @@ class TestDartTargetWriteVersionBuildNumber:
             _write(os.path.join(config_dir, "config.json"), json.dumps({
                 "build_number": {"enabled": True, "strategy": "increment"}
             }))
-            old_cwd = os.getcwd()
-            try:
-                os.chdir(d)
-                target.write_version(d, "2.0.0", d)
-            finally:
-                os.chdir(old_cwd)
+            monkeypatch.chdir(d)
+            target.write_version(d, "2.0.0", d)
             from ruamel.yaml import YAML
             yaml = YAML(typ="safe")
             with open(os.path.join(d, "pubspec.yaml"), "r") as f:
@@ -209,7 +205,7 @@ class TestDartTargetWriteVersionBuildNumber:
             # Old was +4, so new should be +5
             assert data["version"] == "2.0.0+5"
 
-    def test_build_number_increment_from_zero(self):
+    def test_build_number_increment_from_zero(self, monkeypatch):
         """When build_number enabled but no existing +N, start from 0 -> 1."""
         target = DartTarget()
         with tempfile.TemporaryDirectory() as d:
@@ -219,12 +215,8 @@ class TestDartTargetWriteVersionBuildNumber:
             _write(os.path.join(config_dir, "config.json"), json.dumps({
                 "build_number": {"enabled": True, "strategy": "increment"}
             }))
-            old_cwd = os.getcwd()
-            try:
-                os.chdir(d)
-                target.write_version(d, "2.0.0", d)
-            finally:
-                os.chdir(old_cwd)
+            monkeypatch.chdir(d)
+            target.write_version(d, "2.0.0", d)
             from ruamel.yaml import YAML
             yaml = YAML(typ="safe")
             with open(os.path.join(d, "pubspec.yaml"), "r") as f:
