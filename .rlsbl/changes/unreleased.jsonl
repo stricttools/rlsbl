@@ -1,6 +1,0 @@
-{"commits":["5a6419fd3ddd9dd626d93598b17d2ec7ce916fe4"],"user_facing":true,"description":"**Internal.** Extracted shared `_rel_to_git_root` utility, eliminating duplicate path normalization in release flow.","type":"feature"}
-{"commits":["76bb6323409009057d5a17a764026e6b79e45fdd"],"user_facing":true,"description":"**Internal.** Added regression test for release abort cleanup (unexpected-files scenario).","type":"feature"}
-{"commits":["e8dfb69fb878822e127955b3a4c35131675df47f"],"user_facing":true,"description":"**Breaking.** Config utility functions (`should_tag`, `get_push_timeout`, `push_if_needed`, `read_deploy_config`, `get_publish_config`) now accept a config dict instead of `project_root`. `write_project_config` returns the updated dict.","type":"breaking"}
-{"commits":["090f7dbf32ad87ed8d31b29171f75448d4258e3f","a14ba70fe3dbd443bbca86ef83a40baac7fc622d"],"user_facing":true,"description":"**Breaking.** All target `publish()` methods now accept `ctx: ProjectContext` instead of `project_root`. Config is read from `ctx.config` \u2014 no redundant disk reads during publish.","type":"breaking"}
-{"commits":["7aa1f6a7d4237e1e3a0e461ffa34b76954904ca3"],"user_facing":false}
-{"commits":["a241f8600e8a896df656e7171779782016217236"],"user_facing":false}
