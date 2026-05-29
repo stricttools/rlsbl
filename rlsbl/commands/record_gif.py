@@ -31,7 +31,7 @@ def _get_bin_command(project_root):
     if not registry_module:
         return None
     try:
-        tvars = registry_module.template_vars(first_path)
+        tvars = registry_module.template_vars(first_path, str(project_root))
         return tvars.get("binCommand") or None
     except Exception:
         return None

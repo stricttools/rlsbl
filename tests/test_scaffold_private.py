@@ -53,7 +53,7 @@ class TestPrivateScaffoldUsesStandardHook:
         from rlsbl.targets.base import BaseTarget
 
         base = BaseTarget()
-        shared_mappings = base.shared_template_mappings()
+        shared_mappings = base.shared_template_mappings(".")
 
         # For a private repo, no hook replacement should happen -- just use as-is
         # (previously _replace_post_release_hook_for_private would swap the template)

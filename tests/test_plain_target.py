@@ -176,14 +176,14 @@ class TestPlainTargetProperties:
         with tempfile.TemporaryDirectory() as d:
             with open(os.path.join(d, "VERSION"), "w") as f:
                 f.write("3.1.0\n")
-            vars = target.template_vars(d)
+            vars = target.template_vars(d, d)
             assert vars["name"] == os.path.basename(d)
             assert vars["version"] == "3.1.0"
 
     def test_template_vars_fallback_version(self):
         target = PlainTarget()
         with tempfile.TemporaryDirectory() as d:
-            vars = target.template_vars(d)
+            vars = target.template_vars(d, d)
             assert vars["name"] == os.path.basename(d)
             assert vars["version"] == "0.0.0"
 

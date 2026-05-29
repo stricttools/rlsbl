@@ -119,7 +119,7 @@ class DenoTarget(BaseTarget):
             os.path.dirname(os.path.dirname(__file__)), "templates", "deno"
         )
 
-    def template_vars(self, dir_path):
+    def template_vars(self, dir_path, project_root):
         """Extract template variables from deno.json."""
         config_path = self._config_path(dir_path)
         if not config_path:

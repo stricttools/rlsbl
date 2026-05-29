@@ -242,7 +242,7 @@ class MavenTarget(BaseTarget):
             os.path.dirname(os.path.dirname(__file__)), "templates", "maven"
         )
 
-    def template_vars(self, dir_path):
+    def template_vars(self, dir_path, project_root):
         """Extract template variables from the project."""
         name = self._read_project_name(dir_path) or ""
 

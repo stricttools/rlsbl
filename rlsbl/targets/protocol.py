@@ -62,7 +62,7 @@ class ReleaseTarget(Protocol):
         """Absolute path to shared template directory, or None."""
         return None
 
-    def template_vars(self, dir_path: str) -> dict[str, str]:
+    def template_vars(self, dir_path: str, project_root: str) -> dict[str, str]:
         """Extract template placeholder values from the project."""
         return {}
 
@@ -70,7 +70,7 @@ class ReleaseTarget(Protocol):
         """Target-specific template-to-output-path mappings."""
         return []
 
-    def shared_template_mappings(self) -> list[dict[str, str]]:
+    def shared_template_mappings(self, project_root: str) -> list[dict[str, str]]:
         """Shared template-to-output-path mappings."""
         return []
 

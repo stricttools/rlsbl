@@ -42,7 +42,7 @@ def _collect_status(registry, target_path=".", *, tag_glob=None, project_root, p
         sys.exit(1)
 
     version = reg.read_version(target_path)
-    vars_dict = reg.template_vars(target_path)
+    vars_dict = reg.template_vars(target_path, project_root)
     name = vars_dict.get("name") or "(unknown)"
 
     root_str = str(project_root)

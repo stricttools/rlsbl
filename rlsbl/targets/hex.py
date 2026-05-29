@@ -74,7 +74,7 @@ class HexTarget(BaseTarget):
             os.path.dirname(os.path.dirname(__file__)), "templates", "hex"
         )
 
-    def template_vars(self, dir_path):
+    def template_vars(self, dir_path, project_root):
         """Extract template variables from mix.exs."""
         mix_path = os.path.join(dir_path, "mix.exs")
         with open(mix_path, "r", encoding="utf-8") as f:

@@ -109,7 +109,7 @@ class PgdesignTarget(BaseTarget):
             )
             raise RuntimeError("pgdesign schema validation failed")
 
-    def template_vars(self, dir_path):
+    def template_vars(self, dir_path, project_root):
         """Extract template variables."""
         dir_name = os.path.basename(os.path.abspath(dir_path))
         try:

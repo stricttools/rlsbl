@@ -954,7 +954,7 @@ def run_cmd(registry, args, flags, project_root):
             write_project_config("private", private, project_root)
 
         # Gather template variables
-        vars_dict = reg.template_vars(".")
+        vars_dict = reg.template_vars(".", project_root)
         from datetime import datetime
         vars_dict["year"] = str(datetime.now().year)
 
@@ -973,7 +973,7 @@ def run_cmd(registry, args, flags, project_root):
 
         shared_plans = []
         if not flags.get("skip-shared"):
-            shared_mappings = reg.shared_template_mappings()
+            shared_mappings = reg.shared_template_mappings(project_root)
             shared_mappings = _append_deploy_workflow_if_configured(shared_mappings, project_root=project_root)
             shared_plans = plan_mappings(
                 reg.shared_template_dir(), shared_mappings, vars_dict, force,
@@ -1310,7 +1310,7 @@ def _generate_merged_publish(targets, template_vars):
     return result
 
 
-def _merge_template_vars(registries_list, primary, target_paths):
+def _merge_template_vars(registries_list, primary, target_paths, project_root):
     """Build a merged template vars dict with namespaced keys from all targets.
 
     The primary target's vars are included un-namespaced (as the base).
@@ -1323,12 +1323,12 @@ def _merge_template_vars(registries_list, primary, target_paths):
     merged = {}
     # Primary target's vars as base (un-namespaced)
     primary_target = TARGETS[primary]
-    primary_vars = primary_target.template_vars(target_paths.get(primary, "."))
+    primary_vars = primary_target.template_vars(target_paths.get(primary, "."), project_root)
     merged.update(primary_vars)
     # All targets' vars namespaced
     for target_name in registries_list:
         target = TARGETS[target_name]
-        target_vars = target.template_vars(target_paths.get(target_name, "."))
+        target_vars = target.template_vars(target_paths.get(target_name, "."), project_root)
         for key, value in target_vars.items():
             merged[f"{target_name}.{key}"] = value
     return merged
@@ -1451,7 +1451,7 @@ def run_cmd_multi(registries_list, args, flags, project_root):
             print("Scaffolding for private repository (no publish workflow).")
         else:
             print("Scaffolding with merged publish workflow.")
-        vars_dict = _merge_template_vars(registries_list, primary, target_paths)
+        vars_dict = _merge_template_vars(registries_list, primary, target_paths, project_root)
         from datetime import datetime
         vars_dict["year"] = str(datetime.now().year)
 
@@ -1494,7 +1494,7 @@ def run_cmd_multi(registries_list, args, flags, project_root):
             )]
 
         # Plan shared templates (once)
-        shared_mappings = reg.shared_template_mappings()
+        shared_mappings = reg.shared_template_mappings(project_root)
         shared_mappings = _append_deploy_workflow_if_configured(shared_mappings, project_root=project_root)
         shared_plans = plan_mappings(
             reg.shared_template_dir(), shared_mappings, vars_dict, force,

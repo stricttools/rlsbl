@@ -195,14 +195,14 @@ class TestPgdesignTargetTemplateVars:
         with tempfile.TemporaryDirectory() as d:
             with open(os.path.join(d, "pgdesign.toml"), "w") as f:
                 f.write(MINIMAL_TOML)
-            vars = target.template_vars(d)
+            vars = target.template_vars(d, d)
             assert vars["name"] == os.path.basename(d)
             assert vars["version"] == "1.2.3"
 
     def test_template_vars_fallback(self):
         target = PgdesignTarget()
         with tempfile.TemporaryDirectory() as d:
-            vars = target.template_vars(d)
+            vars = target.template_vars(d, d)
             assert vars["name"] == os.path.basename(d)
             assert vars["version"] == "0.0.0"
 

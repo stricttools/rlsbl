@@ -74,7 +74,7 @@ class PlainTarget(BaseTarget):
         # Plain targets are always valid -- scaffold creates the VERSION file.
         return True
 
-    def template_vars(self, dir_path):
+    def template_vars(self, dir_path, project_root):
         try:
             version = self.read_version(dir_path)
         except FileNotFoundError:

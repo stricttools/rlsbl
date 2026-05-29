@@ -905,7 +905,7 @@ class TestNpmRegistryUrl:
         target = NpmTarget()
         pkg = {"name": "test-pkg", "version": "1.0.0"}
         (tmp_path / "package.json").write_text(json.dumps(pkg))
-        vars = target.template_vars(str(tmp_path))
+        vars = target.template_vars(str(tmp_path), str(tmp_path))
         assert vars["registryUrl"] == "https://registry.npmjs.org"
 
     def test_custom_registry_url(self, tmp_path):
@@ -917,7 +917,7 @@ class TestNpmRegistryUrl:
             "publishConfig": {"registry": "https://npm.pkg.github.com"},
         }
         (tmp_path / "package.json").write_text(json.dumps(pkg))
-        vars = target.template_vars(str(tmp_path))
+        vars = target.template_vars(str(tmp_path), str(tmp_path))
         assert vars["registryUrl"] == "https://npm.pkg.github.com"
 
 

@@ -108,7 +108,7 @@ class CargoTarget(BaseTarget):
             os.path.dirname(os.path.dirname(__file__)), "templates", "cargo"
         )
 
-    def template_vars(self, dir_path):
+    def template_vars(self, dir_path, project_root):
         """Extract template variables from Cargo.toml."""
         cargo_path = os.path.join(dir_path, "Cargo.toml")
         with open(cargo_path, "r", encoding="utf-8") as f:

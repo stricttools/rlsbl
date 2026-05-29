@@ -89,7 +89,7 @@ class SpecTarget(BaseTarget):
             os.path.dirname(os.path.dirname(__file__)), "templates", "spec"
         )
 
-    def template_vars(self, dir_path):
+    def template_vars(self, dir_path, project_root):
         """Extract template variables."""
         # Name from directory
         dir_name = os.path.basename(os.path.abspath(dir_path))

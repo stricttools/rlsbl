@@ -368,7 +368,7 @@ def test_pypi_scaffold_does_not_create_npmignore(tmp_project):
     assert len(npmignore_mappings) == 0, "pypi target should not include .npmignore"
 
     # Also check shared_template_mappings -- .npmignore should not be there either
-    shared_mappings = target.shared_template_mappings()
+    shared_mappings = target.shared_template_mappings(".")
     shared_npmignore = [m for m in shared_mappings if m["target"] == ".npmignore"]
     assert len(shared_npmignore) == 0, ".npmignore should not be in shared templates"
 

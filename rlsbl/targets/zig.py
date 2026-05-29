@@ -148,7 +148,7 @@ class ZigTarget(BaseTarget):
         ]
 
     def shared_template_mappings(self, project_root):
-        mappings = super().shared_template_mappings()
+        mappings = super().shared_template_mappings(project_root)
         if not self._is_library("."):
             config = read_project_config(project_root)
             npm_wrapper_config = config.get("npm_wrapper", {})

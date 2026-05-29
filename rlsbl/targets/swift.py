@@ -70,7 +70,7 @@ class SwiftTarget(BaseTarget):
             os.path.dirname(os.path.dirname(__file__)), "templates", "swift"
         )
 
-    def template_vars(self, dir_path):
+    def template_vars(self, dir_path, project_root):
         """Extract template variables from Package.swift."""
         package_name = ""
         package_path = os.path.join(dir_path, "Package.swift")

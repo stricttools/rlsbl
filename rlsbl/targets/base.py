@@ -33,13 +33,13 @@ class BaseTarget:
     def read_metadata(self, dir_path):
         return {}
 
-    def template_vars(self, dir_path):
+    def template_vars(self, dir_path, project_root):
         return {}
 
     def template_mappings(self):
         return []
 
-    def shared_template_mappings(self):
+    def shared_template_mappings(self, project_root):
         return [
             {"template": "CHANGELOG.md.tpl", "target": "CHANGELOG.md"},
             {"template": "gitignore.tpl", "target": ".gitignore"},

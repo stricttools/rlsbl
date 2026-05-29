@@ -247,7 +247,7 @@ class TestMergeTemplateVarsSubdirectory:
             'requires-python = ">=3.11"\n'
         )
         target_paths = {"npm": str(npm_dir), "pypi": str(pypi_dir)}
-        merged = _merge_template_vars(["npm", "pypi"], "npm", target_paths)
+        merged = _merge_template_vars(["npm", "pypi"], "npm", target_paths, str(tmp_path))
         # Primary (npm) vars are un-namespaced
         assert "name" in merged
         # Namespaced pypi vars
@@ -262,5 +262,5 @@ class TestMergeTemplateVarsSubdirectory:
             '{"name": "subdir-pkg", "version": "1.0.0"}'
         )
         target_paths = {"npm": str(npm_dir)}
-        merged = _merge_template_vars(["npm"], "npm", target_paths)
+        merged = _merge_template_vars(["npm"], "npm", target_paths, str(tmp_path))
         assert merged["name"] == "subdir-pkg"

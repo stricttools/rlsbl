@@ -133,7 +133,7 @@ class PypiTarget(BaseTarget):
             os.path.dirname(os.path.dirname(__file__)), "templates", "pypi"
         )
 
-    def template_vars(self, dir_path):
+    def template_vars(self, dir_path, project_root):
         """Extract template variables from the target project's pyproject.toml."""
         toml_path = os.path.join(dir_path, "pyproject.toml")
         with open(toml_path, "rb") as f:
