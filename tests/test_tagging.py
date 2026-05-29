@@ -14,7 +14,7 @@ class TestEnsureNpmKeyword:
     def test_adds_keyword_to_existing_keywords_array(self, tmp_path):
         pkg = {"name": "my-pkg", "version": "1.0.0", "keywords": ["cli"]}
         (tmp_path / "package.json").write_text(json.dumps(pkg, indent=2) + "\n")
-        result = ensure_npm_keyword(str(tmp_path), quiet=True)
+        result = ensure_npm_keyword(str(tmp_path), quiet=True, project_root=str(tmp_path))
         assert result is True
         data = json.loads((tmp_path / "package.json").read_text())
         assert "rlsbl" in data["keywords"]
@@ -23,7 +23,7 @@ class TestEnsureNpmKeyword:
     def test_creates_keywords_array_if_missing(self, tmp_path):
         pkg = {"name": "my-pkg", "version": "1.0.0"}
         (tmp_path / "package.json").write_text(json.dumps(pkg, indent=2) + "\n")
-        result = ensure_npm_keyword(str(tmp_path), quiet=True)
+        result = ensure_npm_keyword(str(tmp_path), quiet=True, project_root=str(tmp_path))
         assert result is True
         data = json.loads((tmp_path / "package.json").read_text())
         assert data["keywords"] == ["rlsbl"]
@@ -31,14 +31,14 @@ class TestEnsureNpmKeyword:
     def test_returns_false_if_already_present(self, tmp_path):
         pkg = {"name": "my-pkg", "version": "1.0.0", "keywords": ["rlsbl"]}
         (tmp_path / "package.json").write_text(json.dumps(pkg, indent=2) + "\n")
-        result = ensure_npm_keyword(str(tmp_path), quiet=True)
+        result = ensure_npm_keyword(str(tmp_path), quiet=True, project_root=str(tmp_path))
         assert result is False
 
     def test_preserves_indent_and_trailing_newline(self, tmp_path):
         pkg = {"name": "my-pkg", "version": "1.0.0"}
         # Use 4-space indent and trailing newline
         (tmp_path / "package.json").write_text(json.dumps(pkg, indent=4) + "\n")
-        ensure_npm_keyword(str(tmp_path), quiet=True)
+        ensure_npm_keyword(str(tmp_path), quiet=True, project_root=str(tmp_path))
         raw = (tmp_path / "package.json").read_text()
         assert raw.endswith("\n")
         # The indent should still be 4 spaces (look for 4-space-indented key)
@@ -51,7 +51,7 @@ class TestEnsurePypiKeyword:
     def test_adds_to_single_line_keywords_array(self, tmp_path):
         content = '[project]\nname = "my-pkg"\nversion = "1.0.0"\nkeywords = ["cli"]\n'
         (tmp_path / "pyproject.toml").write_text(content)
-        result = ensure_pypi_keyword(str(tmp_path), quiet=True)
+        result = ensure_pypi_keyword(str(tmp_path), quiet=True, project_root=str(tmp_path))
         assert result is True
         updated = (tmp_path / "pyproject.toml").read_text()
         assert '"rlsbl"' in updated
@@ -68,7 +68,7 @@ class TestEnsurePypiKeyword:
             ']\n'
         )
         (tmp_path / "pyproject.toml").write_text(content)
-        result = ensure_pypi_keyword(str(tmp_path), quiet=True)
+        result = ensure_pypi_keyword(str(tmp_path), quiet=True, project_root=str(tmp_path))
         assert result is True
         updated = (tmp_path / "pyproject.toml").read_text()
         assert '"rlsbl"' in updated
@@ -78,7 +78,7 @@ class TestEnsurePypiKeyword:
     def test_inserts_keywords_field_when_missing(self, tmp_path):
         content = '[project]\nname = "my-pkg"\nversion = "1.0.0"\n'
         (tmp_path / "pyproject.toml").write_text(content)
-        result = ensure_pypi_keyword(str(tmp_path), quiet=True)
+        result = ensure_pypi_keyword(str(tmp_path), quiet=True, project_root=str(tmp_path))
         assert result is True
         updated = (tmp_path / "pyproject.toml").read_text()
         assert 'keywords = ["rlsbl"]' in updated
@@ -91,7 +91,7 @@ class TestEnsurePypiKeyword:
     def test_returns_false_if_already_present(self, tmp_path):
         content = '[project]\nname = "my-pkg"\nversion = "1.0.0"\nkeywords = ["rlsbl"]\n'
         (tmp_path / "pyproject.toml").write_text(content)
-        result = ensure_pypi_keyword(str(tmp_path), quiet=True)
+        result = ensure_pypi_keyword(str(tmp_path), quiet=True, project_root=str(tmp_path))
         assert result is False
 
     def test_handles_project_urls_subtable(self, tmp_path):
@@ -106,7 +106,7 @@ class TestEnsurePypiKeyword:
             'Repository = "https://github.com/user/repo"\n'
         )
         (tmp_path / "pyproject.toml").write_text(content)
-        result = ensure_pypi_keyword(str(tmp_path), quiet=True)
+        result = ensure_pypi_keyword(str(tmp_path), quiet=True, project_root=str(tmp_path))
         assert result is True
         updated = (tmp_path / "pyproject.toml").read_text()
         assert '"rlsbl"' in updated
@@ -124,7 +124,7 @@ class TestEnsurePypiKeyword:
             'keywords = ["[beta]", "cli"]\n'
         )
         (tmp_path / "pyproject.toml").write_text(content)
-        result = ensure_pypi_keyword(str(tmp_path), quiet=True)
+        result = ensure_pypi_keyword(str(tmp_path), quiet=True, project_root=str(tmp_path))
         assert result is True
         updated = (tmp_path / "pyproject.toml").read_text()
         assert '"rlsbl"' in updated
@@ -197,7 +197,7 @@ class TestEnsureTagsTargetPaths:
         monkeypatch.delenv("GITHUB_TOKEN", raising=False)
         monkeypatch.setattr("rlsbl.tagging.run", _raise_file_not_found)
 
-        ensure_tags(["npm"], target_paths={"npm": str(npm_dir)}, quiet=True)
+        ensure_tags(["npm"], target_paths={"npm": str(npm_dir)}, quiet=True, project_root=str(tmp_path))
 
         data = json.loads((npm_dir / "package.json").read_text())
         assert "rlsbl" in data["keywords"]
@@ -212,7 +212,7 @@ class TestEnsureTagsTargetPaths:
         monkeypatch.delenv("GITHUB_TOKEN", raising=False)
         monkeypatch.setattr("rlsbl.tagging.run", _raise_file_not_found)
 
-        ensure_tags(["pypi"], target_paths={"pypi": str(pypi_dir)}, quiet=True)
+        ensure_tags(["pypi"], target_paths={"pypi": str(pypi_dir)}, quiet=True, project_root=str(tmp_path))
 
         updated = (pypi_dir / "pyproject.toml").read_text()
         assert '"rlsbl"' in updated
@@ -226,7 +226,7 @@ class TestEnsureTagsTargetPaths:
         monkeypatch.delenv("GITHUB_TOKEN", raising=False)
         monkeypatch.setattr("rlsbl.tagging.run", _raise_file_not_found)
 
-        ensure_tags(["npm"], quiet=True)
+        ensure_tags(["npm"], quiet=True, project_root=str(tmp_path))
 
         data = json.loads((tmp_path / "package.json").read_text())
         assert "rlsbl" in data["keywords"]
@@ -241,7 +241,7 @@ class TestEnsureTagsTargetPaths:
         monkeypatch.setattr("rlsbl.tagging.run", _raise_file_not_found)
 
         # Pass target_paths without an npm entry
-        ensure_tags(["npm"], target_paths={"pypi": "/some/path"}, quiet=True)
+        ensure_tags(["npm"], target_paths={"pypi": "/some/path"}, quiet=True, project_root=str(tmp_path))
 
         data = json.loads((tmp_path / "package.json").read_text())
         assert "rlsbl" in data["keywords"]

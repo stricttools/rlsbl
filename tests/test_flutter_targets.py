@@ -204,7 +204,7 @@ class TestFlutterVersionInheritance:
         target = FlutterIosTarget()
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "pubspec.yaml"), SAMPLE_FLUTTER_PUBSPEC)
-            modified = target.write_version(d, "2.0.0")
+            modified = target.write_version(d, "2.0.0", d)
             assert modified == ["pubspec.yaml"]
             assert target.read_version(d) == "2.0.0"
 
@@ -212,7 +212,7 @@ class TestFlutterVersionInheritance:
         target = FlutterAndroidTarget()
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "pubspec.yaml"), SAMPLE_FLUTTER_PUBSPEC)
-            modified = target.write_version(d, "2.0.0")
+            modified = target.write_version(d, "2.0.0", d)
             assert modified == ["pubspec.yaml"]
             assert target.read_version(d) == "2.0.0"
 

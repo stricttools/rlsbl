@@ -146,7 +146,7 @@ class TestMinVersionExtraction:
     def test_go_min_version(self, tmp_path):
         (tmp_path / "go.mod").write_text("module github.com/user/test\n\ngo 1.21\n")
         (tmp_path / "VERSION").write_text("1.0.0")
-        vars_ = TARGETS["go"].template_vars(str(tmp_path))
+        vars_ = TARGETS["go"].template_vars(str(tmp_path), str(tmp_path))
         assert vars_["minRequiredGo"] == "1.21"
 
     def test_cargo_min_rust(self, tmp_path):

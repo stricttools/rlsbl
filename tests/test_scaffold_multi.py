@@ -507,7 +507,7 @@ class TestSubdirectoryNpmTarget:
         npm_dir = npm_subdir_project / "npm"
         from rlsbl.tagging import ensure_npm_keyword
 
-        ensure_npm_keyword(str(npm_dir), quiet=True)
+        ensure_npm_keyword(str(npm_dir), quiet=True, project_root=str(npm_subdir_project))
 
         data = json.loads((npm_dir / "package.json").read_text())
         assert "rlsbl" in data["keywords"]

@@ -194,7 +194,7 @@ class TestZigTargetTemplateVars:
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "build.zig.zon"), SAMPLE_ZON)
             _write(os.path.join(d, "VERSION"), "0.1.0\n")
-            vars = target.template_vars(d)
+            vars = target.template_vars(d, d)
             assert vars["name"] == "my-zig-project"
             assert vars["zig.projectName"] == "my-zig-project"
 
@@ -203,27 +203,27 @@ class TestZigTargetTemplateVars:
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "build.zig.zon"), SAMPLE_ZON)
             _write(os.path.join(d, "VERSION"), "0.1.0\n")
-            vars = target.template_vars(d)
+            vars = target.template_vars(d, d)
             assert vars["zig.minRequiredZig"] == "0.13.0"
 
     def test_fallback_name_to_dirname(self):
         target = ZigTarget()
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "VERSION"), "0.1.0\n")
-            vars = target.template_vars(d)
+            vars = target.template_vars(d, d)
             assert vars["name"] == os.path.basename(d)
 
     def test_fallback_version(self):
         target = ZigTarget()
         with tempfile.TemporaryDirectory() as d:
-            vars = target.template_vars(d)
+            vars = target.template_vars(d, d)
             assert vars["version"] == "0.0.0"
 
     def test_fallback_min_zig_version(self):
         target = ZigTarget()
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "build.zig.zon"), SAMPLE_ZON_NO_MIN_ZIG)
-            vars = target.template_vars(d)
+            vars = target.template_vars(d, d)
             assert vars["zig.minRequiredZig"] == "0.14.0"
 
     def test_detects_binary(self):
@@ -232,7 +232,7 @@ class TestZigTargetTemplateVars:
             _write(os.path.join(d, "build.zig.zon"), SAMPLE_ZON)
             _write(os.path.join(d, "build.zig"), BUILD_ZIG_BINARY)
             _write(os.path.join(d, "VERSION"), "0.1.0\n")
-            vars = target.template_vars(d)
+            vars = target.template_vars(d, d)
             assert vars["zig.isLibrary"] is False
 
     def test_detects_library(self):
@@ -241,7 +241,7 @@ class TestZigTargetTemplateVars:
             _write(os.path.join(d, "build.zig.zon"), SAMPLE_ZON)
             _write(os.path.join(d, "build.zig"), BUILD_ZIG_LIBRARY)
             _write(os.path.join(d, "VERSION"), "0.1.0\n")
-            vars = target.template_vars(d)
+            vars = target.template_vars(d, d)
             assert vars["zig.isLibrary"] is True
 
     def test_detects_binary_exe_call(self):
@@ -251,7 +251,7 @@ class TestZigTargetTemplateVars:
             _write(os.path.join(d, "build.zig.zon"), SAMPLE_ZON)
             _write(os.path.join(d, "build.zig"), BUILD_ZIG_EXE_CALL)
             _write(os.path.join(d, "VERSION"), "0.1.0\n")
-            vars = target.template_vars(d)
+            vars = target.template_vars(d, d)
             assert vars["zig.isLibrary"] is False
 
     def test_library_when_no_build_zig(self):
@@ -260,14 +260,14 @@ class TestZigTargetTemplateVars:
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "build.zig.zon"), SAMPLE_ZON)
             _write(os.path.join(d, "VERSION"), "0.1.0\n")
-            vars = target.template_vars(d)
+            vars = target.template_vars(d, d)
             assert vars["zig.isLibrary"] is True
 
     def test_malformed_zon_uses_fallbacks(self):
         target = ZigTarget()
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "build.zig.zon"), SAMPLE_ZON_MALFORMED)
-            vars = target.template_vars(d)
+            vars = target.template_vars(d, d)
             assert vars["name"] == os.path.basename(d)
             assert vars["version"] == "0.0.0"
             assert vars["zig.minRequiredZig"] == "0.14.0"
@@ -397,7 +397,7 @@ class TestZigNpmWrapperTemplateVars:
             old_cwd = os.getcwd()
             try:
                 os.chdir(d)
-                vars_ = target.template_vars(d)
+                vars_ = target.template_vars(d, d)
             finally:
                 os.chdir(old_cwd)
             assert vars_.get("npmPublishJobs", "") == ""
@@ -417,7 +417,7 @@ class TestZigNpmWrapperTemplateVars:
             old_cwd = os.getcwd()
             try:
                 os.chdir(d)
-                vars_ = target.template_vars(d)
+                vars_ = target.template_vars(d, d)
             finally:
                 os.chdir(old_cwd)
             assert vars_["npmScope"] == "@ziguser"
@@ -436,7 +436,7 @@ class TestZigNpmWrapperTemplateVars:
             old_cwd = os.getcwd()
             try:
                 os.chdir(d)
-                vars_ = target.template_vars(d)
+                vars_ = target.template_vars(d, d)
             finally:
                 os.chdir(old_cwd)
             jobs = vars_.get("npmPublishJobs", "")
@@ -461,7 +461,7 @@ class TestZigNpmWrapperTemplateVars:
             old_cwd = os.getcwd()
             try:
                 os.chdir(d)
-                vars_ = target.template_vars(d)
+                vars_ = target.template_vars(d, d)
             finally:
                 os.chdir(old_cwd)
             assert vars_.get("npmPublishJobs", "") == ""
@@ -486,7 +486,7 @@ class TestZigNpmWrapperTemplateMappings:
             old_cwd = os.getcwd()
             try:
                 os.chdir(d)
-                mappings = target.shared_template_mappings()
+                mappings = target.shared_template_mappings(d)
             finally:
                 os.chdir(old_cwd)
             targets = [m["target"] for m in mappings]
@@ -505,7 +505,7 @@ class TestZigNpmWrapperTemplateMappings:
             old_cwd = os.getcwd()
             try:
                 os.chdir(d)
-                mappings = target.shared_template_mappings()
+                mappings = target.shared_template_mappings(d)
             finally:
                 os.chdir(old_cwd)
             targets = [m["target"] for m in mappings]
@@ -527,7 +527,7 @@ class TestZigNpmWrapperTemplateMappings:
             old_cwd = os.getcwd()
             try:
                 os.chdir(d)
-                mappings = target.shared_template_mappings()
+                mappings = target.shared_template_mappings(d)
             finally:
                 os.chdir(old_cwd)
             targets = [m["target"] for m in mappings]

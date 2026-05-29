@@ -29,7 +29,7 @@ class TestLockDirParameter:
         """Default lock goes to .rlsbl/lock."""
         monkeypatch.chdir(tmp_path)
 
-        acquire_lock()
+        acquire_lock(project_root=str(tmp_path))
         try:
             assert (tmp_path / ".rlsbl" / "lock").exists()
         finally:
@@ -39,7 +39,7 @@ class TestLockDirParameter:
         """Passing lock_dir='.rlsbl-monorepo' creates lock in .rlsbl-monorepo/lock."""
         monkeypatch.chdir(tmp_path)
 
-        acquire_lock(lock_dir=".rlsbl-monorepo")
+        acquire_lock(lock_dir=".rlsbl-monorepo", project_root=str(tmp_path))
         try:
             assert (tmp_path / ".rlsbl-monorepo" / "lock").exists()
             # Must NOT create .rlsbl/ at all
@@ -51,7 +51,7 @@ class TestLockDirParameter:
         """Releasing a custom-dir lock removes the correct file."""
         monkeypatch.chdir(tmp_path)
 
-        acquire_lock(lock_dir=".rlsbl-monorepo")
+        acquire_lock(lock_dir=".rlsbl-monorepo", project_root=str(tmp_path))
         lock_path = tmp_path / ".rlsbl-monorepo" / "lock"
         assert lock_path.exists()
 
@@ -62,7 +62,7 @@ class TestLockDirParameter:
         """rlsbl_lock context manager passes through lock_dir."""
         monkeypatch.chdir(tmp_path)
 
-        with rlsbl_lock(lock_dir=".rlsbl-monorepo"):
+        with rlsbl_lock(lock_dir=".rlsbl-monorepo", project_root=str(tmp_path)):
             lock_path = tmp_path / ".rlsbl-monorepo" / "lock"
             assert lock_path.exists()
 
