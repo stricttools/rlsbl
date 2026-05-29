@@ -88,10 +88,10 @@ def resolve_target_paths(version_dir="."):
     return {e.name: e.path for e in entries}
 
 
-def resolve_release_targets(primary, flags, version_dir="."):
+def resolve_release_targets(primary, flags, version_dir=".", *, config):
     """Compute the effective set of secondary targets for this release.
 
-    Reads the baseline from .rlsbl/config.json "release_targets" list.
+    Reads the baseline from config "release_targets" list.
     If absent, falls back to auto-detect (all targets that detect(".")).
     Entries can be plain strings or dicts with "name" and optional "path".
 
@@ -102,7 +102,6 @@ def resolve_release_targets(primary, flags, version_dir="."):
     """
     from ..targets import TARGETS as ALL_TARGETS
 
-    config = read_json_config(os.path.join(version_dir, ".rlsbl", "config.json"))
     configured = config.get("release_targets")
 
     # Build baseline: dict of name -> path
@@ -538,8 +537,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
             from ..targets.native_changes import detect_native_changes
             # Find last build release tag for native change detection
             _ota_root = str(project_root)
-            config = read_json_config(os.path.join(_ota_root, ".rlsbl", "config.json"))
-            last_build = config.get("last_build_release")
+            last_build = ctx.config.get("last_build_release")
             if last_build:
                 since_ref = f"v{last_build}"
                 native_files = detect_native_changes(_ota_root, since_ref)
@@ -896,7 +894,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
         return
 
     # Resolve which secondary targets participate in this release
-    secondary_targets = resolve_release_targets(registry, flags, version_dir=version_dir)
+    secondary_targets = resolve_release_targets(registry, flags, version_dir=version_dir, config=ctx.config)
 
     # Acquire advisory lock to prevent concurrent rlsbl operations.
     # In monorepo mode the lock goes in .rlsbl-monorepo/ (the workspace
