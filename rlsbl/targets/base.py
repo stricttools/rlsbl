@@ -27,19 +27,19 @@ class BaseTarget:
         )
         return templates
 
-    def read_name(self, dir_path):
+    def read_name(self, dir_path, ctx=None):
         return None
 
     def read_metadata(self, dir_path):
         return {}
 
-    def template_vars(self, dir_path, project_root):
+    def template_vars(self, dir_path, ctx):
         return {}
 
     def template_mappings(self):
         return []
 
-    def shared_template_mappings(self, project_root):
+    def shared_template_mappings(self, ctx):
         return [
             {"template": "CHANGELOG.md.tpl", "target": "CHANGELOG.md"},
             {"template": "gitignore.tpl", "target": ".gitignore"},
@@ -59,7 +59,7 @@ class BaseTarget:
     def get_project_init_hint(self):
         return ""
 
-    def write_version(self, dir_path, version):
+    def write_version(self, dir_path, version, ctx=None):
         """Write a new version to the target's version file(s).
 
         Returns a list of relative file paths (relative to dir_path) that

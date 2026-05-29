@@ -1174,7 +1174,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
         # Build files_to_commit from the paths actually modified by write_version().
         files_to_commit = []
         if new_version != current_version:
-            modified = reg.write_version(primary_path, new_version)
+            modified = reg.write_version(primary_path, new_version, ctx=ctx)
             for rel in modified:
                 files_to_commit.append(target_vpath(primary_path, rel))
             if modified:
@@ -1186,7 +1186,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                     continue
                 other_reg = TARGETS.get(t_name)
                 if other_reg and other_reg.check_project_exists(t_path):
-                    other_modified = other_reg.write_version(t_path, new_version)
+                    other_modified = other_reg.write_version(t_path, new_version, ctx=ctx)
                     for rel in other_modified:
                         files_to_commit.append(target_vpath(t_path, rel))
                     if other_modified:
@@ -1198,7 +1198,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
             selfdoc_path = os.path.join(version_dir, "selfdoc.json")
             if os.path.exists(selfdoc_path) and "docs" not in target_paths:
                 from ..targets.docs import DocsTarget
-                docs_modified = DocsTarget().write_version(version_dir, new_version)
+                docs_modified = DocsTarget().write_version(version_dir, new_version, ctx=ctx)
                 for rel in docs_modified:
                     fpath = vpath(rel)
                     if fpath not in bumped_files:

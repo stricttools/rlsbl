@@ -17,7 +17,7 @@ class SpecTarget(BaseTarget):
     def name(self):
         return "spec"
 
-    def read_name(self, dir_path):
+    def read_name(self, dir_path, ctx=None):
         """Return the directory name as the project name."""
         return os.path.basename(os.path.abspath(dir_path))
 
@@ -53,7 +53,7 @@ class SpecTarget(BaseTarget):
             data = json.load(f)
         return data["version"]
 
-    def write_version(self, dir_path, version):
+    def write_version(self, dir_path, version, ctx=None):
         """Write the new version to version.json atomically.
 
         Returns a list of relative file paths (relative to dir_path) that
@@ -89,7 +89,7 @@ class SpecTarget(BaseTarget):
             os.path.dirname(os.path.dirname(__file__)), "templates", "spec"
         )
 
-    def template_vars(self, dir_path, project_root):
+    def template_vars(self, dir_path, ctx):
         """Extract template variables."""
         # Name from directory
         dir_name = os.path.basename(os.path.abspath(dir_path))

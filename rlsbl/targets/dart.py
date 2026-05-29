@@ -5,7 +5,6 @@ import os
 from ruamel.yaml import YAML
 
 from .base import BaseTarget
-from ..config import read_project_config
 
 
 class DartTarget(BaseTarget):
@@ -41,7 +40,7 @@ class DartTarget(BaseTarget):
         # Strip build number: "1.2.3+4" -> "1.2.3"
         return version.split("+")[0]
 
-    def write_version(self, dir_path, version, project_root):
+    def write_version(self, dir_path, version, ctx=None):
         """Write a new version to pubspec.yaml, preserving comments and formatting.
 
         Handles build number (+N) based on .rlsbl/config.json:
@@ -56,7 +55,7 @@ class DartTarget(BaseTarget):
             data = yaml.load(f)
 
         old_version = str(data.get("version", ""))
-        new_version = self._compute_version_with_build_number(old_version, version, dir_path, project_root=project_root)
+        new_version = self._compute_version_with_build_number(old_version, version, dir_path, ctx=ctx)
 
         data["version"] = new_version
 
@@ -66,9 +65,9 @@ class DartTarget(BaseTarget):
         os.replace(tmp_path, pubspec)
         return [self.version_file()]
 
-    def _compute_version_with_build_number(self, old_version, new_semver, dir_path, project_root):
+    def _compute_version_with_build_number(self, old_version, new_semver, dir_path, ctx=None):
         """Determine the full version string including build number handling."""
-        config = read_project_config(project_root)
+        config = ctx.config if ctx else {}
         build_config = config.get("build_number", {})
         enabled = build_config.get("enabled", False)
         strategy = build_config.get("strategy", "increment")
@@ -90,7 +89,7 @@ class DartTarget(BaseTarget):
     def version_file(self):
         return "pubspec.yaml"
 
-    def read_name(self, dir_path):
+    def read_name(self, dir_path, ctx=None):
         """Read the package name from pubspec.yaml."""
         pubspec = os.path.join(dir_path, "pubspec.yaml")
         if not os.path.exists(pubspec):

@@ -66,7 +66,7 @@ class MavenTarget(BaseTarget):
 
         return None
 
-    def read_name(self, dir_path):
+    def read_name(self, dir_path, ctx=None):
         """Read the project name (groupId:artifactId or group) from build files."""
         return self._read_project_name(dir_path)
 
@@ -156,7 +156,7 @@ class MavenTarget(BaseTarget):
 
         raise ValueError(f"Unknown format: {fmt}")
 
-    def write_version(self, dir_path, version):
+    def write_version(self, dir_path, version, ctx=None):
         """Write version to the same file it was read from.
 
         Returns a list of relative file paths (relative to dir_path) that
@@ -242,7 +242,7 @@ class MavenTarget(BaseTarget):
             os.path.dirname(os.path.dirname(__file__)), "templates", "maven"
         )
 
-    def template_vars(self, dir_path, project_root):
+    def template_vars(self, dir_path, ctx):
         """Extract template variables from the project."""
         name = self._read_project_name(dir_path) or ""
 

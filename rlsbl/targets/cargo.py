@@ -21,7 +21,7 @@ class CargoTarget(BaseTarget):
     def name(self):
         return "cargo"
 
-    def read_name(self, dir_path):
+    def read_name(self, dir_path, ctx=None):
         """Read the package name from Cargo.toml."""
         cargo_path = os.path.join(dir_path, "Cargo.toml")
         if not os.path.exists(cargo_path):
@@ -67,7 +67,7 @@ class CargoTarget(BaseTarget):
             raise ValueError(f"No [package].version in {cargo_path}")
         return str(doc["package"]["version"])
 
-    def write_version(self, dir_path, version):
+    def write_version(self, dir_path, version, ctx=None):
         """Write version to Cargo.toml using tomlkit round-trip (preserves comments).
 
         Returns a list of relative file paths that were modified.
@@ -108,7 +108,7 @@ class CargoTarget(BaseTarget):
             os.path.dirname(os.path.dirname(__file__)), "templates", "cargo"
         )
 
-    def template_vars(self, dir_path, project_root):
+    def template_vars(self, dir_path, ctx):
         """Extract template variables from Cargo.toml."""
         cargo_path = os.path.join(dir_path, "Cargo.toml")
         with open(cargo_path, "r", encoding="utf-8") as f:

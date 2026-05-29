@@ -30,7 +30,7 @@ class PlainTarget(BaseTarget):
         with open(version_path, "r", encoding="utf-8") as f:
             return f.read().strip()
 
-    def write_version(self, dir_path, version):
+    def write_version(self, dir_path, version, ctx=None):
         """Write the new version to the VERSION file and pyproject.toml atomically.
 
         Returns a list of relative file paths that were modified.
@@ -74,7 +74,7 @@ class PlainTarget(BaseTarget):
         # Plain targets are always valid -- scaffold creates the VERSION file.
         return True
 
-    def template_vars(self, dir_path, project_root):
+    def template_vars(self, dir_path, ctx):
         try:
             version = self.read_version(dir_path)
         except FileNotFoundError:

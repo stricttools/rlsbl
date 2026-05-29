@@ -4,6 +4,8 @@ import os
 import subprocess
 import sys
 
+from ..config import read_project_config
+from ..context import ProjectContext
 from ..targets import TARGETS, detect_targets
 from ..utils import require_tool
 from ..workspace import find_workspace_root, load_workspace
@@ -136,7 +138,8 @@ def _resolve_project_name(project_dir, target_name, project_root):
     target = TARGETS.get(target_name)
     if target is not None:
         try:
-            name = target.read_name(project_dir)
+            ctx = ProjectContext(project_root=project_root, workspace_root=None, config=read_project_config(project_root))
+            name = target.read_name(project_dir, ctx=ctx)
             if name:
                 return name
         except Exception:

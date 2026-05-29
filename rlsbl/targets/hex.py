@@ -20,7 +20,7 @@ class HexTarget(BaseTarget):
     def detect(self, dir_path):
         return os.path.exists(os.path.join(dir_path, "mix.exs"))
 
-    def read_name(self, dir_path):
+    def read_name(self, dir_path, ctx=None):
         """Extract app name from mix.exs."""
         mix_path = os.path.join(dir_path, "mix.exs")
         if not os.path.exists(mix_path):
@@ -44,7 +44,7 @@ class HexTarget(BaseTarget):
             raise ValueError(f"No version found in {mix_path}")
         return match.group(1)
 
-    def write_version(self, dir_path, version):
+    def write_version(self, dir_path, version, ctx=None):
         """Write a new version to mix.exs.
 
         Returns a list of relative file paths that were modified.
@@ -74,7 +74,7 @@ class HexTarget(BaseTarget):
             os.path.dirname(os.path.dirname(__file__)), "templates", "hex"
         )
 
-    def template_vars(self, dir_path, project_root):
+    def template_vars(self, dir_path, ctx):
         """Extract template variables from mix.exs."""
         mix_path = os.path.join(dir_path, "mix.exs")
         with open(mix_path, "r", encoding="utf-8") as f:

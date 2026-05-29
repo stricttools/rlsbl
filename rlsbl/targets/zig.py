@@ -5,7 +5,6 @@ import re
 
 from .base import BaseTarget
 from .zig_version import read_zig_version, write_zig_version
-from ..config import read_project_config
 from ..npm_wrapper import (
     build_artifacts,
     build_npm_publish_jobs,
@@ -62,7 +61,7 @@ class ZigTarget(BaseTarget):
         """Read version, delegating to zig_version helpers."""
         return read_zig_version(dir_path)
 
-    def write_version(self, dir_path, version):
+    def write_version(self, dir_path, version, ctx=None):
         """Write version, delegating to zig_version helpers.
 
         Returns a list of relative file paths that were modified.
@@ -77,7 +76,7 @@ class ZigTarget(BaseTarget):
             os.path.dirname(os.path.dirname(__file__)), "templates", "zig"
         )
 
-    def read_name(self, dir_path):
+    def read_name(self, dir_path, ctx=None):
         """Extract .name from build.zig.zon, or None."""
         return self._read_zon_field(dir_path, _ZON_NAME_RE)
 
@@ -100,9 +99,9 @@ class ZigTarget(BaseTarget):
             content = f.read()
         return not bool(_BUILD_EXE_RE.search(content))
 
-    def template_vars(self, dir_path, project_root):
+    def template_vars(self, dir_path, ctx):
         """Extract template variables from build.zig.zon and build.zig."""
-        config = read_project_config(project_root)
+        config = ctx.config if ctx else {}
         name = self._read_zon_field(dir_path, _ZON_NAME_RE)
         if not name:
             name = os.path.basename(os.path.abspath(dir_path))
@@ -147,10 +146,10 @@ class ZigTarget(BaseTarget):
             {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
         ]
 
-    def shared_template_mappings(self, project_root):
-        mappings = super().shared_template_mappings(project_root)
+    def shared_template_mappings(self, ctx):
+        mappings = super().shared_template_mappings(ctx)
         if not self._is_library("."):
-            config = read_project_config(project_root)
+            config = ctx.config if ctx else {}
             npm_wrapper_config = config.get("npm_wrapper", {})
             if npm_wrapper_config.get("scope"):
                 mappings.extend(npm_wrapper_template_mappings())

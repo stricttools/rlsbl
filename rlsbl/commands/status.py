@@ -12,6 +12,8 @@ from ..changelog.validate import (
     _is_changelog_only_commit,
     _unreleased_range,
 )
+from ..config import read_project_config
+from ..context import ProjectContext
 from ..git_util import filter_commits_for_project
 from ..targets import TARGETS, detect_targets
 from ..utils import (
@@ -42,7 +44,8 @@ def _collect_status(registry, target_path=".", *, tag_glob=None, project_root, p
         sys.exit(1)
 
     version = reg.read_version(target_path)
-    vars_dict = reg.template_vars(target_path, project_root)
+    ctx = ProjectContext(project_root=project_root, workspace_root=None, config=read_project_config(project_root))
+    vars_dict = reg.template_vars(target_path, ctx)
     name = vars_dict.get("name") or "(unknown)"
 
     root_str = str(project_root)

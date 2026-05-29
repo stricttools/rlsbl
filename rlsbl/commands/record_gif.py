@@ -5,6 +5,8 @@ import subprocess
 import sys
 import tempfile
 
+from ..config import read_project_config
+from ..context import ProjectContext
 from ..targets import TARGETS, detect_targets
 from ..utils import require_tool
 
@@ -31,7 +33,8 @@ def _get_bin_command(project_root):
     if not registry_module:
         return None
     try:
-        tvars = registry_module.template_vars(first_path, str(project_root))
+        ctx = ProjectContext(project_root=project_root, workspace_root=None, config=read_project_config(str(project_root)))
+        tvars = registry_module.template_vars(first_path, ctx)
         return tvars.get("binCommand") or None
     except Exception:
         return None

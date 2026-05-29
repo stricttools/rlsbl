@@ -24,7 +24,7 @@ class ReleaseTarget(Protocol):
         """Read the current version from the target's manifest file."""
         ...
 
-    def read_name(self, dir_path: str) -> str | None:
+    def read_name(self, dir_path: str, ctx) -> str | None:
         """Read the project's package name from the manifest, or None."""
         return None
 
@@ -32,7 +32,7 @@ class ReleaseTarget(Protocol):
         """Read optional metadata (license, description) from the manifest."""
         return {}
 
-    def write_version(self, dir_path: str, version: str) -> None:
+    def write_version(self, dir_path: str, version: str, ctx) -> None:
         """Write a new version to the target's manifest file (atomic)."""
         ...
 
@@ -62,7 +62,7 @@ class ReleaseTarget(Protocol):
         """Absolute path to shared template directory, or None."""
         return None
 
-    def template_vars(self, dir_path: str, project_root: str) -> dict[str, str]:
+    def template_vars(self, dir_path: str, ctx) -> dict[str, str]:
         """Extract template placeholder values from the project."""
         return {}
 
@@ -70,7 +70,7 @@ class ReleaseTarget(Protocol):
         """Target-specific template-to-output-path mappings."""
         return []
 
-    def shared_template_mappings(self, project_root: str) -> list[dict[str, str]]:
+    def shared_template_mappings(self, ctx) -> list[dict[str, str]]:
         """Shared template-to-output-path mappings."""
         return []
 

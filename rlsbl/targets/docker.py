@@ -4,7 +4,7 @@ import os
 import sys
 
 from .base import BaseTarget
-from ..config import get_publish_config, read_project_config
+from ..config import get_publish_config
 from ..utils import require_tool, run
 
 VERSION_FILE = "VERSION"
@@ -20,9 +20,9 @@ class DockerTarget(BaseTarget):
     def detect(self, dir_path):
         return os.path.exists(os.path.join(dir_path, "Dockerfile"))
 
-    def read_name(self, dir_path, project_root):
+    def read_name(self, dir_path, ctx=None):
         """Return image name from config or directory name."""
-        config = read_project_config(project_root)
+        config = ctx.config if ctx else {}
         docker_config = config.get("docker", {})
         image = docker_config.get("image")
         if image:
@@ -43,7 +43,7 @@ class DockerTarget(BaseTarget):
         with open(version_path, "r", encoding="utf-8") as f:
             return f.read().strip()
 
-    def write_version(self, dir_path, version):
+    def write_version(self, dir_path, version, ctx=None):
         """Write the new version to the VERSION file atomically.
 
         Returns a list of relative file paths that were modified.
@@ -121,9 +121,9 @@ class DockerTarget(BaseTarget):
             os.path.dirname(os.path.dirname(__file__)), "templates", "docker"
         )
 
-    def template_vars(self, dir_path, project_root):
+    def template_vars(self, dir_path, ctx):
         """Extract template variables from config and git."""
-        config = read_project_config(project_root)
+        config = ctx.config if ctx else {}
         docker_config = config.get("docker", {})
         image = docker_config.get("image", "")
         registry = docker_config.get("registry", "")

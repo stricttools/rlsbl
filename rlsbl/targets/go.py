@@ -7,7 +7,6 @@ import shutil
 import subprocess
 
 from .base import BaseTarget
-from ..config import read_project_config
 from ..utils import require_tool
 from ..npm_wrapper import (
     build_artifacts,
@@ -51,7 +50,7 @@ class GoTarget(BaseTarget):
     def detect(self, dir_path):
         return os.path.exists(os.path.join(dir_path, "go.mod"))
 
-    def read_name(self, dir_path):
+    def read_name(self, dir_path, ctx=None):
         """Read the last segment of the module path from go.mod."""
         module_path = self._read_module_path(dir_path)
         if not module_path:
@@ -207,7 +206,7 @@ class GoTarget(BaseTarget):
         with open(version_path, "r", encoding="utf-8") as f:
             return f.read().strip()
 
-    def write_version(self, dir_path, version):
+    def write_version(self, dir_path, version, ctx=None):
         """Write the new version to the VERSION file.
 
         Returns a list of relative file paths that were modified.
@@ -242,9 +241,9 @@ class GoTarget(BaseTarget):
             os.path.dirname(os.path.dirname(__file__)), "templates", "go"
         )
 
-    def template_vars(self, dir_path, project_root):
+    def template_vars(self, dir_path, ctx):
         """Extract template variables from go.mod and .rlsbl/config.json."""
-        config = read_project_config(project_root)
+        config = ctx.config if ctx else {}
         name = self._read_module_path(dir_path)
 
         # Derive short name from module path (last segment)
@@ -371,10 +370,10 @@ class GoTarget(BaseTarget):
             # npm wrapper scaffolding is in shared_template_mappings()
         return mappings
 
-    def shared_template_mappings(self, project_root):
-        mappings = super().shared_template_mappings(project_root)
+    def shared_template_mappings(self, ctx):
+        mappings = super().shared_template_mappings(ctx)
         if not self._is_library("."):
-            config = read_project_config(project_root)
+            config = ctx.config if ctx else {}
             npm_wrapper_config = config.get("npm_wrapper", {})
             if npm_wrapper_config.get("scope"):
                 mappings.extend(npm_wrapper_template_mappings())

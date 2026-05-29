@@ -134,7 +134,7 @@ def register_checks(app):
         for name, path in target_entries:
             target = TARGETS[name]
             try:
-                n = target.read_name(path)
+                n = target.read_name(path, ctx=ctx)
                 names[name] = n
             except Exception:
                 names[name] = None
