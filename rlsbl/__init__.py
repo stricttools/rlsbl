@@ -237,11 +237,8 @@ def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, no_watch, **_kwargs
 @release_group.command(name="init", help="Scaffold a .rlsbl/releases/unreleased.toml file by auto-detecting project targets. The generated file contains a default bump type (patch), an include list of all detected targets, and per-target configuration sections for Flutter targets.")
 def cmd_release_init(**_kwargs):
     root = _require_project_root()
-    from .workspace import find_workspace_root
-    monorepo_root = find_workspace_root(str(root))
-    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     from .commands.release_init import run_cmd
-    run_cmd(project_root=ctx.project_root)
+    run_cmd(project_root=root)
 
 
 @release_group.command(
@@ -256,9 +253,6 @@ def cmd_release_init(**_kwargs):
 )
 def cmd_release_retry(dry_run, yes, quiet, watch, no_watch, **_kwargs):
     root = _require_project_root()
-    from .workspace import find_workspace_root
-    monorepo_root = find_workspace_root(str(root))
-    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
 
     from .release_file import get_retry_file_path, read_retry_file
 
@@ -278,7 +272,7 @@ def cmd_release_retry(dry_run, yes, quiet, watch, no_watch, **_kwargs):
         "watch": bool(watch),
     }
     from .commands.release_retry import run_cmd
-    run_cmd(retry_config, flags, project_root=ctx.project_root)
+    run_cmd(retry_config, flags, project_root=root)
 
 
 # ---------------------------------------------------------------------------
@@ -290,13 +284,10 @@ def cmd_release_retry(dry_run, yes, quiet, watch, no_watch, **_kwargs):
 @strictcli.flag(name="json", type=bool, help="Output status as JSON")
 def cmd_status(target, json, **_kwargs):
     root = _require_project_root()
-    from .workspace import find_workspace_root
-    monorepo_root = find_workspace_root(str(root))
-    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     registry = _resolve_target(target or None)
     flags = {"json": json}
     from .commands.status import run_cmd
-    run_cmd(registry, [], flags, project_root=ctx.project_root)
+    run_cmd(registry, [], flags, project_root=root)
 
 
 # ---------------------------------------------------------------------------
@@ -336,6 +327,8 @@ def cmd_scaffold(target, force, private, no_commit, skip_shared, no_tag, dry_run
         "dry-run": dry_run,
     }
 
+    ctx = create_context(scaffold_root) if scaffold_root else None
+
     resolved_target = target or None
     if resolved_target:
         from .targets import TARGETS
@@ -346,16 +339,14 @@ def cmd_scaffold(target, force, private, no_commit, skip_shared, no_tag, dry_run
             )
             sys.exit(1)
         from .commands.init_cmd import run_cmd
-        run_cmd(resolved_target, [], flags, project_root=scaffold_root)
+        run_cmd(resolved_target, [], flags, ctx=ctx)
     else:
         regs = detect_registries()
         if not regs:
             print("Error: no package.json, pyproject.toml, or go.mod found.", file=sys.stderr)
             sys.exit(1)
         # Warn when auto-detection is used without explicit config
-        from .config import read_project_config
-        cfg = read_project_config(scaffold_root)
-        if "targets" not in cfg:
+        if ctx and "targets" not in ctx.config:
             print(
                 f"Note: Auto-detected target(s): {', '.join(regs)}. "
                 "Run 'rlsbl scaffold' again after reviewing .rlsbl/config.json.",
@@ -363,10 +354,10 @@ def cmd_scaffold(target, force, private, no_commit, skip_shared, no_tag, dry_run
             )
         if len(regs) > 1:
             from .commands.init_cmd import run_cmd_multi
-            run_cmd_multi(regs, [], flags, project_root=scaffold_root)
+            run_cmd_multi(regs, [], flags, ctx=ctx)
         else:
             from .commands.init_cmd import run_cmd
-            run_cmd(regs[0], [], flags, project_root=scaffold_root)
+            run_cmd(regs[0], [], flags, ctx=ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -407,13 +398,10 @@ def cmd_check_name(target, delay, **_kwargs):
 @strictcli.arg(name="version", help="Version to update (defaults to current)", required=False)
 def cmd_release_edit(dry_run, version=None, **_kwargs):
     root = _require_project_root()
-    from .workspace import find_workspace_root
-    monorepo_root = find_workspace_root(str(root))
-    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     args = [version] if version else []
     flags = {"dry-run": dry_run}
     from .commands.edit_release import run_cmd
-    run_cmd(args, flags, project_root=ctx.project_root)
+    run_cmd(args, flags, project_root=root)
 
 
 # ---------------------------------------------------------------------------
@@ -443,9 +431,6 @@ def cmd_release_undo(target, yes, **_kwargs):
 @strictcli.arg(name="version", help="Version to yank (e.g. 0.9.1 or v0.9.1)")
 def cmd_release_yank(reason, use, hard, dry_run, yes, version, **_kwargs):
     root = _require_project_root()
-    from .workspace import find_workspace_root
-    monorepo_root = find_workspace_root(str(root))
-    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     args = [version]
     flags = {
         "reason": reason or None,
@@ -455,7 +440,7 @@ def cmd_release_yank(reason, use, hard, dry_run, yes, version, **_kwargs):
         "yes": yes,
     }
     from .commands.yank import run_cmd
-    run_cmd(args, flags, project_root=ctx.project_root)
+    run_cmd(args, flags, project_root=root)
 
 
 # ---------------------------------------------------------------------------
@@ -520,10 +505,9 @@ def cmd_prs(**_kwargs):
 @strictcli.flag(name="json", type=bool, help="Output as JSON")
 def cmd_unreleased(json, **_kwargs):
     root = _require_project_root()
-    ctx = create_context(root)
     flags = {"json": json}
     from .commands.unreleased import run_cmd
-    run_cmd(None, [], flags, project_root=ctx.project_root)
+    run_cmd(None, [], flags, project_root=root)
 
 
 # ---------------------------------------------------------------------------
@@ -533,9 +517,8 @@ def cmd_unreleased(json, **_kwargs):
 @app.command(name="targets", help="List all release targets detected in the current project directory, showing which ecosystems (npm, PyPI, Go, Cargo, etc.) are active based on manifest files found.")
 def cmd_targets(**_kwargs):
     root = _require_project_root()
-    ctx = create_context(root)
     from .commands.targets_cmd import run_cmd
-    run_cmd(None, [], {}, project_root=ctx.project_root)
+    run_cmd(None, [], {}, project_root=root)
 
 
 # ---------------------------------------------------------------------------
@@ -549,10 +532,9 @@ def cmd_targets(**_kwargs):
 @strictcli.flag(name="duration", type=str, help="Duration in seconds", default="10")
 def cmd_record_gif(width, height, font_size, duration, **_kwargs):
     root = _require_project_root()
-    ctx = create_context(root)
     flags = {"width": width, "height": height, "font-size": font_size, "duration": duration}
     from .commands.record_gif import run_cmd
-    run_cmd(None, [], flags, project_root=ctx.project_root)
+    run_cmd(None, [], flags, project_root=root)
 
 
 # ---------------------------------------------------------------------------
@@ -616,7 +598,6 @@ chlog = app.group("changelog", help="Structured changelog management using JSONL
 @strictcli.flag(name="no-commit", type=bool, help="Skip auto-commit of unreleased.jsonl")
 def cmd_chlog_add(commits, description, type, no_user_facing, no_commit, **_kwargs):
     root = _require_project_root()
-    ctx = create_context(root)
     flags = {
         "commits": commits,
         "description": description,
@@ -625,7 +606,7 @@ def cmd_chlog_add(commits, description, type, no_user_facing, no_commit, **_kwar
         "no-commit": no_commit,
     }
     from .commands.changelog_cmd import cmd_add
-    cmd_add(flags, project_root=ctx.project_root)
+    cmd_add(flags, project_root=root)
 
 
 
@@ -633,10 +614,9 @@ def cmd_chlog_add(commits, description, type, no_user_facing, no_commit, **_kwar
 @strictcli.flag(name="no-commit", type=bool, help="Skip auto-commit of generated files")
 def cmd_chlog_generate(dry_run, no_commit, **_kwargs):
     root = _require_project_root()
-    ctx = create_context(root)
     flags = {"dry-run": dry_run, "no-commit": no_commit}
     from .commands.changelog_cmd import cmd_generate
-    cmd_generate(flags, project_root=ctx.project_root)
+    cmd_generate(flags, project_root=root)
 
 
 @chlog.command(name="amend", help="Append a changelog entry to a released version's JSONL file. Temporarily unlocks the read-only file, appends the entry, re-locks it, regenerates CHANGELOG.md, and syncs GitHub Release notes. Use --no-resolve to skip hash validation for old or amended commits.")
@@ -648,7 +628,6 @@ def cmd_chlog_generate(dry_run, no_commit, **_kwargs):
 @strictcli.flag(name="no-resolve", type=bool, help="Skip hash validation")
 def cmd_chlog_amend(version, commits, description, type, no_user_facing, no_resolve, **_kwargs):
     root = _require_project_root()
-    ctx = create_context(root)
     flags = {
         "version": version,
         "commits": commits,
@@ -658,7 +637,7 @@ def cmd_chlog_amend(version, commits, description, type, no_user_facing, no_reso
         "no-resolve": no_resolve,
     }
     from .commands.changelog_cmd import cmd_amend
-    cmd_amend(flags, project_root=ctx.project_root)
+    cmd_amend(flags, project_root=root)
 
 
 # ---------------------------------------------------------------------------
@@ -672,11 +651,8 @@ mono = app.group("monorepo", help="Manage monorepo workspaces with multiple inde
 @strictcli.flag(name="no-commit", type=bool, help="Skip auto-commit of workspace.toml")
 def cmd_mono_init(no_commit, **_kwargs):
     root = _require_project_root()
-    from .workspace import find_workspace_root
-    monorepo_root = find_workspace_root(str(root))
-    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     from .commands.monorepo import _cmd_init
-    _cmd_init({"no-commit": no_commit}, project_root=ctx.project_root)
+    _cmd_init({"no-commit": no_commit}, project_root=root)
 
 
 @mono.command(name="add", help="Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Optionally set a display name, target registry for publishing, glob patterns for change detection, a subtree remote URL for split publishing, inter-project dependencies, and a library flag to mark shared code packages.")
@@ -690,9 +666,6 @@ def cmd_mono_init(no_commit, **_kwargs):
 @strictcli.arg(name="path", help="Path to the project directory")
 def cmd_mono_add(name, target, watch, subtree_remote, depends_on, library, no_commit, path, **_kwargs):
     root = _require_project_root()
-    from .workspace import find_workspace_root
-    monorepo_root = find_workspace_root(str(root))
-    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     flags = {}
     if name:
         flags["name"] = name
@@ -709,49 +682,37 @@ def cmd_mono_add(name, target, watch, subtree_remote, depends_on, library, no_co
     if no_commit:
         flags["no-commit"] = True
     from .commands.monorepo import _cmd_add
-    _cmd_add([path], flags, project_root=ctx.project_root)
+    _cmd_add([path], flags, project_root=root)
 
 
 @mono.command(name="remove", help="Unregister a project from the monorepo workspace.toml by its path. This removes the project entry from the workspace configuration file but does not delete any files, directories, or git history on disk. The project's code remains intact and can be re-added later with the add subcommand if needed.")
 @strictcli.arg(name="path", help="Path to the project to remove")
 def cmd_mono_remove(path, **_kwargs):
     root = _require_project_root()
-    from .workspace import find_workspace_root
-    monorepo_root = find_workspace_root(str(root))
-    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     from .commands.monorepo import _cmd_remove
-    _cmd_remove([path], {}, project_root=ctx.project_root)
+    _cmd_remove([path], {}, project_root=root)
 
 
 @mono.command(name="list", help="Display all projects registered in the monorepo workspace.toml file. For each project, shows the project name, relative path from the repo root, target registry for publishing, and any configured options such as watch patterns, subtree remotes, inter-project dependencies, and whether the project is marked as a library.")
 def cmd_mono_list(**_kwargs):
     root = _require_project_root()
-    from .workspace import find_workspace_root
-    monorepo_root = find_workspace_root(str(root))
-    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     from .commands.monorepo import _cmd_list
-    _cmd_list({}, project_root=ctx.project_root)
+    _cmd_list({}, project_root=root)
 
 
 @mono.command(name="sync", help="Copy and merge CI workflow files from each project's individual scaffold into the shared .github/workflows directory at the repository root. This ensures that every project in the workspace has its publish and test pipelines properly configured as GitHub Actions workflows, even when projects use different target registries or have custom workflow steps.")
 @strictcli.flag(name="no-commit", type=bool, help="Skip auto-commit of synced workflow files")
 def cmd_mono_sync(no_commit, **_kwargs):
     root = _require_project_root()
-    from .workspace import find_workspace_root
-    monorepo_root = find_workspace_root(str(root))
-    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     from .commands.monorepo import _cmd_sync
-    _cmd_sync({"no-commit": no_commit}, project_root=ctx.project_root)
+    _cmd_sync({"no-commit": no_commit}, project_root=root)
 
 
 @mono.command(name="status", help="Show the current version, last release tag, and number of unreleased commits for every project in the monorepo workspace. Provides a quick overview of which projects have pending changes and are ready for their next release. Projects with zero unreleased commits are shown as up-to-date.")
 def cmd_mono_status(**_kwargs):
     root = _require_project_root()
-    from .workspace import find_workspace_root
-    monorepo_root = find_workspace_root(str(root))
-    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     from .commands.monorepo import _cmd_status
-    _cmd_status({}, project_root=ctx.project_root)
+    _cmd_status({}, project_root=root)
 
 
 @mono.command(name="check-names", help="Check package name availability on a target registry for all projects in the monorepo workspace. Queries the registry API for each project name and reports whether it is available or already taken. Supports optional prefix and suffix arguments to test naming conventions like scoped packages, with a configurable delay between registry queries to avoid rate limiting.")
@@ -761,43 +722,31 @@ def cmd_mono_status(**_kwargs):
 @strictcli.flag(name="delay", type=str, help="Delay between checks in ms", default="200")
 def cmd_mono_check_names(target, prefix, suffix, delay, **_kwargs):
     root = _require_project_root()
-    from .workspace import find_workspace_root
-    monorepo_root = find_workspace_root(str(root))
-    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     flags = {"target": target, "prefix": prefix, "suffix": suffix, "delay": delay}
     from .commands.monorepo import _cmd_check_names
-    _cmd_check_names(_variadic_args, flags, project_root=ctx.project_root)
+    _cmd_check_names(_variadic_args, flags, project_root=root)
 
 
 @mono.command(name="release-order", help="Compute and display the topological release order for all projects in the monorepo workspace based on their declared depends-on relationships. Projects with no dependencies are listed first, followed by projects that depend on them, ensuring each project is released only after its dependencies. Detects and reports circular dependency errors.")
 def cmd_mono_release_order(**_kwargs):
     root = _require_project_root()
-    from .workspace import find_workspace_root
-    monorepo_root = find_workspace_root(str(root))
-    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     from .commands.monorepo import _cmd_release_order
-    _cmd_release_order({}, project_root=ctx.project_root)
+    _cmd_release_order({}, project_root=root)
 
 
 @mono.command(name="outdated", help="Scan all projects in the monorepo workspace for intra-workspace dependencies that reference older versions than what is currently available in the workspace. Lists each outdated dependency with the referenced version and the latest available version, helping identify which downstream projects need a version bump after upstream releases.")
 def cmd_mono_outdated(**_kwargs):
     root = _require_project_root()
-    from .workspace import find_workspace_root
-    monorepo_root = find_workspace_root(str(root))
-    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     from .commands.monorepo import _cmd_outdated
-    _cmd_outdated({}, project_root=ctx.project_root)
+    _cmd_outdated({}, project_root=root)
 
 
 @mono.command(name="snapshot", help="Generate a committed JSON artifact at .rlsbl-monorepo/snapshot.json summarizing all packages, versions, dependencies, and graph structure. Use --check to verify the snapshot is up-to-date without regenerating it (exits 1 if stale).")
 @strictcli.flag(name="check", type=bool, help="Verify snapshot.json is up-to-date (exit 1 if stale)")
 def cmd_mono_snapshot(check, **_kwargs):
     root = _require_project_root()
-    from .workspace import find_workspace_root
-    monorepo_root = find_workspace_root(str(root))
-    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     from .commands.monorepo import _cmd_snapshot
-    _cmd_snapshot({"check": check}, project_root=ctx.project_root)
+    _cmd_snapshot({"check": check}, project_root=root)
 
 
 @mono.command(name="graph", help="Export the monorepo dependency graph in JSON, DOT (Graphviz), or indented text tree format. Supports filtering by a root package (transitive deps) or reverse package (transitive rdeps), with optional depth limiting. Use --output to write to a file instead of stdout.")
@@ -817,11 +766,8 @@ def cmd_mono_graph(format, output, root, reverse, depth=None, **_kwargs):
     if depth is not None:
         flags["depth"] = depth
     root = _require_project_root()
-    from .workspace import find_workspace_root
-    monorepo_root = find_workspace_root(str(root))
-    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     from .commands.monorepo import _cmd_graph
-    _cmd_graph(flags, project_root=ctx.project_root)
+    _cmd_graph(flags, project_root=root)
 
 
 @mono.command(name="impact", help="Analyze the impact of changes to a package, file, or git diff range on the monorepo dependency graph. Shows direct and transitive dependents, test scope, and release candidates. Supports package names, file paths, and --since for git-based change detection.")
@@ -836,11 +782,8 @@ def cmd_mono_impact(format, depth=None, since="", **_kwargs):
     if since:
         flags["since"] = since
     root = _require_project_root()
-    from .workspace import find_workspace_root
-    monorepo_root = find_workspace_root(str(root))
-    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     from .commands.monorepo import _cmd_impact
-    _cmd_impact(args, flags, project_root=ctx.project_root)
+    _cmd_impact(args, flags, project_root=root)
 
 
 @mono.command(name="release", help="Execute a batch release of multiple monorepo packages in topological order. Reads package configurations from .rlsbl-monorepo/releases/unreleased.toml. Each package is released sequentially using the single-package release flow, with leaves (no dependencies) released first. Supports --dry-run, --yes, --allow-dirty flags.")
@@ -853,11 +796,8 @@ def cmd_mono_release(dry_run, yes, quiet, allow_dirty, **_kwargs):
         "allow-dirty": allow_dirty,
     }
     root = _require_project_root()
-    from .workspace import find_workspace_root
-    monorepo_root = find_workspace_root(str(root))
-    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     from .commands.monorepo import _cmd_batch_release
-    _cmd_batch_release(flags, project_root=ctx.project_root)
+    _cmd_batch_release(flags, project_root=root)
 
 
 # ---------------------------------------------------------------------------
@@ -882,9 +822,6 @@ def cmd_dev_install(all, include, exclude, uninstall, global_, venv, **_kwargs):
         )
         sys.exit(2)
     root = _require_project_root()
-    from .workspace import find_workspace_root
-    monorepo_root = find_workspace_root(str(root))
-    ctx = create_context(root, Path(monorepo_root) if monorepo_root else None)
     # Both flags default to False (not True) so strictcli's mutex check doesn't
     # always fire when neither is passed. The user-visible default (no flags ->
     # global mode) is preserved by deriving install_global from --venv only.
@@ -898,7 +835,7 @@ def cmd_dev_install(all, include, exclude, uninstall, global_, venv, **_kwargs):
         "venv": venv,
     }
     from .commands.dev import run_install
-    rc = run_install(flags, project_root=ctx.project_root)
+    rc = run_install(flags, project_root=root)
     if rc:
         sys.exit(rc)
 

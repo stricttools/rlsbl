@@ -14,6 +14,13 @@ from rlsbl.commands.init_cmd import (
     _merge_on_triggers,
     _check_npm_lockfile_missing,
 )
+from rlsbl.context import ProjectContext
+
+
+def _ctx(root="."):
+    """Create a minimal ProjectContext for scaffold tests."""
+    from pathlib import Path
+    return ProjectContext(project_root=Path(root), monorepo_root=None, config={})
 
 
 @pytest.fixture
@@ -46,7 +53,7 @@ class TestRunCmdMulti:
     def test_merged_publish_workflow_created(self, dual_registry_project):
         """Merged publish.yml is generated containing both npm and pypi jobs."""
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd_multi(["npm", "pypi"], [], {}, project_root=".")
+            run_cmd_multi(["npm", "pypi"], [], {}, ctx=_ctx())
 
         publish_path = os.path.join(".github", "workflows", "publish.yml")
         assert os.path.exists(publish_path)
@@ -68,7 +75,7 @@ class TestRunCmdMulti:
     def test_ci_workflow_created(self, dual_registry_project):
         """CI workflow from primary registry (npm) is generated."""
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd_multi(["npm", "pypi"], [], {}, project_root=".")
+            run_cmd_multi(["npm", "pypi"], [], {}, ctx=_ctx())
 
         ci_path = os.path.join(".github", "workflows", "ci.yml")
         assert os.path.exists(ci_path)
@@ -82,7 +89,7 @@ class TestRunCmdMulti:
     def test_shared_templates_processed_once(self, dual_registry_project):
         """Shared templates (CHANGELOG.md, .gitignore) are written once, not duplicated."""
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd_multi(["npm", "pypi"], [], {}, project_root=".")
+            run_cmd_multi(["npm", "pypi"], [], {}, ctx=_ctx())
 
         # Shared files exist
         assert os.path.exists("CHANGELOG.md")
@@ -105,7 +112,7 @@ class TestRunCmdMulti:
         npm template mappings.
         """
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd_multi(["npm", "pypi"], [], {}, project_root=".")
+            run_cmd_multi(["npm", "pypi"], [], {}, ctx=_ctx())
 
         publish_path = os.path.join(".github", "workflows", "publish.yml")
         with open(publish_path) as f:
@@ -118,7 +125,7 @@ class TestRunCmdMulti:
     def test_template_variables_replaced(self, dual_registry_project):
         """Template variables like {{name}} and {{version}} are replaced."""
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd_multi(["npm", "pypi"], [], {}, project_root=".")
+            run_cmd_multi(["npm", "pypi"], [], {}, ctx=_ctx())
 
         # Check CHANGELOG for variable substitution
         with open("CHANGELOG.md") as f:
@@ -128,7 +135,7 @@ class TestRunCmdMulti:
     def test_rlsbl_version_marker_written(self, dual_registry_project):
         """The .rlsbl/version marker is written after scaffolding."""
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd_multi(["npm", "pypi"], [], {}, project_root=".")
+            run_cmd_multi(["npm", "pypi"], [], {}, ctx=_ctx())
 
         marker = os.path.join(".rlsbl", "version")
         assert os.path.exists(marker)
@@ -140,7 +147,7 @@ class TestRunCmdMulti:
     def test_hashes_saved(self, dual_registry_project):
         """File hashes are persisted after multi-registry scaffold."""
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd_multi(["npm", "pypi"], [], {}, project_root=".")
+            run_cmd_multi(["npm", "pypi"], [], {}, ctx=_ctx())
 
         from rlsbl.commands.init_cmd import HASHES_FILE, load_hashes
         assert os.path.exists(HASHES_FILE)
@@ -150,7 +157,7 @@ class TestRunCmdMulti:
     def test_force_flag_overwrites(self, dual_registry_project):
         """Running with --force overwrites existing managed files."""
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd_multi(["npm", "pypi"], [], {}, project_root=".")
+            run_cmd_multi(["npm", "pypi"], [], {}, ctx=_ctx())
 
         # Modify CI file
         ci_path = os.path.join(".github", "workflows", "ci.yml")
@@ -159,7 +166,7 @@ class TestRunCmdMulti:
 
         # Re-scaffold with force
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd_multi(["npm", "pypi"], [], {"force": True}, project_root=".")
+            run_cmd_multi(["npm", "pypi"], [], {"force": True}, ctx=_ctx())
 
         with open(ci_path) as f:
             content = f.read()
@@ -200,7 +207,7 @@ class TestPypiPrimaryNpmSecondary:
         was left unresolved because only pypi vars were un-namespaced.
         """
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd_multi(["pypi", "npm"], [], {}, project_root=".")
+            run_cmd_multi(["pypi", "npm"], [], {}, ctx=_ctx())
 
         publish_path = os.path.join(".github", "workflows", "publish.yml")
         assert os.path.exists(publish_path)
@@ -224,7 +231,7 @@ class TestPypiPrimaryNpmSecondary:
         primary.
         """
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd_multi(["pypi", "npm"], [], {}, project_root=".")
+            run_cmd_multi(["pypi", "npm"], [], {}, ctx=_ctx())
 
         assert os.path.exists(".npmignore"), (
             ".npmignore should be created from npm's template_mappings "
@@ -492,7 +499,7 @@ class TestSubdirectoryNpmTarget:
         """
         with patch("sys.stdout", new_callable=StringIO):
             # Should not raise FileNotFoundError
-            run_cmd_multi(["pypi", "npm"], [], {}, project_root=".")
+            run_cmd_multi(["pypi", "npm"], [], {}, ctx=_ctx())
 
         # Verify scaffold completed successfully
         ci_path = os.path.join(".github", "workflows", "ci.yml")

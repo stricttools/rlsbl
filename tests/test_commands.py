@@ -158,7 +158,7 @@ class TestScaffold:
         if force:
             flags["force"] = True
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd("npm", [], flags, project_root=".")
+            run_cmd("npm", [], flags, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
 
     def test_creates_changelog(self):
         self._run_scaffold()
@@ -409,7 +409,7 @@ class TestScaffold:
         assert ci_path in hashes_before
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd("npm", [], {}, project_root=".")
+            run_cmd("npm", [], {}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
 
         assert os.path.exists(ci_path)
 
@@ -1298,7 +1298,7 @@ class TestScaffoldAutoDetection:
         (mock_git_repo / "package.json").write_text(json.dumps(pkg))
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd("npm", [], {"no-tag": True}, project_root=".")
+            run_cmd("npm", [], {"no-tag": True}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
 
         config_path = mock_git_repo / ".rlsbl" / "config.json"
         assert config_path.exists(), ".rlsbl/config.json should be created"
@@ -1344,7 +1344,7 @@ class TestScaffoldUntrack:
 
         # Run scaffold (which writes .gitignore containing .credentials.json)
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd("npm", [], {"no-tag": True}, project_root=".")
+            run_cmd("npm", [], {"no-tag": True}, ctx=ProjectContext(project_root=Path("."), monorepo_root=None, config={}))
 
         # Verify it's no longer tracked
         result = subprocess.run(
