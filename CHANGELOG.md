@@ -2,6 +2,17 @@
 
 # Changelog
 
+## 0.51.0
+
+### Breaking
+
+- **Breaking.** Renamed `monorepo_root` to `workspace_root` on `ProjectContext`. Deleted `ProjectCheckContext` — all check functions now receive `ProjectContext` with pre-loaded config.
+- **Breaking.** All target methods (`template_vars`, `shared_template_mappings`, `read_name`, `write_version`, `publish`) now accept `ctx: ProjectContext` instead of `project_root`. Fixed latent bugs where dart `write_version` and docker `read_name` didn't receive config.
+
+### Features
+
+- **Internal.** Added `[tool.uv.sources]` for editable strictcli install.
+
 ## 0.50.0
 
 ### Breaking
