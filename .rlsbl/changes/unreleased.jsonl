@@ -2,3 +2,4 @@
 {"commits":["4ea63887a80bb79406ffd9f38db8a48050ff6672","579f3d6f6a248657e6f45e361cf964039f1bd23d","25fd0093b660958a10c8c82f110e9ca3b6987541"],"user_facing":true,"description":"**Breaking.** All target methods (`template_vars`, `shared_template_mappings`, `read_name`, `write_version`, `publish`) now accept `ctx: ProjectContext` instead of `project_root`. Fixed latent bugs where dart `write_version` and docker `read_name` didn't receive config.","type":"breaking"}
 {"commits":["853b2f79fd841055a050e71d3f5e28413bd3c4cd"],"user_facing":true,"description":"**Internal.** Added `[tool.uv.sources]` for editable strictcli install.","type":"feature"}
 {"commits":["38824cc7e1c10da0864645c8c7676ba6a3b75124"],"user_facing":false}
+{"commits":["0d77e11f56229be09553301e01fbc8cbb3f18021"],"user_facing":false}
