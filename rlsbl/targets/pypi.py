@@ -28,7 +28,7 @@ class PypiTarget(BaseTarget):
     def detect(self, dir_path):
         return os.path.exists(os.path.join(dir_path, "pyproject.toml"))
 
-    def read_name(self, dir_path, ctx=None):
+    def read_name(self, dir_path, ctx):
         """Read the project name from pyproject.toml."""
         toml_path = os.path.join(dir_path, "pyproject.toml")
         if not os.path.exists(toml_path):
@@ -66,7 +66,7 @@ class PypiTarget(BaseTarget):
         except KeyError:
             raise ValueError(f"No [project].version in {toml_path}")
 
-    def write_version(self, dir_path, version, ctx=None):
+    def write_version(self, dir_path, version, ctx):
         """Write a new version to pyproject.toml and __version__ in package source.
 
         Returns a list of relative file paths (relative to dir_path) that

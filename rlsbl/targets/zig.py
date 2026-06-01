@@ -61,7 +61,7 @@ class ZigTarget(BaseTarget):
         """Read version, delegating to zig_version helpers."""
         return read_zig_version(dir_path)
 
-    def write_version(self, dir_path, version, ctx=None):
+    def write_version(self, dir_path, version, ctx):
         """Write version, delegating to zig_version helpers.
 
         Returns a list of relative file paths that were modified.
@@ -76,7 +76,7 @@ class ZigTarget(BaseTarget):
             os.path.dirname(os.path.dirname(__file__)), "templates", "zig"
         )
 
-    def read_name(self, dir_path, ctx=None):
+    def read_name(self, dir_path, ctx):
         """Extract .name from build.zig.zon, or None."""
         return self._read_zon_field(dir_path, _ZON_NAME_RE)
 

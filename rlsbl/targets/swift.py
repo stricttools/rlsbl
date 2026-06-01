@@ -19,7 +19,7 @@ class SwiftTarget(BaseTarget):
     def detect(self, dir_path):
         return os.path.exists(os.path.join(dir_path, "Package.swift"))
 
-    def read_name(self, dir_path, ctx=None):
+    def read_name(self, dir_path, ctx):
         """Extract name from Package.swift."""
         package_path = os.path.join(dir_path, "Package.swift")
         if not os.path.exists(package_path):
@@ -43,7 +43,7 @@ class SwiftTarget(BaseTarget):
         with open(version_path, "r", encoding="utf-8") as f:
             return f.read().strip()
 
-    def write_version(self, dir_path, version, ctx=None):
+    def write_version(self, dir_path, version, ctx):
         """Write the new version to the VERSION file atomically.
 
         Returns a list of relative file paths that were modified.

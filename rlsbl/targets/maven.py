@@ -66,7 +66,7 @@ class MavenTarget(BaseTarget):
 
         return None
 
-    def read_name(self, dir_path, ctx=None):
+    def read_name(self, dir_path, ctx):
         """Read the project name (groupId:artifactId or group) from build files."""
         return self._read_project_name(dir_path)
 
@@ -156,7 +156,7 @@ class MavenTarget(BaseTarget):
 
         raise ValueError(f"Unknown format: {fmt}")
 
-    def write_version(self, dir_path, version, ctx=None):
+    def write_version(self, dir_path, version, ctx):
         """Write version to the same file it was read from.
 
         Returns a list of relative file paths (relative to dir_path) that

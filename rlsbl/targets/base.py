@@ -27,7 +27,7 @@ class BaseTarget:
         )
         return templates
 
-    def read_name(self, dir_path, ctx=None):
+    def read_name(self, dir_path, ctx):
         return None
 
     def read_metadata(self, dir_path):
@@ -59,7 +59,7 @@ class BaseTarget:
     def get_project_init_hint(self):
         return ""
 
-    def write_version(self, dir_path, version, ctx=None):
+    def write_version(self, dir_path, version, ctx):
         """Write a new version to the target's version file(s).
 
         Returns a list of relative file paths (relative to dir_path) that

@@ -50,7 +50,7 @@ class GoTarget(BaseTarget):
     def detect(self, dir_path):
         return os.path.exists(os.path.join(dir_path, "go.mod"))
 
-    def read_name(self, dir_path, ctx=None):
+    def read_name(self, dir_path, ctx):
         """Read the last segment of the module path from go.mod."""
         module_path = self._read_module_path(dir_path)
         if not module_path:
@@ -208,7 +208,7 @@ class GoTarget(BaseTarget):
         with open(version_path, "r", encoding="utf-8") as f:
             return f.read().strip()
 
-    def write_version(self, dir_path, version, ctx=None):
+    def write_version(self, dir_path, version, ctx):
         """Write the new version to the VERSION file.
 
         Returns a list of relative file paths that were modified.

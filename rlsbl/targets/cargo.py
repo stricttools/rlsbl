@@ -21,7 +21,7 @@ class CargoTarget(BaseTarget):
     def name(self):
         return "cargo"
 
-    def read_name(self, dir_path, ctx=None):
+    def read_name(self, dir_path, ctx):
         """Read the package name from Cargo.toml."""
         cargo_path = os.path.join(dir_path, "Cargo.toml")
         if not os.path.exists(cargo_path):
@@ -67,7 +67,7 @@ class CargoTarget(BaseTarget):
             raise ValueError(f"No [package].version in {cargo_path}")
         return str(doc["package"]["version"])
 
-    def write_version(self, dir_path, version, ctx=None):
+    def write_version(self, dir_path, version, ctx):
         """Write version to Cargo.toml using tomlkit round-trip (preserves comments).
 
         Returns a list of relative file paths that were modified.
@@ -186,7 +186,7 @@ class CargoTarget(BaseTarget):
         run("cargo", ["build", "--release"], cwd=dir_path)
 
         # Determine the binary name from Cargo.toml
-        name = self.read_name(dir_path) or ""
+        name = self.read_name(dir_path, ctx=None) or ""
         target_release = os.path.join(dir_path, "target", "release", name)
         if os.path.isfile(target_release):
             shutil.copy2(target_release, dist_dir)

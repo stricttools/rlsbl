@@ -48,7 +48,7 @@ class PgdesignTarget(BaseTarget):
             return os.path.join(dir_path, "schema")
         return dir_path
 
-    def read_name(self, dir_path, ctx=None):
+    def read_name(self, dir_path, ctx):
         """Return the directory name as the project name."""
         return os.path.basename(os.path.abspath(dir_path))
 
@@ -72,7 +72,7 @@ class PgdesignTarget(BaseTarget):
             )
         return str(project["version"])
 
-    def write_version(self, dir_path, version, ctx=None):
+    def write_version(self, dir_path, version, ctx):
         """Update [project].version in pgdesign.toml using tomlkit round-trip.
 
         Returns a list of relative file paths (relative to dir_path) that

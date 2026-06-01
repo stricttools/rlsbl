@@ -17,7 +17,7 @@ class SpecTarget(BaseTarget):
     def name(self):
         return "spec"
 
-    def read_name(self, dir_path, ctx=None):
+    def read_name(self, dir_path, ctx):
         """Return the directory name as the project name."""
         return os.path.basename(os.path.abspath(dir_path))
 
@@ -53,7 +53,7 @@ class SpecTarget(BaseTarget):
             data = json.load(f)
         return data["version"]
 
-    def write_version(self, dir_path, version, ctx=None):
+    def write_version(self, dir_path, version, ctx):
         """Write the new version to version.json atomically.
 
         Returns a list of relative file paths (relative to dir_path) that

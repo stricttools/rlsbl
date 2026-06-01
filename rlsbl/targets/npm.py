@@ -24,7 +24,7 @@ class NpmTarget(BaseTarget):
     def detect(self, dir_path):
         return os.path.exists(os.path.join(dir_path, "package.json"))
 
-    def read_name(self, dir_path, ctx=None):
+    def read_name(self, dir_path, ctx):
         """Read the package name from package.json."""
         pkg_path = os.path.join(dir_path, "package.json")
         if not os.path.exists(pkg_path):
@@ -88,7 +88,7 @@ class NpmTarget(BaseTarget):
             raise ValueError(f"No 'version' field in {pkg_path}")
         return pkg["version"]
 
-    def write_version(self, dir_path, version, ctx=None):
+    def write_version(self, dir_path, version, ctx):
         """Write a new version to package.json, preserving formatting.
 
         Returns a list of relative file paths that were modified.

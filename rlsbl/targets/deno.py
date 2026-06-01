@@ -24,7 +24,7 @@ class DenoTarget(BaseTarget):
             or os.path.exists(os.path.join(dir_path, "deno.jsonc"))
         )
 
-    def read_name(self, dir_path, ctx=None):
+    def read_name(self, dir_path, ctx):
         """Read the package name from deno.json."""
         config_path = self._config_path(dir_path)
         if not config_path:
@@ -71,7 +71,7 @@ class DenoTarget(BaseTarget):
             raise ValueError(f"No 'version' field in {config_path}")
         return data["version"]
 
-    def write_version(self, dir_path, version, ctx=None):
+    def write_version(self, dir_path, version, ctx):
         """Write a new version to deno.json or deno.jsonc.
 
         For deno.json, uses standard JSON rewrite preserving indent.

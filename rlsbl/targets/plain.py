@@ -30,7 +30,7 @@ class PlainTarget(BaseTarget):
         with open(version_path, "r", encoding="utf-8") as f:
             return f.read().strip()
 
-    def write_version(self, dir_path, version, ctx=None):
+    def write_version(self, dir_path, version, ctx):
         """Write the new version to the VERSION file and pyproject.toml atomically.
 
         Returns a list of relative file paths that were modified.

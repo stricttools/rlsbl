@@ -20,9 +20,9 @@ class DockerTarget(BaseTarget):
     def detect(self, dir_path):
         return os.path.exists(os.path.join(dir_path, "Dockerfile"))
 
-    def read_name(self, dir_path, ctx=None):
+    def read_name(self, dir_path, ctx):
         """Return image name from config or directory name."""
-        config = ctx.config if ctx else {}
+        config = ctx.config
         docker_config = config.get("docker", {})
         image = docker_config.get("image")
         if image:
@@ -43,7 +43,7 @@ class DockerTarget(BaseTarget):
         with open(version_path, "r", encoding="utf-8") as f:
             return f.read().strip()
 
-    def write_version(self, dir_path, version, ctx=None):
+    def write_version(self, dir_path, version, ctx):
         """Write the new version to the VERSION file atomically.
 
         Returns a list of relative file paths that were modified.
