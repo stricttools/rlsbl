@@ -244,13 +244,9 @@ def register_checks(app):
     @app.check("config-schema")
     def check_config_schema(ctx):
         """Validate .rlsbl/config.json schema: private key and publish config."""
-        from .config import read_json_config, validate_publish_config
+        from .config import validate_publish_config
 
-        config_path = os.path.join(str(ctx.project_root), ".rlsbl", "config.json")
-        if not os.path.exists(config_path):
-            return CheckResult("skip", "no .rlsbl/config.json")
-
-        config = read_json_config(config_path)
+        config = ctx.config
         errors = []
 
         if "private" not in config:
