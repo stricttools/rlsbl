@@ -439,3 +439,51 @@ class TestGoPublishInstall:
 
         captured = capsys.readouterr()
         assert "Warning: go install failed" in captured.out
+
+
+# ---------------------------------------------------------------------------
+# Test class 9: _is_library detection
+# ---------------------------------------------------------------------------
+
+
+class TestIsLibrary:
+    """Test that _is_library correctly identifies libraries vs executables."""
+
+    def test_is_library_root_main(self, tmp_path):
+        """Project with root-level `package main` is not a library."""
+        target = GoTarget()
+        (tmp_path / "go.mod").write_text("module github.com/user/mycli\n\ngo 1.21\n")
+        (tmp_path / "main.go").write_text("package main\n\nfunc main() {}\n")
+        assert target._is_library(str(tmp_path)) is False
+
+    def test_is_library_cmd_layout(self, tmp_path):
+        """Project with cmd/myapp/main.go but no root .go files is not a library."""
+        target = GoTarget()
+        (tmp_path / "go.mod").write_text("module github.com/user/mycli\n\ngo 1.21\n")
+        cmd_dir = tmp_path / "cmd" / "myapp"
+        cmd_dir.mkdir(parents=True)
+        (cmd_dir / "main.go").write_text("package main\n\nfunc main() {}\n")
+        assert target._is_library(str(tmp_path)) is False
+
+    def test_is_library_both(self, tmp_path):
+        """Project with both root main.go and cmd/ is not a library."""
+        target = GoTarget()
+        (tmp_path / "go.mod").write_text("module github.com/user/mycli\n\ngo 1.21\n")
+        (tmp_path / "main.go").write_text("package main\n\nfunc main() {}\n")
+        cmd_dir = tmp_path / "cmd" / "myapp"
+        cmd_dir.mkdir(parents=True)
+        (cmd_dir / "main.go").write_text("package main\n\nfunc main() {}\n")
+        assert target._is_library(str(tmp_path)) is False
+
+    def test_is_library_pure(self, tmp_path):
+        """Project with only `package foo` files is a library."""
+        target = GoTarget()
+        (tmp_path / "go.mod").write_text("module github.com/user/mylib\n\ngo 1.21\n")
+        (tmp_path / "mylib.go").write_text("package mylib\n\nfunc Hello() {}\n")
+        assert target._is_library(str(tmp_path)) is True
+
+    def test_is_library_no_go_files(self, tmp_path):
+        """Empty dir with no .go files defaults to library."""
+        target = GoTarget()
+        (tmp_path / "go.mod").write_text("module github.com/user/mylib\n\ngo 1.21\n")
+        assert target._is_library(str(tmp_path)) is True
