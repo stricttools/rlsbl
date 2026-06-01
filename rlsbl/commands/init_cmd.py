@@ -1172,19 +1172,36 @@ def _extract_jobs_section(lines):
     return job_lines
 
 
-def _generate_merged_publish(targets, template_vars):
+def _generate_merged_publish(targets, template_vars, target_paths=None):
     """Generate a merged publish.yml from individual target publish templates.
 
-    Reads each target's publish.yml.tpl, extracts jobs/permissions/env,
-    and composes a single workflow with all jobs merged.
-    """
-    templates_root = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates")
+    Reads each target's publish.yml.tpl, renders template variables, parses
+    as structured YAML, and merges on-triggers, permissions, env, and jobs
+    into a single workflow dict.
 
-    all_on_triggers = []
+    When *target_paths* is provided (a dict mapping target name to its
+    directory path), subdirectory targets get:
+    - ``defaults.run.working-directory`` injected into their jobs
+    - ``packages-dir`` rewritten for PyPI publish actions
+    - version-file inputs prefixed for setup actions
+    """
+    from copy import deepcopy
+    from io import StringIO
+
+    from ruamel.yaml import YAML
+
+    if target_paths is None:
+        target_paths = {}
+
+    templates_root = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates")
+    # Use round-trip loader to preserve flow-style sequences like
+    # ``types: [published]`` (safe loader loses flow vs block info).
+    yaml_loader = YAML(typ="rt")
+
+    all_on_triggers = {}
     all_permissions = []
-    all_env_entries = []
-    all_jobs = []
-    seen_env_keys = set()
+    merged_env = {}
+    merged_jobs = {}
 
     for target_name in targets:
         tpl_path = os.path.join(templates_root, target_name, "publish.yml.tpl")
@@ -1203,111 +1220,143 @@ def _generate_merged_publish(targets, template_vars):
             if key.startswith(prefix):
                 per_target_vars[key[len(prefix):]] = value
 
-        # Process template variables
+        # Process template variables, then parse as structured YAML.
+        # Unresolved {{var}} placeholders are not valid YAML (parsed as flow
+        # mappings).  Whole-line placeholders (block insertions like
+        # {{homebrewEnv}}) are dropped entirely.  Inline placeholders are
+        # sheltered as __UNRESOLVED__var__ strings before loading and
+        # restored after serialization.
         content, _ = process_template(raw, per_target_vars, template_path=tpl_path)
-        lines = content.splitlines(keepends=True)
-
-        # Extract top-level on block
-        on_block, lines = _extract_top_level_block(lines, "on")
-        if on_block:
-            all_on_triggers.append(_parse_on_triggers(on_block))
-
-        # Extract top-level permissions block
-        perm_block, lines = _extract_top_level_block(lines, "permissions")
-        if perm_block:
-            all_permissions.append(_parse_permissions(perm_block))
-
-        # Extract top-level env block
-        env_block, lines = _extract_top_level_block(lines, "env")
-        if env_block:
-            for k, full_line in _parse_env(env_block):
-                if k not in seen_env_keys:
-                    seen_env_keys.add(k)
-                    all_env_entries.append(full_line)
-
-        # Extract jobs section
-        job_lines = _extract_jobs_section(lines)
-        if not job_lines:
+        # Drop whole-line unresolved placeholders (block insertions)
+        content = re.sub(r"^[ \t]*\{\{\w+\}\}\s*$", "", content, flags=re.MULTILINE)
+        # Shelter remaining inline unresolved placeholders
+        content = re.sub(r"\{\{(\w+)\}\}", r"__UNRESOLVED__\1__", content)
+        data = yaml_loader.load(content)
+        if not isinstance(data, dict):
             continue
 
-        # Find the job key name (first non-blank, non-comment line at 2-space indent)
-        original_job_key = None
-        for jl in job_lines:
-            stripped = jl.rstrip()
-            if stripped and not stripped.startswith("#"):
-                # Should be like "  jobname:" at 2-space indent
-                match = re.match(r"^  (\S+):\s*$", stripped)
-                if match:
-                    original_job_key = match.group(1)
-                break
+        # Collect on-triggers (union, first non-empty sub-block wins)
+        on_block = data.get("on")
+        if isinstance(on_block, dict):
+            for trigger_key, trigger_val in on_block.items():
+                if trigger_key not in all_on_triggers:
+                    all_on_triggers[trigger_key] = trigger_val
+                elif all_on_triggers[trigger_key] is None and trigger_val is not None:
+                    all_on_triggers[trigger_key] = trigger_val
 
-        if original_job_key is None:
+        # Collect workflow-level permissions
+        perms = data.get("permissions")
+        if isinstance(perms, dict):
+            all_permissions.append(perms)
+
+        # Collect workflow-level env (first occurrence of each key wins)
+        env = data.get("env")
+        if isinstance(env, dict):
+            for k, v in env.items():
+                if k not in merged_env:
+                    merged_env[k] = v
+
+        # Extract and transform jobs
+        jobs = data.get("jobs")
+        if not isinstance(jobs, dict):
             continue
 
-        # Rename the job key to the target name for uniqueness
-        renamed_lines = []
-        key_replaced = False
-        for jl in job_lines:
-            if not key_replaced:
-                stripped = jl.rstrip()
-                if stripped and not stripped.startswith("#"):
-                    # Replace original job key with target name
-                    jl = jl.replace(f"  {original_job_key}:", f"  {target_name}:", 1)
-                    key_replaced = True
-            renamed_lines.append(jl)
+        target_path = target_paths.get(target_name, ".")
 
-        all_jobs.append(renamed_lines)
+        # Inject working-directory for subdirectory targets
+        if target_path != ".":
+            for job in jobs.values():
+                defaults = job.get("defaults") or {}
+                run_block = defaults.get("run") or {}
+                run_block["working-directory"] = target_path
+                defaults["run"] = run_block
+                job["defaults"] = defaults
 
-    # Compose the merged workflow
-    output_lines = []
-    output_lines.append("name: Publish\n")
-    output_lines.append("\n")
+        # Rewrite action paths for subdirectory targets
+        if target_path != ".":
+            _rewrite_action_paths_for_jobs(jobs, target_path)
 
-    # Merged on: triggers
-    merged_triggers = _merge_on_triggers(all_on_triggers)
-    output_lines.append("on:\n")
-    for trigger_key, sub_lines in merged_triggers.items():
-        if sub_lines:
-            output_lines.append(f"  {trigger_key}:\n")
-            for sl in sub_lines:
-                line = sl if sl.endswith("\n") else sl + "\n"
-                output_lines.append(line)
-        else:
-            output_lines.append(f"  {trigger_key}:\n")
+        # Rename job keys to target name for uniqueness
+        for original_key in list(jobs):
+            job = jobs.pop(original_key)
+            merged_jobs[target_name] = job
+            break  # Each template has one job; take the first
 
-    # Merged permissions
+    # Guarantee workflow_dispatch is present
+    if "workflow_dispatch" not in all_on_triggers:
+        all_on_triggers["workflow_dispatch"] = None
+
+    # Merge permissions (most permissive value per key)
     merged_perms = _merge_permissions(all_permissions)
+
+    # Compose the final workflow dict
+    workflow = {"name": "Publish"}
+    workflow["on"] = all_on_triggers
     if merged_perms:
-        output_lines.append("\n")
-        output_lines.append("permissions:\n")
-        for k in sorted(merged_perms):
-            output_lines.append(f"  {k}: {merged_perms[k]}\n")
+        workflow["permissions"] = dict(sorted(merged_perms.items()))
+    if merged_env:
+        workflow["env"] = merged_env
+    workflow["jobs"] = merged_jobs
 
-    # Merged env
-    if all_env_entries:
-        output_lines.append("\n")
-        output_lines.append("env:\n")
-        for entry in all_env_entries:
-            # Ensure the line is properly indented (should already be 2-space)
-            line = entry if entry.endswith("\n") else entry + "\n"
-            output_lines.append(line)
+    # Serialize with ruamel.yaml
+    yml = YAML()
+    yml.default_flow_style = False
 
-    # Jobs
-    output_lines.append("\n")
-    output_lines.append("jobs:\n")
-    for i, job_lines in enumerate(all_jobs):
-        # Strip trailing blank lines from previous job
-        if i > 0:
-            # Add a blank line between jobs
-            output_lines.append("\n")
-        for jl in job_lines:
-            line = jl if jl.endswith("\n") else jl + "\n"
-            output_lines.append(line)
+    # Use flow style for short lists (e.g., types: [published])
+    from ruamel.yaml.representer import RoundTripRepresenter
 
-    # Remove trailing blank lines
-    result = "".join(output_lines)
+    def _str_representer(representer, data):
+        if "\n" in data:
+            return representer.represent_scalar(
+                "tag:yaml.org,2002:str", data, style="|"
+            )
+        return representer.represent_scalar("tag:yaml.org,2002:str", data)
+
+    yml.representer.add_representer(str, _str_representer)
+
+    stream = StringIO()
+    yml.dump(workflow, stream)
+    result = stream.getvalue()
+    # Restore sheltered template placeholders
+    result = re.sub(r"__UNRESOLVED__(\w+)__", r"{{\1}}", result)
     result = result.rstrip("\n") + "\n"
     return result
+
+
+# Action inputs that contain file paths and need subdirectory prefixing
+_SETUP_VERSION_FILE_KEYS = {
+    "actions/setup-go": "go-version-file",
+    "actions/setup-python": "python-version-file",
+    "actions/setup-node": "node-version-file",
+}
+
+
+def _rewrite_action_paths_for_jobs(jobs, project_path):
+    """Rewrite action inputs with file paths so they are relative to *project_path*.
+
+    Modifies *jobs* in place. Handles:
+    - ``pypa/gh-action-pypi-publish``: sets ``with.packages-dir``
+    - ``actions/setup-{go,python,node}``: prefixes version-file paths
+    """
+    for job in jobs.values():
+        for step in job.get("steps", []):
+            uses = step.get("uses", "")
+
+            # PyPI publish action
+            if "pypa/gh-action-pypi-publish" in uses:
+                with_block = step.setdefault("with", {})
+                with_block["packages-dir"] = f"{project_path}/dist/"
+
+            # Setup actions with version-file inputs
+            for action_substring, version_key in _SETUP_VERSION_FILE_KEYS.items():
+                if action_substring in uses:
+                    with_block = step.get("with", {})
+                    if version_key in with_block:
+                        val = with_block[version_key]
+                        if isinstance(val, str) and not val.startswith(
+                            f"{project_path}/"
+                        ):
+                            with_block[version_key] = f"{project_path}/{val}"
 
 
 def _merge_template_vars(registries_list, primary, target_paths, ctx):
@@ -1489,7 +1538,7 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         merged_plans = []
         if not private:
             publish_target = os.path.join(".github", "workflows", "publish.yml")
-            merged_content = _generate_merged_publish(registries_list, vars_dict)
+            merged_content = _generate_merged_publish(registries_list, vars_dict, target_paths)
             merged_plans = [_plan_merged_publish(
                 publish_target, merged_content, force,
             )]
