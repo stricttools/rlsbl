@@ -675,6 +675,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
     monorepo_name = None
     monorepo_project_path = None
     is_library = False
+    is_internal = False
 
     if monorepo_root:
         project = resolve_project(monorepo_root, str(project_root))
@@ -685,6 +686,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
         monorepo_name = project["name"]
         monorepo_project_path = project["path"]
         is_library = bool(project.get("library"))
+        is_internal = bool(project.get("internal"))
         log(f"Monorepo project: {monorepo_name} ({monorepo_project_path})")
 
     # Scoped version directory: absolute path to the project within the monorepo,
@@ -744,47 +746,67 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
         print(f'Error: tag "{tag}" already exists.', file=sys.stderr)
         sys.exit(1)
 
-    # Validate JSONL changelog
-    if not changes_dir_exists(version_dir):
-        print(
-            "Error: JSONL changelog not set up. Run 'rlsbl scaffold' to create .rlsbl/changes/",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    changes_dir = get_changes_dir(version_dir)
-    tag_glob = target.monorepo_tag_glob(monorepo_name, path=monorepo_project_path) if monorepo_name else None
-    # In monorepo mode, pass the project dict so coverage/range checks
-    # only consider commits touching this package's files.
-    monorepo_project = project if monorepo_name else None
-    validation = validate_unreleased(changes_dir, tag_glob=tag_glob, project=monorepo_project, config=config)
-    if not validation["passed"]:
-        print("Error: JSONL changelog validation failed:", file=sys.stderr)
-        for check_name, (passed, details) in validation["checks"].items():
-            if not passed:
-                for detail in details:
-                    print(f"  {check_name}: {detail}", file=sys.stderr)
-        sys.exit(1)
-    # Compute the changelog content in memory only. We defer writing CHANGELOG.md
-    # (and per-version .md files) to disk until after pre-release checks pass,
-    # so that an aborted release leaves the working tree exactly as it was.
-    # The actual write to disk happens just after acquire_lock() below.
-    changelog_content = generate_changelog(version_dir, write_to_disk=False, version_override=new_version)
-    log("Generated CHANGELOG.md from JSONL entries (in-memory preview)")
-
-    if isinstance(changelog_content, str):
-        changelog_entry = extract_changelog_entry_from_text(changelog_content, new_version)
+    # Validate JSONL changelog (skipped for internal projects)
+    if monorepo_name and is_internal:
+        log("Internal project: skipping changelog validation")
+        # Still generate CHANGELOG.md if the changes dir exists
+        if changes_dir_exists(version_dir):
+            changes_dir = get_changes_dir(version_dir)
+            changelog_content = generate_changelog(version_dir, write_to_disk=False, version_override=new_version)
+            log("Generated CHANGELOG.md from JSONL entries (in-memory preview)")
+            if isinstance(changelog_content, str):
+                changelog_entry = extract_changelog_entry_from_text(changelog_content, new_version)
+            else:
+                changelog_path = os.path.join(version_dir, "CHANGELOG.md")
+                if os.path.exists(changelog_path):
+                    changelog_entry = extract_changelog_entry(changelog_path, new_version)
+                else:
+                    changelog_entry = None
+        else:
+            changes_dir = None
+            changelog_content = None
+            changelog_entry = None
     else:
-        # Mocked in tests (returns MagicMock). Fall back to the on-disk file,
-        # which test fixtures pre-populate with a known entry.
-        changelog_path = os.path.join(version_dir, "CHANGELOG.md")
-        if not os.path.exists(changelog_path):
+        if not changes_dir_exists(version_dir):
             print(
-                "Error: CHANGELOG.md not found after generation.",
+                "Error: JSONL changelog not set up. Run 'rlsbl scaffold' to create .rlsbl/changes/",
                 file=sys.stderr,
             )
             sys.exit(1)
-        changelog_entry = extract_changelog_entry(changelog_path, new_version)
+
+        changes_dir = get_changes_dir(version_dir)
+        tag_glob = target.monorepo_tag_glob(monorepo_name, path=monorepo_project_path) if monorepo_name else None
+        # In monorepo mode, pass the project dict so coverage/range checks
+        # only consider commits touching this package's files.
+        monorepo_project = project if monorepo_name else None
+        validation = validate_unreleased(changes_dir, tag_glob=tag_glob, project=monorepo_project, config=config)
+        if not validation["passed"]:
+            print("Error: JSONL changelog validation failed:", file=sys.stderr)
+            for check_name, (passed, details) in validation["checks"].items():
+                if not passed:
+                    for detail in details:
+                        print(f"  {check_name}: {detail}", file=sys.stderr)
+            sys.exit(1)
+        # Compute the changelog content in memory only. We defer writing CHANGELOG.md
+        # (and per-version .md files) to disk until after pre-release checks pass,
+        # so that an aborted release leaves the working tree exactly as it was.
+        # The actual write to disk happens just after acquire_lock() below.
+        changelog_content = generate_changelog(version_dir, write_to_disk=False, version_override=new_version)
+        log("Generated CHANGELOG.md from JSONL entries (in-memory preview)")
+
+        if isinstance(changelog_content, str):
+            changelog_entry = extract_changelog_entry_from_text(changelog_content, new_version)
+        else:
+            # Mocked in tests (returns MagicMock). Fall back to the on-disk file,
+            # which test fixtures pre-populate with a known entry.
+            changelog_path = os.path.join(version_dir, "CHANGELOG.md")
+            if not os.path.exists(changelog_path):
+                print(
+                    "Error: CHANGELOG.md not found after generation.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            changelog_entry = extract_changelog_entry(changelog_path, new_version)
 
     # In monorepo mode, hooks/tests/lint must run from the project subdirectory.
     abs_project_dir = os.path.join(monorepo_root, monorepo_project_path) if monorepo_root else None
@@ -889,7 +911,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
             if subtree_remote:
                 plain_tag = target.tag_format(new_version)
                 log(f"Subtree:   {subtree_remote} (tag: {plain_tag})")
-        log(f"Changelog:\n{changelog_entry}")
+        log(f"Changelog:\n{changelog_entry or '(none)'}")
         log("--- No changes made ---")
         return
 
@@ -909,7 +931,8 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
     # Pass version_override so the section heading is "## X.Y.Z" from the
     # start; finalize_version() below renames unreleased.jsonl in place, and
     # no further changelog regeneration is needed.
-    generate_changelog(version_dir, version_override=new_version)
+    if changes_dir is not None:
+        generate_changelog(version_dir, version_override=new_version)
 
     try:
         _run_release_mutating(
@@ -1314,22 +1337,25 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
         # CHANGELOG.md already has the correct "## X.Y.Z" heading because the
         # earlier generate_changelog() call (above acquire_lock) was passed
         # version_override=new_version, so no regeneration is needed here.
-        changes_dir = get_changes_dir(version_dir)
-        tag_glob = target.monorepo_tag_glob(monorepo_name, path=monorepo_project_path) if monorepo_name else None
-        finalize_version(changes_dir, new_version, tag_glob=tag_glob)
-        generate_version_file(changes_dir, new_version)
-        log(f"Finalized JSONL changelog for {new_version}")
-        # Commit the finalized JSONL file and the new empty unreleased.jsonl
-        jsonl_finalized = _rel_to_git_root(os.path.join(changes_dir, f"{new_version}.jsonl"), _git_root)
-        jsonl_unreleased = _rel_to_git_root(os.path.join(changes_dir, "unreleased.jsonl"), _git_root)
-        # Also commit the generated per-version .md file if it exists
-        jsonl_md = _rel_to_git_root(os.path.join(changes_dir, f"{new_version}.md"), _git_root)
-        changelog_file = vpath("CHANGELOG.md")
-        finalize_files = [jsonl_finalized, jsonl_unreleased, changelog_file]
-        if os.path.exists(jsonl_md):
-            finalize_files.append(jsonl_md)
-        commit_files(f"chore: finalize changelog for {new_version}", finalize_files, cwd=_git_root)
-        log(f"Committed finalized changelog files")
+        if changes_dir_exists(version_dir):
+            changes_dir = get_changes_dir(version_dir)
+            tag_glob = target.monorepo_tag_glob(monorepo_name, path=monorepo_project_path) if monorepo_name else None
+            finalize_version(changes_dir, new_version, tag_glob=tag_glob)
+            generate_version_file(changes_dir, new_version)
+            log(f"Finalized JSONL changelog for {new_version}")
+            # Commit the finalized JSONL file and the new empty unreleased.jsonl
+            jsonl_finalized = _rel_to_git_root(os.path.join(changes_dir, f"{new_version}.jsonl"), _git_root)
+            jsonl_unreleased = _rel_to_git_root(os.path.join(changes_dir, "unreleased.jsonl"), _git_root)
+            # Also commit the generated per-version .md file if it exists
+            jsonl_md = _rel_to_git_root(os.path.join(changes_dir, f"{new_version}.md"), _git_root)
+            changelog_file = vpath("CHANGELOG.md")
+            finalize_files = [jsonl_finalized, jsonl_unreleased, changelog_file]
+            if os.path.exists(jsonl_md):
+                finalize_files.append(jsonl_md)
+            commit_files(f"chore: finalize changelog for {new_version}", finalize_files, cwd=_git_root)
+            log(f"Committed finalized changelog files")
+        else:
+            log("No .rlsbl/changes/ directory; skipping changelog finalization")
 
         # Finalize release file: rename unreleased.toml to vX.Y.Z.toml
         # Only if the release file exists (backward compat with legacy path)
@@ -1404,7 +1430,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
     writing_file = notes_file + ".writing"
     try:
         with open(writing_file, "w", encoding="utf-8") as f:
-            f.write(changelog_entry)
+            f.write(changelog_entry or "")
         os.rename(writing_file, notes_file)
         run("gh", ["release", "create", tag, "--title", tag, "--notes-file", notes_file])
         log(f"Created GitHub Release: {tag}")
