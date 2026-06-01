@@ -8,7 +8,7 @@ source imports against manifest-declared dependencies.
 import os
 import tomllib
 
-from .import_scanners import DartImportScanner, PythonImportScanner
+from .import_scanners import DartImportScanner, NpmImportScanner, PythonImportScanner
 from .workspace import WORKSPACE_DIR
 
 
@@ -62,7 +62,7 @@ def _get_imported_workspace_packages(
     lib_imports: set[str] = set()
     test_imports: set[str] = set()
 
-    for scanner in (PythonImportScanner(), DartImportScanner()):
+    for scanner in (PythonImportScanner(), DartImportScanner(), NpmImportScanner()):
         try:
             results = scanner.scan(project_dir, workspace_names)
         except RuntimeError:

@@ -1,4 +1,4 @@
-"""Python and Dart import scanners for dependency-import validation.
+"""Python, Dart, and npm import scanners for dependency-import validation.
 
 Filters raw import data to workspace-relevant imports, handles
 language-specific edge cases, and distinguishes lib/ vs test/ contexts.
@@ -9,6 +9,7 @@ import re
 import sys
 from dataclasses import dataclass
 
+from .lint.npm_ast import NpmAstLinter
 from .lint.python_ast import PythonAstLinter
 from .lint.utils import walk_source_files
 from .targets.utils import normalize_pypi
@@ -182,3 +183,98 @@ class DartImportScanner:
             f"build.yaml exists in {project_path} but no .g.dart files found. "
             "Run the build_runner code generator (e.g. 'dart run build_runner build')."
         )
+
+
+# Node.js built-in modules to exclude from npm import scanning.
+_NODE_BUILTINS = frozenset({
+    "assert", "async_hooks", "buffer", "child_process", "cluster",
+    "console", "constants", "crypto", "dgram", "diagnostics_channel",
+    "dns", "domain", "events", "fs", "http", "http2", "https",
+    "inspector", "module", "net", "os", "path", "perf_hooks",
+    "process", "punycode", "querystring", "readline", "repl",
+    "stream", "string_decoder", "sys", "timers", "tls", "trace_events",
+    "tty", "url", "util", "v8", "vm", "wasi", "worker_threads", "zlib",
+})
+
+
+def _extract_npm_bare_name(specifier: str) -> str | None:
+    """Extract bare package name from an npm import specifier.
+
+    Returns None for relative imports, Node.js builtins, and
+    node:-prefixed builtins. For scoped packages (@scope/pkg/foo),
+    returns @scope/pkg. For unscoped (pkg/foo), returns pkg.
+    """
+    # Skip relative imports
+    if specifier.startswith(".") or specifier.startswith("/"):
+        return None
+
+    # Strip node: prefix and skip builtins
+    bare = specifier.removeprefix("node:")
+    if bare in _NODE_BUILTINS:
+        return None
+    # node: prefix with subpath (e.g. node:fs/promises)
+    if specifier.startswith("node:"):
+        return None
+
+    # Scoped package: @scope/pkg or @scope/pkg/subpath
+    if specifier.startswith("@"):
+        parts = specifier.split("/")
+        if len(parts) < 2:
+            # Malformed scoped import (just @scope)
+            return None
+        return f"{parts[0]}/{parts[1]}"
+
+    # Unscoped: pkg or pkg/subpath
+    return specifier.split("/")[0]
+
+
+class NpmImportScanner:
+    """Scan JS/TS source files for workspace-relevant imports.
+
+    Uses the AST-based scanner from the npm lint system, then
+    post-processes to filter out relative imports, Node.js builtins,
+    and non-workspace packages.
+    """
+
+    def scan(
+        self,
+        project_path: str,
+        workspace_names: set[str],
+    ) -> list[ImportInfo]:
+        """Scan project_path for JS/TS imports matching workspace members.
+
+        Args:
+            project_path: absolute path to the project root.
+            workspace_names: set of workspace member package names
+                (as they appear in package.json, e.g. "@scope/my-lib").
+
+        Returns:
+            list of ImportInfo for imports that match workspace members.
+        """
+        project_path = os.path.abspath(project_path)
+
+        # Build normalized lookup: lowercase name -> original name
+        normalized_lookup = {
+            name.lower(): name for name in workspace_names
+        }
+
+        linter = NpmAstLinter()
+        raw_imports = linter.scan_imports(project_path)
+
+        results = []
+        for specifier, filepath, line_number in raw_imports:
+            bare = _extract_npm_bare_name(specifier)
+            if bare is None:
+                continue
+
+            # npm names are case-insensitive
+            normalized = bare.lower()
+            if normalized in normalized_lookup:
+                results.append(ImportInfo(
+                    package_name=normalized_lookup[normalized],
+                    file_path=filepath,
+                    line_number=line_number,
+                    is_test_context=_is_test_context(filepath, project_path),
+                ))
+
+        return results
