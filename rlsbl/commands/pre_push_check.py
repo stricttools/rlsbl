@@ -367,6 +367,9 @@ def _run_monorepo_check(workspace_root, projects, changed_files, refs=None):
 
     failures = []
     for proj in affected:
+        if proj.get("internal"):
+            continue
+
         proj_dir = os.path.join(workspace_root, proj["path"])
 
         # Gitignore guard: block if rlsbl-managed files are gitignored

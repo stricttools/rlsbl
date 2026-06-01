@@ -496,6 +496,9 @@ def register_checks(app):
             return CheckResult("skip", "no .rlsbl/changes/ directory")
         _changes_dir, tag_glob, project, entries = info
 
+        if project is not None and project.get("internal"):
+            return CheckResult("skip", "internal project")
+
         passed, details = check_coverage(entries, tag_glob, project=project)
 
         if passed:
@@ -543,7 +546,10 @@ def register_checks(app):
         info = _get_changelog_context(ctx)
         if info is None:
             return CheckResult("skip", "no .rlsbl/changes/ directory")
-        _changes_dir, _tag_glob, _project, entries = info
+        _changes_dir, _tag_glob, project, entries = info
+
+        if project is not None and project.get("internal"):
+            return CheckResult("skip", "internal project")
 
         passed, details = check_has_user_facing(entries)
         if passed:
