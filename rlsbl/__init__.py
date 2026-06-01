@@ -287,7 +287,9 @@ def cmd_release_retry(dry_run, yes, quiet, watch, no_watch, **_kwargs):
 @strictcli.flag(name="json", type=bool, help="Output status as JSON")
 def cmd_status(target, json, **_kwargs):
     root = _require_project_root()
-    ctx = create_context(root)
+    from .workspace import find_workspace_root
+    ws_root = find_workspace_root(str(root))
+    ctx = create_context(root, workspace_root=Path(ws_root) if ws_root else None)
     registry = _resolve_target(target or None)
     flags = {"json": json}
     from .commands.status import run_cmd
