@@ -60,6 +60,7 @@ def _cmd_add(args, flags, project_root):
     subtree_remote = flags.get("subtree-remote")
     depends_on_raw = flags.get("depends-on")
     library_raw = flags.get("library")
+    internal_raw = flags.get("internal")
 
     # Parse --library as boolean
     library = None
@@ -70,6 +71,17 @@ def _cmd_add(args, flags, project_root):
             library = False
         else:
             print(f"Error: --library must be 'true' or 'false', got '{library_raw}'.", file=sys.stderr)
+            sys.exit(1)
+
+    # Parse --internal as boolean
+    internal = None
+    if internal_raw is not None:
+        if internal_raw == "true":
+            internal = True
+        elif internal_raw == "false":
+            internal = False
+        else:
+            print(f"Error: --internal must be 'true' or 'false', got '{internal_raw}'.", file=sys.stderr)
             sys.exit(1)
 
     start = str(project_root)
@@ -108,6 +120,8 @@ def _cmd_add(args, flags, project_root):
         project["depends_on"] = depends_on
     if library is True:
         project["library"] = True
+    if internal is True:
+        project["internal"] = True
     projects.append(project)
     save_workspace(root, projects)
     print(f"Added project '{name}' at {path}")
@@ -296,23 +310,29 @@ def _cmd_status(flags, project_root):
         # Library flag
         library_str = "yes" if proj.get("library", False) else ""
 
+        # Internal flag
+        internal_str = "yes" if proj.get("internal", False) else ""
+
         # Subtree remote
         remote = proj.get("subtree_remote", "")
         remote_str = remote if remote else "-"
 
-        rows.append((name, path, target_name, version, latest_tag, unreleased_str, library_str, deps_str, rdeps_str, watch_str, remote_str))
+        rows.append((name, path, target_name, version, latest_tag, unreleased_str, library_str, internal_str, deps_str, rdeps_str, watch_str, remote_str))
 
     # Determine which dynamic columns to show
     any_library = any(row[6] != "" for row in rows)
-    any_deps = any(row[7] != "0" for row in rows)
-    any_rdeps = any(row[8] != "0" for row in rows)
-    any_watch = any(row[9] != "-" for row in rows)
-    any_remote = any(row[10] != "-" for row in rows)
+    any_internal = any(row[7] != "" for row in rows)
+    any_deps = any(row[8] != "0" for row in rows)
+    any_rdeps = any(row[9] != "0" for row in rows)
+    any_watch = any(row[10] != "-" for row in rows)
+    any_remote = any(row[11] != "-" for row in rows)
 
     # Calculate column widths
     base_headers = ("Project", "Path", "Target", "Version", "Tag", "Unreleased")
     if any_library:
         base_headers = base_headers + ("Library",)
+    if any_internal:
+        base_headers = base_headers + ("Internal",)
     if any_deps:
         base_headers = base_headers + ("Deps",)
     if any_rdeps:
@@ -329,14 +349,16 @@ def _cmd_status(flags, project_root):
         cells = list(row[:6])  # base columns: name, path, target, version, tag, unreleased
         if any_library:
             cells.append(row[6])
-        if any_deps:
+        if any_internal:
             cells.append(row[7])
-        if any_rdeps:
+        if any_deps:
             cells.append(row[8])
-        if any_watch:
+        if any_rdeps:
             cells.append(row[9])
-        if any_remote:
+        if any_watch:
             cells.append(row[10])
+        if any_remote:
+            cells.append(row[11])
         display_rows.append(tuple(cells))
 
     widths = [len(h) for h in headers]

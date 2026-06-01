@@ -287,10 +287,11 @@ def cmd_release_retry(dry_run, yes, quiet, watch, no_watch, **_kwargs):
 @strictcli.flag(name="json", type=bool, help="Output status as JSON")
 def cmd_status(target, json, **_kwargs):
     root = _require_project_root()
+    ctx = create_context(root)
     registry = _resolve_target(target or None)
     flags = {"json": json}
     from .commands.status import run_cmd
-    run_cmd(registry, [], flags, project_root=root)
+    run_cmd(registry, [], flags, ctx=ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -535,9 +536,10 @@ def cmd_targets(**_kwargs):
 @strictcli.flag(name="duration", type=str, help="Duration in seconds", default="10")
 def cmd_record_gif(width, height, font_size, duration, **_kwargs):
     root = _require_project_root()
+    ctx = create_context(root)
     flags = {"width": width, "height": height, "font-size": font_size, "duration": duration}
     from .commands.record_gif import run_cmd
-    run_cmd(None, [], flags, project_root=root)
+    run_cmd(None, [], flags, ctx=ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -665,9 +667,10 @@ def cmd_mono_init(no_commit, **_kwargs):
 @strictcli.flag(name="subtree-remote", type=str, help="Subtree remote URL", default="")
 @strictcli.flag(name="depends-on", type=str, help="Comma-separated dependency project names", default="")
 @strictcli.flag(name="library", type=str, help="Mark as library (true/false)", default="")
+@strictcli.flag(name="internal", type=str, help="Mark as internal (true/false)", default="")
 @strictcli.flag(name="no-commit", type=bool, help="Skip auto-commit of workspace.toml and suppress commits from auto-triggered scaffold/sync")
 @strictcli.arg(name="path", help="Path to the project directory")
-def cmd_mono_add(name, target, watch, subtree_remote, depends_on, library, no_commit, path, **_kwargs):
+def cmd_mono_add(name, target, watch, subtree_remote, depends_on, library, internal, no_commit, path, **_kwargs):
     root = _require_project_root()
     flags = {}
     if name:
@@ -682,6 +685,8 @@ def cmd_mono_add(name, target, watch, subtree_remote, depends_on, library, no_co
         flags["depends-on"] = depends_on
     if library:
         flags["library"] = library
+    if internal:
+        flags["internal"] = internal
     if no_commit:
         flags["no-commit"] = True
     from .commands.monorepo import _cmd_add
