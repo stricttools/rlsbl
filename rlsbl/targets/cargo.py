@@ -180,13 +180,13 @@ class CargoTarget(BaseTarget):
             )
         return mappings
 
-    def build_assets(self, dir_path, version, dist_dir):
+    def build_assets(self, dir_path, version, dist_dir, ctx=None):
         """Build Rust binary in release mode and copy to dist_dir."""
         os.makedirs(dist_dir, exist_ok=True)
         run("cargo", ["build", "--release"], cwd=dir_path)
 
         # Determine the binary name from Cargo.toml
-        name = self.read_name(dir_path, ctx=None) or ""
+        name = self.read_name(dir_path, ctx=ctx) or ""
         target_release = os.path.join(dir_path, "target", "release", name)
         if os.path.isfile(target_release):
             shutil.copy2(target_release, dist_dir)
