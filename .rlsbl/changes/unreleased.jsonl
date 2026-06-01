@@ -9,3 +9,4 @@
 {"commits":["12eb51717fea3790743eea3a936daafe5cea3a63","2a0ad030a4e27eddb04819305df1b6edf767df9b"],"user_facing":true,"description":"**Fix.** Standalone multi-target publish workflows now inject `working-directory`, `packages-dir`, and version-file paths for targets in subdirectories. Refactored to structured YAML.","type":"fix"}
 {"commits":["57f9ff7ba4bdc778fee621dee9c0a7b2a48227c5","0c5b51f3a13e232b11dc1086821ba8e1f9bea42b","14de6389d671556aaff4e68ed78165ddff613859"],"user_facing":false}
 {"commits":["7c4c5a35fbe9e6177be77978d69e258f4650f832"],"user_facing":false}
+{"commits":["d9baa8570f7940fa3c056fa4821ed5eb8b08801c","4b8bd9f5d28e8f64afe4ea151475018b7cde9864","49a1cfac543d256266936ac6d0fced7939c1e5b3","fcaf22b5e004338a4e3deaa85ee2f5c9d54db7c6"],"user_facing":false}
