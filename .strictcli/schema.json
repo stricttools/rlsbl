@@ -612,6 +612,12 @@
               "default": ""
             },
             {
+              "name": "internal",
+              "type": "str",
+              "help": "Mark as internal (true/false)",
+              "default": ""
+            },
+            {
               "name": "no-commit",
               "type": "bool",
               "help": "Skip auto-commit of workspace.toml and suppress commits from auto-triggered scaffold/sync",
