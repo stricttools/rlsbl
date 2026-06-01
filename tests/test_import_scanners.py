@@ -1,10 +1,15 @@
-"""Tests for rlsbl.import_scanners -- Python and Dart import scanners."""
+"""Tests for rlsbl.import_scanners -- Python, Dart, and npm import scanners."""
 
 import os
 
 import pytest
 
-from rlsbl.import_scanners import DartImportScanner, ImportInfo, PythonImportScanner
+from rlsbl.import_scanners import (
+    DartImportScanner,
+    ImportInfo,
+    NpmImportScanner,
+    PythonImportScanner,
+)
 
 # Minimal pyproject.toml so language detection finds Python
 _PYPROJECT = '[project]\nname = "example"\n'
@@ -251,6 +256,148 @@ class TestDartImportScanner:
         scanner = DartImportScanner()
         results = scanner.scan(str(tmp_path), {"models"})
         assert results == []
+
+
+class TestNpmImportScanner:
+    """NpmImportScanner detects JS/TS imports from workspace packages."""
+
+    def test_finds_workspace_import(self, tmp_path):
+        """A JS file importing a workspace package is detected."""
+        (tmp_path / "index.js").write_text(
+            "const auth = require('auth');\n"
+        )
+        scanner = NpmImportScanner()
+        results = scanner.scan(str(tmp_path), {"auth"})
+        assert len(results) == 1
+        assert results[0].package_name == "auth"
+        assert results[0].is_test_context is False
+
+    def test_ignores_relative(self, tmp_path):
+        """Relative imports (./foo, ../bar) are excluded."""
+        (tmp_path / "index.js").write_text(
+            "import './foo';\n"
+            "import '../bar';\n"
+            "import '/absolute/path';\n"
+        )
+        scanner = NpmImportScanner()
+        results = scanner.scan(str(tmp_path), {"foo", "bar"})
+        assert results == []
+
+    def test_ignores_builtin(self, tmp_path):
+        """Node.js built-in modules (fs, path, crypto, etc.) are excluded."""
+        (tmp_path / "index.ts").write_text(
+            "import fs from 'fs';\n"
+            "import path from 'path';\n"
+            "import crypto from 'crypto';\n"
+            "import http from 'http';\n"
+            "import os from 'os';\n"
+            "import { spawn } from 'child_process';\n"
+        )
+        scanner = NpmImportScanner()
+        results = scanner.scan(
+            str(tmp_path), {"fs", "path", "crypto", "http", "os", "child_process"}
+        )
+        assert results == []
+
+    def test_ignores_node_prefixed_builtin(self, tmp_path):
+        """node:-prefixed builtins (node:fs, node:path) are excluded."""
+        (tmp_path / "index.ts").write_text(
+            "import fs from 'node:fs';\n"
+            "import { join } from 'node:path';\n"
+            "import { readFile } from 'node:fs/promises';\n"
+        )
+        scanner = NpmImportScanner()
+        results = scanner.scan(str(tmp_path), {"fs", "path"})
+        assert results == []
+
+    def test_scoped_package(self, tmp_path):
+        """Scoped package @scope/pkg is detected when in workspace_names."""
+        (tmp_path / "index.ts").write_text(
+            "import { thing } from '@myorg/utils';\n"
+        )
+        scanner = NpmImportScanner()
+        results = scanner.scan(str(tmp_path), {"@myorg/utils"})
+        assert len(results) == 1
+        assert results[0].package_name == "@myorg/utils"
+
+    def test_scoped_package_with_subpath(self, tmp_path):
+        """@scope/pkg/subpath extracts @scope/pkg as the bare name."""
+        (tmp_path / "index.ts").write_text(
+            "import { helper } from '@myorg/utils/helpers';\n"
+        )
+        scanner = NpmImportScanner()
+        results = scanner.scan(str(tmp_path), {"@myorg/utils"})
+        assert len(results) == 1
+        assert results[0].package_name == "@myorg/utils"
+
+    def test_test_context(self, tmp_path):
+        """Import in a tests/ directory has is_test_context=True."""
+        tests_dir = tmp_path / "tests"
+        tests_dir.mkdir()
+        (tests_dir / "test_app.js").write_text(
+            "const auth = require('auth');\n"
+        )
+        scanner = NpmImportScanner()
+        results = scanner.scan(str(tmp_path), {"auth"})
+        assert len(results) == 1
+        assert results[0].is_test_context is True
+
+    def test_bare_name_extraction(self, tmp_path):
+        """import 'pkg/subpath' extracts bare name 'pkg'."""
+        (tmp_path / "index.js").write_text(
+            "import 'mylib/utils/helpers';\n"
+        )
+        scanner = NpmImportScanner()
+        results = scanner.scan(str(tmp_path), {"mylib"})
+        assert len(results) == 1
+        assert results[0].package_name == "mylib"
+
+    def test_case_insensitive_matching(self, tmp_path):
+        """npm names are case-insensitive: MyLib matches mylib."""
+        (tmp_path / "index.js").write_text(
+            "import MyLib from 'MyLib';\n"
+        )
+        scanner = NpmImportScanner()
+        results = scanner.scan(str(tmp_path), {"mylib"})
+        assert len(results) == 1
+        assert results[0].package_name == "mylib"
+
+    def test_non_workspace_import_excluded(self, tmp_path):
+        """Imports of packages not in workspace_names are excluded."""
+        (tmp_path / "index.js").write_text(
+            "import express from 'express';\n"
+            "import auth from 'auth';\n"
+        )
+        scanner = NpmImportScanner()
+        results = scanner.scan(str(tmp_path), {"auth"})
+        assert len(results) == 1
+        assert results[0].package_name == "auth"
+
+    def test_empty_project_returns_empty(self, tmp_path):
+        """A project with no JS/TS files returns an empty list."""
+        scanner = NpmImportScanner()
+        results = scanner.scan(str(tmp_path), {"auth"})
+        assert results == []
+
+    def test_typescript_file(self, tmp_path):
+        """TypeScript (.ts) files are scanned."""
+        (tmp_path / "app.ts").write_text(
+            "import { Service } from 'auth';\n"
+        )
+        scanner = NpmImportScanner()
+        results = scanner.scan(str(tmp_path), {"auth"})
+        assert len(results) == 1
+        assert results[0].package_name == "auth"
+
+    def test_dynamic_import(self, tmp_path):
+        """Dynamic import() calls are detected."""
+        (tmp_path / "index.js").write_text(
+            "const auth = await import('auth');\n"
+        )
+        scanner = NpmImportScanner()
+        results = scanner.scan(str(tmp_path), {"auth"})
+        assert len(results) == 1
+        assert results[0].package_name == "auth"
 
 
 class TestImportInfo:

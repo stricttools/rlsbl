@@ -293,6 +293,62 @@ class TestLoadDepOverrides:
         assert result == {}
 
 
+class TestNpmWorkspaceDep:
+    """npm-specific dependency validation tests."""
+
+    def test_npm_workspace_dep_not_false_positive(self, tmp_path):
+        """npm project with workspace:* dep that IS imported is not flagged as unused."""
+        project_dir = tmp_path / "app"
+        project_dir.mkdir()
+        (project_dir / "index.js").write_text(
+            "const auth = require('auth');\n"
+        )
+
+        errors = check_unused_deps(
+            project_name="app",
+            project_dir=str(project_dir),
+            manifest_deps={"auth"},
+            workspace_names={"app", "auth"},
+            whitelist={},
+        )
+        assert errors == []
+
+    def test_npm_workspace_dep_unused_is_flagged(self, tmp_path):
+        """npm project with workspace:* dep that is NOT imported is flagged."""
+        project_dir = tmp_path / "app"
+        project_dir.mkdir()
+        (project_dir / "index.js").write_text(
+            "const express = require('express');\n"
+        )
+
+        errors = check_unused_deps(
+            project_name="app",
+            project_dir=str(project_dir),
+            manifest_deps={"auth"},
+            workspace_names={"app", "auth"},
+            whitelist={},
+        )
+        assert len(errors) == 1
+        assert "auth" in errors[0]
+
+    def test_npm_scoped_workspace_dep_imported(self, tmp_path):
+        """Scoped npm workspace dep that is imported is not flagged."""
+        project_dir = tmp_path / "app"
+        project_dir.mkdir()
+        (project_dir / "index.ts").write_text(
+            "import { helper } from '@myorg/utils';\n"
+        )
+
+        errors = check_unused_deps(
+            project_name="app",
+            project_dir=str(project_dir),
+            manifest_deps={"@myorg/utils"},
+            workspace_names={"app", "@myorg/utils"},
+            whitelist={},
+        )
+        assert errors == []
+
+
 class TestDepsChecksIntegration:
     """Integration tests: checks registered on the strictcli check system."""
 
