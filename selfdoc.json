@@ -24,6 +24,12 @@
     "provider": "cloudflare-pages",
     "project": "rlsbl-docs"
   },
+  "gen": {
+    "exclude": [
+      "rlsbl.changelog",
+      "rlsbl.commands.monorepo"
+    ]
+  },
   "root_files": [
     "docs/_CLAUDE.md",
     "docs/_README.md"
