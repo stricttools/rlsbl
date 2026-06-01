@@ -143,7 +143,7 @@ class DockerTarget(BaseTarget):
             "author": author,
         }
 
-    def template_mappings(self):
+    def template_mappings(self, ctx):
         return [
             {"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"},
             {"template": "publish.yml.tpl", "target": ".github/workflows/docker-publish.yml"},

@@ -142,7 +142,7 @@ class DenoTarget(BaseTarget):
             "publishSetup": "Requires DENO_TOKEN or JSR_TOKEN secret on GitHub (Settings > Secrets > Actions)",
         }
 
-    def template_mappings(self):
+    def template_mappings(self, ctx):
         return [
             {"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"},
             {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},

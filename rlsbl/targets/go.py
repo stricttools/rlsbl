@@ -355,17 +355,18 @@ class GoTarget(BaseTarget):
 
         return result
 
-    def template_mappings(self):
+    def template_mappings(self, ctx):
+        project_root = str(ctx.project_root)
         mappings = [
             {"template": "VERSION.tpl", "target": "VERSION"},
             {"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"},
         ]
-        if not self._is_library("."):
+        if not self._is_library(project_root):
             mappings.extend([
                 {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
                 {"template": "goreleaser.yml.tpl", "target": ".goreleaser.yml"},
             ])
-            if not self._has_version_var("."):
+            if not self._has_version_var(project_root):
                 mappings.append(
                     {"template": "version.go.tpl", "target": "version.go"},
                 )
@@ -374,7 +375,7 @@ class GoTarget(BaseTarget):
 
     def shared_template_mappings(self, ctx):
         mappings = super().shared_template_mappings(ctx)
-        if not self._is_library("."):
+        if not self._is_library(str(ctx.project_root)):
             config = ctx.config if ctx else {}
             npm_wrapper_config = config.get("npm_wrapper", {})
             if npm_wrapper_config.get("scope"):

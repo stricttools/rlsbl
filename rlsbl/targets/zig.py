@@ -139,7 +139,7 @@ class ZigTarget(BaseTarget):
             "npmPublishJobs": npm_publish_jobs,
         }
 
-    def template_mappings(self):
+    def template_mappings(self, ctx):
         return [
             {"template": "VERSION.tpl", "target": "VERSION"},
             {"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"},

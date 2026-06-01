@@ -170,7 +170,7 @@ class CargoTarget(BaseTarget):
 
         return result
 
-    def template_mappings(self):
+    def template_mappings(self, ctx):
         mappings = [
             {"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"},
         ]

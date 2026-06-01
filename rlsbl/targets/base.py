@@ -36,7 +36,7 @@ class BaseTarget:
     def template_vars(self, dir_path, ctx):
         return {}
 
-    def template_mappings(self):
+    def template_mappings(self, ctx):
         return []
 
     def shared_template_mappings(self, ctx):

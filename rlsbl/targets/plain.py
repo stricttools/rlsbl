@@ -67,7 +67,7 @@ class PlainTarget(BaseTarget):
             os.path.dirname(os.path.dirname(__file__)), "templates", "plain"
         )
 
-    def template_mappings(self):
+    def template_mappings(self, ctx):
         return [{"template": "VERSION.tpl", "target": "VERSION"}]
 
     def check_project_exists(self, dir_path):

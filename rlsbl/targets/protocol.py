@@ -66,7 +66,7 @@ class ReleaseTarget(Protocol):
         """Extract template placeholder values from the project."""
         return {}
 
-    def template_mappings(self) -> list[dict[str, str]]:
+    def template_mappings(self, ctx) -> list[dict[str, str]]:
         """Target-specific template-to-output-path mappings."""
         return []
 

@@ -172,7 +172,7 @@ class NpmTarget(BaseTarget):
 
         return result
 
-    def template_mappings(self):
+    def template_mappings(self, ctx):
         pm = self._detect_package_manager(".")
         if pm == "pnpm":
             ci_template = "ci-pnpm.yml.tpl"

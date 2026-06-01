@@ -98,7 +98,7 @@ class SwiftTarget(BaseTarget):
             "author": author,
         }
 
-    def template_mappings(self):
+    def template_mappings(self, ctx):
         return [
             {"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"},
         ]

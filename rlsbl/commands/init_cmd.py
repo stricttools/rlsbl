@@ -962,7 +962,7 @@ def run_cmd(registry, args, flags, ctx):
         existing_hashes = load_hashes()
 
         # Process registry-specific templates
-        reg_mappings = reg.template_mappings()
+        reg_mappings = reg.template_mappings(ctx)
         if private:
             reg_mappings = _filter_mappings_for_private(reg_mappings)
 
@@ -1460,7 +1460,7 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         existing_hashes = load_hashes()
 
         # Process primary registry CI template only (publish will come from merged)
-        ci_mappings = [m for m in reg.template_mappings() if "publish" not in m["template"]]
+        ci_mappings = [m for m in reg.template_mappings(ctx) if "publish" not in m["template"]]
         ci_plans = plan_mappings(
             reg.template_dir(), ci_mappings, vars_dict, force,
         )
@@ -1475,7 +1475,7 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         for r in registries_list[1:]:
             secondary = TARGETS[r]
             secondary_extra = [
-                m for m in secondary.template_mappings()
+                m for m in secondary.template_mappings(ctx)
                 if not m["target"].startswith(_wf_prefix) and m["target"] not in seen_targets
             ]
             if secondary_extra:

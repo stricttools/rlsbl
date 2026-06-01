@@ -266,7 +266,7 @@ class MavenTarget(BaseTarget):
             "publishSetup": "Requires GITHUB_TOKEN secret (auto-provided for GitHub Packages)",
         }
 
-    def template_mappings(self):
+    def template_mappings(self, ctx):
         return [
             {"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"},
             {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
