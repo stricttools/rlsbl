@@ -5,8 +5,6 @@ import subprocess
 import sys
 import tempfile
 
-from ..config import read_project_config
-from ..context import ProjectContext
 from ..targets import TARGETS, detect_targets
 from ..utils import require_tool
 
@@ -21,9 +19,9 @@ def _parse_int_flag(flags, name, default):
         sys.exit(1)
 
 
-def _get_bin_command(project_root):
+def _get_bin_command(ctx):
     """Auto-detect the project's binary command name via registry template vars."""
-    dir_path = str(project_root)
+    dir_path = str(ctx.project_root)
     target_entries = detect_targets(dir_path)
     if not target_entries:
         return None
@@ -33,27 +31,26 @@ def _get_bin_command(project_root):
     if not registry_module:
         return None
     try:
-        ctx = ProjectContext(project_root=project_root, workspace_root=None, config=read_project_config(str(project_root)))
         tvars = registry_module.template_vars(first_path, ctx)
         return tvars.get("binCommand") or None
     except Exception:
         return None
 
 
-def run_cmd(registry, args, flags, project_root):
+def run_cmd(registry, args, flags, ctx):
     """Record a demo GIF of '<binCommand> --help' using vhs.
 
     Requires vhs (https://github.com/charmbracelet/vhs) to be installed.
     Output is saved to assets/demo.gif.
     """
-    root_str = str(project_root)
+    root_str = str(ctx.project_root)
 
     if not require_tool("vhs", fatal=False):
         print("Error: vhs is required.", file=sys.stderr)
         print("Install: go install github.com/charmbracelet/vhs@latest", file=sys.stderr)
         sys.exit(1)
 
-    bin_command = _get_bin_command(project_root)
+    bin_command = _get_bin_command(ctx)
     if not bin_command:
         print("Error: could not detect project binary command.", file=sys.stderr)
         print("Ensure package.json, pyproject.toml, or go.mod exists with a CLI entry point.", file=sys.stderr)

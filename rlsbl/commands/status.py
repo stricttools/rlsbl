@@ -12,8 +12,6 @@ from ..changelog.validate import (
     _is_changelog_only_commit,
     _unreleased_range,
 )
-from ..config import read_project_config
-from ..context import ProjectContext
 from ..git_util import filter_commits_for_project
 from ..targets import TARGETS, detect_targets
 from ..utils import (
@@ -25,7 +23,7 @@ from ..utils import (
 from ..workspace import find_workspace_root, load_workspace, resolve_project
 
 
-def _collect_status(registry, target_path=".", *, tag_glob=None, project_root, project=None):
+def _collect_status(registry, target_path=".", *, tag_glob=None, ctx, project=None):
     """Collect status data as a dict.
 
     When tag_glob is set (monorepo mode), it is forwarded to
@@ -44,11 +42,10 @@ def _collect_status(registry, target_path=".", *, tag_glob=None, project_root, p
         sys.exit(1)
 
     version = reg.read_version(target_path)
-    ctx = ProjectContext(project_root=project_root, workspace_root=None, config=read_project_config(project_root))
     vars_dict = reg.template_vars(target_path, ctx)
     name = vars_dict.get("name") or "(unknown)"
 
-    root_str = str(project_root)
+    root_str = str(ctx.project_root)
 
     # Git branch
     try:
@@ -170,12 +167,13 @@ def _collect_status(registry, target_path=".", *, tag_glob=None, project_root, p
     }
 
 
-def run_cmd(registry, args, flags, project_root):
+def run_cmd(registry, args, flags, ctx):
     """Status command handler.
 
     Shows a quick 'where am I' summary: package info, git state, changelog, CI.
     With --json, outputs machine-readable JSON instead.
     """
+    project_root = ctx.project_root
     root_str = str(project_root)
 
     # Build per-target path mapping from detect_targets
@@ -204,7 +202,7 @@ def run_cmd(registry, args, flags, project_root):
         tag_glob = None
     data = _collect_status(
         registry, primary_path, tag_glob=tag_glob,
-        project_root=project_root, project=monorepo_project,
+        ctx=ctx, project=monorepo_project,
     )
 
     if flags.get("json"):
