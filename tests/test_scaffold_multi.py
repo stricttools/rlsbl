@@ -364,6 +364,71 @@ class TestMergedPublishCombinations:
         assert "  workflow_dispatch:" in result
 
 
+class TestMergedPublishWorkingDirectory:
+    """Unit tests for working-directory injection in _generate_merged_publish."""
+
+    TEMPLATE_VARS = {
+        "repoName": "user/repo",
+        "name": "test",
+        "version": "1.0.0",
+        "registryUrl": "https://registry.npmjs.org",
+    }
+
+    def test_subdirectory_target_gets_working_directory(self):
+        """npm target at path 'npm/' produces a job with defaults.run.working-directory."""
+        from ruamel.yaml import YAML
+
+        result = _generate_merged_publish(
+            ["npm"], self.TEMPLATE_VARS, target_paths={"npm": "npm"}
+        )
+        data = YAML(typ="safe").load(result)
+        npm_job = data["jobs"]["npm"]
+        assert npm_job["defaults"]["run"]["working-directory"] == "npm"
+
+    def test_root_target_no_working_directory(self):
+        """npm target at path '.' does not get working-directory injected."""
+        result = _generate_merged_publish(
+            ["npm"], self.TEMPLATE_VARS, target_paths={"npm": "."}
+        )
+        assert "working-directory" not in result
+
+    def test_pypi_subdirectory_gets_packages_dir(self):
+        """pypi target at path 'python/' rewrites packages-dir to 'python/dist/'."""
+        from ruamel.yaml import YAML
+
+        result = _generate_merged_publish(
+            ["pypi"], self.TEMPLATE_VARS, target_paths={"pypi": "python"}
+        )
+        data = YAML(typ="safe").load(result)
+        pypi_job = data["jobs"]["pypi"]
+        # Find the pypi publish step
+        publish_step = None
+        for step in pypi_job["steps"]:
+            if "pypa/gh-action-pypi-publish" in step.get("uses", ""):
+                publish_step = step
+                break
+        assert publish_step is not None, "pypi publish step not found"
+        assert publish_step["with"]["packages-dir"] == "python/dist/"
+
+    def test_version_file_rewritten(self):
+        """go target at path 'go/' prefixes go-version-file with 'go/'."""
+        from ruamel.yaml import YAML
+
+        result = _generate_merged_publish(
+            ["go"], self.TEMPLATE_VARS, target_paths={"go": "go"}
+        )
+        data = YAML(typ="safe").load(result)
+        go_job = data["jobs"]["go"]
+        # Find the setup-go step
+        setup_step = None
+        for step in go_job["steps"]:
+            if "actions/setup-go" in step.get("uses", ""):
+                setup_step = step
+                break
+        assert setup_step is not None, "setup-go step not found"
+        assert setup_step["with"]["go-version-file"] == "go/go.mod"
+
+
 class TestOnTriggerParsing:
     """Unit tests for _parse_on_triggers and _merge_on_triggers."""
 
