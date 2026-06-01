@@ -72,7 +72,9 @@ class GoTarget(BaseTarget):
         return match.group(1) if match else ""
 
     def _is_library(self, dir_path):
-        """Return True if the project has no `package main` in root .go files."""
+        """Return True if the project has no `package main` in root .go files or cmd/ layout."""
+        if self._has_cmd_main(dir_path):
+            return False
         for go_file in glob.glob(os.path.join(dir_path, "*.go")):
             with open(go_file, encoding="utf-8") as f:
                 for line in f:
