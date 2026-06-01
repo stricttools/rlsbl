@@ -35,6 +35,7 @@ Register a project directory in the monorepo workspace.toml configuration. The p
 | `--subtree-remote` |  | str |  |  | Subtree remote URL |
 | `--depends-on` |  | str |  |  | Comma-separated dependency project names |
 | `--library` |  | str |  |  | Mark as library (true/false) |
+| `--internal` |  | str |  |  | Mark as internal (true/false) |
 | `--no-commit` |  | bool |  |  | Skip auto-commit of workspace.toml and suppress commits from auto-triggered scaffold/sync |
 
 ### Arguments
