@@ -78,6 +78,10 @@ def make_workspace(root, projects):
         if "watch" in proj:
             watch_items = ", ".join(f'"{w}"' for w in proj["watch"])
             lines.append(f"watch = [{watch_items}]")
+        if proj.get("library"):
+            lines.append("library = true")
+        if proj.get("internal"):
+            lines.append("internal = true")
         lines.append("")
     (ws_dir / WORKSPACE_FILE).write_text("\n".join(lines))
 
