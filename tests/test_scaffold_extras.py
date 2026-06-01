@@ -4,6 +4,8 @@ import os
 import subprocess
 from pathlib import Path
 
+from conftest import make_ctx
+
 from rlsbl.commands.init_cmd import (
     USER_OWNED,
     _finalize_scaffold,
@@ -300,7 +302,7 @@ def test_npm_scaffold_creates_npmignore(tmp_project):
 
     target = NpmTarget()
     tpl_dir = target.template_dir()
-    mappings = target.template_mappings()
+    mappings = target.template_mappings(ctx=make_ctx("."))
 
     # Verify .npmignore is in the mappings
     npmignore_mappings = [m for m in mappings if m["target"] == ".npmignore"]
@@ -335,7 +337,7 @@ def test_npmignore_is_user_owned(tmp_project):
     target = NpmTarget()
     tpl_dir = target.template_dir()
     npmignore_mappings = [
-        m for m in target.template_mappings() if m["target"] == ".npmignore"
+        m for m in target.template_mappings(ctx=make_ctx(".")) if m["target"] == ".npmignore"
     ]
 
     # The user-owned file should not be overwritten
@@ -364,7 +366,7 @@ def test_pypi_scaffold_does_not_create_npmignore(tmp_project):
     from rlsbl.targets.pypi import PypiTarget
 
     target = PypiTarget()
-    mappings = target.template_mappings()
+    mappings = target.template_mappings(ctx=make_ctx("."))
 
     # .npmignore must not appear in pypi's template_mappings
     npmignore_mappings = [m for m in mappings if m["target"] == ".npmignore"]

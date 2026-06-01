@@ -145,14 +145,14 @@ class TestZigTargetWriteVersion:
     def test_writes_version_file(self):
         target = ZigTarget()
         with tempfile.TemporaryDirectory() as d:
-            target.write_version(d, "2.0.0")
+            target.write_version(d, "2.0.0", ctx=make_ctx(d))
             assert _read(os.path.join(d, "VERSION")) == "2.0.0\n"
 
     def test_syncs_zon(self):
         target = ZigTarget()
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "build.zig.zon"), SAMPLE_ZON)
-            target.write_version(d, "1.5.0")
+            target.write_version(d, "1.5.0", ctx=make_ctx(d))
             content = _read(os.path.join(d, "build.zig.zon"))
             assert '.version = "1.5.0"' in content
 
@@ -279,7 +279,7 @@ class TestZigTargetTemplateMappings:
 
     def test_returns_expected_mappings(self):
         target = ZigTarget()
-        mappings = target.template_mappings()
+        mappings = target.template_mappings(ctx=make_ctx("."))
         templates = [m["template"] for m in mappings]
         targets = [m["target"] for m in mappings]
         assert "VERSION.tpl" in templates
@@ -291,7 +291,7 @@ class TestZigTargetTemplateMappings:
 
     def test_mappings_are_list_of_dicts(self):
         target = ZigTarget()
-        mappings = target.template_mappings()
+        mappings = target.template_mappings(ctx=make_ctx("."))
         assert isinstance(mappings, list)
         for m in mappings:
             assert isinstance(m, dict)

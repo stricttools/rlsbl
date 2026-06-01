@@ -7,7 +7,7 @@ import sys
 
 import pytest
 
-from conftest import make_commit as _make_commit
+from conftest import make_commit as _make_commit, make_ctx
 from rlsbl.changelog import (
     ChangelogEntry,
     append_entry,
@@ -375,7 +375,7 @@ class TestStatusWithJsonl:
 
         from rlsbl.commands.status import _collect_status
 
-        data = _collect_status("npm", project_root=".")
+        data = _collect_status("npm", ctx=make_ctx("."))
         # jsonl_coverage should be set (non-None)
         assert data["jsonl_coverage"] is not None
         assert "covered" in data["jsonl_coverage"] or "entries" in data["jsonl_coverage"]
@@ -398,7 +398,7 @@ class TestStatusWithJsonl:
 
         from rlsbl.commands.status import run_cmd
 
-        run_cmd("npm", [], {"json": True}, project_root=mock_git_repo)
+        run_cmd("npm", [], {"json": True}, ctx=make_ctx(mock_git_repo))
         captured = capsys.readouterr()
         data = json.loads(captured.out)
         assert "jsonl_coverage" in data
@@ -421,7 +421,7 @@ class TestStatusWithJsonl:
 
         from rlsbl.commands.status import run_cmd
 
-        run_cmd("npm", [], {}, project_root=mock_git_repo)
+        run_cmd("npm", [], {}, ctx=make_ctx(mock_git_repo))
         captured = capsys.readouterr()
         assert "JSONL:" in captured.out
 
@@ -439,7 +439,7 @@ class TestStatusWithoutJsonl:
 
         from rlsbl.commands.status import _collect_status
 
-        data = _collect_status("npm", project_root=".")
+        data = _collect_status("npm", ctx=make_ctx("."))
         assert data["jsonl_coverage"] == "not set up"
 
     def test_text_output_shows_not_set_up(self, mock_git_repo, capsys):
@@ -450,6 +450,6 @@ class TestStatusWithoutJsonl:
 
         from rlsbl.commands.status import run_cmd
 
-        run_cmd("npm", [], {}, project_root=mock_git_repo)
+        run_cmd("npm", [], {}, ctx=make_ctx(mock_git_repo))
         captured = capsys.readouterr()
         assert "JSONL:     not set up" in captured.out

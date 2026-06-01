@@ -5,6 +5,7 @@ import tempfile
 
 import tomlkit
 
+from conftest import make_ctx
 from rlsbl.targets.pgdesign import PgdesignTarget
 from rlsbl.targets.protocol import ReleaseTarget
 from rlsbl.targets import TARGETS
@@ -131,7 +132,7 @@ class TestPgdesignTargetWriteVersion:
             path = os.path.join(d, "pgdesign.toml")
             with open(path, "w") as f:
                 f.write(MINIMAL_TOML)
-            result = target.write_version(d, "2.0.0")
+            result = target.write_version(d, "2.0.0", ctx=make_ctx(d))
             assert result == ["pgdesign.toml"]
             with open(path, "r") as f:
                 doc = tomlkit.parse(f.read())
@@ -143,7 +144,7 @@ class TestPgdesignTargetWriteVersion:
             path = os.path.join(d, "pgdesign.toml")
             with open(path, "w") as f:
                 f.write(MINIMAL_TOML)
-            target.write_version(d, "3.0.0")
+            target.write_version(d, "3.0.0", ctx=make_ctx(d))
             with open(path, "r") as f:
                 doc = tomlkit.parse(f.read())
             assert doc["project"]["schemas"] == ["auth.toml"]
@@ -157,7 +158,7 @@ class TestPgdesignTargetWriteVersion:
             path = os.path.join(schema_dir, "pgdesign.toml")
             with open(path, "w") as f:
                 f.write(MINIMAL_TOML)
-            result = target.write_version(d, "4.0.0")
+            result = target.write_version(d, "4.0.0", ctx=make_ctx(d))
             assert result == [os.path.join("schema", "pgdesign.toml")]
             with open(path, "r") as f:
                 doc = tomlkit.parse(f.read())
@@ -169,7 +170,7 @@ class TestPgdesignTargetWriteVersion:
             path = os.path.join(d, "pgdesign.toml")
             with open(path, "w") as f:
                 f.write(MINIMAL_TOML)
-            target.write_version(d, "1.0.0")
+            target.write_version(d, "1.0.0", ctx=make_ctx(d))
             files = os.listdir(d)
             assert "pgdesign.toml.tmp" not in files
 
@@ -180,7 +181,7 @@ class TestPgdesignTargetWriteVersion:
             path = os.path.join(d, "pgdesign.toml")
             with open(path, "w") as f:
                 f.write("[database]\nurl = \"postgres://localhost/test\"\n")
-            target.write_version(d, "0.1.0")
+            target.write_version(d, "0.1.0", ctx=make_ctx(d))
             with open(path, "r") as f:
                 doc = tomlkit.parse(f.read())
             assert str(doc["project"]["version"]) == "0.1.0"

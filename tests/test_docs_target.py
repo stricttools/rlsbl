@@ -4,6 +4,7 @@ import json
 import os
 import tempfile
 
+from conftest import make_ctx
 from rlsbl.targets.protocol import ReleaseTarget
 from rlsbl.targets.docs import DocsTarget
 from rlsbl.targets import TARGETS
@@ -101,7 +102,7 @@ class TestDocsTargetWriteVersion:
             config_path = os.path.join(d, "selfdoc.json")
             with open(config_path, "w") as f:
                 json.dump({"language": "python", "version": "0.1.0"}, f, indent=2)
-            result = target.write_version(d, "0.2.0")
+            result = target.write_version(d, "0.2.0", ctx=make_ctx(d))
             assert result == ["selfdoc.json"]
             with open(config_path) as f:
                 data = json.load(f)
@@ -114,7 +115,7 @@ class TestDocsTargetWriteVersion:
             config_path = os.path.join(d, "selfdoc.json")
             with open(config_path, "w") as f:
                 json.dump({"language": "go"}, f, indent=2)
-            target.write_version(d, "1.0.0")
+            target.write_version(d, "1.0.0", ctx=make_ctx(d))
             with open(config_path) as f:
                 data = json.load(f)
             assert data["version"] == "1.0.0"
@@ -132,7 +133,7 @@ class TestDocsTargetWriteVersion:
             }
             with open(config_path, "w") as f:
                 json.dump(original, f, indent=2)
-            target.write_version(d, "0.6.0")
+            target.write_version(d, "0.6.0", ctx=make_ctx(d))
             with open(config_path) as f:
                 data = json.load(f)
             assert data["version"] == "0.6.0"
@@ -147,7 +148,7 @@ class TestDocsTargetWriteVersion:
             with open(config_path, "w") as f:
                 json.dump({"language": "python", "version": "0.1.0"}, f, indent=4)
                 f.write("\n")
-            target.write_version(d, "0.2.0")
+            target.write_version(d, "0.2.0", ctx=make_ctx(d))
             with open(config_path) as f:
                 content = f.read()
             # Should preserve 4-space indent

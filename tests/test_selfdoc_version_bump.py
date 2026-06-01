@@ -15,6 +15,7 @@ import pytest
 from strictcli import CheckResult
 
 from rlsbl import app
+from conftest import make_ctx
 from rlsbl.context import ProjectContext
 
 
@@ -81,7 +82,7 @@ class TestReleaseBumpSelfdocJson:
 
         # --- replicate the bump logic from release.py ---
         files_to_commit = []
-        modified = npm_target.write_version(primary_path, new_version)
+        modified = npm_target.write_version(primary_path, new_version, ctx=make_ctx(primary_path))
         for rel in modified:
             files_to_commit.append(os.path.normpath(os.path.join(primary_path, rel)))
 
@@ -90,7 +91,7 @@ class TestReleaseBumpSelfdocJson:
                 continue
             other_reg = TARGETS.get(t_name)
             if other_reg and other_reg.check_project_exists(t_path):
-                other_modified = other_reg.write_version(t_path, new_version)
+                other_modified = other_reg.write_version(t_path, new_version, ctx=make_ctx(t_path))
                 for rel in other_modified:
                     files_to_commit.append(os.path.normpath(os.path.join(t_path, rel)))
 
@@ -99,7 +100,7 @@ class TestReleaseBumpSelfdocJson:
         selfdoc_path = os.path.join(version_dir, "selfdoc.json")
         if os.path.exists(selfdoc_path) and "docs" not in target_paths:
             from rlsbl.targets.docs import DocsTarget
-            docs_modified = DocsTarget().write_version(version_dir, new_version)
+            docs_modified = DocsTarget().write_version(version_dir, new_version, ctx=make_ctx(version_dir))
             for rel in docs_modified:
                 fpath = os.path.normpath(os.path.join(version_dir, rel))
                 if fpath not in bumped_files:
@@ -129,7 +130,7 @@ class TestReleaseBumpSelfdocJson:
         target_paths = {"npm": version_dir, "docs": version_dir}
 
         files_to_commit = []
-        modified = npm_target.write_version(primary_path, new_version)
+        modified = npm_target.write_version(primary_path, new_version, ctx=make_ctx(primary_path))
         for rel in modified:
             files_to_commit.append(os.path.normpath(os.path.join(primary_path, rel)))
 
@@ -138,7 +139,7 @@ class TestReleaseBumpSelfdocJson:
                 continue
             other_reg = TARGETS.get(t_name)
             if other_reg and other_reg.check_project_exists(t_path):
-                other_modified = other_reg.write_version(t_path, new_version)
+                other_modified = other_reg.write_version(t_path, new_version, ctx=make_ctx(t_path))
                 for rel in other_modified:
                     files_to_commit.append(os.path.normpath(os.path.join(t_path, rel)))
 

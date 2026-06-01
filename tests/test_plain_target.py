@@ -3,6 +3,7 @@
 import os
 import tempfile
 
+from conftest import make_ctx
 from rlsbl.targets.plain import PlainTarget
 from rlsbl.targets import TARGETS
 
@@ -56,7 +57,7 @@ class TestPlainTargetWriteVersion:
     def test_write_version_creates_file(self):
         target = PlainTarget()
         with tempfile.TemporaryDirectory() as d:
-            target.write_version(d, "1.0.0")
+            target.write_version(d, "1.0.0", ctx=make_ctx(d))
             path = os.path.join(d, "VERSION")
             assert os.path.exists(path)
             with open(path) as f:
@@ -67,14 +68,14 @@ class TestPlainTargetWriteVersion:
         with tempfile.TemporaryDirectory() as d:
             with open(os.path.join(d, "VERSION"), "w") as f:
                 f.write("1.0.0\n")
-            target.write_version(d, "2.0.0")
+            target.write_version(d, "2.0.0", ctx=make_ctx(d))
             with open(os.path.join(d, "VERSION")) as f:
                 assert f.read() == "2.0.0\n"
 
     def test_write_version_no_tmp_left_behind(self):
         target = PlainTarget()
         with tempfile.TemporaryDirectory() as d:
-            target.write_version(d, "1.0.0")
+            target.write_version(d, "1.0.0", ctx=make_ctx(d))
             files = os.listdir(d)
             assert "VERSION.tmp" not in files
 
@@ -91,7 +92,7 @@ class TestPlainTargetWriteVersionPyproject:
             # Create pyproject.toml with [project].version
             with open(os.path.join(d, "pyproject.toml"), "w") as f:
                 f.write('[project]\nname = "test"\nversion = "1.0.0"\n')
-            modified = target.write_version(d, "2.0.0")
+            modified = target.write_version(d, "2.0.0", ctx=make_ctx(d))
             assert "VERSION" in modified
             assert "pyproject.toml" in modified
             # Check VERSION was updated
@@ -106,7 +107,7 @@ class TestPlainTargetWriteVersionPyproject:
     def test_write_version_without_pyproject_toml(self):
         target = PlainTarget()
         with tempfile.TemporaryDirectory() as d:
-            modified = target.write_version(d, "1.0.0")
+            modified = target.write_version(d, "1.0.0", ctx=make_ctx(d))
             assert modified == ["VERSION"]
             with open(os.path.join(d, "VERSION")) as f:
                 assert f.read() == "1.0.0\n"
@@ -120,7 +121,7 @@ class TestPlainTargetWriteVersionPyproject:
             # Create pyproject.toml WITHOUT [project].version
             with open(os.path.join(d, "pyproject.toml"), "w") as f:
                 f.write('[project]\nname = "test"\n')
-            modified = target.write_version(d, "2.0.0")
+            modified = target.write_version(d, "2.0.0", ctx=make_ctx(d))
             assert modified == ["VERSION"]
             # pyproject.toml should be unchanged
             with open(os.path.join(d, "pyproject.toml")) as f:
@@ -134,7 +135,7 @@ class TestPlainTargetWriteVersionPyproject:
                 f.write("1.0.0\n")
             with open(os.path.join(d, "pyproject.toml"), "w") as f:
                 f.write('[project]\nname = "test"\nversion = "1.0.0"\n')
-            target.write_version(d, "2.0.0")
+            target.write_version(d, "2.0.0", ctx=make_ctx(d))
             files = os.listdir(d)
             assert "pyproject.toml.tmp" not in files
             assert "VERSION.tmp" not in files
@@ -153,7 +154,7 @@ class TestPlainTargetProperties:
 
     def test_template_mappings_has_version(self):
         target = PlainTarget()
-        mappings = target.template_mappings()
+        mappings = target.template_mappings(ctx=make_ctx("."))
         assert len(mappings) == 1
         assert mappings[0]["template"] == "VERSION.tpl"
         assert mappings[0]["target"] == "VERSION"

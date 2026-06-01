@@ -113,7 +113,7 @@ class TestPypiWriteVersion:
             )
             with open(toml_path, "w") as f:
                 f.write(content)
-            target.write_version(d, "2.0.0")
+            target.write_version(d, "2.0.0", ctx=_ctx())
             with open(toml_path, "r") as f:
                 updated = f.read()
             assert 'version = "2.0.0"' in updated
@@ -136,7 +136,7 @@ class TestPypiWriteVersion:
             )
             with open(toml_path, "w") as f:
                 f.write(content)
-            target.write_version(d, "3.5.0")
+            target.write_version(d, "3.5.0", ctx=_ctx())
             with open(toml_path, "r") as f:
                 updated = f.read()
             assert 'version = "3.5.0"' in updated
@@ -158,7 +158,7 @@ class TestPypiWriteVersionDunderVersion:
             init_path = os.path.join(pkg_dir, "__init__.py")
             with open(init_path, "w") as f:
                 f.write('__version__ = "1.0.0"\n')
-            target.write_version(d, "2.0.0")
+            target.write_version(d, "2.0.0", ctx=_ctx())
             with open(init_path) as f:
                 content = f.read()
             assert '__version__ = "2.0.0"' in content
@@ -175,7 +175,7 @@ class TestPypiWriteVersionDunderVersion:
             init_path = os.path.join(pkg_dir, "__init__.py")
             with open(init_path, "w") as f:
                 f.write("__version__ = '1.0.0'\n")
-            target.write_version(d, "3.0.0")
+            target.write_version(d, "3.0.0", ctx=_ctx())
             with open(init_path) as f:
                 content = f.read()
             assert "__version__ = '3.0.0'" in content
@@ -187,7 +187,7 @@ class TestPypiWriteVersionDunderVersion:
             toml_path = os.path.join(d, "pyproject.toml")
             with open(toml_path, "w") as f:
                 f.write('[project]\nname = "my-pkg"\nversion = "1.0.0"\n')
-            target.write_version(d, "2.0.0")
+            target.write_version(d, "2.0.0", ctx=_ctx())
             with open(toml_path) as f:
                 content = f.read()
             assert 'version = "2.0.0"' in content
@@ -205,7 +205,7 @@ class TestPypiWriteVersionDunderVersion:
             original = '"""My package."""\n\nfrom .core import main\n'
             with open(init_path, "w") as f:
                 f.write(original)
-            target.write_version(d, "2.0.0")
+            target.write_version(d, "2.0.0", ctx=_ctx())
             with open(init_path) as f:
                 content = f.read()
             assert content == original
@@ -434,7 +434,7 @@ class TestSwiftTarget:
         target = SwiftTarget()
         (tmp_path / "VERSION").write_text("1.2.3\n")
         assert target.read_version(str(tmp_path)) == "1.2.3"
-        target.write_version(str(tmp_path), "2.0.0")
+        target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
         assert (tmp_path / "VERSION").read_text().strip() == "2.0.0"
 
     def test_tag_format(self):
@@ -455,7 +455,7 @@ class TestSwiftAppleTarget:
         target = SwiftAppleTarget()
         (tmp_project / "VERSION").write_text("1.2.3\n")
         assert target.read_version(str(tmp_project)) == "1.2.3"
-        target.write_version(str(tmp_project), "2.0.0")
+        target.write_version(str(tmp_project), "2.0.0", ctx=_ctx())
         assert (tmp_project / "VERSION").read_text().strip() == "2.0.0"
 
     def test_config_based_detection(self, tmp_project):
@@ -484,7 +484,7 @@ class TestSpecTarget:
         target = SpecTarget()
         (tmp_path / "version.json").write_text('{"version": "1.2.3"}')
         assert target.read_version(str(tmp_path)) == "1.2.3"
-        target.write_version(str(tmp_path), "2.0.0")
+        target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
         data = json.loads((tmp_path / "version.json").read_text())
         assert data["version"] == "2.0.0"
 
@@ -506,7 +506,7 @@ class TestHexTarget:
         content = 'defmodule MyApp.MixProject do\n  def project do\n    [app: :myapp, version: "1.2.3"]\n  end\nend'
         (tmp_path / "mix.exs").write_text(content)
         assert target.read_version(str(tmp_path)) == "1.2.3"
-        target.write_version(str(tmp_path), "2.0.0")
+        target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
         assert '"2.0.0"' in (tmp_path / "mix.exs").read_text()
 
     def test_tag_format(self):
@@ -544,7 +544,7 @@ class TestDenoTarget:
         target = DenoTarget()
         (tmp_path / "deno.json").write_text('{"name": "@scope/pkg", "version": "1.2.3"}')
         assert target.read_version(str(tmp_path)) == "1.2.3"
-        target.write_version(str(tmp_path), "2.0.0")
+        target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
         data = json.loads((tmp_path / "deno.json").read_text())
         assert data["version"] == "2.0.0"
 
@@ -557,7 +557,7 @@ class TestDenoTarget:
         target = DenoTarget()
         content = '// my config\n{"name": "@scope/pkg", "version": "1.0.0"}'
         (tmp_path / "deno.jsonc").write_text(content)
-        target.write_version(str(tmp_path), "2.0.0")
+        target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
         result = (tmp_path / "deno.jsonc").read_text()
         assert "// my config" in result
         assert '"2.0.0"' in result
@@ -603,7 +603,7 @@ class TestCargoTarget:
         content = '[package]\nname = "myapp"\nversion = "1.2.3"\nedition = "2021"\n'
         (tmp_path / "Cargo.toml").write_text(content)
         assert target.read_version(str(tmp_path)) == "1.2.3"
-        target.write_version(str(tmp_path), "2.0.0")
+        target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
         import tomlkit
         doc = tomlkit.parse((tmp_path / "Cargo.toml").read_text())
         assert doc["package"]["version"] == "2.0.0"
@@ -611,7 +611,7 @@ class TestCargoTarget:
     def test_version_preserves_comments(self, tmp_path):
         content = '# My crate\n[package]\nname = "myapp"\nversion = "1.0.0"  # current\nedition = "2021"\n'
         (tmp_path / "Cargo.toml").write_text(content)
-        CargoTarget().write_version(str(tmp_path), "2.0.0")
+        CargoTarget().write_version(str(tmp_path), "2.0.0", ctx=_ctx())
         result = (tmp_path / "Cargo.toml").read_text()
         assert "# My crate" in result
         assert "# current" in result or "2.0.0" in result
@@ -671,7 +671,7 @@ class TestDockerTarget:
         target = DockerTarget()
         (tmp_path / "VERSION").write_text("1.2.3\n")
         assert target.read_version(str(tmp_path)) == "1.2.3"
-        target.write_version(str(tmp_path), "2.0.0")
+        target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
         assert (tmp_path / "VERSION").read_text().strip() == "2.0.0"
 
     def test_tag_format(self):
@@ -746,7 +746,7 @@ class TestMavenTarget:
         (tmp_path / "gradle.properties").write_text("VERSION_NAME=1.2.3\n")
         target = MavenTarget()
         assert target.read_version(str(tmp_path)) == "1.2.3"
-        target.write_version(str(tmp_path), "2.0.0")
+        target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
         assert "VERSION_NAME=2.0.0" in (tmp_path / "gradle.properties").read_text()
 
     def test_version_from_gradle_kts(self, tmp_path):
@@ -754,7 +754,7 @@ class TestMavenTarget:
         (tmp_path / "build.gradle.kts").write_text('version = "1.2.3"\n')
         target = MavenTarget()
         assert target.read_version(str(tmp_path)) == "1.2.3"
-        target.write_version(str(tmp_path), "2.0.0")
+        target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
         assert 'version = "2.0.0"' in (tmp_path / "build.gradle.kts").read_text()
 
     def test_version_from_pom(self, tmp_path):
@@ -763,7 +763,7 @@ class TestMavenTarget:
         (tmp_path / "pom.xml").write_text(pom)
         target = MavenTarget()
         assert target.read_version(str(tmp_path)) == "1.2.3"
-        target.write_version(str(tmp_path), "2.0.0")
+        target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
         assert "2.0.0" in (tmp_path / "pom.xml").read_text()
 
     def test_version_priority(self, tmp_path):
@@ -799,7 +799,7 @@ class TestMavenTarget:
         (tmp_path / "build.gradle").write_text("version = '1.5.0'\n")
         target = MavenTarget()
         assert target.read_version(str(tmp_path)) == "1.5.0"
-        target.write_version(str(tmp_path), "2.0.0")
+        target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
         assert "version = '2.0.0'" in (tmp_path / "build.gradle").read_text()
 
     def test_detection_groovy_gradle(self, tmp_path):
@@ -847,7 +847,7 @@ class TestGoScaffoldTemplates:
         target = GoTarget()
         (tmp_project / "go.mod").write_text("module github.com/user/myapp\n\ngo 1.21\n")
         (tmp_project / "main.go").write_text("package main\n\nfunc main() {}\n")
-        mappings = target.template_mappings()
+        mappings = target.template_mappings(ctx=_ctx())
         targets = [m["target"] for m in mappings]
         assert "version.go" in targets
 
@@ -858,7 +858,7 @@ class TestGoScaffoldTemplates:
         (tmp_project / "main.go").write_text(
             "package main\n\nvar Version string\n\nfunc main() {}\n"
         )
-        mappings = target.template_mappings()
+        mappings = target.template_mappings(ctx=_ctx())
         targets = [m["target"] for m in mappings]
         assert "version.go" not in targets
 
@@ -867,7 +867,7 @@ class TestGoScaffoldTemplates:
         target = GoTarget()
         (tmp_project / "go.mod").write_text("module github.com/user/mylib\n\ngo 1.21\n")
         (tmp_project / "lib.go").write_text("package mylib\n\nfunc Hello() string { return \"hello\" }\n")
-        mappings = target.template_mappings()
+        mappings = target.template_mappings(ctx=_ctx())
         targets = [m["target"] for m in mappings]
         assert "version.go" not in targets
 
@@ -967,21 +967,21 @@ class TestNpmPackageManagerDetection:
     def test_template_mappings_npm(self, tmp_project):
         target = NpmTarget()
         (tmp_project / "package-lock.json").write_text("{}")
-        mappings = target.template_mappings()
+        mappings = target.template_mappings(ctx=_ctx())
         ci_templates = [m["template"] for m in mappings if m["target"].endswith("ci.yml")]
         assert ci_templates == ["ci.yml.tpl"]
 
     def test_template_mappings_pnpm(self, tmp_project):
         target = NpmTarget()
         (tmp_project / "pnpm-lock.yaml").write_text("")
-        mappings = target.template_mappings()
+        mappings = target.template_mappings(ctx=_ctx())
         ci_templates = [m["template"] for m in mappings if m["target"].endswith("ci.yml")]
         assert ci_templates == ["ci-pnpm.yml.tpl"]
 
     def test_template_mappings_yarn(self, tmp_project):
         target = NpmTarget()
         (tmp_project / "yarn.lock").write_text("")
-        mappings = target.template_mappings()
+        mappings = target.template_mappings(ctx=_ctx())
         ci_templates = [m["template"] for m in mappings if m["target"].endswith("ci.yml")]
         assert ci_templates == ["ci-yarn.yml.tpl"]
 
@@ -1025,7 +1025,7 @@ class TestWriteVersionReturnPaths:
             init_path = os.path.join(pkg_dir, "__init__.py")
             with open(init_path, "w") as f:
                 f.write('__version__ = "1.0.0"\n')
-            result = target.write_version(d, "2.0.0")
+            result = target.write_version(d, "2.0.0", ctx=_ctx())
             assert result == ["pyproject.toml", os.path.join("my_pkg", "__init__.py")]
 
     def test_pypi_returns_both_files_src_layout(self):
@@ -1040,7 +1040,7 @@ class TestWriteVersionReturnPaths:
             init_path = os.path.join(pkg_dir, "__init__.py")
             with open(init_path, "w") as f:
                 f.write('__version__ = "1.0.0"\n')
-            result = target.write_version(d, "2.0.0")
+            result = target.write_version(d, "2.0.0", ctx=_ctx())
             assert result == ["pyproject.toml", os.path.join("src", "my_pkg", "__init__.py")]
 
     def test_pypi_returns_only_pyproject_without_init(self):
@@ -1050,7 +1050,7 @@ class TestWriteVersionReturnPaths:
             toml_path = os.path.join(d, "pyproject.toml")
             with open(toml_path, "w") as f:
                 f.write('[project]\nname = "my-pkg"\nversion = "1.0.0"\n')
-            result = target.write_version(d, "2.0.0")
+            result = target.write_version(d, "2.0.0", ctx=_ctx())
             assert result == ["pyproject.toml"]
 
     def test_pypi_returns_only_pyproject_when_init_has_no_dunder(self):
@@ -1065,7 +1065,7 @@ class TestWriteVersionReturnPaths:
             init_path = os.path.join(pkg_dir, "__init__.py")
             with open(init_path, "w") as f:
                 f.write('"""My package."""\n')
-            result = target.write_version(d, "2.0.0")
+            result = target.write_version(d, "2.0.0", ctx=_ctx())
             assert result == ["pyproject.toml"]
 
     def test_zig_returns_both_files_with_zon(self):
@@ -1076,7 +1076,7 @@ class TestWriteVersionReturnPaths:
             zon_content = '.{\n    .name = "my-project",\n    .version = "0.1.0",\n}\n'
             with open(os.path.join(d, "build.zig.zon"), "w") as f:
                 f.write(zon_content)
-            result = target.write_version(d, "1.0.0")
+            result = target.write_version(d, "1.0.0", ctx=_ctx())
             assert result == ["VERSION", "build.zig.zon"]
 
     def test_zig_returns_only_version_without_zon(self):
@@ -1084,7 +1084,7 @@ class TestWriteVersionReturnPaths:
         from rlsbl.targets.zig import ZigTarget
         target = ZigTarget()
         with tempfile.TemporaryDirectory() as d:
-            result = target.write_version(d, "1.0.0")
+            result = target.write_version(d, "1.0.0", ctx=_ctx())
             assert result == ["VERSION"]
 
     def test_maven_returns_gradle_properties(self, tmp_path):
@@ -1093,7 +1093,7 @@ class TestWriteVersionReturnPaths:
         target = MavenTarget()
         (tmp_path / "build.gradle.kts").write_text('plugins { id("java") }')
         (tmp_path / "gradle.properties").write_text("VERSION_NAME=1.0.0\n")
-        result = target.write_version(str(tmp_path), "2.0.0")
+        result = target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
         assert result == ["gradle.properties"]
 
     def test_maven_returns_pom_xml(self, tmp_path):
@@ -1101,55 +1101,55 @@ class TestWriteVersionReturnPaths:
         from rlsbl.targets.maven import MavenTarget
         pom = '<project><version>1.0.0</version></project>'
         (tmp_path / "pom.xml").write_text(pom)
-        result = MavenTarget().write_version(str(tmp_path), "2.0.0")
+        result = MavenTarget().write_version(str(tmp_path), "2.0.0", ctx=_ctx())
         assert result == ["pom.xml"]
 
     def test_npm_returns_package_json(self, tmp_path):
         """NpmTarget.write_version returns ['package.json']."""
         target = NpmTarget()
         (tmp_path / "package.json").write_text(json.dumps({"name": "test", "version": "1.0.0"}))
-        result = target.write_version(str(tmp_path), "2.0.0")
+        result = target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
         assert result == ["package.json"]
 
     def test_go_returns_version_file(self, tmp_path):
         """GoTarget.write_version returns ['VERSION']."""
         target = GoTarget()
-        result = target.write_version(str(tmp_path), "1.0.0")
+        result = target.write_version(str(tmp_path), "1.0.0", ctx=_ctx())
         assert result == ["VERSION"]
 
     def test_cargo_returns_cargo_toml(self, tmp_path):
         """CargoTarget.write_version returns ['Cargo.toml']."""
         target = CargoTarget()
         (tmp_path / "Cargo.toml").write_text('[package]\nname = "test"\nversion = "1.0.0"\n')
-        result = target.write_version(str(tmp_path), "2.0.0")
+        result = target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
         assert result == ["Cargo.toml"]
 
     def test_deno_returns_deno_json(self, tmp_path):
         """DenoTarget.write_version returns ['deno.json']."""
         target = DenoTarget()
         (tmp_path / "deno.json").write_text('{"name": "test", "version": "1.0.0"}')
-        result = target.write_version(str(tmp_path), "2.0.0")
+        result = target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
         assert result == ["deno.json"]
 
     def test_deno_returns_deno_jsonc(self, tmp_path):
         """DenoTarget.write_version returns ['deno.jsonc'] for jsonc files."""
         target = DenoTarget()
         (tmp_path / "deno.jsonc").write_text('// comment\n{"name": "test", "version": "1.0.0"}')
-        result = target.write_version(str(tmp_path), "2.0.0")
+        result = target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
         assert result == ["deno.jsonc"]
 
     def test_hex_returns_mix_exs(self, tmp_path):
         """HexTarget.write_version returns ['mix.exs']."""
         target = HexTarget()
         (tmp_path / "mix.exs").write_text('defmodule T do\n  [version: "1.0.0"]\nend')
-        result = target.write_version(str(tmp_path), "2.0.0")
+        result = target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
         assert result == ["mix.exs"]
 
     def test_spec_returns_version_json(self, tmp_path):
         """SpecTarget.write_version returns ['version.json']."""
         target = SpecTarget()
         (tmp_path / "version.json").write_text('{"version": "1.0.0"}')
-        result = target.write_version(str(tmp_path), "2.0.0")
+        result = target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
         assert result == ["version.json"]
 
     def test_spec_returns_spec_subdir_path(self, tmp_path):
@@ -1157,7 +1157,7 @@ class TestWriteVersionReturnPaths:
         target = SpecTarget()
         (tmp_path / "spec").mkdir()
         (tmp_path / "spec" / "version.json").write_text('{"version": "1.0.0"}')
-        result = target.write_version(str(tmp_path), "2.0.0")
+        result = target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
         assert result == [os.path.join("spec", "version.json")]
 
     def test_docs_returns_selfdoc_json(self):
@@ -1167,26 +1167,26 @@ class TestWriteVersionReturnPaths:
         with tempfile.TemporaryDirectory() as d:
             with open(os.path.join(d, "selfdoc.json"), "w") as f:
                 json.dump({"language": "python"}, f, indent=2)
-            result = target.write_version(d, "1.0.0")
+            result = target.write_version(d, "1.0.0", ctx=_ctx())
             assert result == ["selfdoc.json"]
 
     def test_plain_returns_version_file(self, tmp_path):
         """PlainTarget.write_version returns ['VERSION']."""
         from rlsbl.targets.plain import PlainTarget
         target = PlainTarget()
-        result = target.write_version(str(tmp_path), "1.0.0")
+        result = target.write_version(str(tmp_path), "1.0.0", ctx=_ctx())
         assert result == ["VERSION"]
 
     def test_swift_returns_version_file(self, tmp_path):
         """SwiftTarget.write_version returns ['VERSION']."""
         target = SwiftTarget()
-        result = target.write_version(str(tmp_path), "1.0.0")
+        result = target.write_version(str(tmp_path), "1.0.0", ctx=_ctx())
         assert result == ["VERSION"]
 
     def test_swift_apple_returns_version_file(self, tmp_path):
         """SwiftAppleTarget.write_version returns ['VERSION']."""
         target = SwiftAppleTarget()
-        result = target.write_version(str(tmp_path), "1.0.0")
+        result = target.write_version(str(tmp_path), "1.0.0", ctx=_ctx())
         assert result == ["VERSION"]
 
 

@@ -40,7 +40,7 @@ class DocsTarget(BaseTarget):
         except (OSError, json.JSONDecodeError):
             return "0.0.0"
 
-    def write_version(self, dir_path, version, ctx=None):
+    def write_version(self, dir_path, version, ctx):
         """Write version to selfdoc.json atomically, preserving formatting."""
         config_path = os.path.join(dir_path, "selfdoc.json")
         with open(config_path, "r", encoding="utf-8") as f:

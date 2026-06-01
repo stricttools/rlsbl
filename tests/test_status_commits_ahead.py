@@ -12,6 +12,7 @@ import subprocess
 
 import pytest
 
+from conftest import make_ctx
 from rlsbl.commands.monorepo import _cmd_init, _cmd_add
 
 
@@ -55,7 +56,7 @@ class TestStatusCommitsAheadStandalone:
 
         capsys.readouterr()
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {}, project_root=".")
+        run_cmd("npm", [], {}, ctx=make_ctx("."))
         out = capsys.readouterr().out
 
         assert "commits ahead" not in out
@@ -76,7 +77,7 @@ class TestStatusCommitsAheadStandalone:
 
         capsys.readouterr()
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {}, project_root=".")
+        run_cmd("npm", [], {}, ctx=make_ctx("."))
         out = capsys.readouterr().out
 
         # Find the warning line
@@ -99,7 +100,7 @@ class TestStatusCommitsAheadStandalone:
 
         capsys.readouterr()
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {}, project_root=".")
+        run_cmd("npm", [], {}, ctx=make_ctx("."))
         out = capsys.readouterr().out
 
         warning_lines = [l for l in out.splitlines() if l.startswith(WARN_PREFIX)]
@@ -117,7 +118,7 @@ class TestStatusCommitsAheadStandalone:
 
         capsys.readouterr()
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {}, project_root=".")
+        run_cmd("npm", [], {}, ctx=make_ctx("."))
         out = capsys.readouterr().out
 
         assert "commits ahead" not in out
@@ -134,7 +135,7 @@ class TestStatusCommitsAheadStandalone:
 
         capsys.readouterr()
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {}, project_root=".")
+        run_cmd("npm", [], {}, ctx=make_ctx("."))
         captured = capsys.readouterr()
 
         assert "2 commits ahead of v1.0.0" in captured.out
@@ -151,7 +152,7 @@ class TestStatusCommitsAheadStandalone:
 
         capsys.readouterr()
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {}, project_root=".")
+        run_cmd("npm", [], {}, ctx=make_ctx("."))
         out = capsys.readouterr().out
         lines = out.splitlines()
 
@@ -174,7 +175,7 @@ class TestStatusCommitsAheadStandalone:
 
         capsys.readouterr()
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {"json": True}, project_root=".")
+        run_cmd("npm", [], {"json": True}, ctx=make_ctx("."))
         out = capsys.readouterr().out
         data = json.loads(out)
 
@@ -189,7 +190,7 @@ class TestStatusCommitsAheadStandalone:
 
         capsys.readouterr()
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {"json": True}, project_root=".")
+        run_cmd("npm", [], {"json": True}, ctx=make_ctx("."))
         out = capsys.readouterr().out
         data = json.loads(out)
 
@@ -224,7 +225,7 @@ class TestStatusCommitsAheadMonorepo:
         capsys.readouterr()
         monkeypatch.chdir(str(core_dir))
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {}, project_root=".")
+        run_cmd("npm", [], {}, ctx=make_ctx("."))
         out = capsys.readouterr().out
 
         warning_lines = [l for l in out.splitlines() if l.startswith(WARN_PREFIX)]
@@ -245,7 +246,7 @@ class TestStatusCommitsAheadMonorepo:
         capsys.readouterr()
         monkeypatch.chdir(str(proj_dir))
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {}, project_root=".")
+        run_cmd("npm", [], {}, ctx=make_ctx("."))
         out = capsys.readouterr().out
 
         assert "commits ahead" not in out
@@ -285,7 +286,7 @@ class TestStatusCommitsAheadMonorepo:
         # alpha: no commits touch its files -> no warning
         capsys.readouterr()
         monkeypatch.chdir(str(alpha))
-        run_cmd("npm", [], {}, project_root=".")
+        run_cmd("npm", [], {}, ctx=make_ctx("."))
         alpha_out = capsys.readouterr().out
         alpha_warnings = [l for l in alpha_out.splitlines() if l.startswith(WARN_PREFIX)]
         assert len(alpha_warnings) == 0, (
@@ -296,7 +297,7 @@ class TestStatusCommitsAheadMonorepo:
         # beta: 2 commits touch its files -> warning
         capsys.readouterr()
         monkeypatch.chdir(str(beta))
-        run_cmd("npm", [], {}, project_root=".")
+        run_cmd("npm", [], {}, ctx=make_ctx("."))
         beta_out = capsys.readouterr().out
         beta_warnings = [l for l in beta_out.splitlines() if l.startswith(WARN_PREFIX)]
         assert len(beta_warnings) == 1
@@ -330,13 +331,13 @@ class TestStatusCommitsAheadMonorepo:
 
         capsys.readouterr()
         monkeypatch.chdir(str(alpha))
-        run_cmd("npm", [], {"json": True}, project_root=".")
+        run_cmd("npm", [], {"json": True}, ctx=make_ctx("."))
         data = json.loads(capsys.readouterr().out)
         assert data["commits_ahead"] == 1
 
         capsys.readouterr()
         monkeypatch.chdir(str(beta))
-        run_cmd("npm", [], {"json": True}, project_root=".")
+        run_cmd("npm", [], {"json": True}, ctx=make_ctx("."))
         data = json.loads(capsys.readouterr().out)
         assert data["commits_ahead"] == 2
 
@@ -377,7 +378,7 @@ class TestStatusCommitsAheadMonorepo:
         # alpha shows warning -- 2 commits ahead of alpha@v1.0.0
         capsys.readouterr()
         monkeypatch.chdir(str(alpha))
-        run_cmd("npm", [], {}, project_root=".")
+        run_cmd("npm", [], {}, ctx=make_ctx("."))
         alpha_out = capsys.readouterr().out
         alpha_warnings = [l for l in alpha_out.splitlines() if l.startswith(WARN_PREFIX)]
         assert len(alpha_warnings) == 1
@@ -387,7 +388,7 @@ class TestStatusCommitsAheadMonorepo:
         # beta does not show warning -- its tag is at HEAD
         capsys.readouterr()
         monkeypatch.chdir(str(beta))
-        run_cmd("npm", [], {}, project_root=".")
+        run_cmd("npm", [], {}, ctx=make_ctx("."))
         beta_out = capsys.readouterr().out
         beta_warnings = [l for l in beta_out.splitlines() if l.startswith(WARN_PREFIX)]
         assert len(beta_warnings) == 0

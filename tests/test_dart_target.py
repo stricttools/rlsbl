@@ -232,12 +232,12 @@ class TestDartTargetReadName:
         target = DartTarget()
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "pubspec.yaml"), SAMPLE_PUBSPEC)
-            assert target.read_name(d) == "my_dart_app"
+            assert target.read_name(d, ctx=make_ctx(d)) == "my_dart_app"
 
     def test_read_name_none_without_pubspec(self):
         target = DartTarget()
         with tempfile.TemporaryDirectory() as d:
-            assert target.read_name(d) is None
+            assert target.read_name(d, ctx=make_ctx(d)) is None
 
 
 class TestDartTargetReadMetadata:

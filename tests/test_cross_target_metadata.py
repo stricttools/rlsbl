@@ -172,7 +172,7 @@ class TestReadNameAndMetadata:
         (tmp_path / "pyproject.toml").write_text(
             '[project]\nname = "my-package"\nversion = "1.0.0"\n'
         )
-        assert TARGETS["pypi"].read_name(str(tmp_path)) == "my-package"
+        assert TARGETS["pypi"].read_name(str(tmp_path), ctx=make_ctx(tmp_path)) == "my-package"
 
     def test_pypi_read_metadata_string_license(self, tmp_path):
         (tmp_path / "pyproject.toml").write_text(
@@ -196,7 +196,7 @@ class TestReadNameAndMetadata:
         (tmp_path / "package.json").write_text(
             '{"name": "@scope/pkg", "version": "1.0.0"}'
         )
-        assert TARGETS["npm"].read_name(str(tmp_path)) == "@scope/pkg"
+        assert TARGETS["npm"].read_name(str(tmp_path), ctx=make_ctx(tmp_path)) == "@scope/pkg"
 
     def test_npm_read_metadata(self, tmp_path):
         (tmp_path / "package.json").write_text(
@@ -208,11 +208,11 @@ class TestReadNameAndMetadata:
 
     def test_go_read_name(self, tmp_path):
         (tmp_path / "go.mod").write_text("module github.com/user/myrepo\n\ngo 1.21\n")
-        assert TARGETS["go"].read_name(str(tmp_path)) == "myrepo"
+        assert TARGETS["go"].read_name(str(tmp_path), ctx=make_ctx(tmp_path)) == "myrepo"
 
     def test_read_name_missing_file(self, tmp_path):
-        assert TARGETS["pypi"].read_name(str(tmp_path)) is None
-        assert TARGETS["npm"].read_name(str(tmp_path)) is None
+        assert TARGETS["pypi"].read_name(str(tmp_path), ctx=make_ctx(tmp_path)) is None
+        assert TARGETS["npm"].read_name(str(tmp_path), ctx=make_ctx(tmp_path)) is None
 
     def test_read_metadata_missing_file(self, tmp_path):
         assert TARGETS["pypi"].read_metadata(str(tmp_path)) == {}

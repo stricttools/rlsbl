@@ -6,6 +6,7 @@ import subprocess
 
 import pytest
 
+from conftest import make_ctx
 from rlsbl.changelog.validate import _unreleased_range
 from rlsbl.commands.monorepo import _cmd_init, _cmd_add, _cmd_status
 from rlsbl.workspace import load_workspace, save_workspace, WORKSPACE_DIR, WORKSPACE_FILE
@@ -178,7 +179,7 @@ class TestStatusMonorepoAware:
         monkeypatch.chdir(str(mock_git_repo / "core"))
 
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {}, project_root=".")
+        run_cmd("npm", [], {}, ctx=make_ctx("."))
         captured = capsys.readouterr()
 
         assert "Part of monorepo" in captured.out
@@ -192,7 +193,7 @@ class TestStatusMonorepoAware:
             json.dump({"name": "standalone", "version": "1.0.0"}, f)
 
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {}, project_root=".")
+        run_cmd("npm", [], {}, ctx=make_ctx("."))
         captured = capsys.readouterr()
 
         assert "Part of monorepo" not in captured.out
@@ -213,7 +214,7 @@ class TestStatusMonorepoAware:
             json.dump({"name": "monorepo-root", "version": "0.0.1"}, f)
 
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {}, project_root=".")
+        run_cmd("npm", [], {}, ctx=make_ctx("."))
         captured = capsys.readouterr()
 
         assert "Part of monorepo" in captured.out
@@ -253,7 +254,7 @@ class TestStatusTagScoping:
             side_effect=spy_unreleased_range,
         ):
             from rlsbl.commands.status import run_cmd
-            run_cmd("npm", [], {}, project_root=".")
+            run_cmd("npm", [], {}, ctx=make_ctx("."))
 
         assert len(captured_calls) == 1
         assert captured_calls[0] == "mylib@v*"
@@ -285,7 +286,7 @@ class TestStatusTagScoping:
             side_effect=spy_unreleased_range,
         ):
             from rlsbl.commands.status import run_cmd
-            run_cmd("npm", [], {}, project_root=".")
+            run_cmd("npm", [], {}, ctx=make_ctx("."))
 
         assert len(captured_calls) == 1
         assert captured_calls[0] is None
@@ -314,7 +315,7 @@ class TestStatusTagScoping:
             side_effect=spy_unreleased_range,
         ):
             from rlsbl.commands.status import _collect_status
-            _collect_status("npm", ".", tag_glob="my-project@v*", project_root=".")
+            _collect_status("npm", ".", tag_glob="my-project@v*", ctx=make_ctx("."))
 
         assert len(captured_calls) == 1
         assert captured_calls[0] == "my-project@v*"
@@ -350,7 +351,7 @@ class TestStatusTagScoping:
             side_effect=spy_unreleased_range,
         ):
             from rlsbl.commands.status import run_cmd
-            run_cmd("npm", [], {}, project_root=".")
+            run_cmd("npm", [], {}, ctx=make_ctx("."))
 
         assert len(captured_calls) == 1
         # Root is not a project in the workspace, so no tag glob

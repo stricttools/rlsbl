@@ -9,6 +9,7 @@ import json
 
 import pytest
 
+from conftest import make_ctx
 from rlsbl.targets import TARGETS, TargetEntry, _parse_target_entry, detect_targets
 from rlsbl.commands.release import resolve_release_targets, resolve_target_paths
 from rlsbl.commands.init_cmd import _merge_template_vars
@@ -133,7 +134,7 @@ class TestVersionSyncSubdirectory:
         npm_dir = tmp_path / "npm"
         npm_dir.mkdir()
         (npm_dir / "package.json").write_text('{"name": "test", "version": "1.0.0"}')
-        TARGETS["npm"].write_version(str(npm_dir), "2.0.0")
+        TARGETS["npm"].write_version(str(npm_dir), "2.0.0", ctx=make_ctx(npm_dir))
         assert TARGETS["npm"].read_version(str(npm_dir)) == "2.0.0"
 
     def test_read_name_from_subdirectory(self, tmp_path):
@@ -143,7 +144,7 @@ class TestVersionSyncSubdirectory:
         (pypi_dir / "pyproject.toml").write_text(
             '[project]\nname = "my-pkg"\nversion = "1.0.0"\n'
         )
-        assert TARGETS["pypi"].read_name(str(pypi_dir)) == "my-pkg"
+        assert TARGETS["pypi"].read_name(str(pypi_dir), ctx=make_ctx(pypi_dir)) == "my-pkg"
 
     def test_read_metadata_from_subdirectory(self, tmp_path):
         """read_metadata works with subdirectory path."""
@@ -170,7 +171,7 @@ class TestVersionSyncSubdirectory:
         (pypi_dir / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "1.0.0"\n'
         )
-        TARGETS["pypi"].write_version(str(pypi_dir), "2.5.0")
+        TARGETS["pypi"].write_version(str(pypi_dir), "2.5.0", ctx=make_ctx(pypi_dir))
         assert TARGETS["pypi"].read_version(str(pypi_dir)) == "2.5.0"
 
 
