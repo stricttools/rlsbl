@@ -802,8 +802,14 @@ def register_checks(app):
 
         Returns a dict mapping project name to (lib_imports, test_imports).
         All dep checks (unused, undeclared, runtime-test-only, dev-in-lib)
-        share one scan pass via this cache.
+        share one scan pass via this cache.  The result is memoized on the
+        context object so that multiple checks in the same run reuse a
+        single scan instead of re-walking every project's source tree.
         """
+        cached = getattr(ctx, "_dep_import_cache", None)
+        if cached is not None:
+            return cached
+
         from .dep_validation import _get_imported_workspace_packages
 
         root = str(ctx.workspace_root)
@@ -814,6 +820,7 @@ def register_checks(app):
             cache[proj["name"]] = _get_imported_workspace_packages(
                 project_dir, workspace_names
             )
+        ctx._dep_import_cache = cache
         return cache
 
     @app.check("deps-unused")
