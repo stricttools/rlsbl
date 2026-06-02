@@ -1,0 +1,8 @@
+# Version bump type: patch, minor, or major
+bump = "minor"
+# Short description of this release (required for dev_node releases)
+description = "Dev node architecture, release descriptions, quality checks, and graph enhancements"
+# Optional context explaining why these changes were made
+context = "The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinterpreted exempt as a desired behavior rather than a graph position. Dev nodes now fully opt out of the changelog system instead of being exempted from enforcement."
+include = ["npm", "pypi", "docs"]
+exclude = []
