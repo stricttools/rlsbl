@@ -1,4 +1,0 @@
-{"commits":["b588c052e6117716d73afaecf80034e0b2e39978"],"user_facing":true,"description":"**Fix.** Batch release files now enforce mandatory description per package, matching single-release behavior.","type":"fix"}
-{"commits":["f838aacdf670a9e813d4806bbfeedf93ca02d625","a777ca943557e2fddedba1c53811417e87b2c17c"],"user_facing":false}
-{"commits":["9ad1bc3c45705c11ee0340aafc33f1d00b6ae537"],"user_facing":false}
-{"commits":["d298bd07fdfe075af2977302edb8984ba316e902"],"user_facing":true,"description":"**Fix.** Dep quality checks now share a cached import scan instead of scanning 4x per workspace project.","type":"fix"}
