@@ -1,12 +1,16 @@
-"""Tests for project root discovery (find_project_root and main() integration)."""
+"""Tests for project root discovery (find_project_root, _require_sub_project_root, and main() integration)."""
 
+import json
 import os
 import sys
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 import pytest
 
+from conftest import make_workspace, run_git
 from rlsbl.utils import find_project_root
+from rlsbl.workspace import WORKSPACE_DIR
 
 
 class TestFindProjectRoot:
@@ -181,3 +185,93 @@ class TestMainRootDiscovery:
 
         # Should stay in sub-project, not walk to monorepo root
         assert os.getcwd() == original_cwd
+
+
+class TestRequireSubProjectRoot:
+    """Tests for _require_sub_project_root() resolution logic."""
+
+    def _make_monorepo(self, tmp_path, monkeypatch, projects_spec):
+        """Set up a monorepo git repo with workspace.toml and sub-projects.
+
+        projects_spec: list of dicts with path, name, and optional has_rlsbl (bool).
+        """
+        monkeypatch.chdir(tmp_path)
+
+        run_git(tmp_path, "init", "-q", "-b", "main")
+        run_git(tmp_path, "config", "user.email", "test@test.local")
+        run_git(tmp_path, "config", "user.name", "Test")
+
+        readme = tmp_path / "README.md"
+        readme.write_text("# monorepo\n")
+        run_git(tmp_path, "add", "README.md")
+        run_git(tmp_path, "commit", "-q", "-m", "initial")
+
+        ws_projects = [{"path": s["path"], "name": s["name"]} for s in projects_spec]
+        make_workspace(tmp_path, ws_projects)
+
+        for spec in projects_spec:
+            proj_dir = tmp_path / spec["path"]
+            proj_dir.mkdir(parents=True, exist_ok=True)
+            # Every project gets a package.json so it's detectable
+            (proj_dir / "package.json").write_text(
+                json.dumps({"name": spec["name"], "version": "0.1.0"})
+            )
+            if spec.get("has_rlsbl"):
+                (proj_dir / ".rlsbl").mkdir(exist_ok=True)
+
+        run_git(tmp_path, "add", WORKSPACE_DIR)
+        for spec in projects_spec:
+            run_git(tmp_path, "add", spec["path"])
+        run_git(tmp_path, "commit", "-q", "-m", "add projects")
+
+        return tmp_path
+
+    def test_sub_project_root_in_monorepo(self, tmp_path, monkeypatch):
+        """Chdir into sub-project with .rlsbl/ -> returns sub-project path."""
+        root = self._make_monorepo(tmp_path, monkeypatch, [
+            {"path": "pkg-a", "name": "pkg-a", "has_rlsbl": True},
+        ])
+        sub = root / "pkg-a"
+        monkeypatch.chdir(sub)
+
+        from rlsbl import _require_sub_project_root
+        result = _require_sub_project_root()
+
+        assert result == sub
+
+    def test_sub_project_root_without_rlsbl(self, tmp_path, monkeypatch):
+        """Chdir into sub-project without .rlsbl/ -> returns sub-project path (not monorepo root).
+
+        The workspace.toml lists the project, so resolve_project matches it
+        even though it has no .rlsbl/ directory of its own.
+        """
+        root = self._make_monorepo(tmp_path, monkeypatch, [
+            {"path": "pkg-b", "name": "pkg-b", "has_rlsbl": False},
+        ])
+        sub = root / "pkg-b"
+        monkeypatch.chdir(sub)
+
+        from rlsbl import _require_sub_project_root
+        result = _require_sub_project_root()
+
+        # Should resolve to the sub-project, not the monorepo root
+        assert result == sub
+
+    def test_sub_project_root_standalone(self, tmp_path, monkeypatch):
+        """Standalone project (no monorepo) -> returns project root (same as _require_project_root)."""
+        monkeypatch.chdir(tmp_path)
+
+        run_git(tmp_path, "init", "-q", "-b", "main")
+        run_git(tmp_path, "config", "user.email", "test@test.local")
+        run_git(tmp_path, "config", "user.name", "Test")
+        (tmp_path / ".rlsbl").mkdir()
+        (tmp_path / "package.json").write_text(
+            json.dumps({"name": "standalone", "version": "1.0.0"})
+        )
+        run_git(tmp_path, "add", ".")
+        run_git(tmp_path, "commit", "-q", "-m", "initial")
+
+        from rlsbl import _require_sub_project_root
+        result = _require_sub_project_root()
+
+        assert result == tmp_path

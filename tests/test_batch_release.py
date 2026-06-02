@@ -466,3 +466,65 @@ class TestBatchFinalization:
         date_part, time_part = parts.split("-", 1)
         assert len(date_part) == 8  # YYYYMMDD
         assert len(time_part) == 6  # HHMMSS
+
+
+# ---------------------------------------------------------------------------
+# Batch release with changelog-exempt projects
+# ---------------------------------------------------------------------------
+
+
+class TestBatchReleaseExempt:
+
+    def test_exempt_project_included_in_batch(self, mock_git_repo, capsys):
+        """Changelog-exempt projects are released (version bumped) in batch mode.
+
+        The batch release flow does not skip exempt projects -- they get
+        version bumps like any other project. The exemption only applies to
+        changelog enforcement (no JSONL coverage required).
+        """
+        _make_npm_project(mock_git_repo, "internal", version="0.1.0")
+        _make_npm_project(mock_git_repo, "public", version="0.1.0")
+
+        projects = [
+            {"path": "internal", "name": "internal", "changelog_exempt": True},
+            {"path": "public", "name": "public"},
+        ]
+        _init_workspace(mock_git_repo, projects)
+
+        batch_path = get_batch_release_file_path(str(mock_git_repo))
+        _write_toml(
+            batch_path,
+            '[packages.internal]\n'
+            'bump = "patch"\n'
+            'include = ["npm"]\n'
+            'exclude = []\n'
+            '\n'
+            '[packages.public]\n'
+            'bump = "minor"\n'
+            'include = ["npm"]\n'
+            'exclude = []\n',
+        )
+
+        released = []
+        configs = {}
+
+        def mock_run_cmd(release_config, flags, **kwargs):
+            name = os.path.basename(str(kwargs["ctx"].project_root))
+            released.append(name)
+            configs[name] = release_config
+
+        with patch("rlsbl.commands.monorepo.batch_release._finalize_batch_file"):
+            with patch("rlsbl.commands.release.run_cmd", mock_run_cmd):
+                _cmd_batch_release(
+                    {"dry-run": False, "yes": True, "quiet": False},
+                    project_root=mock_git_repo,
+                )
+
+        # Both projects are released (exempt is NOT skipped)
+        assert "internal" in released
+        assert "public" in released
+        assert len(released) == 2
+
+        # The exempt project gets its configured bump type
+        assert configs["internal"].bump == "patch"
+        assert configs["public"].bump == "minor"
