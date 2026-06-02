@@ -271,12 +271,16 @@ def _python_module_name(filepath: str, project_dir: str) -> str | None:
     return ".".join(parts)
 
 
-def _collect_python_imports(filepath: str) -> set[str]:
-    """Collect all import targets from a Python file using simple regex.
+def _collect_python_imports(
+    filepath: str, project_dir: str,
+) -> set[str]:
+    """Collect all import targets from a Python file.
 
     Returns a set of dotted module names that are imported.
-    Handles: import foo, import foo.bar, from foo import bar,
-    from foo.bar import baz.
+    Handles absolute imports (import foo, from foo.bar import baz)
+    and relative imports (from .utils import helper, from ..core import x).
+    Relative imports are resolved to absolute dotted paths using the
+    file's position within the project directory.
     """
     imports: set[str] = set()
     try:
@@ -285,13 +289,40 @@ def _collect_python_imports(filepath: str) -> set[str]:
     except (OSError, UnicodeDecodeError):
         return imports
 
+    # Determine this file's package for resolving relative imports
+    rel = os.path.relpath(filepath, project_dir)
+    parts = rel.split(os.sep)
+    if parts[-1].endswith(".py"):
+        parts[-1] = parts[-1][:-3]
+    # For __init__.py, the module IS the package (don't strip last part)
+    if parts[-1] == "__init__":
+        file_package_parts = parts[:-1]
+    else:
+        file_package_parts = parts[:-1]
+
     # Match 'import x.y.z' and 'import x.y.z as alias'
     for m in re.finditer(r"^\s*import\s+([\w.]+)", content, re.MULTILINE):
         imports.add(m.group(1))
 
-    # Match 'from x.y.z import ...'
-    for m in re.finditer(r"^\s*from\s+([\w.]+)\s+import\s+", content, re.MULTILINE):
-        imports.add(m.group(1))
+    # Match 'from x.y.z import ...' (absolute) and 'from .x import ...' (relative)
+    for m in re.finditer(r"^\s*from\s+(\.+[\w.]*|[\w.]+)\s+import\s+", content, re.MULTILINE):
+        module = m.group(1)
+        if module.startswith("."):
+            # Relative import: resolve to absolute path
+            dots = len(module) - len(module.lstrip("."))
+            relative_module = module.lstrip(".")
+            # Go up 'dots - 1' levels from the current package
+            if dots - 1 > len(file_package_parts):
+                continue  # Can't go above project root
+            base_parts = file_package_parts[:len(file_package_parts) - (dots - 1)]
+            if relative_module:
+                resolved = ".".join(base_parts + [relative_module]) if base_parts else relative_module
+            else:
+                resolved = ".".join(base_parts) if base_parts else ""
+            if resolved:
+                imports.add(resolved)
+        else:
+            imports.add(module)
 
     return imports
 
@@ -381,7 +412,7 @@ def find_dead_modules(project_dir: str) -> list[str]:
     # Collect all imports across all production files
     all_imports: set[str] = set()
     for filepath in production_files:
-        all_imports.update(_collect_python_imports(filepath))
+        all_imports.update(_collect_python_imports(filepath, project_dir))
 
     # Collect all __init__.py exports (names referenced via relative import
     # or __all__)
