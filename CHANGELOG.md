@@ -2,6 +2,31 @@
 
 # Changelog
 
+## 0.54.0
+
+Dev node architecture, release descriptions, quality checks, and graph enhancements
+
+<details>
+<summary>Context</summary>
+
+The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinterpreted exempt as a desired behavior rather than a graph position. Dev nodes now fully opt out of the changelog system instead of being exempted from enforcement.
+
+</details>
+
+### Breaking
+
+- **Breaking.** Renamed `changelog_exempt` to `dev_node`. Dev node projects no longer participate in the changelog system — no JSONL entries, no CHANGELOG.md, no pre-push enforcement. Release does version bump + tag + GitHub Release (body from release description). Boundary guardrail prevents non-dev-nodes from depending on dev_nodes at runtime.
+
+### Features
+
+- **Internal.** Added `WorkspaceProject` typed wrapper and `project` field on `ProjectContext` for structured workspace project access.
+- **New feature.** Release description and context fields in `unreleased.toml`. Description appears in CHANGELOG.md under version heading. Context appears as collapsible details block. Description mandatory for dev_node releases.
+- **New feature.** Three quality checks: `deps-runtime-test-only` (warning: runtime dep only used in tests), `deps-dev-in-lib` (error: dev dep imported in lib code), `dead-modules` (warning: Python modules with zero intra-project references).
+
+### Fixes
+
+- **Fix.** Library lint now excludes test and example files by default. Go `*_test.go`, Python `test_*.py`/`tests/`, npm `*.test.ts`/`__tests__/`, and `examples/` dirs are no longer flagged for stdout usage.
+
 ## 0.53.0
 
 ### Breaking
