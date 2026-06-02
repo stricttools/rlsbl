@@ -291,6 +291,52 @@ class TestMergedPublishCombinations:
         assert "\n  go:" not in result
         assert "\n  deno:" not in result
 
+    def test_go_npm_wrapper_jobs_preserved(self):
+        """Go template with npmPublishJobs content preserves both goreleaser and npm-publish jobs.
+
+        When Go's publish.yml.tpl expands {{npmPublishJobs}} to add an
+        npm-publish job, the merged publish must contain BOTH the goreleaser
+        job AND the npm-publish job, not just the first one.
+        """
+        npm_publish_yaml = (
+            "\n"
+            "  npm-publish:\n"
+            "    needs: [goreleaser]\n"
+            "    runs-on: ubuntu-latest\n"
+            "    steps:\n"
+            "      - uses: actions/checkout@v4\n"
+            "      - name: Publish npm wrapper\n"
+            "        run: npm publish --access public\n"
+            "        env:\n"
+            "          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}\n"
+        )
+        go_vars = {
+            **self.TEMPLATE_VARS,
+            "homebrewEnv": "",
+            "npmPublishJobs": npm_publish_yaml,
+        }
+        result = _generate_merged_publish(["go"], go_vars)
+
+        from ruamel.yaml import YAML
+
+        data = YAML(typ="safe").load(result)
+        job_keys = list(data["jobs"].keys())
+
+        # Both jobs must be present
+        assert "go" in job_keys, f"Expected 'go' job key, got {job_keys}"
+        assert "go-npm-publish" in job_keys, f"Expected 'go-npm-publish' job key, got {job_keys}"
+
+        # goreleaser job (renamed to 'go') should have goreleaser action
+        go_job = data["jobs"]["go"]
+        step_uses = [s.get("uses", "") for s in go_job["steps"]]
+        assert any("goreleaser" in u for u in step_uses), "goreleaser step missing from go job"
+
+        # npm-publish job should have npm publish step
+        npm_job = data["jobs"]["go-npm-publish"]
+        assert npm_job["needs"] == ["goreleaser"]
+        step_names = [s.get("name", "") for s in npm_job["steps"]]
+        assert any("npm" in n.lower() for n in step_names), "npm step missing from npm-publish job"
+
     def test_secondary_npm_registry_url_resolved(self):
         """When npm is a secondary target, {{registryUrl}} must resolve from namespaced vars.
 
