@@ -119,10 +119,14 @@ def read_release_file(path: str) -> ReleaseConfig:
                 f"but got: {mode_list}"
             )
 
-    # --- description (optional) ---
-    description = data.get("description", "")
+    # --- description (required) ---
+    if "description" not in data:
+        raise ValueError("missing required field: description")
+    description = data["description"]
     if not isinstance(description, str):
         raise ValueError("description must be a string")
+    if not description.strip():
+        raise ValueError("description must be set in unreleased.toml (a short summary of this release)")
 
     # --- context (optional) ---
     context = data.get("context", "")
