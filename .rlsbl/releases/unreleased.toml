@@ -1,8 +1,0 @@
-# Version bump type: patch, minor, or major
-bump = "patch"
-# Short description of this release (required)
-description = "Batch release description enforcement, scan cache optimization, lint exclusion todo cleanup"
-# Optional context explaining why these changes were made
-context = ""
-include = ["npm", "pypi", "docs"]
-exclude = []
