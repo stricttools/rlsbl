@@ -80,8 +80,8 @@ def make_workspace(root, projects):
             lines.append(f"watch = [{watch_items}]")
         if proj.get("library"):
             lines.append("library = true")
-        if proj.get("internal"):
-            lines.append("internal = true")
+        if proj.get("changelog_exempt"):
+            lines.append("changelog_exempt = true")
         lines.append("")
     (ws_dir / WORKSPACE_FILE).write_text("\n".join(lines))
 

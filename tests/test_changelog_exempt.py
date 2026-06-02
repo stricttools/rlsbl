@@ -1,4 +1,4 @@
-"""Tests for internal project changelog exemption."""
+"""Tests for changelog-exempt project changelog exemption."""
 
 import json
 import os
@@ -19,13 +19,13 @@ from rlsbl.workspace import WORKSPACE_DIR
 
 
 @pytest.fixture
-def internal_monorepo(tmp_path, monkeypatch):
-    """Create a monorepo with one internal and one regular project.
+def exempt_monorepo(tmp_path, monkeypatch):
+    """Create a monorepo with one changelog-exempt and one regular project.
 
     Yields a SimpleNamespace with:
         root        -- Path to the repo root
         projects    -- list of project dicts (matching workspace.toml)
-        internal_dir -- absolute Path to the internal subproject
+        exempt_dir  -- absolute Path to the changelog-exempt subproject
         regular_dir  -- absolute Path to the regular subproject
     """
     monkeypatch.chdir(tmp_path)
@@ -40,22 +40,22 @@ def internal_monorepo(tmp_path, monkeypatch):
     run_git(tmp_path, "commit", "-q", "-m", "initial")
 
     projects = [
-        {"path": "internal-pkg", "name": "mypkg-internal", "internal": True},
+        {"path": "internal-pkg", "name": "mypkg-internal", "changelog_exempt": True},
         {"path": "regular-pkg", "name": "mypkg-regular"},
     ]
 
     make_workspace(tmp_path, projects)
 
-    internal_dir = tmp_path / "internal-pkg"
+    exempt_dir = tmp_path / "internal-pkg"
     regular_dir = tmp_path / "regular-pkg"
 
-    # Set up internal project with JSONL changelog
-    (internal_dir / ".rlsbl" / "changes").mkdir(parents=True)
-    (internal_dir / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
-    (internal_dir / ".rlsbl" / "config.json").write_text(
+    # Set up changelog-exempt project with JSONL changelog
+    (exempt_dir / ".rlsbl" / "changes").mkdir(parents=True)
+    (exempt_dir / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
+    (exempt_dir / ".rlsbl" / "config.json").write_text(
         json.dumps({"private": False}) + "\n"
     )
-    (internal_dir / "package.json").write_text(
+    (exempt_dir / "package.json").write_text(
         json.dumps({"name": "mypkg-internal", "version": "0.1.0"})
     )
 
@@ -82,7 +82,7 @@ def internal_monorepo(tmp_path, monkeypatch):
     yield SimpleNamespace(
         root=tmp_path,
         projects=projects,
-        internal_dir=internal_dir,
+        exempt_dir=exempt_dir,
         regular_dir=regular_dir,
     )
 
@@ -98,31 +98,31 @@ def _write_jsonl_entry(proj_dir, commits, user_facing=False):
         f.write(json.dumps(entry) + "\n")
 
 
-class TestInternalProjectPrePush:
-    """Internal projects should be skipped in pre-push changelog checks."""
+class TestChangelogExemptProjectPrePush:
+    """Changelog-exempt projects should be skipped in pre-push changelog checks."""
 
-    def test_internal_project_skips_pre_push_coverage(self, internal_monorepo, capsys):
-        """Push touching internal project without JSONL entries exits 0."""
-        root = internal_monorepo.root
-        projects = internal_monorepo.projects
+    def test_exempt_project_skips_pre_push_coverage(self, exempt_monorepo, capsys):
+        """Push touching changelog-exempt project without JSONL entries exits 0."""
+        root = exempt_monorepo.root
+        projects = exempt_monorepo.projects
 
-        # Make a commit that touches the internal project
-        sha = make_commit(root, "internal-pkg/main.js", "internal change")
+        # Make a commit that touches the changelog-exempt project
+        sha = make_commit(root, "internal-pkg/main.js", "exempt change")
 
-        # Do NOT add any JSONL entry for the internal project
+        # Do NOT add any JSONL entry for the changelog-exempt project
         changed_files = {"internal-pkg/main.js"}
 
         with patch("rlsbl.commands.pre_push_check._get_pushed_commits",
                    return_value={sha}):
             with pytest.raises(SystemExit) as exc_info:
                 _run_monorepo_check(str(root), projects, changed_files, refs=[("fake", "fake")])
-            # Should pass because internal project is skipped
+            # Should pass because changelog-exempt project is skipped
             assert exc_info.value.code == 0
 
-    def test_non_internal_still_enforced(self, internal_monorepo, capsys):
-        """Regular (non-internal) project still requires JSONL coverage."""
-        root = internal_monorepo.root
-        projects = internal_monorepo.projects
+    def test_non_exempt_still_enforced(self, exempt_monorepo, capsys):
+        """Regular (non-exempt) project still requires JSONL coverage."""
+        root = exempt_monorepo.root
+        projects = exempt_monorepo.projects
 
         # Make a commit that touches the regular project
         sha = make_commit(root, "regular-pkg/main.js", "regular change")
@@ -139,10 +139,10 @@ class TestInternalProjectPrePush:
             captured = capsys.readouterr()
             assert "mypkg-regular" in captured.err
 
-    def test_internal_skipped_while_regular_checked(self, internal_monorepo, capsys):
-        """When both projects have changes, internal is skipped and regular is checked."""
-        root = internal_monorepo.root
-        projects = internal_monorepo.projects
+    def test_exempt_skipped_while_regular_checked(self, exempt_monorepo, capsys):
+        """When both projects have changes, exempt is skipped and regular is checked."""
+        root = exempt_monorepo.root
+        projects = exempt_monorepo.projects
 
         # Make a commit touching both
         (root / "internal-pkg" / "a.js").write_text("// a\n")
@@ -152,7 +152,7 @@ class TestInternalProjectPrePush:
         sha = git_head(root)
 
         # Add coverage ONLY for regular project
-        _write_jsonl_entry(internal_monorepo.regular_dir, [sha[:12]])
+        _write_jsonl_entry(exempt_monorepo.regular_dir, [sha[:12]])
         run_git(root, "add", "regular-pkg/.rlsbl/changes/unreleased.jsonl")
         run_git(root, "commit", "-q", "-m", "changelog: regular entry")
 
@@ -162,30 +162,30 @@ class TestInternalProjectPrePush:
                    return_value={sha}):
             with pytest.raises(SystemExit) as exc_info:
                 _run_monorepo_check(str(root), projects, changed_files, refs=[("fake", "fake")])
-            # Should pass: internal is skipped, regular has coverage
+            # Should pass: exempt is skipped, regular has coverage
             assert exc_info.value.code == 0
 
 
-class TestInternalProjectChecks:
-    """Internal projects should skip changelog-coverage and changelog-user-facing checks."""
+class TestChangelogExemptProjectChecks:
+    """Changelog-exempt projects should skip changelog-coverage and changelog-user-facing checks."""
 
-    def test_internal_project_skips_user_facing_check(self, internal_monorepo):
-        """Changelog-user-facing check returns skip for internal projects."""
+    def test_exempt_project_skips_user_facing_check(self, exempt_monorepo):
+        """Changelog-user-facing check returns skip for changelog-exempt projects."""
         from strictcli import CheckResult
         from rlsbl.check_context import WorkspaceCheckContext
         from rlsbl.workspace import load_workspace, resolve_project
         from rlsbl.workspace_graph import WorkspaceGraph
 
-        root = internal_monorepo.root
-        internal_dir = internal_monorepo.internal_dir
+        root = exempt_monorepo.root
+        exempt_dir = exempt_monorepo.exempt_dir
 
         # Load workspace state
         projects = load_workspace(str(root))
         graph = WorkspaceGraph(str(root), projects)
 
-        # Create a WorkspaceCheckContext pointing at the internal project
+        # Create a WorkspaceCheckContext pointing at the changelog-exempt project
         ctx = WorkspaceCheckContext(
-            project_root=internal_dir,
+            project_root=exempt_dir,
             workspace_root=root,
             config={},
             projects=projects,
@@ -213,23 +213,23 @@ class TestInternalProjectChecks:
         # Run changelog-user-facing check
         result = registered_checks["changelog-user-facing"](ctx)
         assert result.status == "skip"
-        assert "internal" in result.message
+        assert "changelog-exempt" in result.message
 
-    def test_internal_project_skips_coverage_check(self, internal_monorepo):
-        """Changelog-coverage check returns skip for internal projects."""
+    def test_exempt_project_skips_coverage_check(self, exempt_monorepo):
+        """Changelog-coverage check returns skip for changelog-exempt projects."""
         from strictcli import CheckResult
         from rlsbl.check_context import WorkspaceCheckContext
         from rlsbl.workspace import load_workspace
         from rlsbl.workspace_graph import WorkspaceGraph
 
-        root = internal_monorepo.root
-        internal_dir = internal_monorepo.internal_dir
+        root = exempt_monorepo.root
+        exempt_dir = exempt_monorepo.exempt_dir
 
         projects = load_workspace(str(root))
         graph = WorkspaceGraph(str(root), projects)
 
         ctx = WorkspaceCheckContext(
-            project_root=internal_dir,
+            project_root=exempt_dir,
             workspace_root=root,
             config={},
             projects=projects,
@@ -254,16 +254,16 @@ class TestInternalProjectChecks:
 
         result = registered_checks["changelog-coverage"](ctx)
         assert result.status == "skip"
-        assert "internal" in result.message
+        assert "changelog-exempt" in result.message
 
-    def test_regular_project_not_skipped(self, internal_monorepo):
-        """Changelog checks are NOT skipped for regular (non-internal) projects."""
+    def test_regular_project_not_skipped(self, exempt_monorepo):
+        """Changelog checks are NOT skipped for regular (non-exempt) projects."""
         from rlsbl.check_context import WorkspaceCheckContext
         from rlsbl.workspace import load_workspace
         from rlsbl.workspace_graph import WorkspaceGraph
 
-        root = internal_monorepo.root
-        regular_dir = internal_monorepo.regular_dir
+        root = exempt_monorepo.root
+        regular_dir = exempt_monorepo.regular_dir
 
         projects = load_workspace(str(root))
         graph = WorkspaceGraph(str(root), projects)
@@ -294,8 +294,8 @@ class TestInternalProjectChecks:
 
         # Coverage check should NOT skip for regular project
         result = registered_checks["changelog-coverage"](ctx)
-        assert result.status != "skip" or "internal" not in result.message
+        assert result.status != "skip" or "changelog-exempt" not in result.message
 
         # User-facing check should NOT skip for regular project
         result = registered_checks["changelog-user-facing"](ctx)
-        assert result.status != "skip" or "internal" not in result.message
+        assert result.status != "skip" or "changelog-exempt" not in result.message
