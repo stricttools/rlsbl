@@ -1,5 +1,5 @@
 {
-  "version": "0.54.1",
+  "version": "0.54.2",
   "base_url": "https://rlsbl.smmh.dev",
   "language": "python",
   "source": [
@@ -9,7 +9,7 @@
   "output": "docs/_build/",
   "versions": [
     {
-      "version": "0.54.1",
+      "version": "0.54.2",
       "indexed": true
     }
   ],

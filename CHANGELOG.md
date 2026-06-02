@@ -2,9 +2,16 @@
 
 # Changelog
 
-## 0.54.1
+## 0.54.2
 
-Make release description mandatory
+Batch release description enforcement, scan cache optimization, lint exclusion todo cleanup
+
+### Fixes
+
+- **Fix.** Batch release files now enforce mandatory description per package, matching single-release behavior.
+- **Fix.** Dep quality checks now share a cached import scan instead of scanning 4x per workspace project.
+
+## 0.54.1
 
 ### Breaking
 
