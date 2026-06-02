@@ -226,6 +226,28 @@ class TestReleaseInitRoundTrip:
         assert data["targets"]["flutter-android"]["mode"] == "build"
 
 
+class TestReleaseInitDescriptionContext:
+    """Scaffolded file includes description and context fields."""
+
+    def test_scaffolded_file_has_description_and_context(self, tmp_path, monkeypatch):
+        entries = [TargetEntry(name="pypi", path=str(tmp_path))]
+        _run_release_init(tmp_path, entries, monkeypatch)
+
+        release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
+        data = _read_scaffolded_toml(str(release_path))
+        assert data["description"] == ""
+        assert data["context"] == ""
+
+    def test_scaffolded_file_has_description_comment(self, tmp_path, monkeypatch):
+        entries = [TargetEntry(name="npm", path=str(tmp_path))]
+        _run_release_init(tmp_path, entries, monkeypatch)
+
+        release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
+        raw = release_path.read_text()
+        assert "# Short description of this release" in raw
+        assert "# Optional context" in raw
+
+
 class TestReleaseInitPrintsPath:
     """The command prints the path of the created file."""
 

@@ -108,6 +108,82 @@ class TestGenerateVersionSection:
         # only 2 bullet items
         assert md.count("- ") == 2
 
+    def test_description_added_after_heading(self):
+        entries = [
+            ChangelogEntry(commits=["a"], user_facing=True, description="A feature", type="feature"),
+        ]
+        md = generate_version_section("5.0.0", entries, description="Major overhaul of the widget system")
+        assert "## 5.0.0" in md
+        assert "Major overhaul of the widget system" in md
+        # Description comes before the first type group
+        desc_pos = md.index("Major overhaul of the widget system")
+        features_pos = md.index("### Features")
+        assert desc_pos < features_pos
+
+    def test_context_added_as_details_block(self):
+        entries = [
+            ChangelogEntry(commits=["a"], user_facing=True, description="A fix", type="fix"),
+        ]
+        md = generate_version_section("5.1.0", entries, context="Users reported crashes on startup")
+        assert "<details>" in md
+        assert "<summary>Context</summary>" in md
+        assert "Users reported crashes on startup" in md
+        assert "</details>" in md
+
+    def test_description_and_context_together(self):
+        entries = [
+            ChangelogEntry(commits=["a"], user_facing=True, description="New API", type="feature"),
+        ]
+        md = generate_version_section(
+            "6.0.0", entries,
+            description="Redesigned widget API",
+            context="The old API had performance issues",
+        )
+        assert "Redesigned widget API" in md
+        assert "The old API had performance issues" in md
+        # Description before context before entries
+        desc_pos = md.index("Redesigned widget API")
+        ctx_pos = md.index("<details>")
+        feat_pos = md.index("### Features")
+        assert desc_pos < ctx_pos < feat_pos
+
+    def test_description_with_no_user_facing_entries(self):
+        entries = [
+            ChangelogEntry(commits=["a"], user_facing=False),
+        ]
+        md = generate_version_section("7.0.0", entries, description="Internal refactor")
+        assert "Internal refactor" in md
+        assert "- No user-facing changes." in md
+
+    def test_context_with_no_user_facing_entries(self):
+        entries = [
+            ChangelogEntry(commits=["a"], user_facing=False),
+        ]
+        md = generate_version_section(
+            "7.1.0", entries, context="Preparing for next major release",
+        )
+        assert "<details>" in md
+        assert "Preparing for next major release" in md
+        assert "- No user-facing changes." in md
+
+    def test_empty_description_not_added(self):
+        entries = [
+            ChangelogEntry(commits=["a"], user_facing=True, description="Feat", type="feature"),
+        ]
+        md = generate_version_section("8.0.0", entries, description="")
+        lines = md.strip().splitlines()
+        # No empty paragraph between heading and ### Features
+        assert lines[0] == "## 8.0.0"
+        assert lines[1] == ""
+        assert lines[2] == "### Features"
+
+    def test_empty_context_not_added(self):
+        entries = [
+            ChangelogEntry(commits=["a"], user_facing=True, description="Feat", type="feature"),
+        ]
+        md = generate_version_section("8.1.0", entries, context="")
+        assert "<details>" not in md
+
 
 class TestGenerateVersionFile:
     """Tests for generate_version_file."""
@@ -388,3 +464,68 @@ class TestGenerateChangelog:
         assert "## 9.9.9" not in content
         assert "## Unreleased" not in content
         assert "## 1.0.0" in content
+
+    def test_description_flows_into_unreleased_section(self, tmp_path, monkeypatch):
+        """description parameter appears in the unreleased section."""
+        monkeypatch.chdir(tmp_path)
+        self._setup_project(
+            tmp_path,
+            unreleased_lines=[
+                _jsonl_line(commits=["x"], user_facing=True, description="New thing", type="feature"),
+            ],
+        )
+
+        content = generate_changelog(
+            str(tmp_path),
+            version_override="2.0.0",
+            description="Complete API redesign",
+        )
+        assert "Complete API redesign" in content
+        # Description is in the 2.0.0 section
+        desc_pos = content.index("Complete API redesign")
+        heading_pos = content.index("## 2.0.0")
+        assert desc_pos > heading_pos
+
+    def test_context_flows_into_unreleased_section(self, tmp_path, monkeypatch):
+        """context parameter appears as details block in unreleased section."""
+        monkeypatch.chdir(tmp_path)
+        self._setup_project(
+            tmp_path,
+            unreleased_lines=[
+                _jsonl_line(commits=["x"], user_facing=True, description="Fix", type="fix"),
+            ],
+        )
+
+        content = generate_changelog(
+            str(tmp_path),
+            version_override="1.1.0",
+            context="Root cause was a race condition",
+        )
+        assert "<details>" in content
+        assert "Root cause was a race condition" in content
+
+    def test_description_not_applied_to_versioned_sections(self, tmp_path, monkeypatch):
+        """description only affects the unreleased section, not existing versions."""
+        monkeypatch.chdir(tmp_path)
+        self._setup_project(
+            tmp_path,
+            versions={
+                "1.0.0": [
+                    _jsonl_line(commits=["a"], user_facing=True, description="Old feat", type="feature"),
+                ],
+            },
+            unreleased_lines=[
+                _jsonl_line(commits=["x"], user_facing=True, description="New feat", type="feature"),
+            ],
+        )
+
+        content = generate_changelog(
+            str(tmp_path),
+            version_override="2.0.0",
+            description="Only for the new version",
+        )
+        # Description appears after 2.0.0 heading
+        desc_pos = content.index("Only for the new version")
+        v2_pos = content.index("## 2.0.0")
+        v1_pos = content.index("## 1.0.0")
+        assert v2_pos < desc_pos < v1_pos
