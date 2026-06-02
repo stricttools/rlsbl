@@ -275,6 +275,7 @@ class TestReleaseFileFlutterMode:
             'bump = "patch"\n'
             'include = ["flutter-ios"]\n'
             'exclude = []\n'
+            'description = "test release"\n'
             "\n"
             "[targets.flutter-ios]\n"
             'mode = "ota"\n'
@@ -288,6 +289,7 @@ class TestReleaseFileFlutterMode:
             'bump = "minor"\n'
             'include = ["flutter-android"]\n'
             'exclude = []\n'
+            'description = "test release"\n'
             "\n"
             "[targets.flutter-android]\n"
             'mode = "build"\n'
@@ -301,6 +303,7 @@ class TestReleaseFileFlutterMode:
             'bump = "patch"\n'
             'include = ["flutter-ios", "flutter-android"]\n'
             'exclude = []\n'
+            'description = "test release"\n'
             "\n"
             "[targets.flutter-ios]\n"
             'mode = "ota"\n'
@@ -335,6 +338,7 @@ class TestReleaseFileFlutterMode:
             'bump = "patch"\n'
             'include = ["pypi"]\n'
             'exclude = []\n'
+            'description = "test release"\n'
         )
         cfg = read_release_file(str(f))
         assert cfg.targets == {}

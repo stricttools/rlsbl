@@ -25,7 +25,7 @@ class TestGetReleaseFilePath:
 class TestReadReleaseFileValid:
     def test_minimal_file(self, tmp_path):
         f = tmp_path / "release.toml"
-        f.write_text('bump = "patch"\ninclude = ["pypi"]\nexclude = ["npm"]\n')
+        f.write_text('bump = "patch"\ninclude = ["pypi"]\nexclude = ["npm"]\ndescription = "test release"\n')
         cfg = read_release_file(str(f))
         assert cfg.bump == "patch"
         assert cfg.include == ["pypi"]
@@ -34,7 +34,7 @@ class TestReadReleaseFileValid:
 
     def test_empty_include_and_exclude(self, tmp_path):
         f = tmp_path / "release.toml"
-        f.write_text('bump = "minor"\ninclude = []\nexclude = []\n')
+        f.write_text('bump = "minor"\ninclude = []\nexclude = []\ndescription = "test release"\n')
         cfg = read_release_file(str(f))
         assert cfg.bump == "minor"
         assert cfg.include == []
@@ -47,6 +47,7 @@ class TestReadReleaseFileValid:
             'bump = "minor"\n'
             'include = ["flutter-ios", "flutter-android"]\n'
             'exclude = ["npm"]\n'
+            'description = "test release"\n'
             "\n"
             "[targets.flutter-ios]\n"
             'mode = "ota"\n'
@@ -65,14 +66,14 @@ class TestReadReleaseFileValid:
 
     def test_returns_dataclass(self, tmp_path):
         f = tmp_path / "release.toml"
-        f.write_text('bump = "major"\ninclude = []\nexclude = []\n')
+        f.write_text('bump = "major"\ninclude = []\nexclude = []\ndescription = "test release"\n')
         cfg = read_release_file(str(f))
         assert isinstance(cfg, ReleaseConfig)
 
     def test_all_bump_types(self, tmp_path):
         for bump in VALID_BUMP_TYPES:
             f = tmp_path / f"release_{bump}.toml"
-            f.write_text(f'bump = "{bump}"\ninclude = []\nexclude = []\n')
+            f.write_text(f'bump = "{bump}"\ninclude = []\nexclude = []\ndescription = "test release"\n')
             cfg = read_release_file(str(f))
             assert cfg.bump == bump
 
@@ -185,7 +186,7 @@ class TestReadReleaseFileErrors:
 
     def test_context_not_string(self, tmp_path):
         f = tmp_path / "release.toml"
-        f.write_text('bump = "patch"\ninclude = []\nexclude = []\ncontext = true\n')
+        f.write_text('bump = "patch"\ninclude = []\nexclude = []\ndescription = "test release"\ncontext = true\n')
         with pytest.raises(ValueError, match="context must be a string"):
             read_release_file(str(f))
 
@@ -193,11 +194,24 @@ class TestReadReleaseFileErrors:
 class TestReadReleaseFileDescriptionContext:
     """Tests for description and context fields in release files."""
 
-    def test_description_and_context_default_empty(self, tmp_path):
+    def test_description_required(self, tmp_path):
+        """Omitting description raises ValueError."""
         f = tmp_path / "release.toml"
         f.write_text('bump = "patch"\ninclude = []\nexclude = []\n')
+        with pytest.raises(ValueError, match="description"):
+            read_release_file(str(f))
+
+    def test_empty_description_rejected(self, tmp_path):
+        """An empty description string is rejected."""
+        f = tmp_path / "release.toml"
+        f.write_text('bump = "patch"\ninclude = []\nexclude = []\ndescription = ""\n')
+        with pytest.raises(ValueError, match="description"):
+            read_release_file(str(f))
+
+    def test_context_defaults_empty(self, tmp_path):
+        f = tmp_path / "release.toml"
+        f.write_text('bump = "patch"\ninclude = []\nexclude = []\ndescription = "test release"\n')
         cfg = read_release_file(str(f))
-        assert cfg.description == ""
         assert cfg.context == ""
 
     def test_description_read(self, tmp_path):
@@ -213,6 +227,7 @@ class TestReadReleaseFileDescriptionContext:
         f = tmp_path / "release.toml"
         f.write_text(
             'bump = "patch"\ninclude = []\nexclude = []\n'
+            'description = "test release"\n'
             'context = "Users reported crash on iOS 17"\n'
         )
         cfg = read_release_file(str(f))
@@ -242,6 +257,7 @@ class TestReadReleaseFileDescriptionContext:
         f = tmp_path / "release.toml"
         f.write_text(
             'bump = "patch"\ninclude = []\nexclude = []\n'
+            'description = "test release"\n'
             'context = "  padded context  "\n'
         )
         cfg = read_release_file(str(f))
