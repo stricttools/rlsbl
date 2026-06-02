@@ -1,9 +1,0 @@
-{"commits":["975de49d3b94aee0cbf9318979ca5e3afc4af08e","d9b490a87f20b7bafe6e08a27069725c3ecdf435"],"user_facing":true,"description":"**Internal.** Added `scope` field to Dependency namedtuple (runtime/dev/peer/explicit). Reverse dependency graph now supports scope-filtered traversal.","type":"feature"}
-{"commits":["c8531397f715338d67c75dbdad0e0872e19d8601","fb80a5254870b2b8168905393249199672378d8b"],"user_facing":true,"description":"**Breaking.** Renamed `internal` workspace flag to `changelog_exempt`. The new name describes the behavior (changelog enforcement exemption), preventing misuse.","type":"breaking"}
-{"commits":["8401381ded7e3f6e06a5069070bd3dbef464271d"],"user_facing":false}
-{"commits":["db6a876689291466ab29e7bd97d45b256cd0211f","bbf61d51bb9fc89863f7731554766c1debd230c5"],"user_facing":false}
-{"commits":["cac00cac5d909aecf5044ecbdd7c90358a2cca5c","cf58e53efbc8a9e783758443eef53ee26deb7eb2","4225786e37a521022c62488ae3b3233eb4794b15","41b9f29ab5e2617618fcffd877f52c793d80032d","1c4d2097a6a118405d27e98894683be6b53a452a"],"user_facing":false}
-{"commits":["ff15f26f2f0b8463d0ebe40c4642f7be4717f6ab","5613c53f7169f8d25fda946d239cb37598eb6f9d","5e38b362e446adadeff0e4c7f9a951c7915015e3","81f59b0f7b5b00b74d7de11e0a5da2a22607d87f","5ffdebf9aa973a1c5a45a41ded8480f4c106ca8e"],"user_facing":false}
-{"commits":["965c9b0e9afbd6241dd1438f5777a11c04d106db"],"user_facing":false}
-{"commits":["ca4c9670b986e1673145b19ab53fffea039640f2"],"user_facing":false}
-{"commits":["327e56bd96c1c864e553a8863ebbd9815c2358b5"],"user_facing":false}
