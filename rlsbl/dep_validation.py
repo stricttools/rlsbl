@@ -84,6 +84,8 @@ def check_unused_deps(
     manifest_deps: set[str],
     workspace_names: set[str],
     whitelist: dict[tuple[str, str], str],
+    *,
+    _cached_imports: tuple[set[str], set[str]] | None = None,
 ) -> list[str]:
     """Check for declared workspace deps that no source file imports.
 
@@ -93,6 +95,8 @@ def check_unused_deps(
         manifest_deps: set of declared intra-workspace dependency names.
         workspace_names: set of all workspace member package names.
         whitelist: mapping of (package, dep) -> reason for allowed unused deps.
+        _cached_imports: optional pre-computed (lib_imports, test_imports) tuple
+            to avoid redundant scans when multiple checks share the same project.
 
     Returns:
         list of error strings (empty means all good).
@@ -100,9 +104,12 @@ def check_unused_deps(
     if not manifest_deps:
         return []
 
-    lib_imports, test_imports = _get_imported_workspace_packages(
-        project_dir, workspace_names
-    )
+    if _cached_imports is not None:
+        lib_imports, test_imports = _cached_imports
+    else:
+        lib_imports, test_imports = _get_imported_workspace_packages(
+            project_dir, workspace_names
+        )
     all_imports = lib_imports | test_imports
 
     errors = []
@@ -123,6 +130,8 @@ def check_undeclared_deps(
     project_dir: str,
     manifest_deps: set[str],
     workspace_names: set[str],
+    *,
+    _cached_imports: tuple[set[str], set[str]] | None = None,
 ) -> list[str]:
     """Check for imports from workspace packages not declared as deps.
 
@@ -134,13 +143,18 @@ def check_undeclared_deps(
         project_dir: absolute path to the project directory.
         manifest_deps: set of declared intra-workspace dependency names.
         workspace_names: set of all workspace member package names.
+        _cached_imports: optional pre-computed (lib_imports, test_imports) tuple
+            to avoid redundant scans when multiple checks share the same project.
 
     Returns:
         list of error strings (empty means all good).
     """
-    lib_imports, _test_imports = _get_imported_workspace_packages(
-        project_dir, workspace_names
-    )
+    if _cached_imports is not None:
+        lib_imports, _test_imports = _cached_imports
+    else:
+        lib_imports, _test_imports = _get_imported_workspace_packages(
+            project_dir, workspace_names
+        )
 
     errors = []
     for imported in sorted(lib_imports):
@@ -154,3 +168,55 @@ def check_undeclared_deps(
             )
 
     return errors
+
+
+def check_runtime_test_only(
+    manifest_deps_with_scope: dict[str, str],
+    lib_imports: set[str],
+    test_imports: set[str],
+) -> list[str]:
+    """Find runtime deps that are only used in test code.
+
+    For each dependency where scope="runtime": if it appears in
+    test_imports but NOT in lib_imports, it is flagged.
+
+    Args:
+        manifest_deps_with_scope: mapping of dep name -> scope string.
+        lib_imports: workspace package names found in production code.
+        test_imports: workspace package names found in test code.
+
+    Returns:
+        list of flagged dependency names.
+    """
+    flagged = []
+    for dep_name, scope in sorted(manifest_deps_with_scope.items()):
+        if scope != "runtime":
+            continue
+        if dep_name in test_imports and dep_name not in lib_imports:
+            flagged.append(dep_name)
+    return flagged
+
+
+def check_dev_in_lib(
+    manifest_deps_with_scope: dict[str, str],
+    lib_imports: set[str],
+) -> list[str]:
+    """Find dev deps that are imported in production code.
+
+    For each dependency where scope="dev": if it appears in
+    lib_imports, it is flagged.
+
+    Args:
+        manifest_deps_with_scope: mapping of dep name -> scope string.
+        lib_imports: workspace package names found in production code.
+
+    Returns:
+        list of flagged dependency names.
+    """
+    flagged = []
+    for dep_name, scope in sorted(manifest_deps_with_scope.items()):
+        if scope != "dev":
+            continue
+        if dep_name in lib_imports:
+            flagged.append(dep_name)
+    return flagged

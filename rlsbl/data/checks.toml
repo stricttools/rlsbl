@@ -259,3 +259,19 @@ fast = false
 pure = true
 needs_network = false
 depends_on = []
+
+[checks.deps-runtime-test-only]
+tags = ["quality"]
+severity = "warn"
+fast = false
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.deps-dev-in-lib]
+tags = ["quality"]
+severity = "error"
+fast = false
+pure = true
+needs_network = false
+depends_on = []

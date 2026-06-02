@@ -797,6 +797,25 @@ def register_checks(app):
     # Dependency validation
     # ------------------------------------------------------------------
 
+    def _build_dep_import_cache(ctx):
+        """Build per-project import scan cache for dependency checks.
+
+        Returns a dict mapping project name to (lib_imports, test_imports).
+        All dep checks (unused, undeclared, runtime-test-only, dev-in-lib)
+        share one scan pass via this cache.
+        """
+        from .dep_validation import _get_imported_workspace_packages
+
+        root = str(ctx.workspace_root)
+        workspace_names = {p["name"] for p in ctx.projects}
+        cache = {}
+        for proj in ctx.projects:
+            project_dir = os.path.join(root, proj["path"])
+            cache[proj["name"]] = _get_imported_workspace_packages(
+                project_dir, workspace_names
+            )
+        return cache
+
     @app.check("deps-unused")
     def check_deps_unused(ctx):
         """Declared workspace deps must be imported by at least one source file."""
@@ -808,6 +827,7 @@ def register_checks(app):
         root = str(ctx.workspace_root)
         whitelist = load_dep_overrides(root)
         workspace_names = {p["name"] for p in ctx.projects}
+        import_cache = _build_dep_import_cache(ctx)
 
         all_errors = []
         for proj in ctx.projects:
@@ -815,7 +835,8 @@ def register_checks(app):
             project_dir = os.path.join(root, proj["path"])
             manifest_deps = {d.name for d in ctx.graph.dependencies(name)}
             errors = check_unused_deps(
-                name, project_dir, manifest_deps, workspace_names, whitelist
+                name, project_dir, manifest_deps, workspace_names, whitelist,
+                _cached_imports=import_cache[name],
             )
             all_errors.extend(errors)
 
@@ -837,6 +858,7 @@ def register_checks(app):
 
         root = str(ctx.workspace_root)
         workspace_names = {p["name"] for p in ctx.projects}
+        import_cache = _build_dep_import_cache(ctx)
 
         all_errors = []
         for proj in ctx.projects:
@@ -844,7 +866,8 @@ def register_checks(app):
             project_dir = os.path.join(root, proj["path"])
             manifest_deps = {d.name for d in ctx.graph.dependencies(name)}
             errors = check_undeclared_deps(
-                name, project_dir, manifest_deps, workspace_names
+                name, project_dir, manifest_deps, workspace_names,
+                _cached_imports=import_cache[name],
             )
             all_errors.extend(errors)
 
@@ -855,6 +878,72 @@ def register_checks(app):
                 details=all_errors,
             )
         return CheckResult("pass", "no undeclared workspace dependencies")
+
+    @app.check("deps-runtime-test-only")
+    def check_deps_runtime_test_only(ctx):
+        """Runtime deps used only in test code should be dev deps instead."""
+        if not isinstance(ctx, WorkspaceCheckContext):
+            return CheckResult("skip", "not a monorepo workspace")
+
+        from .dep_validation import check_runtime_test_only
+
+        import_cache = _build_dep_import_cache(ctx)
+
+        all_flagged = []
+        for proj in ctx.projects:
+            name = proj["name"]
+            manifest_deps_with_scope = {
+                d.name: d.scope for d in ctx.graph.dependencies(name)
+            }
+            lib_imports, test_imports = import_cache[name]
+            flagged = check_runtime_test_only(
+                manifest_deps_with_scope, lib_imports, test_imports
+            )
+            for dep in flagged:
+                all_flagged.append(
+                    f"'{name}' declares '{dep}' as runtime dependency "
+                    f"but only imports it in test code"
+                )
+
+        if all_flagged:
+            return CheckResult(
+                "warn",
+                f"{len(all_flagged)} runtime dep(s) used only in tests",
+                details=all_flagged,
+            )
+        return CheckResult("pass", "no runtime deps used only in tests")
+
+    @app.check("deps-dev-in-lib")
+    def check_deps_dev_in_lib(ctx):
+        """Dev deps must not be imported in production code."""
+        if not isinstance(ctx, WorkspaceCheckContext):
+            return CheckResult("skip", "not a monorepo workspace")
+
+        from .dep_validation import check_dev_in_lib
+
+        import_cache = _build_dep_import_cache(ctx)
+
+        all_flagged = []
+        for proj in ctx.projects:
+            name = proj["name"]
+            manifest_deps_with_scope = {
+                d.name: d.scope for d in ctx.graph.dependencies(name)
+            }
+            lib_imports, _test_imports = import_cache[name]
+            flagged = check_dev_in_lib(manifest_deps_with_scope, lib_imports)
+            for dep in flagged:
+                all_flagged.append(
+                    f"'{name}' declares '{dep}' as dev dependency "
+                    f"but imports it in production code"
+                )
+
+        if all_flagged:
+            return CheckResult(
+                "fail",
+                f"{len(all_flagged)} dev dep(s) imported in production code",
+                details=all_flagged,
+            )
+        return CheckResult("pass", "no dev deps imported in production code")
 
     @app.check("deps-stale")
     def check_deps_stale(ctx):
