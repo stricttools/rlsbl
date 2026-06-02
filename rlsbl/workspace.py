@@ -10,6 +10,74 @@ WORKSPACE_DIR = ".rlsbl-monorepo"
 WORKSPACE_FILE = "workspace.toml"
 
 
+class WorkspaceProject:
+    """Typed wrapper over a workspace.toml project dict.
+
+    Provides typed property access for known fields while preserving the
+    underlying dict for round-trip serialization. Unknown fields are kept
+    intact. Dict-like ``[]``, ``get()``, and ``in`` access is supported
+    for backward compatibility with code that treats projects as dicts.
+    """
+
+    def __init__(self, data: dict):
+        self._data = data
+
+    @property
+    def name(self) -> str:
+        return self._data["name"]
+
+    @property
+    def path(self) -> str:
+        return self._data["path"]
+
+    @property
+    def watch(self) -> list[str]:
+        return self._data.get("watch", [])
+
+    @property
+    def library(self) -> bool:
+        return bool(self._data.get("library", False))
+
+    @property
+    def dev_node(self) -> bool:
+        return bool(self._data.get("dev_node", False))
+
+    @property
+    def depends_on(self) -> list[str]:
+        return self._data.get("depends_on", [])
+
+    @property
+    def changelog_exempt(self) -> bool:
+        return bool(self._data.get("changelog_exempt", False))
+
+    def get(self, key, default=None):
+        """Dict-like access for backward compatibility."""
+        return self._data.get(key, default)
+
+    def __getitem__(self, key):
+        return self._data[key]
+
+    def __setitem__(self, key, value):
+        self._data[key] = value
+
+    def __contains__(self, key):
+        return key in self._data
+
+    def __eq__(self, other):
+        if isinstance(other, WorkspaceProject):
+            return self._data == other._data
+        if isinstance(other, dict):
+            return self._data == other
+        return NotImplemented
+
+    def __repr__(self):
+        return f"WorkspaceProject({self._data!r})"
+
+    def to_dict(self) -> dict:
+        """Return the underlying dict for serialization."""
+        return self._data
+
+
 def find_workspace_root(start_path="."):
     """Walk up from start_path looking for a .rlsbl-monorepo/workspace.toml.
 
@@ -27,10 +95,11 @@ def find_workspace_root(start_path="."):
 
 
 def load_workspace(root):
-    """Read and validate workspace.toml, returning the list of project dicts.
+    """Read and validate workspace.toml, returning a list of WorkspaceProject.
 
-    Each project dict has at least 'path' (str) and 'name' (str, defaults to
-    basename of path).
+    Each project has at least 'path' (str) and 'name' (str, defaults to
+    basename of path). The returned WorkspaceProject instances support
+    dict-like access for backward compatibility.
 
     Raises FileNotFoundError if workspace.toml doesn't exist.
     Raises ValueError on invalid structure.
@@ -58,7 +127,7 @@ def load_workspace(root):
         entry["path"] = entry["path"].rstrip("/")
         if "name" not in entry or not entry["name"]:
             entry["name"] = os.path.basename(entry["path"])
-        result.append(entry)
+        result.append(WorkspaceProject(entry))
 
     return result
 
@@ -94,12 +163,13 @@ def save_workspace(root, projects):
     else:
         aot = tomlkit.aot()
         for proj in projects:
+            d = proj.to_dict() if isinstance(proj, WorkspaceProject) else proj
             table = tomlkit.table()
-            table.add("path", proj["path"])
-            table.add("name", proj["name"])
-            for key in sorted(proj.keys()):
+            table.add("path", d["path"])
+            table.add("name", d["name"])
+            for key in sorted(d.keys()):
                 if key not in ("path", "name"):
-                    table.add(key, proj[key])
+                    table.add(key, d[key])
             aot.append(table)
         doc.add("projects", aot)
 
@@ -110,7 +180,7 @@ def save_workspace(root, projects):
 
 
 def resolve_project(root, cwd="."):
-    """Determine which project cwd is inside, returning its dict or None.
+    """Determine which project cwd is inside, returning a WorkspaceProject or None.
 
     If multiple projects match (nested paths), returns the most specific one.
     """
