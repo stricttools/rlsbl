@@ -116,29 +116,28 @@ class TestEntryPoint:
 
 
 class TestTestFileInclusion:
-    """Test files are included by default; exclude_patterns in config can exclude them."""
+    """Test and example files are excluded from lint by default."""
 
-    def test_tests_dir_included_by_default(self, tmp_path):
-        """Without exclude config, test files ARE linted."""
+    def test_tests_dir_excluded_by_default(self, tmp_path):
+        """Without exclude config, test files are NOT linted (default exclusion)."""
         (tmp_path / "pyproject.toml").write_text(_PYPROJECT)
         tests_dir = tmp_path / "tests"
         tests_dir.mkdir()
         (tests_dir / "test_foo.py").write_text('print("in test")\n')
         results = lint_library(str(tmp_path))
-        assert len(results) == 1
-        assert results[0].rule == "stdout"
+        assert results == []
 
     def test_tests_dir_excluded_by_config(self, tmp_path):
-        """With exclude config, test files are skipped."""
+        """With exclude config, test files are skipped (user overrides merge with defaults)."""
         (tmp_path / "pyproject.toml").write_text(_PYPROJECT)
         tests_dir = tmp_path / "tests"
         tests_dir.mkdir()
         (tests_dir / "test_foo.py").write_text('print("in test")\n')
-        # Configure exclusion
+        # Configure exclusion -- user adds extra pattern, defaults still apply
         lint_dir = tmp_path / ".rlsbl" / "lint"
         lint_dir.mkdir(parents=True)
         (lint_dir / "python.toml").write_text(
-            '[files]\nexclude = ["tests/", "test_*"]\n'
+            '[files]\nexclude = ["custom_dir/"]\n'
         )
         results = lint_library(str(tmp_path))
         assert results == []
@@ -151,6 +150,33 @@ class TestTestFileInclusion:
         results = lint_library(str(tmp_path))
         assert len(results) == 1
         assert results[0].rule == "stdout"
+
+    def test_go_test_file_excluded_by_default(self, tmp_path):
+        """Go test files (*_test.go) are excluded from lint by default."""
+        (tmp_path / "go.mod").write_text("module example\n\ngo 1.21\n")
+        (tmp_path / "lib.go").write_text(
+            'package example\n\nimport "net/http"\n'
+        )
+        (tmp_path / "lib_test.go").write_text(
+            'package example\n\nimport "net/http"\n'
+        )
+        results = lint_library(str(tmp_path))
+        # Only the production file should produce a violation
+        assert len(results) == 1
+        assert "lib.go" in results[0].file
+
+    def test_npm_test_file_excluded_by_default(self, tmp_path):
+        """npm test files (*.test.ts) are excluded from lint by default."""
+        (tmp_path / "package.json").write_text('{"name": "example"}\n')
+        (tmp_path / "lib.ts").write_text('import express from "express";\n')
+        (tmp_path / "lib.test.ts").write_text(
+            'import express from "express";\n'
+        )
+        results = lint_library(str(tmp_path))
+        # Only the production file should produce a violation
+        assert len(results) == 1
+        assert "lib.ts" in results[0].file
+        assert "lib.test.ts" not in results[0].file
 
 
 class TestLanguageConfig:
