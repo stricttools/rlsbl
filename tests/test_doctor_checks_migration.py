@@ -16,7 +16,7 @@ from rlsbl.check_context import WorkspaceCheckContext
 
 
 # ---------------------------------------------------------------------------
-# All 31 checks are declared in checks.toml and registered on the app
+# All 34 checks are declared in checks.toml and registered on the app
 # ---------------------------------------------------------------------------
 
 EXPECTED_CHECKS = [
@@ -55,14 +55,18 @@ EXPECTED_CHECKS = [
     "deps-unused",
     "deps-undeclared",
     "deps-stale",
+    # Quality checks
+    "deps-runtime-test-only",
+    "deps-dev-in-lib",
+    "dead-modules",
 ]
 
 
 class TestCheckDeclarations:
     """Every check must be declared in checks.toml and registered on the app."""
 
-    def test_all_31_checks_declared(self):
-        """checks.toml defines exactly the 31 expected checks."""
+    def test_all_34_checks_declared(self):
+        """checks.toml defines exactly the 34 expected checks."""
         assert sorted(app._check_defs.keys()) == sorted(EXPECTED_CHECKS)
 
     @pytest.mark.parametrize("name", EXPECTED_CHECKS)
@@ -71,14 +75,14 @@ class TestCheckDeclarations:
         assert app._check_defs[name].impl is not None
 
     def test_check_list_shows_all(self):
-        """``rlsbl check --list`` outputs all 31 check names."""
+        """``rlsbl check --list`` outputs all 34 check names."""
         result = app.test(["check", "--list"])
         assert result.exit_code == 0
         for name in EXPECTED_CHECKS:
             assert name in result.stdout
 
     def test_check_list_json(self):
-        """``rlsbl check --list --json`` outputs valid JSON with all 31 checks."""
+        """``rlsbl check --list --json`` outputs valid JSON with all 34 checks."""
         result = app.test(["check", "--list", "--json"])
         assert result.exit_code == 0
         data = json.loads(result.stdout)
@@ -110,8 +114,12 @@ class TestCheckTags:
     def test_changelog_tag(self):
         assert "changelog" in app._check_defs["changelog-entry"].tags
 
-    def test_library_lint_quality_tag(self):
-        assert "quality" in app._check_defs["library-lint"].tags
+    @pytest.mark.parametrize("name", [
+        "library-lint", "deps-runtime-test-only", "deps-dev-in-lib",
+        "dead-modules",
+    ])
+    def test_quality_tag(self, name):
+        assert "quality" in app._check_defs[name].tags
 
 
 # ---------------------------------------------------------------------------
