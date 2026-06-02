@@ -21,7 +21,7 @@ class TestDartScannerVersioned:
         """))
         deps = DartScanner().scan(str(proj), {"app", "models"})
         assert len(deps) == 1
-        assert deps[0] == Dependency(name="models", dep_type="versioned", constraint="^1.0.0")
+        assert deps[0] == Dependency(name="models", dep_type="versioned", constraint="^1.0.0", scope="runtime")
 
     def test_any_constraint(self, tmp_path):
         proj = tmp_path / "app"
@@ -33,7 +33,7 @@ class TestDartScannerVersioned:
         """))
         deps = DartScanner().scan(str(proj), {"models"})
         assert len(deps) == 1
-        assert deps[0] == Dependency(name="models", dep_type="versioned", constraint="any")
+        assert deps[0] == Dependency(name="models", dep_type="versioned", constraint="any", scope="runtime")
 
     def test_null_constraint(self, tmp_path):
         """A dep with no constraint (YAML null) gets empty string."""
@@ -46,7 +46,7 @@ class TestDartScannerVersioned:
         """))
         deps = DartScanner().scan(str(proj), {"models"})
         assert len(deps) == 1
-        assert deps[0] == Dependency(name="models", dep_type="versioned", constraint="")
+        assert deps[0] == Dependency(name="models", dep_type="versioned", constraint="", scope="runtime")
 
 
 class TestDartScannerPath:
@@ -61,7 +61,7 @@ class TestDartScannerPath:
         """))
         deps = DartScanner().scan(str(proj), {"utils"})
         assert len(deps) == 1
-        assert deps[0] == Dependency(name="utils", dep_type="path", constraint="../utils")
+        assert deps[0] == Dependency(name="utils", dep_type="path", constraint="../utils", scope="runtime")
 
 
 class TestDartScannerHosted:
@@ -77,7 +77,7 @@ class TestDartScannerHosted:
         """))
         deps = DartScanner().scan(str(proj), {"schema"})
         assert len(deps) == 1
-        assert deps[0] == Dependency(name="schema", dep_type="versioned", constraint="^2.0.0")
+        assert deps[0] == Dependency(name="schema", dep_type="versioned", constraint="^2.0.0", scope="runtime")
 
     def test_hosted_without_version(self, tmp_path):
         proj = tmp_path / "app"
@@ -90,7 +90,7 @@ class TestDartScannerHosted:
         """))
         deps = DartScanner().scan(str(proj), {"schema"})
         assert len(deps) == 1
-        assert deps[0] == Dependency(name="schema", dep_type="versioned", constraint="")
+        assert deps[0] == Dependency(name="schema", dep_type="versioned", constraint="", scope="runtime")
 
 
 class TestDartScannerNonWorkspace:
@@ -127,7 +127,7 @@ class TestDartScannerDevDependencies:
         """))
         deps = DartScanner().scan(str(proj), {"test_utils"})
         assert len(deps) == 1
-        assert deps[0] == Dependency(name="test_utils", dep_type="versioned", constraint="^1.0.0")
+        assert deps[0] == Dependency(name="test_utils", dep_type="versioned", constraint="^1.0.0", scope="dev")
 
 
 class TestDartScannerMultiple:

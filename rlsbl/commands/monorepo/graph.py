@@ -52,6 +52,7 @@ def _collect_graph_data(root, projects, graph):
                 "to": dep.name,
                 "type": dep.dep_type,
                 "constraint": dep.constraint,
+                "scope": dep.scope,
             })
 
     return packages, edges

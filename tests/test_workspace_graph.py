@@ -662,7 +662,7 @@ class TestExplicitDependsOn:
         graph = WorkspaceGraph(root, projects)
         deps = graph.dependencies("app")
         assert len(deps) == 1
-        assert deps[0] == Dependency(name="lib", dep_type="explicit", constraint="")
+        assert deps[0] == Dependency(name="lib", dep_type="explicit", constraint="", scope="explicit")
 
     def test_explicit_counted_in_dep_rdep(self, tmp_path):
         """Explicit edge counted in dep_count/rdep_count."""

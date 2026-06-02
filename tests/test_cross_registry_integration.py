@@ -146,7 +146,7 @@ class TestOutdatedShowsExplicitDeps:
         deps = graph.dependencies("cli")
         assert len(deps) == 1
         assert deps[0] == Dependency(
-            name="orchestrator", dep_type="versioned", constraint=">=1.0"
+            name="orchestrator", dep_type="versioned", constraint=">=1.0", scope="runtime"
         )
 
 
