@@ -2,6 +2,16 @@
 
 # Changelog
 
+## 0.53.0
+
+### Breaking
+
+- **Breaking.** Renamed `internal` workspace flag to `changelog_exempt`. The new name describes the behavior (changelog enforcement exemption), preventing misuse.
+
+### Features
+
+- **Internal.** Added `scope` field to Dependency namedtuple (runtime/dev/peer/explicit). Reverse dependency graph now supports scope-filtered traversal.
+
 ## 0.52.0
 
 ### Breaking
