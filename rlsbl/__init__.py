@@ -347,10 +347,16 @@ def cmd_scaffold(target, force, private, no_commit, skip_shared, no_tag, dry_run
     # package.json, go.mod, etc.), use cwd -- the user is in a sub-project
     # and wants to scaffold in place. This prevents walking up to a monorepo
     # root when inside a sub-project.
+    # When --target is explicitly passed (e.g., --target plain), always use
+    # cwd -- the user is declaring what to scaffold and where. Without this,
+    # plain-target projects (whose detect() always returns False) would walk
+    # up to the monorepo root, causing _is_dev_node_project() to fail.
     from .utils import find_project_root
     cwd_has_project = bool(detect_registries())
     scaffold_root = None
-    if not cwd_has_project:
+    if target:
+        scaffold_root = Path.cwd()
+    elif not cwd_has_project:
         root = find_project_root()
         if root is not None:
             scaffold_root = Path(root)
