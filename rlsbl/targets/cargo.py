@@ -171,16 +171,17 @@ class CargoTarget(BaseTarget):
         return result
 
     def template_mappings(self, ctx):
+        project_root = str(ctx.project_root)
         mappings = [
             {"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"},
         ]
-        if not self._is_library("."):
+        if not self._is_library(project_root):
             mappings.append(
                 {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
             )
         return mappings
 
-    def build_assets(self, dir_path, version, dist_dir, ctx=None):
+    def build_assets(self, dir_path, version, dist_dir, ctx):
         """Build Rust binary in release mode and copy to dist_dir."""
         os.makedirs(dist_dir, exist_ok=True)
         run("cargo", ["build", "--release"], cwd=dir_path)

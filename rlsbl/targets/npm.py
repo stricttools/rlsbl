@@ -189,7 +189,7 @@ class NpmTarget(BaseTarget):
             {"template": "npmignore.tpl", "target": ".npmignore"},
         ]
 
-    def build_assets(self, dir_path, version, dist_dir, ctx=None):
+    def build_assets(self, dir_path, version, dist_dir, ctx):
         """Pack a tarball for GH Release upload."""
         os.makedirs(dist_dir, exist_ok=True)
         run("npm", ["pack", "--pack-destination", dist_dir], cwd=dir_path)
