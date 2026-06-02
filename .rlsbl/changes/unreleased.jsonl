@@ -1,0 +1,1 @@
+{"commits":["3d3bafd11bb6ea3ed08402f972635db15f48eceb"],"user_facing":true,"description":"**Breaking.** Release description is now mandatory in unreleased.toml. Every release must have a short summary.","type":"breaking"}
