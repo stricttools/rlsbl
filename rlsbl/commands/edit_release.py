@@ -43,15 +43,12 @@ def run_cmd(args, flags, project_root):
             monorepo_name = project["name"]
             monorepo_project_path = project["path"]
 
-    # Version directory: project subdir in monorepo, repo root otherwise
-    # Version directory: absolute path to the project
-    if monorepo_name:
-        version_dir = os.path.join(monorepo_root, monorepo_project_path)
-    else:
-        version_dir = start_path
+    # Project directory: project_root is already resolved to the sub-project
+    # in monorepo mode (via _require_sub_project_root).
+    project_dir = start_path
 
     # Detect primary target
-    entries = detect_targets(version_dir)
+    entries = detect_targets(project_dir)
     if not entries:
         print("Error: no package.json, pyproject.toml, or go.mod found.", file=sys.stderr)
         sys.exit(1)
@@ -74,7 +71,7 @@ def run_cmd(args, flags, project_root):
         tag = target.tag_format(version)
 
     # Extract changelog entry from project subdir in monorepo mode
-    changelog_path = os.path.join(version_dir, "CHANGELOG.md")
+    changelog_path = os.path.join(project_dir, "CHANGELOG.md")
     if not os.path.exists(changelog_path):
         print("Error: CHANGELOG.md not found.", file=sys.stderr)
         sys.exit(1)

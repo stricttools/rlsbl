@@ -75,7 +75,7 @@ def parse_porcelain_paths(porcelain_output):
     return dirty_files
 
 
-def resolve_target_paths(version_dir="."):
+def resolve_target_paths(project_dir="."):
     """Build a dict mapping target names to their resolved paths.
 
     Uses detect_targets() which reads .rlsbl/config.json "targets" (supporting
@@ -84,11 +84,11 @@ def resolve_target_paths(version_dir="."):
 
     Returns dict[str, str] mapping target name -> resolved directory path.
     """
-    entries = detect_targets(version_dir)
+    entries = detect_targets(project_dir)
     return {e.name: e.path for e in entries}
 
 
-def resolve_release_targets(primary, flags, version_dir=".", *, config):
+def resolve_release_targets(primary, flags, project_dir=".", *, config):
     """Compute the effective set of secondary targets for this release.
 
     Reads the baseline from config "release_targets" list.
@@ -109,7 +109,7 @@ def resolve_release_targets(primary, flags, version_dir=".", *, config):
         baseline = {}
         for entry in configured:
             try:
-                te = _parse_target_entry(entry, version_dir)
+                te = _parse_target_entry(entry, project_dir)
             except (ValueError, TypeError):
                 # Unparseable entry -- skip
                 continue
@@ -117,7 +117,7 @@ def resolve_release_targets(primary, flags, version_dir=".", *, config):
                 baseline[te.name] = te.path
     else:
         # Auto-detect: use detect_targets which handles config and fallback
-        baseline = resolve_target_paths(version_dir)
+        baseline = resolve_target_paths(project_dir)
 
     # Never include the primary target in the secondary set
     baseline.pop(primary, None)
@@ -295,7 +295,7 @@ def _run_selfdoc_check(flags, project_dir=None, docs_excluded=False):
     return True
 
 
-def _refresh_selfdoc_hashes(files_to_commit, log, version_dir=".", project_dir=None):
+def _refresh_selfdoc_hashes(files_to_commit, log, project_dir="."):
     """Re-run selfdoc check after version bump to refresh content hashes.
 
     The early selfdoc check (before tests) validates documentation correctness,
@@ -307,7 +307,7 @@ def _refresh_selfdoc_hashes(files_to_commit, log, version_dir=".", project_dir=N
 
     Non-fatal: errors are warned about but do not abort the release.
     """
-    check_dir = project_dir if project_dir else version_dir
+    check_dir = project_dir
     selfdoc_config = os.path.join(check_dir, "selfdoc.json")
     if not os.path.exists(selfdoc_config):
         return
@@ -344,7 +344,7 @@ def _refresh_selfdoc_hashes(files_to_commit, log, version_dir=".", project_dir=N
 _SCHEMA_DUMP_TIMEOUT = 30
 
 
-def _run_strictcli_schema_dump(flags, log, version_dir=".", project_dir=None):
+def _run_strictcli_schema_dump(flags, log, project_dir="."):
     """Run --dump-schema for strictcli projects to regenerate .strictcli/schema.json.
 
     Detects strictcli usage via pyproject.toml, runs the entry point with
@@ -354,14 +354,14 @@ def _run_strictcli_schema_dump(flags, log, version_dir=".", project_dir=None):
     Non-fatal: a failing dump command prints a warning but does not abort.
     """
     if flags.get("dry-run"):
-        check_dir = project_dir if project_dir else version_dir
+        check_dir = project_dir
         result = detect_strictcli(check_dir)
         if result:
             entry_point, _ = result
             log(f"Would run: uv run {entry_point} --dump-schema")
         return
 
-    check_dir = project_dir if project_dir else version_dir
+    check_dir = project_dir
     result = detect_strictcli(check_dir)
     if not result:
         return
@@ -458,9 +458,9 @@ def _sync_lockfiles(target_paths, files_to_commit, log):
                     log(f"Lockfile updated: {lockfile}")
 
 
-def _update_last_build_release(version_dir, version):
+def _update_last_build_release(project_dir, version):
     """Store last_build_release version in .rlsbl/config.json for OTA validation."""
-    config_path = os.path.join(version_dir, ".rlsbl", "config.json")
+    config_path = os.path.join(project_dir, ".rlsbl", "config.json")
     try:
         config = read_json_config(config_path)
     except Exception:
@@ -689,21 +689,18 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
         is_changelog_exempt = bool(project.get("changelog_exempt"))
         log(f"Monorepo project: {monorepo_name} ({monorepo_project_path})")
 
-    # Scoped version directory: absolute path to the project within the monorepo,
-    # or the project root in standalone mode.
-    if monorepo_name:
-        version_dir = os.path.join(monorepo_root, monorepo_project_path)
-    else:
-        version_dir = str(project_root)
+    # Project directory: ctx.project_root is already resolved to the sub-project
+    # in monorepo mode (via _require_sub_project_root).
+    project_dir = str(project_root)
 
     # Get target instance for tag_format/build/publish
     target = TARGETS[registry]
 
     # Resolve per-target paths from config (supports subdirectory targets)
-    target_paths = resolve_target_paths(version_dir)
+    target_paths = resolve_target_paths(project_dir)
 
-    # Primary target's path: from config if available, else version_dir
-    primary_path = target_paths.get(registry, version_dir)
+    # Primary target's path: from config if available, else project_dir
+    primary_path = target_paths.get(registry, project_dir)
 
     # Current version
     current_version = reg.read_version(primary_path)
@@ -750,14 +747,14 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
     if monorepo_name and is_changelog_exempt:
         log("Changelog-exempt project: skipping changelog validation")
         # Still generate CHANGELOG.md if the changes dir exists
-        if changes_dir_exists(version_dir):
-            changes_dir = get_changes_dir(version_dir)
-            changelog_content = generate_changelog(version_dir, write_to_disk=False, version_override=new_version)
+        if changes_dir_exists(project_dir):
+            changes_dir = get_changes_dir(project_dir)
+            changelog_content = generate_changelog(project_dir, write_to_disk=False, version_override=new_version)
             log("Generated CHANGELOG.md from JSONL entries (in-memory preview)")
             if isinstance(changelog_content, str):
                 changelog_entry = extract_changelog_entry_from_text(changelog_content, new_version)
             else:
-                changelog_path = os.path.join(version_dir, "CHANGELOG.md")
+                changelog_path = os.path.join(project_dir, "CHANGELOG.md")
                 if os.path.exists(changelog_path):
                     changelog_entry = extract_changelog_entry(changelog_path, new_version)
                 else:
@@ -767,14 +764,14 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
             changelog_content = None
             changelog_entry = None
     else:
-        if not changes_dir_exists(version_dir):
+        if not changes_dir_exists(project_dir):
             print(
                 "Error: JSONL changelog not set up. Run 'rlsbl scaffold' to create .rlsbl/changes/",
                 file=sys.stderr,
             )
             sys.exit(1)
 
-        changes_dir = get_changes_dir(version_dir)
+        changes_dir = get_changes_dir(project_dir)
         tag_glob = target.monorepo_tag_glob(monorepo_name, path=monorepo_project_path) if monorepo_name else None
         # In monorepo mode, pass the project dict so coverage/range checks
         # only consider commits touching this package's files.
@@ -791,7 +788,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
         # (and per-version .md files) to disk until after pre-release checks pass,
         # so that an aborted release leaves the working tree exactly as it was.
         # The actual write to disk happens just after acquire_lock() below.
-        changelog_content = generate_changelog(version_dir, write_to_disk=False, version_override=new_version)
+        changelog_content = generate_changelog(project_dir, write_to_disk=False, version_override=new_version)
         log("Generated CHANGELOG.md from JSONL entries (in-memory preview)")
 
         if isinstance(changelog_content, str):
@@ -799,7 +796,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
         else:
             # Mocked in tests (returns MagicMock). Fall back to the on-disk file,
             # which test fixtures pre-populate with a known entry.
-            changelog_path = os.path.join(version_dir, "CHANGELOG.md")
+            changelog_path = os.path.join(project_dir, "CHANGELOG.md")
             if not os.path.exists(changelog_path):
                 print(
                     "Error: CHANGELOG.md not found after generation.",
@@ -808,16 +805,13 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
                 sys.exit(1)
             changelog_entry = extract_changelog_entry(changelog_path, new_version)
 
-    # In monorepo mode, hooks/tests/lint must run from the project subdirectory.
-    abs_project_dir = os.path.join(monorepo_root, monorepo_project_path) if monorepo_root else None
-
     # Snapshot dirty files BEFORE any hooks run, so we can detect which files
     # hooks create or modify (the diff between pre-hook and post-hook snapshots).
     pre_hook_output = run("git", ["status", "--porcelain"])
     pre_hook_dirty = parse_porcelain_paths(pre_hook_output) if pre_hook_output else set()
 
     # Run pre-checks hook if present
-    pre_checks_script = os.path.join(version_dir, ".rlsbl", "hooks", "pre-checks.sh")
+    pre_checks_script = os.path.join(project_dir, ".rlsbl", "hooks", "pre-checks.sh")
     if os.path.exists(pre_checks_script):
         pre_checks_script = os.path.abspath(pre_checks_script)
         log("Running pre-checks hook...")
@@ -825,7 +819,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
         try:
             env = os.environ.copy()
             env["RLSBL_VERSION"] = new_version
-            subprocess.run(["bash", pre_checks_script], env=env, check=True, timeout=hook_timeout, cwd=abs_project_dir)
+            subprocess.run(["bash", pre_checks_script], env=env, check=True, timeout=hook_timeout, cwd=project_dir)
         except subprocess.CalledProcessError as e:
             print(f"Error: pre-checks hook exited with code {e.returncode}.", file=sys.stderr)
             sys.exit(1)
@@ -834,22 +828,22 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
             sys.exit(1)
 
     # Dump strictcli schema if the project uses strictcli
-    _run_strictcli_schema_dump(flags, log, version_dir=version_dir, project_dir=abs_project_dir)
+    _run_strictcli_schema_dump(flags, log, project_dir=project_dir)
 
     # Regenerate selfdoc pages so the subsequent check validates fresh content
-    _run_selfdoc_gen(flags, project_dir=abs_project_dir, docs_excluded=docs_excluded)
+    _run_selfdoc_gen(flags, project_dir=project_dir, docs_excluded=docs_excluded)
 
     # Built-in selfdoc check (before tests so doc issues surface early)
-    _run_selfdoc_check(flags, project_dir=abs_project_dir, docs_excluded=docs_excluded)
+    _run_selfdoc_check(flags, project_dir=project_dir, docs_excluded=docs_excluded)
 
     # Built-in test runner
-    _run_builtin_tests(registry, flags, project_dir=abs_project_dir, ctx=ctx)
+    _run_builtin_tests(registry, flags, project_dir=project_dir, ctx=ctx)
 
     # Built-in lint runner
-    _run_builtin_lint(flags, is_library=is_library, project_dir=abs_project_dir)
+    _run_builtin_lint(flags, is_library=is_library, project_dir=project_dir)
 
     # Run pre-release hook if present
-    pre_release_script = os.path.join(version_dir, ".rlsbl", "hooks", "pre-release.sh")
+    pre_release_script = os.path.join(project_dir, ".rlsbl", "hooks", "pre-release.sh")
     if os.path.exists(pre_release_script):
         pre_release_script = os.path.abspath(pre_release_script)
         log("Running pre-release hook...")
@@ -857,7 +851,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
         try:
             env = os.environ.copy()
             env["RLSBL_VERSION"] = new_version
-            subprocess.run(["bash", pre_release_script], env=env, check=True, timeout=hook_timeout, cwd=abs_project_dir)
+            subprocess.run(["bash", pre_release_script], env=env, check=True, timeout=hook_timeout, cwd=project_dir)
         except subprocess.CalledProcessError as e:
             print(f"Error: pre-release hook exited with code {e.returncode}.", file=sys.stderr)
             sys.exit(1)
@@ -896,7 +890,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
             if other_reg and other_reg.check_project_exists(t_path):
                 other_file = other_reg.version_file()
                 if other_file:
-                    rel = os.path.relpath(os.path.join(t_path, other_file), version_dir)
+                    rel = os.path.relpath(os.path.join(t_path, other_file), project_dir)
                     other_files.append(os.path.normpath(rel))
         if other_files:
             log(f"Sync to:   {', '.join(other_files)}")
@@ -916,7 +910,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
         return
 
     # Resolve which secondary targets participate in this release
-    secondary_targets = resolve_release_targets(registry, flags, version_dir=version_dir, config=ctx.config)
+    secondary_targets = resolve_release_targets(registry, flags, project_dir=project_dir, config=ctx.config)
 
     # Acquire advisory lock to prevent concurrent rlsbl operations.
     # In monorepo mode the lock goes in .rlsbl-monorepo/ (the workspace
@@ -932,7 +926,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
     # start; finalize_version() below renames unreleased.jsonl in place, and
     # no further changelog regeneration is needed.
     if changes_dir is not None:
-        generate_changelog(version_dir, version_override=new_version)
+        generate_changelog(project_dir, version_override=new_version)
 
     try:
         _run_release_mutating(
@@ -941,13 +935,11 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
             secondary_targets=secondary_targets,
             monorepo_name=monorepo_name,
             monorepo_project_path=monorepo_project_path,
-            version_dir=version_dir,
             commit_msg=commit_msg,
             primary_path=primary_path,
             target_paths=target_paths,
             lock_dir=lock_dir,
             pre_existing_dirty=pre_existing_dirty,
-            abs_project_dir=abs_project_dir,
             hook_generated=hook_generated,
             ctx=ctx,
         )
@@ -961,10 +953,10 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
     if flutter_targets:
         mode = release_config.targets.get(flutter_targets[0], {}).get("mode")
         if mode == "build":
-            _update_last_build_release(version_dir, new_version)
+            _update_last_build_release(project_dir, new_version)
 
 
-def _print_stale_dep_advisory(monorepo_name, new_version, version_dir, monorepo_root=None):
+def _print_stale_dep_advisory(monorepo_name, new_version, monorepo_root=None):
     """Print advisory about downstream packages with stale constraints.
 
     After releasing a package, checks if any workspace package that depends
@@ -1009,7 +1001,7 @@ def _print_stale_dep_advisory(monorepo_name, new_version, version_dir, monorepo_
         pass
 
 
-def upload_release_assets(tag, version_dir, new_version, log, flags, *, ctx):
+def upload_release_assets(tag, new_version, log, flags, *, ctx):
     """Build and upload release assets for targets with ``publish.<target>.assets: true``.
 
     For each detected target that has assets enabled in its publish config:
@@ -1024,7 +1016,8 @@ def upload_release_assets(tag, version_dir, new_version, log, flags, *, ctx):
 
     ctx: ProjectContext carrying project_root, monorepo_root, and config.
     """
-    entries = detect_targets(version_dir)
+    project_dir = str(ctx.project_root)
+    entries = detect_targets(project_dir)
     config = ctx.config
 
     targets_with_assets = []
@@ -1048,7 +1041,7 @@ def upload_release_assets(tag, version_dir, new_version, log, flags, *, ctx):
         pub_cfg = get_publish_config(entry.name, ctx.config)
         max_size_mb = pub_cfg.get("max_asset_size_mb")
 
-        dist_dir = os.path.join(version_dir, ".rlsbl", "dist", entry.name)
+        dist_dir = os.path.join(project_dir, ".rlsbl", "dist", entry.name)
 
         if dry_run:
             log(f"Would build and upload assets for target '{entry.name}' to release {tag}")
@@ -1105,11 +1098,10 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                           bump_type, tag, branch, changelog_entry, target, *,
                           secondary_targets=None, monorepo_name=None,
                           monorepo_project_path=None,
-                          version_dir=".", commit_msg=None,
+                          commit_msg=None,
                           primary_path=None, target_paths=None,
                           lock_dir=".rlsbl",
                           pre_existing_dirty=None,
-                          abs_project_dir=None,
                           hook_generated=None,
                           ctx):
     """Inner release logic that runs under the advisory lock (mutating phase).
@@ -1118,6 +1110,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
     """
     project_root = ctx.project_root
     monorepo_root = ctx.workspace_root
+    project_dir = str(project_root)
     # Snapshot dirty files BEFORE any version-bump writes. This captures
     # everything dirtied by prior stages (generate_changelog, hooks, lint,
     # --allow-dirty pre-existing files, etc.). Only files that become dirty
@@ -1129,17 +1122,17 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
     if commit_msg is None:
         commit_msg = tag
     if primary_path is None:
-        primary_path = version_dir
+        primary_path = project_dir
     if target_paths is None:
-        target_paths = resolve_target_paths(version_dir)
+        target_paths = resolve_target_paths(project_dir)
 
     # git status --porcelain outputs paths relative to the repo root.
     # Compute the repo root so vpath can produce matching relative paths.
     _git_root = run("git", ["rev-parse", "--show-toplevel"]).strip()
 
     def vpath(filename):
-        """Join filename with version_dir, return relative to git root."""
-        return _rel_to_git_root(os.path.join(version_dir, filename), _git_root)
+        """Join filename with project_dir, return relative to git root."""
+        return _rel_to_git_root(os.path.join(project_dir, filename), _git_root)
 
     def target_vpath(t_path, filename):
         """Join filename with a target's resolved path, return relative to git root."""
@@ -1216,10 +1209,10 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
             # Ensure selfdoc.json is bumped even when "docs" is not in the
             # explicit targets list.  DocsTarget.detect() checks for the file.
             bumped_files = set(files_to_commit)
-            selfdoc_path = os.path.join(version_dir, "selfdoc.json")
+            selfdoc_path = os.path.join(project_dir, "selfdoc.json")
             if os.path.exists(selfdoc_path) and "docs" not in target_paths:
                 from ..targets.docs import DocsTarget
-                docs_modified = DocsTarget().write_version(version_dir, new_version, ctx=ctx)
+                docs_modified = DocsTarget().write_version(project_dir, new_version, ctx=ctx)
                 for rel in docs_modified:
                     fpath = vpath(rel)
                     if fpath not in bumped_files:
@@ -1229,7 +1222,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
 
         # Ecosystem tagging: add keyword to manifests if enabled
         if should_tag(flags, ctx.config):
-            npm_path = target_paths.get("npm", version_dir)
+            npm_path = target_paths.get("npm", project_dir)
             try:
                 if TARGETS["npm"].check_project_exists(npm_path):
                     if ensure_npm_keyword(npm_path, quiet=quiet, project_root=project_root):
@@ -1238,7 +1231,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                             files_to_commit.append(pkg_path)
             except Exception:
                 pass
-            pypi_path = target_paths.get("pypi", version_dir)
+            pypi_path = target_paths.get("pypi", project_dir)
             try:
                 if TARGETS["pypi"].check_project_exists(pypi_path):
                     if ensure_pypi_keyword(pypi_path, quiet=quiet, project_root=project_root):
@@ -1264,7 +1257,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                 pass
 
         # Re-run selfdoc check to refresh hashes after version bump
-        _refresh_selfdoc_hashes(files_to_commit, log, version_dir=version_dir, project_dir=abs_project_dir)
+        _refresh_selfdoc_hashes(files_to_commit, log, project_dir=project_dir)
 
         # Include the generated CHANGELOG.md in the commit
         changelog_file = vpath("CHANGELOG.md")
@@ -1302,7 +1295,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
             # release flow.  It may be tracked (dirty) or gitignored (invisible to
             # git status).  Either way it is not a concurrent-change signal.
             validated_raw = os.path.normpath(
-                os.path.join(get_changes_dir(version_dir), ".validated")
+                os.path.join(get_changes_dir(project_dir), ".validated")
             )
             validated_file = os.path.relpath(validated_raw, _git_root) if os.path.isabs(validated_raw) else validated_raw
             expected_files.add(validated_file)
@@ -1337,8 +1330,8 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
         # CHANGELOG.md already has the correct "## X.Y.Z" heading because the
         # earlier generate_changelog() call (above acquire_lock) was passed
         # version_override=new_version, so no regeneration is needed here.
-        if changes_dir_exists(version_dir):
-            changes_dir = get_changes_dir(version_dir)
+        if changes_dir_exists(project_dir):
+            changes_dir = get_changes_dir(project_dir)
             tag_glob = target.monorepo_tag_glob(monorepo_name, path=monorepo_project_path) if monorepo_name else None
             finalize_version(changes_dir, new_version, tag_glob=tag_glob)
             generate_version_file(changes_dir, new_version)
@@ -1360,7 +1353,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
         # Finalize release file: rename unreleased.toml to vX.Y.Z.toml
         # Only if the release file exists (backward compat with legacy path)
         from ..release_file import get_release_file_path
-        release_file_path = get_release_file_path(version_dir)
+        release_file_path = get_release_file_path(project_dir)
         if os.path.exists(release_file_path):
             releases_dir = os.path.dirname(release_file_path)
             versioned_release = os.path.join(releases_dir, f"v{new_version}.toml")
@@ -1478,7 +1471,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                 os.unlink(tmp)
 
     # Upload release assets for targets with publish.<target>.assets: true
-    upload_release_assets(tag, version_dir, new_version, log, flags, ctx=ctx)
+    upload_release_assets(tag, new_version, log, flags, ctx=ctx)
 
     # Publish step: skip for private repos (they don't publish to registries)
     is_private = ctx.config.get("private", False)
@@ -1531,7 +1524,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
         ensure_github_topic(quiet=quiet)
 
     # Run post-release hook if present (non-fatal: release is already complete)
-    post_release_script = os.path.join(version_dir, ".rlsbl", "hooks", "post-release.sh")
+    post_release_script = os.path.join(project_dir, ".rlsbl", "hooks", "post-release.sh")
     if os.path.exists(post_release_script):
         post_release_script = os.path.abspath(post_release_script)
         log("Running post-release hook...")
@@ -1539,7 +1532,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
         try:
             env = os.environ.copy()
             env["RLSBL_VERSION"] = new_version
-            subprocess.run(["bash", post_release_script], env=env, check=True, timeout=hook_timeout, cwd=abs_project_dir)
+            subprocess.run(["bash", post_release_script], env=env, check=True, timeout=hook_timeout, cwd=project_dir)
         except subprocess.CalledProcessError as e:
             print(f"Warning: post-release hook exited with code {e.returncode}.", file=sys.stderr)
         except subprocess.TimeoutExpired:
@@ -1562,7 +1555,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
 
     # Advisory: constraint propagation
     if monorepo_name:
-        _print_stale_dep_advisory(monorepo_name, new_version, version_dir, monorepo_root=monorepo_root)
+        _print_stale_dep_advisory(monorepo_name, new_version, monorepo_root=monorepo_root)
 
     # Watch CI or print hint (uses SHA captured before post-release hooks).
     # Dry-run returns earlier (no push happens), but guard defensively.

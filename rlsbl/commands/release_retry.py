@@ -48,13 +48,13 @@ def _find_dispatch_workflows():
     return results
 
 
-def _scaffold_retry_file(retry_path, version_dir, target, monorepo_name, monorepo_project_path, log):
+def _scaffold_retry_file(retry_path, project_dir, target, monorepo_name, monorepo_project_path, log):
     """Auto-scaffold retry.toml from project state.
 
     Returns the RetryConfig after writing the file.
     """
     # Auto-detect version
-    entries = detect_targets(version_dir)
+    entries = detect_targets(project_dir)
     if not entries:
         print("Error: no package.json, pyproject.toml, or go.mod found.", file=sys.stderr)
         sys.exit(1)
@@ -146,14 +146,12 @@ def run_cmd(retry_config, flags, project_root):
             monorepo_name = project["name"]
             monorepo_project_path = project["path"]
 
-    # Version directory: absolute path to the project
-    if monorepo_name:
-        version_dir = os.path.join(monorepo_root, monorepo_project_path)
-    else:
-        version_dir = start_path
+    # Project directory: project_root is already resolved to the sub-project
+    # in monorepo mode (via _require_sub_project_root).
+    project_dir = start_path
 
     # Detect primary target (needed for tag format)
-    entries = detect_targets(version_dir)
+    entries = detect_targets(project_dir)
     if not entries:
         print("Error: no package.json, pyproject.toml, or go.mod found.", file=sys.stderr)
         sys.exit(1)
@@ -161,7 +159,7 @@ def run_cmd(retry_config, flags, project_root):
     target = TARGETS[primary.name]
 
     # Auto-scaffold retry.toml if not provided
-    retry_path = get_retry_file_path(version_dir)
+    retry_path = get_retry_file_path(project_dir)
     if retry_config is None:
         if os.path.exists(retry_path):
             # File exists but wasn't read by the caller -- read it now
@@ -173,7 +171,7 @@ def run_cmd(retry_config, flags, project_root):
         else:
             try:
                 retry_config = _scaffold_retry_file(
-                    retry_path, version_dir, target,
+                    retry_path, project_dir, target,
                     monorepo_name, monorepo_project_path, log,
                 )
             except ValueError as e:

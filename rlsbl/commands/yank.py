@@ -47,12 +47,10 @@ def run_cmd(args, flags, project_root):
             monorepo_name = project["name"]
             monorepo_project_path = project["path"]
 
-    # Version directory: absolute path to the project
-    if monorepo_name:
-        version_dir = os.path.join(monorepo_root, monorepo_project_path)
-    else:
-        version_dir = start_path
-    entries = detect_targets(version_dir)
+    # Project directory: project_root is already resolved to the sub-project
+    # in monorepo mode (via _require_sub_project_root).
+    project_dir = start_path
+    entries = detect_targets(project_dir)
     if entries:
         target = TARGETS[entries[0].name]
         if monorepo_name:
