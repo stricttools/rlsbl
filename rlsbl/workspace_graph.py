@@ -11,7 +11,8 @@ import tomlkit
 from .targets.utils import normalize_pypi
 
 
-Dependency = namedtuple("Dependency", ["name", "dep_type", "constraint"])
+Dependency = namedtuple("Dependency", ["name", "dep_type", "constraint", "scope"])
+Dependency.__new__.__defaults__ = ("runtime",)
 
 
 @runtime_checkable
@@ -93,12 +94,8 @@ class PypiScanner:
         deps = []
         project_section = data.get("project", {})
 
-        # Collect all dependency strings: main + optional
-        all_dep_strings = list(project_section.get("dependencies", []))
-        for group_deps in project_section.get("optional-dependencies", {}).values():
-            all_dep_strings.extend(group_deps)
-
-        for dep_str in all_dep_strings:
+        # Main dependencies: scope="runtime"
+        for dep_str in project_section.get("dependencies", []):
             name, is_path, constraint = _parse_pypi_dep_name(dep_str)
             if name is None:
                 continue
@@ -109,7 +106,24 @@ class PypiScanner:
                     name=pypi_normalized[normalized],
                     dep_type=dep_type,
                     constraint=constraint,
+                    scope="runtime",
                 ))
+
+        # Optional dependencies: scope="dev"
+        for group_deps in project_section.get("optional-dependencies", {}).values():
+            for dep_str in group_deps:
+                name, is_path, constraint = _parse_pypi_dep_name(dep_str)
+                if name is None:
+                    continue
+                normalized = normalize_pypi(name)
+                if normalized in pypi_normalized:
+                    dep_type = "path" if is_path else "versioned"
+                    deps.append(Dependency(
+                        name=pypi_normalized[normalized],
+                        dep_type=dep_type,
+                        constraint=constraint,
+                        scope="dev",
+                    ))
 
         return deps
 
@@ -130,9 +144,13 @@ class NpmScanner:
             return []
 
         deps = []
-        dep_sections = ["dependencies", "devDependencies", "peerDependencies"]
+        dep_sections = [
+            ("dependencies", "runtime"),
+            ("devDependencies", "dev"),
+            ("peerDependencies", "peer"),
+        ]
 
-        for section in dep_sections:
+        for section, scope in dep_sections:
             for name, version in data.get(section, {}).items():
                 if name not in workspace_names:
                     continue
@@ -145,7 +163,7 @@ class NpmScanner:
                 else:
                     dep_type = "versioned"
                     constraint = version if isinstance(version, str) else ""
-                deps.append(Dependency(name=name, dep_type=dep_type, constraint=constraint))
+                deps.append(Dependency(name=name, dep_type=dep_type, constraint=constraint, scope=scope))
 
         return deps
 
@@ -171,7 +189,7 @@ class DartScanner:
             return []
 
         deps = []
-        for section in ("dependencies", "dev_dependencies"):
+        for section, scope in (("dependencies", "runtime"), ("dev_dependencies", "dev")):
             section_data = data.get(section)
             if not isinstance(section_data, dict):
                 continue
@@ -179,16 +197,16 @@ class DartScanner:
                 if name not in workspace_names:
                     continue
                 if spec is None:
-                    deps.append(Dependency(name=name, dep_type="versioned", constraint=""))
+                    deps.append(Dependency(name=name, dep_type="versioned", constraint="", scope=scope))
                 elif isinstance(spec, str):
-                    deps.append(Dependency(name=name, dep_type="versioned", constraint=spec))
+                    deps.append(Dependency(name=name, dep_type="versioned", constraint=spec, scope=scope))
                 elif isinstance(spec, dict):
                     if "path" in spec:
-                        deps.append(Dependency(name=name, dep_type="path", constraint=spec["path"]))
+                        deps.append(Dependency(name=name, dep_type="path", constraint=spec["path"], scope=scope))
                     elif "version" in spec:
-                        deps.append(Dependency(name=name, dep_type="versioned", constraint=spec["version"]))
+                        deps.append(Dependency(name=name, dep_type="versioned", constraint=spec["version"], scope=scope))
                     else:
-                        deps.append(Dependency(name=name, dep_type="versioned", constraint=""))
+                        deps.append(Dependency(name=name, dep_type="versioned", constraint="", scope=scope))
 
         return deps
 
@@ -236,6 +254,7 @@ class WorkspaceGraph:
                     name=dep_name,
                     dep_type="explicit",
                     constraint="",
+                    scope="explicit",
                 ))
 
             # Deduplicate: same target name only once (first wins)
@@ -245,11 +264,11 @@ class WorkspaceGraph:
                     seen.add(dep.name)
                     self._deps[name].append(dep)
 
-        # Build reverse deps
+        # Build reverse deps: each entry is (dependent_name, scope)
         for name, dep_list in self._deps.items():
             for dep in dep_list:
                 if dep.name in self._rdeps:
-                    self._rdeps[dep.name].append(name)
+                    self._rdeps[dep.name].append((name, dep.scope))
 
     def dependencies(self, project_name):
         """Return list of Dependency namedtuples for intra-workspace deps."""
@@ -257,7 +276,7 @@ class WorkspaceGraph:
 
     def dependents(self, project_name):
         """Return list of project names that depend on this project."""
-        return list(self._rdeps.get(project_name, []))
+        return [name for name, _scope in self._rdeps.get(project_name, [])]
 
     def topological_order(self):
         """Return project names in topological order (leaves first).
@@ -287,7 +306,7 @@ class WorkspaceGraph:
             node = queue.pop(0)
             result.append(node)
             # For each project that depends on this node, decrement its in-degree
-            for dependent in self._rdeps.get(node, []):
+            for dependent, _scope in self._rdeps.get(node, []):
                 in_degree[dependent] -= 1
                 if in_degree[dependent] == 0:
                     queue.append(dependent)
@@ -338,12 +357,13 @@ class WorkspaceGraph:
                     result.append(dep.name)
         return result
 
-    def transitive_rdeps(self, name, depth=None):
+    def transitive_rdeps(self, name, depth=None, scope_filter=None):
         """Return transitive reverse-dependency names in BFS discovery order.
 
         Excludes the starting node. Optional *depth* limits traversal
-        (None = unlimited, 0 = empty list).  Raises KeyError if *name*
-        is not in the graph.
+        (None = unlimited, 0 = empty list).  Optional *scope_filter*
+        restricts traversal to edges whose scope matches the given string.
+        Raises KeyError if *name* is not in the graph.
         """
         if name not in self._rdeps:
             raise KeyError(name)
@@ -352,7 +372,9 @@ class WorkspaceGraph:
         result = []
         visited = {name}
         queue = []
-        for rdep_name in self._rdeps[name]:
+        for rdep_name, scope in self._rdeps[name]:
+            if scope_filter is not None and scope != scope_filter:
+                continue
             if rdep_name not in visited:
                 visited.add(rdep_name)
                 queue.append((rdep_name, 1))
@@ -361,7 +383,9 @@ class WorkspaceGraph:
             current, d = queue.pop(0)
             if depth is not None and d >= depth:
                 continue
-            for rdep_name in self._rdeps.get(current, []):
+            for rdep_name, scope in self._rdeps.get(current, []):
+                if scope_filter is not None and scope != scope_filter:
+                    continue
                 if rdep_name not in visited:
                     visited.add(rdep_name)
                     queue.append((rdep_name, d + 1))
