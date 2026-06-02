@@ -1276,11 +1276,19 @@ def _generate_merged_publish(targets, template_vars, target_paths=None):
         if target_path != ".":
             _rewrite_action_paths_for_jobs(jobs, target_path)
 
-        # Rename job keys to target name for uniqueness
-        for original_key in list(jobs):
+        # Rename job keys to target name for uniqueness.
+        # Single-job templates get the target name as key (e.g. "npm").
+        # Multi-job templates (e.g. Go with npmPublishJobs) get the first
+        # job as target name, additional jobs as "{target}-{original_key}".
+        job_keys = list(jobs)
+        for i, original_key in enumerate(job_keys):
             job = jobs.pop(original_key)
-            merged_jobs[target_name] = job
-            break  # Each template has one job; take the first
+            if len(job_keys) == 1:
+                merged_jobs[target_name] = job
+            elif i == 0:
+                merged_jobs[target_name] = job
+            else:
+                merged_jobs[f"{target_name}-{original_key}"] = job
 
     # Guarantee workflow_dispatch is present
     if "workflow_dispatch" not in all_on_triggers:
