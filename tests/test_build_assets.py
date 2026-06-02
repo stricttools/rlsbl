@@ -5,14 +5,21 @@ import json
 import os
 import subprocess
 import textwrap
+from pathlib import Path
 
 import pytest
 
+from rlsbl.context import ProjectContext
 from rlsbl.targets.base import BaseTarget
 from rlsbl.targets.pypi import PypiTarget
 from rlsbl.targets.npm import NpmTarget
 from rlsbl.targets.go import GoTarget
 from rlsbl.targets.cargo import CargoTarget
+
+
+def _ctx(project_root):
+    """Build a ProjectContext for tests."""
+    return ProjectContext(project_root=Path(str(project_root)), workspace_root=None, config={})
 
 
 # ---------------------------------------------------------------------------
@@ -92,7 +99,7 @@ class TestBaseTarget:
         target = ConcreteBase()
         dist = str(tmp_path / "dist")
         with pytest.raises(NotImplementedError, match="Asset builds not supported for target 'test'"):
-            target.build_assets(str(tmp_path), "1.0.0", dist)
+            target.build_assets(str(tmp_path), "1.0.0", dist, ctx=_ctx(tmp_path))
 
 
 # ---------------------------------------------------------------------------
@@ -118,7 +125,7 @@ class TestPypiTarget:
 
         monkeypatch.setattr("rlsbl.targets.pypi.run", fake_run)
 
-        result = target.build_assets(str(proj), "1.0.0", dist)
+        result = target.build_assets(str(proj), "1.0.0", dist, ctx=_ctx(proj))
 
         assert len(calls) == 1
         cmd, args, cwd = calls[0]
@@ -142,7 +149,7 @@ class TestPypiTarget:
 
         monkeypatch.setattr("rlsbl.targets.pypi.run", fake_run)
 
-        target.build_assets(str(proj), "1.0.0", dist)
+        target.build_assets(str(proj), "1.0.0", dist, ctx=_ctx(proj))
         assert os.path.isdir(dist)
 
 
@@ -168,7 +175,7 @@ class TestNpmTarget:
 
         monkeypatch.setattr("rlsbl.targets.npm.run", fake_run)
 
-        result = target.build_assets(str(proj), "1.0.0", dist)
+        result = target.build_assets(str(proj), "1.0.0", dist, ctx=_ctx(proj))
 
         assert len(calls) == 1
         cmd, args, cwd = calls[0]
@@ -191,7 +198,7 @@ class TestNpmTarget:
 
         monkeypatch.setattr("rlsbl.targets.npm.run", fake_run)
 
-        target.build_assets(str(proj), "1.0.0", dist)
+        target.build_assets(str(proj), "1.0.0", dist, ctx=_ctx(proj))
         assert os.path.isdir(dist)
 
 
@@ -221,7 +228,7 @@ class TestGoTarget:
         monkeypatch.setattr("rlsbl.targets.go.run", fake_run)
         monkeypatch.setattr("rlsbl.targets.go.shutil.which", lambda name: "/usr/bin/goreleaser")
 
-        result = target.build_assets(str(proj), "1.0.0", dist)
+        result = target.build_assets(str(proj), "1.0.0", dist, ctx=_ctx(proj))
 
         assert len(calls) == 1
         cmd, args, cwd = calls[0]
@@ -252,7 +259,7 @@ class TestGoTarget:
         monkeypatch.setattr("rlsbl.targets.go.run", fake_run)
         monkeypatch.setattr("rlsbl.targets.go.shutil.which", lambda name: None)
 
-        result = target.build_assets(str(proj), "1.0.0", dist)
+        result = target.build_assets(str(proj), "1.0.0", dist, ctx=_ctx(proj))
 
         assert len(calls) == 1
         cmd, args, cwd = calls[0]
@@ -287,7 +294,7 @@ class TestGoTarget:
         monkeypatch.setattr("rlsbl.targets.go.run", fake_run)
         monkeypatch.setattr("rlsbl.targets.go.shutil.which", lambda name: "/usr/bin/goreleaser")
 
-        result = target.build_assets(str(proj), "1.0.0", dist)
+        result = target.build_assets(str(proj), "1.0.0", dist, ctx=_ctx(proj))
 
         # Should have called goreleaser first, then fallen back to go build
         assert len(calls) == 2
@@ -312,7 +319,7 @@ class TestGoTarget:
         monkeypatch.setattr("rlsbl.targets.go.run", fake_run)
         monkeypatch.setattr("rlsbl.targets.go.shutil.which", lambda name: None)
 
-        target.build_assets(str(proj), "1.0.0", dist)
+        target.build_assets(str(proj), "1.0.0", dist, ctx=_ctx(proj))
         assert os.path.isdir(dist)
 
 
@@ -339,7 +346,7 @@ class TestCargoTarget:
 
         monkeypatch.setattr("rlsbl.targets.cargo.run", fake_run)
 
-        result = target.build_assets(str(proj), "1.0.0", dist)
+        result = target.build_assets(str(proj), "1.0.0", dist, ctx=_ctx(proj))
 
         assert len(calls) == 1
         cmd, args, cwd = calls[0]
@@ -360,7 +367,7 @@ class TestCargoTarget:
 
         monkeypatch.setattr("rlsbl.targets.cargo.run", fake_run)
 
-        target.build_assets(str(proj), "1.0.0", dist)
+        target.build_assets(str(proj), "1.0.0", dist, ctx=_ctx(proj))
         assert os.path.isdir(dist)
 
     def test_no_binary_returns_empty(self, tmp_path, monkeypatch):
@@ -375,5 +382,5 @@ class TestCargoTarget:
 
         monkeypatch.setattr("rlsbl.targets.cargo.run", fake_run)
 
-        result = target.build_assets(str(proj), "1.0.0", dist)
+        result = target.build_assets(str(proj), "1.0.0", dist, ctx=_ctx(proj))
         assert result == []

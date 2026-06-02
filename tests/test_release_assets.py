@@ -110,7 +110,7 @@ class TestAssetBuildAndUpload:
         mock_target = MagicMock()
         artifact_path = os.path.join(self.tmp_dir, "fake-artifact.tgz")
 
-        def fake_build_assets(project_dir, version, dist_dir, ctx=None):
+        def fake_build_assets(project_dir, version, dist_dir, ctx):
             os.makedirs(dist_dir, exist_ok=True)
             # Create a small artifact
             with open(artifact_path, "wb") as f:
@@ -189,7 +189,7 @@ class TestAssetSizeExceeded:
 
         mock_target = MagicMock()
 
-        def fake_build_assets(project_dir, version, dist_dir, ctx=None):
+        def fake_build_assets(project_dir, version, dist_dir, ctx):
             os.makedirs(dist_dir, exist_ok=True)
             # Create a file that exceeds 1MB
             with open(oversized_path, "wb") as f:
