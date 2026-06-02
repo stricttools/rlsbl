@@ -6,9 +6,16 @@ source imports against manifest-declared dependencies.
 """
 
 import os
+import re
 import tomllib
 
-from .import_scanners import DartImportScanner, NpmImportScanner, PythonImportScanner
+from .import_scanners import (
+    DartImportScanner,
+    NpmImportScanner,
+    PythonImportScanner,
+    _NON_PRODUCTION_PATTERNS,
+)
+from .lint.utils import walk_source_files
 from .workspace import WORKSPACE_DIR
 
 
@@ -220,3 +227,191 @@ def check_dev_in_lib(
         if dep_name in lib_imports:
             flagged.append(dep_name)
     return flagged
+
+
+def _is_non_production_path(filepath: str, project_dir: str) -> bool:
+    """Check if a file path is in a non-production context.
+
+    Uses _NON_PRODUCTION_PATTERNS from import_scanners.py to detect
+    test directories, example directories, and test file patterns.
+    """
+    rel = os.path.relpath(filepath, project_dir)
+    parts = rel.split(os.sep)
+    non_prod_dirs = (
+        _NON_PRODUCTION_PATTERNS["test_dirs"]
+        | _NON_PRODUCTION_PATTERNS["example_dirs"]
+    )
+    if any(part in non_prod_dirs for part in parts):
+        return True
+    basename = parts[-1]
+    return any(
+        pat.match(basename)
+        for pat in _NON_PRODUCTION_PATTERNS["test_file_patterns"]
+    )
+
+
+def _python_module_name(filepath: str, project_dir: str) -> str | None:
+    """Derive the dotted module name from a Python file path.
+
+    Returns None for files that cannot be mapped to a module name
+    (e.g. files outside a package structure).
+    """
+    rel = os.path.relpath(filepath, project_dir)
+    # Convert path separators to dots and strip .py extension
+    if rel.endswith(".py"):
+        rel = rel[:-3]
+    else:
+        return None
+    parts = rel.split(os.sep)
+    # Strip __init__ from the end (it represents the package itself)
+    if parts and parts[-1] == "__init__":
+        parts = parts[:-1]
+    if not parts:
+        return None
+    return ".".join(parts)
+
+
+def _collect_python_imports(filepath: str) -> set[str]:
+    """Collect all import targets from a Python file using simple regex.
+
+    Returns a set of dotted module names that are imported.
+    Handles: import foo, import foo.bar, from foo import bar,
+    from foo.bar import baz.
+    """
+    imports: set[str] = set()
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            content = f.read()
+    except (OSError, UnicodeDecodeError):
+        return imports
+
+    # Match 'import x.y.z' and 'import x.y.z as alias'
+    for m in re.finditer(r"^\s*import\s+([\w.]+)", content, re.MULTILINE):
+        imports.add(m.group(1))
+
+    # Match 'from x.y.z import ...'
+    for m in re.finditer(r"^\s*from\s+([\w.]+)\s+import\s+", content, re.MULTILINE):
+        imports.add(m.group(1))
+
+    return imports
+
+
+def _collect_init_exports(filepath: str) -> set[str]:
+    """Collect names exported from an __init__.py file.
+
+    Looks for __all__ definitions and import statements.
+    Returns module names that are imported by the __init__.py.
+    """
+    exports: set[str] = set()
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            content = f.read()
+    except (OSError, UnicodeDecodeError):
+        return exports
+
+    # Find __all__ = [...] and extract names
+    all_match = re.search(
+        r"__all__\s*=\s*\[([^\]]*)\]", content, re.DOTALL
+    )
+    if all_match:
+        for name_match in re.finditer(r"""['"](\w+)['"]""", all_match.group(1)):
+            exports.add(name_match.group(1))
+
+    # Collect from .foo import bar (relative imports in __init__.py)
+    for m in re.finditer(r"^\s*from\s+\.(\w+)\s+import\s+", content, re.MULTILINE):
+        exports.add(m.group(1))
+
+    # Collect import .foo (rare but possible)
+    for m in re.finditer(r"^\s*from\s+\.\s+import\s+([\w,\s]+)", content, re.MULTILINE):
+        for name in m.group(1).split(","):
+            name = name.strip()
+            if name:
+                exports.add(name)
+
+    return exports
+
+
+def find_dead_modules(project_dir: str) -> list[str]:
+    """Find Python modules not referenced by any other module in the project.
+
+    A module is considered dead if:
+    1. No other module in the project imports it (by any prefix match)
+    2. It is not listed in any __init__.py's __all__ or imported by
+       any __init__.py
+
+    Only checks Python projects. Non-production files (tests, examples)
+    are excluded from the scan.
+
+    Args:
+        project_dir: absolute path to the project root.
+
+    Returns:
+        list of relative paths of dead modules (e.g. ["mylib/unused.py"]).
+    """
+    project_dir = os.path.abspath(project_dir)
+
+    # Check this is a Python project
+    if not os.path.isfile(os.path.join(project_dir, "pyproject.toml")):
+        return []
+
+    # Collect all .py files excluding non-production paths
+    all_files = walk_source_files(project_dir, (".py",), [])
+    production_files = [
+        f for f in all_files
+        if not _is_non_production_path(f, project_dir)
+    ]
+
+    if not production_files:
+        return []
+
+    # Build module name -> filepath mapping
+    module_to_file: dict[str, str] = {}
+    init_files: list[str] = []
+    for filepath in production_files:
+        if os.path.basename(filepath) == "__init__.py":
+            init_files.append(filepath)
+            continue
+        mod_name = _python_module_name(filepath, project_dir)
+        if mod_name:
+            module_to_file[mod_name] = filepath
+
+    if not module_to_file:
+        return []
+
+    # Collect all imports across all production files
+    all_imports: set[str] = set()
+    for filepath in production_files:
+        all_imports.update(_collect_python_imports(filepath))
+
+    # Collect all __init__.py exports (names referenced via relative import
+    # or __all__)
+    init_exported_names: set[str] = set()
+    for init_path in init_files:
+        init_exported_names.update(_collect_init_exports(init_path))
+
+    # Check each module for references
+    dead = []
+    for mod_name, filepath in sorted(module_to_file.items()):
+        # Check if any import matches this module (prefix match)
+        # e.g. module "foo.bar" is referenced by "import foo.bar" or
+        # "from foo.bar import baz" or "import foo.bar.sub"
+        is_referenced = False
+        for imp in all_imports:
+            # imp references mod_name if imp starts with mod_name
+            # or mod_name starts with imp (importing a parent pulls in child)
+            if imp == mod_name or imp.startswith(mod_name + ".") or mod_name.startswith(imp + "."):
+                is_referenced = True
+                break
+
+        if is_referenced:
+            continue
+
+        # Check if the module's leaf name is exported by any __init__.py
+        leaf_name = mod_name.rsplit(".", 1)[-1]
+        if leaf_name in init_exported_names:
+            continue
+
+        rel_path = os.path.relpath(filepath, project_dir)
+        dead.append(rel_path)
+
+    return dead

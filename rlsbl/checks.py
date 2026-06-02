@@ -1023,3 +1023,31 @@ def register_checks(app):
                 details=violations,
             )
         return CheckResult("pass", "no layer violations")
+
+    # ------------------------------------------------------------------
+    # Dead module detection
+    # ------------------------------------------------------------------
+
+    @app.check("dead-modules")
+    def check_dead_modules(ctx):
+        """Python modules not referenced by any other module in the project."""
+        from .targets import detect_targets
+
+        root_str = str(ctx.project_root)
+        target_entries = detect_targets(root_str)
+        target_names = {e.name for e in target_entries}
+
+        # Only run for Python projects; skip for Go, npm, etc.
+        if "pypi" not in target_names:
+            return CheckResult("skip", "not a Python project")
+
+        from .dep_validation import find_dead_modules
+
+        dead = find_dead_modules(root_str)
+        if dead:
+            return CheckResult(
+                "warn",
+                f"{len(dead)} dead module(s)",
+                details=[f"{path}: not imported by any other module" for path in dead],
+            )
+        return CheckResult("pass", "no dead modules")

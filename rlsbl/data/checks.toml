@@ -275,3 +275,11 @@ fast = false
 pure = true
 needs_network = false
 depends_on = []
+
+[checks.dead-modules]
+tags = ["quality"]
+severity = "warn"
+fast = false
+pure = true
+needs_network = false
+depends_on = []
