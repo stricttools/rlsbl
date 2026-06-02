@@ -118,7 +118,7 @@ class GoTarget(BaseTarget):
             first_line = f.readline()
         return bool(re.match(r"^package\s+main\b", first_line))
 
-    def build_assets(self, dir_path, version, dist_dir):
+    def build_assets(self, dir_path, version, dist_dir, ctx=None):
         """Build Go binaries into dist_dir.
 
         Uses goreleaser for cross-compilation when available, falling back

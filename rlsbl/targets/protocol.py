@@ -95,7 +95,7 @@ class ReleaseTarget(Protocol):
         """
         pass
 
-    def build_assets(self, dir_path: str, version: str, dist_dir: str) -> list[str]:
+    def build_assets(self, dir_path: str, version: str, dist_dir: str, ctx=None) -> list[str]:
         """Build distributable artifacts for GH Release upload.
 
         Returns list of artifact file paths in dist_dir.

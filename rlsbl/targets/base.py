@@ -74,7 +74,7 @@ class BaseTarget:
     def publish(self, dir_path, version, ctx):
         pass
 
-    def build_assets(self, dir_path, version, dist_dir):
+    def build_assets(self, dir_path, version, dist_dir, ctx=None):
         raise NotImplementedError(
             f"Asset builds not supported for target '{self.name}'"
         )

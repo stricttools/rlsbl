@@ -282,7 +282,7 @@ class PypiTarget(BaseTarget):
         finally:
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
-    def build_assets(self, dir_path, version, dist_dir):
+    def build_assets(self, dir_path, version, dist_dir, ctx=None):
         """Build sdist and wheel for GH Release upload."""
         os.makedirs(dist_dir, exist_ok=True)
         run("uv", ["build", "--out-dir", dist_dir], env=os.environ, cwd=dir_path)
