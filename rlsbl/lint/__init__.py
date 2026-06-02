@@ -17,6 +17,15 @@ from .result import LintResult
 
 __all__ = ["lint_library", "scan_imports", "LintResult"]
 
+# Default exclusion patterns for library lint, per language.
+# These exclude test and example files from lint by default so that
+# library boundary checks focus on production code only.
+_DEFAULT_EXCLUDE_PATTERNS: dict[str, list[str]] = {
+    "python": ["tests/", "test_*.py", "conftest.py", "examples/"],
+    "go": ["*_test.go", "examples/"],
+    "npm": ["__tests__/", "*.test.js", "*.test.ts", "*.spec.js", "*.spec.ts", "examples/"],
+}
+
 
 def _detect_languages(project_path: str) -> list[str]:
     """Detect which languages are present in the project."""
@@ -89,6 +98,10 @@ def lint_library(project_path: str) -> list[LintResult]:
     results: list[LintResult] = []
     for language in languages:
         config = load_language_config(project_path, language)
+        # Merge default test/example exclusions with user-configured ones
+        defaults = _DEFAULT_EXCLUDE_PATTERNS.get(language, [])
+        merged = list(dict.fromkeys(defaults + config.exclude_patterns))
+        config.exclude_patterns = merged
         linter = _create_linter(language, parser_type)
         if linter is not None:
             results.extend(linter.lint(project_path, config))
