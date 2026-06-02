@@ -15,23 +15,51 @@ from ..changelog.files import (
 from ..changelog.generate import generate_changelog
 from ..changelog.resolve import resolve_hash
 from ..changelog.schema import ChangelogEntry, parse_jsonl, validate_schema
+from ..git_util import filter_commits_for_project
 from ..utils import commit_files
 from ..workspace import find_workspace_root, resolve_project
 
 
-def _check_dev_node(project_root):
-    """Error if the current project is a dev_node (no changelog support)."""
+def _resolve_workspace_project(project_root):
+    """Resolve the WorkspaceProject for project_root, or None in standalone mode.
+
+    Also checks and exits if the project is a dev_node.
+    """
     if project_root is None:
-        return
+        return None
     ws_root = find_workspace_root(str(project_root))
     if ws_root is None:
-        return
+        return None
     project = resolve_project(ws_root, str(project_root))
     if project is None:
-        return
+        return None
     if project.get("dev_node"):
         print("Error: dev node projects don't use changelogs.", file=sys.stderr)
         sys.exit(1)
+    return project
+
+
+def _check_project_scope(resolved_commits, project):
+    """Verify all commits touch files belonging to the project.
+
+    Hard error if any commit does not touch the project's files.
+    Skipped when project is None (standalone mode).
+    """
+    if project is None:
+        return
+    in_scope = filter_commits_for_project(set(resolved_commits), project)
+    for sha in resolved_commits:
+        if sha not in in_scope:
+            name = project.get("name", project.get("path", "unknown"))
+            path = project.get("path", "unknown")
+            print(
+                f"Error: commit {sha[:12]} does not touch files in "
+                f"project '{name}' (path: {path}). Use the correct "
+                f"project directory or update watch patterns in "
+                f"workspace.toml.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
 
 def _check_duplicate_commits(existing_entries, new_entry):
@@ -68,7 +96,7 @@ def cmd_add(flags, project_root):
     - --commits: comma-separated commit hashes
     - --description and --type: required unless --no-user-facing is set
     """
-    _check_dev_node(project_root)
+    ws_project = _resolve_workspace_project(project_root)
 
     commits_raw = flags.get("commits", "")
     if not commits_raw:
@@ -88,6 +116,8 @@ def cmd_add(flags, project_root):
             print(f"Error: commit hash does not resolve: {h}", file=sys.stderr)
             sys.exit(1)
         resolved_commits.append(full)
+
+    _check_project_scope(resolved_commits, ws_project)
 
     no_user_facing = flags.get("no-user-facing", False)
     user_facing = not no_user_facing
@@ -141,7 +171,7 @@ def cmd_add(flags, project_root):
 
 def cmd_generate(flags, project_root):
     """Generate CHANGELOG.md from JSONL changelog files."""
-    _check_dev_node(project_root)
+    _resolve_workspace_project(project_root)
 
     if not changes_dir_exists(project_root):
         print("Error: .rlsbl/changes/ does not exist.", file=sys.stderr)
@@ -207,7 +237,7 @@ def cmd_amend(flags, project_root):
     - --no-user-facing: mark entry as non-user-facing
     - --no-resolve: skip hash validation (for old/amended commits)
     """
-    _check_dev_node(project_root)
+    ws_project = _resolve_workspace_project(project_root)
 
     version = flags.get("version", "")
     if not version:
@@ -236,6 +266,9 @@ def cmd_amend(flags, project_root):
                 print(f"Error: commit hash does not resolve: {h}", file=sys.stderr)
                 sys.exit(1)
             resolved_commits.append(full)
+
+    if not no_resolve:
+        _check_project_scope(resolved_commits, ws_project)
 
     no_user_facing = flags.get("no-user-facing", False)
     user_facing = not no_user_facing
