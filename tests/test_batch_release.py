@@ -84,12 +84,12 @@ class TestReadBatchReleaseFile:
         batch_file = tmp_path / "unreleased.toml"
         batch_file.write_text(
             '[packages.models]\n'
-            'bump = "major"\n'
+            'bump = "major"\ndescription = "test release"\n'
             'include = ["pypi"]\n'
             'exclude = []\n'
             '\n'
             '[packages."marketplace-contract"]\n'
-            'bump = "minor"\n'
+            'bump = "minor"\ndescription = "test release"\n'
             'include = ["pypi"]\n'
             'exclude = []\n'
         )
@@ -113,7 +113,7 @@ class TestReadBatchReleaseFile:
         batch_file = tmp_path / "unreleased.toml"
         batch_file.write_text(
             '[packages.mylib]\n'
-            'bump = "patch"\n'
+            'bump = "patch"\ndescription = "test release"\n'
             'include = ["npm"]\n'
             'exclude = []\n'
         )
@@ -126,7 +126,7 @@ class TestReadBatchReleaseFile:
         batch_file = tmp_path / "unreleased.toml"
         batch_file.write_text(
             '[packages.myapp]\n'
-            'bump = "minor"\n'
+            'bump = "minor"\ndescription = "test release"\n'
             'include = ["flutter-ios"]\n'
             'exclude = []\n'
             '\n'
@@ -139,7 +139,7 @@ class TestReadBatchReleaseFile:
     def test_missing_packages_section(self, tmp_path):
         """Missing [packages] section raises ValueError."""
         batch_file = tmp_path / "unreleased.toml"
-        batch_file.write_text('bump = "patch"\n')
+        batch_file.write_text('bump = "patch"\ndescription = "test release"\n')
         with pytest.raises(ValueError, match="missing required section"):
             read_batch_release_file(str(batch_file))
 
@@ -166,7 +166,7 @@ class TestReadBatchReleaseFile:
         batch_file = tmp_path / "unreleased.toml"
         batch_file.write_text(
             '[packages.mylib]\n'
-            'bump = "huge"\n'
+            'bump = "huge"\ndescription = "test release"\n'
             'include = ["pypi"]\n'
             'exclude = []\n'
         )
@@ -178,7 +178,7 @@ class TestReadBatchReleaseFile:
         batch_file = tmp_path / "unreleased.toml"
         batch_file.write_text(
             '[packages.mylib]\n'
-            'bump = "patch"\n'
+            'bump = "patch"\ndescription = "test release"\n'
             'exclude = []\n'
         )
         with pytest.raises(ValueError, match="include"):
@@ -189,7 +189,7 @@ class TestReadBatchReleaseFile:
         batch_file = tmp_path / "unreleased.toml"
         batch_file.write_text(
             '[packages.mylib]\n'
-            'bump = "patch"\n'
+            'bump = "patch"\ndescription = "test release"\n'
             'include = ["pypi"]\n'
         )
         with pytest.raises(ValueError, match="exclude"):
@@ -200,7 +200,7 @@ class TestReadBatchReleaseFile:
         batch_file = tmp_path / "unreleased.toml"
         batch_file.write_text(
             '[packages.mylib]\n'
-            'bump = "patch"\n'
+            'bump = "patch"\ndescription = "test release"\n'
             'include = ["pypi", "npm"]\n'
             'exclude = ["pypi"]\n'
         )
@@ -231,12 +231,12 @@ class TestBatchValidation:
         _write_toml(
             batch_path,
             '[packages.alpha]\n'
-            'bump = "patch"\n'
+            'bump = "patch"\ndescription = "test release"\n'
             'include = ["npm"]\n'
             'exclude = []\n'
             '\n'
             '[packages.nonexistent]\n'
-            'bump = "minor"\n'
+            'bump = "minor"\ndescription = "test release"\n'
             'include = ["pypi"]\n'
             'exclude = []\n',
         )
@@ -286,17 +286,17 @@ class TestBatchTopologicalOrder:
         _write_toml(
             batch_path,
             '[packages.A]\n'
-            'bump = "patch"\n'
+            'bump = "patch"\ndescription = "test release"\n'
             'include = ["npm"]\n'
             'exclude = []\n'
             '\n'
             '[packages.B]\n'
-            'bump = "minor"\n'
+            'bump = "minor"\ndescription = "test release"\n'
             'include = ["npm"]\n'
             'exclude = []\n'
             '\n'
             '[packages.C]\n'
-            'bump = "patch"\n'
+            'bump = "patch"\ndescription = "test release"\n'
             'include = ["npm"]\n'
             'exclude = []\n',
         )
@@ -332,12 +332,12 @@ class TestBatchTopologicalOrder:
         _write_toml(
             batch_path,
             '[packages.A]\n'
-            'bump = "patch"\n'
+            'bump = "patch"\ndescription = "test release"\n'
             'include = ["npm"]\n'
             'exclude = []\n'
             '\n'
             '[packages.C]\n'
-            'bump = "patch"\n'
+            'bump = "patch"\ndescription = "test release"\n'
             'include = ["npm"]\n'
             'exclude = []\n',
         )
@@ -369,12 +369,12 @@ class TestBatchTopologicalOrder:
         _write_toml(
             batch_path,
             '[packages.zeta]\n'
-            'bump = "patch"\n'
+            'bump = "patch"\ndescription = "test release"\n'
             'include = ["npm"]\n'
             'exclude = []\n'
             '\n'
             '[packages.alpha]\n'
-            'bump = "patch"\n'
+            'bump = "patch"\ndescription = "test release"\n'
             'include = ["npm"]\n'
             'exclude = []\n',
         )
@@ -402,7 +402,7 @@ class TestBatchFinalization:
     def test_file_renamed_and_locked(self, mock_git_repo):
         """Batch file is renamed to timestamped name and made read-only."""
         batch_path = get_batch_release_file_path(str(mock_git_repo))
-        _write_toml(batch_path, '[packages.x]\nbump = "patch"\ninclude = ["pypi"]\nexclude = []\n')
+        _write_toml(batch_path, '[packages.x]\nbump = "patch"\ndescription = "test release"\ninclude = ["pypi"]\nexclude = []\n')
 
         messages = []
 
@@ -431,7 +431,7 @@ class TestBatchFinalization:
     def test_finalize_commits_files(self, mock_git_repo):
         """Finalization calls commit_files with the correct paths."""
         batch_path = get_batch_release_file_path(str(mock_git_repo))
-        _write_toml(batch_path, '[packages.x]\nbump = "patch"\ninclude = ["pypi"]\nexclude = []\n')
+        _write_toml(batch_path, '[packages.x]\nbump = "patch"\ndescription = "test release"\ninclude = ["pypi"]\nexclude = []\n')
 
         committed_files = []
 
@@ -449,7 +449,7 @@ class TestBatchFinalization:
     def test_timestamp_format(self, mock_git_repo):
         """Versioned file name follows batch-YYYYMMDD-HHMMSS.toml format."""
         batch_path = get_batch_release_file_path(str(mock_git_repo))
-        _write_toml(batch_path, '[packages.x]\nbump = "patch"\ninclude = ["pypi"]\nexclude = []\n')
+        _write_toml(batch_path, '[packages.x]\nbump = "patch"\ndescription = "test release"\ninclude = ["pypi"]\nexclude = []\n')
 
         with patch("rlsbl.commands.monorepo.batch_release.commit_files"):
             _finalize_batch_file(batch_path, lambda msg: None)
@@ -495,12 +495,12 @@ class TestBatchReleaseDevNode:
         _write_toml(
             batch_path,
             '[packages.internal]\n'
-            'bump = "patch"\n'
+            'bump = "patch"\ndescription = "test release"\n'
             'include = ["npm"]\n'
             'exclude = []\n'
             '\n'
             '[packages.public]\n'
-            'bump = "minor"\n'
+            'bump = "minor"\ndescription = "test release"\n'
             'include = ["npm"]\n'
             'exclude = []\n',
         )

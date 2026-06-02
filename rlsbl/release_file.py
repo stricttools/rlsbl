@@ -251,10 +251,14 @@ def read_batch_release_file(path: str) -> BatchReleaseConfig:
                         )
                 targets[tname] = dict(tcfg)
 
-        # --- description (optional) ---
-        description = pkg_data.get("description", "")
+        # --- description (required) ---
+        if "description" not in pkg_data:
+            raise ValueError(f"[packages.{pkg_name}] missing required field: description")
+        description = pkg_data["description"]
         if not isinstance(description, str):
             raise ValueError(f"[packages.{pkg_name}] description must be a string")
+        if not description.strip():
+            raise ValueError(f"[packages.{pkg_name}] description must be set (a short summary of this release)")
 
         # --- context (optional) ---
         context = pkg_data.get("context", "")
