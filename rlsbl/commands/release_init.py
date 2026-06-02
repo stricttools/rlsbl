@@ -42,7 +42,7 @@ def run_cmd(project_root):
     doc = tomlkit.document()
     doc.add(tomlkit.comment("Version bump type: patch, minor, or major"))
     doc.add("bump", "")
-    doc.add(tomlkit.comment("Short description of this release (required for dev_node releases)"))
+    doc.add(tomlkit.comment("Short description of this release (required)"))
     doc.add("description", "")
     doc.add(tomlkit.comment("Optional context explaining why these changes were made"))
     doc.add("context", "")
