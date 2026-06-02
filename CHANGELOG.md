@@ -2,16 +2,15 @@
 
 # Changelog
 
+## 0.54.1
+
+Make release description mandatory
+
+### Breaking
+
+- **Breaking.** Release description is now mandatory in unreleased.toml. Every release must have a short summary.
+
 ## 0.54.0
-
-Dev node architecture, release descriptions, quality checks, and graph enhancements
-
-<details>
-<summary>Context</summary>
-
-The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinterpreted exempt as a desired behavior rather than a graph position. Dev nodes now fully opt out of the changelog system instead of being exempted from enforcement.
-
-</details>
 
 ### Breaking
 
