@@ -52,7 +52,7 @@ def generate_snapshot(root, projects, graph):
             "deps": deps,
             "rdeps": rdeps,
             "library": proj.get("library", False),
-            "changelog_exempt": proj.get("changelog_exempt", False),
+            "dev_node": proj.get("dev_node", False),
             "test_only": proj.get("test_only", False),
         }
 

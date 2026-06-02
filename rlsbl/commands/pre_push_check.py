@@ -367,7 +367,7 @@ def _run_monorepo_check(workspace_root, projects, changed_files, refs=None):
 
     failures = []
     for proj in affected:
-        if proj.get("changelog_exempt"):
+        if proj.get("dev_node"):
             continue
 
         proj_dir = os.path.join(workspace_root, proj["path"])

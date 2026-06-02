@@ -496,8 +496,8 @@ def register_checks(app):
             return CheckResult("skip", "no .rlsbl/changes/ directory")
         _changes_dir, tag_glob, project, entries = info
 
-        if project is not None and project.get("changelog_exempt"):
-            return CheckResult("skip", "changelog-exempt project")
+        if project is not None and project.get("dev_node"):
+            return CheckResult("skip", "dev node project")
 
         passed, details = check_coverage(entries, tag_glob, project=project)
 
@@ -548,8 +548,8 @@ def register_checks(app):
             return CheckResult("skip", "no .rlsbl/changes/ directory")
         _changes_dir, _tag_glob, project, entries = info
 
-        if project is not None and project.get("changelog_exempt"):
-            return CheckResult("skip", "changelog-exempt project")
+        if project is not None and project.get("dev_node"):
+            return CheckResult("skip", "dev node project")
 
         passed, details = check_has_user_facing(entries)
         if passed:
@@ -745,31 +745,31 @@ def register_checks(app):
             )
         return CheckResult("pass", "no stale entries")
 
-    @app.check("changelog-exempt-boundary")
-    def check_changelog_exempt_boundary(ctx):
-        """Non-exempt projects must not have runtime deps on changelog-exempt projects."""
+    @app.check("dev-node-boundary")
+    def check_dev_node_boundary(ctx):
+        """Non-dev-node projects must not have runtime deps on dev node projects."""
         if not isinstance(ctx, WorkspaceCheckContext):
             return CheckResult("skip", "not a monorepo workspace")
 
         # Build lookup: project name -> project dict
         projects_by_name = {p["name"]: p for p in ctx.projects}
 
-        # Find all changelog-exempt projects
-        exempt_names = [
+        # Find all dev node projects
+        dev_node_names = [
             name for name, proj in projects_by_name.items()
-            if proj.get("changelog_exempt")
+            if proj.get("dev_node")
         ]
 
-        if not exempt_names:
-            return CheckResult("pass", "no changelog-exempt projects")
+        if not dev_node_names:
+            return CheckResult("pass", "no dev node projects")
 
         violations = []
-        for exempt_name in exempt_names:
+        for dev_name in dev_node_names:
             # Collect non-dev dependents: runtime and explicit scopes
             dependents = set()
             for scope in ("runtime", "explicit"):
                 try:
-                    rdeps = ctx.graph.transitive_rdeps(exempt_name, scope_filter=scope)
+                    rdeps = ctx.graph.transitive_rdeps(dev_name, scope_filter=scope)
                 except KeyError:
                     continue
                 dependents.update(rdeps)
@@ -778,11 +778,11 @@ def register_checks(app):
                 dep_proj = projects_by_name.get(dep_name)
                 if dep_proj is None:
                     continue
-                if not dep_proj.get("changelog_exempt"):
+                if not dep_proj.get("dev_node"):
                     violations.append(
-                        f"non-exempt project '{dep_name}' has a runtime dependency "
-                        f"on changelog-exempt project '{exempt_name}'. "
-                        f"Bug fixes in '{exempt_name}' won't appear in any changelog."
+                        f"non-dev-node project '{dep_name}' has a runtime dependency "
+                        f"on dev node project '{dev_name}'. "
+                        f"Bug fixes in '{dev_name}' won't appear in any changelog."
                     )
 
         if violations:
@@ -791,7 +791,7 @@ def register_checks(app):
                 f"{len(violations)} boundary violation(s)",
                 details=violations,
             )
-        return CheckResult("pass", "changelog-exempt boundary clean")
+        return CheckResult("pass", "dev node boundary clean")
 
     # ------------------------------------------------------------------
     # Dependency validation

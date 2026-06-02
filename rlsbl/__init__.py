@@ -702,10 +702,10 @@ def cmd_mono_init(no_commit, **_kwargs):
 @strictcli.flag(name="subtree-remote", type=str, help="Subtree remote URL", default="")
 @strictcli.flag(name="depends-on", type=str, help="Comma-separated dependency project names", default="")
 @strictcli.flag(name="library", type=str, help="Mark as library (true/false)", default="")
-@strictcli.flag(name="changelog-exempt", type=str, help="Mark as changelog-exempt (true/false)", default="")
+@strictcli.flag(name="dev-node", type=str, help="Mark as dev node (true/false)", default="")
 @strictcli.flag(name="no-commit", type=bool, help="Skip auto-commit of workspace.toml and suppress commits from auto-triggered scaffold/sync")
 @strictcli.arg(name="path", help="Path to the project directory")
-def cmd_mono_add(name, target, watch, subtree_remote, depends_on, library, changelog_exempt, no_commit, path, **_kwargs):
+def cmd_mono_add(name, target, watch, subtree_remote, depends_on, library, dev_node, no_commit, path, **_kwargs):
     root = _require_project_root()
     flags = {}
     if name:
@@ -720,8 +720,8 @@ def cmd_mono_add(name, target, watch, subtree_remote, depends_on, library, chang
         flags["depends-on"] = depends_on
     if library:
         flags["library"] = library
-    if changelog_exempt:
-        flags["changelog_exempt"] = changelog_exempt
+    if dev_node:
+        flags["dev_node"] = dev_node
     if no_commit:
         flags["no-commit"] = True
     from .commands.monorepo import _cmd_add

@@ -216,7 +216,7 @@ pure = true
 needs_network = false
 depends_on = []
 
-[checks.changelog-exempt-boundary]
+[checks.dev-node-boundary]
 tags = ["workspace"]
 severity = "error"
 fast = true

@@ -60,7 +60,7 @@ def _cmd_add(args, flags, project_root):
     subtree_remote = flags.get("subtree-remote")
     depends_on_raw = flags.get("depends-on")
     library_raw = flags.get("library")
-    changelog_exempt_raw = flags.get("changelog_exempt")
+    dev_node_raw = flags.get("dev_node")
 
     # Parse --library as boolean
     library = None
@@ -73,15 +73,15 @@ def _cmd_add(args, flags, project_root):
             print(f"Error: --library must be 'true' or 'false', got '{library_raw}'.", file=sys.stderr)
             sys.exit(1)
 
-    # Parse --changelog-exempt as boolean
-    changelog_exempt = None
-    if changelog_exempt_raw is not None:
-        if changelog_exempt_raw == "true":
-            changelog_exempt = True
-        elif changelog_exempt_raw == "false":
-            changelog_exempt = False
+    # Parse --dev-node as boolean
+    dev_node = None
+    if dev_node_raw is not None:
+        if dev_node_raw == "true":
+            dev_node = True
+        elif dev_node_raw == "false":
+            dev_node = False
         else:
-            print(f"Error: --changelog-exempt must be 'true' or 'false', got '{changelog_exempt_raw}'.", file=sys.stderr)
+            print(f"Error: --dev-node must be 'true' or 'false', got '{dev_node_raw}'.", file=sys.stderr)
             sys.exit(1)
 
     start = str(project_root)
@@ -120,8 +120,8 @@ def _cmd_add(args, flags, project_root):
         project["depends_on"] = depends_on
     if library is True:
         project["library"] = True
-    if changelog_exempt is True:
-        project["changelog_exempt"] = True
+    if dev_node is True:
+        project["dev_node"] = True
     projects.append(project)
     save_workspace(root, projects)
     print(f"Added project '{name}' at {path}")
@@ -310,18 +310,18 @@ def _cmd_status(flags, project_root):
         # Library flag
         library_str = "yes" if proj.get("library", False) else ""
 
-        # Changelog-exempt flag
-        changelog_exempt_str = "yes" if proj.get("changelog_exempt", False) else ""
+        # Dev-node flag
+        dev_node_str = "yes" if proj.get("dev_node", False) else ""
 
         # Subtree remote
         remote = proj.get("subtree_remote", "")
         remote_str = remote if remote else "-"
 
-        rows.append((name, path, target_name, version, latest_tag, unreleased_str, library_str, changelog_exempt_str, deps_str, rdeps_str, watch_str, remote_str))
+        rows.append((name, path, target_name, version, latest_tag, unreleased_str, library_str, dev_node_str, deps_str, rdeps_str, watch_str, remote_str))
 
     # Determine which dynamic columns to show
     any_library = any(row[6] != "" for row in rows)
-    any_exempt = any(row[7] != "" for row in rows)
+    any_dev_node = any(row[7] != "" for row in rows)
     any_deps = any(row[8] != "0" for row in rows)
     any_rdeps = any(row[9] != "0" for row in rows)
     any_watch = any(row[10] != "-" for row in rows)
@@ -331,8 +331,8 @@ def _cmd_status(flags, project_root):
     base_headers = ("Project", "Path", "Target", "Version", "Tag", "Unreleased")
     if any_library:
         base_headers = base_headers + ("Library",)
-    if any_exempt:
-        base_headers = base_headers + ("Exempt",)
+    if any_dev_node:
+        base_headers = base_headers + ("Dev",)
     if any_deps:
         base_headers = base_headers + ("Deps",)
     if any_rdeps:
@@ -349,7 +349,7 @@ def _cmd_status(flags, project_root):
         cells = list(row[:6])  # base columns: name, path, target, version, tag, unreleased
         if any_library:
             cells.append(row[6])
-        if any_exempt:
+        if any_dev_node:
             cells.append(row[7])
         if any_deps:
             cells.append(row[8])

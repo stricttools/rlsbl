@@ -469,24 +469,24 @@ class TestBatchFinalization:
 
 
 # ---------------------------------------------------------------------------
-# Batch release with changelog-exempt projects
+# Batch release with dev node projects
 # ---------------------------------------------------------------------------
 
 
-class TestBatchReleaseExempt:
+class TestBatchReleaseDevNode:
 
-    def test_exempt_project_included_in_batch(self, mock_git_repo, capsys):
-        """Changelog-exempt projects are released (version bumped) in batch mode.
+    def test_dev_node_project_included_in_batch(self, mock_git_repo, capsys):
+        """Dev node projects are released (version bumped) in batch mode.
 
-        The batch release flow does not skip exempt projects -- they get
-        version bumps like any other project. The exemption only applies to
+        The batch release flow does not skip dev node projects -- they get
+        version bumps like any other project. The dev node flag only applies to
         changelog enforcement (no JSONL coverage required).
         """
         _make_npm_project(mock_git_repo, "internal", version="0.1.0")
         _make_npm_project(mock_git_repo, "public", version="0.1.0")
 
         projects = [
-            {"path": "internal", "name": "internal", "changelog_exempt": True},
+            {"path": "internal", "name": "internal", "dev_node": True},
             {"path": "public", "name": "public"},
         ]
         _init_workspace(mock_git_repo, projects)

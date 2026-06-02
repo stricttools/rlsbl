@@ -612,9 +612,9 @@
               "default": ""
             },
             {
-              "name": "changelog-exempt",
+              "name": "dev-node",
               "type": "str",
-              "help": "Mark as changelog-exempt (true/false)",
+              "help": "Mark as dev node (true/false)",
               "default": ""
             },
             {
@@ -1112,7 +1112,7 @@
       "needs_network": false,
       "depends_on": []
     },
-    "changelog-exempt-boundary": {
+    "dev-node-boundary": {
       "tags": [
         "workspace"
       ],

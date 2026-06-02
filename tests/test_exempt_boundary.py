@@ -1,8 +1,8 @@
-"""Tests for the changelog-exempt boundary guardrail check.
+"""Tests for the dev node boundary guardrail check.
 
-The changelog-exempt-boundary check ensures that non-exempt projects do not
-have runtime dependencies on changelog-exempt projects (since bug fixes
-in exempt projects would silently bypass changelog coverage).
+The dev-node-boundary check ensures that non-dev-node projects do not
+have runtime dependencies on dev node projects (since bug fixes
+in dev node projects would silently bypass changelog coverage).
 """
 
 import json
@@ -59,7 +59,7 @@ def _setup_monorepo(tmp_path, monkeypatch, projects_spec):
     """Set up a monorepo with given projects and return (root, ctx).
 
     projects_spec is a list of dicts with keys:
-      path, name, changelog_exempt (optional bool),
+      path, name, dev_node (optional bool),
       deps (optional list of runtime dep names),
       dev_deps (optional list of dev dep names).
     """
@@ -77,8 +77,8 @@ def _setup_monorepo(tmp_path, monkeypatch, projects_spec):
     ws_projects = []
     for spec in projects_spec:
         ws_proj = {"path": spec["path"], "name": spec["name"]}
-        if spec.get("changelog_exempt"):
-            ws_proj["changelog_exempt"] = True
+        if spec.get("dev_node"):
+            ws_proj["dev_node"] = True
         ws_projects.append(ws_proj)
 
     make_workspace(tmp_path, ws_projects)
@@ -115,59 +115,59 @@ def _setup_monorepo(tmp_path, monkeypatch, projects_spec):
 
 
 class TestBoundaryGuardrail:
-    """Tests for check_changelog_exempt_boundary."""
+    """Tests for check_dev_node_boundary."""
 
     def test_boundary_catches_runtime_dependency(self, tmp_path, monkeypatch):
-        """Non-exempt A depends on exempt B via runtime dep -> FAIL."""
+        """Non-dev-node A depends on dev node B via runtime dep -> FAIL."""
         _root, ctx = _setup_monorepo(tmp_path, monkeypatch, [
             {"path": "proj-a", "name": "proj-a", "deps": ["proj-b"]},
-            {"path": "proj-b", "name": "proj-b", "changelog_exempt": True},
+            {"path": "proj-b", "name": "proj-b", "dev_node": True},
         ])
         checks = _register_and_get_checks()
-        result = checks["changelog-exempt-boundary"](ctx)
+        result = checks["dev-node-boundary"](ctx)
 
         assert result.status == "fail"
         assert "proj-a" in result.details[0]
         assert "proj-b" in result.details[0]
 
     def test_boundary_allows_dev_dependency(self, tmp_path, monkeypatch):
-        """Non-exempt A depends on exempt B via dev dep only -> PASS."""
+        """Non-dev-node A depends on dev node B via dev dep only -> PASS."""
         _root, ctx = _setup_monorepo(tmp_path, monkeypatch, [
             {"path": "proj-a", "name": "proj-a", "dev_deps": ["proj-b"]},
-            {"path": "proj-b", "name": "proj-b", "changelog_exempt": True},
+            {"path": "proj-b", "name": "proj-b", "dev_node": True},
         ])
         checks = _register_and_get_checks()
-        result = checks["changelog-exempt-boundary"](ctx)
+        result = checks["dev-node-boundary"](ctx)
 
         assert result.status == "pass"
 
     def test_boundary_allows_no_dependents(self, tmp_path, monkeypatch):
-        """Exempt B with no dependents at all -> PASS."""
+        """Dev node B with no dependents at all -> PASS."""
         _root, ctx = _setup_monorepo(tmp_path, monkeypatch, [
             {"path": "proj-a", "name": "proj-a"},
-            {"path": "proj-b", "name": "proj-b", "changelog_exempt": True},
+            {"path": "proj-b", "name": "proj-b", "dev_node": True},
         ])
         checks = _register_and_get_checks()
-        result = checks["changelog-exempt-boundary"](ctx)
+        result = checks["dev-node-boundary"](ctx)
 
         assert result.status == "pass"
 
     def test_boundary_transitive_chain(self, tmp_path, monkeypatch):
-        """A->B->C where C is exempt, A is not, all runtime -> FAIL.
+        """A->B->C where C is dev node, A is not, all runtime -> FAIL.
 
-        A transitively depends on exempt C through non-exempt B.
+        A transitively depends on dev node C through non-dev-node B.
         """
         _root, ctx = _setup_monorepo(tmp_path, monkeypatch, [
             {"path": "proj-a", "name": "proj-a", "deps": ["proj-b"]},
             {"path": "proj-b", "name": "proj-b", "deps": ["proj-c"]},
-            {"path": "proj-c", "name": "proj-c", "changelog_exempt": True},
+            {"path": "proj-c", "name": "proj-c", "dev_node": True},
         ])
         checks = _register_and_get_checks()
-        result = checks["changelog-exempt-boundary"](ctx)
+        result = checks["dev-node-boundary"](ctx)
 
         assert result.status == "fail"
-        # Should mention proj-a (the non-exempt project that transitively
-        # depends on exempt proj-c)
+        # Should mention proj-a (the non-dev-node project that transitively
+        # depends on dev node proj-c)
         violation_text = "\n".join(result.details)
         assert "proj-a" in violation_text
         assert "proj-c" in violation_text

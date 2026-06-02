@@ -46,10 +46,6 @@ class WorkspaceProject:
     def depends_on(self) -> list[str]:
         return self._data.get("depends_on", [])
 
-    @property
-    def changelog_exempt(self) -> bool:
-        return bool(self._data.get("changelog_exempt", False))
-
     def get(self, key, default=None):
         """Dict-like access for backward compatibility."""
         return self._data.get(key, default)

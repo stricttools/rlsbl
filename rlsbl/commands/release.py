@@ -675,7 +675,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
     monorepo_name = None
     monorepo_project_path = None
     is_library = False
-    is_changelog_exempt = False
+    is_dev_node = False
 
     if monorepo_root:
         project = resolve_project(monorepo_root, str(project_root))
@@ -686,7 +686,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
         monorepo_name = project["name"]
         monorepo_project_path = project["path"]
         is_library = bool(project.get("library"))
-        is_changelog_exempt = bool(project.get("changelog_exempt"))
+        is_dev_node = bool(project.get("dev_node"))
         log(f"Monorepo project: {monorepo_name} ({monorepo_project_path})")
 
     # Project directory: ctx.project_root is already resolved to the sub-project
@@ -743,9 +743,9 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
         print(f'Error: tag "{tag}" already exists.', file=sys.stderr)
         sys.exit(1)
 
-    # Validate JSONL changelog (skipped for changelog-exempt projects)
-    if monorepo_name and is_changelog_exempt:
-        log("Changelog-exempt project: skipping changelog validation")
+    # Validate JSONL changelog (skipped for dev node projects)
+    if monorepo_name and is_dev_node:
+        log("Dev node project: skipping changelog validation")
         # Still generate CHANGELOG.md if the changes dir exists
         if changes_dir_exists(project_dir):
             changes_dir = get_changes_dir(project_dir)
