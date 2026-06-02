@@ -33,7 +33,7 @@ class TestStrictcliSchemaDumpFunction:
         messages = []
         _run_strictcli_schema_dump(
             {}, lambda msg: messages.append(msg),
-            version_dir=str(tmp_path), project_dir=str(tmp_path),
+            project_dir=str(tmp_path),
         )
         assert not messages
         captured = capsys.readouterr()
@@ -49,7 +49,7 @@ class TestStrictcliSchemaDumpFunction:
         messages = []
         _run_strictcli_schema_dump(
             {"dry-run": True}, lambda msg: messages.append(msg),
-            version_dir=str(tmp_path), project_dir=str(tmp_path),
+            project_dir=str(tmp_path),
         )
         assert any("Would run: uv run myapp --dump-schema" in m for m in messages)
 
@@ -62,7 +62,7 @@ class TestStrictcliSchemaDumpFunction:
         messages = []
         _run_strictcli_schema_dump(
             {"dry-run": True}, lambda msg: messages.append(msg),
-            version_dir=str(tmp_path), project_dir=str(tmp_path),
+            project_dir=str(tmp_path),
         )
         assert not messages
 
@@ -81,7 +81,7 @@ class TestStrictcliSchemaDumpFunction:
 
             _run_strictcli_schema_dump(
                 {}, lambda msg: messages.append(msg),
-                version_dir=str(tmp_path), project_dir=str(tmp_path),
+                project_dir=str(tmp_path),
             )
 
         captured = capsys.readouterr()
@@ -102,7 +102,7 @@ class TestStrictcliSchemaDumpFunction:
 
             _run_strictcli_schema_dump(
                 {}, lambda msg: messages.append(msg),
-                version_dir=str(tmp_path), project_dir=str(tmp_path),
+                project_dir=str(tmp_path),
             )
 
         captured = capsys.readouterr()
@@ -123,7 +123,7 @@ class TestStrictcliSchemaDumpFunction:
 
             _run_strictcli_schema_dump(
                 {}, lambda msg: messages.append(msg),
-                version_dir=str(tmp_path), project_dir=str(tmp_path),
+                project_dir=str(tmp_path),
             )
 
         mock_sp.run.assert_called_once()

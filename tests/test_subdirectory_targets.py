@@ -184,14 +184,14 @@ class TestResolveReleaseTargetsSubdirectory:
     """Tests for resolve_release_targets() with subdirectory config."""
 
     def test_plain_string_release_targets(self, tmp_path, monkeypatch):
-        """Plain string release_targets resolve to version_dir."""
+        """Plain string release_targets resolve to project_dir."""
         monkeypatch.chdir(tmp_path)
         config_dir = tmp_path / ".rlsbl"
         config_dir.mkdir()
         config = {"targets": ["npm", "pypi"], "release_targets": ["npm"]}
         (config_dir / "config.json").write_text(json.dumps(config))
         (tmp_path / "package.json").write_text('{"name": "test", "version": "1.0.0"}')
-        result = resolve_release_targets("pypi", {}, version_dir=str(tmp_path), config=config)
+        result = resolve_release_targets("pypi", {}, project_dir=str(tmp_path), config=config)
         assert isinstance(result, dict)
         assert "npm" in result
 
@@ -206,7 +206,7 @@ class TestResolveReleaseTargetsSubdirectory:
         config = {"targets": [{"name": "npm", "path": "npm"}],
                   "release_targets": [{"name": "npm", "path": "npm"}]}
         (config_dir / "config.json").write_text(json.dumps(config))
-        result = resolve_release_targets("pypi", {}, version_dir=str(tmp_path), config=config)
+        result = resolve_release_targets("pypi", {}, project_dir=str(tmp_path), config=config)
         assert "npm" in result
         assert result["npm"] == str(npm_dir)
 

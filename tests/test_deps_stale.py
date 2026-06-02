@@ -248,7 +248,7 @@ class TestStaleDepAdvisory:
 
         captured = StringIO()
         with patch("sys.stderr", captured):
-            _print_stale_dep_advisory("lib", "2.0.0", str(lib_dir))
+            _print_stale_dep_advisory("lib", "2.0.0")
 
         output = captured.getvalue()
         assert "Stale dependency constraints" in output
@@ -284,7 +284,7 @@ class TestStaleDepAdvisory:
 
         captured = StringIO()
         with patch("sys.stderr", captured):
-            _print_stale_dep_advisory("lib", "2.0.0", str(lib_dir))
+            _print_stale_dep_advisory("lib", "2.0.0")
 
         assert captured.getvalue() == ""
 
@@ -303,6 +303,6 @@ class TestStaleDepAdvisory:
 
         captured = StringIO()
         with patch("sys.stderr", captured):
-            _print_stale_dep_advisory("lib", "1.0.0", str(lib_dir))
+            _print_stale_dep_advisory("lib", "1.0.0")
 
         assert captured.getvalue() == ""

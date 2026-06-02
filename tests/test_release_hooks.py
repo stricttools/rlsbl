@@ -423,7 +423,7 @@ class TestHookCwdStandalone:
         _push,
         tmp_project,
     ):
-        """In standalone mode, pre-checks hook subprocess.run gets cwd=None."""
+        """In standalone mode, pre-checks hook subprocess.run gets cwd=project_dir."""
         _setup_project(tmp_project, "pre-checks.sh", "#!/bin/bash\necho ok\n")
         mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
 
@@ -437,9 +437,9 @@ class TestHookCwdStandalone:
             run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False}))
 
             assert mock_sp.run.call_count >= 1
-            # The pre-checks hook call should have cwd=None
+            # The pre-checks hook call should have cwd=project_dir (".")
             pre_checks_call = mock_sp.run.call_args_list[0]
-            assert pre_checks_call.kwargs.get("cwd") is None
+            assert pre_checks_call.kwargs.get("cwd") == "."
 
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
@@ -463,7 +463,7 @@ class TestHookCwdStandalone:
         _push,
         tmp_project,
     ):
-        """In standalone mode, pre-release hook subprocess.run gets cwd=None."""
+        """In standalone mode, pre-release hook subprocess.run gets cwd=project_dir."""
         _setup_project(tmp_project, "pre-release.sh", "#!/bin/bash\necho ok\n")
         mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
 
@@ -477,9 +477,9 @@ class TestHookCwdStandalone:
             run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False}))
 
             assert mock_sp.run.call_count >= 1
-            # The pre-release hook call should have cwd=None
+            # The pre-release hook call should have cwd=project_dir (".")
             pre_release_call = mock_sp.run.call_args_list[0]
-            assert pre_release_call.kwargs.get("cwd") is None
+            assert pre_release_call.kwargs.get("cwd") == "."
 
     @patch("rlsbl.commands.release.read_deploy_config", return_value=([], []))
     @patch("rlsbl.commands.release.should_tag", return_value=False)
@@ -505,7 +505,7 @@ class TestHookCwdStandalone:
         _deploy,
         tmp_project,
     ):
-        """In standalone mode, post-release hook subprocess.run gets cwd=None."""
+        """In standalone mode, post-release hook subprocess.run gets cwd=project_dir."""
         _setup_project(tmp_project, "post-release.sh", "#!/bin/bash\necho ok\n")
 
         def fake_run(cmd, args=None, timeout=120, env=None):
@@ -543,7 +543,7 @@ class TestHookCwdStandalone:
                 if len(c[0][0]) > 1 and "post-release.sh" in c[0][0][1]
             ]
             assert len(post_release_calls) == 1
-            assert post_release_calls[0].kwargs.get("cwd") is None
+            assert post_release_calls[0].kwargs.get("cwd") == "."
 
 
 class TestHookCwdMonorepo:
@@ -600,7 +600,7 @@ class TestHookCwdMonorepo:
 
             from rlsbl.commands.release import run_cmd
 
-            run_cmd(_rc(include=["pypi"]), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(ns.root)), config={"private": False}))
+            run_cmd(_rc(include=["pypi"]), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=ns.python_dir, workspace_root=Path(str(ns.root)), config={"private": False}))
 
             # Find the pre-checks hook call
             pre_checks_calls = [
@@ -662,7 +662,7 @@ class TestHookCwdMonorepo:
 
             from rlsbl.commands.release import run_cmd
 
-            run_cmd(_rc(include=["pypi"]), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(ns.root)), config={"private": False}))
+            run_cmd(_rc(include=["pypi"]), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=ns.python_dir, workspace_root=Path(str(ns.root)), config={"private": False}))
 
             # Find the pre-release hook call
             pre_release_calls = [
@@ -744,7 +744,7 @@ class TestHookCwdMonorepo:
 
             from rlsbl.commands.release import run_cmd
 
-            run_cmd(_rc(include=["pypi"]), {"quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(ns.root)), config={"private": False}))
+            run_cmd(_rc(include=["pypi"]), {"quiet": True, "yes": True}, ctx=ProjectContext(project_root=ns.python_dir, workspace_root=Path(str(ns.root)), config={"private": False}))
 
             # Find the post-release hook call
             post_release_calls = [

@@ -125,7 +125,7 @@ class TestRefreshSelfdocHashes:
             patch("rlsbl.commands.release.require_tool", return_value="/usr/bin/selfdoc"),
             patch("rlsbl.commands.release.subprocess.run", side_effect=fake_subprocess_run),
         ):
-            _refresh_selfdoc_hashes(files_to_commit, log, version_dir=str(tmp_path))
+            _refresh_selfdoc_hashes(files_to_commit, log, project_dir=str(tmp_path))
 
         assert norm_hashes in files_to_commit
 
@@ -153,7 +153,7 @@ class TestRefreshSelfdocHashes:
             patch("rlsbl.commands.release.require_tool", return_value="/usr/bin/selfdoc"),
             patch("rlsbl.commands.release.subprocess.run", side_effect=fake_subprocess_run),
         ):
-            _refresh_selfdoc_hashes(files_to_commit, log, version_dir=str(tmp_path))
+            _refresh_selfdoc_hashes(files_to_commit, log, project_dir=str(tmp_path))
 
         assert files_to_commit == []
 
@@ -163,7 +163,7 @@ class TestRefreshSelfdocHashes:
         log = MagicMock()
 
         with patch("rlsbl.commands.release.subprocess.run") as mock_run:
-            _refresh_selfdoc_hashes(files_to_commit, log, version_dir=str(tmp_path))
+            _refresh_selfdoc_hashes(files_to_commit, log, project_dir=str(tmp_path))
 
         mock_run.assert_not_called()
         assert files_to_commit == []
@@ -176,7 +176,7 @@ class TestRefreshSelfdocHashes:
         log = MagicMock()
 
         with patch("rlsbl.commands.release.subprocess.run") as mock_run:
-            _refresh_selfdoc_hashes(files_to_commit, log, version_dir=str(tmp_path))
+            _refresh_selfdoc_hashes(files_to_commit, log, project_dir=str(tmp_path))
 
         mock_run.assert_not_called()
         assert files_to_commit == []
@@ -195,7 +195,7 @@ class TestRefreshSelfdocHashes:
             patch("rlsbl.commands.release.require_tool", return_value=None),
             patch("rlsbl.commands.release.subprocess.run") as mock_run,
         ):
-            _refresh_selfdoc_hashes(files_to_commit, log, version_dir=str(tmp_path))
+            _refresh_selfdoc_hashes(files_to_commit, log, project_dir=str(tmp_path))
 
         mock_run.assert_not_called()
         assert files_to_commit == []
@@ -216,7 +216,7 @@ class TestRefreshSelfdocHashes:
                   side_effect=OSError("selfdoc crashed")),
         ):
             # Should not raise
-            _refresh_selfdoc_hashes(files_to_commit, log, version_dir=str(tmp_path))
+            _refresh_selfdoc_hashes(files_to_commit, log, project_dir=str(tmp_path))
 
         assert files_to_commit == []
         # Warning should be logged
@@ -249,7 +249,7 @@ class TestRefreshSelfdocHashes:
             patch("rlsbl.commands.release.require_tool", return_value="/usr/bin/selfdoc"),
             patch("rlsbl.commands.release.subprocess.run", side_effect=fake_subprocess_run),
         ):
-            _refresh_selfdoc_hashes(files_to_commit, log, version_dir=str(tmp_path))
+            _refresh_selfdoc_hashes(files_to_commit, log, project_dir=str(tmp_path))
 
         assert files_to_commit.count(norm_hashes) == 1
 
@@ -283,7 +283,6 @@ class TestRefreshSelfdocHashes:
         ):
             _refresh_selfdoc_hashes(
                 files_to_commit, log,
-                version_dir=".",
                 project_dir=str(project_dir),
             )
 

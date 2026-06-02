@@ -53,7 +53,7 @@ class TestNoAssetsConfigured:
                 "targets": ["npm"],
                 "publish": {"npm": {"local": False}},
             })
-            upload_release_assets("v1.0.0", ".", "1.0.0", log, {}, ctx=ctx)
+            upload_release_assets("v1.0.0", "1.0.0", log, {}, ctx=ctx)
             # gh release upload should never be called
             mock_run.assert_not_called()
 
@@ -68,7 +68,7 @@ class TestNoAssetsConfigured:
 
         with patch("rlsbl.commands.release.run") as mock_run:
             ctx = ProjectContext(project_root=Path("."), workspace_root=None, config={"targets": ["npm"]})
-            upload_release_assets("v1.0.0", ".", "1.0.0", lambda m: None, {}, ctx=ctx)
+            upload_release_assets("v1.0.0", "1.0.0", lambda m: None, {}, ctx=ctx)
             mock_run.assert_not_called()
 
     def test_assets_false_skips(self):
@@ -85,7 +85,7 @@ class TestNoAssetsConfigured:
                 "targets": ["npm"],
                 "publish": {"npm": {"assets": False}},
             })
-            upload_release_assets("v1.0.0", ".", "1.0.0", lambda m: None, {}, ctx=ctx)
+            upload_release_assets("v1.0.0", "1.0.0", lambda m: None, {}, ctx=ctx)
             mock_run.assert_not_called()
 
 
@@ -128,7 +128,7 @@ class TestAssetBuildAndUpload:
         })
         with patch("rlsbl.commands.release.TARGETS", {"npm": mock_target}):
             with patch("rlsbl.commands.release.run") as mock_run:
-                upload_release_assets("v1.0.0", ".", "1.0.0", log, {}, ctx=ctx)
+                upload_release_assets("v1.0.0", "1.0.0", log, {}, ctx=ctx)
 
                 # gh release upload should be called with --clobber
                 mock_run.assert_called_once()
@@ -162,7 +162,7 @@ class TestAssetBuildAndUpload:
         })
         with patch("rlsbl.commands.release.TARGETS", {"npm": mock_target}):
             with patch("rlsbl.commands.release.run") as mock_run:
-                upload_release_assets("v1.0.0", ".", "1.0.0", log, {}, ctx=ctx)
+                upload_release_assets("v1.0.0", "1.0.0", log, {}, ctx=ctx)
                 mock_run.assert_not_called()
 
         assert any("No artifacts" in m for m in messages)
@@ -205,7 +205,7 @@ class TestAssetSizeExceeded:
         with patch("rlsbl.commands.release.TARGETS", {"pypi": mock_target}):
             with patch("rlsbl.commands.release.run"):
                 with pytest.raises(SystemExit) as exc_info:
-                    upload_release_assets("v1.0.0", ".", "1.0.0", lambda m: None, {}, ctx=ctx)
+                    upload_release_assets("v1.0.0", "1.0.0", lambda m: None, {}, ctx=ctx)
                 assert exc_info.value.code == 1
 
         captured = capsys.readouterr()
@@ -241,7 +241,7 @@ class TestBuildAssetsNotImplemented:
         with patch("rlsbl.commands.release.TARGETS", {"npm": mock_target}):
             with patch("rlsbl.commands.release.run") as mock_run:
                 # Should not raise
-                upload_release_assets("v1.0.0", ".", "1.0.0", lambda m: None, {}, ctx=ctx)
+                upload_release_assets("v1.0.0", "1.0.0", lambda m: None, {}, ctx=ctx)
                 # No upload call
                 mock_run.assert_not_called()
 
@@ -277,7 +277,7 @@ class TestDryRun:
         })
         with patch("rlsbl.commands.release.TARGETS", {"npm": mock_target}):
             with patch("rlsbl.commands.release.run") as mock_run:
-                upload_release_assets("v1.0.0", ".", "1.0.0", log, {"dry-run": True}, ctx=ctx)
+                upload_release_assets("v1.0.0", "1.0.0", log, {"dry-run": True}, ctx=ctx)
                 # No build_assets or upload calls
                 mock_target.build_assets.assert_not_called()
                 mock_run.assert_not_called()
