@@ -110,6 +110,10 @@ def _require_sub_project_root():
         if project:
             sub_path = Path(ws_root) / project["path"]
             return sub_path
+        # CWD is inside the monorepo but not in any registered project
+        print(f"Error: CWD is inside monorepo at {ws_root} but not inside any registered project.", file=sys.stderr)
+        print("Run 'rlsbl monorepo add <path>' to register this project.", file=sys.stderr)
+        sys.exit(1)
     return root
 
 
