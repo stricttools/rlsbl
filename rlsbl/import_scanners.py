@@ -18,7 +18,28 @@ from .targets.utils import normalize_pypi
 _STDLIB_MODULES: frozenset[str] = frozenset(sys.stdlib_module_names)
 
 # Directories that indicate test context.
-_TEST_DIRS = frozenset({"test", "tests"})
+_TEST_DIRS = frozenset({"test", "tests", "__tests__"})
+
+# Directories that indicate example/demo context (not production code).
+_EXAMPLE_DIRS = frozenset({"examples", "example"})
+
+# File name patterns that indicate test files (checked against basename).
+_TEST_FILE_PATTERNS = (
+    re.compile(r"^test_.*\.py$"),
+    re.compile(r"^.*_test\.py$"),
+    re.compile(r"^.*_test\.go$"),
+    re.compile(r"^.*\.test\.[jt]sx?$"),
+    re.compile(r"^.*\.spec\.[jt]sx?$"),
+    re.compile(r"^conftest\.py$"),
+)
+
+# Shared constant for non-production context detection. Reusable by lint
+# exclusion and dead-module checks.
+_NON_PRODUCTION_PATTERNS = {
+    "test_dirs": _TEST_DIRS,
+    "example_dirs": _EXAMPLE_DIRS,
+    "test_file_patterns": _TEST_FILE_PATTERNS,
+}
 
 # Regex for Dart package imports: import 'package:foo/bar.dart'
 # Also matches export statements.
@@ -36,14 +57,18 @@ class ImportInfo:
 
 
 def _is_test_context(filepath: str, project_path: str) -> bool:
-    """Determine whether a file is in a test directory.
+    """Determine whether a file is in a non-production context.
 
-    Checks if any path component between project_path and filepath
-    is 'test' or 'tests'.
+    Checks directory names (test, tests, __tests__, examples, example)
+    and file name patterns (test_*.py, *_test.go, *.spec.ts, etc.).
     """
     rel = os.path.relpath(filepath, project_path)
     parts = rel.split(os.sep)
-    return any(part in _TEST_DIRS for part in parts)
+    non_prod_dirs = _TEST_DIRS | _EXAMPLE_DIRS
+    if any(part in non_prod_dirs for part in parts):
+        return True
+    basename = parts[-1]
+    return any(pat.match(basename) for pat in _TEST_FILE_PATTERNS)
 
 
 class PythonImportScanner:
