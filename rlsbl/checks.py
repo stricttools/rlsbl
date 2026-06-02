@@ -745,6 +745,54 @@ def register_checks(app):
             )
         return CheckResult("pass", "no stale entries")
 
+    @app.check("changelog-exempt-boundary")
+    def check_changelog_exempt_boundary(ctx):
+        """Non-exempt projects must not have runtime deps on changelog-exempt projects."""
+        if not isinstance(ctx, WorkspaceCheckContext):
+            return CheckResult("skip", "not a monorepo workspace")
+
+        # Build lookup: project name -> project dict
+        projects_by_name = {p["name"]: p for p in ctx.projects}
+
+        # Find all changelog-exempt projects
+        exempt_names = [
+            name for name, proj in projects_by_name.items()
+            if proj.get("changelog_exempt")
+        ]
+
+        if not exempt_names:
+            return CheckResult("pass", "no changelog-exempt projects")
+
+        violations = []
+        for exempt_name in exempt_names:
+            # Collect non-dev dependents: runtime and explicit scopes
+            dependents = set()
+            for scope in ("runtime", "explicit"):
+                try:
+                    rdeps = ctx.graph.transitive_rdeps(exempt_name, scope_filter=scope)
+                except KeyError:
+                    continue
+                dependents.update(rdeps)
+
+            for dep_name in sorted(dependents):
+                dep_proj = projects_by_name.get(dep_name)
+                if dep_proj is None:
+                    continue
+                if not dep_proj.get("changelog_exempt"):
+                    violations.append(
+                        f"non-exempt project '{dep_name}' has a runtime dependency "
+                        f"on changelog-exempt project '{exempt_name}'. "
+                        f"Bug fixes in '{exempt_name}' won't appear in any changelog."
+                    )
+
+        if violations:
+            return CheckResult(
+                "fail",
+                f"{len(violations)} boundary violation(s)",
+                details=violations,
+            )
+        return CheckResult("pass", "changelog-exempt boundary clean")
+
     # ------------------------------------------------------------------
     # Dependency validation
     # ------------------------------------------------------------------

@@ -16,7 +16,7 @@ from rlsbl.check_context import WorkspaceCheckContext
 
 
 # ---------------------------------------------------------------------------
-# All 30 checks are declared in checks.toml and registered on the app
+# All 31 checks are declared in checks.toml and registered on the app
 # ---------------------------------------------------------------------------
 
 EXPECTED_CHECKS = [
@@ -48,6 +48,7 @@ EXPECTED_CHECKS = [
     "workspace-targets",
     "workspace-unregistered",
     "workspace-stale-entries",
+    "changelog-exempt-boundary",
     # Layer checks
     "layers-violations",
     # Dependency validation checks
@@ -60,8 +61,8 @@ EXPECTED_CHECKS = [
 class TestCheckDeclarations:
     """Every check must be declared in checks.toml and registered on the app."""
 
-    def test_all_30_checks_declared(self):
-        """checks.toml defines exactly the 30 expected checks."""
+    def test_all_31_checks_declared(self):
+        """checks.toml defines exactly the 31 expected checks."""
         assert sorted(app._check_defs.keys()) == sorted(EXPECTED_CHECKS)
 
     @pytest.mark.parametrize("name", EXPECTED_CHECKS)
@@ -70,14 +71,14 @@ class TestCheckDeclarations:
         assert app._check_defs[name].impl is not None
 
     def test_check_list_shows_all(self):
-        """``rlsbl check --list`` outputs all 30 check names."""
+        """``rlsbl check --list`` outputs all 31 check names."""
         result = app.test(["check", "--list"])
         assert result.exit_code == 0
         for name in EXPECTED_CHECKS:
             assert name in result.stdout
 
     def test_check_list_json(self):
-        """``rlsbl check --list --json`` outputs valid JSON with all 30 checks."""
+        """``rlsbl check --list --json`` outputs valid JSON with all 31 checks."""
         result = app.test(["check", "--list", "--json"])
         assert result.exit_code == 0
         data = json.loads(result.stdout)
@@ -364,6 +365,7 @@ class TestCheckTagFiltering:
         assert "workspace-targets" in result.stdout
         assert "workspace-unregistered" in result.stdout
         assert "workspace-stale-entries" in result.stdout
+        assert "changelog-exempt-boundary" in result.stdout
 
 
 # ---------------------------------------------------------------------------
@@ -389,7 +391,7 @@ class TestNewCheckDependencies:
         for name in [
             "workspace-ci-router", "workspace-ci-synced",
             "workspace-targets", "workspace-unregistered",
-            "workspace-stale-entries",
+            "workspace-stale-entries", "changelog-exempt-boundary",
         ]:
             assert app._check_defs[name].depends_on == []
 
