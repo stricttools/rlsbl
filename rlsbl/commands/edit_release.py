@@ -1,12 +1,33 @@
-"""Edit-release command that updates existing GitHub Release notes by extracting the matching version section from CHANGELOG.md."""
+"""Edit-release command that updates existing GitHub Release notes by extracting the matching version section from CHANGELOG.md or the versioned release file for dev nodes."""
 
 import os
 import sys
 import time
 
+import tomlkit
+
 from ..targets import TARGETS, detect_targets
 from ..utils import check_gh_auth, check_gh_installed, extract_changelog_entry, run
 from ..workspace import find_workspace_root, resolve_project
+
+
+def _read_release_description(project_dir, version):
+    """Read description from a versioned release file (vX.Y.Z.toml).
+
+    Dev node projects have no CHANGELOG.md, so release notes come from
+    the versioned release file instead. Returns the bump type as a
+    minimal description, or a placeholder if the file doesn't exist.
+    """
+    release_path = os.path.join(project_dir, ".rlsbl", "releases", f"v{version}.toml")
+    if not os.path.exists(release_path):
+        return f"Release {version}"
+    try:
+        with open(release_path, "r", encoding="utf-8") as f:
+            data = tomlkit.load(f)
+        bump = data.get("bump", "patch")
+        return f"Release {version} ({bump})"
+    except Exception:
+        return f"Release {version}"
 
 
 def run_cmd(args, flags, project_root):
@@ -16,7 +37,8 @@ def run_cmd(args, flags, project_root):
     primary target. Reads the changelog entry and updates the GitHub Release.
 
     In monorepo mode, uses the project's monorepo tag format and reads
-    CHANGELOG.md from the project subdirectory.
+    CHANGELOG.md from the project subdirectory. Dev node projects (no
+    CHANGELOG.md) read from the versioned release file instead.
 
     Args:
         args: Positional args; optional first element is the version.
@@ -35,6 +57,7 @@ def run_cmd(args, flags, project_root):
     # Detect monorepo context
     monorepo_name = None
     monorepo_project_path = None
+    is_dev_node = False
     start_path = str(project_root)
     monorepo_root = find_workspace_root(start_path)
     if monorepo_root:
@@ -42,6 +65,7 @@ def run_cmd(args, flags, project_root):
         if project is not None:
             monorepo_name = project["name"]
             monorepo_project_path = project["path"]
+            is_dev_node = bool(project.get("dev_node"))
 
     # Project directory: project_root is already resolved to the sub-project
     # in monorepo mode (via _require_sub_project_root).
@@ -70,19 +94,23 @@ def run_cmd(args, flags, project_root):
     else:
         tag = target.tag_format(version)
 
-    # Extract changelog entry from project subdir in monorepo mode
-    changelog_path = os.path.join(project_dir, "CHANGELOG.md")
-    if not os.path.exists(changelog_path):
-        print("Error: CHANGELOG.md not found.", file=sys.stderr)
-        sys.exit(1)
+    # Extract release notes: dev nodes use the versioned release file,
+    # regular projects use CHANGELOG.md
+    if is_dev_node:
+        changelog_entry = _read_release_description(project_dir, version)
+    else:
+        changelog_path = os.path.join(project_dir, "CHANGELOG.md")
+        if not os.path.exists(changelog_path):
+            print("Error: CHANGELOG.md not found.", file=sys.stderr)
+            sys.exit(1)
 
-    changelog_entry = extract_changelog_entry(changelog_path, version)
-    if not changelog_entry:
-        print(
-            f"Error: no changelog entry found for version {version} in CHANGELOG.md.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        changelog_entry = extract_changelog_entry(changelog_path, version)
+        if not changelog_entry:
+            print(
+                f"Error: no changelog entry found for version {version} in CHANGELOG.md.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
     # Check that the GitHub Release exists
     try:
