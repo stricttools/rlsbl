@@ -39,11 +39,26 @@ def _collect_graph_data(root, projects, graph):
         dep_names = [d.name for d in deps]
         rdep_names = graph.dependents(name)
 
+        # Raw facts from project config
+        dev_node = bool(proj.get("dev_node", False))
+        library = bool(proj.get("library", False))
+
+        # Check if any reverse-dependent has runtime or explicit scope
+        rdeps_with_scope = graph._rdeps.get(name, [])
+        has_runtime_dependents = any(
+            scope in ("runtime", "explicit") for _, scope in rdeps_with_scope
+        )
+        is_leaf = len(rdeps_with_scope) == 0
+
         packages[name] = {
             "deps": dep_names,
             "rdeps": rdep_names,
             "target": target_name,
             "version": version,
+            "dev_node": dev_node,
+            "library": library,
+            "has_runtime_dependents": has_runtime_dependents,
+            "is_leaf": is_leaf,
         }
 
         for dep in deps:
@@ -95,31 +110,63 @@ def _render_json(packages, edges):
 
 
 def _render_dot(packages, edges):
-    """Render the graph as Graphviz DOT."""
+    """Render the graph as Graphviz DOT with scope-styled edges and fact-styled nodes."""
+    _EDGE_STYLES = {
+        "runtime": "",
+        "dev": " [style=dashed, color=gray]",
+        "peer": " [style=dotted, color=blue]",
+        "explicit": " [color=black, penwidth=2]",
+    }
     lines = [
         "digraph dependencies {",
         '    rankdir=TB;',
         '    node [shape=box, fontname="Helvetica", fontsize=10];',
     ]
+
+    # Node styling based on raw facts
+    for name, pkg in sorted(packages.items()):
+        if pkg.get("dev_node"):
+            lines.append(f'    "{name}" [style=filled, fillcolor=lightgray];')
+        elif pkg.get("is_leaf"):
+            lines.append(f'    "{name}" [style=filled, fillcolor=lightgreen];')
+
+    # Edge styling based on scope
     for edge in edges:
-        lines.append(f'    "{edge["from"]}" -> "{edge["to"]}";')
+        attrs = _EDGE_STYLES.get(edge.get("scope", "runtime"), "")
+        lines.append(f'    "{edge["from"]}" -> "{edge["to"]}"{attrs};')
+
     lines.append("}")
     return "\n".join(lines)
 
 
 def _render_text(packages, edges):
-    """Render the graph as an indented text tree."""
+    """Render the graph as an indented text tree with fact labels."""
     lines = []
     for name in sorted(packages.keys()):
-        lines.append(name)
+        lines.append(_text_label(name, packages.get(name, {})))
         for dep in sorted(packages[name]["deps"]):
             _render_text_subtree(dep, packages, lines, indent=1, visited={name})
     return "\n".join(lines)
 
 
+def _text_label(name, pkg):
+    """Build a text label with fact annotations like [dev], [lib], [leaf]."""
+    labels = []
+    if pkg.get("dev_node"):
+        labels.append("[dev]")
+    if pkg.get("library"):
+        labels.append("[lib]")
+    if pkg.get("is_leaf"):
+        labels.append("[leaf]")
+    if labels:
+        return f"{name} {' '.join(labels)}"
+    return name
+
+
 def _render_text_subtree(name, packages, lines, indent, visited):
     """Recursively render a package and its deps as indented text."""
-    lines.append("  " * indent + name)
+    label = _text_label(name, packages.get(name, {}))
+    lines.append("  " * indent + label)
     if name in visited or name not in packages:
         return
     visited = visited | {name}
