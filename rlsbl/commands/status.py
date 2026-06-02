@@ -116,9 +116,10 @@ def _collect_status(registry, target_path=".", *, tag_glob=None, ctx, project=No
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         pass
 
-    # JSONL changelog coverage
-    jsonl_coverage = "not set up"
-    if changes_dir_exists(target_path):
+    # JSONL changelog coverage (dev nodes don't use changelogs)
+    is_dev_node = project is not None and project.get("dev_node")
+    jsonl_coverage = "dev node -- no changelog" if is_dev_node else "not set up"
+    if not is_dev_node and changes_dir_exists(target_path):
         try:
             changes_dir = get_changes_dir(target_path)
             entries = read_unreleased(changes_dir)

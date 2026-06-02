@@ -109,6 +109,15 @@ def run_cmd(registry, args, flags, project_root):
             print("No unreleased commits.")
         sys.exit(0)
 
+    # Dev node projects don't use changelogs
+    is_dev_node = monorepo_project is not None and monorepo_project.get("dev_node")
+    if is_dev_node:
+        if flags.get("json"):
+            print(json.dumps({"tag": tag, "commits": len(commits), "dev_node": True}))
+        else:
+            print(f"dev node -- no changelog ({len(commits)} unreleased commits)")
+        sys.exit(0)
+
     # Cross-reference each commit against JSONL changelog
     if not changes_dir_exists(root_str):
         print(
