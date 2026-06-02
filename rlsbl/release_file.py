@@ -22,6 +22,8 @@ class ReleaseConfig:
     include: list[str]  # target names to release
     exclude: list[str]  # target names to skip
     targets: dict[str, dict] = field(default_factory=dict)  # per-target config
+    description: str = ""  # short description of this release
+    context: str = ""  # optional context explaining why these changes were made
 
 
 def get_release_file_path(project_dir: str = ".") -> str:
@@ -117,11 +119,23 @@ def read_release_file(path: str) -> ReleaseConfig:
                 f"but got: {mode_list}"
             )
 
+    # --- description (optional) ---
+    description = data.get("description", "")
+    if not isinstance(description, str):
+        raise ValueError("description must be a string")
+
+    # --- context (optional) ---
+    context = data.get("context", "")
+    if not isinstance(context, str):
+        raise ValueError("context must be a string")
+
     return ReleaseConfig(
         bump=bump,
         include=list(include),
         exclude=list(exclude),
         targets=targets,
+        description=description.strip(),
+        context=context.strip(),
     )
 
 
@@ -233,11 +247,23 @@ def read_batch_release_file(path: str) -> BatchReleaseConfig:
                         )
                 targets[tname] = dict(tcfg)
 
+        # --- description (optional) ---
+        description = pkg_data.get("description", "")
+        if not isinstance(description, str):
+            raise ValueError(f"[packages.{pkg_name}] description must be a string")
+
+        # --- context (optional) ---
+        context = pkg_data.get("context", "")
+        if not isinstance(context, str):
+            raise ValueError(f"[packages.{pkg_name}] context must be a string")
+
         packages[pkg_name] = ReleaseConfig(
             bump=bump,
             include=list(include),
             exclude=list(exclude),
             targets=targets,
+            description=description.strip(),
+            context=context.strip(),
         )
 
     return BatchReleaseConfig(packages=packages)
