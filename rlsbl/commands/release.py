@@ -743,26 +743,12 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
         print(f'Error: tag "{tag}" already exists.', file=sys.stderr)
         sys.exit(1)
 
-    # Validate JSONL changelog (skipped for dev node projects)
+    # Dev node projects don't participate in the changelog system
     if monorepo_name and is_dev_node:
-        log("Dev node project: skipping changelog validation")
-        # Still generate CHANGELOG.md if the changes dir exists
-        if changes_dir_exists(project_dir):
-            changes_dir = get_changes_dir(project_dir)
-            changelog_content = generate_changelog(project_dir, write_to_disk=False, version_override=new_version)
-            log("Generated CHANGELOG.md from JSONL entries (in-memory preview)")
-            if isinstance(changelog_content, str):
-                changelog_entry = extract_changelog_entry_from_text(changelog_content, new_version)
-            else:
-                changelog_path = os.path.join(project_dir, "CHANGELOG.md")
-                if os.path.exists(changelog_path):
-                    changelog_entry = extract_changelog_entry(changelog_path, new_version)
-                else:
-                    changelog_entry = None
-        else:
-            changes_dir = None
-            changelog_content = None
-            changelog_entry = None
+        log("Dev node project: skipping changelog infrastructure")
+        changes_dir = None
+        changelog_content = None
+        changelog_entry = None
     else:
         if not changes_dir_exists(project_dir):
             print(
@@ -1259,10 +1245,12 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
         # Re-run selfdoc check to refresh hashes after version bump
         _refresh_selfdoc_hashes(files_to_commit, log, project_dir=project_dir)
 
-        # Include the generated CHANGELOG.md in the commit
-        changelog_file = vpath("CHANGELOG.md")
-        if changelog_file not in files_to_commit:
-            files_to_commit.append(changelog_file)
+        # Include the generated CHANGELOG.md in the commit (dev nodes have no CHANGELOG.md)
+        changelog_path = os.path.join(project_dir, "CHANGELOG.md")
+        if os.path.exists(changelog_path):
+            changelog_file = vpath("CHANGELOG.md")
+            if changelog_file not in files_to_commit:
+                files_to_commit.append(changelog_file)
 
         # Include hook-generated files (created or modified by pre-checks/pre-release hooks)
         if hook_generated:

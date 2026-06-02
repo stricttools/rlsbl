@@ -21,6 +21,23 @@ BASES_DIR = os.path.join(".rlsbl", "bases")
 _NPM_LOCKFILES = ("package-lock.json", "pnpm-lock.yaml", "yarn.lock")
 
 
+def _is_dev_node_project(project_root):
+    """Check if the current project is a dev_node in its monorepo workspace.
+
+    Returns False if not in a monorepo or if the project is not a dev_node.
+    """
+    if project_root is None:
+        return False
+    from ..workspace import find_workspace_root, resolve_project
+    ws_root = find_workspace_root(str(project_root))
+    if ws_root is None:
+        return False
+    project = resolve_project(ws_root, str(project_root))
+    if project is None:
+        return False
+    return bool(project.get("dev_node"))
+
+
 def _check_npm_lockfile_missing(start_dir="."):
     """Check if any npm lockfile exists from start_dir up to the git root.
 
@@ -974,6 +991,14 @@ def run_cmd(registry, args, flags, ctx):
         if not flags.get("skip-shared"):
             shared_mappings = reg.shared_template_mappings(ctx)
             shared_mappings = _append_deploy_workflow_if_configured(shared_mappings, ctx.config)
+
+            # Dev node projects skip changelog infrastructure
+            if _is_dev_node_project(project_root):
+                shared_mappings = [
+                    m for m in shared_mappings
+                    if m["target"] not in ("CHANGELOG.md", ".rlsbl/changes/unreleased.jsonl")
+                ]
+
             shared_plans = plan_mappings(
                 reg.shared_template_dir(), shared_mappings, vars_dict, force,
             )
@@ -1554,6 +1579,14 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         # Plan shared templates (once)
         shared_mappings = reg.shared_template_mappings(ctx)
         shared_mappings = _append_deploy_workflow_if_configured(shared_mappings, ctx.config)
+
+        # Dev node projects skip changelog infrastructure
+        if _is_dev_node_project(project_root):
+            shared_mappings = [
+                m for m in shared_mappings
+                if m["target"] not in ("CHANGELOG.md", ".rlsbl/changes/unreleased.jsonl")
+            ]
+
         shared_plans = plan_mappings(
             reg.shared_template_dir(), shared_mappings, vars_dict, force,
         )

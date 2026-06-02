@@ -16,6 +16,22 @@ from ..changelog.generate import generate_changelog
 from ..changelog.resolve import resolve_hash
 from ..changelog.schema import ChangelogEntry, parse_jsonl, validate_schema
 from ..utils import commit_files
+from ..workspace import find_workspace_root, resolve_project
+
+
+def _check_dev_node(project_root):
+    """Error if the current project is a dev_node (no changelog support)."""
+    if project_root is None:
+        return
+    ws_root = find_workspace_root(str(project_root))
+    if ws_root is None:
+        return
+    project = resolve_project(ws_root, str(project_root))
+    if project is None:
+        return
+    if project.get("dev_node"):
+        print("Error: dev node projects don't use changelogs.", file=sys.stderr)
+        sys.exit(1)
 
 
 def _check_duplicate_commits(existing_entries, new_entry):
@@ -52,6 +68,8 @@ def cmd_add(flags, project_root):
     - --commits: comma-separated commit hashes
     - --description and --type: required unless --no-user-facing is set
     """
+    _check_dev_node(project_root)
+
     commits_raw = flags.get("commits", "")
     if not commits_raw:
         print("Error: --commits is required.", file=sys.stderr)
@@ -123,6 +141,7 @@ def cmd_add(flags, project_root):
 
 def cmd_generate(flags, project_root):
     """Generate CHANGELOG.md from JSONL changelog files."""
+    _check_dev_node(project_root)
 
     if not changes_dir_exists(project_root):
         print("Error: .rlsbl/changes/ does not exist.", file=sys.stderr)
@@ -188,6 +207,8 @@ def cmd_amend(flags, project_root):
     - --no-user-facing: mark entry as non-user-facing
     - --no-resolve: skip hash validation (for old/amended commits)
     """
+    _check_dev_node(project_root)
+
     version = flags.get("version", "")
     if not version:
         print("Error: --version is required.", file=sys.stderr)
