@@ -1,6 +1,6 @@
 """Check context types for the strictcli check system."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .context import ProjectContext
 
@@ -9,5 +9,5 @@ from .context import ProjectContext
 class WorkspaceCheckContext(ProjectContext):
     """Check context for monorepo/workspace checks. Extends ProjectContext."""
 
-    projects: list  # list of project dicts from workspace.toml
-    graph: object  # WorkspaceGraph instance (typed as object to avoid circular imports)
+    projects: list = field(default_factory=list)  # list of WorkspaceProject from workspace.toml
+    graph: object = field(default=None)  # WorkspaceGraph instance (typed as object to avoid circular imports)

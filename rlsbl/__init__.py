@@ -69,6 +69,10 @@ __version__ = _detect_version()
 # handle natively. Populated by main() before app.run().
 _variadic_args: list[str] = []
 
+# The WorkspaceProject resolved by _require_sub_project_root(), or None in
+# standalone mode. Command handlers can pass this to create_context().
+_resolved_project = None
+
 
 def detect_registries():
     """Detect all registries/targets applicable in the current directory.
@@ -101,13 +105,20 @@ def _require_sub_project_root():
     In standalone mode: same as _require_project_root().
     In monorepo mode: uses resolve_project() to find which sub-project CWD is in,
     returns the sub-project path instead of the monorepo root.
+
+    Side effect: sets module-level ``_resolved_project`` to the
+    WorkspaceProject when in monorepo mode, or None in standalone mode.
+    Command handlers can pass this to ``create_context(project=...)``.
     """
+    global _resolved_project
+    _resolved_project = None
     root = _require_project_root()
     from .workspace import find_workspace_root, resolve_project
     ws_root = find_workspace_root(str(root))
     if ws_root:
         project = resolve_project(ws_root, str(Path.cwd()))
         if project:
+            _resolved_project = project
             sub_path = Path(ws_root) / project["path"]
             return sub_path
         # CWD is inside the monorepo but not in any registered project
