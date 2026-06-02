@@ -746,9 +746,24 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
     # Dev node projects don't participate in the changelog system
     if monorepo_name and is_dev_node:
         log("Dev node project: skipping changelog infrastructure")
+        # Enforce mandatory description for dev_node releases
+        if not release_config.description:
+            print(
+                "Error: dev node releases require a description in unreleased.toml.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
         changes_dir = None
         changelog_content = None
-        changelog_entry = None
+        # Build GitHub Release body from description + context
+        body_parts = [release_config.description]
+        if release_config.context:
+            body_parts.append("")
+            body_parts.append(
+                "<details>\n<summary>Context</summary>\n\n"
+                f"{release_config.context}\n\n</details>"
+            )
+        changelog_entry = "\n".join(body_parts)
     else:
         if not changes_dir_exists(project_dir):
             print(
@@ -774,7 +789,10 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
         # (and per-version .md files) to disk until after pre-release checks pass,
         # so that an aborted release leaves the working tree exactly as it was.
         # The actual write to disk happens just after acquire_lock() below.
-        changelog_content = generate_changelog(project_dir, write_to_disk=False, version_override=new_version)
+        changelog_content = generate_changelog(
+            project_dir, write_to_disk=False, version_override=new_version,
+            description=release_config.description, context=release_config.context,
+        )
         log("Generated CHANGELOG.md from JSONL entries (in-memory preview)")
 
         if isinstance(changelog_content, str):
@@ -912,7 +930,10 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
     # start; finalize_version() below renames unreleased.jsonl in place, and
     # no further changelog regeneration is needed.
     if changes_dir is not None:
-        generate_changelog(project_dir, version_override=new_version)
+        generate_changelog(
+            project_dir, version_override=new_version,
+            description=release_config.description, context=release_config.context,
+        )
 
     try:
         _run_release_mutating(

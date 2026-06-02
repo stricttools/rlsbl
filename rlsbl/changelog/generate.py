@@ -18,7 +18,13 @@ _TYPE_ORDER: list[tuple[str, str]] = [
 ]
 
 
-def generate_version_section(version: str, entries: list[ChangelogEntry]) -> str:
+def generate_version_section(
+    version: str,
+    entries: list[ChangelogEntry],
+    *,
+    description: str = "",
+    context: str = "",
+) -> str:
     """Generate markdown for one version section.
 
     Only includes entries where user_facing=True. Groups by type under
@@ -27,6 +33,11 @@ def generate_version_section(version: str, entries: list[ChangelogEntry]) -> str
 
     If all entries share a release_type (e.g., "ota" or "build"), a marker
     is appended to the version heading.
+
+    When ``description`` is provided, it is added as a paragraph after the
+    version heading and before the first type group. When ``context`` is
+    provided, it is rendered as a collapsible ``<details>`` block after the
+    description.
     """
     # Determine release type marker from entries
     release_types = {e.release_type for e in entries if e.release_type}
@@ -38,7 +49,16 @@ def generate_version_section(version: str, entries: list[ChangelogEntry]) -> str
     user_facing = [e for e in entries if e.user_facing]
 
     if not user_facing:
-        return f"## {version}{release_marker}\n\n- No user-facing changes.\n"
+        section = f"## {version}{release_marker}\n\n"
+        if description:
+            section += f"{description}\n\n"
+        if context:
+            section += (
+                "<details>\n<summary>Context</summary>\n\n"
+                f"{context}\n\n</details>\n\n"
+            )
+        section += "- No user-facing changes.\n"
+        return section
 
     # Bucket entries by type.
     buckets: dict[str, list[str]] = {}
@@ -47,6 +67,19 @@ def generate_version_section(version: str, entries: list[ChangelogEntry]) -> str
         buckets.setdefault(key, []).append(entry.description or "")
 
     parts: list[str] = [f"## {version}{release_marker}"]
+
+    if description:
+        parts.append("")
+        parts.append(description)
+
+    if context:
+        parts.append("")
+        parts.append("<details>")
+        parts.append("<summary>Context</summary>")
+        parts.append("")
+        parts.append(context)
+        parts.append("")
+        parts.append("</details>")
 
     for type_key, header in _TYPE_ORDER:
         descs = buckets.get(type_key)
@@ -114,6 +147,8 @@ def generate_changelog(
     *,
     write_to_disk: bool = True,
     version_override: str | None = None,
+    description: str = "",
+    context: str = "",
 ) -> str:
     """Generate the complete CHANGELOG.md from .rlsbl/changes/ JSONL files.
 
@@ -132,6 +167,10 @@ def generate_changelog(
     heading is "## {version_override}" instead of "## Unreleased". Versioned
     sections (from existing JSONL files) are unaffected. Default None preserves
     the original behaviour exactly.
+
+    ``description`` and ``context`` are applied to the unreleased section only
+    (the current release being prepared). They are not applied to previously
+    released version sections.
     """
     _read_changelog_format(project_path)
 
@@ -142,7 +181,9 @@ def generate_changelog(
     unreleased = read_unreleased(changes_dir)
     if unreleased:
         heading = version_override if version_override else "Unreleased"
-        sections.append(generate_version_section(heading, unreleased))
+        sections.append(generate_version_section(
+            heading, unreleased, description=description, context=context,
+        ))
 
     # Versioned entries (newest first)
     for version, jsonl_path in list_versioned_files(changes_dir):
