@@ -12,6 +12,7 @@ from rlsbl.dep_validation import (
     check_unused_deps,
     find_dead_go_packages,
     find_dead_modules,
+    find_dead_npm_modules,
     load_dep_overrides,
 )
 from rlsbl.workspace import WORKSPACE_DIR
@@ -676,6 +677,196 @@ class TestFindDeadGoPackages:
         assert "internal/lonely" in dead
 
 
+class TestFindDeadNpmModules:
+    """find_dead_npm_modules detects unreachable npm source files."""
+
+    def _pkg_json(self, tmp_path, data):
+        """Write a package.json with the given dict data."""
+        import json as _json
+        (tmp_path / "package.json").write_text(_json.dumps(data))
+
+    def test_reachable_via_main_not_flagged(self, tmp_path):
+        """A file reachable from main entry point is not flagged."""
+        self._pkg_json(tmp_path, {
+            "name": "test", "version": "1.0.0",
+            "main": "./src/index.js",
+        })
+        src = tmp_path / "src"
+        src.mkdir()
+        (src / "index.js").write_text("const util = require('./util');\n")
+        (src / "util.js").write_text("module.exports = {};\n")
+
+        dead = find_dead_npm_modules(str(tmp_path))
+        assert dead == []
+
+    def test_unreachable_file_flagged(self, tmp_path):
+        """A file not reachable from any entry point is flagged as dead."""
+        self._pkg_json(tmp_path, {
+            "name": "test", "version": "1.0.0",
+            "main": "./src/index.js",
+        })
+        src = tmp_path / "src"
+        src.mkdir()
+        (src / "index.js").write_text("module.exports = {};\n")
+        (src / "orphan.js").write_text("module.exports = {};\n")
+
+        dead = find_dead_npm_modules(str(tmp_path))
+        assert "src/orphan.js" in dead
+        assert "src/index.js" not in dead
+
+    def test_bin_entry_point_makes_file_reachable(self, tmp_path):
+        """A file referenced via bin entry point is reachable."""
+        self._pkg_json(tmp_path, {
+            "name": "test", "version": "1.0.0",
+            "bin": {"mycli": "./cli.js"},
+        })
+        (tmp_path / "cli.js").write_text("const lib = require('./lib');\n")
+        (tmp_path / "lib.js").write_text("module.exports = {};\n")
+
+        dead = find_dead_npm_modules(str(tmp_path))
+        assert dead == []
+
+    def test_exports_map_entry_point(self, tmp_path):
+        """Exports map with subpath conditions works as entry point."""
+        self._pkg_json(tmp_path, {
+            "name": "test", "version": "1.0.0",
+            "exports": {
+                ".": {
+                    "import": "./dist/index.mjs",
+                    "require": "./dist/index.cjs",
+                },
+            },
+        })
+        dist = tmp_path / "dist"
+        dist.mkdir()
+        (dist / "index.mjs").write_text("import { helper } from './helper.mjs';\n")
+        (dist / "index.cjs").write_text("const helper = require('./helper.cjs');\n")
+        (dist / "helper.mjs").write_text("export function helper() {}\n")
+        (dist / "helper.cjs").write_text("module.exports = {};\n")
+
+        dead = find_dead_npm_modules(str(tmp_path))
+        assert dead == []
+
+    def test_js_to_ts_resolution(self, tmp_path):
+        """Import of ./foo.js resolves to ./foo.ts when only .ts exists."""
+        self._pkg_json(tmp_path, {
+            "name": "test", "version": "1.0.0",
+            "main": "./src/index.ts",
+        })
+        src = tmp_path / "src"
+        src.mkdir()
+        # TypeScript source imports with .js extension (common TS pattern)
+        (src / "index.ts").write_text("import { helper } from './helper.js';\n")
+        (src / "helper.ts").write_text("export function helper() {}\n")
+
+        dead = find_dead_npm_modules(str(tmp_path))
+        assert dead == []
+
+    def test_no_package_json_returns_empty(self, tmp_path):
+        """Directory without package.json returns empty list."""
+        (tmp_path / "index.js").write_text("module.exports = {};\n")
+
+        dead = find_dead_npm_modules(str(tmp_path))
+        assert dead == []
+
+    def test_no_entry_points_returns_empty(self, tmp_path):
+        """Package with no exports/main/bin returns empty (no reachability analysis)."""
+        self._pkg_json(tmp_path, {
+            "name": "test", "version": "1.0.0",
+        })
+        src = tmp_path / "src"
+        src.mkdir()
+        (src / "index.js").write_text("module.exports = {};\n")
+
+        dead = find_dead_npm_modules(str(tmp_path))
+        assert dead == []
+
+    def test_test_files_excluded_from_dead(self, tmp_path):
+        """Test files are not flagged as dead even if unreachable."""
+        self._pkg_json(tmp_path, {
+            "name": "test", "version": "1.0.0",
+            "main": "./src/index.js",
+        })
+        src = tmp_path / "src"
+        src.mkdir()
+        (src / "index.js").write_text("module.exports = {};\n")
+        tests = tmp_path / "__tests__"
+        tests.mkdir()
+        (tests / "index.test.js").write_text("test('it works', () => {});\n")
+
+        dead = find_dead_npm_modules(str(tmp_path))
+        rel_paths = [os.path.basename(d) for d in dead]
+        assert "index.test.js" not in rel_paths
+
+    def test_transitive_reachability(self, tmp_path):
+        """Files reachable transitively through the import chain are not dead."""
+        self._pkg_json(tmp_path, {
+            "name": "test", "version": "1.0.0",
+            "main": "./src/index.js",
+        })
+        src = tmp_path / "src"
+        src.mkdir()
+        (src / "index.js").write_text("require('./a');\n")
+        (src / "a.js").write_text("require('./b');\n")
+        (src / "b.js").write_text("require('./c');\n")
+        (src / "c.js").write_text("module.exports = {};\n")
+
+        dead = find_dead_npm_modules(str(tmp_path))
+        assert dead == []
+
+    def test_directory_index_resolution(self, tmp_path):
+        """Import of a directory resolves to its index file."""
+        self._pkg_json(tmp_path, {
+            "name": "test", "version": "1.0.0",
+            "main": "./src/index.js",
+        })
+        src = tmp_path / "src"
+        src.mkdir()
+        (src / "index.js").write_text("require('./utils');\n")
+        utils = src / "utils"
+        utils.mkdir()
+        (utils / "index.js").write_text("module.exports = {};\n")
+
+        dead = find_dead_npm_modules(str(tmp_path))
+        assert dead == []
+
+    def test_bin_string_entry_point(self, tmp_path):
+        """bin as a plain string (not dict) works as entry point."""
+        self._pkg_json(tmp_path, {
+            "name": "mycli", "version": "1.0.0",
+            "bin": "./cli.js",
+        })
+        (tmp_path / "cli.js").write_text("console.log('hello');\n")
+
+        dead = find_dead_npm_modules(str(tmp_path))
+        assert dead == []
+
+    def test_multiple_entry_points_combined(self, tmp_path):
+        """Files reachable from different entry points are all considered."""
+        self._pkg_json(tmp_path, {
+            "name": "test", "version": "1.0.0",
+            "main": "./lib/index.js",
+            "bin": {"cli": "./bin/cli.js"},
+        })
+        lib = tmp_path / "lib"
+        lib.mkdir()
+        (lib / "index.js").write_text("require('./core');\n")
+        (lib / "core.js").write_text("module.exports = {};\n")
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        (bin_dir / "cli.js").write_text("require('./helpers');\n")
+        (bin_dir / "helpers.js").write_text("module.exports = {};\n")
+        # Orphan not reachable from either entry point
+        (tmp_path / "orphan.js").write_text("module.exports = {};\n")
+
+        dead = find_dead_npm_modules(str(tmp_path))
+        assert "orphan.js" in dead
+        assert "lib/index.js" not in dead
+        assert "lib/core.js" not in dead
+        assert "bin/cli.js" not in dead
+        assert "bin/helpers.js" not in dead
+
+
 class TestDepsChecksIntegration:
     """Integration tests: checks registered on the strictcli check system."""
 
@@ -992,11 +1183,13 @@ class TestDepsChecksIntegration:
         assert "dead-modules" in captured
 
     def test_dead_modules_skip_unsupported_target(self, tmp_path):
-        """dead-modules skips for projects that are neither Python nor Go."""
+        """dead-modules skips for projects that are neither Python, Go, nor npm."""
         from rlsbl.context import ProjectContext
 
-        # Create an npm-only project (no Python, no Go)
-        (tmp_path / "package.json").write_text('{"name":"test","version":"1.0.0"}')
+        # Create a Cargo-only project (no Python, no Go, no npm)
+        (tmp_path / "Cargo.toml").write_text(
+            '[package]\nname = "test"\nversion = "1.0.0"\n'
+        )
 
         captured = self._capture_checks()
         ctx = ProjectContext(project_root=Path(tmp_path), workspace_root=None, config={})
@@ -1077,6 +1270,47 @@ class TestDepsChecksIntegration:
         (orphan_dir / "orphan.go").write_text(
             'package orphan\n\nfunc Unused() {}\n'
         )
+
+        captured = self._capture_checks()
+        ctx = ProjectContext(project_root=Path(tmp_path), workspace_root=None, config={})
+        result = captured["dead-modules"](ctx)
+        assert result.status == "warn"
+        assert "1 dead module" in result.message
+
+    def test_dead_modules_npm_pass_clean(self, tmp_path):
+        """dead-modules passes for an npm project with all files reachable."""
+        import json as _json
+        from rlsbl.context import ProjectContext
+
+        (tmp_path / "package.json").write_text(_json.dumps({
+            "name": "test",
+            "version": "1.0.0",
+            "main": "./src/index.js",
+        }))
+        src = tmp_path / "src"
+        src.mkdir()
+        (src / "index.js").write_text("const util = require('./util');\n")
+        (src / "util.js").write_text("module.exports = {};\n")
+
+        captured = self._capture_checks()
+        ctx = ProjectContext(project_root=Path(tmp_path), workspace_root=None, config={})
+        result = captured["dead-modules"](ctx)
+        assert result.status == "pass"
+
+    def test_dead_modules_npm_warn_unreachable(self, tmp_path):
+        """dead-modules warns for an npm project with unreachable files."""
+        import json as _json
+        from rlsbl.context import ProjectContext
+
+        (tmp_path / "package.json").write_text(_json.dumps({
+            "name": "test",
+            "version": "1.0.0",
+            "main": "./src/index.js",
+        }))
+        src = tmp_path / "src"
+        src.mkdir()
+        (src / "index.js").write_text("module.exports = {};\n")
+        (src / "orphan.js").write_text("module.exports = {};\n")
 
         captured = self._capture_checks()
         ctx = ProjectContext(project_root=Path(tmp_path), workspace_root=None, config={})
