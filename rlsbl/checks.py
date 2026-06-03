@@ -1046,24 +1046,44 @@ def register_checks(app):
 
     @app.check("dead-modules")
     def check_dead_modules(ctx):
-        """Python modules not referenced by any other module in the project."""
+        """Unreferenced Python modules or Go internal packages."""
         from .targets import detect_targets
 
         root_str = str(ctx.project_root)
         target_entries = detect_targets(root_str)
         target_names = {e.name for e in target_entries}
 
-        # Only run for Python projects; skip for Go, npm, etc.
-        if "pypi" not in target_names:
-            return CheckResult("skip", "not a Python project")
+        supported = {"pypi", "go"} & target_names
+        if not supported:
+            return CheckResult("skip", "not a Python or Go project")
 
-        from .dep_validation import find_dead_modules
+        all_dead: list[str] = []
+        details: list[str] = []
 
-        dead = find_dead_modules(root_str)
-        if dead:
+        if "pypi" in target_names:
+            from .dep_validation import find_dead_modules
+
+            py_dead = find_dead_modules(root_str)
+            all_dead.extend(py_dead)
+            details.extend(
+                f"{path}: not imported by any other module"
+                for path in py_dead
+            )
+
+        if "go" in target_names:
+            from .dep_validation import find_dead_go_packages
+
+            go_dead = find_dead_go_packages(root_str)
+            all_dead.extend(go_dead)
+            details.extend(
+                f"{path}: internal package not imported outside itself"
+                for path in go_dead
+            )
+
+        if all_dead:
             return CheckResult(
                 "warn",
-                f"{len(dead)} dead module(s)",
-                details=[f"{path}: not imported by any other module" for path in dead],
+                f"{len(all_dead)} dead module(s)",
+                details=details,
             )
         return CheckResult("pass", "no dead modules")
