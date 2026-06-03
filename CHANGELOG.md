@@ -2,16 +2,20 @@
 
 # Changelog
 
+## 0.57.0
+
+Batch release-init filtering, retry.toml cleanup, and feature support matrix
+
+### Features
+
+- **New.** `monorepo release-init` now accepts a `--packages` flag to scaffold only specific packages. Packages with zero unreleased commits are automatically commented out with an explanation.
+- **New.** Feature support matrix: `get_feature_matrix()` and `generate_feature_matrix_markdown()` functions showing which checks support which targets.
+
+### Fixes
+
+- **Fix.** `retry.toml` is now cleaned up when validation fails during release retry, in both the init and retry handlers. Previously, an invalid `retry.toml` could be left behind, blocking subsequent retries.
+
 ## 0.56.0
-
-New checks (license-file, scaffold-unreplaced-vars, dead-modules-npm), batch release-init improvements, and scaffold/release fixes
-
-<details>
-<summary>Context</summary>
-
-LICENSE is no longer scaffold-managed -- projects own their LICENSE file, enforced by the new license-file check. Batch release-init now supports Flutter targets and includes TOML comments. Several fixes for retry.toml cleanup, bare scaffold on plain targets, workspace-unregistered false positives, and shared release config validation.
-
-</details>
 
 ### Breaking
 

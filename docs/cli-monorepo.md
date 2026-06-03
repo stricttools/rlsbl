@@ -142,3 +142,9 @@ Execute a batch release of multiple monorepo packages in topological order. Read
 ## monorepo release-init
 
 Scaffold a batch release file for all workspace projects. Creates .rlsbl-monorepo/releases/unreleased.toml with [packages.<name>] sections for each non-dev-node project, auto-detecting targets.
+
+### Flags
+
+| Name | Short | Type | Default | Env | Description |
+|------|-------|------|---------|-----|-------------|
+| `--packages` |  | str |  |  | Comma-separated package names to include (default: all) |
