@@ -16,7 +16,7 @@ from rlsbl.check_context import WorkspaceCheckContext
 
 
 # ---------------------------------------------------------------------------
-# All 37 checks are declared in checks.toml and registered on the app
+# All checks are declared in checks.toml and registered on the app
 # ---------------------------------------------------------------------------
 
 EXPECTED_CHECKS = [
@@ -68,9 +68,10 @@ EXPECTED_CHECKS = [
 class TestCheckDeclarations:
     """Every check must be declared in checks.toml and registered on the app."""
 
-    def test_all_37_checks_declared(self):
-        """checks.toml defines exactly the 37 expected checks."""
+    def test_all_checks_declared(self):
+        """checks.toml defines exactly the expected checks."""
         assert sorted(app._check_defs.keys()) == sorted(EXPECTED_CHECKS)
+        assert len(app._check_defs) == len(EXPECTED_CHECKS)
 
     @pytest.mark.parametrize("name", EXPECTED_CHECKS)
     def test_check_has_implementation(self, name):
@@ -78,14 +79,14 @@ class TestCheckDeclarations:
         assert app._check_defs[name].impl is not None
 
     def test_check_list_shows_all(self):
-        """``rlsbl check --list`` outputs all 37 check names."""
+        """``rlsbl check --list`` outputs all check names."""
         result = app.test(["check", "--list"])
         assert result.exit_code == 0
         for name in EXPECTED_CHECKS:
             assert name in result.stdout
 
     def test_check_list_json(self):
-        """``rlsbl check --list --json`` outputs valid JSON with all 37 checks."""
+        """``rlsbl check --list --json`` outputs valid JSON with all checks."""
         result = app.test(["check", "--list", "--json"])
         assert result.exit_code == 0
         data = json.loads(result.stdout)
