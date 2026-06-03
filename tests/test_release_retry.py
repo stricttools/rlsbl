@@ -453,6 +453,62 @@ class TestReleaseRetry(unittest.TestCase):
         # _scaffold_retry_file was called
         mock_scaffold.assert_called_once()
 
+    @patch("rlsbl.commands.release_retry.run")
+    @patch("os.path.exists", return_value=True)
+    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.TARGETS")
+    @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
+    @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
+    @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
+    def test_auto_scaffold_cleans_up_file_on_validation_error(self, _gh_inst, _gh_auth, _ws_root,
+                                                                mock_targets_dict, mock_detect,
+                                                                _exists, mock_run):
+        """When auto-scaffold fails validation (empty ref), retry.toml is deleted and
+        error message suggests `rlsbl release run`."""
+        import tempfile
+
+        target = self._make_mock_target("0.41.7")
+        entry = self._make_mock_entry()
+        mock_detect.return_value = [entry]
+        mock_targets_dict.__getitem__ = lambda self, key: target
+        mock_run.side_effect = self._run_side_effect
+
+        scaffold_error = ValueError("ref must be set in retry.toml (e.g. a tag like v1.2.3 or a branch like main)")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            retry_path = os.path.join(tmpdir, "retry.toml")
+            # Pre-create the file to simulate what _scaffold_retry_file does
+            # before read_retry_file raises ValueError
+            with open(retry_path, "w") as f:
+                f.write('version = "0.41.7"\ndispatch = ["ci.yml"]\nref = ""\n')
+
+            with patch("rlsbl.commands.release_retry._scaffold_retry_file", side_effect=scaffold_error), \
+                 patch("rlsbl.commands.release_retry.get_retry_file_path", return_value=retry_path):
+                def exists_side_effect(path):
+                    if "retry.toml" in str(path):
+                        # First call: check if file exists before scaffolding -> False
+                        # The os.path.exists in the except block will check the real fs
+                        return False
+                    return True
+                _exists.side_effect = exists_side_effect
+
+                # Un-patch os.path.exists for the cleanup code so it sees
+                # the real file we created above
+                with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
+                    with self.assertRaises(SystemExit) as ctx:
+                        run_cmd(None, {"yes": True}, project_root=".")
+
+            self.assertEqual(ctx.exception.code, 1)
+
+            # retry.toml must NOT exist on disk after the error
+            self.assertFalse(os.path.exists(retry_path),
+                             "retry.toml should be deleted after auto-scaffold validation failure")
+
+            # Error message should mention `release run` as the alternative
+            stderr_output = mock_stderr.getvalue()
+            self.assertIn("ref must be set", stderr_output)
+            self.assertIn("rlsbl release run", stderr_output)
+
     @patch("rlsbl.commands.release_retry.read_retry_file")
     @patch("rlsbl.commands.release_retry.detect_targets")
     @patch("rlsbl.commands.release_retry.TARGETS")
