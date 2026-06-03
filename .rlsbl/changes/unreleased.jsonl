@@ -3,3 +3,4 @@
 {"commits":["5ed660bae23611ff6a27d46cdb21fcad1c1e9406"],"user_facing":true,"description":"**New.** Feature support matrix: `get_feature_matrix()` and `generate_feature_matrix_markdown()` functions showing which checks support which targets.","type":"feature"}
 {"commits":["d34f274a5e90691d04f3f2506b9057804c5046ca","9e3feeb8e192d95fc6e7064c63d7186e9ba834ac"],"user_facing":false}
 {"commits":["50fca0635812ac52939748807d17bf5ff382dcca"],"user_facing":false}
+{"commits":["fbdb6eeb0e0e440bf24287ff605c1d633e80f0a7"],"user_facing":false}
