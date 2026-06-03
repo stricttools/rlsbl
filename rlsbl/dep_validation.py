@@ -9,7 +9,6 @@ import json
 import os
 import re
 import tomllib
-from collections import deque
 from dataclasses import dataclass
 
 from .import_scanners import (

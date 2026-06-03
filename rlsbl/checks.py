@@ -1291,16 +1291,16 @@ def register_checks(app):
 
     @app.check("dead-modules")
     def check_dead_modules(ctx):
-        """Unreferenced Python modules, Go internal packages, or npm source files."""
+        """Unreferenced Python modules, Go internal packages, npm or Dart source files."""
         from .targets import detect_targets
 
         root_str = str(ctx.project_root)
         target_entries = detect_targets(root_str)
         target_names = {e.name for e in target_entries}
 
-        supported = {"pypi", "go", "npm"} & target_names
+        supported = {"pypi", "go", "npm", "dart"} & target_names
         if not supported:
-            return CheckResult("skip", "not a Python, Go, or npm project")
+            return CheckResult("skip", "not a Python, Go, npm, or Dart project")
 
         # In workspace context, exclude sibling project directories
         exclude = None
@@ -1343,6 +1343,16 @@ def register_checks(app):
                 for path in npm_dead
             )
 
+        if "dart" in target_names:
+            from .dep_validation import find_dead_dart_modules
+
+            dart_dead = find_dead_dart_modules(root_str, exclude_dirs=exclude)
+            all_dead.extend(dart_dead)
+            details.extend(
+                f"{path}: not reachable from any entry point"
+                for path in dart_dead
+            )
+
         if all_dead:
             return CheckResult(
                 "warn",
@@ -1350,75 +1360,6 @@ def register_checks(app):
                 details=details,
             )
         return CheckResult("pass", "no dead modules")
-
-    # ------------------------------------------------------------------
-    # Circular dependency detection
-    # ------------------------------------------------------------------
-
-    @app.check("circular-deps")
-    def check_circular_deps(ctx):
-        """Detect intra-package circular import dependencies."""
-        from .targets import detect_targets
-
-        root_str = str(ctx.project_root)
-        target_entries = detect_targets(root_str)
-        target_names = {e.name for e in target_entries}
-
-        supported = {"pypi", "npm", "dart"} & target_names
-        if not supported:
-            return CheckResult("skip", "not a Python, npm, or Dart project")
-
-        # In workspace context, exclude sibling project directories
-        exclude = None
-        if isinstance(ctx, WorkspaceCheckContext) and ctx.project is not None:
-            ws_root = str(ctx.workspace_root)
-            exclude = _sibling_exclude_dirs(
-                ws_root, ctx.project["path"], ctx.projects,
-            ) or None
-
-        all_cycles: list[list[str]] = []
-        # Track which language found each cycle for severity determination
-        npm_cycles: list[list[str]] = []
-
-        if "pypi" in target_names:
-            from .dep_validation import find_circular_python_deps
-
-            py_cycles = find_circular_python_deps(root_str, exclude_dirs=exclude)
-            all_cycles.extend(py_cycles)
-
-        if "npm" in target_names:
-            from .dep_validation import find_circular_npm_deps
-
-            npm_cycles = find_circular_npm_deps(root_str, exclude_dirs=exclude)
-            all_cycles.extend(npm_cycles)
-
-        if "dart" in target_names:
-            from .dep_validation import find_circular_dart_deps
-
-            dart_cycles = find_circular_dart_deps(root_str, exclude_dirs=exclude)
-            all_cycles.extend(dart_cycles)
-
-        if not all_cycles:
-            return CheckResult("pass", "no circular dependencies")
-
-        details = []
-        for cycle in all_cycles:
-            details.append(
-                f"cycle: {' -> '.join(cycle)} -> {cycle[0]}"
-            )
-
-        # npm cycles are errors; Python and Dart cycles are warnings
-        if npm_cycles:
-            return CheckResult(
-                "fail",
-                f"{len(all_cycles)} circular dependency cycle(s)",
-                details=details,
-            )
-        return CheckResult(
-            "warn",
-            f"{len(all_cycles)} circular dependency cycle(s)",
-            details=details,
-        )
 
     @app.check("scaffold-unreplaced-vars")
     def check_scaffold_unreplaced_vars(ctx):

@@ -1,4 +1,4 @@
-"""Tests for rlsbl.import_scanners -- Python, Dart, and npm import scanners."""
+"""Tests for rlsbl.import_scanners -- Python, Dart, npm, and Go import scanners."""
 
 import os
 
@@ -6,6 +6,7 @@ import pytest
 
 from rlsbl.import_scanners import (
     DartImportScanner,
+    GoImportScanner,
     ImportInfo,
     NpmImportScanner,
     PythonImportScanner,
@@ -398,6 +399,228 @@ class TestNpmImportScanner:
         results = scanner.scan(str(tmp_path), {"auth"})
         assert len(results) == 1
         assert results[0].package_name == "auth"
+
+
+class TestGoImportScanner:
+    """GoImportScanner detects Go imports from workspace sibling modules."""
+
+    def _write_go_mod(self, path, module_path):
+        """Write a go.mod with the given module path."""
+        (path / "go.mod").write_text(f"module {module_path}\n\ngo 1.21\n")
+
+    def test_workspace_sibling_import_detected(self, tmp_path):
+        """A Go file importing a workspace sibling's module path is detected."""
+        self._write_go_mod(tmp_path, "github.com/org/projA")
+        (tmp_path / "main.go").write_text(
+            'package main\n\nimport "github.com/org/projB/pkg"\n'
+        )
+        scanner = GoImportScanner()
+        module_path_map = {
+            "projA": "github.com/org/projA",
+            "projB": "github.com/org/projB",
+        }
+        results = scanner.scan(
+            str(tmp_path), {"projA", "projB"},
+            module_path_map=module_path_map,
+        )
+        assert len(results) == 1
+        assert results[0].package_name == "projB"
+        assert results[0].is_test_context is False
+
+    def test_exact_module_path_match(self, tmp_path):
+        """Importing the exact module path (no subpackage) is detected."""
+        self._write_go_mod(tmp_path, "github.com/org/projA")
+        (tmp_path / "main.go").write_text(
+            'package main\n\nimport "github.com/org/projB"\n'
+        )
+        scanner = GoImportScanner()
+        module_path_map = {
+            "projA": "github.com/org/projA",
+            "projB": "github.com/org/projB",
+        }
+        results = scanner.scan(
+            str(tmp_path), {"projA", "projB"},
+            module_path_map=module_path_map,
+        )
+        assert len(results) == 1
+        assert results[0].package_name == "projB"
+
+    def test_external_import_not_detected(self, tmp_path):
+        """Importing an external package not in the workspace is not detected."""
+        self._write_go_mod(tmp_path, "github.com/org/projA")
+        (tmp_path / "main.go").write_text(
+            'package main\n\nimport "github.com/external/lib"\n'
+        )
+        scanner = GoImportScanner()
+        module_path_map = {
+            "projA": "github.com/org/projA",
+            "projB": "github.com/org/projB",
+        }
+        results = scanner.scan(
+            str(tmp_path), {"projA", "projB"},
+            module_path_map=module_path_map,
+        )
+        assert results == []
+
+    def test_self_import_excluded(self, tmp_path):
+        """Importing the project's own module path is excluded."""
+        self._write_go_mod(tmp_path, "github.com/org/projA")
+        (tmp_path / "main.go").write_text(
+            'package main\n\nimport "github.com/org/projA/internal/util"\n'
+        )
+        scanner = GoImportScanner()
+        module_path_map = {
+            "projA": "github.com/org/projA",
+            "projB": "github.com/org/projB",
+        }
+        results = scanner.scan(
+            str(tmp_path), {"projA", "projB"},
+            module_path_map=module_path_map,
+        )
+        assert results == []
+
+    def test_test_file_context_detection(self, tmp_path):
+        """Files ending in _test.go have is_test_context=True."""
+        self._write_go_mod(tmp_path, "github.com/org/projA")
+        (tmp_path / "main.go").write_text(
+            'package main\n\nimport "github.com/org/projB"\n'
+        )
+        (tmp_path / "main_test.go").write_text(
+            'package main\n\nimport "github.com/org/projB"\n'
+        )
+        scanner = GoImportScanner()
+        module_path_map = {
+            "projA": "github.com/org/projA",
+            "projB": "github.com/org/projB",
+        }
+        results = scanner.scan(
+            str(tmp_path), {"projA", "projB"},
+            module_path_map=module_path_map,
+        )
+        by_file = {
+            os.path.basename(r.file_path): r.is_test_context for r in results
+        }
+        assert by_file["main.go"] is False
+        assert by_file["main_test.go"] is True
+
+    def test_test_directory_context_detection(self, tmp_path):
+        """Files in a tests/ directory have is_test_context=True."""
+        self._write_go_mod(tmp_path, "github.com/org/projA")
+        tests_dir = tmp_path / "tests"
+        tests_dir.mkdir()
+        (tests_dir / "integration.go").write_text(
+            'package tests\n\nimport "github.com/org/projB"\n'
+        )
+        scanner = GoImportScanner()
+        module_path_map = {
+            "projA": "github.com/org/projA",
+            "projB": "github.com/org/projB",
+        }
+        results = scanner.scan(
+            str(tmp_path), {"projA", "projB"},
+            module_path_map=module_path_map,
+        )
+        assert len(results) == 1
+        assert results[0].is_test_context is True
+
+    def test_no_module_path_map_returns_empty(self, tmp_path):
+        """Without module_path_map, GoImportScanner returns empty results."""
+        self._write_go_mod(tmp_path, "github.com/org/projA")
+        (tmp_path / "main.go").write_text(
+            'package main\n\nimport "github.com/org/projB"\n'
+        )
+        scanner = GoImportScanner()
+        results = scanner.scan(str(tmp_path), {"projA", "projB"})
+        assert results == []
+
+    def test_no_go_mod_returns_empty(self, tmp_path):
+        """A project without go.mod returns empty results."""
+        (tmp_path / "main.go").write_text(
+            'package main\n\nimport "github.com/org/projB"\n'
+        )
+        scanner = GoImportScanner()
+        module_path_map = {
+            "projB": "github.com/org/projB",
+        }
+        # No go.mod means own_module_path is None; all sibling modules
+        # are still checked (since None != any module path).
+        results = scanner.scan(
+            str(tmp_path), {"projB"},
+            module_path_map=module_path_map,
+        )
+        assert len(results) == 1
+        assert results[0].package_name == "projB"
+
+    def test_grouped_imports(self, tmp_path):
+        """Grouped import statements are all detected."""
+        self._write_go_mod(tmp_path, "github.com/org/projA")
+        (tmp_path / "main.go").write_text(
+            'package main\n\nimport (\n'
+            '\t"fmt"\n'
+            '\t"github.com/org/projB"\n'
+            '\t"github.com/org/projC/internal/util"\n'
+            ')\n'
+        )
+        scanner = GoImportScanner()
+        module_path_map = {
+            "projA": "github.com/org/projA",
+            "projB": "github.com/org/projB",
+            "projC": "github.com/org/projC",
+        }
+        results = scanner.scan(
+            str(tmp_path), {"projA", "projB", "projC"},
+            module_path_map=module_path_map,
+        )
+        names = {r.package_name for r in results}
+        assert names == {"projB", "projC"}
+
+    def test_empty_project_returns_empty(self, tmp_path):
+        """A project with no Go files returns an empty list."""
+        self._write_go_mod(tmp_path, "github.com/org/projA")
+        scanner = GoImportScanner()
+        module_path_map = {
+            "projA": "github.com/org/projA",
+            "projB": "github.com/org/projB",
+        }
+        results = scanner.scan(
+            str(tmp_path), {"projA", "projB"},
+            module_path_map=module_path_map,
+        )
+        assert results == []
+
+    def test_stdlib_import_not_detected(self, tmp_path):
+        """Standard library imports (fmt, os, etc.) are not detected."""
+        self._write_go_mod(tmp_path, "github.com/org/projA")
+        (tmp_path / "main.go").write_text(
+            'package main\n\nimport (\n\t"fmt"\n\t"os"\n)\n'
+        )
+        scanner = GoImportScanner()
+        module_path_map = {
+            "projA": "github.com/org/projA",
+        }
+        results = scanner.scan(
+            str(tmp_path), {"projA"},
+            module_path_map=module_path_map,
+        )
+        assert results == []
+
+    def test_partial_module_path_no_false_positive(self, tmp_path):
+        """A module path that is a prefix but not followed by '/' is not matched."""
+        self._write_go_mod(tmp_path, "github.com/org/projA")
+        # projB-extra should NOT match projB
+        (tmp_path / "main.go").write_text(
+            'package main\n\nimport "github.com/org/projB-extra"\n'
+        )
+        scanner = GoImportScanner()
+        module_path_map = {
+            "projA": "github.com/org/projA",
+            "projB": "github.com/org/projB",
+        }
+        results = scanner.scan(
+            str(tmp_path), {"projA", "projB"},
+            module_path_map=module_path_map,
+        )
+        assert results == []
 
 
 class TestImportInfo:

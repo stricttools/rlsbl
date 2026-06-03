@@ -29,6 +29,7 @@ _TEST_FILE_PATTERNS = (
     re.compile(r"^test_.*\.py$"),
     re.compile(r"^.*_test\.py$"),
     re.compile(r"^.*_test\.go$"),
+    re.compile(r"^.*_test\.dart$"),
     re.compile(r"^.*\.test\.[jt]sx?$"),
     re.compile(r"^.*\.spec\.[jt]sx?$"),
     re.compile(r"^conftest\.py$"),
