@@ -21,6 +21,23 @@ BASES_DIR = os.path.join(".rlsbl", "bases")
 _NPM_LOCKFILES = ("package-lock.json", "pnpm-lock.yaml", "yarn.lock")
 
 
+def _find_git_dir():
+    """Find the .git directory using git rev-parse, which works from any subdirectory.
+
+    Returns the absolute path to the .git directory, or None if not inside a git repo.
+    Unlike os.path.isdir(".git"), this works when CWD is a monorepo sub-project
+    where .git/ lives at the repo root.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--git-dir"],
+            capture_output=True, text=True, check=True,
+        )
+        return os.path.abspath(result.stdout.strip())
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
 def _is_dev_node_project(project_root):
     """Check if the current project is a dev_node in its monorepo workspace.
 
@@ -621,13 +638,15 @@ def _install_or_update_pre_push_hook():
         compute_hook_hash,
     )
 
-    if not os.path.isdir(".git"):
+    git_dir = _find_git_dir()
+    if git_dir is None:
         return
 
-    hook_target = os.path.join(".git", "hooks", "pre-push")
+    hooks_dir = os.path.join(git_dir, "hooks")
+    hook_target = os.path.join(hooks_dir, "pre-push")
 
     if not os.path.exists(hook_target):
-        os.makedirs(os.path.join(".git", "hooks"), exist_ok=True)
+        os.makedirs(hooks_dir, exist_ok=True)
         with open(hook_target, "w", encoding="utf-8") as f:
             f.write(CURRENT_PRE_PUSH_HOOK)
         os.chmod(hook_target, 0o755)
@@ -793,7 +812,7 @@ def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnin
         return
 
     # Only attempt commit if we're in a git repo
-    if not os.path.isdir(".git"):
+    if _find_git_dir() is None:
         return
 
     # Untrack files that are now gitignored but still tracked by git.
