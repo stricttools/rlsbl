@@ -18,13 +18,17 @@ from strictcli import CheckResult
 from .check_context import WorkspaceCheckContext
 
 # Manifest filenames used by workspace-unregistered and workspace-stale-entries
-# to detect project directories. Covers all 14 release targets.
-PROJECT_MANIFESTS = (
-    "go.mod", "pyproject.toml", "package.json", "Cargo.toml",
-    "mix.exs", "deno.json", "build.zig.zon",
-    "pubspec.yaml", "Package.swift", "build.gradle.kts", "build.gradle", "pom.xml",
-    "version.json", "pgdesign.toml", "selfdoc.json", "Dockerfile",
-)
+# to detect project directories. Derived from each target's detection_files
+# so it stays in sync automatically when new targets are added.
+def _all_detection_files():
+    from .targets import TARGETS
+    files = set()
+    for target_cls in TARGETS.values():
+        files.update(target_cls.detection_files)
+    return tuple(sorted(files))
+
+
+PROJECT_MANIFESTS = _all_detection_files()
 
 # Universal project indicator: every scaffolded rlsbl project has this file.
 RLSBL_CONFIG = os.path.join(".rlsbl", "config.json")
