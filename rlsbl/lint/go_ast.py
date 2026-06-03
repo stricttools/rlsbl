@@ -163,6 +163,50 @@ def _check_entry_points(tree, filepath, config):
     return results
 
 
+def scan_imports(filepath: str) -> list[tuple[str, str, int]]:
+    """Extract all import paths from a Go source file.
+
+    Parses the file with tree-sitter and walks import_declaration nodes
+    to collect every imported package path.
+
+    Args:
+        filepath: absolute path to a .go file.
+
+    Returns:
+        list of (import_path, filepath, line_number) tuples.
+    """
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            source = f.read()
+    except (OSError, UnicodeDecodeError):
+        return []
+
+    parser = _make_parser()
+    tree = parser.parse(source.encode("utf-8"))
+    results: list[tuple[str, str, int]] = []
+
+    def _walk(node):
+        if node.type == "import_declaration":
+            for child in node.children:
+                _collect_import_spec(child)
+            return
+        for child in node.children:
+            _walk(child)
+
+    def _collect_import_spec(node):
+        if node.type == "import_spec":
+            for child in node.children:
+                if child.type == "interpreted_string_literal":
+                    content = _extract_string_content(child)
+                    results.append((content, filepath, _node_line(node)))
+        elif node.type == "import_spec_list":
+            for child in node.children:
+                _collect_import_spec(child)
+
+    _walk(tree.root_node)
+    return results
+
+
 class GoAstLinter:
     """Go linter using tree-sitter AST analysis."""
 
