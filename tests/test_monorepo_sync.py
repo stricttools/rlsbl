@@ -11,6 +11,7 @@ import pytest
 from rlsbl.commands.monorepo import (
     _cmd_init,
     _cmd_add,
+    _build_project_template_vars,
     _cmd_sync,
     _generate_router,
     _inject_packages_dir,
@@ -858,3 +859,206 @@ class TestDotPathSelfReference:
         assert dest.exists()
         content = dest.read_text()
         assert "workflow_call" in content
+
+
+PYPI_CI_WITH_TEMPLATE_VARS = """\
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # requires-python: >= {{pypi.minRequiredPython}}
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - run: uv run pytest
+"""
+
+GO_CI_WITH_TEMPLATE_VARS = """\
+name: CI
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # min go version: {{go.minRequiredGo}}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go test ./...
+"""
+
+
+class TestTemplateVarResolution:
+    """Tests for resolving {{...}} template variables during sync."""
+
+    def test_pypi_template_var_resolved(self, mock_git_repo, capsys):
+        """{{pypi.minRequiredPython}} in CI workflow comments is resolved during sync."""
+        proj_dir = os.path.join(str(mock_git_repo), "mypylib")
+        os.makedirs(proj_dir, exist_ok=True)
+        with open(os.path.join(proj_dir, "pyproject.toml"), "w") as f:
+            f.write(
+                '[project]\nname = "mypylib"\nversion = "0.1.0"\n'
+                'requires-python = ">= 3.11"\n'
+            )
+        wf_dir = os.path.join(proj_dir, ".github", "workflows")
+        os.makedirs(wf_dir, exist_ok=True)
+        with open(os.path.join(wf_dir, "ci.yml"), "w") as f:
+            f.write(PYPI_CI_WITH_TEMPLATE_VARS)
+
+        _cmd_init({}, project_root=".")
+        from rlsbl.workspace import save_workspace
+        save_workspace(".", [{"path": "mypylib", "name": "mypylib"}])
+        subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
+        subprocess.run(
+            ["git", "commit", "-q", "-m", "setup"],
+            cwd=str(mock_git_repo), check=True,
+        )
+
+        _cmd_sync({}, project_root=".")
+        dest = mock_git_repo / ".github" / "workflows" / "mypylib-ci.yml"
+        content = dest.read_text()
+        # The template var should be resolved to the actual version
+        assert "3.11" in content
+        # The literal {{...}} pattern should NOT appear
+        assert "{{pypi.minRequiredPython}}" not in content
+
+    def test_go_template_var_resolved(self, mock_git_repo, capsys):
+        """{{go.minRequiredGo}} in CI workflow comments is resolved during sync."""
+        proj_dir = os.path.join(str(mock_git_repo), "mygomod")
+        os.makedirs(proj_dir, exist_ok=True)
+        with open(os.path.join(proj_dir, "go.mod"), "w") as f:
+            f.write("module example.com/mygomod\n\ngo 1.22\n")
+        # Go target needs a VERSION file
+        with open(os.path.join(proj_dir, "VERSION"), "w") as f:
+            f.write("0.1.0\n")
+        wf_dir = os.path.join(proj_dir, ".github", "workflows")
+        os.makedirs(wf_dir, exist_ok=True)
+        with open(os.path.join(wf_dir, "ci.yml"), "w") as f:
+            f.write(GO_CI_WITH_TEMPLATE_VARS)
+
+        _cmd_init({}, project_root=".")
+        from rlsbl.workspace import save_workspace
+        save_workspace(".", [{"path": "mygomod", "name": "mygomod"}])
+        subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
+        subprocess.run(
+            ["git", "commit", "-q", "-m", "setup"],
+            cwd=str(mock_git_repo), check=True,
+        )
+
+        _cmd_sync({}, project_root=".")
+        dest = mock_git_repo / ".github" / "workflows" / "mygomod-ci.yml"
+        content = dest.read_text()
+        # The template var should be resolved to the actual Go version
+        assert "1.22" in content
+        assert "{{go.minRequiredGo}}" not in content
+
+    def test_no_template_vars_still_works(self, mock_git_repo, capsys):
+        """CI workflow without any {{...}} patterns is synced normally."""
+        _init_workspace_with_projects(mock_git_repo, [
+            ("tooling", {"ci": True}),
+        ])
+        _cmd_sync({}, project_root=".")
+        dest = mock_git_repo / ".github" / "workflows" / "tooling-ci.yml"
+        content = dest.read_text()
+        assert "workflow_call" in content
+        assert "{{" not in content
+
+    def test_github_actions_expressions_preserved(self, mock_git_repo, capsys):
+        """${{ ... }} GitHub Actions expressions are not touched by template resolution."""
+        proj_dir = os.path.join(str(mock_git_repo), "mypylib")
+        os.makedirs(proj_dir, exist_ok=True)
+        with open(os.path.join(proj_dir, "pyproject.toml"), "w") as f:
+            f.write(
+                '[project]\nname = "mypylib"\nversion = "0.1.0"\n'
+                'requires-python = ">= 3.11"\n'
+            )
+        ci_content = """\
+name: CI
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # requires-python: >= {{pypi.minRequiredPython}}
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - run: uv python install ${{ matrix.python-version }}
+"""
+        wf_dir = os.path.join(proj_dir, ".github", "workflows")
+        os.makedirs(wf_dir, exist_ok=True)
+        with open(os.path.join(wf_dir, "ci.yml"), "w") as f:
+            f.write(ci_content)
+
+        _cmd_init({}, project_root=".")
+        from rlsbl.workspace import save_workspace
+        save_workspace(".", [{"path": "mypylib", "name": "mypylib"}])
+        subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
+        subprocess.run(
+            ["git", "commit", "-q", "-m", "setup"],
+            cwd=str(mock_git_repo), check=True,
+        )
+
+        _cmd_sync({}, project_root=".")
+        dest = mock_git_repo / ".github" / "workflows" / "mypylib-ci.yml"
+        content = dest.read_text()
+        # rlsbl template var resolved
+        assert "{{pypi.minRequiredPython}}" not in content
+        # GitHub Actions expression preserved
+        assert "matrix.python-version" in content
+
+
+class TestBuildProjectTemplateVars:
+    """Unit tests for _build_project_template_vars."""
+
+    def test_pypi_project_vars(self, mock_git_repo):
+        """PyPI project returns namespaced and un-namespaced vars."""
+        proj_dir = os.path.join(str(mock_git_repo), "mypkg")
+        os.makedirs(proj_dir, exist_ok=True)
+        with open(os.path.join(proj_dir, "pyproject.toml"), "w") as f:
+            f.write(
+                '[project]\nname = "mypkg"\nversion = "1.0.0"\n'
+                'requires-python = ">= 3.12"\n'
+            )
+        tvars = _build_project_template_vars(proj_dir, str(mock_git_repo))
+        # Namespaced key should exist
+        assert tvars.get("pypi.minRequiredPython") == "3.12"
+        # Un-namespaced key should also exist
+        assert tvars.get("minRequiredPython") == "3.12"
+
+    def test_go_project_vars(self, mock_git_repo):
+        """Go project returns namespaced and un-namespaced vars."""
+        proj_dir = os.path.join(str(mock_git_repo), "gomod")
+        os.makedirs(proj_dir, exist_ok=True)
+        with open(os.path.join(proj_dir, "go.mod"), "w") as f:
+            f.write("module example.com/gomod\n\ngo 1.23\n")
+        with open(os.path.join(proj_dir, "VERSION"), "w") as f:
+            f.write("0.1.0\n")
+        tvars = _build_project_template_vars(proj_dir, str(mock_git_repo))
+        assert tvars.get("go.minRequiredGo") == "1.23"
+        assert tvars.get("minRequiredGo") == "1.23"
+
+    def test_no_targets_returns_empty(self, mock_git_repo):
+        """Directory with no detectable targets returns empty dict."""
+        proj_dir = os.path.join(str(mock_git_repo), "empty")
+        os.makedirs(proj_dir, exist_ok=True)
+        tvars = _build_project_template_vars(proj_dir, str(mock_git_repo))
+        assert tvars == {}

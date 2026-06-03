@@ -8,6 +8,8 @@ from ruamel.yaml import YAML
 from ruamel.yaml.scalarstring import LiteralScalarString
 
 from ...action_versions import format_action
+from ...commands.init_cmd import process_template
+from ...context import create_context
 from ...utils import commit_files, commit_files_if_changed
 from ...workspace import find_workspace_root, load_workspace
 from ...targets import detect_targets, TARGETS
@@ -196,6 +198,40 @@ def _get_monorepo_tag_prefix(project, root):
     return f"{project['name']}@v"
 
 
+def _build_project_template_vars(project_dir, root):
+    """Build a template vars dict for a project, with both namespaced and un-namespaced keys.
+
+    Detects the project's targets, calls each target's template_vars(), and
+    returns a merged dict where each target's vars appear under both their
+    bare names and ``{target_name}.{key}`` namespaced names. This allows
+    process_template to resolve patterns like ``{{pypi.minRequiredPython}}``
+    in workflow comments.
+    """
+    from pathlib import Path
+
+    target_entries = detect_targets(project_dir)
+    if not target_entries:
+        return {}
+
+    ctx = create_context(Path(project_dir), workspace_root=Path(root))
+    merged = {}
+    for entry in target_entries:
+        if entry.name not in TARGETS:
+            continue
+        target = TARGETS[entry.name]
+        try:
+            tvars = target.template_vars(entry.path, ctx)
+        except Exception:
+            continue
+        # Un-namespaced (first target wins for collisions)
+        for key, value in tvars.items():
+            if key not in merged:
+                merged[key] = value
+        # Namespaced: always add
+        for key, value in tvars.items():
+            merged[f"{entry.name}.{key}"] = value
+    return merged
+
 
 def _cmd_sync(flags, project_root):
     start = str(project_root)
@@ -247,6 +283,14 @@ def _cmd_sync(flags, project_root):
             else:
                 with open(ci_src, "r", encoding="utf-8") as f:
                     content = f.read()
+
+                # Resolve any remaining {{...}} template variables in the
+                # workflow content (e.g. {{pypi.minRequiredPython}} in comments
+                # that scaffold left unresolved).
+                project_dir = os.path.join(root, path)
+                tvars = _build_project_template_vars(project_dir, root)
+                if tvars:
+                    content, _ = process_template(content, tvars)
 
                 doc = parse_ci_workflow(content)
                 if doc is None:

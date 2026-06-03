@@ -24,6 +24,7 @@ from .snapshot_cmd import _cmd_snapshot
 
 from .sync import (
     _cmd_sync,
+    _build_project_template_vars,
     parse_ci_workflow,
     emit_ci_workflow,
     _rewrite_trigger,
@@ -53,6 +54,7 @@ __all__ = [
     "_parse_version_tuple",
     # sync
     "_cmd_sync",
+    "_build_project_template_vars",
     "parse_ci_workflow",
     "emit_ci_workflow",
     "_rewrite_trigger",
