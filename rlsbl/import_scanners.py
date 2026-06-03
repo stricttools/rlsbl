@@ -82,6 +82,7 @@ class PythonImportScanner:
         self,
         project_path: str,
         workspace_names: set[str],
+        exclude_dirs: list[str] | None = None,
     ) -> list[ImportInfo]:
         """Scan project_path for Python imports matching workspace members.
 
@@ -89,6 +90,8 @@ class PythonImportScanner:
             project_path: absolute path to the project root.
             workspace_names: set of workspace member package names
                 (as they appear in pyproject.toml, e.g. "my-lib").
+            exclude_dirs: directory paths to skip during the walk
+                (relative to project_path or absolute).
 
         Returns:
             list of ImportInfo for imports that match workspace members.
@@ -101,7 +104,7 @@ class PythonImportScanner:
         }
 
         linter = PythonAstLinter()
-        raw_imports = linter.scan_imports(project_path)
+        raw_imports = linter.scan_imports(project_path, exclude_dirs=exclude_dirs)
 
         results = []
         for pkg_name, filepath, line_number in raw_imports:
@@ -142,6 +145,7 @@ class DartImportScanner:
         self,
         project_path: str,
         workspace_names: set[str],
+        exclude_dirs: list[str] | None = None,
     ) -> list[ImportInfo]:
         """Scan project_path for Dart imports matching workspace members.
 
@@ -149,6 +153,8 @@ class DartImportScanner:
             project_path: absolute path to the project root.
             workspace_names: set of workspace member package names
                 (as they appear in pubspec.yaml).
+            exclude_dirs: directory paths to skip during the walk
+                (relative to project_path or absolute).
 
         Returns:
             list of ImportInfo for imports that match workspace members.
@@ -161,7 +167,7 @@ class DartImportScanner:
 
         self._check_generated_files(project_path)
 
-        dart_files = walk_source_files(project_path, (".dart",), [])
+        dart_files = walk_source_files(project_path, (".dart",), [], exclude_dirs=exclude_dirs)
 
         results = []
         for filepath in dart_files:
@@ -265,6 +271,7 @@ class NpmImportScanner:
         self,
         project_path: str,
         workspace_names: set[str],
+        exclude_dirs: list[str] | None = None,
     ) -> list[ImportInfo]:
         """Scan project_path for JS/TS imports matching workspace members.
 
@@ -272,6 +279,8 @@ class NpmImportScanner:
             project_path: absolute path to the project root.
             workspace_names: set of workspace member package names
                 (as they appear in package.json, e.g. "@scope/my-lib").
+            exclude_dirs: directory paths to skip during the walk
+                (relative to project_path or absolute).
 
         Returns:
             list of ImportInfo for imports that match workspace members.
@@ -284,7 +293,7 @@ class NpmImportScanner:
         }
 
         linter = NpmAstLinter()
-        raw_imports = linter.scan_imports(project_path)
+        raw_imports = linter.scan_imports(project_path, exclude_dirs=exclude_dirs)
 
         results = []
         for specifier, filepath, line_number in raw_imports:

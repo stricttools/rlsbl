@@ -237,13 +237,17 @@ class NpmAstLinter:
 
         return results
 
-    def scan_imports(self, project_path: str) -> set[tuple[str, str, int]]:
+    def scan_imports(
+        self,
+        project_path: str,
+        exclude_dirs: list[str] | None = None,
+    ) -> set[tuple[str, str, int]]:
         """Collect all imported package names from JS/TS files.
 
         Returns a set of (package_name, file_path, line_number) tuples.
         """
         all_imports: set[tuple[str, str, int]] = set()
-        for filepath in walk_source_files(project_path, _ALL_EXTENSIONS, []):
+        for filepath in walk_source_files(project_path, _ALL_EXTENSIONS, [], exclude_dirs=exclude_dirs):
             try:
                 with open(filepath, "r", encoding="utf-8") as f:
                     source = f.read()

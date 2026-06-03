@@ -212,14 +212,18 @@ class PythonAstLinter:
 
         return results
 
-    def scan_imports(self, project_path: str) -> set[tuple[str, str, int]]:
+    def scan_imports(
+        self,
+        project_path: str,
+        exclude_dirs: list[str] | None = None,
+    ) -> set[tuple[str, str, int]]:
         """Collect all imported top-level module names from Python files.
 
         Returns a set of (package_name, file_path, line_number) tuples.
         """
         all_imports: set[tuple[str, str, int]] = set()
         parser = _make_parser()
-        for filepath in walk_source_files(project_path, (".py",), []):
+        for filepath in walk_source_files(project_path, (".py",), [], exclude_dirs=exclude_dirs):
             try:
                 with open(filepath, "r", encoding="utf-8") as f:
                     source = f.read()
