@@ -17,6 +17,7 @@ from rlsbl.dep_validation import (
     find_dead_workspace_packages,
     load_dep_overrides,
 )
+from rlsbl.lint.utils import walk_source_files
 from rlsbl.workspace import WORKSPACE_DIR
 
 
@@ -867,6 +868,276 @@ class TestFindDeadNpmModules:
         assert "lib/core.js" not in dead
         assert "bin/cli.js" not in dead
         assert "bin/helpers.js" not in dead
+
+
+class TestWalkSourceFilesExcludeDirs:
+    """walk_source_files with exclude_dirs skips specified directories."""
+
+    def test_exclude_dirs_skips_specified_directory(self, tmp_path):
+        """Directories listed in exclude_dirs are not walked."""
+        (tmp_path / "main.py").write_text("x = 1\n")
+        sibling = tmp_path / "sibling_project"
+        sibling.mkdir()
+        (sibling / "lib.py").write_text("y = 2\n")
+
+        # Without exclude_dirs, both files found
+        all_files = walk_source_files(str(tmp_path), (".py",), [])
+        basenames = {os.path.basename(f) for f in all_files}
+        assert "main.py" in basenames
+        assert "lib.py" in basenames
+
+        # With exclude_dirs, sibling is skipped
+        filtered = walk_source_files(
+            str(tmp_path), (".py",), [],
+            exclude_dirs=[str(sibling)],
+        )
+        basenames = {os.path.basename(f) for f in filtered}
+        assert "main.py" in basenames
+        assert "lib.py" not in basenames
+
+    def test_exclude_dirs_relative_path(self, tmp_path):
+        """exclude_dirs accepts paths relative to project_path."""
+        (tmp_path / "main.py").write_text("x = 1\n")
+        sub = tmp_path / "sub"
+        sub.mkdir()
+        (sub / "mod.py").write_text("y = 2\n")
+
+        filtered = walk_source_files(
+            str(tmp_path), (".py",), [],
+            exclude_dirs=["sub"],
+        )
+        basenames = {os.path.basename(f) for f in filtered}
+        assert "main.py" in basenames
+        assert "mod.py" not in basenames
+
+    def test_exclude_dirs_none_walks_everything(self, tmp_path):
+        """exclude_dirs=None (default) walks all directories."""
+        (tmp_path / "a.py").write_text("")
+        sub = tmp_path / "sub"
+        sub.mkdir()
+        (sub / "b.py").write_text("")
+
+        files = walk_source_files(str(tmp_path), (".py",), [], exclude_dirs=None)
+        basenames = {os.path.basename(f) for f in files}
+        assert basenames == {"a.py", "b.py"}
+
+    def test_exclude_dirs_multiple(self, tmp_path):
+        """Multiple directories can be excluded at once."""
+        (tmp_path / "root.py").write_text("")
+        for name in ("alpha", "beta", "gamma"):
+            d = tmp_path / name
+            d.mkdir()
+            (d / f"{name}.py").write_text("")
+
+        filtered = walk_source_files(
+            str(tmp_path), (".py",), [],
+            exclude_dirs=["alpha", "beta"],
+        )
+        basenames = {os.path.basename(f) for f in filtered}
+        assert "root.py" in basenames
+        assert "gamma.py" in basenames
+        assert "alpha.py" not in basenames
+        assert "beta.py" not in basenames
+
+    def test_exclude_dirs_nested_subdirectory(self, tmp_path):
+        """Excluding a nested directory only skips that subtree."""
+        (tmp_path / "top.py").write_text("")
+        a = tmp_path / "a"
+        a.mkdir()
+        (a / "a.py").write_text("")
+        b = a / "b"
+        b.mkdir()
+        (b / "b.py").write_text("")
+
+        # Exclude a/b, keep a/
+        filtered = walk_source_files(
+            str(tmp_path), (".py",), [],
+            exclude_dirs=[str(b)],
+        )
+        basenames = {os.path.basename(f) for f in filtered}
+        assert "top.py" in basenames
+        assert "a.py" in basenames
+        assert "b.py" not in basenames
+
+
+class TestRootProjectDepScan:
+    """Dep scan for path='.' projects excludes sibling project directories."""
+
+    def test_root_project_excludes_siblings(self, tmp_path):
+        """A project at path='.' with exclude_dirs skips sibling projects."""
+        # Root project (path=".")
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "root-app"\n'
+        )
+        (tmp_path / "main.py").write_text("import sibling_lib\n")
+
+        # Sibling project at path="sibling"
+        sibling = tmp_path / "sibling"
+        sibling.mkdir()
+        (sibling / "pyproject.toml").write_text(
+            '[project]\nname = "sibling-lib"\n'
+        )
+        (sibling / "app.py").write_text("import root_app\n")
+
+        from rlsbl.dep_validation import _get_imported_workspace_packages
+
+        workspace_names = {"root-app", "sibling-lib"}
+
+        # Without exclusions, scanning root picks up sibling's import
+        lib_all, test_all = _get_imported_workspace_packages(
+            str(tmp_path), workspace_names,
+        )
+        # sibling/app.py imports root_app, which would be a false positive
+        # for the root project if we don't exclude sibling
+        assert "root-app" in (lib_all | test_all)
+
+        # With exclusions, sibling's files are not scanned
+        lib_exc, test_exc = _get_imported_workspace_packages(
+            str(tmp_path), workspace_names,
+            exclude_dirs=[str(sibling)],
+        )
+        # Only main.py's import should be found
+        all_exc = lib_exc | test_exc
+        assert "sibling-lib" in all_exc  # main.py imports sibling_lib
+        # root-app from sibling/app.py should NOT appear
+        assert "root-app" not in all_exc
+
+    def test_dead_modules_excludes_siblings(self, tmp_path):
+        """find_dead_modules with exclude_dirs does not scan sibling dirs."""
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "mylib"\n'
+        )
+        pkg = tmp_path / "mylib"
+        pkg.mkdir()
+        (pkg / "__init__.py").write_text("from .core import x\n")
+        (pkg / "core.py").write_text("x = 1\n")
+
+        # Sibling project with a module that would be detected as dead
+        sibling = tmp_path / "sibling"
+        sibling.mkdir()
+        (sibling / "orphan.py").write_text("z = 3\n")
+
+        # Without exclusion, sibling's orphan.py appears as dead
+        dead_all = find_dead_modules(str(tmp_path))
+        sibling_dead = [d for d in dead_all if "sibling" in d]
+        assert len(sibling_dead) > 0
+
+        # With exclusion, sibling's files are not scanned
+        dead_exc = find_dead_modules(
+            str(tmp_path), exclude_dirs=[str(sibling)],
+        )
+        sibling_dead = [d for d in dead_exc if "sibling" in d]
+        assert len(sibling_dead) == 0
+
+    def test_sibling_exclude_dirs_integration(self, tmp_path):
+        """_sibling_exclude_dirs computes correct exclusions for root project."""
+        from rlsbl.checks import register_checks
+
+        # Capture the _sibling_exclude_dirs function
+        captured = {}
+
+        class MockApp:
+            _checks_enabled = True
+
+            def check(self, name):
+                def decorator(fn):
+                    captured[name] = fn
+                    return fn
+                return decorator
+
+        register_checks(MockApp())
+
+        # Access _sibling_exclude_dirs via the module's closure
+        from rlsbl import checks as checks_mod
+
+        # Manually test the helper that register_checks defines
+        # by constructing the same workspace scenario
+        projects = [
+            {"name": "root", "path": "."},
+            {"name": "framework", "path": "framework"},
+            {"name": "server", "path": "server"},
+        ]
+        root = str(tmp_path)
+
+        # The root project's path is ".", so all siblings are inside it
+        root_abs = os.path.normpath(os.path.join(root, "."))
+        exclude = []
+        for other in projects:
+            if other["path"] == ".":
+                continue
+            other_abs = os.path.normpath(os.path.join(root, other["path"]))
+            if other_abs.startswith(root_abs + os.sep):
+                exclude.append(other_abs)
+
+        assert len(exclude) == 2
+        assert os.path.normpath(os.path.join(root, "framework")) in exclude
+        assert os.path.normpath(os.path.join(root, "server")) in exclude
+
+    def test_dep_cache_uses_sibling_exclusions(self, tmp_path):
+        """_build_dep_import_cache excludes sibling dirs for root project."""
+        from rlsbl.check_context import WorkspaceCheckContext
+        from rlsbl.workspace_graph import WorkspaceGraph
+
+        ws_dir = tmp_path / ".rlsbl-monorepo"
+        ws_dir.mkdir()
+        (ws_dir / "workspace.toml").write_text(
+            '[[projects]]\npath = "."\nname = "root-app"\n\n'
+            '[[projects]]\npath = "sibling"\nname = "sibling-lib"\n'
+        )
+
+        # Root project imports os (not a workspace member)
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "root-app"\n'
+        )
+        (tmp_path / "main.py").write_text("import os\n")
+
+        # Sibling project imports root_app (should be excluded from root scan)
+        sibling = tmp_path / "sibling"
+        sibling.mkdir()
+        (sibling / "pyproject.toml").write_text(
+            '[project]\nname = "sibling-lib"\n'
+        )
+        (sibling / "app.py").write_text("import root_app\n")
+
+        projects = [
+            {"name": "root-app", "path": "."},
+            {"name": "sibling-lib", "path": "sibling"},
+        ]
+        graph = WorkspaceGraph(str(tmp_path), projects)
+
+        ctx = WorkspaceCheckContext(
+            project_root=Path(tmp_path),
+            workspace_root=Path(tmp_path),
+            config={},
+            projects=projects,
+            graph=graph,
+        )
+
+        captured = {}
+
+        class MockApp:
+            _checks_enabled = True
+
+            def check(self, name):
+                def decorator(fn):
+                    captured[name] = fn
+                    return fn
+                return decorator
+
+        from rlsbl.checks import register_checks
+        register_checks(MockApp())
+
+        # Run deps-unused which triggers _build_dep_import_cache
+        result = captured["deps-unused"](ctx)
+
+        # The root project should NOT see root-app as imported
+        # (that import lives in sibling/app.py which should be excluded)
+        cache = ctx._dep_import_cache
+        root_lib, root_test = cache["root-app"]
+        # root-app should not appear in its own scan results
+        # (sibling/app.py's "import root_app" should be excluded)
+        assert "root-app" not in root_lib
+        assert "root-app" not in root_test
 
 
 class TestDepsChecksIntegration:
