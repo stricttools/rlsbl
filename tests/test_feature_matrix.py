@@ -91,8 +91,8 @@ class TestCheckTargetsConsistencyWithCode:
         assert targets == frozenset({"pypi", "go", "npm"})
 
     def test_dep_checks_use_import_scanners(self):
-        """Dep checks use PythonImportScanner, DartImportScanner, NpmImportScanner."""
-        scanner_targets = frozenset({"pypi", "dart", "npm"})
+        """Dep checks use PythonImportScanner, DartImportScanner, NpmImportScanner, GoImportScanner."""
+        scanner_targets = frozenset({"pypi", "dart", "npm", "go"})
         for check_name in ("deps-unused", "deps-undeclared",
                            "deps-runtime-test-only", "deps-dev-in-lib"):
             assert CHECK_TARGETS[check_name] == scanner_targets, (

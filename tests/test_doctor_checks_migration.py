@@ -62,6 +62,7 @@ EXPECTED_CHECKS = [
     "dead-modules",
     "scaffold-unreplaced-vars",
     "dead-workspace-packages",
+    "circular-deps",
 ]
 
 
