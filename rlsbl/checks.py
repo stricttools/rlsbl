@@ -30,6 +30,141 @@ PROJECT_MANIFESTS = (
 RLSBL_CONFIG = os.path.join(".rlsbl", "config.json")
 
 
+# ---------------------------------------------------------------------------
+# Feature support matrix metadata
+# ---------------------------------------------------------------------------
+#
+# Maps each check name to its supported targets. Three kinds of values:
+#   None         -- universal (works for any/all targets)
+#   frozenset()  -- only works for these specific targets
+#   "workspace"  -- workspace-only, target-agnostic (graph/structure checks)
+#
+# For checks that use import scanners in workspace mode, the targets
+# listed are the languages the scanners support (pypi=Python, dart, npm).
+
+CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
+    # --- project tag (universal) ---
+    "lock": None,
+    "version-consistency": None,
+    "name-consistency": None,
+    "license-consistency": None,
+    "description-consistency": None,
+    "private-hook-stale": None,
+    "config-schema": None,
+    "license-file": None,
+    # --- release tag (universal) ---
+    "local-tag": None,
+    "remote-tag": None,
+    "github-release": None,
+    "branch-sync": None,
+    # --- changelog tag (universal) ---
+    "changelog-entry": None,
+    "changelog-hashes": None,
+    "changelog-range": None,
+    "changelog-coverage": None,
+    "changelog-orphans": None,
+    "changelog-schema": None,
+    "changelog-user-facing": None,
+    "changelog-batch-commits": None,
+    "changelog-batch-entries": None,
+    # --- workspace tag (workspace-only, target-agnostic) ---
+    "workspace-ci-router": "workspace",
+    "workspace-ci-synced": "workspace",
+    "workspace-targets": "workspace",
+    "workspace-unregistered": "workspace",
+    "workspace-stale-entries": "workspace",
+    "dev-node-boundary": "workspace",
+    "layers-violations": "workspace",
+    "deps-stale": "workspace",
+    # --- workspace + language-specific import scanners ---
+    "deps-unused": frozenset({"pypi", "dart", "npm"}),
+    "deps-undeclared": frozenset({"pypi", "dart", "npm"}),
+    "deps-runtime-test-only": frozenset({"pypi", "dart", "npm"}),
+    "deps-dev-in-lib": frozenset({"pypi", "dart", "npm"}),
+    # --- target-specific quality checks ---
+    "dead-modules": frozenset({"pypi", "go", "npm"}),
+    "library-lint": frozenset({"pypi", "go", "npm"}),
+    # --- quality tag (universal) ---
+    "scaffold-unreplaced-vars": None,
+}
+
+# Canonical column order for the feature matrix. Only targets that
+# appear as values in CHECK_TARGETS are included (not all 18 TARGETS).
+MATRIX_COLUMNS: tuple[str, ...] = ("pypi", "go", "npm", "dart", "cargo",
+                                    "deno", "hex", "zig", "swift",
+                                    "swift-apple", "maven", "docker",
+                                    "flutter-ios", "flutter-android",
+                                    "pgdesign", "plain", "docs", "spec")
+
+
+def get_feature_matrix() -> dict[str, dict[str, str]]:
+    """Build a feature matrix mapping check names to per-target support.
+
+    Returns ``{check_name: {target: "yes"|"no"|"all"|"workspace"}}``
+    where:
+    - ``"all"`` means the check is universal (works for any target)
+    - ``"workspace"`` means the check requires a monorepo workspace
+    - ``"yes"`` means the target is explicitly supported
+    - ``"no"`` means the target is not supported
+    """
+    matrix: dict[str, dict[str, str]] = {}
+    for check_name, targets in CHECK_TARGETS.items():
+        row: dict[str, str] = {}
+        if targets is None:
+            for col in MATRIX_COLUMNS:
+                row[col] = "all"
+        elif targets == "workspace":
+            for col in MATRIX_COLUMNS:
+                row[col] = "workspace"
+        else:
+            for col in MATRIX_COLUMNS:
+                row[col] = "yes" if col in targets else "no"
+        matrix[check_name] = row
+    return matrix
+
+
+def generate_feature_matrix_markdown() -> str:
+    """Generate a Markdown table of check-vs-target support.
+
+    Only includes checks that have target-specific behavior (not
+    universal or workspace-only), since those are the interesting rows.
+    """
+    matrix = get_feature_matrix()
+
+    # Filter to checks with at least one "yes" or "no" (target-specific)
+    interesting = {
+        name: row for name, row in matrix.items()
+        if any(v in ("yes", "no") for v in row.values())
+    }
+
+    if not interesting:
+        return "No target-specific checks registered.\n"
+
+    # Determine which columns have at least one "yes" among interesting rows
+    active_cols = [
+        col for col in MATRIX_COLUMNS
+        if any(row.get(col) == "yes" for row in interesting.values())
+    ]
+
+    # Build table
+    lines: list[str] = []
+    header = "| Check | " + " | ".join(active_cols) + " |"
+    separator = "|-------|" + "|".join("-" * (len(c) + 2) for c in active_cols) + "|"
+    lines.append(header)
+    lines.append(separator)
+
+    for check_name in sorted(interesting):
+        row = interesting[check_name]
+        cells = []
+        for col in active_cols:
+            val = row[col]
+            cells.append("yes" if val == "yes" else "no")
+        lines.append(f"| {check_name} | " + " | ".join(cells) + " |")
+
+    lines.append("")
+    return "\n".join(lines)
+
+
 def _resolve_version_and_tag(ctx):
     """Detect version and tag from project targets rooted at *ctx*.
 
