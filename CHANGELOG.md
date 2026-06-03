@@ -2,9 +2,23 @@
 
 # Changelog
 
-## 0.58.0
+## 0.59.0
 
-New dead-workspace-packages check for detecting unused library packages in monorepo workspaces
+Unified manifest detection, PlainTarget auto-detection, monorepo sync template resolution, required template variables, and fixes for sub-directory scaffold operations and release-file commit exemption.
+
+### Features
+
+- **PlainTarget auto-detection.** VERSION-only projects are now auto-detected without opt-in configuration.
+- **Unified manifest detection.** Target detection files are now derived from the target registry as a single source of truth, eliminating hardcoded manifest lists.
+- **Required template variables.** `process_template` now errors on missing critical variables at scaffold time instead of silently leaving placeholders.
+- **Monorepo sync template resolution.** `monorepo sync` now resolves template variables in per-project CI workflows instead of copying them verbatim.
+
+### Fixes
+
+- **Scaffold auto-commit and hook install from sub-directories.** Scaffold auto-commit and pre-push hook installation now work correctly when run from monorepo sub-project directories.
+- **Release file commits auto-exempted.** Commits that only touch `.rlsbl/releases/` files are now automatically exempted from changelog coverage checks.
+
+## 0.58.0
 
 ### Features
 
