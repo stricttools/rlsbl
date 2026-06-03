@@ -166,7 +166,17 @@ def run_cmd(retry_config, flags, project_root):
             try:
                 retry_config = read_retry_file(retry_path)
             except ValueError as e:
+                # Clean up the invalid file so it doesn't block subsequent
+                # `rlsbl release run` with a dirty working tree.
+                if os.path.exists(retry_path):
+                    os.remove(retry_path)
                 print(f"Error in retry file: {e}", file=sys.stderr)
+                print(
+                    "Hint: `rlsbl release retry` is for dispatching CI after a "
+                    "completed release. To re-run a failed release, use "
+                    "`rlsbl release run`.",
+                    file=sys.stderr,
+                )
                 sys.exit(1)
         else:
             try:
