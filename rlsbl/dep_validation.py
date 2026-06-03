@@ -9,10 +9,12 @@ import json
 import os
 import re
 import tomllib
+from collections import deque
 from dataclasses import dataclass
 
 from .import_scanners import (
     DartImportScanner,
+    GoImportScanner,
     NpmImportScanner,
     PythonImportScanner,
     _NON_PRODUCTION_PATTERNS,
@@ -64,8 +66,17 @@ def _get_imported_workspace_packages(
     project_dir: str,
     workspace_names: set[str],
     exclude_dirs: list[str] | None = None,
+    *,
+    module_path_map: dict[str, str] | None = None,
 ) -> tuple[set[str], set[str]]:
     """Scan a project for workspace imports, split by context.
+
+    Args:
+        project_dir: absolute path to the project root.
+        workspace_names: set of all workspace member package names.
+        exclude_dirs: directory paths to skip during the walk.
+        module_path_map: mapping of workspace project name to its Go
+            module path (from go.mod). Passed through to GoImportScanner.
 
     Returns (lib_imports, test_imports) where each is a set of
     workspace package names found in lib/test contexts respectively.
@@ -85,6 +96,19 @@ def _get_imported_workspace_packages(
                 test_imports.add(info.package_name)
             else:
                 lib_imports.add(info.package_name)
+
+    # GoImportScanner needs the module_path_map keyword argument
+    go_scanner = GoImportScanner()
+    go_results = go_scanner.scan(
+        project_dir, workspace_names,
+        exclude_dirs=exclude_dirs,
+        module_path_map=module_path_map,
+    )
+    for info in go_results:
+        if info.is_test_context:
+            test_imports.add(info.package_name)
+        else:
+            lib_imports.add(info.package_name)
 
     return lib_imports, test_imports
 
