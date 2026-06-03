@@ -94,6 +94,12 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "scaffold-unreplaced-vars": None,
 }
 
+# Excluded targets: checks where a target is deliberately excluded because
+# the compiler/toolchain already handles it. Maps check_name -> {target: reason}.
+CHECK_EXCLUDED_TARGETS: dict[str, dict[str, str]] = {
+    "circular-deps": {"go": "compiler rejects circular imports"},
+}
+
 # Canonical column order for the feature matrix. Only targets that
 # appear as values in CHECK_TARGETS are included (not all 18 TARGETS).
 MATRIX_COLUMNS: tuple[str, ...] = ("pypi", "go", "npm", "dart", "cargo",
@@ -106,16 +112,18 @@ MATRIX_COLUMNS: tuple[str, ...] = ("pypi", "go", "npm", "dart", "cargo",
 def get_feature_matrix() -> dict[str, dict[str, str]]:
     """Build a feature matrix mapping check names to per-target support.
 
-    Returns ``{check_name: {target: "yes"|"no"|"all"|"workspace"}}``
+    Returns ``{check_name: {target: "yes"|"no"|"n/a"|"all"|"workspace"}}``
     where:
     - ``"all"`` means the check is universal (works for any target)
     - ``"workspace"`` means the check requires a monorepo workspace
     - ``"yes"`` means the target is explicitly supported
+    - ``"n/a"`` means the check is deliberately excluded (toolchain handles it)
     - ``"no"`` means the target is not supported
     """
     matrix: dict[str, dict[str, str]] = {}
     for check_name, targets in CHECK_TARGETS.items():
         row: dict[str, str] = {}
+        excluded = CHECK_EXCLUDED_TARGETS.get(check_name, {})
         if targets is None:
             for col in MATRIX_COLUMNS:
                 row[col] = "all"
@@ -124,7 +132,12 @@ def get_feature_matrix() -> dict[str, dict[str, str]]:
                 row[col] = "workspace"
         else:
             for col in MATRIX_COLUMNS:
-                row[col] = "yes" if col in targets else "no"
+                if col in excluded:
+                    row[col] = "n/a"
+                elif col in targets:
+                    row[col] = "yes"
+                else:
+                    row[col] = "no"
         matrix[check_name] = row
     return matrix
 
@@ -137,10 +150,10 @@ def generate_feature_matrix_markdown() -> str:
     """
     matrix = get_feature_matrix()
 
-    # Filter to checks with at least one "yes" or "no" (target-specific)
+    # Filter to checks with at least one "yes", "no", or "n/a" (target-specific)
     interesting = {
         name: row for name, row in matrix.items()
-        if any(v in ("yes", "no") for v in row.values())
+        if any(v in ("yes", "no", "n/a") for v in row.values())
     }
 
     if not interesting:
@@ -164,7 +177,12 @@ def generate_feature_matrix_markdown() -> str:
         cells = []
         for col in active_cols:
             val = row[col]
-            cells.append("yes" if val == "yes" else "no")
+            if val == "yes":
+                cells.append("yes")
+            elif val == "n/a":
+                cells.append("n/a")
+            else:
+                cells.append("no")
         lines.append(f"| {check_name} | " + " | ".join(cells) + " |")
 
     lines.append("")

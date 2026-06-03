@@ -3,6 +3,7 @@
 import tomllib
 
 from rlsbl.checks import (
+    CHECK_EXCLUDED_TARGETS,
     CHECK_TARGETS,
     MATRIX_COLUMNS,
     generate_feature_matrix_markdown,
@@ -149,13 +150,18 @@ class TestGetFeatureMatrix:
                     f"workspace check {name} should have all 'workspace' values"
                 )
 
-    def test_target_specific_checks_have_yes_no(self):
+    def test_target_specific_checks_have_yes_no_or_na(self):
         matrix = get_feature_matrix()
         for name, value in CHECK_TARGETS.items():
             if isinstance(value, frozenset):
                 row = matrix[name]
+                excluded = CHECK_EXCLUDED_TARGETS.get(name, {})
                 for col, cell in row.items():
-                    if col in value:
+                    if col in excluded:
+                        assert cell == "n/a", (
+                            f"{name}[{col}] should be 'n/a'"
+                        )
+                    elif col in value:
                         assert cell == "yes", (
                             f"{name}[{col}] should be 'yes'"
                         )
@@ -208,3 +214,72 @@ class TestGenerateFeatureMatrixMarkdown:
         assert "go" in header
         assert "npm" in header
         assert "dart" in header
+
+    def test_na_cells_in_markdown(self):
+        """n/a cells must appear as 'n/a' in the markdown output."""
+        md = generate_feature_matrix_markdown()
+        # circular-deps x go should be n/a
+        for line in md.strip().split("\n"):
+            if line.startswith("| circular-deps"):
+                cells = [c.strip() for c in line.split("|")[1:] if c.strip()]
+                # cells[0] is the check name, the rest are target values
+                # Find the go column index
+                header = md.split("\n")[0]
+                header_cells = [c.strip() for c in header.split("|")[1:] if c.strip()]
+                go_idx = header_cells.index("go")
+                assert cells[go_idx] == "n/a", (
+                    f"circular-deps x go should be 'n/a', got {cells[go_idx]!r}"
+                )
+                break
+        else:
+            raise AssertionError("circular-deps row not found in markdown")
+
+
+class TestCheckExcludedTargets:
+    """CHECK_EXCLUDED_TARGETS must be well-formed and consistent."""
+
+    def test_excluded_checks_exist(self):
+        """Every check in CHECK_EXCLUDED_TARGETS must exist in CHECK_TARGETS."""
+        for name in CHECK_EXCLUDED_TARGETS:
+            assert name in CHECK_TARGETS, (
+                f"CHECK_EXCLUDED_TARGETS[{name!r}] not in CHECK_TARGETS"
+            )
+
+    def test_excluded_targets_are_known(self):
+        """Excluded target names must be in MATRIX_COLUMNS."""
+        columns = set(MATRIX_COLUMNS)
+        for name, excluded in CHECK_EXCLUDED_TARGETS.items():
+            for target in excluded:
+                assert target in columns, (
+                    f"CHECK_EXCLUDED_TARGETS[{name!r}] references unknown target {target!r}"
+                )
+
+    def test_excluded_targets_not_in_supported(self):
+        """Excluded targets must not also be in the check's supported set."""
+        for name, excluded in CHECK_EXCLUDED_TARGETS.items():
+            targets = CHECK_TARGETS[name]
+            if isinstance(targets, frozenset):
+                overlap = set(excluded) & targets
+                assert not overlap, (
+                    f"CHECK_EXCLUDED_TARGETS[{name!r}] overlaps with "
+                    f"CHECK_TARGETS: {sorted(overlap)}"
+                )
+
+    def test_excluded_targets_have_reasons(self):
+        """Every excluded target must have a non-empty reason string."""
+        for name, excluded in CHECK_EXCLUDED_TARGETS.items():
+            for target, reason in excluded.items():
+                assert isinstance(reason, str) and reason.strip(), (
+                    f"CHECK_EXCLUDED_TARGETS[{name!r}][{target!r}] "
+                    f"must have a non-empty reason"
+                )
+
+    def test_circular_deps_go_excluded(self):
+        """circular-deps must exclude go with a reason."""
+        assert "circular-deps" in CHECK_EXCLUDED_TARGETS
+        assert "go" in CHECK_EXCLUDED_TARGETS["circular-deps"]
+
+    def test_circular_deps_go_is_na_in_matrix(self):
+        """circular-deps x go must be 'n/a' in get_feature_matrix()."""
+        matrix = get_feature_matrix()
+        assert matrix["circular-deps"]["go"] == "n/a"
