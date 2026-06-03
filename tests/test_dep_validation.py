@@ -11,6 +11,7 @@ from rlsbl.dep_validation import (
     check_runtime_test_only,
     check_undeclared_deps,
     check_unused_deps,
+    find_dead_dart_modules,
     find_dead_go_packages,
     find_dead_modules,
     find_dead_npm_modules,
@@ -1840,3 +1841,262 @@ class TestDeadWorkspacePackagesCheck:
         result = captured["dead-workspace-packages"](ctx)
         assert result.status == "warn"
         assert "1 dead workspace package" in result.message
+
+
+# Minimal pubspec.yaml template for Dart tests
+_PUBSPEC = 'name: {name}\nversion: 0.1.0\nenvironment:\n  sdk: ">=3.0.0 <4.0.0"\n'
+
+
+class TestFindDeadDartModules:
+    """find_dead_dart_modules detects unreachable Dart source files."""
+
+    def test_reachable_via_barrel_not_flagged(self, tmp_path):
+        """A file exported by the barrel file is not flagged."""
+        (tmp_path / "pubspec.yaml").write_text(_PUBSPEC.format(name="mylib"))
+        lib = tmp_path / "lib"
+        lib.mkdir()
+        (lib / "mylib.dart").write_text("export 'src/helper.dart';\n")
+        src = lib / "src"
+        src.mkdir()
+        (src / "helper.dart").write_text("void help() {}\n")
+
+        dead = find_dead_dart_modules(str(tmp_path))
+        assert dead == []
+
+    def test_unreachable_file_flagged(self, tmp_path):
+        """A file not reachable from any entry point is flagged as dead."""
+        (tmp_path / "pubspec.yaml").write_text(_PUBSPEC.format(name="mylib"))
+        lib = tmp_path / "lib"
+        lib.mkdir()
+        (lib / "mylib.dart").write_text("export 'src/used.dart';\n")
+        src = lib / "src"
+        src.mkdir()
+        (src / "used.dart").write_text("void used() {}\n")
+        (src / "orphan.dart").write_text("void orphan() {}\n")
+
+        dead = find_dead_dart_modules(str(tmp_path))
+        assert os.path.join("lib", "src", "orphan.dart") in dead
+        assert os.path.join("lib", "src", "used.dart") not in dead
+
+    def test_bin_entry_point_works(self, tmp_path):
+        """A file reachable from a bin/ script is not flagged."""
+        (tmp_path / "pubspec.yaml").write_text(_PUBSPEC.format(name="mycli"))
+        lib = tmp_path / "lib"
+        lib.mkdir()
+        (lib / "mycli.dart").write_text("// barrel\n")
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        (bin_dir / "mycli.dart").write_text("import '../lib/src/runner.dart';\n")
+        src = lib / "src"
+        src.mkdir()
+        (src / "runner.dart").write_text("void run() {}\n")
+
+        dead = find_dead_dart_modules(str(tmp_path))
+        assert os.path.join("lib", "src", "runner.dart") not in dead
+
+    def test_relative_imports_resolved(self, tmp_path):
+        """Relative imports are properly resolved across directories."""
+        (tmp_path / "pubspec.yaml").write_text(_PUBSPEC.format(name="mylib"))
+        lib = tmp_path / "lib"
+        lib.mkdir()
+        (lib / "mylib.dart").write_text("export 'src/a.dart';\n")
+        src = lib / "src"
+        src.mkdir()
+        (src / "a.dart").write_text("import '../src/b.dart';\n")
+        (src / "b.dart").write_text("import 'c.dart';\n")
+        (src / "c.dart").write_text("void c() {}\n")
+
+        dead = find_dead_dart_modules(str(tmp_path))
+        assert dead == []
+
+    def test_package_self_imports_resolved(self, tmp_path):
+        """package:self/... imports are resolved to lib/... paths."""
+        (tmp_path / "pubspec.yaml").write_text(_PUBSPEC.format(name="mylib"))
+        lib = tmp_path / "lib"
+        lib.mkdir()
+        (lib / "mylib.dart").write_text("export 'src/core.dart';\n")
+        src = lib / "src"
+        src.mkdir()
+        (src / "core.dart").write_text("import 'package:mylib/src/util.dart';\n")
+        (src / "util.dart").write_text("void util() {}\n")
+
+        dead = find_dead_dart_modules(str(tmp_path))
+        assert dead == []
+
+    def test_no_pubspec_returns_empty(self, tmp_path):
+        """Directory without pubspec.yaml returns empty list."""
+        lib = tmp_path / "lib"
+        lib.mkdir()
+        (lib / "something.dart").write_text("void x() {}\n")
+
+        dead = find_dead_dart_modules(str(tmp_path))
+        assert dead == []
+
+    def test_test_files_excluded(self, tmp_path):
+        """Test files are not flagged as dead even if unreachable."""
+        (tmp_path / "pubspec.yaml").write_text(_PUBSPEC.format(name="mylib"))
+        lib = tmp_path / "lib"
+        lib.mkdir()
+        (lib / "mylib.dart").write_text("export 'src/core.dart';\n")
+        src = lib / "src"
+        src.mkdir()
+        (src / "core.dart").write_text("void core() {}\n")
+        test_dir = tmp_path / "test"
+        test_dir.mkdir()
+        (test_dir / "core_test.dart").write_text(
+            "import 'package:mylib/mylib.dart';\nvoid main() {}\n"
+        )
+
+        dead = find_dead_dart_modules(str(tmp_path))
+        rel_paths = [os.path.basename(d) for d in dead]
+        assert "core_test.dart" not in rel_paths
+
+    def test_transitive_reachability(self, tmp_path):
+        """Files reachable transitively through exports/imports are not dead."""
+        (tmp_path / "pubspec.yaml").write_text(_PUBSPEC.format(name="mylib"))
+        lib = tmp_path / "lib"
+        lib.mkdir()
+        (lib / "mylib.dart").write_text("export 'src/a.dart';\n")
+        src = lib / "src"
+        src.mkdir()
+        (src / "a.dart").write_text("import 'b.dart';\n")
+        (src / "b.dart").write_text("import 'c.dart';\n")
+        (src / "c.dart").write_text("void c() {}\n")
+
+        dead = find_dead_dart_modules(str(tmp_path))
+        assert dead == []
+
+    def test_no_entry_points_returns_empty(self, tmp_path):
+        """Package with no barrel file and no bin/ returns empty."""
+        (tmp_path / "pubspec.yaml").write_text(_PUBSPEC.format(name="mylib"))
+        lib = tmp_path / "lib"
+        lib.mkdir()
+        src = lib / "src"
+        src.mkdir()
+        (src / "orphan.dart").write_text("void orphan() {}\n")
+
+        dead = find_dead_dart_modules(str(tmp_path))
+        assert dead == []
+
+    def test_external_package_imports_ignored(self, tmp_path):
+        """Imports of external packages do not affect the graph."""
+        (tmp_path / "pubspec.yaml").write_text(_PUBSPEC.format(name="mylib"))
+        lib = tmp_path / "lib"
+        lib.mkdir()
+        (lib / "mylib.dart").write_text("export 'src/core.dart';\n")
+        src = lib / "src"
+        src.mkdir()
+        (src / "core.dart").write_text(
+            "import 'package:flutter/material.dart';\n"
+            "import 'package:other_pkg/other.dart';\n"
+            "void core() {}\n"
+        )
+
+        dead = find_dead_dart_modules(str(tmp_path))
+        assert dead == []
+
+    def test_dart_sdk_imports_ignored(self, tmp_path):
+        """dart:xxx imports do not affect the graph."""
+        (tmp_path / "pubspec.yaml").write_text(_PUBSPEC.format(name="mylib"))
+        lib = tmp_path / "lib"
+        lib.mkdir()
+        (lib / "mylib.dart").write_text("export 'src/core.dart';\n")
+        src = lib / "src"
+        src.mkdir()
+        (src / "core.dart").write_text("import 'dart:io';\nvoid core() {}\n")
+
+        dead = find_dead_dart_modules(str(tmp_path))
+        assert dead == []
+
+    def test_multiple_bin_entry_points(self, tmp_path):
+        """Multiple bin/ scripts serve as entry points."""
+        (tmp_path / "pubspec.yaml").write_text(_PUBSPEC.format(name="mylib"))
+        lib = tmp_path / "lib"
+        lib.mkdir()
+        (lib / "mylib.dart").write_text("// barrel\n")
+        src = lib / "src"
+        src.mkdir()
+        (src / "a.dart").write_text("void a() {}\n")
+        (src / "b.dart").write_text("void b() {}\n")
+        (src / "orphan.dart").write_text("void orphan() {}\n")
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        (bin_dir / "tool_a.dart").write_text("import '../lib/src/a.dart';\n")
+        (bin_dir / "tool_b.dart").write_text("import '../lib/src/b.dart';\n")
+
+        dead = find_dead_dart_modules(str(tmp_path))
+        assert os.path.join("lib", "src", "a.dart") not in dead
+        assert os.path.join("lib", "src", "b.dart") not in dead
+        assert os.path.join("lib", "src", "orphan.dart") in dead
+
+    def test_test_file_pattern_excluded(self, tmp_path):
+        """Files matching *_test.dart outside test/ are excluded."""
+        (tmp_path / "pubspec.yaml").write_text(_PUBSPEC.format(name="mylib"))
+        lib = tmp_path / "lib"
+        lib.mkdir()
+        (lib / "mylib.dart").write_text("export 'src/core.dart';\n")
+        src = lib / "src"
+        src.mkdir()
+        (src / "core.dart").write_text("void core() {}\n")
+        (src / "core_test.dart").write_text("void testCore() {}\n")
+
+        dead = find_dead_dart_modules(str(tmp_path))
+        rel_paths = [os.path.basename(d) for d in dead]
+        assert "core_test.dart" not in rel_paths
+
+
+class TestDeadDartModulesCheck:
+    """Integration tests: dead-modules check for Dart projects."""
+
+    def _capture_checks(self):
+        """Register all checks on a mock app and return the captured dict."""
+        captured = {}
+
+        class MockApp:
+            _checks_enabled = True
+
+            def check(self, name):
+                def decorator(fn):
+                    captured[name] = fn
+                    return fn
+                return decorator
+
+        from rlsbl.checks import register_checks
+        register_checks(MockApp())
+        return captured
+
+    def test_dead_modules_dart_pass_clean(self, tmp_path):
+        """dead-modules passes for a Dart project with all files reachable."""
+        from rlsbl.context import ProjectContext
+
+        (tmp_path / "pubspec.yaml").write_text(_PUBSPEC.format(name="mylib"))
+        lib = tmp_path / "lib"
+        lib.mkdir()
+        (lib / "mylib.dart").write_text("export 'src/core.dart';\n")
+        src = lib / "src"
+        src.mkdir()
+        (src / "core.dart").write_text("void core() {}\n")
+
+        captured = self._capture_checks()
+        ctx = ProjectContext(project_root=Path(tmp_path), workspace_root=None, config={})
+        result = captured["dead-modules"](ctx)
+        assert result.status == "pass"
+
+    def test_dead_modules_dart_warn_unreachable(self, tmp_path):
+        """dead-modules warns for a Dart project with unreachable files."""
+        from rlsbl.context import ProjectContext
+
+        (tmp_path / "pubspec.yaml").write_text(_PUBSPEC.format(name="mylib"))
+        lib = tmp_path / "lib"
+        lib.mkdir()
+        (lib / "mylib.dart").write_text("export 'src/core.dart';\n")
+        src = lib / "src"
+        src.mkdir()
+        (src / "core.dart").write_text("void core() {}\n")
+        (src / "orphan.dart").write_text("void orphan() {}\n")
+
+        captured = self._capture_checks()
+        ctx = ProjectContext(project_root=Path(tmp_path), workspace_root=None, config={})
+        result = captured["dead-modules"](ctx)
+        assert result.status == "warn"
+        assert "1 dead module" in result.message
