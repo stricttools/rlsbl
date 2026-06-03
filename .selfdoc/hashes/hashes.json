@@ -144,7 +144,7 @@
     "description": "92c829699be90c4ea09e05c6e0ff3830b755bdd05be47a9427e51074cedcb831"
   },
   "en/cli-index.md": {
-    "content": "336426e7531d5d2a03b675eecc1630833a68813f7bb6a6934bc2e9ab9a4f6276",
+    "content": "803dd263006c32ec068fe9426e69e5149f1932dd4cd7f9a5763ce2493bf270db",
     "description": "0f01533cb10562a220aa70ea5e33e2500c0c1e4aa8e16b2f80c532449a68b7ea"
   },
   "en/cli-migrate.md": {
@@ -152,7 +152,7 @@
     "description": "ed5d34392baa022c09e4daec00277910a7cbc15b08d430083b3bff2510762617"
   },
   "en/cli-monorepo.md": {
-    "content": "a43af335f6a72ea6b47915c6aac42bfb8118f52350323b42074bfc2395550c02",
+    "content": "cfafafab0cb2a54b705545a29dfdc92399d6904c74d13ea6ebaf7cf327e52abe",
     "description": "752342d5365828fb0c019d6c4bf04f94b450d75f34ab4ac641fd3a028e963749"
   },
   "en/cli-pre-push-check.md": {
