@@ -5,6 +5,7 @@ across workspace projects. Uses import scanners to compare actual
 source imports against manifest-declared dependencies.
 """
 
+import json
 import os
 import re
 import tomllib
@@ -543,4 +544,234 @@ def find_dead_go_packages(project_dir: str) -> list[str]:
             rel_path = os.path.relpath(pkg_dir, project_dir)
             dead.append(rel_path)
 
+    return dead
+
+
+# ---------------------------------------------------------------------------
+# npm dead module detection (entry-point reachability)
+# ---------------------------------------------------------------------------
+
+# Extensions tried when resolving npm relative imports.
+_NPM_RESOLVE_EXTENSIONS = (".ts", ".tsx", ".js", ".mjs", ".cjs")
+
+# Index file names tried when a resolved path is a directory.
+_NPM_INDEX_NAMES = (
+    "index.ts", "index.tsx", "index.js", "index.mjs", "index.cjs",
+)
+
+# Source file extensions for npm projects.
+_NPM_SOURCE_EXTENSIONS = (".js", ".ts", ".mjs", ".cjs", ".tsx")
+
+
+def _resolve_npm_file(path: str) -> str | None:
+    """Resolve a single path to an existing file using npm conventions.
+
+    Tries the exact path, then with each extension appended, then as
+    a directory with index files. Also handles .js -> .ts mapping for
+    TypeScript projects.
+
+    Returns the absolute file path if found, None otherwise.
+    """
+    # Exact match
+    if os.path.isfile(path):
+        return path
+
+    # Try appending extensions
+    for ext in _NPM_RESOLVE_EXTENSIONS:
+        candidate = path + ext
+        if os.path.isfile(candidate):
+            return candidate
+
+    # .js -> .ts mapping: if path ends with .js but only .ts exists
+    if path.endswith(".js"):
+        ts_path = path[:-3] + ".ts"
+        if os.path.isfile(ts_path):
+            return ts_path
+        tsx_path = path[:-3] + ".tsx"
+        if os.path.isfile(tsx_path):
+            return tsx_path
+
+    # .jsx -> .tsx mapping
+    if path.endswith(".jsx"):
+        tsx_path = path[:-4] + ".tsx"
+        if os.path.isfile(tsx_path):
+            return tsx_path
+
+    # Directory -> index file
+    if os.path.isdir(path):
+        for index_name in _NPM_INDEX_NAMES:
+            candidate = os.path.join(path, index_name)
+            if os.path.isfile(candidate):
+                return candidate
+
+    return None
+
+
+def _collect_export_paths(value: object) -> list[str]:
+    """Recursively collect all file path strings from a package.json exports value.
+
+    The exports field can be:
+    - A string: "./dist/index.js"
+    - A dict with condition keys: {"import": "./dist/index.mjs", "require": "./dist/index.cjs"}
+    - A nested subpath map: {".": {"import": "..."}, "./sub": "..."}
+    - A list (rarely): ["./a.js", "./b.js"]
+
+    Collects all string values that look like file paths (start with ".").
+    """
+    paths: list[str] = []
+    if isinstance(value, str):
+        if value.startswith("."):
+            paths.append(value)
+    elif isinstance(value, dict):
+        for v in value.values():
+            paths.extend(_collect_export_paths(v))
+    elif isinstance(value, list):
+        for item in value:
+            paths.extend(_collect_export_paths(item))
+    return paths
+
+
+def _resolve_npm_entry_points(project_dir: str) -> set[str]:
+    """Extract and resolve entry point file paths from package.json.
+
+    Parses exports, main, and bin fields. Resolves each declared path
+    to an absolute filesystem path, handling .js -> .ts mapping and
+    directory -> index file resolution.
+
+    Returns a set of absolute file paths. Missing files are skipped.
+    """
+    pkg_path = os.path.join(project_dir, "package.json")
+    if not os.path.isfile(pkg_path):
+        return set()
+
+    try:
+        with open(pkg_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return set()
+
+    raw_paths: list[str] = []
+
+    # exports field
+    exports = data.get("exports")
+    if exports is not None:
+        raw_paths.extend(_collect_export_paths(exports))
+
+    # main field
+    main = data.get("main")
+    if isinstance(main, str):
+        raw_paths.append(main)
+
+    # bin field
+    bin_field = data.get("bin")
+    if isinstance(bin_field, str):
+        raw_paths.append(bin_field)
+    elif isinstance(bin_field, dict):
+        for v in bin_field.values():
+            if isinstance(v, str):
+                raw_paths.append(v)
+
+    # Resolve each path to an absolute file
+    entry_points: set[str] = set()
+    for raw in raw_paths:
+        abs_path = os.path.normpath(os.path.join(project_dir, raw))
+        resolved = _resolve_npm_file(abs_path)
+        if resolved is not None:
+            entry_points.add(os.path.abspath(resolved))
+
+    return entry_points
+
+
+def _build_npm_import_graph(project_dir: str) -> dict[str, set[str]]:
+    """Build a file-level import graph for an npm project.
+
+    Uses NpmAstLinter.scan_imports() to collect all imports, then
+    resolves relative imports to absolute file paths.
+
+    Returns a dict mapping each source file's absolute path to a set
+    of absolute paths it imports (only resolved relative imports).
+    """
+    from .lint.npm_ast import NpmAstLinter
+
+    linter = NpmAstLinter()
+    raw_imports = linter.scan_imports(project_dir)
+
+    graph: dict[str, set[str]] = {}
+    for specifier, filepath, _line in raw_imports:
+        # Only process relative imports
+        if not specifier.startswith("./") and not specifier.startswith("../"):
+            continue
+
+        abs_filepath = os.path.abspath(filepath)
+        if abs_filepath not in graph:
+            graph[abs_filepath] = set()
+
+        # Resolve the import relative to the importing file's directory
+        import_dir = os.path.dirname(abs_filepath)
+        abs_target = os.path.normpath(os.path.join(import_dir, specifier))
+        resolved = _resolve_npm_file(abs_target)
+        if resolved is not None:
+            graph[abs_filepath].add(os.path.abspath(resolved))
+
+    return graph
+
+
+def find_dead_npm_modules(project_dir: str) -> list[str]:
+    """Find npm source files unreachable from any package.json entry point.
+
+    A source file is "dead" if there is no path through the import graph
+    from any declared entry point (exports, main, bin) to that file.
+
+    Args:
+        project_dir: absolute path to the npm project root.
+
+    Returns:
+        sorted list of relative paths of dead source files.
+    """
+    project_dir = os.path.abspath(project_dir)
+
+    if not os.path.isfile(os.path.join(project_dir, "package.json")):
+        return []
+
+    entry_points = _resolve_npm_entry_points(project_dir)
+    if not entry_points:
+        # No entry points declared -- cannot determine reachability.
+        return []
+
+    import_graph = _build_npm_import_graph(project_dir)
+
+    # Collect all production source files
+    all_files = walk_source_files(project_dir, _NPM_SOURCE_EXTENSIONS, [])
+    production_files = {
+        os.path.abspath(f)
+        for f in all_files
+        if not _is_non_production_path(f, project_dir)
+    }
+
+    if not production_files:
+        return []
+
+    # BFS from entry points
+    reachable: set[str] = set()
+    queue = list(entry_points & production_files)
+    # Also seed with entry points that exist but may not be in
+    # production_files (e.g. if entry point is outside src/)
+    for ep in entry_points:
+        if ep not in reachable:
+            reachable.add(ep)
+            queue.append(ep)
+
+    while queue:
+        current = queue.pop()
+        for neighbor in import_graph.get(current, set()):
+            if neighbor not in reachable:
+                reachable.add(neighbor)
+                queue.append(neighbor)
+
+    # Dead = production files not reachable
+    dead = sorted(
+        os.path.relpath(f, project_dir)
+        for f in production_files
+        if f not in reachable
+    )
     return dead
