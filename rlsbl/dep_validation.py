@@ -9,6 +9,7 @@ import json
 import os
 import re
 import tomllib
+from dataclasses import dataclass
 
 from .import_scanners import (
     DartImportScanner,
@@ -775,3 +776,99 @@ def find_dead_npm_modules(project_dir: str) -> list[str]:
         if f not in reachable
     )
     return dead
+
+
+# ---------------------------------------------------------------------------
+# Workspace-level dead export detection
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class DeadWorkspacePackage:
+    """A workspace package with no workspace importers."""
+
+    name: str
+    severity: str  # "error" or "warn"
+    message: str
+
+
+def find_dead_workspace_packages(
+    projects: list[dict],
+    import_cache: dict[str, tuple[set[str], set[str]]],
+) -> list[DeadWorkspacePackage]:
+    """Find library packages that no other workspace package imports.
+
+    A library package is "dead" at the workspace level if its name does
+    not appear in any other project's lib_imports or test_imports sets.
+
+    Args:
+        projects: list of workspace project dicts (must have "name",
+            and optionally "library" and "dev_node" keys).
+        import_cache: mapping of project name to (lib_imports, test_imports)
+            as produced by _build_dep_import_cache in checks.py.
+
+    Returns:
+        list of DeadWorkspacePackage for packages with no workspace importers.
+    """
+    # Build reverse-import map: for each package name, which projects
+    # import it (split by lib vs test context).
+    lib_importers: dict[str, set[str]] = {}
+    test_importers: dict[str, set[str]] = {}
+
+    for proj in projects:
+        proj_name = proj["name"]
+        lib_imports, test_imports = import_cache.get(proj_name, (set(), set()))
+        for imported in lib_imports:
+            if imported == proj_name:
+                continue  # self-imports don't count
+            lib_importers.setdefault(imported, set()).add(proj_name)
+        for imported in test_imports:
+            if imported == proj_name:
+                continue
+            test_importers.setdefault(imported, set()).add(proj_name)
+
+    results: list[DeadWorkspacePackage] = []
+
+    for proj in projects:
+        name = proj["name"]
+
+        # Skip dev_node projects -- excluded from most checks
+        if proj.get("dev_node"):
+            continue
+
+        # Skip non-library projects (apps, CLIs) -- they are entry points
+        # that consume but aren't consumed.
+        if not proj.get("library"):
+            continue
+
+        has_lib_importers = bool(lib_importers.get(name))
+        has_test_importers = bool(test_importers.get(name))
+
+        if has_lib_importers:
+            # Imported in production code by at least one sibling -- alive
+            continue
+
+        if has_test_importers and not has_lib_importers:
+            # Only imported in tests by workspace siblings
+            importers = sorted(test_importers[name])
+            results.append(DeadWorkspacePackage(
+                name=name,
+                severity="warn",
+                message=(
+                    f"library '{name}' is only imported in test code by "
+                    f"workspace siblings ({', '.join(importers)})"
+                ),
+            ))
+            continue
+
+        # Zero workspace importers. Published libraries might still be
+        # consumed externally, so this is a warning not an error.
+        results.append(DeadWorkspacePackage(
+            name=name,
+            severity="warn",
+            message=(
+                f"library '{name}' is not imported by any workspace package"
+            ),
+        ))
+
+    return results
