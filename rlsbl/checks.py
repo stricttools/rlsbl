@@ -1052,10 +1052,19 @@ def register_checks(app):
         if cached is not None:
             return cached
 
-        from .dep_validation import _get_imported_workspace_packages
+        from .dep_validation import _get_imported_workspace_packages, _read_go_module_path
 
         root = str(ctx.workspace_root)
         workspace_names = {p["name"] for p in ctx.projects}
+
+        # Build Go module path mapping for all Go projects in the workspace
+        module_path_map: dict[str, str] = {}
+        for proj in ctx.projects:
+            project_dir = os.path.join(root, proj["path"])
+            mod_path = _read_go_module_path(project_dir)
+            if mod_path is not None:
+                module_path_map[proj["name"]] = mod_path
+
         cache = {}
         for proj in ctx.projects:
             project_dir = os.path.join(root, proj["path"])
@@ -1063,6 +1072,7 @@ def register_checks(app):
             cache[proj["name"]] = _get_imported_workspace_packages(
                 project_dir, workspace_names,
                 exclude_dirs=exclude or None,
+                module_path_map=module_path_map or None,
             )
         ctx._dep_import_cache = cache
         return cache
