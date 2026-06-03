@@ -15,6 +15,7 @@ from .import_scanners import (
     PythonImportScanner,
     _NON_PRODUCTION_PATTERNS,
 )
+from .lint.go_ast import scan_imports as _go_scan_imports
 from .lint.utils import walk_source_files
 from .workspace import WORKSPACE_DIR
 
@@ -444,5 +445,102 @@ def find_dead_modules(project_dir: str) -> list[str]:
 
         rel_path = os.path.relpath(filepath, project_dir)
         dead.append(rel_path)
+
+    return dead
+
+
+def _read_go_module_path(project_dir: str) -> str | None:
+    """Read the module path from go.mod.
+
+    Returns None if go.mod does not exist or cannot be parsed.
+    """
+    go_mod = os.path.join(project_dir, "go.mod")
+    if not os.path.isfile(go_mod):
+        return None
+    try:
+        with open(go_mod, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("module "):
+                    return line[len("module "):].strip()
+    except (OSError, UnicodeDecodeError):
+        pass
+    return None
+
+
+def _go_package_dir(filepath: str) -> str:
+    """Return the directory of a Go file (its package directory)."""
+    return os.path.dirname(filepath)
+
+
+def find_dead_go_packages(project_dir: str) -> list[str]:
+    """Find Go internal packages not referenced by any non-test code.
+
+    A Go internal package is dead if no non-test .go file outside that
+    package imports it. Only packages under ``internal/`` subdirectories
+    are checked, since those are the packages with restricted visibility
+    in Go's module system.
+
+    Args:
+        project_dir: absolute path to the Go project root (where go.mod lives).
+
+    Returns:
+        list of relative paths of dead internal packages
+        (e.g. ["internal/unused"]).
+    """
+    project_dir = os.path.abspath(project_dir)
+
+    module_path = _read_go_module_path(project_dir)
+    if module_path is None:
+        return []
+
+    # Find all .go files in the project
+    all_go_files = walk_source_files(project_dir, (".go",), [])
+    if not all_go_files:
+        return []
+
+    # Identify internal package directories and their import paths
+    internal_pkg_dirs: dict[str, str] = {}  # abs_dir -> full_import_path
+    for filepath in all_go_files:
+        pkg_dir = _go_package_dir(filepath)
+        if pkg_dir in internal_pkg_dirs:
+            continue
+        rel_dir = os.path.relpath(pkg_dir, project_dir)
+        parts = rel_dir.split(os.sep)
+        if "internal" in parts:
+            import_path = module_path + "/" + rel_dir.replace(os.sep, "/")
+            internal_pkg_dirs[pkg_dir] = import_path
+
+    if not internal_pkg_dirs:
+        return []
+
+    # Collect imports per non-test .go file, keyed by the file's package dir
+    # file_imports: list of (pkg_dir, set_of_import_paths) for non-test files
+    file_imports: list[tuple[str, set[str]]] = []
+    for filepath in all_go_files:
+        if os.path.basename(filepath).endswith("_test.go"):
+            continue
+        pkg_dir_of_file = _go_package_dir(filepath)
+        imports = {ip for ip, _fp, _ln in _go_scan_imports(filepath)}
+        file_imports.append((pkg_dir_of_file, imports))
+
+    # Check each internal package: is it imported by any non-test file
+    # outside its own directory?
+    dead = []
+    for pkg_dir, import_path in sorted(internal_pkg_dirs.items(), key=lambda x: x[1]):
+        is_referenced = False
+        for file_pkg_dir, imports in file_imports:
+            if file_pkg_dir == pkg_dir:
+                continue  # same package -- doesn't count
+            for imp in imports:
+                if imp == import_path or imp.startswith(import_path + "/"):
+                    is_referenced = True
+                    break
+            if is_referenced:
+                break
+
+        if not is_referenced:
+            rel_path = os.path.relpath(pkg_dir, project_dir)
+            dead.append(rel_path)
 
     return dead
