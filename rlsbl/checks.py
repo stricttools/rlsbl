@@ -16,6 +16,18 @@ from strictcli import CheckResult
 
 from .check_context import WorkspaceCheckContext
 
+# Manifest filenames used by workspace-unregistered and workspace-stale-entries
+# to detect project directories. Covers all 14 release targets.
+PROJECT_MANIFESTS = (
+    "go.mod", "pyproject.toml", "package.json", "Cargo.toml",
+    "mix.exs", "deno.json", "build.zig.zon",
+    "pubspec.yaml", "Package.swift", "build.gradle.kts", "build.gradle", "pom.xml",
+    "version.json", "pgdesign.toml", "selfdoc.json", "Dockerfile",
+)
+
+# Universal project indicator: every scaffolded rlsbl project has this file.
+RLSBL_CONFIG = os.path.join(".rlsbl", "config.json")
+
 
 def _resolve_version_and_tag(ctx):
     """Detect version and tag from project targets rooted at *ctx*.
@@ -679,11 +691,6 @@ def register_checks(app):
         except (subprocess.CalledProcessError, FileNotFoundError):
             pass
 
-        project_manifests = (
-            "go.mod", "pyproject.toml", "package.json", "Cargo.toml",
-            "mix.exs", "deno.json", "build.zig.zon",
-        )
-
         found_project_dirs = set()
         try:
             entries = os.listdir(root)
@@ -698,7 +705,11 @@ def register_checks(app):
             dir_path = os.path.join(root, entry)
             if not os.path.isdir(dir_path):
                 continue
-            for manifest in project_manifests:
+            # Check for rlsbl scaffolding (universal indicator)
+            if os.path.isfile(os.path.join(dir_path, RLSBL_CONFIG)):
+                found_project_dirs.add(entry)
+                continue
+            for manifest in PROJECT_MANIFESTS:
                 if os.path.isfile(os.path.join(dir_path, manifest)):
                     found_project_dirs.add(entry)
                     break
@@ -720,19 +731,17 @@ def register_checks(app):
 
         root = str(ctx.workspace_root)
 
-        project_manifests = (
-            "go.mod", "pyproject.toml", "package.json", "Cargo.toml",
-            "mix.exs", "deno.json", "build.zig.zon",
-        )
-
         stale = []
         for proj in ctx.projects:
             dir_path = os.path.join(root, proj["path"])
             if not os.path.isdir(dir_path):
                 stale.append(proj["path"])
                 continue
+            # Check for rlsbl scaffolding (universal indicator)
+            if os.path.isfile(os.path.join(dir_path, RLSBL_CONFIG)):
+                continue
             has_manifest = any(
-                os.path.isfile(os.path.join(dir_path, m)) for m in project_manifests
+                os.path.isfile(os.path.join(dir_path, m)) for m in PROJECT_MANIFESTS
             )
             if not has_manifest:
                 stale.append(proj["path"])
