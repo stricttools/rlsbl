@@ -10,6 +10,7 @@ import tomlkit
 from conftest import make_commit, make_workspace, run_git
 
 from rlsbl.commands.monorepo import _cmd_batch_release_init
+from rlsbl.commands.monorepo.batch_release_init import _render_commented_section
 from rlsbl.release_file import get_batch_release_file_path
 
 
@@ -413,3 +414,50 @@ class TestCommentOutZeroCommits:
         assert "stale" not in data.get("packages", {})
         assert "# stale: no unreleased commits since stale@v0.5.0" in raw
         assert "# [packages.stale]" in raw
+
+
+class TestRenderCommentedSection:
+    """Regression tests for _render_commented_section.
+
+    v0.57.1 fixed a bug where tomlkit.dumps() received a raw list instead
+    of a tomlkit item, crashing on Python 3.14. These tests verify the
+    function produces valid commented TOML output for various inputs.
+    """
+
+    def test_returns_string_with_comment_prefix(self):
+        """Output is a string where every line starts with '# '."""
+        result = _render_commented_section("my-pkg", ["npm"], "no changes")
+        assert isinstance(result, str)
+        for line in result.splitlines():
+            assert line.startswith("# "), f"Line missing comment prefix: {line!r}"
+
+    def test_single_target_include_rendered(self):
+        """A single-element include list is rendered correctly."""
+        result = _render_commented_section("my-pkg", ["pypi"], "some reason")
+        assert '# include = ["pypi"]' in result
+        assert "# [packages.my-pkg]" in result
+        assert "# my-pkg: some reason" in result
+
+    def test_multiple_targets_include_rendered(self):
+        """A multi-element include list is rendered as a TOML array."""
+        result = _render_commented_section("widget", ["npm", "pypi", "docker"], "tagged")
+        assert "# [packages.widget]" in result
+        # The include line must contain all three targets in array syntax
+        include_line = [l for l in result.splitlines() if "include" in l][0]
+        assert "npm" in include_line
+        assert "pypi" in include_line
+        assert "docker" in include_line
+
+    def test_empty_target_list_does_not_crash(self):
+        """An empty target list produces valid output (edge case)."""
+        result = _render_commented_section("empty", [], "no targets")
+        assert isinstance(result, str)
+        assert "# include = []" in result
+
+    def test_standard_fields_present(self):
+        """All standard fields (bump, description, context, exclude) appear."""
+        result = _render_commented_section("pkg", ["npm"], "reason")
+        assert '# bump = ""' in result
+        assert '# description = ""' in result
+        assert '# context = ""' in result
+        assert "# exclude = []" in result
