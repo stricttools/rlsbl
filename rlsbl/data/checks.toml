@@ -300,6 +300,14 @@ pure = true
 needs_network = false
 depends_on = []
 
+[checks.circular-deps]
+tags = ["quality"]
+severity = "warn"
+fast = false
+pure = true
+needs_network = false
+depends_on = []
+
 [checks.scaffold-unreplaced-vars]
 tags = ["quality"]
 severity = "error"
