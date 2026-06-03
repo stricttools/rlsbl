@@ -119,7 +119,7 @@ def _render_commented_section(name, target_names, reason):
         "# bump = \"\"",
         "# description = \"\"",
         "# context = \"\"",
-        f"# include = {tomlkit.dumps(tomlkit.item(target_names)).strip()}",
+        f"# include = {tomlkit.item(target_names).as_string()}",
         "# exclude = []",
     ]
     return "\n".join(lines)
