@@ -286,6 +286,41 @@ class TestTargetRegistryIntegration:
             TARGETS["go"].publish(d, "1.0.0", _ctx(d))
 
 
+class TestDetectionFiles:
+    """Tests that detection_files is the single source of truth for PROJECT_MANIFESTS."""
+
+    def test_project_manifests_covers_all_detection_files(self):
+        """PROJECT_MANIFESTS includes every target's detection_files."""
+        from rlsbl.checks import PROJECT_MANIFESTS
+        manifests = set(PROJECT_MANIFESTS)
+        for name, target in TARGETS.items():
+            for f in target.detection_files:
+                assert f in manifests, (
+                    f"detection_files entry {f!r} from target {name!r} "
+                    f"missing in PROJECT_MANIFESTS"
+                )
+
+    def test_project_manifests_only_from_detection_files(self):
+        """PROJECT_MANIFESTS contains nothing beyond what targets declare."""
+        from rlsbl.checks import PROJECT_MANIFESTS
+        expected = set()
+        for target in TARGETS.values():
+            expected.update(target.detection_files)
+        assert set(PROJECT_MANIFESTS) == expected
+
+    def test_detection_files_tuple_type(self):
+        """Every target's detection_files is a tuple of strings."""
+        for name, target in TARGETS.items():
+            df = target.detection_files
+            assert isinstance(df, tuple), (
+                f"{name}.detection_files is {type(df).__name__}, expected tuple"
+            )
+            for entry in df:
+                assert isinstance(entry, str), (
+                    f"{name}.detection_files contains {type(entry).__name__}, expected str"
+                )
+
+
 class TestDetectTargetsConfig:
     """Tests for config-driven target detection via .rlsbl/config.json."""
 
