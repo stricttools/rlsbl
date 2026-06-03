@@ -1,8 +1,0 @@
-# Version bump type: patch, minor, or major
-bump = "minor"
-# Short description of this release (required)
-description = "New checks (license-file, scaffold-unreplaced-vars, dead-modules-npm), batch release-init improvements, and scaffold/release fixes"
-# Optional context explaining why these changes were made
-context = "LICENSE is no longer scaffold-managed -- projects own their LICENSE file, enforced by the new license-file check. Batch release-init now supports Flutter targets and includes TOML comments. Several fixes for retry.toml cleanup, bare scaffold on plain targets, workspace-unregistered false positives, and shared release config validation."
-include = ["npm", "pypi", "docs"]
-exclude = []
