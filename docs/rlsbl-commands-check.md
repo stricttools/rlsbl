@@ -9,4 +9,4 @@ nav_order: 13
 
 # rlsbl.commands.check
 
-:-: ref path="rlsbl.commands.check"
+:-: ref path="rlsbl.commands.check" lang="python"

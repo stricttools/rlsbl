@@ -9,4 +9,4 @@ nav_order: 8
 
 # rlsbl.changelog.validate
 
-:-: ref path="rlsbl.changelog.validate"
+:-: ref path="rlsbl.changelog.validate" lang="python"

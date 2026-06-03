@@ -9,4 +9,4 @@ nav_order: 19
 
 # rlsbl.commands.init_cmd
 
-:-: ref path="rlsbl.commands.init_cmd"
+:-: ref path="rlsbl.commands.init_cmd" lang="python"

@@ -9,4 +9,4 @@ nav_order: 12
 
 # rlsbl.commands.changelog_cmd
 
-:-: ref path="rlsbl.commands.changelog_cmd"
+:-: ref path="rlsbl.commands.changelog_cmd" lang="python"

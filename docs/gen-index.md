@@ -31,6 +31,7 @@ order: 90
 - [rlsbl.commands.init_cmd](rlsbl-commands-init_cmd.html)
 - [rlsbl.commands.migrate](rlsbl-commands-migrate.html)
 - [rlsbl.commands.monorepo.batch_release](rlsbl-commands-monorepo-batch_release.html)
+- [rlsbl.commands.monorepo.batch_release_init](rlsbl-commands-monorepo-batch_release_init.html)
 - [rlsbl.commands.monorepo.commands](rlsbl-commands-monorepo-commands.html)
 - [rlsbl.commands.monorepo.graph](rlsbl-commands-monorepo-graph.html)
 - [rlsbl.commands.monorepo.impact](rlsbl-commands-monorepo-impact.html)

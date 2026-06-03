@@ -9,4 +9,4 @@ nav_order: 14
 
 # rlsbl.commands.commit_cmd
 
-:-: ref path="rlsbl.commands.commit_cmd"
+:-: ref path="rlsbl.commands.commit_cmd" lang="python"

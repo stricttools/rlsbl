@@ -9,4 +9,4 @@ nav_order: 20
 
 # rlsbl.commands.migrate
 
-:-: ref path="rlsbl.commands.migrate"
+:-: ref path="rlsbl.commands.migrate" lang="python"

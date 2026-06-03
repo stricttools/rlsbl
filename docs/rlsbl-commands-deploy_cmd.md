@@ -9,4 +9,4 @@ nav_order: 15
 
 # rlsbl.commands.deploy_cmd
 
-:-: ref path="rlsbl.commands.deploy_cmd"
+:-: ref path="rlsbl.commands.deploy_cmd" lang="python"

@@ -9,4 +9,4 @@ nav_order: 5
 
 # rlsbl.changelog.generate
 
-:-: ref path="rlsbl.changelog.generate"
+:-: ref path="rlsbl.changelog.generate" lang="python"

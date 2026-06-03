@@ -9,4 +9,4 @@ nav_order: 18
 
 # rlsbl.commands.edit_release
 
-:-: ref path="rlsbl.commands.edit_release"
+:-: ref path="rlsbl.commands.edit_release" lang="python"

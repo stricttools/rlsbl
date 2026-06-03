@@ -9,4 +9,4 @@ nav_order: 10
 
 # rlsbl.checks
 
-:-: ref path="rlsbl.checks"
+:-: ref path="rlsbl.checks" lang="python"

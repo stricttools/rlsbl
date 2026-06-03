@@ -1,14 +1,17 @@
 {
-  "version": "0.54.2",
+  "version": "0.55.0",
   "base_url": "https://rlsbl.smmh.dev",
   "source": [
-    {"path": "rlsbl/", "language": "python"}
+    {
+      "path": "rlsbl/",
+      "language": "python"
+    }
   ],
   "docs": "docs/",
   "output": "docs/_build/",
   "versions": [
     {
-      "version": "0.54.2",
+      "version": "0.55.0",
       "indexed": true
     }
   ],

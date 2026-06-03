@@ -9,4 +9,4 @@ nav_order: 21
 
 # rlsbl.commands.monorepo.batch_release
 
-:-: ref path="rlsbl.commands.monorepo.batch_release"
+:-: ref path="rlsbl.commands.monorepo.batch_release" lang="python"

@@ -2,9 +2,22 @@
 
 # Changelog
 
-## 0.54.2
+## 0.55.0
 
-Batch release description enforcement, scan cache optimization, lint exclusion todo cleanup
+Monorepo release-init command, Go dead-modules detection, scaffold and workspace check fixes
+
+### Features
+
+- **New command.** `monorepo release-init` scaffolds a batch release file with per-package sections for all workspace projects.
+- **New feature.** `dead-modules` check now supports Go projects. Detects unreferenced `internal/` packages via tree-sitter import scanning.
+
+### Fixes
+
+- **Fix.** Template sheltering now handles dotted placeholders like `{{zig.projectName}}`, preventing YAML corruption in multi-target scaffold.
+- **Fix.** Scaffold with explicit `--target` now uses the current directory as project root, fixing dev_node detection for plain-target projects in monorepos.
+- **Fix.** Workspace stale-entries and unregistered checks now recognize all 16 target manifest types plus `.rlsbl/config.json` as a universal project indicator.
+
+## 0.54.2
 
 ### Fixes
 

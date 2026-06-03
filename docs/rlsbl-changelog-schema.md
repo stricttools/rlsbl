@@ -9,4 +9,4 @@ nav_order: 7
 
 # rlsbl.changelog.schema
 
-:-: ref path="rlsbl.changelog.schema"
+:-: ref path="rlsbl.changelog.schema" lang="python"

@@ -9,4 +9,4 @@ nav_order: 6
 
 # rlsbl.changelog.resolve
 
-:-: ref path="rlsbl.changelog.resolve"
+:-: ref path="rlsbl.changelog.resolve" lang="python"

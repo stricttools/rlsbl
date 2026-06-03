@@ -9,4 +9,4 @@ nav_order: 16
 
 # rlsbl.commands.dev
 
-:-: ref path="rlsbl.commands.dev"
+:-: ref path="rlsbl.commands.dev" lang="python"

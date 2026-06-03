@@ -9,4 +9,4 @@ nav_order: 17
 
 # rlsbl.commands.discover
 
-:-: ref path="rlsbl.commands.discover"
+:-: ref path="rlsbl.commands.discover" lang="python"
