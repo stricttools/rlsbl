@@ -62,10 +62,24 @@ def _cmd_batch_release_init(project_root):
         target_names = [e.name for e in entries]
 
         pkg_table = tomlkit.table()
+        pkg_table.add(tomlkit.comment("Version bump type: patch, minor, or major"))
         pkg_table.add("bump", "")
+        pkg_table.add(tomlkit.comment("Short description of this release (required)"))
         pkg_table.add("description", "")
+        pkg_table.add(tomlkit.comment("Optional context explaining why these changes were made"))
+        pkg_table.add("context", "")
         pkg_table.add("include", target_names)
         pkg_table.add("exclude", [])
+
+        # Add per-target config sections for Flutter targets
+        flutter_targets = [n for n in target_names if "flutter" in n]
+        if flutter_targets:
+            targets_table = tomlkit.table(is_super_table=True)
+            for ft in flutter_targets:
+                t = tomlkit.table()
+                t.add("mode", "build")
+                targets_table.add(ft, t)
+            pkg_table.add("targets", targets_table)
 
         packages.add(proj["name"], pkg_table)
         any_added = True
