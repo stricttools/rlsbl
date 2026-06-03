@@ -509,6 +509,49 @@ class TestReleaseRetry(unittest.TestCase):
             self.assertIn("ref must be set", stderr_output)
             self.assertIn("rlsbl release run", stderr_output)
 
+    @patch("rlsbl.commands.release_retry.run")
+    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.TARGETS")
+    @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
+    @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
+    @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
+    def test_existing_invalid_retry_toml_cleaned_up(self, _gh_inst, _gh_auth, _ws_root,
+                                                     mock_targets_dict, mock_detect,
+                                                     mock_run):
+        """When retry_config is None but retry.toml exists with invalid content,
+        run_cmd deletes the file and shows the hint message."""
+        import tempfile
+
+        target = self._make_mock_target("0.41.7")
+        entry = self._make_mock_entry()
+        mock_detect.return_value = [entry]
+        mock_targets_dict.__getitem__ = lambda self, key: target
+        mock_run.side_effect = self._run_side_effect
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            retry_path = os.path.join(tmpdir, "retry.toml")
+            # Create an invalid retry.toml (empty ref)
+            with open(retry_path, "w") as f:
+                f.write('version = "0.41.7"\ndispatch = ["ci.yml"]\nref = ""\n')
+
+            with patch("rlsbl.commands.release_retry.get_retry_file_path", return_value=retry_path):
+                with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
+                    with self.assertRaises(SystemExit) as ctx:
+                        # Pass retry_config=None so run_cmd hits the internal
+                        # read path (file exists but wasn't read by caller)
+                        run_cmd(None, {"yes": True}, project_root=".")
+
+            self.assertEqual(ctx.exception.code, 1)
+
+            # retry.toml must NOT exist on disk after the error
+            self.assertFalse(os.path.exists(retry_path),
+                             "retry.toml should be deleted after internal read validation failure")
+
+            # Error message should mention `release run` as the alternative
+            stderr_output = mock_stderr.getvalue()
+            self.assertIn("ref must be set", stderr_output)
+            self.assertIn("rlsbl release run", stderr_output)
+
     @patch("rlsbl.commands.release_retry.read_retry_file")
     @patch("rlsbl.commands.release_retry.detect_targets")
     @patch("rlsbl.commands.release_retry.TARGETS")
@@ -988,6 +1031,49 @@ class TestRunIdCapture(unittest.TestCase):
                 run_cmd(config, {"yes": True, "watch": True}, project_root=".")
 
             mock_watch.assert_called_once_with(None, [], {"run-id": ["1001", "1002", "1003"]})
+
+
+class TestCmdReleaseRetryCleanup(unittest.TestCase):
+    """Tests for the cmd_release_retry entry point in __init__.py.
+
+    The __init__.py handler reads retry.toml before calling run_cmd.
+    When read_retry_file raises ValueError, the handler must delete the
+    invalid file and show a hint message.
+    """
+
+    def test_init_handler_cleans_up_invalid_retry_toml(self):
+        """cmd_release_retry deletes retry.toml and shows hint when read fails."""
+        import tempfile
+        from rlsbl import cmd_release_retry
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            retry_path = os.path.join(tmpdir, "retry.toml")
+            # Create an invalid retry.toml (empty ref)
+            with open(retry_path, "w") as f:
+                f.write('version = "0.41.7"\ndispatch = ["ci.yml"]\nref = ""\n')
+
+            with patch("rlsbl._require_sub_project_root", return_value="."), \
+                 patch("rlsbl.release_file.get_retry_file_path", return_value=retry_path):
+                with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
+                    with self.assertRaises(SystemExit) as ctx:
+                        cmd_release_retry(
+                            dry_run=False,
+                            yes=True,
+                            quiet=True,
+                            watch=False,
+                            no_watch=True,
+                        )
+
+            self.assertEqual(ctx.exception.code, 1)
+
+            # retry.toml must NOT exist on disk after the error
+            self.assertFalse(os.path.exists(retry_path),
+                             "retry.toml should be deleted by __init__.py handler")
+
+            # Error message should include both the error and the hint
+            stderr_output = mock_stderr.getvalue()
+            self.assertIn("ref must be set", stderr_output)
+            self.assertIn("rlsbl release run", stderr_output)
 
 
 if __name__ == "__main__":
