@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.monorepo.batch_release_init
-description: "Batch release init command: scaffold a batch release file for all workspace projects."
+description: "Scaffold a batch release file for all workspace projects, auto-detecting targets and commenting out packages with no unreleased commits."
 generated: true
 nav_group: "API Reference"
 nav_order: 22
