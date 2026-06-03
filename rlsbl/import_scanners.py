@@ -9,6 +9,7 @@ import re
 import sys
 from dataclasses import dataclass
 
+from .lint.go_ast import scan_imports as _go_scan_imports
 from .lint.npm_ast import NpmAstLinter
 from .lint.python_ast import PythonAstLinter
 from .lint.utils import walk_source_files
@@ -312,3 +313,107 @@ class NpmImportScanner:
                 ))
 
         return results
+
+
+class GoImportScanner:
+    """Scan Go source files for workspace-relevant imports.
+
+    Uses the tree-sitter-based scanner from the Go lint system, then
+    post-processes to filter to imports matching other workspace projects'
+    Go module paths.
+    """
+
+    def scan(
+        self,
+        project_path: str,
+        workspace_names: set[str],
+        exclude_dirs: list[str] | None = None,
+        *,
+        module_path_map: dict[str, str] | None = None,
+    ) -> list[ImportInfo]:
+        """Scan project_path for Go imports matching workspace members.
+
+        Args:
+            project_path: absolute path to the project root.
+            workspace_names: set of workspace member package names.
+            exclude_dirs: directory paths to skip during the walk
+                (relative to project_path or absolute).
+            module_path_map: mapping of workspace project name to its
+                Go module path (from go.mod). Only Go projects appear
+                in this map. Required for Go import detection.
+
+        Returns:
+            list of ImportInfo for imports that match workspace members.
+        """
+        project_path = os.path.abspath(project_path)
+
+        if not module_path_map:
+            return []
+
+        # Read this project's own module path to exclude self-imports
+        own_module_path = self._read_module_path(project_path)
+
+        # Build reverse lookup: module_path -> workspace_name
+        # Only include other projects (not self)
+        module_to_name: dict[str, str] = {}
+        for ws_name, mod_path in module_path_map.items():
+            if mod_path == own_module_path:
+                continue
+            module_to_name[mod_path] = ws_name
+
+        if not module_to_name:
+            return []
+
+        go_files = walk_source_files(
+            project_path, (".go",), [], exclude_dirs=exclude_dirs,
+        )
+
+        results = []
+        for filepath in go_files:
+            raw_imports = _go_scan_imports(filepath)
+            is_test = _is_test_context(filepath, project_path)
+
+            for import_path, _fp, line_number in raw_imports:
+                matched_name = self._match_workspace_import(
+                    import_path, module_to_name,
+                )
+                if matched_name is not None:
+                    results.append(ImportInfo(
+                        package_name=matched_name,
+                        file_path=filepath,
+                        line_number=line_number,
+                        is_test_context=is_test,
+                    ))
+
+        return results
+
+    @staticmethod
+    def _read_module_path(project_path: str) -> str | None:
+        """Read the module path from go.mod."""
+        go_mod = os.path.join(project_path, "go.mod")
+        if not os.path.isfile(go_mod):
+            return None
+        try:
+            with open(go_mod, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("module "):
+                        return line[len("module "):].strip()
+        except (OSError, UnicodeDecodeError):
+            pass
+        return None
+
+    @staticmethod
+    def _match_workspace_import(
+        import_path: str,
+        module_to_name: dict[str, str],
+    ) -> str | None:
+        """Check if an import path belongs to a workspace sibling.
+
+        An import matches a workspace module if the import path equals
+        the module path or starts with it followed by '/'.
+        """
+        for mod_path, ws_name in module_to_name.items():
+            if import_path == mod_path or import_path.startswith(mod_path + "/"):
+                return ws_name
+        return None
