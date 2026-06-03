@@ -629,6 +629,103 @@ class TestWorkspaceStaleEntriesCheck:
 
 
 # ---------------------------------------------------------------------------
+# Functional tests: workspace-unregistered check
+# ---------------------------------------------------------------------------
+
+class TestWorkspaceUnregisteredCheck:
+    """The workspace-unregistered check detects dirs with manifests not in workspace.toml."""
+
+    def test_private_package_json_not_flagged(self, mock_git_repo):
+        """Directory with private package.json is NOT flagged as unregistered."""
+        # Create a private npm workspace root (e.g., pnpm workspace root)
+        web_dir = mock_git_repo / "web"
+        web_dir.mkdir()
+        (web_dir / "package.json").write_text(json.dumps({
+            "name": "web-workspace",
+            "private": True,
+            "workspaces": ["packages/*"],
+        }))
+        ctx = WorkspaceCheckContext(
+            project_root=mock_git_repo,
+            workspace_root=mock_git_repo,
+            config={},
+            projects=[],
+            graph=None,
+        )
+        result = app._check_defs["workspace-unregistered"].impl(ctx)
+        assert result.status == "pass"
+
+    def test_non_private_package_json_flagged(self, mock_git_repo):
+        """Directory with non-private package.json IS flagged as unregistered."""
+        lib_dir = mock_git_repo / "mylib"
+        lib_dir.mkdir()
+        (lib_dir / "package.json").write_text(json.dumps({
+            "name": "mylib",
+            "version": "1.0.0",
+        }))
+        ctx = WorkspaceCheckContext(
+            project_root=mock_git_repo,
+            workspace_root=mock_git_repo,
+            config={},
+            projects=[],
+            graph=None,
+        )
+        result = app._check_defs["workspace-unregistered"].impl(ctx)
+        assert result.status == "fail"
+        assert any("mylib" in d for d in result.details)
+
+    def test_parent_of_registered_path_not_flagged(self, mock_git_repo):
+        """Directory that is a parent of a registered project path is NOT flagged."""
+        # Create web/ with a package.json (would normally be flagged)
+        web_dir = mock_git_repo / "web"
+        web_dir.mkdir()
+        (web_dir / "package.json").write_text(json.dumps({
+            "name": "web-root",
+            "version": "1.0.0",
+        }))
+        # Register web/frontend as a project (making web/ a parent)
+        frontend_dir = web_dir / "frontend"
+        frontend_dir.mkdir()
+        (frontend_dir / "package.json").write_text(json.dumps({
+            "name": "frontend",
+            "version": "1.0.0",
+        }))
+        ctx = WorkspaceCheckContext(
+            project_root=mock_git_repo,
+            workspace_root=mock_git_repo,
+            config={},
+            projects=[{"path": "web/frontend", "name": "frontend"}],
+            graph=None,
+        )
+        result = app._check_defs["workspace-unregistered"].impl(ctx)
+        assert result.status == "pass"
+
+    def test_non_parent_dir_still_flagged(self, mock_git_repo):
+        """Directory that is NOT a parent of any registered path IS flagged."""
+        # Create two dirs: one registered, one not
+        registered_dir = mock_git_repo / "backend"
+        registered_dir.mkdir()
+        (registered_dir / "pyproject.toml").write_text('[project]\nname = "backend"\n')
+
+        unrelated_dir = mock_git_repo / "tools"
+        unrelated_dir.mkdir()
+        (unrelated_dir / "pyproject.toml").write_text('[project]\nname = "tools"\n')
+
+        ctx = WorkspaceCheckContext(
+            project_root=mock_git_repo,
+            workspace_root=mock_git_repo,
+            config={},
+            projects=[{"path": "backend", "name": "backend"}],
+            graph=None,
+        )
+        result = app._check_defs["workspace-unregistered"].impl(ctx)
+        assert result.status == "fail"
+        assert any("tools" in d for d in result.details)
+        # backend should NOT be in the unregistered list (it's registered)
+        assert not any("backend" in d for d in result.details)
+
+
+# ---------------------------------------------------------------------------
 # Functional tests: private-hook-stale check
 # ---------------------------------------------------------------------------
 
