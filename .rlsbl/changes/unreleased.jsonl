@@ -5,3 +5,4 @@
 {"commits":["58217cee6a0424f184aa56ab30c60dc76af4b5c9"],"user_facing":true,"description":"**Scaffold auto-commit and hook install from sub-directories.** Scaffold auto-commit and pre-push hook installation now work correctly when run from monorepo sub-project directories.","type":"fix"}
 {"commits":["9e17f6dcc084098072e3de1a853375c629db6d6a"],"user_facing":true,"description":"**Release file commits auto-exempted.** Commits that only touch `.rlsbl/releases/` files are now automatically exempted from changelog coverage checks.","type":"fix"}
 {"commits":["3b632f818cb6f8c4c1982edb79e758118fdf00bd","83416dfdb808325d829f1347e8e21e97362faec0","9d430b653104db5e7e4391cd268b4806f4241ac5"],"user_facing":false}
+{"commits":["5e300b720f564cd9235ba93e00dba1e94a2cde4d"],"user_facing":false}
