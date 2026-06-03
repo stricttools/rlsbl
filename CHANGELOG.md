@@ -2,9 +2,15 @@
 
 # Changelog
 
-## 0.57.0
+## 0.57.1
 
-Batch release-init filtering, retry.toml cleanup, and feature support matrix
+Fix Python 3.14 compatibility in monorepo release-init
+
+### Fixes
+
+- **Fix.** `monorepo release-init` no longer crashes on Python 3.14 when rendering commented-out package sections. The `tomlkit.dumps()` call was replaced with `tomlkit.item().as_string()` to avoid a `ValueError` when serializing arrays.
+
+## 0.57.0
 
 ### Features
 
