@@ -67,33 +67,6 @@ def test_force_does_not_overwrite_changelog(tmp_project):
     assert "CHANGELOG.md" not in created_targets
 
 
-def test_force_does_not_overwrite_license(tmp_project):
-    """--force must NOT overwrite LICENSE if it already exists (regression for 1a1fc61)."""
-    assert "LICENSE" in USER_OWNED
-
-    # Pre-existing user content
-    license_file = tmp_project / "LICENSE"
-    license_file.write_text("MIT License\n\nCopyright (c) 2025 Custom Author\n")
-
-    # Set up a template directory with a LICENSE template
-    tpl_dir = tmp_project / "templates"
-    tpl_dir.mkdir()
-    (tpl_dir / "license.tpl").write_text("MIT License\n\nCopyright (c) {{year}} {{author}}\n")
-
-    mappings = [{"template": "license.tpl", "target": "LICENSE"}]
-
-    created, skipped, warnings, _ = process_mappings(
-        str(tpl_dir), mappings, {"year": "2026", "author": "Template Author"},
-        force=True,
-    )
-
-    # LICENSE is user-owned (not overwritten with template content),
-    # but the copyright year is always updated
-    assert license_file.read_text() == "MIT License\n\nCopyright (c) 2025-2026 Custom Author\n"
-    created_targets = [t for t, _ in created]
-    assert "LICENSE" in created_targets
-
-
 def test_template_author_never_literal(tmp_project):
     """Template variables like {{author}} must be substituted, never left literal."""
     tpl_dir = tmp_project / "templates"

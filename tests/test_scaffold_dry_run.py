@@ -56,7 +56,6 @@ class TestDryRunFreshProject:
         assert not os.path.exists(".github/workflows/ci.yml")
         assert not os.path.exists(".github/workflows/publish.yml")
         assert not os.path.exists(".rlsbl/hooks/pre-release.sh")
-        assert not os.path.exists("LICENSE")
         assert not os.path.exists("CHANGELOG.md")
         assert not os.path.exists(".rlsbl/version")
         assert not os.path.exists(".rlsbl/hashes.json")
@@ -70,7 +69,6 @@ class TestDryRunFreshProject:
         assert "Files:" in out
         # Some core scaffold targets should appear
         assert ".github/workflows/ci.yml" in out
-        assert "LICENSE" in out
 
     def test_dry_run_does_not_create_rlsbl_config(self, npm_project):
         """--dry-run must NOT create or write .rlsbl/config.json."""

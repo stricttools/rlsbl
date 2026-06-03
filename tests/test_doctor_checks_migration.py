@@ -16,7 +16,7 @@ from rlsbl.check_context import WorkspaceCheckContext
 
 
 # ---------------------------------------------------------------------------
-# All 34 checks are declared in checks.toml and registered on the app
+# All 36 checks are declared in checks.toml and registered on the app
 # ---------------------------------------------------------------------------
 
 EXPECTED_CHECKS = [
@@ -27,6 +27,7 @@ EXPECTED_CHECKS = [
     "description-consistency",
     "private-hook-stale",
     "config-schema",
+    "license-file",
     "local-tag",
     "remote-tag",
     "github-release",
@@ -59,14 +60,15 @@ EXPECTED_CHECKS = [
     "deps-runtime-test-only",
     "deps-dev-in-lib",
     "dead-modules",
+    "scaffold-unreplaced-vars",
 ]
 
 
 class TestCheckDeclarations:
     """Every check must be declared in checks.toml and registered on the app."""
 
-    def test_all_34_checks_declared(self):
-        """checks.toml defines exactly the 34 expected checks."""
+    def test_all_36_checks_declared(self):
+        """checks.toml defines exactly the 36 expected checks."""
         assert sorted(app._check_defs.keys()) == sorted(EXPECTED_CHECKS)
 
     @pytest.mark.parametrize("name", EXPECTED_CHECKS)
@@ -75,14 +77,14 @@ class TestCheckDeclarations:
         assert app._check_defs[name].impl is not None
 
     def test_check_list_shows_all(self):
-        """``rlsbl check --list`` outputs all 34 check names."""
+        """``rlsbl check --list`` outputs all 36 check names."""
         result = app.test(["check", "--list"])
         assert result.exit_code == 0
         for name in EXPECTED_CHECKS:
             assert name in result.stdout
 
     def test_check_list_json(self):
-        """``rlsbl check --list --json`` outputs valid JSON with all 34 checks."""
+        """``rlsbl check --list --json`` outputs valid JSON with all 36 checks."""
         result = app.test(["check", "--list", "--json"])
         assert result.exit_code == 0
         data = json.loads(result.stdout)
@@ -100,7 +102,7 @@ class TestCheckTags:
     @pytest.mark.parametrize("name", [
         "lock", "version-consistency", "name-consistency",
         "license-consistency", "description-consistency",
-        "private-hook-stale", "config-schema",
+        "private-hook-stale", "config-schema", "license-file",
     ])
     def test_project_tag(self, name):
         assert "project" in app._check_defs[name].tags
@@ -116,7 +118,7 @@ class TestCheckTags:
 
     @pytest.mark.parametrize("name", [
         "library-lint", "deps-runtime-test-only", "deps-dev-in-lib",
-        "dead-modules",
+        "dead-modules", "scaffold-unreplaced-vars",
     ])
     def test_quality_tag(self, name):
         assert "quality" in app._check_defs[name].tags
