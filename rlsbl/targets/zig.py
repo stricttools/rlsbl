@@ -47,6 +47,8 @@ def _zig_archive_fn(spec, name):
 class ZigTarget(BaseTarget):
     """Release target for Zig projects (build.zig.zon + VERSION file)."""
 
+    detection_files = ("build.zig.zon", "build.zig")
+
     @property
     def name(self):
         return "zig"

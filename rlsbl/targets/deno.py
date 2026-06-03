@@ -14,6 +14,8 @@ from ..utils import run
 class DenoTarget(BaseTarget):
     """Release target for Deno projects (deno.json / deno.jsonc)."""
 
+    detection_files = ("deno.json", "deno.jsonc")
+
     @property
     def name(self):
         return "deno"

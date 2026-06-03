@@ -10,6 +10,9 @@ from .dart import DartTarget
 class FlutterIosTarget(DartTarget):
     """Release target for Flutter iOS apps (pubspec.yaml with flutter: section)."""
 
+    # Shares pubspec.yaml with dart; no unique detection files.
+    detection_files = ()
+
     @property
     def name(self):
         return "flutter-ios"

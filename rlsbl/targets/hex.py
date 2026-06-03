@@ -13,6 +13,8 @@ from ..utils import run
 class HexTarget(BaseTarget):
     """Release target for Hex/Elixir projects (mix.exs)."""
 
+    detection_files = ("mix.exs",)
+
     @property
     def name(self):
         return "hex"

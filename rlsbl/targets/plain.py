@@ -35,6 +35,9 @@ _OTHER_TARGET_MANIFESTS = (
 class PlainTarget(BaseTarget):
     """Release target for projects that have no build system or package registry."""
 
+    # Plain is opt-in only; no detection files to avoid false positives
+    # (VERSION is too generic -- every Go/Swift/Docker project has one).
+
     @property
     def name(self):
         return "plain"

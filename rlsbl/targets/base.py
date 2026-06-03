@@ -1,10 +1,19 @@
 """Base class for release targets providing shared defaults for version reading, writing, detection, scaffolding, and publish configuration."""
 
 import os
+from typing import ClassVar
 
 
 class BaseTarget:
-    """Concrete base providing defaults for optional Protocol methods."""
+    """Concrete base providing defaults for optional Protocol methods.
+
+    Subclasses should override ``detection_files`` with the filenames whose
+    existence in a directory indicates a project of that type.  The tuple is
+    used both by the target's own ``detect()`` method and by
+    ``checks.PROJECT_MANIFESTS`` (derived automatically from the registry).
+    """
+
+    detection_files: ClassVar[tuple[str, ...]] = ()
 
     def version_file(self):
         return None

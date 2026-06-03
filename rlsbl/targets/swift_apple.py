@@ -12,6 +12,8 @@ VERSION_FILE = "VERSION"
 class SwiftAppleTarget(BaseTarget):
     """Release target for Apple-platform Swift projects (macOS-only CI)."""
 
+    # Opt-in only; shares Package.swift with swift target.
+
     @property
     def name(self):
         return "swift-apple"

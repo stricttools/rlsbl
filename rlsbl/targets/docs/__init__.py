@@ -18,6 +18,8 @@ from ...utils import require_tool
 class DocsTarget(BaseTarget):
     """Release target that delegates documentation to selfdoc."""
 
+    detection_files = ("selfdoc.json",)
+
     @property
     def name(self):
         return "docs"

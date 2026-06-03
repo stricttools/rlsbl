@@ -13,6 +13,8 @@ class SpecTarget(BaseTarget):
     Extra fields are preserved on version bumps.
     """
 
+    detection_files = ("version.json",)
+
     @property
     def name(self):
         return "spec"

@@ -10,6 +10,9 @@ from .dart import DartTarget
 class FlutterAndroidTarget(DartTarget):
     """Release target for Flutter Android apps (pubspec.yaml with flutter: section)."""
 
+    # Shares pubspec.yaml with dart; no unique detection files.
+    detection_files = ()
+
     @property
     def name(self):
         return "flutter-android"

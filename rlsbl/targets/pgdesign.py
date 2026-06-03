@@ -17,6 +17,8 @@ class PgdesignTarget(BaseTarget):
     On release, validates the schema and generates migrations if configured.
     """
 
+    detection_files = ("pgdesign.toml",)
+
     @property
     def name(self):
         return "pgdesign"

@@ -14,6 +14,8 @@ from ..utils import run
 class MavenTarget(BaseTarget):
     """Release target for Maven/Gradle (Java/Kotlin) projects."""
 
+    detection_files = ("build.gradle.kts", "build.gradle", "pom.xml")
+
     @property
     def name(self):
         return "maven"

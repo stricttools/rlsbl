@@ -17,6 +17,8 @@ _MIN_VERSION_RE = re.compile(r">=\s*(\d+(?:\.\d+)*)")
 class NpmTarget(BaseTarget):
     """Release target for npm/Node.js projects (package.json)."""
 
+    detection_files = ("package.json",)
+
     @property
     def name(self):
         return "npm"

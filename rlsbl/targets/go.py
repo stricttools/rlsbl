@@ -43,6 +43,8 @@ def _go_archive_fn(spec, name):
 class GoTarget(BaseTarget):
     """Release target for Go projects (go.mod + VERSION file)."""
 
+    detection_files = ("go.mod",)
+
     @property
     def name(self):
         return "go"

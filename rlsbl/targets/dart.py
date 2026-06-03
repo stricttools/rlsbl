@@ -10,6 +10,8 @@ from .base import BaseTarget
 class DartTarget(BaseTarget):
     """Release target for Dart packages (pubspec.yaml)."""
 
+    detection_files = ("pubspec.yaml",)
+
     @property
     def name(self):
         return "dart"

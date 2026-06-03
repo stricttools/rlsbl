@@ -17,6 +17,8 @@ from ..utils import run
 class CargoTarget(BaseTarget):
     """Release target for Rust/Cargo projects (Cargo.toml)."""
 
+    detection_files = ("Cargo.toml",)
+
     @property
     def name(self):
         return "cargo"

@@ -12,6 +12,8 @@ VERSION_FILE = "VERSION"
 class SwiftTarget(BaseTarget):
     """Release target for Swift packages (Package.swift + VERSION file)."""
 
+    detection_files = ("Package.swift",)
+
     @property
     def name(self):
         return "swift"

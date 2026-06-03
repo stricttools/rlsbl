@@ -21,6 +21,8 @@ _MIN_VERSION_RE = re.compile(r">=\s*(\d+\.\d+(?:\.\d+)?)")
 class PypiTarget(BaseTarget):
     """Release target for Python projects (pyproject.toml)."""
 
+    detection_files = ("pyproject.toml",)
+
     @property
     def name(self):
         return "pypi"

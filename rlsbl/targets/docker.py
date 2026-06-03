@@ -13,6 +13,8 @@ VERSION_FILE = "VERSION"
 class DockerTarget(BaseTarget):
     """Release target for Docker projects (Dockerfile + VERSION file)."""
 
+    detection_files = ("Dockerfile",)
+
     @property
     def name(self):
         return "docker"
