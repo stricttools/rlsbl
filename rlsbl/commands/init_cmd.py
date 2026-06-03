@@ -65,7 +65,6 @@ def _check_npm_lockfile_missing(start_dir="."):
 # Files owned by the user after initial scaffold -- never overwrite or merge
 USER_OWNED = {
     "CHANGELOG.md",
-    "LICENSE",
     ".npmignore",
     ".rlsbl/hooks/pre-checks.sh",
     ".rlsbl/changes/unreleased.jsonl",
@@ -305,66 +304,14 @@ def plan_mappings(template_dir, mappings, vars_dict, force):
             raw = f.read()
         theirs, unreplaced = process_template(raw, vars_dict, template_path=template_path)
 
-        # --- User-owned files: never overwrite (even with --force),
-        # except LICENSE gets its copyright year updated.
+        # --- User-owned files: never overwrite (even with --force).
         if os.path.exists(target) and target in USER_OWNED:
-            if target == "LICENSE":
-                from datetime import datetime
-                current_year = str(datetime.now().year)
-                with open(target, "r", encoding="utf-8") as f:
-                    content = f.read()
-                # Match "Copyright (c) YYYY" or "Copyright (c) YYYY-YYYY"
-                old_year = None
-                def _capture_range(m):
-                    nonlocal old_year
-                    if m.group(2) == current_year:
-                        return m.group(0)
-                    old_year = f"{m.group(1).split()[-1]}-{m.group(2)}"
-                    return f"{m.group(1)}-{current_year}"
-                updated_content = re.sub(
-                    r"(Copyright\s+\(c\)\s+\d{4})-(\d{4})",
-                    _capture_range,
-                    content,
-                )
-                if updated_content == content:
-                    def _capture_single(m):
-                        nonlocal old_year
-                        if m.group(2) == current_year:
-                            return m.group(0)
-                        old_year = m.group(2)
-                        return f"{m.group(1)}{m.group(2)}-{current_year}"
-                    updated_content = re.sub(
-                        r"(Copyright\s+\(c\)\s+)(\d{4})(?![-\d])",
-                        _capture_single,
-                        content,
-                    )
-                if updated_content != content:
-                    year_detail = (
-                        f"year updated ({old_year} -> {old_year.split('-')[0]}-{current_year})"
-                        if old_year and "-" in old_year
-                        else f"year updated ({old_year} -> {old_year}-{current_year})"
-                    ) if old_year else "year updated"
-                    plans.append({
-                        "target": "LICENSE",
-                        "status": year_detail,
-                        "bucket": "created",
-                        "action": "write_no_base",
-                        "content": updated_content,
-                    })
-                else:
-                    plans.append({
-                        "target": target,
-                        "status": "user-owned",
-                        "bucket": "skipped",
-                        "action": "none",
-                    })
-            else:
-                plans.append({
-                    "target": target,
-                    "status": "user-owned",
-                    "bucket": "skipped",
-                    "action": "none",
-                })
+            plans.append({
+                "target": target,
+                "status": "user-owned",
+                "bucket": "skipped",
+                "action": "none",
+            })
             continue
 
         # --- .gitignore: additive set-union merge (append new lines, never remove) ---
@@ -568,7 +515,7 @@ def process_mappings(template_dir, mappings, vars_dict, force,
 
     Uses a universal three-way merge (via git merge-file) for existing files:
     base (last scaffolded version) + ours (user's current file) + theirs (new template).
-    USER_OWNED files are never overwritten or merged (except LICENSE year update).
+    USER_OWNED files are never overwritten or merged.
 
     Returns (created, skipped, warnings, new_hashes).
     created/skipped are lists of (target, status) tuples for unified display.
