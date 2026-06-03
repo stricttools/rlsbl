@@ -1,0 +1,5 @@
+{"commits":["8889828f2f38511e3143dfcb50a20e84c18e1898","8829921feb444c4150044e83b61ce4e5da758b40","a03a54b41e50960f14444cc30262c73d62107937","45792143bf2c285c6584ef720624313267ce9711"],"user_facing":true,"description":"**New check.** `dead-workspace-packages` detects workspace library packages never imported by any sibling, with specific messaging for test-only imports.","type":"feature"}
+{"commits":["bccf907f04c728c486364aaf6ce0f7636721cda4"],"user_facing":true,"description":"**Improved.** Expanded monorepo `release init` command description for better selfdoc SEO.","type":"fix"}
+{"commits":["2d80c1d9b0493f43bfdad21ca050958bb79fa204","4aed76b66900da460e872adb9b4b047094dc199f","1fca8b3cb9a1bec868c19f05af0af424e0f90f6c"],"user_facing":false}
+{"commits":["085dc91627641849b0c67abc84b1a9d90969e943"],"user_facing":false}
+{"commits":["63b0ce66b60a8d2082b011cc1859d685082ebb76"],"user_facing":false}
