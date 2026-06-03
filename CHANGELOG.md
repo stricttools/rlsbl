@@ -2,9 +2,19 @@
 
 # Changelog
 
-## 0.57.1
+## 0.58.0
 
-Fix Python 3.14 compatibility in monorepo release-init
+New dead-workspace-packages check for detecting unused library packages in monorepo workspaces
+
+### Features
+
+- **New check.** `dead-workspace-packages` detects workspace library packages never imported by any sibling, with specific messaging for test-only imports.
+
+### Fixes
+
+- **Improved.** Expanded monorepo `release init` command description for better selfdoc SEO.
+
+## 0.57.1
 
 ### Fixes
 
