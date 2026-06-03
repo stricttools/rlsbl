@@ -277,6 +277,35 @@ def register_checks(app):
             return CheckResult("fail", f"{len(errors)} config error(s)", details=errors)
         return CheckResult("pass", "config schema valid")
 
+    @app.check("license-file")
+    def check_license_file(ctx):
+        """LICENSE file must exist, be non-empty, and have no template variables."""
+        import re as _re
+
+        license_path = os.path.join(str(ctx.project_root), "LICENSE")
+        if not os.path.exists(license_path):
+            return CheckResult("fail", "LICENSE file not found in project root")
+
+        try:
+            size = os.path.getsize(license_path)
+        except OSError:
+            return CheckResult("fail", "cannot read LICENSE file")
+
+        if size == 0:
+            return CheckResult("fail", "LICENSE file is empty")
+
+        with open(license_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        template_vars = _re.findall(r"\{\{\w+(?:\.\w+)*\}\}", content)
+        if template_vars:
+            return CheckResult(
+                "fail",
+                f"LICENSE contains unreplaced template variable(s): {', '.join(template_vars)}",
+            )
+
+        return CheckResult("pass", "LICENSE file valid")
+
     # ------------------------------------------------------------------
     # Tag: release
     # ------------------------------------------------------------------
@@ -1104,3 +1133,47 @@ def register_checks(app):
                 details=details,
             )
         return CheckResult("pass", "no dead modules")
+
+    @app.check("scaffold-unreplaced-vars")
+    def check_scaffold_unreplaced_vars(ctx):
+        """Committed scaffold files must not contain unreplaced rlsbl template variables."""
+        import glob
+        import re as _re
+
+        root_str = str(ctx.project_root)
+
+        # File patterns to scan for unreplaced template variables
+        scan_patterns = [
+            os.path.join(root_str, ".github", "workflows", "*.yml"),
+            os.path.join(root_str, ".goreleaser.yml"),
+            os.path.join(root_str, ".rlsbl", "hooks", "*.sh"),
+        ]
+
+        # rlsbl template syntax: {{word}} or {{word.word}}
+        # Exclude GitHub Actions ${{ ... }} syntax (preceded by $)
+        template_re = _re.compile(r"(?<!\$)\{\{\w+(?:\.\w+)*\}\}")
+
+        errors = []
+        for pattern in scan_patterns:
+            for filepath in glob.glob(pattern):
+                rel_path = os.path.relpath(filepath, root_str)
+                try:
+                    with open(filepath, "r", encoding="utf-8") as f:
+                        content = f.read()
+                except (OSError, UnicodeDecodeError):
+                    continue
+
+                matches = template_re.findall(content)
+                if matches:
+                    unique = sorted(set(matches))
+                    errors.append(
+                        f"{rel_path}: unreplaced variable(s) {', '.join(unique)}"
+                    )
+
+        if errors:
+            return CheckResult(
+                "fail",
+                f"{len(errors)} file(s) with unreplaced template variables",
+                details=errors,
+            )
+        return CheckResult("pass", "no unreplaced template variables")
