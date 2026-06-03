@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from rlsbl.dep_validation import (
+    DeadWorkspacePackage,
     check_dev_in_lib,
     check_runtime_test_only,
     check_undeclared_deps,
@@ -13,6 +14,7 @@ from rlsbl.dep_validation import (
     find_dead_go_packages,
     find_dead_modules,
     find_dead_npm_modules,
+    find_dead_workspace_packages,
     load_dep_overrides,
 )
 from rlsbl.workspace import WORKSPACE_DIR
@@ -1317,3 +1319,253 @@ class TestDepsChecksIntegration:
         result = captured["dead-modules"](ctx)
         assert result.status == "warn"
         assert "1 dead module" in result.message
+
+
+class TestFindDeadWorkspacePackages:
+    """find_dead_workspace_packages detects library packages with no workspace importers."""
+
+    def test_library_imported_by_app_not_flagged(self):
+        """Library A imported by app B is not flagged."""
+        projects = [
+            {"name": "app", "path": "app"},
+            {"name": "auth", "path": "auth", "library": True},
+        ]
+        import_cache = {
+            "app": ({"auth"}, set()),   # app imports auth in lib code
+            "auth": (set(), set()),
+        }
+        dead = find_dead_workspace_packages(projects, import_cache)
+        assert dead == []
+
+    def test_library_not_imported_is_flagged(self):
+        """Library A not imported by anything is flagged."""
+        projects = [
+            {"name": "app", "path": "app"},
+            {"name": "auth", "path": "auth", "library": True},
+        ]
+        import_cache = {
+            "app": (set(), set()),
+            "auth": (set(), set()),
+        }
+        dead = find_dead_workspace_packages(projects, import_cache)
+        assert len(dead) == 1
+        assert dead[0].name == "auth"
+        assert dead[0].severity == "warn"
+        assert "not imported by any workspace package" in dead[0].message
+
+    def test_non_library_app_not_flagged(self):
+        """Non-library (app) with no importers is not flagged -- apps are entry points."""
+        projects = [
+            {"name": "app", "path": "app"},
+            {"name": "cli", "path": "cli"},
+        ]
+        import_cache = {
+            "app": (set(), set()),
+            "cli": (set(), set()),
+        }
+        dead = find_dead_workspace_packages(projects, import_cache)
+        assert dead == []
+
+    def test_dev_node_not_flagged(self):
+        """Dev_node with no importers is not flagged -- excluded from checks."""
+        projects = [
+            {"name": "app", "path": "app"},
+            {"name": "test-utils", "path": "test-utils", "library": True, "dev_node": True},
+        ]
+        import_cache = {
+            "app": (set(), set()),
+            "test-utils": (set(), set()),
+        }
+        dead = find_dead_workspace_packages(projects, import_cache)
+        assert dead == []
+
+    def test_library_imported_only_in_tests(self):
+        """Library imported only in tests gets specific warning message."""
+        projects = [
+            {"name": "app", "path": "app"},
+            {"name": "testlib", "path": "testlib", "library": True},
+        ]
+        import_cache = {
+            "app": (set(), {"testlib"}),   # app imports testlib only in tests
+            "testlib": (set(), set()),
+        }
+        dead = find_dead_workspace_packages(projects, import_cache)
+        assert len(dead) == 1
+        assert dead[0].name == "testlib"
+        assert dead[0].severity == "warn"
+        assert "only imported in test code" in dead[0].message
+        assert "app" in dead[0].message
+
+    def test_self_imports_not_counted(self):
+        """A library importing itself does not count as having importers."""
+        projects = [
+            {"name": "mylib", "path": "mylib", "library": True},
+        ]
+        import_cache = {
+            "mylib": ({"mylib"}, set()),   # self-import only
+        }
+        dead = find_dead_workspace_packages(projects, import_cache)
+        assert len(dead) == 1
+        assert dead[0].name == "mylib"
+
+    def test_multiple_dead_libraries(self):
+        """Multiple dead libraries are all reported."""
+        projects = [
+            {"name": "app", "path": "app"},
+            {"name": "lib-a", "path": "lib-a", "library": True},
+            {"name": "lib-b", "path": "lib-b", "library": True},
+        ]
+        import_cache = {
+            "app": (set(), set()),
+            "lib-a": (set(), set()),
+            "lib-b": (set(), set()),
+        }
+        dead = find_dead_workspace_packages(projects, import_cache)
+        assert len(dead) == 2
+        names = {d.name for d in dead}
+        assert names == {"lib-a", "lib-b"}
+
+    def test_library_imported_in_lib_and_test(self):
+        """Library imported in both lib and test code is not flagged."""
+        projects = [
+            {"name": "app", "path": "app"},
+            {"name": "utils", "path": "utils", "library": True},
+        ]
+        import_cache = {
+            "app": ({"utils"}, {"utils"}),
+            "utils": (set(), set()),
+        }
+        dead = find_dead_workspace_packages(projects, import_cache)
+        assert dead == []
+
+    def test_empty_workspace(self):
+        """Empty workspace produces no dead packages."""
+        dead = find_dead_workspace_packages([], {})
+        assert dead == []
+
+    def test_library_false_not_flagged(self):
+        """Project with library=False explicitly set is not flagged."""
+        projects = [
+            {"name": "app", "path": "app", "library": False},
+        ]
+        import_cache = {
+            "app": (set(), set()),
+        }
+        dead = find_dead_workspace_packages(projects, import_cache)
+        assert dead == []
+
+
+class TestDeadWorkspacePackagesCheck:
+    """Integration tests: dead-workspace-packages check on the strictcli system."""
+
+    def _capture_checks(self):
+        """Register all checks on a mock app and return the captured dict."""
+        captured = {}
+
+        class MockApp:
+            _checks_enabled = True
+
+            def check(self, name):
+                def decorator(fn):
+                    captured[name] = fn
+                    return fn
+                return decorator
+
+        from rlsbl.checks import register_checks
+        register_checks(MockApp())
+        return captured
+
+    def test_registered(self):
+        """dead-workspace-packages check is registered."""
+        captured = self._capture_checks()
+        assert "dead-workspace-packages" in captured
+
+    def test_skip_not_workspace(self):
+        """Skips when context is not a workspace."""
+        from rlsbl.context import ProjectContext
+
+        captured = self._capture_checks()
+        ctx = ProjectContext(project_root=Path("/tmp/fake"), workspace_root=None, config={})
+        result = captured["dead-workspace-packages"](ctx)
+        assert result.status == "skip"
+
+    def test_pass_all_libraries_imported(self, tmp_path):
+        """Passes when all library packages have workspace importers."""
+        from rlsbl.check_context import WorkspaceCheckContext
+        from rlsbl.workspace_graph import WorkspaceGraph
+
+        ws_dir = tmp_path / ".rlsbl-monorepo"
+        ws_dir.mkdir()
+        (ws_dir / "workspace.toml").write_text(
+            '[[projects]]\npath = "app"\nname = "app"\n\n'
+            '[[projects]]\npath = "auth"\nname = "auth"\nlibrary = true\n'
+        )
+
+        app_dir = tmp_path / "app"
+        app_dir.mkdir()
+        (app_dir / "pyproject.toml").write_text(
+            '[project]\nname = "app"\ndependencies = ["auth"]\n'
+        )
+        (app_dir / "main.py").write_text("import auth\n")
+
+        auth_dir = tmp_path / "auth"
+        auth_dir.mkdir()
+        (auth_dir / "pyproject.toml").write_text('[project]\nname = "auth"\n')
+
+        projects = [
+            {"name": "app", "path": "app"},
+            {"name": "auth", "path": "auth", "library": True},
+        ]
+        graph = WorkspaceGraph(str(tmp_path), projects)
+
+        ctx = WorkspaceCheckContext(
+            project_root=Path(tmp_path),
+            workspace_root=Path(tmp_path),
+            config={},
+            projects=projects,
+            graph=graph,
+        )
+
+        captured = self._capture_checks()
+        result = captured["dead-workspace-packages"](ctx)
+        assert result.status == "pass"
+
+    def test_warn_dead_library(self, tmp_path):
+        """Warns when a library package has no workspace importers."""
+        from rlsbl.check_context import WorkspaceCheckContext
+        from rlsbl.workspace_graph import WorkspaceGraph
+
+        ws_dir = tmp_path / ".rlsbl-monorepo"
+        ws_dir.mkdir()
+        (ws_dir / "workspace.toml").write_text(
+            '[[projects]]\npath = "app"\nname = "app"\n\n'
+            '[[projects]]\npath = "orphan"\nname = "orphan"\nlibrary = true\n'
+        )
+
+        app_dir = tmp_path / "app"
+        app_dir.mkdir()
+        (app_dir / "pyproject.toml").write_text('[project]\nname = "app"\n')
+        (app_dir / "main.py").write_text("import os\n")
+
+        orphan_dir = tmp_path / "orphan"
+        orphan_dir.mkdir()
+        (orphan_dir / "pyproject.toml").write_text('[project]\nname = "orphan"\n')
+
+        projects = [
+            {"name": "app", "path": "app"},
+            {"name": "orphan", "path": "orphan", "library": True},
+        ]
+        graph = WorkspaceGraph(str(tmp_path), projects)
+
+        ctx = WorkspaceCheckContext(
+            project_root=Path(tmp_path),
+            workspace_root=Path(tmp_path),
+            config={},
+            projects=projects,
+            graph=graph,
+        )
+
+        captured = self._capture_checks()
+        result = captured["dead-workspace-packages"](ctx)
+        assert result.status == "warn"
+        assert "1 dead workspace package" in result.message
