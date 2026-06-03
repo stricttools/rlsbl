@@ -14,6 +14,7 @@ from .commands import (
 )
 
 from .batch_release import _cmd_batch_release
+from .batch_release_init import _cmd_batch_release_init
 
 from .graph import _cmd_graph
 
@@ -44,6 +45,7 @@ __all__ = [
     "_cmd_release_order",
     "_cmd_check_names",
     "_cmd_batch_release",
+    "_cmd_batch_release_init",
     "_cmd_graph",
     "_cmd_impact",
     "_cmd_snapshot",
