@@ -144,7 +144,7 @@
     "description": "92c829699be90c4ea09e05c6e0ff3830b755bdd05be47a9427e51074cedcb831"
   },
   "en/cli-index.md": {
-    "content": "fc906bbb8b87ece15c0e7a09bba03ba9ceb0cba54d29faf1093fcff470ce2a44",
+    "content": "22ab1f23c4092a3775eb11ce5125b17b8b7fced369edd4cfe0819fed08917bee",
     "description": "0f01533cb10562a220aa70ea5e33e2500c0c1e4aa8e16b2f80c532449a68b7ea"
   },
   "en/cli-migrate.md": {
@@ -152,7 +152,7 @@
     "description": "ed5d34392baa022c09e4daec00277910a7cbc15b08d430083b3bff2510762617"
   },
   "en/cli-monorepo.md": {
-    "content": "8657ad83da910473531c1af259dc367c026c42c75156c27b183e8a76a6512b24",
+    "content": "a43af335f6a72ea6b47915c6aac42bfb8118f52350323b42074bfc2395550c02",
     "description": "752342d5365828fb0c019d6c4bf04f94b450d75f34ab4ac641fd3a028e963749"
   },
   "en/cli-pre-push-check.md": {
@@ -256,7 +256,7 @@
     "description": "4870b94e84c0fbee86eb108525c30947097e9badac00f69ac0663eeb8442f307"
   },
   "en/rlsbl-checks.md": {
-    "content": "5076a1d78f0b86b1757a09edc8298a78887c47117cf3aac6e95258f56384c7c3",
+    "content": "29c659da34a4bc26468fbee7c017e4e4a59931548208a6abf0277b2a25be1e14",
     "description": "d3137ed885db74c9735a5a877e1502aeaecacfcda42bbe6a066df0cc2fe532d4"
   },
   "en/rlsbl-commands-changelog_cmd.md": {
@@ -300,7 +300,7 @@
     "description": "a501d59840bdb92d635d55846a3ec45a515631098725c251bb7584287a534590"
   },
   "en/rlsbl-commands-monorepo-batch_release_init.md": {
-    "content": "7476d0538bc8e0f632dbc218f48acd117b64ea017572f4b1499a6f6a7df1ef68",
+    "content": "d771c98cd1c9b090ddbaf5edd8d135432cba8805c9489fae0aad92ac3a9cea98",
     "description": "8253b536262fa64f3ac562b9db1da0278253be7bdd7763def8bac55e81166d9f"
   },
   "en/rlsbl-commands-monorepo-commands.md": {
@@ -596,7 +596,7 @@
     "description": "cbc6efd4505a9d5f40720a9c4b6607789053bc8eb9137163a99e5e3ca41e240e"
   },
   "en/rlsbl.md": {
-    "content": "f671234e895f73e2823e9011927b577998e6c50883c0ecbaafcd204cea654de4",
+    "content": "06228014df6f740d6be46c8d28ddaf6ca75ba3e86ed3a7db5d74fdb66f2a24a4",
     "description": "846d7106c20777b824e0116e8e62127eb6c86ab277fe4904e1cbecc2e9839d43"
   },
   "en/targets.md": {
