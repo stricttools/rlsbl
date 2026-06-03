@@ -1,0 +1,5 @@
+{"commits":["1e3ab222277cb20c3bf401d1397cf85640ea3278"],"user_facing":true,"description":"**Fix.** `retry.toml` is now cleaned up when validation fails during release retry, in both the init and retry handlers. Previously, an invalid `retry.toml` could be left behind, blocking subsequent retries.","type":"fix"}
+{"commits":["00736d92fd5e33d307f22b1348da74b9c14257e0"],"user_facing":true,"description":"**New.** `monorepo release-init` now accepts a `--packages` flag to scaffold only specific packages. Packages with zero unreleased commits are automatically commented out with an explanation.","type":"feature"}
+{"commits":["5ed660bae23611ff6a27d46cdb21fcad1c1e9406"],"user_facing":true,"description":"**New.** Feature support matrix: `get_feature_matrix()` and `generate_feature_matrix_markdown()` functions showing which checks support which targets.","type":"feature"}
+{"commits":["d34f274a5e90691d04f3f2506b9057804c5046ca","9e3feeb8e192d95fc6e7064c63d7186e9ba834ac"],"user_facing":false}
+{"commits":["50fca0635812ac52939748807d17bf5ff382dcca"],"user_facing":false}
