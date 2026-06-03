@@ -82,10 +82,10 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "deps-stale": "workspace",
     "dead-workspace-packages": "workspace",
     # --- workspace + language-specific import scanners ---
-    "deps-unused": frozenset({"pypi", "dart", "npm"}),
-    "deps-undeclared": frozenset({"pypi", "dart", "npm"}),
-    "deps-runtime-test-only": frozenset({"pypi", "dart", "npm"}),
-    "deps-dev-in-lib": frozenset({"pypi", "dart", "npm"}),
+    "deps-unused": frozenset({"pypi", "dart", "npm", "go"}),
+    "deps-undeclared": frozenset({"pypi", "dart", "npm", "go"}),
+    "deps-runtime-test-only": frozenset({"pypi", "dart", "npm", "go"}),
+    "deps-dev-in-lib": frozenset({"pypi", "dart", "npm", "go"}),
     # --- target-specific quality checks ---
     "dead-modules": frozenset({"pypi", "go", "npm"}),
     "library-lint": frozenset({"pypi", "go", "npm"}),
