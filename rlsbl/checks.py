@@ -1092,16 +1092,16 @@ def register_checks(app):
 
     @app.check("dead-modules")
     def check_dead_modules(ctx):
-        """Unreferenced Python modules or Go internal packages."""
+        """Unreferenced Python modules, Go internal packages, or npm source files."""
         from .targets import detect_targets
 
         root_str = str(ctx.project_root)
         target_entries = detect_targets(root_str)
         target_names = {e.name for e in target_entries}
 
-        supported = {"pypi", "go"} & target_names
+        supported = {"pypi", "go", "npm"} & target_names
         if not supported:
-            return CheckResult("skip", "not a Python or Go project")
+            return CheckResult("skip", "not a Python, Go, or npm project")
 
         all_dead: list[str] = []
         details: list[str] = []
@@ -1124,6 +1124,16 @@ def register_checks(app):
             details.extend(
                 f"{path}: internal package not imported outside itself"
                 for path in go_dead
+            )
+
+        if "npm" in target_names:
+            from .dep_validation import find_dead_npm_modules
+
+            npm_dead = find_dead_npm_modules(root_str)
+            all_dead.extend(npm_dead)
+            details.extend(
+                f"{path}: not reachable from any entry point"
+                for path in npm_dead
             )
 
         if all_dead:
