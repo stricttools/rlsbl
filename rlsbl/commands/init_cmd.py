@@ -137,7 +137,7 @@ NEXT_STEPS = {
 _ESCAPE_SENTINEL = "__RLSBL_ESCAPE_OPEN__"
 
 
-def process_template(template_content, vars_dict, template_path=None):
+def process_template(template_content, vars_dict, template_path=None, *, required_vars=None):
     r"""Process a template string with substitution and escape handling.
 
     Pass 1 resolves ``{{action "owner/name"}}`` placeholders against the
@@ -153,6 +153,11 @@ def process_template(template_content, vars_dict, template_path=None):
     preserved). This lets templates contain third-party ``{{...}}`` syntax
     (e.g. Docker metadata-action's ``{{version}}``) without colliding with
     rlsbl's template engine.
+
+    If *required_vars* is provided (a set of variable names), any variable
+    in that set that remains unreplaced after substitution raises
+    :class:`ValueError`. This turns silent placeholder leaks into hard
+    errors for critical template variables.
 
     Returns ``(content, unreplaced)`` where ``unreplaced`` is the list of
     variable names in pass 2 that had no entry in ``vars_dict``. Pass 1
@@ -188,6 +193,16 @@ def process_template(template_content, vars_dict, template_path=None):
         return match.group(0)
 
     content = re.sub(r"\{\{(\w+(?:\.\w+)*)\}\}", replacer, content)
+
+    # Validate required variables before restoring escapes.
+    if required_vars:
+        missing = set(required_vars) & set(unreplaced)
+        if missing:
+            ctx = f" in {template_path}" if template_path else ""
+            names = ", ".join(sorted(missing))
+            raise ValueError(
+                f"Required template variable(s) not provided{ctx}: {names}"
+            )
 
     # Post-pass: restore escaped placeholders to literal ``{{``.
     content = content.replace(_ESCAPE_SENTINEL, "{{")
@@ -259,8 +274,13 @@ def _three_way_merge(ours_text, base_text, theirs_text):
                     pass
 
 
-def plan_mappings(template_dir, mappings, vars_dict, force):
+def plan_mappings(template_dir, mappings, vars_dict, force, *, required_vars=None):
     """Compute what process_mappings would do, without writing anything.
+
+    When *required_vars* is provided (a set of variable names), it is
+    forwarded to :func:`process_template` for every mapping. Any required
+    variable that remains unresolved raises :class:`ValueError`, turning
+    silent placeholder leaks into hard scaffold-time errors.
 
     Returns a list of plan dicts. Each plan represents one mapping and contains:
       - "target": the target file path
@@ -302,7 +322,9 @@ def plan_mappings(template_dir, mappings, vars_dict, force):
 
         with open(template_path, "r", encoding="utf-8") as f:
             raw = f.read()
-        theirs, unreplaced = process_template(raw, vars_dict, template_path=template_path)
+        theirs, unreplaced = process_template(
+            raw, vars_dict, template_path=template_path, required_vars=required_vars,
+        )
 
         # --- User-owned files: never overwrite (even with --force).
         if os.path.exists(target) and target in USER_OWNED:
@@ -932,6 +954,7 @@ def run_cmd(registry, args, flags, ctx):
 
         reg_plans = plan_mappings(
             reg.template_dir(), reg_mappings, vars_dict, force,
+            required_vars={"name", "registryUrl"},
         )
 
         shared_plans = []
@@ -1498,6 +1521,7 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         ci_mappings = [m for m in reg.template_mappings(ctx) if "publish" not in m["template"]]
         ci_plans = plan_mappings(
             reg.template_dir(), ci_mappings, vars_dict, force,
+            required_vars={"name", "registryUrl"},
         )
 
         # Collect non-workflow files from non-primary targets (e.g. .npmignore

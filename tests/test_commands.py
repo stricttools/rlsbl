@@ -70,6 +70,61 @@ class TestProcessTemplate:
         assert content == "plain text"
         assert unreplaced == []
 
+    def test_required_vars_present_resolves_normally(self):
+        content, unreplaced = process_template(
+            "Hello {{name}}, year {{year}}",
+            {"name": "pkg", "year": "2026"},
+            required_vars={"name", "year"},
+        )
+        assert content == "Hello pkg, year 2026"
+        assert unreplaced == []
+
+    def test_required_vars_missing_raises_valueerror(self):
+        with pytest.raises(ValueError, match="name"):
+            process_template(
+                "Hello {{name}} {{other}}",
+                {"other": "val"},
+                required_vars={"name"},
+            )
+
+    def test_required_vars_missing_includes_template_path(self):
+        with pytest.raises(ValueError, match="mytemplate.tpl"):
+            process_template(
+                "{{author}} wrote this",
+                {},
+                template_path="mytemplate.tpl",
+                required_vars={"author"},
+            )
+
+    def test_required_vars_none_preserves_existing_behavior(self):
+        content, unreplaced = process_template(
+            "{{missing}} var",
+            {},
+            required_vars=None,
+        )
+        assert content == "{{missing}} var"
+        assert unreplaced == ["missing"]
+
+    def test_required_vars_subset_of_unreplaced(self):
+        """Only variables in required_vars raise; other unreplaced are fine."""
+        with pytest.raises(ValueError, match="critical") as exc_info:
+            process_template(
+                "{{critical}} and {{optional}}",
+                {},
+                required_vars={"critical"},
+            )
+        assert "optional" not in str(exc_info.value)
+
+    def test_required_vars_not_in_template_does_not_error(self):
+        """required_vars that don't appear in the template are silently ignored."""
+        content, unreplaced = process_template(
+            "Hello {{name}}",
+            {"name": "pkg"},
+            required_vars={"name", "registryUrl"},
+        )
+        assert content == "Hello pkg"
+        assert unreplaced == []
+
 
 class TestBaseStorage:
     """Tests for _save_base / _load_base helpers."""
