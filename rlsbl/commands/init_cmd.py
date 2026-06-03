@@ -1253,9 +1253,13 @@ def _generate_merged_publish(targets, template_vars, target_paths=None):
         # restored after serialization.
         content, _ = process_template(raw, per_target_vars, template_path=tpl_path)
         # Drop whole-line unresolved placeholders (block insertions)
-        content = re.sub(r"^[ \t]*\{\{\w+\}\}\s*$", "", content, flags=re.MULTILINE)
-        # Shelter remaining inline unresolved placeholders
-        content = re.sub(r"\{\{(\w+)\}\}", r"__UNRESOLVED__\1__", content)
+        content = re.sub(r"^[ \t]*\{\{\w+(?:\.\w+)*\}\}\s*$", "", content, flags=re.MULTILINE)
+        # Shelter remaining inline unresolved placeholders.
+        # Dots in names (e.g. zig.projectName) are encoded as _DOT_ so the
+        # sentinel is a single \w+ token that survives YAML round-tripping.
+        def _shelter(m):
+            return "__UNRESOLVED__" + m.group(1).replace(".", "_DOT_") + "__"
+        content = re.sub(r"\{\{(\w+(?:\.\w+)*)\}\}", _shelter, content)
         data = yaml_loader.load(content)
         if not isinstance(data, dict):
             continue
@@ -1350,8 +1354,10 @@ def _generate_merged_publish(targets, template_vars, target_paths=None):
     stream = StringIO()
     yml.dump(workflow, stream)
     result = stream.getvalue()
-    # Restore sheltered template placeholders
-    result = re.sub(r"__UNRESOLVED__(\w+)__", r"{{\1}}", result)
+    # Restore sheltered template placeholders (decode _DOT_ back to .)
+    def _unshelter(m):
+        return "{{" + m.group(1).replace("_DOT_", ".") + "}}"
+    result = re.sub(r"__UNRESOLVED__(.+?)__", _unshelter, result)
     result = result.rstrip("\n") + "\n"
     return result
 
