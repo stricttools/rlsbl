@@ -915,3 +915,235 @@ def find_dead_workspace_packages(
         ))
 
     return results
+
+
+# ---------------------------------------------------------------------------
+# Circular dependency detection (Tarjan's SCC)
+# ---------------------------------------------------------------------------
+
+
+def find_circular_deps(import_graph: dict[str, set[str]]) -> list[list[str]]:
+    """Find circular dependencies in a file-level import graph using Tarjan's SCC.
+
+    Args:
+        import_graph: mapping of file path to the set of file paths it imports.
+
+    Returns:
+        list of cycles, where each cycle is a list of file paths forming
+        the strongly connected component. Only SCCs with 2+ nodes are
+        returned (self-loops are not interesting).
+    """
+    # Tarjan's strongly connected components algorithm
+    index_counter = [0]
+    stack: list[str] = []
+    on_stack: set[str] = set()
+    index: dict[str, int] = {}
+    lowlink: dict[str, int] = {}
+    result: list[list[str]] = []
+
+    # Collect all nodes (some may only appear as targets, not keys)
+    all_nodes: set[str] = set(import_graph.keys())
+    for targets in import_graph.values():
+        all_nodes.update(targets)
+
+    def strongconnect(node: str) -> None:
+        index[node] = index_counter[0]
+        lowlink[node] = index_counter[0]
+        index_counter[0] += 1
+        stack.append(node)
+        on_stack.add(node)
+
+        for neighbor in import_graph.get(node, set()):
+            if neighbor not in index:
+                strongconnect(neighbor)
+                lowlink[node] = min(lowlink[node], lowlink[neighbor])
+            elif neighbor in on_stack:
+                lowlink[node] = min(lowlink[node], index[neighbor])
+
+        # Root of an SCC
+        if lowlink[node] == index[node]:
+            component: list[str] = []
+            while True:
+                w = stack.pop()
+                on_stack.discard(w)
+                component.append(w)
+                if w == node:
+                    break
+            if len(component) >= 2:
+                result.append(sorted(component))
+
+    for node in sorted(all_nodes):
+        if node not in index:
+            strongconnect(node)
+
+    return result
+
+
+def _build_python_import_graph(
+    project_dir: str,
+    exclude_dirs: list[str] | None = None,
+) -> dict[str, set[str]]:
+    """Build a file-level import graph for a Python project.
+
+    Uses _collect_python_imports to get dotted module names, then resolves
+    them to file paths via a module-name-to-file mapping.
+
+    Returns a dict mapping each source file's relative path to a set of
+    relative paths it imports (only intra-project imports that resolve to
+    actual files).
+    """
+    project_dir = os.path.abspath(project_dir)
+
+    if not os.path.isfile(os.path.join(project_dir, "pyproject.toml")):
+        return {}
+
+    all_files = walk_source_files(project_dir, (".py",), [], exclude_dirs=exclude_dirs)
+    production_files = [
+        f for f in all_files
+        if not _is_non_production_path(f, project_dir)
+    ]
+
+    if not production_files:
+        return {}
+
+    # Build module name -> relative path mapping
+    module_to_relpath: dict[str, str] = {}
+    for filepath in production_files:
+        mod_name = _python_module_name(filepath, project_dir)
+        if mod_name:
+            module_to_relpath[mod_name] = os.path.relpath(filepath, project_dir)
+
+    # Build file-level import graph using relative paths
+    graph: dict[str, set[str]] = {}
+    for filepath in production_files:
+        rel_path = os.path.relpath(filepath, project_dir)
+        imports = _collect_python_imports(filepath, project_dir)
+        resolved: set[str] = set()
+        for imp in imports:
+            # Try exact match first, then prefix match for sub-modules
+            if imp in module_to_relpath:
+                target = module_to_relpath[imp]
+                if target != rel_path:
+                    resolved.add(target)
+            else:
+                # Check if any module starts with this import (parent import)
+                for mod_name, mod_path in module_to_relpath.items():
+                    if mod_name.startswith(imp + ".") and mod_path != rel_path:
+                        resolved.add(mod_path)
+        if resolved:
+            graph[rel_path] = resolved
+
+    return graph
+
+
+def find_circular_python_deps(
+    project_dir: str,
+    exclude_dirs: list[str] | None = None,
+) -> list[list[str]]:
+    """Find circular dependencies in a Python project.
+
+    Builds a file-level import graph from Python source files and runs
+    Tarjan's SCC algorithm to detect cycles.
+
+    Args:
+        project_dir: absolute path to the project root.
+        exclude_dirs: directory paths to skip during the walk.
+
+    Returns:
+        list of cycles, each a sorted list of relative file paths.
+    """
+    graph = _build_python_import_graph(project_dir, exclude_dirs=exclude_dirs)
+    return find_circular_deps(graph)
+
+
+def find_circular_npm_deps(
+    project_dir: str,
+    exclude_dirs: list[str] | None = None,
+) -> list[list[str]]:
+    """Find circular dependencies in an npm project.
+
+    Reuses _build_npm_import_graph() and runs Tarjan's SCC algorithm.
+
+    Args:
+        project_dir: absolute path to the project root.
+        exclude_dirs: directory paths to skip during the walk.
+
+    Returns:
+        list of cycles, each a sorted list of relative file paths.
+    """
+    project_dir = os.path.abspath(project_dir)
+
+    if not os.path.isfile(os.path.join(project_dir, "package.json")):
+        return []
+
+    abs_graph = _build_npm_import_graph(project_dir, exclude_dirs=exclude_dirs)
+
+    # Convert absolute paths to relative for consistent output
+    rel_graph: dict[str, set[str]] = {}
+    for src, targets in abs_graph.items():
+        rel_src = os.path.relpath(src, project_dir)
+        rel_graph[rel_src] = {os.path.relpath(t, project_dir) for t in targets}
+
+    return find_circular_deps(rel_graph)
+
+
+def find_circular_dart_deps(
+    project_dir: str,
+    exclude_dirs: list[str] | None = None,
+) -> list[list[str]]:
+    """Find circular dependencies in a Dart project.
+
+    Builds a file-level import graph from Dart source files using regex
+    to extract relative imports, then runs Tarjan's SCC algorithm.
+
+    Args:
+        project_dir: absolute path to the project root.
+        exclude_dirs: directory paths to skip during the walk.
+
+    Returns:
+        list of cycles, each a sorted list of relative file paths.
+    """
+    project_dir = os.path.abspath(project_dir)
+
+    pubspec = os.path.join(project_dir, "pubspec.yaml")
+    if not os.path.isfile(pubspec):
+        return []
+
+    dart_files = walk_source_files(project_dir, (".dart",), [], exclude_dirs=exclude_dirs)
+    production_files = [
+        f for f in dart_files
+        if not _is_non_production_path(f, project_dir)
+    ]
+
+    if not production_files:
+        return []
+
+    # Build file-level import graph from relative Dart imports
+    _dart_relative_import_re = re.compile(
+        r"""(?:import|export)\s+['"](?!package:|dart:)([\w./]+)['"]"""
+    )
+
+    graph: dict[str, set[str]] = {}
+    for filepath in production_files:
+        rel_path = os.path.relpath(filepath, project_dir)
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                content = f.read()
+        except (OSError, UnicodeDecodeError):
+            continue
+
+        targets: set[str] = set()
+        for match in _dart_relative_import_re.finditer(content):
+            import_path = match.group(1)
+            # Resolve relative to the importing file's directory
+            import_dir = os.path.dirname(filepath)
+            abs_target = os.path.normpath(os.path.join(import_dir, import_path))
+            if os.path.isfile(abs_target):
+                target_rel = os.path.relpath(abs_target, project_dir)
+                if target_rel != rel_path:
+                    targets.add(target_rel)
+
+        if targets:
+            graph[rel_path] = targets
+
+    return find_circular_deps(graph)
