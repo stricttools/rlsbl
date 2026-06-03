@@ -1,6 +1,6 @@
-"""Regression test for plain-target dev_node scaffold root resolution.
+"""Regression tests for plain-target scaffold root resolution.
 
-Bug: when running `rlsbl scaffold --target plain` in a monorepo sub-project,
+Bug 1: when running `rlsbl scaffold --target plain` in a monorepo sub-project,
 `detect_registries()` returns empty (PlainTarget.detect() always returns
 False), so cmd_scaffold falls through to `find_project_root()` which walks
 up and finds the monorepo root. The scaffold_root is then the monorepo root
@@ -9,8 +9,16 @@ the project from the wrong root). This means changelog infrastructure
 (unreleased.jsonl, CHANGELOG.md) gets created for dev_node projects that
 should not have it.
 
-Fix: when --target is explicitly passed, always use Path.cwd() as
+Fix 1: when --target is explicitly passed, always use Path.cwd() as
 scaffold_root.
+
+Bug 2: bare `rlsbl scaffold` (no --target) fails for already-scaffolded
+plain-target projects because detect_registries() returns empty (PlainTarget
+never auto-detects) and the code errors with "no package.json, pyproject.toml,
+or go.mod found" even though .rlsbl/config.json has targets: ["plain"].
+
+Fix 2: when cwd has .rlsbl/config.json, use cwd as scaffold_root and read
+targets from config when detect_registries() is empty.
 """
 
 import json
@@ -118,3 +126,46 @@ class TestScaffoldPlainDevNode:
         assert unreleased.exists(), (
             "unreleased.jsonl should be created for non-dev_node projects"
         )
+
+
+class TestBareScaffoldPlainTarget:
+    """Bare `rlsbl scaffold` (no --target) for already-scaffolded plain projects."""
+
+    def test_bare_scaffold_reads_target_from_config(self, mock_git_repo, monkeypatch):
+        """Already-scaffolded plain-target project re-scaffolds without --target.
+
+        When .rlsbl/config.json exists with targets: ["plain"], bare scaffold
+        should use cwd as scaffold_root and read the target from config instead
+        of erroring with 'no package.json found'.
+        """
+        # Set up a plain-target project that was previously scaffolded
+        rlsbl_dir = mock_git_repo / ".rlsbl"
+        rlsbl_dir.mkdir()
+        (rlsbl_dir / "config.json").write_text(
+            json.dumps({"targets": ["plain"], "private": False})
+        )
+        (mock_git_repo / "VERSION").write_text("0.1.0\n")
+        monkeypatch.chdir(mock_git_repo)
+
+        # Run bare scaffold (no --target flag) via app.test
+        from rlsbl import app
+        app.test(["scaffold", "--no-tag"])
+
+        # Verify .rlsbl/version was written (proves scaffold ran to completion)
+        from rlsbl import __version__
+        version_marker = rlsbl_dir / "version"
+        assert version_marker.exists(), (
+            ".rlsbl/version should be created by scaffold"
+        )
+        assert version_marker.read_text().strip() == __version__
+
+    def test_bare_scaffold_plain_without_config_still_errors(self, tmp_project):
+        """Without .rlsbl/config.json and no manifest files, scaffold errors."""
+        import subprocess
+        result = subprocess.run(
+            ["python", "-m", "rlsbl", "scaffold"],
+            capture_output=True, text=True,
+            cwd=str(tmp_project),
+        )
+        assert result.returncode != 0
+        assert "no package.json" in result.stderr or "not in an rlsbl project" in result.stderr
