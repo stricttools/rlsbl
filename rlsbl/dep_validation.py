@@ -63,6 +63,7 @@ def load_dep_overrides(root: str) -> dict[tuple[str, str], str]:
 def _get_imported_workspace_packages(
     project_dir: str,
     workspace_names: set[str],
+    exclude_dirs: list[str] | None = None,
 ) -> tuple[set[str], set[str]]:
     """Scan a project for workspace imports, split by context.
 
@@ -74,7 +75,7 @@ def _get_imported_workspace_packages(
 
     for scanner in (PythonImportScanner(), DartImportScanner(), NpmImportScanner()):
         try:
-            results = scanner.scan(project_dir, workspace_names)
+            results = scanner.scan(project_dir, workspace_names, exclude_dirs=exclude_dirs)
         except RuntimeError:
             # DartImportScanner raises RuntimeError for missing .g.dart;
             # skip gracefully for dep validation purposes.
@@ -365,7 +366,10 @@ def _collect_init_exports(filepath: str) -> set[str]:
     return exports
 
 
-def find_dead_modules(project_dir: str) -> list[str]:
+def find_dead_modules(
+    project_dir: str,
+    exclude_dirs: list[str] | None = None,
+) -> list[str]:
     """Find Python modules not referenced by any other module in the project.
 
     A module is considered dead if:
@@ -378,6 +382,8 @@ def find_dead_modules(project_dir: str) -> list[str]:
 
     Args:
         project_dir: absolute path to the project root.
+        exclude_dirs: directory paths to skip during the walk
+            (relative to project_dir or absolute).
 
     Returns:
         list of relative paths of dead modules (e.g. ["mylib/unused.py"]).
@@ -389,7 +395,7 @@ def find_dead_modules(project_dir: str) -> list[str]:
         return []
 
     # Collect all .py files excluding non-production paths
-    all_files = walk_source_files(project_dir, (".py",), [])
+    all_files = walk_source_files(project_dir, (".py",), [], exclude_dirs=exclude_dirs)
     production_files = [
         f for f in all_files
         if not _is_non_production_path(f, project_dir)
@@ -475,7 +481,10 @@ def _go_package_dir(filepath: str) -> str:
     return os.path.dirname(filepath)
 
 
-def find_dead_go_packages(project_dir: str) -> list[str]:
+def find_dead_go_packages(
+    project_dir: str,
+    exclude_dirs: list[str] | None = None,
+) -> list[str]:
     """Find Go internal packages not referenced by any non-test code.
 
     A Go internal package is dead if no non-test .go file outside that
@@ -485,6 +494,8 @@ def find_dead_go_packages(project_dir: str) -> list[str]:
 
     Args:
         project_dir: absolute path to the Go project root (where go.mod lives).
+        exclude_dirs: directory paths to skip during the walk
+            (relative to project_dir or absolute).
 
     Returns:
         list of relative paths of dead internal packages
@@ -497,7 +508,7 @@ def find_dead_go_packages(project_dir: str) -> list[str]:
         return []
 
     # Find all .go files in the project
-    all_go_files = walk_source_files(project_dir, (".go",), [])
+    all_go_files = walk_source_files(project_dir, (".go",), [], exclude_dirs=exclude_dirs)
     if not all_go_files:
         return []
 
@@ -683,7 +694,10 @@ def _resolve_npm_entry_points(project_dir: str) -> set[str]:
     return entry_points
 
 
-def _build_npm_import_graph(project_dir: str) -> dict[str, set[str]]:
+def _build_npm_import_graph(
+    project_dir: str,
+    exclude_dirs: list[str] | None = None,
+) -> dict[str, set[str]]:
     """Build a file-level import graph for an npm project.
 
     Uses NpmAstLinter.scan_imports() to collect all imports, then
@@ -695,7 +709,7 @@ def _build_npm_import_graph(project_dir: str) -> dict[str, set[str]]:
     from .lint.npm_ast import NpmAstLinter
 
     linter = NpmAstLinter()
-    raw_imports = linter.scan_imports(project_dir)
+    raw_imports = linter.scan_imports(project_dir, exclude_dirs=exclude_dirs)
 
     graph: dict[str, set[str]] = {}
     for specifier, filepath, _line in raw_imports:
@@ -717,7 +731,10 @@ def _build_npm_import_graph(project_dir: str) -> dict[str, set[str]]:
     return graph
 
 
-def find_dead_npm_modules(project_dir: str) -> list[str]:
+def find_dead_npm_modules(
+    project_dir: str,
+    exclude_dirs: list[str] | None = None,
+) -> list[str]:
     """Find npm source files unreachable from any package.json entry point.
 
     A source file is "dead" if there is no path through the import graph
@@ -725,6 +742,8 @@ def find_dead_npm_modules(project_dir: str) -> list[str]:
 
     Args:
         project_dir: absolute path to the npm project root.
+        exclude_dirs: directory paths to skip during the walk
+            (relative to project_dir or absolute).
 
     Returns:
         sorted list of relative paths of dead source files.
@@ -739,10 +758,10 @@ def find_dead_npm_modules(project_dir: str) -> list[str]:
         # No entry points declared -- cannot determine reachability.
         return []
 
-    import_graph = _build_npm_import_graph(project_dir)
+    import_graph = _build_npm_import_graph(project_dir, exclude_dirs=exclude_dirs)
 
     # Collect all production source files
-    all_files = walk_source_files(project_dir, _NPM_SOURCE_EXTENSIONS, [])
+    all_files = walk_source_files(project_dir, _NPM_SOURCE_EXTENSIONS, [], exclude_dirs=exclude_dirs)
     production_files = {
         os.path.abspath(f)
         for f in all_files
