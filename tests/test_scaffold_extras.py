@@ -428,3 +428,101 @@ def test_bare_scaffold_is_idempotent(mock_git_repo):
     merged_targets = {t: s for t, s in created3}
     assert target in merged_targets
     assert merged_targets[target] == "merged"
+
+
+# --- Monorepo sub-project scaffold tests (git dir at parent) ---
+
+
+def test_scaffold_auto_commits_from_subdirectory(mock_git_repo, monkeypatch, capsys):
+    """Scaffold must auto-commit when CWD is a sub-directory and .git/ is at the repo root.
+
+    This is the monorepo case: scaffold runs from e.g. packages/my-lib/ but .git/
+    lives at the repo root. The old code checked os.path.isdir(".git") which fails
+    in sub-directories, silently skipping the commit.
+    """
+    # Create a subdirectory (simulating a monorepo sub-project)
+    subdir = mock_git_repo / "packages" / "my-lib"
+    subdir.mkdir(parents=True)
+
+    # Set up a template and process it from the subdirectory
+    tpl_dir = subdir / "templates"
+    tpl_dir.mkdir()
+    (tpl_dir / "ci.yml.tpl").write_text("name: CI\n")
+
+    # chdir into the subdirectory where .git/ does NOT exist
+    monkeypatch.chdir(subdir)
+
+    mappings = [{"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"}]
+    created, skipped, warnings, new_hashes = process_mappings(
+        str(tpl_dir), mappings, {}, force=False,
+    )
+
+    assert len(created) == 1
+    assert created[0][1] == "created"
+
+    _finalize_scaffold(
+        existing_hashes={},
+        all_hash_dicts=[new_hashes],
+        created=created,
+        skipped=skipped,
+        warnings=warnings,
+        registry=None,
+        flags={"no-tag": True},
+        registries=[],
+        project_root=str(subdir),
+        config={},
+    )
+
+    captured = capsys.readouterr()
+    assert "Committed scaffold changes." in captured.out
+
+    # Verify scaffold output files were committed.
+    # Check that the .github/ and .rlsbl/ files created in the subdirectory are tracked.
+    result = subprocess.run(
+        ["git", "status", "--porcelain"],
+        capture_output=True, text=True, cwd=str(mock_git_repo),
+    )
+    uncommitted_scaffold = [
+        line for line in result.stdout.strip().splitlines()
+        if line and ("packages/my-lib/.github/" in line
+                     or "packages/my-lib/.rlsbl/" in line)
+    ]
+    assert uncommitted_scaffold == [], (
+        f"Sub-project scaffold files not committed: {uncommitted_scaffold}"
+    )
+
+
+def test_pre_push_hook_installed_from_subdirectory(mock_git_repo, monkeypatch, capsys):
+    """Pre-push hook must be installed at the repo root's .git/hooks/ even when
+    scaffold runs from a sub-directory."""
+    subdir = mock_git_repo / "packages" / "my-lib"
+    subdir.mkdir(parents=True)
+
+    monkeypatch.chdir(subdir)
+
+    _finalize_scaffold(
+        existing_hashes={},
+        all_hash_dicts=[{}],
+        created=[],
+        skipped=[],
+        warnings=[],
+        registry=None,
+        flags={"no-commit": True, "no-tag": True},
+        registries=[],
+        project_root=str(subdir),
+        config={},
+    )
+
+    # Hook should be at the actual .git dir (repo root), not in the subdirectory
+    hook_path = mock_git_repo / ".git" / "hooks" / "pre-push"
+    assert hook_path.exists(), (
+        "pre-push hook should be installed at repo root .git/hooks/ "
+        "even when scaffold runs from a sub-directory"
+    )
+    content = hook_path.read_text()
+    assert "pre-push-check" in content
+
+    # Verify no .git directory was created in the subdirectory
+    assert not (subdir / ".git").exists(), (
+        ".git should NOT be created in the sub-directory"
+    )
