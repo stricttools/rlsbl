@@ -577,6 +577,56 @@ class TestWorkspaceStaleEntriesCheck:
         assert result.status == "fail"
         assert len(result.details) == 1
 
+    def test_dart_project_not_stale(self, mock_git_repo):
+        """Dart project with pubspec.yaml is NOT flagged as stale."""
+        proj_dir = mock_git_repo / "flutter_app"
+        proj_dir.mkdir()
+        (proj_dir / "pubspec.yaml").write_text("name: flutter_app\nversion: 1.0.0\n")
+        ctx = WorkspaceCheckContext(
+            project_root=mock_git_repo,
+            workspace_root=mock_git_repo,
+            config={},
+            projects=[{"path": "flutter_app", "name": "flutter_app"}],
+            graph=None,
+        )
+        result = app._check_defs["workspace-stale-entries"].impl(ctx)
+        assert result.status == "pass"
+
+    def test_rlsbl_config_not_stale(self, mock_git_repo):
+        """Project with .rlsbl/config.json but no traditional manifest is NOT stale."""
+        proj_dir = mock_git_repo / "custom_proj"
+        proj_dir.mkdir()
+        rlsbl_dir = proj_dir / ".rlsbl"
+        rlsbl_dir.mkdir()
+        (rlsbl_dir / "config.json").write_text('{"private": false}')
+        ctx = WorkspaceCheckContext(
+            project_root=mock_git_repo,
+            workspace_root=mock_git_repo,
+            config={},
+            projects=[{"path": "custom_proj", "name": "custom_proj"}],
+            graph=None,
+        )
+        result = app._check_defs["workspace-stale-entries"].impl(ctx)
+        assert result.status == "pass"
+
+    def test_plain_target_with_rlsbl_config_not_stale(self, mock_git_repo):
+        """Plain-target project with VERSION and .rlsbl/config.json is NOT stale."""
+        proj_dir = mock_git_repo / "plain_proj"
+        proj_dir.mkdir()
+        (proj_dir / "VERSION").write_text("1.0.0\n")
+        rlsbl_dir = proj_dir / ".rlsbl"
+        rlsbl_dir.mkdir()
+        (rlsbl_dir / "config.json").write_text('{"private": false}')
+        ctx = WorkspaceCheckContext(
+            project_root=mock_git_repo,
+            workspace_root=mock_git_repo,
+            config={},
+            projects=[{"path": "plain_proj", "name": "plain_proj"}],
+            graph=None,
+        )
+        result = app._check_defs["workspace-stale-entries"].impl(ctx)
+        assert result.status == "pass"
+
 
 # ---------------------------------------------------------------------------
 # Functional tests: private-hook-stale check
