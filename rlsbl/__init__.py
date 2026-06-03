@@ -870,7 +870,7 @@ def cmd_mono_release(dry_run, yes, quiet, allow_dirty, **_kwargs):
     _cmd_batch_release(flags, project_root=root)
 
 
-@mono.command(name="release-init", help="Scaffold a batch release file for all workspace projects. Creates .rlsbl-monorepo/releases/unreleased.toml with [packages.<name>] sections for each non-dev-node project, auto-detecting targets.")
+@mono.command(name="release-init", help="Scaffold a batch release file for all workspace projects by auto-detecting each project's release targets and generating per-package configuration sections. Creates .rlsbl-monorepo/releases/unreleased.toml with a [packages.<name>] section for each non-dev-node project, pre-populated with bump type, description, and include lists. Packages with no unreleased commits since their last tag are rendered as commented-out sections.")
 @strictcli.flag(name="packages", type=str, help="Comma-separated package names to include (default: all)", default="")
 def cmd_mono_release_init(packages, **_kwargs):
     root = _require_project_root()

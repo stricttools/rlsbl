@@ -1,4 +1,4 @@
-"""Batch release init command: scaffold a batch release file for all workspace projects."""
+"""Scaffold a batch release file for all workspace projects, auto-detecting targets and commenting out packages with no unreleased commits."""
 
 import os
 import re
