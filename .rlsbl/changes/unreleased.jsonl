@@ -1,1 +1,2 @@
 {"commits":["4356544a71acb100aa336a2c09588f38f2ef304e"],"user_facing":true,"description":"**Feature matrix.** Support \"n/a\" cells for checks where the toolchain already handles the concern natively (e.g., circular-deps for Go modules).","type":"feature"}
+{"commits":["23a5c2924d421273fd9947a2aca917c14b49406e"],"user_facing":false}
