@@ -2,9 +2,18 @@
 
 # Changelog
 
-## 0.59.1
+## 0.60.0
 
-Fix false-positive deps-undeclared findings in root-project dep scan when sibling project source files are present.
+Go workspace dependency validation, circular dependency detection, Dart dead-module detection, and feature matrix selfdoc directive.
+
+### Features
+
+- **Go workspace dependency validation.** GoImportScanner enables deps-unused, deps-undeclared, deps-runtime-test-only, and deps-dev-in-lib checks for Go projects.
+- **Circular dependency detection.** New `circular-deps` quality check detects intra-package circular import chains using Tarjan's SCC algorithm. Per-language severity: Python=warn, npm=error. Go is skipped (compiler catches cycles).
+- **Dart dead-module detection.** The `dead-modules` check now supports Dart projects, finding unreachable files via entry-point reachability from pubspec.yaml barrel files and bin/ scripts.
+- **Feature matrix directive.** New `table-feature-matrix` selfdoc directive auto-generates a language support table in docs.
+
+## 0.59.1
 
 ### Fixes
 
