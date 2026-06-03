@@ -175,7 +175,17 @@ def run_cmd(retry_config, flags, project_root):
                     monorepo_name, monorepo_project_path, log,
                 )
             except ValueError as e:
+                # Clean up the auto-scaffolded file -- it's untracked and
+                # would block subsequent `rlsbl release run`.
+                if os.path.exists(retry_path):
+                    os.remove(retry_path)
                 print(f"Error in retry file: {e}", file=sys.stderr)
+                print(
+                    "Hint: `rlsbl release retry` is for dispatching CI after a "
+                    "completed release. To re-run a failed release, use "
+                    "`rlsbl release run`.",
+                    file=sys.stderr,
+                )
                 sys.exit(1)
 
     # Use config values
