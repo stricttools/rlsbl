@@ -35,5 +35,8 @@
   "root_files": [
     "docs/_CLAUDE.md",
     "docs/_README.md"
-  ]
+  ],
+  "directives": {
+    "table-feature-matrix": "docs/directives/feature_matrix.py"
+  }
 }

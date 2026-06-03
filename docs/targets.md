@@ -21,6 +21,14 @@ rlsbl supports 12 release targets, each handling version management and scaffold
 | docs | Documentation (selfdoc) | selfdoc.json |
 | spec | Specification | spec.json |
 
+## Check support matrix
+
+Some checks are universal (they run for any target), while others only apply to targets with language-specific import scanners or AST analysis. This matrix shows which target-specific checks support which targets.
+
+:-: table-feature-matrix
+
+All checks not listed here are universal and run for every target.
+
 ## ReleaseTarget protocol
 
 All targets implement the `ReleaseTarget` protocol, a runtime-checkable Python Protocol that defines the required interface for detection, version reading and writing, tag formatting, and scaffolding template resolution. Targets may also provide optional build and publish steps for ecosystems that support automated publishing, such as npm and PyPI.
