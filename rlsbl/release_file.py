@@ -31,42 +31,47 @@ def get_release_file_path(project_dir: str = ".") -> str:
     return os.path.join(project_dir, ".rlsbl", "releases", "unreleased.toml")
 
 
-def read_release_file(path: str) -> ReleaseConfig:
-    """Read and validate a release TOML file.
+def _validate_release_config(data: dict, prefix: str = "") -> ReleaseConfig:
+    """Validate release config fields from a parsed TOML dict.
 
-    Raises FileNotFoundError if the file doesn't exist.
+    Shared validation for both single-project and batch (per-package) release
+    configs. The prefix is prepended to all error messages -- empty string for
+    single-project, "[packages.<name>] " for batch.
+
     Raises ValueError for schema/validation failures.
+    Returns a ReleaseConfig on success.
     """
-    with open(path, "r", encoding="utf-8") as f:
-        data = tomlkit.load(f)
+    def err(msg: str) -> ValueError:
+        return ValueError(f"{prefix}{msg}")
 
     # --- bump ---
     if "bump" not in data:
-        raise ValueError("missing required field: bump")
+        raise err("missing required field: bump")
     bump = data["bump"]
     if not isinstance(bump, str) or bump not in VALID_BUMP_TYPES:
-        raise ValueError(
-            f"bump must be set in unreleased.toml: got {bump!r} (must be one of {VALID_BUMP_TYPES})"
+        raise err(
+            f"bump must be set to a valid value: invalid bump {bump!r} "
+            f"(must be one of {VALID_BUMP_TYPES})"
         )
 
     # --- include ---
     if "include" not in data:
-        raise ValueError("missing required field: include")
+        raise err("missing required field: include")
     include = data["include"]
     if not isinstance(include, list) or not all(isinstance(s, str) for s in include):
-        raise ValueError("include must be a list of strings")
+        raise err("include must be a list of strings")
 
     # --- exclude ---
     if "exclude" not in data:
-        raise ValueError("missing required field: exclude")
+        raise err("missing required field: exclude")
     exclude = data["exclude"]
     if not isinstance(exclude, list) or not all(isinstance(s, str) for s in exclude):
-        raise ValueError("exclude must be a list of strings")
+        raise err("exclude must be a list of strings")
 
     # --- include ∩ exclude must be empty ---
     overlap = set(include) & set(exclude)
     if overlap:
-        raise ValueError(
+        raise err(
             f"targets appear in both include and exclude: {sorted(overlap)}"
         )
 
@@ -75,25 +80,25 @@ def read_release_file(path: str) -> ReleaseConfig:
     targets = {}
     if targets_raw:
         if not isinstance(targets_raw, dict):
-            raise ValueError("targets must be a table of per-target configurations")
+            raise err("targets must be a table of per-target configurations")
         include_set = set(include)
         for name, cfg in targets_raw.items():
             if name not in include_set:
-                raise ValueError(
+                raise err(
                     f"target config for {name!r} but it is not in include"
                 )
             if not isinstance(cfg, dict):
-                raise ValueError(f"target config for {name!r} must be a table")
+                raise err(f"target config for {name!r} must be a table")
             # Validate known fields
             for key, value in cfg.items():
                 if key == "mode":
                     if value not in VALID_TARGET_MODES:
-                        raise ValueError(
+                        raise err(
                             f"invalid mode for target {name!r}: {value!r} "
                             f"(must be one of {VALID_TARGET_MODES})"
                         )
                 else:
-                    raise ValueError(
+                    raise err(
                         f"unknown field {key!r} in target config for {name!r}"
                     )
             targets[name] = dict(cfg)
@@ -102,7 +107,7 @@ def read_release_file(path: str) -> ReleaseConfig:
     for name in include:
         if name.startswith("flutter-"):
             if name not in targets or "mode" not in targets[name]:
-                raise ValueError(
+                raise err(
                     f"Flutter target {name!r} requires a [targets.{name}] section "
                     f"with mode = \"ota\" or mode = \"build\""
                 )
@@ -114,24 +119,24 @@ def read_release_file(path: str) -> ReleaseConfig:
         unique_modes = set(modes.values())
         if len(unique_modes) > 1:
             mode_list = ", ".join(f"{n}={m!r}" for n, m in sorted(modes.items()))
-            raise ValueError(
+            raise err(
                 f"All Flutter targets must have the same mode, "
                 f"but got: {mode_list}"
             )
 
     # --- description (required) ---
     if "description" not in data:
-        raise ValueError("missing required field: description")
+        raise err("missing required field: description")
     description = data["description"]
     if not isinstance(description, str):
-        raise ValueError("description must be a string")
+        raise err("description must be a string")
     if not description.strip():
-        raise ValueError("description must be set in unreleased.toml (a short summary of this release)")
+        raise err("description must be set (a short summary of this release)")
 
     # --- context (optional) ---
     context = data.get("context", "")
     if not isinstance(context, str):
-        raise ValueError("context must be a string")
+        raise err("context must be a string")
 
     return ReleaseConfig(
         bump=bump,
@@ -141,6 +146,18 @@ def read_release_file(path: str) -> ReleaseConfig:
         description=description.strip(),
         context=context.strip(),
     )
+
+
+def read_release_file(path: str) -> ReleaseConfig:
+    """Read and validate a release TOML file.
+
+    Raises FileNotFoundError if the file doesn't exist.
+    Raises ValueError for schema/validation failures.
+    """
+    with open(path, "r", encoding="utf-8") as f:
+        data = tomlkit.load(f)
+
+    return _validate_release_config(data)
 
 
 @dataclass
@@ -184,94 +201,8 @@ def read_batch_release_file(path: str) -> BatchReleaseConfig:
                 f"[packages.{pkg_name}] must be a table"
             )
 
-        # --- bump ---
-        if "bump" not in pkg_data:
-            raise ValueError(f"[packages.{pkg_name}] missing required field: bump")
-        bump = pkg_data["bump"]
-        if not isinstance(bump, str) or bump not in VALID_BUMP_TYPES:
-            raise ValueError(
-                f"[packages.{pkg_name}] invalid bump value: {bump!r} "
-                f"(must be one of {VALID_BUMP_TYPES})"
-            )
-
-        # --- include ---
-        if "include" not in pkg_data:
-            raise ValueError(f"[packages.{pkg_name}] missing required field: include")
-        include = pkg_data["include"]
-        if not isinstance(include, list) or not all(isinstance(s, str) for s in include):
-            raise ValueError(f"[packages.{pkg_name}] include must be a list of strings")
-
-        # --- exclude ---
-        if "exclude" not in pkg_data:
-            raise ValueError(f"[packages.{pkg_name}] missing required field: exclude")
-        exclude = pkg_data["exclude"]
-        if not isinstance(exclude, list) or not all(isinstance(s, str) for s in exclude):
-            raise ValueError(f"[packages.{pkg_name}] exclude must be a list of strings")
-
-        # --- include/exclude overlap ---
-        overlap = set(include) & set(exclude)
-        if overlap:
-            raise ValueError(
-                f"[packages.{pkg_name}] targets appear in both include and exclude: "
-                f"{sorted(overlap)}"
-            )
-
-        # --- targets section (optional) ---
-        targets_raw = pkg_data.get("targets", {})
-        targets = {}
-        if targets_raw:
-            if not isinstance(targets_raw, dict):
-                raise ValueError(
-                    f"[packages.{pkg_name}] targets must be a table"
-                )
-            include_set = set(include)
-            for tname, tcfg in targets_raw.items():
-                if tname not in include_set:
-                    raise ValueError(
-                        f"[packages.{pkg_name}] target config for {tname!r} "
-                        "but it is not in include"
-                    )
-                if not isinstance(tcfg, dict):
-                    raise ValueError(
-                        f"[packages.{pkg_name}] target config for {tname!r} "
-                        "must be a table"
-                    )
-                for key, value in tcfg.items():
-                    if key == "mode":
-                        if value not in VALID_TARGET_MODES:
-                            raise ValueError(
-                                f"[packages.{pkg_name}] invalid mode for target "
-                                f"{tname!r}: {value!r} "
-                                f"(must be one of {VALID_TARGET_MODES})"
-                            )
-                    else:
-                        raise ValueError(
-                            f"[packages.{pkg_name}] unknown field {key!r} "
-                            f"in target config for {tname!r}"
-                        )
-                targets[tname] = dict(tcfg)
-
-        # --- description (required) ---
-        if "description" not in pkg_data:
-            raise ValueError(f"[packages.{pkg_name}] missing required field: description")
-        description = pkg_data["description"]
-        if not isinstance(description, str):
-            raise ValueError(f"[packages.{pkg_name}] description must be a string")
-        if not description.strip():
-            raise ValueError(f"[packages.{pkg_name}] description must be set (a short summary of this release)")
-
-        # --- context (optional) ---
-        context = pkg_data.get("context", "")
-        if not isinstance(context, str):
-            raise ValueError(f"[packages.{pkg_name}] context must be a string")
-
-        packages[pkg_name] = ReleaseConfig(
-            bump=bump,
-            include=list(include),
-            exclude=list(exclude),
-            targets=targets,
-            description=description.strip(),
-            context=context.strip(),
+        packages[pkg_name] = _validate_release_config(
+            pkg_data, prefix=f"[packages.{pkg_name}] "
         )
 
     return BatchReleaseConfig(packages=packages)
