@@ -1,8 +1,0 @@
-# Version bump type: patch, minor, or major
-bump = "minor"
-# Short description of this release (required)
-description = "Unified manifest detection, PlainTarget auto-detection, monorepo sync template resolution, required template variables, and fixes for sub-directory scaffold operations and release-file commit exemption."
-# Optional context explaining why these changes were made
-context = ""
-include = ["npm", "pypi", "docs"]
-exclude = []
