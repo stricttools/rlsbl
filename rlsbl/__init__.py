@@ -353,8 +353,15 @@ def cmd_scaffold(target, force, private, no_commit, skip_shared, no_tag, dry_run
     # up to the monorepo root, causing _is_dev_node_project() to fail.
     from .utils import find_project_root
     cwd_has_project = bool(detect_registries())
+    # Already-scaffolded projects (e.g. plain targets whose detect() returns
+    # False) are recognised by the presence of .rlsbl/config.json in cwd.
+    cwd_has_rlsbl_config = (Path.cwd() / ".rlsbl" / "config.json").is_file()
     scaffold_root = None
     if target:
+        scaffold_root = Path.cwd()
+    elif cwd_has_rlsbl_config:
+        # Re-scaffold: cwd is already an rlsbl project regardless of
+        # whether detect_registries() finds manifest files.
         scaffold_root = Path.cwd()
     elif not cwd_has_project:
         root = find_project_root()
@@ -387,6 +394,10 @@ def cmd_scaffold(target, force, private, no_commit, skip_shared, no_tag, dry_run
         run_cmd(resolved_target, [], flags, ctx=ctx)
     else:
         regs = detect_registries()
+        if not regs and ctx and ctx.config.get("targets"):
+            # Plain targets (and others whose detect() returns False) won't
+            # appear in detect_registries(), but the config records them.
+            regs = list(ctx.config["targets"])
         if not regs:
             print("Error: no package.json, pyproject.toml, or go.mod found.", file=sys.stderr)
             sys.exit(1)
