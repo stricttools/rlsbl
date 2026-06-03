@@ -1017,6 +1017,28 @@ def register_checks(app):
     # Dependency validation
     # ------------------------------------------------------------------
 
+    def _sibling_exclude_dirs(root, project_path, all_projects):
+        """Compute sibling project directories to exclude from a scan.
+
+        For a project at ``project_path``, returns a list of other
+        workspace project directories that are subdirectories of this
+        project's path.  This prevents walk_source_files from descending
+        into sibling projects when the current project is at a parent
+        path (e.g. ``path = "."``).
+        """
+        project_abs = os.path.normpath(os.path.join(root, project_path))
+        exclude = []
+        for other in all_projects:
+            other_path = other["path"]
+            if other_path == project_path:
+                continue
+            other_abs = os.path.normpath(os.path.join(root, other_path))
+            # Only exclude if the other project is strictly inside this
+            # project's directory tree.
+            if other_abs.startswith(project_abs + os.sep):
+                exclude.append(other_abs)
+        return exclude
+
     def _build_dep_import_cache(ctx):
         """Build per-project import scan cache for dependency checks.
 
@@ -1037,8 +1059,10 @@ def register_checks(app):
         cache = {}
         for proj in ctx.projects:
             project_dir = os.path.join(root, proj["path"])
+            exclude = _sibling_exclude_dirs(root, proj["path"], ctx.projects)
             cache[proj["name"]] = _get_imported_workspace_packages(
-                project_dir, workspace_names
+                project_dir, workspace_names,
+                exclude_dirs=exclude or None,
             )
         ctx._dep_import_cache = cache
         return cache
@@ -1268,13 +1292,21 @@ def register_checks(app):
         if not supported:
             return CheckResult("skip", "not a Python, Go, or npm project")
 
+        # In workspace context, exclude sibling project directories
+        exclude = None
+        if isinstance(ctx, WorkspaceCheckContext) and ctx.project is not None:
+            ws_root = str(ctx.workspace_root)
+            exclude = _sibling_exclude_dirs(
+                ws_root, ctx.project["path"], ctx.projects,
+            ) or None
+
         all_dead: list[str] = []
         details: list[str] = []
 
         if "pypi" in target_names:
             from .dep_validation import find_dead_modules
 
-            py_dead = find_dead_modules(root_str)
+            py_dead = find_dead_modules(root_str, exclude_dirs=exclude)
             all_dead.extend(py_dead)
             details.extend(
                 f"{path}: not imported by any other module"
@@ -1284,7 +1316,7 @@ def register_checks(app):
         if "go" in target_names:
             from .dep_validation import find_dead_go_packages
 
-            go_dead = find_dead_go_packages(root_str)
+            go_dead = find_dead_go_packages(root_str, exclude_dirs=exclude)
             all_dead.extend(go_dead)
             details.extend(
                 f"{path}: internal package not imported outside itself"
@@ -1294,7 +1326,7 @@ def register_checks(app):
         if "npm" in target_names:
             from .dep_validation import find_dead_npm_modules
 
-            npm_dead = find_dead_npm_modules(root_str)
+            npm_dead = find_dead_npm_modules(root_str, exclude_dirs=exclude)
             all_dead.extend(npm_dead)
             details.extend(
                 f"{path}: not reachable from any entry point"
