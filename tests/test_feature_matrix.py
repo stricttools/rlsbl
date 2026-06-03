@@ -81,9 +81,9 @@ class TestCheckTargetsConsistencyWithCode:
     """Verify CHECK_TARGETS matches the actual skip logic in check functions."""
 
     def test_dead_modules_targets(self):
-        """dead-modules check supports pypi, go, npm per its implementation."""
+        """dead-modules check supports pypi, go, npm, dart per its implementation."""
         targets = CHECK_TARGETS["dead-modules"]
-        assert targets == frozenset({"pypi", "go", "npm"})
+        assert targets == frozenset({"pypi", "go", "npm", "dart"})
 
     def test_library_lint_targets(self):
         """library-lint supports python/pypi, go, npm per _detect_languages."""
