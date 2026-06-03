@@ -10,6 +10,7 @@ from rlsbl.dep_validation import (
     check_runtime_test_only,
     check_undeclared_deps,
     check_unused_deps,
+    find_dead_go_packages,
     find_dead_modules,
     load_dep_overrides,
 )
@@ -546,6 +547,135 @@ class TestFindDeadModules:
         assert "mylib/sub/detail.py" not in dead
 
 
+class TestFindDeadGoPackages:
+    """find_dead_go_packages detects unreferenced Go internal packages."""
+
+    _GO_MOD = 'module github.com/user/myapp\n\ngo 1.21\n'
+
+    def test_used_internal_package_not_flagged(self, tmp_path):
+        """An internal package imported by non-test code is not flagged."""
+        (tmp_path / "go.mod").write_text(self._GO_MOD)
+        (tmp_path / "main.go").write_text(
+            'package main\n\n'
+            'import "github.com/user/myapp/internal/auth"\n\n'
+            'func main() { auth.Run() }\n'
+        )
+        internal = tmp_path / "internal" / "auth"
+        internal.mkdir(parents=True)
+        (internal / "auth.go").write_text(
+            'package auth\n\nfunc Run() {}\n'
+        )
+
+        dead = find_dead_go_packages(str(tmp_path))
+        assert dead == []
+
+    def test_unused_internal_package_flagged(self, tmp_path):
+        """An internal package not imported by anything is flagged as dead."""
+        (tmp_path / "go.mod").write_text(self._GO_MOD)
+        (tmp_path / "main.go").write_text(
+            'package main\n\nfunc main() {}\n'
+        )
+        internal = tmp_path / "internal" / "unused"
+        internal.mkdir(parents=True)
+        (internal / "unused.go").write_text(
+            'package unused\n\nfunc Noop() {}\n'
+        )
+
+        dead = find_dead_go_packages(str(tmp_path))
+        assert "internal/unused" in dead
+
+    def test_no_internal_directory_returns_empty(self, tmp_path):
+        """A Go project with no internal/ directory returns empty list."""
+        (tmp_path / "go.mod").write_text(self._GO_MOD)
+        (tmp_path / "main.go").write_text(
+            'package main\n\nfunc main() {}\n'
+        )
+        pkg = tmp_path / "pkg" / "util"
+        pkg.mkdir(parents=True)
+        (pkg / "util.go").write_text(
+            'package util\n\nfunc Help() {}\n'
+        )
+
+        dead = find_dead_go_packages(str(tmp_path))
+        assert dead == []
+
+    def test_test_files_do_not_count_as_references(self, tmp_path):
+        """_test.go files importing an internal package do not save it."""
+        (tmp_path / "go.mod").write_text(self._GO_MOD)
+        (tmp_path / "main.go").write_text(
+            'package main\n\nfunc main() {}\n'
+        )
+        internal = tmp_path / "internal" / "helper"
+        internal.mkdir(parents=True)
+        (internal / "helper.go").write_text(
+            'package helper\n\nfunc H() {}\n'
+        )
+        # Only a test file imports this package
+        (tmp_path / "main_test.go").write_text(
+            'package main\n\n'
+            'import "github.com/user/myapp/internal/helper"\n\n'
+            'func TestX() { helper.H() }\n'
+        )
+
+        dead = find_dead_go_packages(str(tmp_path))
+        assert "internal/helper" in dead
+
+    def test_no_go_mod_returns_empty(self, tmp_path):
+        """A directory without go.mod returns empty list."""
+        (tmp_path / "main.go").write_text(
+            'package main\n\nfunc main() {}\n'
+        )
+        dead = find_dead_go_packages(str(tmp_path))
+        assert dead == []
+
+    def test_multiple_internal_packages_mixed(self, tmp_path):
+        """Multiple internal packages: used ones pass, unused ones flagged."""
+        (tmp_path / "go.mod").write_text(self._GO_MOD)
+        (tmp_path / "main.go").write_text(
+            'package main\n\n'
+            'import "github.com/user/myapp/internal/used"\n\n'
+            'func main() { used.Run() }\n'
+        )
+
+        used_pkg = tmp_path / "internal" / "used"
+        used_pkg.mkdir(parents=True)
+        (used_pkg / "used.go").write_text(
+            'package used\n\nfunc Run() {}\n'
+        )
+
+        dead_pkg = tmp_path / "internal" / "dead"
+        dead_pkg.mkdir(parents=True)
+        (dead_pkg / "dead.go").write_text(
+            'package dead\n\nfunc Nothing() {}\n'
+        )
+
+        dead = find_dead_go_packages(str(tmp_path))
+        assert "internal/used" not in dead
+        assert "internal/dead" in dead
+
+    def test_self_import_does_not_count(self, tmp_path):
+        """Files within an internal package importing their own package
+        do not count as external references."""
+        (tmp_path / "go.mod").write_text(self._GO_MOD)
+        (tmp_path / "main.go").write_text(
+            'package main\n\nfunc main() {}\n'
+        )
+
+        internal = tmp_path / "internal" / "lonely"
+        internal.mkdir(parents=True)
+        # lonely package has two files; one references a symbol from the
+        # same package, but that's intra-package, not an external reference.
+        (internal / "a.go").write_text(
+            'package lonely\n\nfunc A() { B() }\n'
+        )
+        (internal / "b.go").write_text(
+            'package lonely\n\nfunc B() {}\n'
+        )
+
+        dead = find_dead_go_packages(str(tmp_path))
+        assert "internal/lonely" in dead
+
+
 class TestDepsChecksIntegration:
     """Integration tests: checks registered on the strictcli check system."""
 
@@ -861,11 +991,11 @@ class TestDepsChecksIntegration:
         captured = self._capture_checks()
         assert "dead-modules" in captured
 
-    def test_dead_modules_skip_non_python(self, tmp_path):
-        """dead-modules skips for non-Python projects."""
+    def test_dead_modules_skip_unsupported_target(self, tmp_path):
+        """dead-modules skips for projects that are neither Python nor Go."""
         from rlsbl.context import ProjectContext
 
-        # Create a non-Python project (npm only)
+        # Create an npm-only project (no Python, no Go)
         (tmp_path / "package.json").write_text('{"name":"test","version":"1.0.0"}')
 
         captured = self._capture_checks()
@@ -902,6 +1032,51 @@ class TestDepsChecksIntegration:
         (pkg / "__init__.py").write_text("from .core import run\n")
         (pkg / "core.py").write_text("def run(): pass\n")
         (pkg / "orphan.py").write_text("def unused(): pass\n")
+
+        captured = self._capture_checks()
+        ctx = ProjectContext(project_root=Path(tmp_path), workspace_root=None, config={})
+        result = captured["dead-modules"](ctx)
+        assert result.status == "warn"
+        assert "1 dead module" in result.message
+
+    def test_dead_modules_go_pass_clean(self, tmp_path):
+        """dead-modules passes for a Go project with all internal packages used."""
+        from rlsbl.context import ProjectContext
+
+        (tmp_path / "go.mod").write_text(
+            'module example.com/proj\n\ngo 1.21\n'
+        )
+        (tmp_path / "main.go").write_text(
+            'package main\n\n'
+            'import "example.com/proj/internal/core"\n\n'
+            'func main() { core.Run() }\n'
+        )
+        core_dir = tmp_path / "internal" / "core"
+        core_dir.mkdir(parents=True)
+        (core_dir / "core.go").write_text(
+            'package core\n\nfunc Run() {}\n'
+        )
+
+        captured = self._capture_checks()
+        ctx = ProjectContext(project_root=Path(tmp_path), workspace_root=None, config={})
+        result = captured["dead-modules"](ctx)
+        assert result.status == "pass"
+
+    def test_dead_modules_go_warn_unreferenced(self, tmp_path):
+        """dead-modules warns for a Go project with an unused internal package."""
+        from rlsbl.context import ProjectContext
+
+        (tmp_path / "go.mod").write_text(
+            'module example.com/proj\n\ngo 1.21\n'
+        )
+        (tmp_path / "main.go").write_text(
+            'package main\n\nfunc main() {}\n'
+        )
+        orphan_dir = tmp_path / "internal" / "orphan"
+        orphan_dir.mkdir(parents=True)
+        (orphan_dir / "orphan.go").write_text(
+            'package orphan\n\nfunc Unused() {}\n'
+        )
 
         captured = self._capture_checks()
         ctx = ProjectContext(project_root=Path(tmp_path), workspace_root=None, config={})
