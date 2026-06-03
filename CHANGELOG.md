@@ -2,9 +2,15 @@
 
 # Changelog
 
-## 0.59.0
+## 0.59.1
 
-Unified manifest detection, PlainTarget auto-detection, monorepo sync template resolution, required template variables, and fixes for sub-directory scaffold operations and release-file commit exemption.
+Fix false-positive deps-undeclared findings in root-project dep scan when sibling project source files are present.
+
+### Fixes
+
+- **Fix.** Root-project dep scan no longer produces false-positive deps-undeclared findings from sibling project source files.
+
+## 0.59.0
 
 ### Features
 
