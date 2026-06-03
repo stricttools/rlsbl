@@ -9,6 +9,7 @@ import json
 import os
 import re
 import tomllib
+from collections import deque
 from dataclasses import dataclass
 
 from .import_scanners import (
@@ -812,6 +813,226 @@ def find_dead_npm_modules(
                 queue.append(neighbor)
 
     # Dead = production files not reachable
+    dead = sorted(
+        os.path.relpath(f, project_dir)
+        for f in production_files
+        if f not in reachable
+    )
+    return dead
+
+
+# ---------------------------------------------------------------------------
+# Dart dead module detection (entry-point reachability)
+# ---------------------------------------------------------------------------
+
+# Regex matching Dart import/export statements.
+# Captures the quoted path from: import 'path'; / export 'path';
+# Also handles double quotes and 'show'/'hide'/'as' suffixes.
+_DART_IMPORT_EXPORT_RE = re.compile(
+    r"""^\s*(?:import|export)\s+['"]([^'"]+)['"]"""
+)
+
+
+def _read_dart_package_name(project_dir: str) -> str | None:
+    """Read the package name from pubspec.yaml.
+
+    Returns None if pubspec.yaml does not exist or has no 'name' field.
+    """
+    pubspec_path = os.path.join(project_dir, "pubspec.yaml")
+    if not os.path.isfile(pubspec_path):
+        return None
+    try:
+        from ruamel.yaml import YAML
+        yaml = YAML(typ="safe")
+        with open(pubspec_path, "r", encoding="utf-8") as f:
+            data = yaml.load(f)
+    except Exception:
+        return None
+    if not isinstance(data, dict):
+        return None
+    return data.get("name")
+
+
+def _resolve_dart_entry_points(project_dir: str) -> set[str]:
+    """Determine Dart entry point files for reachability analysis.
+
+    Entry points are:
+    - lib/<package_name>.dart  (barrel file / main library entry)
+    - bin/*.dart               (executable scripts)
+
+    Returns a set of absolute file paths.
+    """
+    project_dir = os.path.abspath(project_dir)
+    entry_points: set[str] = set()
+
+    pkg_name = _read_dart_package_name(project_dir)
+    if pkg_name:
+        barrel = os.path.join(project_dir, "lib", f"{pkg_name}.dart")
+        if os.path.isfile(barrel):
+            entry_points.add(os.path.abspath(barrel))
+
+    bin_dir = os.path.join(project_dir, "bin")
+    if os.path.isdir(bin_dir):
+        for name in os.listdir(bin_dir):
+            if name.endswith(".dart"):
+                entry_points.add(
+                    os.path.abspath(os.path.join(bin_dir, name))
+                )
+
+    return entry_points
+
+
+def _resolve_dart_import(
+    specifier: str,
+    importing_file: str,
+    project_dir: str,
+    package_name: str | None,
+) -> str | None:
+    """Resolve a Dart import specifier to an absolute file path.
+
+    Handles:
+    - Relative imports: 'src/foo.dart', '../utils.dart'
+    - Self-package imports: 'package:mylib/src/foo.dart' -> lib/src/foo.dart
+
+    Returns absolute path if resolved, None otherwise.
+    Skips dart: imports and external package: imports.
+    """
+    if specifier.startswith("dart:"):
+        return None
+
+    # Self-package import: package:<name>/path
+    if specifier.startswith("package:"):
+        without_prefix = specifier[len("package:"):]
+        slash_idx = without_prefix.find("/")
+        if slash_idx < 0:
+            return None
+        pkg = without_prefix[:slash_idx]
+        rest = without_prefix[slash_idx + 1:]
+        if pkg != package_name:
+            # External package -- not part of intra-package graph
+            return None
+        # Self-package: resolve to lib/<rest>
+        resolved = os.path.normpath(os.path.join(project_dir, "lib", rest))
+        if os.path.isfile(resolved):
+            return os.path.abspath(resolved)
+        return None
+
+    # Relative import: resolve relative to the importing file's directory
+    import_dir = os.path.dirname(importing_file)
+    resolved = os.path.normpath(os.path.join(import_dir, specifier))
+    if os.path.isfile(resolved):
+        return os.path.abspath(resolved)
+    return None
+
+
+def _build_dart_import_graph(
+    project_dir: str,
+    exclude_dirs: list[str] | None = None,
+) -> dict[str, set[str]]:
+    """Build a file-level import graph for a Dart project.
+
+    Walks all .dart files, extracts import/export statements via regex,
+    and resolves relative and self-package imports to absolute paths.
+
+    Returns a dict mapping each source file's absolute path to a set
+    of absolute paths it imports/exports (only resolved intra-package refs).
+    """
+    project_dir = os.path.abspath(project_dir)
+    package_name = _read_dart_package_name(project_dir)
+
+    dart_files = walk_source_files(
+        project_dir, (".dart",), [], exclude_dirs=exclude_dirs,
+    )
+
+    graph: dict[str, set[str]] = {}
+    for filepath in dart_files:
+        abs_filepath = os.path.abspath(filepath)
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                content = f.read()
+        except (OSError, UnicodeDecodeError):
+            continue
+
+        deps: set[str] = set()
+        for line in content.splitlines():
+            m = _DART_IMPORT_EXPORT_RE.match(line)
+            if not m:
+                continue
+            specifier = m.group(1)
+            resolved = _resolve_dart_import(
+                specifier, abs_filepath, project_dir, package_name,
+            )
+            if resolved is not None:
+                deps.add(resolved)
+
+        if deps:
+            graph[abs_filepath] = deps
+
+    return graph
+
+
+def find_dead_dart_modules(
+    project_dir: str,
+    exclude_dirs: list[str] | None = None,
+) -> list[str]:
+    """Find Dart source files unreachable from any entry point.
+
+    A .dart file is "dead" if there is no path through the import/export
+    graph from any entry point (barrel file, bin scripts) to that file.
+
+    Test files (test/, *_test.dart) are excluded from the scan.
+
+    Args:
+        project_dir: absolute path to the Dart project root.
+        exclude_dirs: directory paths to skip during the walk
+            (relative to project_dir or absolute).
+
+    Returns:
+        sorted list of relative paths of dead source files.
+    """
+    project_dir = os.path.abspath(project_dir)
+
+    if not os.path.isfile(os.path.join(project_dir, "pubspec.yaml")):
+        return []
+
+    entry_points = _resolve_dart_entry_points(project_dir)
+    if not entry_points:
+        return []
+
+    import_graph = _build_dart_import_graph(
+        project_dir, exclude_dirs=exclude_dirs,
+    )
+
+    # Collect all production .dart files
+    all_files = walk_source_files(
+        project_dir, (".dart",), [], exclude_dirs=exclude_dirs,
+    )
+    production_files = {
+        os.path.abspath(f)
+        for f in all_files
+        if not _is_non_production_path(f, project_dir)
+    }
+
+    if not production_files:
+        return []
+
+    # BFS from entry points
+    reachable: set[str] = set()
+    queue: deque[str] = deque()
+
+    for ep in entry_points:
+        if ep not in reachable:
+            reachable.add(ep)
+            queue.append(ep)
+
+    while queue:
+        current = queue.popleft()
+        for neighbor in import_graph.get(current, set()):
+            if neighbor not in reachable:
+                reachable.add(neighbor)
+                queue.append(neighbor)
+
+    # Dead = production files not reachable from any entry point
     dead = sorted(
         os.path.relpath(f, project_dir)
         for f in production_files
