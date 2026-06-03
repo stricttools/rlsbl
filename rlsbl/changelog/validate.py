@@ -137,6 +137,7 @@ def _is_changelog_only_commit(sha: str) -> bool:
 
     Returns True when every file changed by the commit matches one of:
     - ``.rlsbl/changes/`` (any depth)
+    - ``.rlsbl/releases/`` (any depth)
     - ``.rlsbl/version``
     - ``CHANGELOG.md``
 
@@ -164,6 +165,7 @@ def _is_changelog_path(path: str) -> bool:
 
     Recognised patterns (with optional leading directory prefix):
     - ``[prefix/].rlsbl/changes/...``
+    - ``[prefix/].rlsbl/releases/...``
     - ``[prefix/].rlsbl/version``
     - ``[prefix/]CHANGELOG.md``
     """
@@ -174,6 +176,8 @@ def _is_changelog_path(path: str) -> bool:
     for i, part in enumerate(parts):
         tail = "/".join(parts[i:])
         if tail.startswith(".rlsbl/changes/"):
+            return True
+        if tail.startswith(".rlsbl/releases/"):
             return True
         if tail == ".rlsbl/version":
             return True

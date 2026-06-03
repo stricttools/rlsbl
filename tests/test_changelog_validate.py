@@ -741,6 +741,24 @@ class TestChangelogOnlyCommitExemption:
         )
         assert any("skipped 1 changelog-only" in d for d in details)
 
+    def test_release_file_only_commit_exempt(self, git_repo):
+        """A commit that only touches .rlsbl/releases/ is exempt."""
+        sha_code = _make_commit(git_repo, "code.py", "add code")
+        entries = [ChangelogEntry(commits=[sha_code], user_facing=False)]
+
+        # Commit that only touches .rlsbl/releases/unreleased.toml
+        releases_dir = git_repo / ".rlsbl" / "releases"
+        releases_dir.mkdir(parents=True, exist_ok=True)
+        (releases_dir / "unreleased.toml").write_text("bump = 'patch'\n")
+        _run_git(git_repo, "add", ".rlsbl/releases/unreleased.toml")
+        _run_git(git_repo, "commit", "-m", "add release file")
+
+        passed, details = check_coverage(entries)
+        assert passed is True, (
+            f".rlsbl/releases/-only commit should be exempt: {details}"
+        )
+        assert any("skipped 1 changelog-only" in d for d in details)
+
 
 class TestIsChangelogPath:
     """Unit tests for _is_changelog_path."""
@@ -777,6 +795,15 @@ class TestIsChangelogPath:
         # A file named CHANGELOG.md nested deeper should still match
         assert _is_changelog_path("subdir/CHANGELOG.md") is True
 
+    def test_releases_unreleased_toml(self):
+        assert _is_changelog_path(".rlsbl/releases/unreleased.toml") is True
+
+    def test_monorepo_releases_prefixed(self):
+        assert _is_changelog_path("python/.rlsbl/releases/unreleased.toml") is True
+
+    def test_releases_subfile(self):
+        assert _is_changelog_path(".rlsbl/releases/retry.toml") is True
+
 
 class TestIsChangelogOnlyCommit:
     """Integration tests for _is_changelog_only_commit with real git commits."""
@@ -810,6 +837,28 @@ class TestIsChangelogOnlyCommit:
         _run_git(git_repo, "commit", "-m", "update changelog")
         sha = _git_head(git_repo)
         assert _is_changelog_only_commit(sha) is True
+
+    def test_commit_touching_only_releases_dir(self, git_repo):
+        """A commit touching only .rlsbl/releases/ files is changelog-only."""
+        releases_dir = git_repo / ".rlsbl" / "releases"
+        releases_dir.mkdir(parents=True, exist_ok=True)
+        (releases_dir / "unreleased.toml").write_text("bump = 'patch'\n")
+        _run_git(git_repo, "add", ".rlsbl/releases/unreleased.toml")
+        _run_git(git_repo, "commit", "-m", "add release file")
+        sha = _git_head(git_repo)
+        assert _is_changelog_only_commit(sha) is True
+
+    def test_commit_touching_releases_and_source(self, git_repo):
+        """A commit touching .rlsbl/releases/ AND source is NOT changelog-only."""
+        releases_dir = git_repo / ".rlsbl" / "releases"
+        releases_dir.mkdir(parents=True, exist_ok=True)
+        (releases_dir / "unreleased.toml").write_text("bump = 'minor'\n")
+        (git_repo / "app.py").write_text("print('hi')\n")
+        _run_git(git_repo, "add", ".rlsbl/releases/unreleased.toml")
+        _run_git(git_repo, "add", "app.py")
+        _run_git(git_repo, "commit", "-m", "release file and source")
+        sha = _git_head(git_repo)
+        assert _is_changelog_only_commit(sha) is False
 
 
 class TestMonorepoPathScoping:
