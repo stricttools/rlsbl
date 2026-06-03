@@ -1,0 +1,3 @@
+{"commits":["34b950e669c48723c03f654132703ffc4dea0ec5","abd5ac263425807888a7177742a56ecf13fb0054","f9bb007ff8dd6581a49b6b9e677b8af84ac00ab5"],"user_facing":true,"description":"**Fix.** Root-project dep scan no longer produces false-positive deps-undeclared findings from sibling project source files.","type":"fix"}
+{"commits":["8bcfc1105adb832afa050b37894fa6939ed17955","d9cceada775baeb738baff49726bf83f7dda27db","32e47f5e0eca187c684b8bc8dd4f5905983b669f"],"user_facing":false}
+{"commits":["9b55276322bee3fb35e3b97f5c96af546ae44f66"],"user_facing":false}
