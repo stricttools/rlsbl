@@ -9,19 +9,74 @@ from rlsbl.targets import TARGETS
 
 
 class TestPlainTargetDetect:
-    """PlainTarget.detect() always returns False (opt-in only)."""
+    """PlainTarget.detect() returns True when VERSION exists and no other target manifests are present."""
 
-    def test_detect_always_false_empty_dir(self):
+    def test_detect_false_empty_dir(self):
         target = PlainTarget()
         with tempfile.TemporaryDirectory() as d:
             assert target.detect(d) is False
 
-    def test_detect_always_false_with_version_file(self):
+    def test_detect_true_version_only(self):
         target = PlainTarget()
         with tempfile.TemporaryDirectory() as d:
             with open(os.path.join(d, "VERSION"), "w") as f:
                 f.write("1.0.0\n")
+            assert target.detect(d) is True
+
+    def test_detect_false_with_package_json(self):
+        target = PlainTarget()
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "VERSION"), "w") as f:
+                f.write("1.0.0\n")
+            with open(os.path.join(d, "package.json"), "w") as f:
+                f.write("{}")
             assert target.detect(d) is False
+
+    def test_detect_false_with_pyproject_toml(self):
+        target = PlainTarget()
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "VERSION"), "w") as f:
+                f.write("1.0.0\n")
+            with open(os.path.join(d, "pyproject.toml"), "w") as f:
+                f.write("[project]\n")
+            assert target.detect(d) is False
+
+    def test_detect_false_with_go_mod(self):
+        target = PlainTarget()
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "VERSION"), "w") as f:
+                f.write("1.0.0\n")
+            with open(os.path.join(d, "go.mod"), "w") as f:
+                f.write("module example\n")
+            assert target.detect(d) is False
+
+    def test_detect_false_with_cargo_toml(self):
+        target = PlainTarget()
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "VERSION"), "w") as f:
+                f.write("1.0.0\n")
+            with open(os.path.join(d, "Cargo.toml"), "w") as f:
+                f.write("[package]\n")
+            assert target.detect(d) is False
+
+    def test_detect_false_no_version_file(self):
+        """Other manifests present but no VERSION file -- still False."""
+        target = PlainTarget()
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "README.md"), "w") as f:
+                f.write("# Hello\n")
+            assert target.detect(d) is False
+
+    def test_detect_true_version_with_unrelated_files(self):
+        """VERSION exists with non-manifest files -- should detect."""
+        target = PlainTarget()
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "VERSION"), "w") as f:
+                f.write("1.0.0\n")
+            with open(os.path.join(d, "README.md"), "w") as f:
+                f.write("# Hello\n")
+            os.makedirs(os.path.join(d, "src"))
+            assert target.detect(d) is True
 
 
 class TestPlainTargetReadVersion:

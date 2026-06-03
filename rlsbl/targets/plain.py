@@ -8,6 +8,29 @@ from .base import BaseTarget
 
 VERSION_FILE = "VERSION"
 
+# Primary manifest files for all other targets. If any of these exist,
+# the directory belongs to a more specific target and plain should not
+# auto-detect.
+_OTHER_TARGET_MANIFESTS = (
+    "package.json",        # npm
+    "pyproject.toml",      # pypi
+    "go.mod",              # go
+    "Cargo.toml",          # cargo
+    "pubspec.yaml",        # dart, flutter-ios, flutter-android
+    "Package.swift",       # swift, swift-apple
+    "mix.exs",             # hex
+    "deno.json",           # deno
+    "deno.jsonc",          # deno
+    "Dockerfile",          # docker
+    "build.gradle.kts",    # maven
+    "build.gradle",        # maven
+    "pom.xml",             # maven
+    "build.zig.zon",       # zig
+    "build.zig",           # zig
+    "pgdesign.toml",       # pgdesign
+    "version.json",        # spec
+)
+
 
 class PlainTarget(BaseTarget):
     """Release target for projects that have no build system or package registry."""
@@ -17,8 +40,14 @@ class PlainTarget(BaseTarget):
         return "plain"
 
     def detect(self, dir_path):
-        # Opt-in only via --target plain or config; never auto-detected.
-        return False
+        # Auto-detect when a VERSION file exists and no other target's
+        # primary manifest is present.
+        if not os.path.exists(os.path.join(dir_path, VERSION_FILE)):
+            return False
+        for manifest in _OTHER_TARGET_MANIFESTS:
+            if os.path.exists(os.path.join(dir_path, manifest)):
+                return False
+        return True
 
     def read_version(self, dir_path):
         """Read version from the VERSION file."""
