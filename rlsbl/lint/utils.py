@@ -14,19 +14,38 @@ def walk_source_files(
     project_path: str,
     extensions: tuple[str, ...],
     exclude_patterns: list[str],
+    exclude_dirs: list[str] | None = None,
 ) -> list[str]:
     """Walk project directory, return source files matching extensions.
 
     Excludes directories in _EXCLUDED_DIRS and .egg-info dirs.
     Applies exclude_patterns (fnmatch) against relative paths.
+    Skips directories whose normalized absolute path matches any entry
+    in exclude_dirs (used to exclude sibling workspace project directories).
     By default (empty exclude_patterns), all files including tests are included.
     """
+    # Normalize exclude_dirs to absolute paths for reliable matching.
+    normalized_exclude_dirs: frozenset[str] = frozenset()
+    if exclude_dirs:
+        normalized_exclude_dirs = frozenset(
+            os.path.normpath(os.path.join(project_path, d))
+            for d in exclude_dirs
+        )
+
     results = []
     for dirpath, dirs, filenames in os.walk(project_path):
         dirs[:] = [
             d for d in dirs
             if d not in _EXCLUDED_DIRS and not d.endswith(".egg-info")
         ]
+
+        # Prune directories that match exclude_dirs (sibling project paths)
+        if normalized_exclude_dirs:
+            dirs[:] = [
+                d for d in dirs
+                if os.path.normpath(os.path.join(dirpath, d))
+                not in normalized_exclude_dirs
+            ]
 
         # Prune directories that match exclude patterns
         if exclude_patterns:
