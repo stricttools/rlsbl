@@ -8,6 +8,7 @@ The check functions return :class:`strictcli.CheckResult` with lowercase
 status strings: ``"pass"``, ``"fail"``, ``"warn"``, ``"skip"``.
 """
 
+import json
 import os
 import subprocess
 import sys
@@ -711,8 +712,24 @@ def register_checks(app):
                 continue
             for manifest in PROJECT_MANIFESTS:
                 if os.path.isfile(os.path.join(dir_path, manifest)):
+                    # Skip private npm workspace roots (not real projects)
+                    if manifest == "package.json":
+                        try:
+                            with open(os.path.join(dir_path, manifest)) as f:
+                                pkg = json.load(f)
+                            if pkg.get("private") is True:
+                                continue
+                        except (json.JSONDecodeError, OSError):
+                            pass
                     found_project_dirs.add(entry)
                     break
+
+        # Filter out directories that are parents of registered paths
+        # (e.g., "web" is a parent if "web/frontend" is registered)
+        found_project_dirs -= {
+            d for d in found_project_dirs
+            if any(rp.startswith(d + "/") for rp in registered_paths)
+        }
 
         unregistered = sorted(found_project_dirs - registered_paths)
         if unregistered:
