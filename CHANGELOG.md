@@ -2,9 +2,15 @@
 
 # Changelog
 
-## 0.60.0
+## 0.60.1
 
-Go workspace dependency validation, circular dependency detection, Dart dead-module detection, and feature matrix selfdoc directive.
+Feature matrix n/a support for toolchain-native checks
+
+### Features
+
+- **Feature matrix.** Support "n/a" cells for checks where the toolchain already handles the concern natively (e.g., circular-deps for Go modules).
+
+## 0.60.0
 
 ### Features
 
