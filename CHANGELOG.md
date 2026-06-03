@@ -2,9 +2,35 @@
 
 # Changelog
 
-## 0.55.0
+## 0.56.0
 
-Monorepo release-init command, Go dead-modules detection, scaffold and workspace check fixes
+New checks (license-file, scaffold-unreplaced-vars, dead-modules-npm), batch release-init improvements, and scaffold/release fixes
+
+<details>
+<summary>Context</summary>
+
+LICENSE is no longer scaffold-managed -- projects own their LICENSE file, enforced by the new license-file check. Batch release-init now supports Flutter targets and includes TOML comments. Several fixes for retry.toml cleanup, bare scaffold on plain targets, workspace-unregistered false positives, and shared release config validation.
+
+</details>
+
+### Breaking
+
+- **LICENSE removed from scaffold.** Projects must now manage their own LICENSE file. The `license-file` check enforces its presence.
+
+### Features
+
+- **npm dead module detection.** New `dead-modules-npm` check detects unreachable modules in npm packages by tracing entry-point reachability through the dependency graph.
+- **New checks.** `license-file` errors if LICENSE is missing, empty, or contains template variables. `scaffold-unreplaced-vars` detects leftover template variables in scaffold-generated files.
+- **Batch release-init improvements.** Flutter targets now get per-target config sections. Release files include TOML comments and the `context` field.
+
+### Fixes
+
+- **Fix retry.toml blocking release.** `release retry` now cleans up the scaffolded retry.toml when validation fails, preventing it from blocking subsequent `release run` attempts.
+- **Fix bare scaffold for plain targets.** `rlsbl scaffold` now reads targets from config.json for already-scaffolded projects that use plain targets, instead of erroring.
+- **Fix workspace-unregistered false positives.** The check now skips private `package.json` files and parent directories of registered projects.
+- **Shared release config validation.** Single and batch release paths now use a shared validator, fixing missing Flutter validation in the batch path.
+
+## 0.55.0
 
 ### Features
 
