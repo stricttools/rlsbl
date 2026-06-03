@@ -76,6 +76,7 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "dev-node-boundary": "workspace",
     "layers-violations": "workspace",
     "deps-stale": "workspace",
+    "dead-workspace-packages": "workspace",
     # --- workspace + language-specific import scanners ---
     "deps-unused": frozenset({"pypi", "dart", "npm"}),
     "deps-undeclared": frozenset({"pypi", "dart", "npm"}),
@@ -982,6 +983,31 @@ def register_checks(app):
                 details=violations,
             )
         return CheckResult("pass", "dev node boundary clean")
+
+    # ------------------------------------------------------------------
+    # Dead workspace packages
+    # ------------------------------------------------------------------
+
+    @app.check("dead-workspace-packages")
+    def check_dead_workspace_packages(ctx):
+        """Library packages must be imported by at least one workspace sibling."""
+        if not isinstance(ctx, WorkspaceCheckContext):
+            return CheckResult("skip", "not a monorepo workspace")
+
+        from .dep_validation import find_dead_workspace_packages
+
+        import_cache = _build_dep_import_cache(ctx)
+        dead = find_dead_workspace_packages(ctx.projects, import_cache)
+
+        if not dead:
+            return CheckResult("pass", "all library packages have workspace importers")
+
+        details = [d.message for d in dead]
+        return CheckResult(
+            "warn",
+            f"{len(dead)} dead workspace package(s)",
+            details=details,
+        )
 
     # ------------------------------------------------------------------
     # Dependency validation
