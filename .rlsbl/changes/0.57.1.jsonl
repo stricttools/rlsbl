@@ -1,0 +1,2 @@
+{"commits":["dc87473c5b0c3da6fcc3b249a79be4f2568e3927"],"user_facing":true,"description":"**Fix.** `monorepo release-init` no longer crashes on Python 3.14 when rendering commented-out package sections. The `tomlkit.dumps()` call was replaced with `tomlkit.item().as_string()` to avoid a `ValueError` when serializing arrays.","type":"fix"}
+{"commits":["8e29769a458f2112bb0d0921029ef20ebfb598db"],"user_facing":false}
