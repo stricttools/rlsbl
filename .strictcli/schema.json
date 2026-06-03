@@ -34,7 +34,7 @@
   },
   "project_id": "rlsbl",
   "name": "rlsbl",
-  "version": "0.57.0",
+  "version": "0.57.1",
   "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 14 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, and more). Ships 32 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
   "global_flags": [
     {
@@ -786,7 +786,7 @@
         },
         "release-init": {
           "name": "release-init",
-          "help": "Scaffold a batch release file for all workspace projects. Creates .rlsbl-monorepo/releases/unreleased.toml with [packages.<name>] sections for each non-dev-node project, auto-detecting targets.",
+          "help": "Scaffold a batch release file for all workspace projects by auto-detecting each project's release targets and generating per-package configuration sections. Creates .rlsbl-monorepo/releases/unreleased.toml with a [packages.<name>] section for each non-dev-node project, pre-populated with bump type, description, and include lists. Packages with no unreleased commits since their last tag are rendered as commented-out sections.",
           "flags": [
             {
               "name": "packages",
@@ -1140,6 +1140,16 @@
       ],
       "severity": "error",
       "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "dead-workspace-packages": {
+      "tags": [
+        "workspace"
+      ],
+      "severity": "warn",
+      "fast": false,
       "pure": true,
       "needs_network": false,
       "depends_on": []
