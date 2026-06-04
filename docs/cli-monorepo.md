@@ -9,7 +9,7 @@ nav_order: 9
 
 # rlsbl monorepo
 
-Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Provides 10 monorepo subcommands and supports all 14 release targets in a single workspace.toml.
+Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Provides 10 monorepo subcommands and supports all 18 release targets in a single workspace.toml.
 
 ## monorepo init
 

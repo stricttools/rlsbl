@@ -10,9 +10,9 @@ order: 91
 
 # rlsbl CLI Reference
 
-Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 14 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, and more). Ships 32 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).
+Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 32 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).
 
-Version: 0.60.0
+Version: 0.60.1
 
 ## Commands
 
@@ -35,5 +35,5 @@ Version: 0.60.0
 
 - [release](cli-release.html) -- Release orchestration commands. Provides 6 subcommands covering the full release lifecycle: run, init, retry, edit, undo, and yank.
 - [changelog](cli-changelog.html) -- Structured changelog management using JSONL entries. Add and generate CHANGELOG.md from per-commit changelog entries stored in unreleased.jsonl for precise, auditable release notes.
-- [monorepo](cli-monorepo.html) -- Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Provides 10 monorepo subcommands and supports all 14 release targets in a single workspace.toml.
+- [monorepo](cli-monorepo.html) -- Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Provides 10 monorepo subcommands and supports all 18 release targets in a single workspace.toml.
 - [dev](cli-dev.html) -- Developer utilities for locally working with rlsbl projects, including editable installs that mirror the project's release target (pypi -> uv tool install -e, npm -> npm link, go -> go install).
