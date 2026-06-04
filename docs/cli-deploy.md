@@ -14,12 +14,12 @@ Run the configured deployment pipeline for the project. Supports named deploy ta
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |
-|------|-------|------|---------|-----|-------------|
+| --- | --- | --- | --- | --- | --- |
 | `--target` |  | str |  |  | Target a specific registry |
 | `--force` |  | bool |  |  | Override branch restrictions |
 
 ## Arguments
 
 | Name | Required | Description |
-|------|----------|-------------|
+| --- | --- | --- |
 | `target_name` | no | Deploy target name |

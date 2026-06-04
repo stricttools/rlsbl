@@ -18,7 +18,7 @@ Create a new monorepo workspace by generating the .rlsbl-monorepo directory and 
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
-|------|-------|------|---------|-----|-------------|
+| --- | --- | --- | --- | --- | --- |
 | `--no-commit` |  | bool |  |  | Skip auto-commit of workspace.toml |
 
 ## monorepo add
@@ -28,7 +28,7 @@ Register a project directory in the monorepo workspace.toml configuration. The p
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
-|------|-------|------|---------|-----|-------------|
+| --- | --- | --- | --- | --- | --- |
 | `--name` |  | str |  |  | Project name (defaults to directory name) |
 | `--target` |  | str |  |  | Target registry |
 | `--watch` |  | str |  |  | Comma-separated glob patterns to watch |
@@ -41,7 +41,7 @@ Register a project directory in the monorepo workspace.toml configuration. The p
 ### Arguments
 
 | Name | Required | Description |
-|------|----------|-------------|
+| --- | --- | --- |
 | `path` | yes | Path to the project directory |
 
 ## monorepo remove
@@ -51,7 +51,7 @@ Unregister a project from the monorepo workspace.toml by its path. This removes 
 ### Arguments
 
 | Name | Required | Description |
-|------|----------|-------------|
+| --- | --- | --- |
 | `path` | yes | Path to the project to remove |
 
 ## monorepo list
@@ -65,7 +65,7 @@ Copy and merge CI workflow files from each project's individual scaffold into th
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
-|------|-------|------|---------|-----|-------------|
+| --- | --- | --- | --- | --- | --- |
 | `--no-commit` |  | bool |  |  | Skip auto-commit of synced workflow files |
 
 ## monorepo status
@@ -79,7 +79,7 @@ Check package name availability on a target registry for all projects in the mon
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
-|------|-------|------|---------|-----|-------------|
+| --- | --- | --- | --- | --- | --- |
 | `--target` |  | str |  |  | Target registry (npm, pypi, or go) |
 | `--prefix` |  | str |  |  | Prefix to prepend to project names |
 | `--suffix` |  | str |  |  | Suffix to append to project names |
@@ -100,7 +100,7 @@ Generate a committed JSON artifact at .rlsbl-monorepo/snapshot.json summarizing 
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
-|------|-------|------|---------|-----|-------------|
+| --- | --- | --- | --- | --- | --- |
 | `--check` |  | bool |  |  | Verify snapshot.json is up-to-date (exit 1 if stale) |
 
 ## monorepo graph
@@ -110,7 +110,7 @@ Export the monorepo dependency graph in JSON, DOT (Graphviz), or indented text t
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
-|------|-------|------|---------|-----|-------------|
+| --- | --- | --- | --- | --- | --- |
 | `--format` |  | str | json |  | Output format: json, dot, or text (default: json) |
 | `--output` |  | str |  |  | Write output to file instead of stdout |
 | `--root` |  | str |  |  | Show only transitive deps from this package |
@@ -124,7 +124,7 @@ Analyze the impact of changes to a package, file, or git diff range on the monor
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
-|------|-------|------|---------|-----|-------------|
+| --- | --- | --- | --- | --- | --- |
 | `--format` |  | str | text |  | Output format: json or text (default: text) |
 | `--depth` |  | int |  |  | Limit traversal depth |
 | `--since` |  | str |  |  | Git ref to diff against HEAD (e.g. HEAD~3, v1.0.0) |
@@ -136,7 +136,7 @@ Execute a batch release of multiple monorepo packages in topological order. Read
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
-|------|-------|------|---------|-----|-------------|
+| --- | --- | --- | --- | --- | --- |
 | `--allow-dirty` |  | bool |  |  | Allow releasing with a dirty working tree |
 
 ## monorepo release-init
@@ -146,5 +146,5 @@ Scaffold a batch release file for all workspace projects by auto-detecting each 
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
-|------|-------|------|---------|-----|-------------|
+| --- | --- | --- | --- | --- | --- |
 | `--packages` |  | str |  |  | Comma-separated package names to include (default: all) |

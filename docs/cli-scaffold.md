@@ -14,7 +14,7 @@ Generate or update CI/CD workflows, git hooks, changelog, and license files. Saf
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |
-|------|-------|------|---------|-----|-------------|
+| --- | --- | --- | --- | --- | --- |
 | `--target` |  | str |  |  | Target a specific registry (auto-detected if omitted) |
 | `--force` |  | bool |  |  | Overwrite all files (ignore user customizations) |
 | `--private` |  | bool |  |  | Scaffold for private repos (skip publish) |

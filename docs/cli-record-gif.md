@@ -14,7 +14,7 @@ Record an animated GIF demo of rlsbl commands using the vhs terminal recorder. C
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |
-|------|-------|------|---------|-----|-------------|
+| --- | --- | --- | --- | --- | --- |
 | `--width` |  | str | 1200 |  | GIF width in pixels |
 | `--height` |  | str | 600 |  | GIF height in pixels |
 | `--font-size` |  | str | 24 |  | Font size in pixels |

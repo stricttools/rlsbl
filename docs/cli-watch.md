@@ -14,12 +14,12 @@ Poll GitHub Actions CI workflow runs for a specific commit SHA and report pass o
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |
-|------|-------|------|---------|-----|-------------|
+| --- | --- | --- | --- | --- | --- |
 | `--target` |  | str |  |  | Target a specific registry |
 | `--run-id` |  | str |  |  | CI workflow run ID to watch |
 
 ## Arguments
 
 | Name | Required | Description |
-|------|----------|-------------|
+| --- | --- | --- |
 | `sha` | no | Commit SHA to watch (defaults to HEAD) |

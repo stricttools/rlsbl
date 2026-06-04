@@ -14,5 +14,5 @@ List commits between the latest release tag and HEAD, and check whether each has
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |
-|------|-------|------|---------|-----|-------------|
+| --- | --- | --- | --- | --- | --- |
 | `--json` |  | bool |  |  | Output as JSON |

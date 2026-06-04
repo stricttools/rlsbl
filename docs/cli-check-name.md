@@ -14,6 +14,6 @@ Query npm, PyPI, or other registries to check whether one or more package names 
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |
-|------|-------|------|---------|-----|-------------|
+| --- | --- | --- | --- | --- | --- |
 | `--target` |  | str |  |  | Target registry (npm, pypi, or go) |
 | `--delay` |  | str | 200 |  | Delay between checks in ms |

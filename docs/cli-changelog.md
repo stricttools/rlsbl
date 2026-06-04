@@ -18,7 +18,7 @@ Append a structured changelog entry to the project's unreleased.jsonl file. Each
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
-|------|-------|------|---------|-----|-------------|
+| --- | --- | --- | --- | --- | --- |
 | `--commits` |  | str |  |  | Comma-separated commit hashes |
 | `--description` |  | str |  |  | Entry description |
 | `--type` |  | str |  |  | Entry type (feature, fix, breaking) |
@@ -32,7 +32,7 @@ Compile all validated JSONL changelog entries into a formatted CHANGELOG.md file
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
-|------|-------|------|---------|-----|-------------|
+| --- | --- | --- | --- | --- | --- |
 | `--no-commit` |  | bool |  |  | Skip auto-commit of generated files |
 
 ## changelog amend
@@ -42,7 +42,7 @@ Append a changelog entry to a released version's JSONL file. Temporarily unlocks
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
-|------|-------|------|---------|-----|-------------|
+| --- | --- | --- | --- | --- | --- |
 | `--version` |  | str |  |  | Released version to amend (e.g., 0.39.0) |
 | `--commits` |  | str |  |  | Comma-separated commit hashes |
 | `--description` |  | str |  |  | Entry description |

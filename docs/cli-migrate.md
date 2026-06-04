@@ -14,5 +14,5 @@ Run pending configuration migrations to update .rlsbl config files to the latest
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |
-|------|-------|------|---------|-----|-------------|
+| --- | --- | --- | --- | --- | --- |
 | `--status` |  | bool |  |  | Show migration status |

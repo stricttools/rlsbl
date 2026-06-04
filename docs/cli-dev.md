@@ -18,7 +18,7 @@ Install the project locally for development using the detected target's editable
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
-|------|-------|------|---------|-----|-------------|
+| --- | --- | --- | --- | --- | --- |
 | `--all` |  | bool |  |  | In monorepo mode, install every project in the workspace |
 | `--include` |  | str |  |  | In monorepo mode, comma-separated project names to include |
 | `--exclude` |  | str |  |  | In monorepo mode, comma-separated project names to exclude |

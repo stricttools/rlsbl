@@ -18,7 +18,7 @@ Bump version, validate the JSONL changelog, run tests and lint, commit, tag, pus
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
-|------|-------|------|---------|-----|-------------|
+| --- | --- | --- | --- | --- | --- |
 | `--allow-dirty` |  | bool |  |  | Allow releasing with a dirty working tree |
 | `--watch` |  | bool |  |  | After release, automatically watch CI runs to completion |
 | `--no-watch` |  | bool |  |  | After release, print the watch command hint without watching |
@@ -34,7 +34,7 @@ Dispatch CI/CD workflows for a completed release via gh workflow run. Reads the 
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
-|------|-------|------|---------|-----|-------------|
+| --- | --- | --- | --- | --- | --- |
 | `--watch` |  | bool |  |  | After retry, automatically watch CI runs to completion |
 | `--no-watch` |  | bool |  |  | After retry, print the watch command hint without watching |
 
@@ -45,7 +45,7 @@ Sync the GitHub Release notes for a given version with the corresponding CHANGEL
 ### Arguments
 
 | Name | Required | Description |
-|------|----------|-------------|
+| --- | --- | --- |
 | `version` | no | Version to update (defaults to current) |
 
 ## release undo
@@ -55,7 +55,7 @@ Revert the most recent release by deleting the GitHub Release, removing the git 
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
-|------|-------|------|---------|-----|-------------|
+| --- | --- | --- | --- | --- | --- |
 | `--target` |  | str |  |  | Target a specific registry |
 
 ## release yank
@@ -65,7 +65,7 @@ Mark a past release as deprecated (soft yank) or delete it (hard yank). Soft yan
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
-|------|-------|------|---------|-----|-------------|
+| --- | --- | --- | --- | --- | --- |
 | `--reason` |  | str |  |  | Why the version is being yanked |
 | `--use` |  | str |  |  | Replacement version to recommend |
 | `--hard` |  | bool |  |  | Delete the release instead of marking as pre-release |
@@ -73,5 +73,5 @@ Mark a past release as deprecated (soft yank) or delete it (hard yank). Soft yan
 ### Arguments
 
 | Name | Required | Description |
-|------|----------|-------------|
+| --- | --- | --- |
 | `version` | yes | Version to yank (e.g. 0.9.1 or v0.9.1) |

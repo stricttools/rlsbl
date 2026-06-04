@@ -14,7 +14,7 @@ Run project checks
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |
-|------|-------|------|---------|-----|-------------|
+| --- | --- | --- | --- | --- | --- |
 | `--all` |  | bool |  |  | Run all checks |
 | `--tag` |  | str |  |  | Tag DSL expression to filter checks |
 | `--name` |  | str |  |  | Glob pattern to filter by check name |
