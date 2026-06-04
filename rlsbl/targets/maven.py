@@ -15,6 +15,8 @@ class MavenTarget(BaseTarget):
     """Release target for Maven/Gradle (Java/Kotlin) projects."""
 
     detection_files = ("build.gradle.kts", "build.gradle", "pom.xml")
+    capabilities = frozenset({"publish", "read_name", "ci_templates"})
+    ecosystem = "Java / Maven"
 
     @property
     def name(self):
