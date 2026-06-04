@@ -15,6 +15,8 @@ class DenoTarget(BaseTarget):
     """Release target for Deno projects (deno.json / deno.jsonc)."""
 
     detection_files = ("deno.json", "deno.jsonc")
+    capabilities = frozenset({"publish", "read_name", "ci_templates", "dev_install"})
+    ecosystem = "Deno / JSR"
 
     @property
     def name(self):
