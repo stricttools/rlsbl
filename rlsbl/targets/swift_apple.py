@@ -13,6 +13,9 @@ class SwiftAppleTarget(BaseTarget):
     """Release target for Apple-platform Swift projects (macOS-only CI)."""
 
     # Opt-in only; shares Package.swift with swift target.
+    capabilities = frozenset({"read_name", "ci_templates"})
+    ecosystem = "Swift (Apple)"
+    auto_detectable = "no"
 
     @property
     def name(self):
