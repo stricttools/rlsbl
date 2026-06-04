@@ -14,6 +14,8 @@ class SpecTarget(BaseTarget):
     """
 
     detection_files = ("version.json",)
+    capabilities = frozenset({"read_name", "ci_templates"})
+    ecosystem = "Specification"
 
     @property
     def name(self):
