@@ -106,3 +106,45 @@ class TestSpecificTargets:
         # Go uses path-based format: "{path}/v{version}"
         assert "{path}" in value
         assert "v{version}" in value
+
+    def test_flutter_detection_files_is_dash(self):
+        """Flutter targets have empty detection_files, rendered as '---'."""
+        _, rows = generate_target_table_data()
+        by_name = _rows_by_name(rows)
+        headers = EXPECTED_HEADERS
+        df_idx = headers.index("Detection files")
+        assert by_name["flutter-ios"][df_idx] == "---"
+        assert by_name["flutter-android"][df_idx] == "---"
+
+    def test_flutter_monorepo_tag_format(self):
+        """Flutter targets use name-based monorepo tag formats with platform suffix."""
+        _, rows = generate_target_table_data()
+        by_name = _rows_by_name(rows)
+        headers = EXPECTED_HEADERS
+        mono_idx = headers.index("Monorepo tag format")
+        assert by_name["flutter-ios"][mono_idx] == "{name}-ios@v{version}"
+        assert by_name["flutter-android"][mono_idx] == "{name}-android@v{version}"
+
+    def test_dev_install_formatting(self):
+        """Targets with both global and venv show both; targets with only global show just global."""
+        _, rows = generate_target_table_data()
+        by_name = _rows_by_name(rows)
+        headers = EXPECTED_HEADERS
+        dev_idx = headers.index("dev_install")
+        # npm has both global and venv
+        npm_val = by_name["npm"][dev_idx]
+        assert npm_val.startswith("global: ")
+        assert ", venv: " in npm_val
+        # go has only global
+        go_val = by_name["go"][dev_idx]
+        assert go_val.startswith("global: ")
+        assert ", venv: " not in go_val
+
+    def test_dev_install_empty_for_non_capable(self):
+        """Targets without dev_install capability have an empty string in that column."""
+        _, rows = generate_target_table_data()
+        by_name = _rows_by_name(rows)
+        headers = EXPECTED_HEADERS
+        dev_idx = headers.index("dev_install")
+        assert by_name["docker"][dev_idx] == ""
+        assert by_name["plain"][dev_idx] == ""
