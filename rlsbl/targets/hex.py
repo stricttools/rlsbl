@@ -14,6 +14,8 @@ class HexTarget(BaseTarget):
     """Release target for Hex/Elixir projects (mix.exs)."""
 
     detection_files = ("mix.exs",)
+    capabilities = frozenset({"publish", "read_name", "ci_templates", "dev_install"})
+    ecosystem = "Elixir / Hex"
 
     @property
     def name(self):
