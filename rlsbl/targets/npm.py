@@ -18,6 +18,8 @@ class NpmTarget(BaseTarget):
     """Release target for npm/Node.js projects (package.json)."""
 
     detection_files = ("package.json",)
+    capabilities = frozenset({"publish", "build_assets", "read_name", "read_metadata", "ci_templates", "dev_install"})
+    ecosystem = "Node.js / npm"
 
     @property
     def name(self):
