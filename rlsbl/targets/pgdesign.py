@@ -18,6 +18,8 @@ class PgdesignTarget(BaseTarget):
     """
 
     detection_files = ("pgdesign.toml",)
+    capabilities = frozenset({"read_name"})
+    ecosystem = "PostgreSQL"
 
     @property
     def name(self):
