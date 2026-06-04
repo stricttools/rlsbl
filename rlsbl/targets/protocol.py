@@ -16,6 +16,15 @@ class ReleaseTarget(Protocol):
         """Unique identifier for this target (e.g. 'npm', 'pypi', 'codehome')."""
         ...
 
+    capabilities: frozenset[str]
+    """Set of capabilities this target supports (e.g. 'publish', 'build_assets', 'dev_install')."""
+
+    ecosystem: str
+    """Ecosystem identifier (e.g. 'node', 'python', 'go', 'jvm')."""
+
+    auto_detectable: str
+    """Whether this target can be auto-detected: 'yes', 'no', or 'conditional'."""
+
     def detect(self, dir_path: str) -> bool:
         """Check if this target is present/applicable in the given directory."""
         ...
