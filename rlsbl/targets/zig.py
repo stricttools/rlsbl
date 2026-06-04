@@ -48,6 +48,8 @@ class ZigTarget(BaseTarget):
     """Release target for Zig projects (build.zig.zon + VERSION file)."""
 
     detection_files = ("build.zig.zon", "build.zig")
+    capabilities = frozenset({"read_name", "ci_templates", "dev_install"})
+    ecosystem = "Zig"
 
     @property
     def name(self):
