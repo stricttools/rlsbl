@@ -1286,3 +1286,41 @@ class TestGoMonorepoTagFormat:
         """Trailing slash in path must not produce a double slash in the glob."""
         result = GoTarget().monorepo_tag_glob("auth-gateway", path="auth-gateway/")
         assert result == "auth-gateway/v*"
+
+
+VALID_CAPABILITIES = {"publish", "build_assets", "read_name", "read_metadata", "ci_templates", "dev_install"}
+VALID_AUTO_DETECTABLE = {"yes", "no", "conditional"}
+
+
+class TestTargetIntrospectionConformance:
+    """Conformance tests verifying every registered target declares capabilities, ecosystem, and auto_detectable."""
+
+    @pytest.mark.parametrize("name", list(TARGETS.keys()))
+    def test_ecosystem_is_nonempty_string(self, name):
+        """Every target must declare a non-empty ecosystem string."""
+        target = TARGETS[name]
+        assert isinstance(target.ecosystem, str), (
+            f"{name}.ecosystem is {type(target.ecosystem).__name__}, expected str"
+        )
+        assert target.ecosystem != "", f"{name}.ecosystem is empty"
+
+    @pytest.mark.parametrize("name", list(TARGETS.keys()))
+    def test_capabilities_is_frozenset_of_valid_values(self, name):
+        """Every target must declare capabilities as a frozenset with values from the allowed set."""
+        target = TARGETS[name]
+        assert isinstance(target.capabilities, frozenset), (
+            f"{name}.capabilities is {type(target.capabilities).__name__}, expected frozenset"
+        )
+        invalid = target.capabilities - VALID_CAPABILITIES
+        assert not invalid, (
+            f"{name}.capabilities contains invalid values: {invalid}"
+        )
+
+    @pytest.mark.parametrize("name", list(TARGETS.keys()))
+    def test_auto_detectable_is_valid(self, name):
+        """Every target must declare auto_detectable as one of 'yes', 'no', 'conditional'."""
+        target = TARGETS[name]
+        assert target.auto_detectable in VALID_AUTO_DETECTABLE, (
+            f"{name}.auto_detectable is {target.auto_detectable!r}, "
+            f"expected one of {VALID_AUTO_DETECTABLE}"
+        )
