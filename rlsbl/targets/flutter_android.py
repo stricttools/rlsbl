@@ -12,6 +12,8 @@ class FlutterAndroidTarget(DartTarget):
 
     # Shares pubspec.yaml with dart; no unique detection files.
     detection_files = ()
+    capabilities = frozenset({"read_name", "read_metadata"})
+    ecosystem = "Flutter (Android)"
 
     @property
     def name(self):
