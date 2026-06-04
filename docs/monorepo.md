@@ -4,7 +4,7 @@ description: "Guide to rlsbl monorepo workspaces — initializing workspaces, ad
 
 # Monorepo guide
 
-rlsbl supports monorepo workflows via the `rlsbl monorepo` command family, which provides 10 subcommands for managing workspaces with multiple independently-versioned projects. A single workspace can contain any mix of the 14 supported release targets, all coordinated through one `.rlsbl-monorepo/workspace.toml` file at the repository root.
+rlsbl supports monorepo workflows via the `rlsbl monorepo` command family, which provides 10 subcommands for managing workspaces with multiple independently-versioned projects. A single workspace can contain any mix of the 18 supported release targets, all coordinated through one `.rlsbl-monorepo/workspace.toml` file at the repository root.
 
 ## Getting started
 

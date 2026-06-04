@@ -11,6 +11,6 @@ Handles version bumping, changelog validation, tagging, GitHub Releases, CI scaf
 ## Pages
 
 - [CLI reference](cli-index.md) -- all CLI commands and options
-- [Release targets](targets.md) -- the 12 supported ecosystems
+- [Release targets](targets.md) -- the 18 supported ecosystems
 - [Monorepo guide](monorepo.md) -- workspace management and subtree publishing
 - [Configuration reference](configuration.md) -- config file formats
