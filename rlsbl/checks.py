@@ -142,11 +142,14 @@ def get_feature_matrix() -> dict[str, dict[str, str]]:
     return matrix
 
 
-def generate_feature_matrix_markdown() -> str:
-    """Generate a Markdown table of check-vs-target support.
+def generate_feature_matrix_data() -> tuple[list[str], list[list[str]]]:
+    """Generate raw data for the check-vs-target feature support matrix.
 
     Only includes checks that have target-specific behavior (not
     universal or workspace-only), since those are the interesting rows.
+
+    Returns ``(headers, rows)`` where *headers* is ``["Check", col1, ...]``
+    and each row is ``[check_name, cell1, ...]``.
     """
     matrix = get_feature_matrix()
 
@@ -157,7 +160,7 @@ def generate_feature_matrix_markdown() -> str:
     }
 
     if not interesting:
-        return "No target-specific checks registered.\n"
+        return ["Check"], []
 
     # Determine which columns have at least one "yes" among interesting rows
     active_cols = [
@@ -165,16 +168,12 @@ def generate_feature_matrix_markdown() -> str:
         if any(row.get(col) == "yes" for row in interesting.values())
     ]
 
-    # Build table
-    lines: list[str] = []
-    header = "| Check | " + " | ".join(active_cols) + " |"
-    separator = "|-------|" + "|".join("-" * (len(c) + 2) for c in active_cols) + "|"
-    lines.append(header)
-    lines.append(separator)
+    headers = ["Check"] + active_cols
 
+    rows: list[list[str]] = []
     for check_name in sorted(interesting):
         row = interesting[check_name]
-        cells = []
+        cells = [check_name]
         for col in active_cols:
             val = row[col]
             if val == "yes":
@@ -183,10 +182,9 @@ def generate_feature_matrix_markdown() -> str:
                 cells.append("n/a")
             else:
                 cells.append("no")
-        lines.append(f"| {check_name} | " + " | ".join(cells) + " |")
+        rows.append(cells)
 
-    lines.append("")
-    return "\n".join(lines)
+    return headers, rows
 
 
 def _resolve_version_and_tag(ctx):

@@ -6,7 +6,7 @@ from rlsbl.checks import (
     CHECK_EXCLUDED_TARGETS,
     CHECK_TARGETS,
     MATRIX_COLUMNS,
-    generate_feature_matrix_markdown,
+    generate_feature_matrix_data,
     get_feature_matrix,
 )
 
@@ -179,60 +179,67 @@ class TestGetFeatureMatrix:
             )
 
 
-class TestGenerateFeatureMatrixMarkdown:
-    """Tests for generate_feature_matrix_markdown()."""
+class TestGenerateFeatureMatrixData:
+    """Tests for generate_feature_matrix_data()."""
 
-    def test_produces_markdown_table(self):
-        md = generate_feature_matrix_markdown()
-        lines = md.strip().split("\n")
-        # Header + separator + at least one data row
-        assert len(lines) >= 3
-        assert lines[0].startswith("| Check |")
-        assert lines[1].startswith("|---")
+    def test_returns_headers_and_rows(self):
+        headers, rows = generate_feature_matrix_data()
+        assert isinstance(headers, list)
+        assert isinstance(rows, list)
+        assert len(headers) >= 2  # "Check" + at least one target column
+        assert len(rows) >= 1  # at least one data row
+        assert headers[0] == "Check"
+
+    def test_rows_match_header_length(self):
+        headers, rows = generate_feature_matrix_data()
+        for row in rows:
+            assert len(row) == len(headers), (
+                f"row {row[0]} has {len(row)} cells, expected {len(headers)}"
+            )
 
     def test_only_target_specific_rows(self):
-        """Only checks with yes/no values appear in the table."""
-        md = generate_feature_matrix_markdown()
+        """Only checks with yes/no values appear in the data."""
+        headers, rows = generate_feature_matrix_data()
+        check_names = {row[0] for row in rows}
         # Universal checks should not appear
-        assert "version-consistency" not in md
-        assert "changelog-entry" not in md
+        assert "version-consistency" not in check_names
+        assert "changelog-entry" not in check_names
         # Workspace-only checks should not appear
-        assert "workspace-ci-router" not in md
+        assert "workspace-ci-router" not in check_names
         # Target-specific checks should appear
-        assert "dead-modules" in md
-        assert "library-lint" in md
-        assert "deps-unused" in md
+        assert "dead-modules" in check_names
+        assert "library-lint" in check_names
+        assert "deps-unused" in check_names
 
     def test_only_active_columns(self):
         """Columns with no 'yes' among interesting rows are excluded."""
-        md = generate_feature_matrix_markdown()
+        headers, rows = generate_feature_matrix_data()
         # cargo has no target-specific checks that support it
-        assert "cargo" not in md.split("\n")[0]
+        assert "cargo" not in headers
         # pypi, go, npm, dart should all appear
-        header = md.split("\n")[0]
-        assert "pypi" in header
-        assert "go" in header
-        assert "npm" in header
-        assert "dart" in header
+        assert "pypi" in headers
+        assert "go" in headers
+        assert "npm" in headers
+        assert "dart" in headers
 
-    def test_na_cells_in_markdown(self):
-        """n/a cells must appear as 'n/a' in the markdown output."""
-        md = generate_feature_matrix_markdown()
-        # circular-deps x go should be n/a
-        for line in md.strip().split("\n"):
-            if line.startswith("| circular-deps"):
-                cells = [c.strip() for c in line.split("|")[1:] if c.strip()]
-                # cells[0] is the check name, the rest are target values
-                # Find the go column index
-                header = md.split("\n")[0]
-                header_cells = [c.strip() for c in header.split("|")[1:] if c.strip()]
-                go_idx = header_cells.index("go")
-                assert cells[go_idx] == "n/a", (
-                    f"circular-deps x go should be 'n/a', got {cells[go_idx]!r}"
+    def test_na_cells_in_data(self):
+        """n/a cells must appear as 'n/a' in the data."""
+        headers, rows = generate_feature_matrix_data()
+        go_idx = headers.index("go")
+        for row in rows:
+            if row[0] == "circular-deps":
+                assert row[go_idx] == "n/a", (
+                    f"circular-deps x go should be 'n/a', got {row[go_idx]!r}"
                 )
                 break
         else:
-            raise AssertionError("circular-deps row not found in markdown")
+            raise AssertionError("circular-deps row not found in data")
+
+    def test_rows_sorted_by_check_name(self):
+        """Rows must be sorted alphabetically by check name."""
+        headers, rows = generate_feature_matrix_data()
+        check_names = [row[0] for row in rows]
+        assert check_names == sorted(check_names)
 
 
 class TestCheckExcludedTargets:
