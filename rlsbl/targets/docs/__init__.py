@@ -19,6 +19,8 @@ class DocsTarget(BaseTarget):
     """Release target that delegates documentation to selfdoc."""
 
     detection_files = ("selfdoc.json",)
+    capabilities = frozenset({"publish"})
+    ecosystem = "Documentation"
 
     @property
     def name(self):
