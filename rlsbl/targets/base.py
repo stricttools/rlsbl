@@ -14,6 +14,9 @@ class BaseTarget:
     """
 
     detection_files: ClassVar[tuple[str, ...]] = ()
+    capabilities: ClassVar[frozenset[str]] = frozenset()
+    ecosystem: ClassVar[str] = ""
+    auto_detectable: ClassVar[str] = "yes"
 
     def version_file(self):
         return None
