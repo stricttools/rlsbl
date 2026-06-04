@@ -22,6 +22,8 @@ class PypiTarget(BaseTarget):
     """Release target for Python projects (pyproject.toml)."""
 
     detection_files = ("pyproject.toml",)
+    capabilities = frozenset({"publish", "build_assets", "read_name", "read_metadata", "ci_templates", "dev_install"})
+    ecosystem = "Python / PyPI"
 
     @property
     def name(self):
