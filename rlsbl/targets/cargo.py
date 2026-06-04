@@ -18,6 +18,8 @@ class CargoTarget(BaseTarget):
     """Release target for Rust/Cargo projects (Cargo.toml)."""
 
     detection_files = ("Cargo.toml",)
+    capabilities = frozenset({"publish", "build_assets", "read_name", "read_metadata", "ci_templates", "dev_install"})
+    ecosystem = "Rust / crates.io"
 
     @property
     def name(self):
