@@ -37,6 +37,7 @@
     "docs/_README.md"
   ],
   "directives": {
-    "table-feature-matrix": "docs/directives/feature_matrix.py"
+    "table-feature-matrix": "docs/directives/feature_matrix.py",
+    "table-targets": "docs/directives/target_table.py"
   }
 }
