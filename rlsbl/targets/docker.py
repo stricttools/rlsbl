@@ -14,6 +14,8 @@ class DockerTarget(BaseTarget):
     """Release target for Docker projects (Dockerfile + VERSION file)."""
 
     detection_files = ("Dockerfile",)
+    capabilities = frozenset({"publish", "read_name", "ci_templates"})
+    ecosystem = "Docker"
 
     @property
     def name(self):
