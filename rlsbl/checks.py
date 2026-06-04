@@ -16,12 +16,12 @@ import sys
 from strictcli import CheckResult
 
 from .check_context import WorkspaceCheckContext
+from .targets import TARGETS
 
 # Manifest filenames used by workspace-unregistered and workspace-stale-entries
 # to detect project directories. Derived from each target's detection_files
 # so it stays in sync automatically when new targets are added.
 def _all_detection_files():
-    from .targets import TARGETS
     files = set()
     for target_cls in TARGETS.values():
         files.update(target_cls.detection_files)
@@ -100,13 +100,9 @@ CHECK_EXCLUDED_TARGETS: dict[str, dict[str, str]] = {
     "circular-deps": {"go": "compiler rejects circular imports"},
 }
 
-# Canonical column order for the feature matrix. Only targets that
-# appear as values in CHECK_TARGETS are included (not all 18 TARGETS).
-MATRIX_COLUMNS: tuple[str, ...] = ("pypi", "go", "npm", "dart", "cargo",
-                                    "deno", "hex", "zig", "swift",
-                                    "swift-apple", "maven", "docker",
-                                    "flutter-ios", "flutter-android",
-                                    "pgdesign", "plain", "docs", "spec")
+# Canonical column order for the feature matrix, derived from TARGETS
+# so both the matrix and the target table share the same source of truth.
+MATRIX_COLUMNS: tuple[str, ...] = tuple(sorted(TARGETS.keys()))
 
 
 def get_feature_matrix() -> dict[str, dict[str, str]]:
