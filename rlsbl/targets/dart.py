@@ -11,6 +11,8 @@ class DartTarget(BaseTarget):
     """Release target for Dart packages (pubspec.yaml)."""
 
     detection_files = ("pubspec.yaml",)
+    capabilities = frozenset({"read_name", "read_metadata"})
+    ecosystem = "Dart / pub.dev"
 
     @property
     def name(self):
