@@ -13,6 +13,8 @@ class SwiftTarget(BaseTarget):
     """Release target for Swift packages (Package.swift + VERSION file)."""
 
     detection_files = ("Package.swift",)
+    capabilities = frozenset({"read_name", "ci_templates", "dev_install"})
+    ecosystem = "Swift (SPM)"
 
     @property
     def name(self):
