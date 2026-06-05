@@ -103,6 +103,16 @@ Generate a committed JSON artifact at .rlsbl-monorepo/snapshot.json summarizing 
 | --- | --- | --- | --- | --- | --- |
 | `--check` |  | bool |  |  | Verify snapshot.json is up-to-date (exit 1 if stale) |
 
+## monorepo mirror
+
+Initialize a subtree mirror repository for a monorepo project. Splits the project's subtree, pushes it to the configured subtree_remote, clones the mirror, scaffolds rlsbl CI, and pushes the result.
+
+### Arguments
+
+| Name | Required | Description |
+| --- | --- | --- |
+| `project` | yes | Name of the workspace project to mirror |
+
 ## monorepo graph
 
 Export the monorepo dependency graph in JSON, DOT (Graphviz), or indented text tree format. Supports filtering by a root package (transitive deps) or reverse package (transitive rdeps), with optional depth limiting. Use --output to write to a file instead of stdout.

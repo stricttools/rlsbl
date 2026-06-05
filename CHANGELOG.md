@@ -2,9 +2,17 @@
 
 # Changelog
 
-## 0.63.2
+## 0.64.0
 
-Fix CI test failure when selfdoc not installed.
+Monorepo mirror command, native-android and native-ios targets.
+
+### Features
+
+- **New command.** `monorepo mirror` copies monorepo sub-project state (version, changelog, docs) into a standalone mirror repository for independent distribution.
+- **New target.** `native-android` release target for Android application projects using Gradle, with automatic mutual exclusion against the `maven` target to prevent conflicts.
+- **New target.** `native-ios` release target for iOS application projects with Xcode and Tuist support.
+
+## 0.63.2
 
 ### Fixes
 

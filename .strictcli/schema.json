@@ -14,6 +14,8 @@
       "env": null,
       "choices": null,
       "repeatable": false,
+      "unique": false,
+      "env_separator": null,
       "negatable": null,
       "hidden": false
     },
@@ -34,7 +36,7 @@
   },
   "project_id": "rlsbl",
   "name": "rlsbl",
-  "version": "0.63.1",
+  "version": "0.63.2",
   "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 32 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
   "global_flags": [
     {
@@ -225,7 +227,8 @@
           "type": "str",
           "help": "CI workflow run ID to watch",
           "default": [],
-          "repeatable": true
+          "repeatable": true,
+          "unique": true
         }
       ],
       "args": [
@@ -713,6 +716,16 @@
             }
           ]
         },
+        "mirror": {
+          "name": "mirror",
+          "help": "Initialize a subtree mirror repository for a monorepo project. Splits the project's subtree, pushes it to the configured subtree_remote, clones the mirror, scaffolds rlsbl CI, and pushes the result.",
+          "args": [
+            {
+              "name": "project",
+              "help": "Name of the workspace project to mirror"
+            }
+          ]
+        },
         "graph": {
           "name": "graph",
           "help": "Export the monorepo dependency graph in JSON, DOT (Graphviz), or indented text tree format. Supports filtering by a root package (transitive deps) or reverse package (transitive rdeps), with optional depth limiting. Use --output to write to a file instead of stdout.",
@@ -1152,6 +1165,16 @@
       "fast": false,
       "pure": true,
       "needs_network": false,
+      "depends_on": []
+    },
+    "subtree-remote-reachable": {
+      "tags": [
+        "workspace"
+      ],
+      "severity": "error",
+      "fast": false,
+      "pure": false,
+      "needs_network": true,
       "depends_on": []
     },
     "layers-violations": {
