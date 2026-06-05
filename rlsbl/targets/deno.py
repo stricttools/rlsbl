@@ -112,7 +112,11 @@ class DenoTarget(BaseTarget):
         os.replace(tmp_path, config_path)
         return [os.path.basename(config_path)]
 
-    def version_file(self):
+    def version_file(self, dir_path=None):
+        if dir_path is not None:
+            path = self._config_path(dir_path)
+            if path:
+                return os.path.basename(path)
         return "deno.json"
 
     def tag_format(self, version):
