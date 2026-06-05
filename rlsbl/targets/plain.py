@@ -28,6 +28,7 @@ _OTHER_TARGET_MANIFESTS = (
     "build.zig.zon",       # zig
     "build.zig",           # zig
     "pgdesign.toml",       # pgdesign
+    "selfdoc.json",        # docs
     "version.json",        # spec
 )
 
