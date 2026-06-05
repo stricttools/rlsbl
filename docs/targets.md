@@ -1,14 +1,20 @@
 ---
-description: "All 18 rlsbl release targets — npm, PyPI, Go, Cargo, Deno, Hex, Maven, Swift, Zig, Docker, Dart, Flutter, docs, and more — with the ReleaseTarget protocol."
+description: "All 16 rlsbl release targets — npm, PyPI, Go, Cargo, Deno, Hex, Maven, Swift, Zig, Docker, Dart, Flutter, and more — with the ReleaseTarget protocol, plus 9 pipeline types for publishing."
 ---
 
 # Release targets
 
-rlsbl supports 18 release targets, each handling version management and scaffolding for a specific ecosystem.
+rlsbl supports 16 release targets, each handling version management and scaffolding for a specific ecosystem.
 
 :-: table-targets
 
 All targets share core release functionality: version bumping, git tagging, and GitHub Release creation. The table above shows optional capabilities that vary by ecosystem.
+
+## Publish pipelines
+
+Publishing is handled by pipelines, not targets. Each pipeline type implements a specific publish mechanism (registry upload, container push, deployment). Pipelines are configured per-project in `.rlsbl/config.json` under the `pipelines` key.
+
+:-: table-pipelines
 
 ## Check support matrix
 
