@@ -892,7 +892,7 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
                 continue
             other_reg = TARGETS.get(t_name)
             if other_reg and other_reg.check_project_exists(t_path):
-                other_file = other_reg.version_file()
+                other_file = other_reg.version_file(t_path)
                 if other_file:
                     rel = os.path.relpath(os.path.join(t_path, other_file), project_dir)
                     other_files.append(os.path.normpath(rel))
@@ -1148,7 +1148,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
     # Pre-compute expected version files for the confirmation prompt display.
     # The actual files_to_commit list is built from write_version() return
     # values below, which may include additional files (e.g. __init__.py).
-    version_file = reg.version_file()
+    version_file = reg.version_file(primary_path)
     preview_files = []
     if version_file:
         preview_files.append(target_vpath(primary_path, version_file))
@@ -1157,7 +1157,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
             continue
         other_reg = TARGETS.get(t_name)
         if other_reg and other_reg.check_project_exists(t_path):
-            other_file = other_reg.version_file()
+            other_file = other_reg.version_file(t_path)
             if other_file:
                 preview_files.append(target_vpath(t_path, other_file))
 
