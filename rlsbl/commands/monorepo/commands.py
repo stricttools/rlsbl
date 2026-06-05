@@ -235,16 +235,17 @@ def _cmd_status(flags, project_root):
         name = proj["name"]
         path = proj["path"]
 
-        # Detect target
+        # Detect targets
         target_entries = detect_targets(os.path.join(root, path))
-        target_name = target_entries[0].name if target_entries else "none"
+        target_names = [e.name for e in target_entries]
+        target_display = ", ".join(target_names) if target_names else "none"
 
-        # Read version
+        # Read version (use first target -- one version per project)
         version = "?"
-        if target_name != "none" and target_name in TARGETS:
-            target_path = target_entries[0].path if target_entries else os.path.join(root, path)
+        first_target_name = target_entries[0].name if target_entries else None
+        if first_target_name and first_target_name in TARGETS:
             try:
-                version = TARGETS[target_name].read_version(target_path)
+                version = TARGETS[first_target_name].read_version(target_entries[0].path)
             except Exception:
                 version = "?"
 
@@ -252,8 +253,8 @@ def _cmd_status(flags, project_root):
         latest_tag = "(none)"
         latest_tag_version = None
         try:
-            if target_name != "none" and target_name in TARGETS:
-                tag_glob = TARGETS[target_name].monorepo_tag_glob(name, path=path)
+            if first_target_name and first_target_name in TARGETS:
+                tag_glob = TARGETS[first_target_name].monorepo_tag_glob(name, path=path)
             else:
                 tag_glob = f"{name}@v*"
             result = subprocess.run(
@@ -317,7 +318,7 @@ def _cmd_status(flags, project_root):
         remote = proj.get("subtree_remote", "")
         remote_str = remote if remote else "-"
 
-        rows.append((name, path, target_name, version, latest_tag, unreleased_str, library_str, dev_node_str, deps_str, rdeps_str, watch_str, remote_str))
+        rows.append((name, path, target_display, version, latest_tag, unreleased_str, library_str, dev_node_str, deps_str, rdeps_str, watch_str, remote_str))
 
     # Determine which dynamic columns to show
     any_library = any(row[6] != "" for row in rows)
