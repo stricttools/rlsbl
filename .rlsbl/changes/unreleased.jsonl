@@ -6,3 +6,4 @@
 {"commits":["2b222902195c3e8c4d2bbd7a10fa353c7c4fd611"],"user_facing":true,"description":"**Fix.** Release confirmation prompt now shows the correct version filename for Deno projects using `deno.jsonc`.","type":"fix"}
 {"commits":["85ec564f3f39eff9b524a152fa6325c0711df808"],"user_facing":true,"description":"**Fix.** PlainTarget no longer auto-detects alongside the docs target when both `VERSION` and `selfdoc.json` are present.","type":"fix"}
 {"commits":["39046d28ff0a48a60f30c343df761d6e762871de"],"user_facing":true,"description":"**Fix.** Flutter targets now show `pubspec.yaml (flutter)` in the target table instead of `---` for detection files.","type":"fix"}
+{"commits":["75b0b6baa80e8fc93169b100c33267bec809c5a2"],"user_facing":false}
