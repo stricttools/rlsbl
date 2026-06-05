@@ -8,6 +8,8 @@ rlsbl supports 18 release targets, each handling version management and scaffold
 
 :-: table-targets
 
+All targets share core release functionality: version bumping, git tagging, and GitHub Release creation. The table above shows optional capabilities that vary by ecosystem.
+
 ## Check support matrix
 
 Some checks are universal (they run for any target), while others only apply to targets with language-specific import scanners or AST analysis. This matrix shows which target-specific checks support which targets.
