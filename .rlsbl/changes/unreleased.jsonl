@@ -1,3 +1,4 @@
 {"commits":["8d2dd07510e0688cb687e778354196c76c0441fe"],"user_facing":true,"description":"**Refactor.** SwiftAppleTarget now inherits from SwiftTarget, eliminating 9 duplicated methods.","type":"feature"}
 {"commits":["a73a9a92a5cff420ed7d86c8b957c6cf14c07622","b59e74d7c5b53d05235c373a376ca3b9b458961c"],"user_facing":true,"description":"**New feature.** `publish()` and `build_assets()` are now gated on target capabilities. Targets that don't declare the capability are skipped instead of calling no-op methods.","type":"feature"}
 {"commits":["f4853151ef4dd6d857e46726f3bc03c54460dd4c"],"user_facing":false}
+{"commits":["410ac82fcbc3c1938bbd882ceeace09cd83f333f"],"user_facing":true,"description":"**Breaking.** `BaseTarget.build_assets()` returns an empty list instead of raising `NotImplementedError`. Custom targets that relied on the exception should declare `build_assets` in their capabilities frozenset.","type":"breaking"}
