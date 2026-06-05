@@ -17,6 +17,8 @@ from .dart import DartTarget
 from .docker import DockerTarget
 from .flutter import FlutterTarget
 from .maven import MavenTarget
+from .native_android import NativeAndroidTarget
+from .native_ios import NativeIosTarget
 from .zig import ZigTarget
 from .pgdesign import PgdesignTarget
 from .plain import PlainTarget
@@ -45,6 +47,8 @@ TARGETS = {
     "docker": DockerTarget(),
     "flutter": FlutterTarget(),
     "maven": MavenTarget(),
+    "native-android": NativeAndroidTarget(),
+    "native-ios": NativeIosTarget(),
     "zig": ZigTarget(),
     "pgdesign": PgdesignTarget(),
     "plain": PlainTarget(),

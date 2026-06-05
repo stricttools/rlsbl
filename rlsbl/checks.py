@@ -81,6 +81,7 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "layers-violations": "workspace",
     "deps-stale": "workspace",
     "dead-workspace-packages": "workspace",
+    "subtree-remote-reachable": "workspace",
     # --- workspace + language-specific import scanners ---
     "deps-unused": frozenset({"pypi", "dart", "npm", "go"}),
     "deps-undeclared": frozenset({"pypi", "dart", "npm", "go"}),
@@ -112,7 +113,7 @@ CHECK_EXCLUDED_TARGETS: dict[str, dict[str, str]] = {
 # listed here, startup fails loudly.
 MATRIX_COLUMNS: tuple[str, ...] = (
     "pypi", "go", "npm", "dart", "cargo", "deno", "hex", "zig",
-    "swift", "swift-apple", "maven", "docker", "flutter",
+    "swift", "swift-apple", "maven", "native-android", "native-ios", "docker", "flutter",
     "pgdesign", "plain", "spec",
 )
 assert set(MATRIX_COLUMNS) == set(TARGETS.keys()), (
@@ -1038,6 +1039,41 @@ def register_checks(app):
             f"{len(dead)} dead workspace package(s)",
             details=details,
         )
+
+    # ------------------------------------------------------------------
+    # Subtree remote reachability
+    # ------------------------------------------------------------------
+
+    @app.check("subtree-remote-reachable")
+    def check_subtree_remote_reachable(ctx):
+        """Every project with subtree_remote must have a reachable remote."""
+        if not isinstance(ctx, WorkspaceCheckContext):
+            return CheckResult("skip", "not a monorepo workspace")
+
+        from .utils import run as _run
+
+        errors = []
+        checked = 0
+        for proj in ctx.projects:
+            remote = proj.get("subtree_remote", "")
+            if not remote:
+                continue
+            checked += 1
+            try:
+                _run("git", ["ls-remote", remote], cwd=str(ctx.workspace_root))
+            except subprocess.CalledProcessError:
+                errors.append(f"{proj['name']}: subtree remote unreachable: {remote}")
+
+        if checked == 0:
+            return CheckResult("skip", "no projects have subtree_remote")
+
+        if errors:
+            return CheckResult(
+                "fail",
+                f"{len(errors)} unreachable subtree remote(s)",
+                details=errors,
+            )
+        return CheckResult("pass", f"all {checked} subtree remote(s) reachable")
 
     # ------------------------------------------------------------------
     # Dependency validation

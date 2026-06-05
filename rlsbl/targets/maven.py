@@ -75,11 +75,30 @@ class MavenTarget(BaseTarget):
         """Maven/Gradle metadata extraction not yet implemented."""
         return {}
 
+    def _is_android_app(self, dir_path):
+        """Check if a gradle file declares the Android application plugin."""
+        for name in ("build.gradle.kts", "build.gradle"):
+            path = os.path.join(dir_path, name)
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                if "com.android.application" in content:
+                    return True
+        return False
+
     def detect(self, dir_path):
-        """Detect if dir has build.gradle.kts, build.gradle, or pom.xml."""
-        return (
+        """Detect if dir has build.gradle.kts, build.gradle, or pom.xml.
+
+        Returns False for Android application projects (those use native-android).
+        """
+        has_gradle = (
             os.path.exists(os.path.join(dir_path, "build.gradle.kts"))
             or os.path.exists(os.path.join(dir_path, "build.gradle"))
+        )
+        if has_gradle and self._is_android_app(dir_path):
+            return False
+        return (
+            has_gradle
             or os.path.exists(os.path.join(dir_path, "pom.xml"))
         )
 
