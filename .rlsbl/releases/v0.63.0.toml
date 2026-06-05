@@ -1,0 +1,8 @@
+# Version bump type: patch, minor, or major
+bump = "minor"
+# Short description of this release (required)
+description = "Pipeline separation: versioning and publishing are now independent concerns."
+# Optional context explaining why these changes were made
+context = "Breaking: publish() and build_assets() removed from targets, replaced by pipeline types. DocsTarget removed (use cloudflare-pages pipeline). flutter-ios/flutter-android merged into single flutter target. The publish config key is no longer recognized -- use pipelines. New: 9 built-in pipeline types, custom_assets, hooks override built-ins, 5 new checks, pipeline introspect table. Fix: multi-target array bugs in snapshot/graph/status."
+include = ["npm", "pypi"]
+exclude = []
