@@ -2,16 +2,15 @@
 
 # Changelog
 
+## 0.63.1
+
+Pass RLSBL_DIST_DIR env var to custom_assets build commands.
+
+### Features
+
+- **New feature.** Custom asset build commands now receive the dist directory via the `RLSBL_DIST_DIR` environment variable, eliminating the need for hardcoded paths.
+
 ## 0.63.0
-
-Pipeline separation: versioning and publishing are now independent concerns.
-
-<details>
-<summary>Context</summary>
-
-Breaking: publish() and build_assets() removed from targets, replaced by pipeline types. DocsTarget removed (use cloudflare-pages pipeline). flutter-ios/flutter-android merged into single flutter target. The publish config key is no longer recognized -- use pipelines. New: 9 built-in pipeline types, custom_assets, hooks override built-ins, 5 new checks, pipeline introspect table. Fix: multi-target array bugs in snapshot/graph/status.
-
-</details>
 
 ### Breaking
 
