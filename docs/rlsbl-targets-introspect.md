@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.introspect
-description: "Target introspection -- generates raw table data for all release targets and their properties."
+description: "Target introspection -- generates raw table data for all release targets showing ecosystem, detection files, capabilities, and tag formats."
 generated: true
 nav_group: "API Reference"
 nav_order: 78
