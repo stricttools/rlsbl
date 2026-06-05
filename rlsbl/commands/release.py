@@ -1019,7 +1019,7 @@ def upload_release_assets(tag, new_version, log, flags, *, ctx):
     5. Clean up the dist directory
 
     Skips silently if no targets have assets enabled.
-    Warns and skips targets whose ``build_assets()`` raises ``NotImplementedError``.
+    Skips targets that lack the ``build_assets`` capability.
 
     ctx: ProjectContext carrying project_root, monorepo_root, and config.
     """
