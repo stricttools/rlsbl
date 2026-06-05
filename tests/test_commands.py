@@ -1120,23 +1120,23 @@ class TestResolveReleaseTargets:
 
     def test_missing_config_falls_back_to_auto_detect(self):
         """Without release_targets in config, auto-detect all detected targets."""
-        # Create selfdoc.json so docs target is detected
-        with open("selfdoc.json", "w") as f:
-            f.write("{}")
+        # Create version.json so spec target is detected
+        with open("version.json", "w") as f:
+            json.dump({"version": "1.0.0"}, f)
 
         from rlsbl.commands.release import resolve_release_targets
 
         result = resolve_release_targets("npm", {}, config={})
-        # docs is detected via selfdoc.json
-        assert "docs" in result
+        # spec is detected via version.json
+        assert "spec" in result
         # npm is the primary and must be excluded from secondaries
         assert "npm" not in result
 
     def test_config_release_targets_restricts_secondaries(self):
         """release_targets in config restricts which secondaries run."""
-        # Create selfdoc.json so docs target would be auto-detected
-        with open("selfdoc.json", "w") as f:
-            f.write("{}")
+        # Create version.json so spec target would be auto-detected
+        with open("version.json", "w") as f:
+            json.dump({"version": "1.0.0"}, f)
         # Config says only npm participates (but npm is primary, so secondaries = empty)
         os.makedirs(".rlsbl", exist_ok=True)
         config = {"release_targets": ["npm"]}
@@ -1146,29 +1146,29 @@ class TestResolveReleaseTargets:
         from rlsbl.commands.release import resolve_release_targets
 
         result = resolve_release_targets("npm", {}, config=config)
-        # docs is NOT in the configured list, so it should not appear
-        assert "docs" not in result
+        # spec is NOT in the configured list, so it should not appear
+        assert "spec" not in result
         # npm is primary, excluded from secondaries
         assert "npm" not in result
         assert result == {}
 
-    def test_config_release_targets_includes_docs(self):
-        """release_targets listing docs includes it even without auto-detect."""
+    def test_config_release_targets_includes_spec(self):
+        """release_targets listing spec includes it even without auto-detect."""
         os.makedirs(".rlsbl", exist_ok=True)
-        config = {"release_targets": ["npm", "docs"]}
+        config = {"release_targets": ["npm", "spec"]}
         with open(os.path.join(".rlsbl", "config.json"), "w") as f:
             json.dump(config, f)
 
         from rlsbl.commands.release import resolve_release_targets
 
         result = resolve_release_targets("npm", {}, config=config)
-        assert "docs" in result
+        assert "spec" in result
         assert "npm" not in result
 
     def test_primary_always_excluded_from_secondaries(self):
         """The primary target is never in the secondary set, even if config lists it."""
         os.makedirs(".rlsbl", exist_ok=True)
-        config = {"release_targets": ["npm", "docs"]}
+        config = {"release_targets": ["npm", "spec"]}
         with open(os.path.join(".rlsbl", "config.json"), "w") as f:
             json.dump(config, f)
 
@@ -1180,14 +1180,14 @@ class TestResolveReleaseTargets:
     def test_unknown_target_in_config_ignored(self):
         """Unknown target names in config are silently filtered out."""
         os.makedirs(".rlsbl", exist_ok=True)
-        config = {"release_targets": ["npm", "nonexistent", "docs"]}
+        config = {"release_targets": ["npm", "nonexistent", "spec"]}
         with open(os.path.join(".rlsbl", "config.json"), "w") as f:
             json.dump(config, f)
 
         from rlsbl.commands.release import resolve_release_targets
 
         result = resolve_release_targets("npm", {}, config=config)
-        assert "docs" in result
+        assert "spec" in result
         assert "nonexistent" not in result
 
 

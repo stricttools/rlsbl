@@ -1,8 +1,8 @@
 """Tests for selfdoc.json version bump and version-consistency check.
 
-Verifies that selfdoc.json is bumped during release even when "docs" is not
-in the explicit targets list, and that the version-consistency check detects
-drift in selfdoc.json regardless of target configuration.
+Verifies that selfdoc.json is bumped during release via the inline
+_bump_selfdoc_version function, and that the version-consistency check
+detects drift in selfdoc.json regardless of target configuration.
 """
 
 import json
@@ -95,16 +95,14 @@ class TestReleaseBumpSelfdocJson:
                 for rel in other_modified:
                     files_to_commit.append(os.path.normpath(os.path.join(t_path, rel)))
 
-        # Now apply the selfdoc.json fallback (the fix)
+        # Now apply the selfdoc.json bump (inline, no DocsTarget)
+        from rlsbl.commands.release import _bump_selfdoc_version
         bumped_files = set(files_to_commit)
-        selfdoc_path = os.path.join(version_dir, "selfdoc.json")
-        if os.path.exists(selfdoc_path) and "docs" not in target_paths:
-            from rlsbl.targets.docs import DocsTarget
-            docs_modified = DocsTarget().write_version(version_dir, new_version, ctx=make_ctx(version_dir))
-            for rel in docs_modified:
-                fpath = os.path.normpath(os.path.join(version_dir, rel))
-                if fpath not in bumped_files:
-                    files_to_commit.append(fpath)
+        selfdoc_modified = _bump_selfdoc_version(version_dir, new_version)
+        for rel in selfdoc_modified:
+            fpath = os.path.normpath(os.path.join(version_dir, rel))
+            if fpath not in bumped_files:
+                files_to_commit.append(fpath)
 
         # Verify selfdoc.json was bumped
         with open(os.path.join(version_dir, "selfdoc.json")) as f:
@@ -115,47 +113,25 @@ class TestReleaseBumpSelfdocJson:
         selfdoc_committed = any("selfdoc.json" in f for f in files_to_commit)
         assert selfdoc_committed, f"selfdoc.json not in files_to_commit: {files_to_commit}"
 
-    def test_bump_no_double_bump_when_docs_in_targets(self, tmp_path, monkeypatch):
-        """When targets=["npm", "docs"], selfdoc.json is bumped by the loop, not the fallback."""
-        _make_project(tmp_path, targets=["npm", "docs"], pkg_version="1.0.0", selfdoc_version="1.0.0")
-        monkeypatch.chdir(tmp_path)
+    def test_bump_selfdoc_no_file_returns_empty(self, tmp_path):
+        """When selfdoc.json does not exist, _bump_selfdoc_version returns []."""
+        from rlsbl.commands.release import _bump_selfdoc_version
+        result = _bump_selfdoc_version(str(tmp_path), "1.0.0")
+        assert result == []
 
-        from rlsbl.targets import TARGETS
-
-        npm_target = TARGETS["npm"]
-        version_dir = str(tmp_path)
-        new_version = "1.1.0"
-        registry = "npm"
-        primary_path = version_dir
-        target_paths = {"npm": version_dir, "docs": version_dir}
-
-        files_to_commit = []
-        modified = npm_target.write_version(primary_path, new_version, ctx=make_ctx(primary_path))
-        for rel in modified:
-            files_to_commit.append(os.path.normpath(os.path.join(primary_path, rel)))
-
-        for t_name, t_path in target_paths.items():
-            if t_name == registry:
-                continue
-            other_reg = TARGETS.get(t_name)
-            if other_reg and other_reg.check_project_exists(t_path):
-                other_modified = other_reg.write_version(t_path, new_version, ctx=make_ctx(t_path))
-                for rel in other_modified:
-                    files_to_commit.append(os.path.normpath(os.path.join(t_path, rel)))
-
-        # The fallback should NOT trigger because "docs" IS in target_paths
-        selfdoc_path = os.path.join(version_dir, "selfdoc.json")
-        assert os.path.exists(selfdoc_path)
-        assert "docs" in target_paths  # so fallback is skipped
-
-        # Verify selfdoc.json was already bumped by the loop
-        with open(selfdoc_path) as f:
+    def test_bump_selfdoc_updates_versions_array(self, tmp_path):
+        """_bump_selfdoc_version also updates the last entry in the versions array."""
+        (tmp_path / "selfdoc.json").write_text(json.dumps({
+            "version": "1.0.0",
+            "versions": [{"version": "1.0.0", "indexed": True}],
+        }, indent=2))
+        from rlsbl.commands.release import _bump_selfdoc_version
+        result = _bump_selfdoc_version(str(tmp_path), "1.1.0")
+        assert result == ["selfdoc.json"]
+        with open(tmp_path / "selfdoc.json") as f:
             data = json.load(f)
         assert data["version"] == "1.1.0"
-
-        # Count how many times selfdoc.json appears in files_to_commit
-        selfdoc_count = sum(1 for f in files_to_commit if "selfdoc.json" in f)
-        assert selfdoc_count == 1, f"selfdoc.json appeared {selfdoc_count} times: {files_to_commit}"
+        assert data["versions"][-1]["version"] == "1.1.0"
 
 
 # ---------------------------------------------------------------------------
@@ -196,8 +172,8 @@ class TestVersionConsistencySelfdoc:
         assert result.status == "pass"
         assert "1.0.0" in result.message
 
-    def test_passes_auto_detect_includes_docs(self, tmp_path, monkeypatch):
-        """Without explicit targets, auto-detection picks up both npm and docs."""
+    def test_passes_auto_detect_includes_selfdoc(self, tmp_path, monkeypatch):
+        """Without explicit targets, auto-detection picks up npm and selfdoc.json is checked inline."""
         _make_project(
             tmp_path,
             targets=None,  # auto-detect
@@ -212,7 +188,7 @@ class TestVersionConsistencySelfdoc:
         assert "2.0.0" in result.message
 
     def test_drift_detected_auto_detect(self, tmp_path, monkeypatch):
-        """Without explicit targets, auto-detection catches docs drift."""
+        """Without explicit targets, auto-detection catches selfdoc.json drift."""
         _make_project(
             tmp_path,
             targets=None,  # auto-detect

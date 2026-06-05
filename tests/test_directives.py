@@ -99,7 +99,7 @@ def _target_table_resolve(attrs, config, body):
 # ---------------------------------------------------------------------------
 
 ALL_TARGETS = sorted([
-    "cargo", "dart", "deno", "docker", "docs", "flutter",
+    "cargo", "dart", "deno", "docker", "flutter",
     "go", "hex", "maven", "npm", "pgdesign", "plain",
     "pypi", "spec", "swift", "swift-apple", "zig",
 ])
@@ -138,7 +138,7 @@ class TestTargetTableResolve:
         assert "|" in result
 
     def test_contains_all_targets(self):
-        """Output contains all 17 target names."""
+        """Output contains all 16 target names."""
         result = _target_table_resolve({}, None, None)
         missing = [t for t in ALL_TARGETS if t not in result]
         assert not missing, (

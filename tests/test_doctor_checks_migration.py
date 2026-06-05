@@ -197,11 +197,11 @@ class TestVersionConsistencyCheck:
         assert result.status == "warn"
         assert "no targets" in result.message
 
-    def test_docs_target_included_in_consistency(self, mock_git_repo):
-        """DocsTarget is a versioned target and participates in consistency.
+    def test_selfdoc_included_in_consistency(self, mock_git_repo):
+        """selfdoc.json is included in version-consistency checks.
 
         When selfdoc.json has the same version as package.json, the check
-        passes across both targets.
+        passes across both sources.
         """
         pkg = {"name": "test-pkg", "version": "1.0.0"}
         (mock_git_repo / "package.json").write_text(json.dumps(pkg))
@@ -215,8 +215,8 @@ class TestVersionConsistencyCheck:
         assert result.status == "pass"
         assert "1.0.0" in result.message
 
-    def test_docs_target_mismatch_detected(self, mock_git_repo):
-        """DocsTarget version mismatch with other targets causes failure."""
+    def test_selfdoc_version_mismatch_detected(self, mock_git_repo):
+        """selfdoc.json version mismatch with other targets causes failure."""
         pkg = {"name": "test-pkg", "version": "1.0.0"}
         (mock_git_repo / "package.json").write_text(json.dumps(pkg))
         # selfdoc.json with different version

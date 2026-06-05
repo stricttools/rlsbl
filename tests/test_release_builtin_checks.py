@@ -440,18 +440,6 @@ class TestSelfdocCheck:
             assert result is True
             mock_run.assert_not_called()
 
-    def test_selfdoc_check_skipped_when_docs_excluded(self, tmp_project, capsys):
-        """When docs_excluded is True, selfdoc check is skipped."""
-        (tmp_project / "selfdoc.json").write_text("{}")
-
-        with patch("rlsbl.commands.release.subprocess.run") as mock_run:
-            result = _run_selfdoc_check({}, docs_excluded=True)
-
-            assert result is True
-            mock_run.assert_not_called()
-            captured = capsys.readouterr()
-            assert "Skipping selfdoc check" in captured.out
-
     def test_selfdoc_check_skipped_when_not_installed(self, tmp_project, capsys):
         """When selfdoc.json exists but selfdoc is not on PATH, print note and return."""
         (tmp_project / "selfdoc.json").write_text("{}")
@@ -544,18 +532,6 @@ class TestSelfdocGen:
 
             assert result is True
             mock_run.assert_not_called()
-
-    def test_selfdoc_gen_skipped_when_docs_excluded(self, tmp_project, capsys):
-        """When docs_excluded is True, selfdoc gen is skipped."""
-        (tmp_project / "selfdoc.json").write_text("{}")
-
-        with patch("rlsbl.commands.release.subprocess.run") as mock_run:
-            result = _run_selfdoc_gen({}, docs_excluded=True)
-
-            assert result is True
-            mock_run.assert_not_called()
-            captured = capsys.readouterr()
-            assert "Skipping selfdoc gen" in captured.out
 
     def test_selfdoc_gen_skipped_when_not_installed(self, tmp_project, capsys):
         """When selfdoc.json exists but selfdoc is not on PATH, print note and return."""

@@ -282,14 +282,13 @@ class TestReleaseAbortCleanup:
             # is what matters; assert that below.
             with pytest.raises((SystemExit, subprocess.CalledProcessError)):
                 run_cmd(
-                    _rc(exclude=["docs"]),
+                    _rc(),
                     {
                         "yes": True,
                         "quiet": True,
                     },
-                
                     ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}),
-)
+                )
 
         # .validated may be written by changelog validation; tolerate that
         # specific file but require nothing else changed.

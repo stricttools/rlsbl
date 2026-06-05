@@ -30,9 +30,9 @@ class TestHeaders:
 
 
 class TestRows:
-    def test_returns_17_rows(self):
+    def test_returns_16_rows(self):
         _, rows = generate_target_table_data()
-        assert len(rows) == 17
+        assert len(rows) == 16
 
     def test_rows_match_header_length(self):
         headers, rows = generate_target_table_data()
@@ -68,13 +68,6 @@ class TestCapabilityCheckmarks:
 
 
 class TestSpecificTargets:
-    def test_docs_tag_format_is_dash(self):
-        _, rows = generate_target_table_data()
-        by_name = _rows_by_name(rows)
-        headers = EXPECTED_HEADERS
-        tag_idx = headers.index("Tag format")
-        assert by_name["docs"][tag_idx] == "---"
-
     def test_maven_version_file_is_dash(self):
         _, rows = generate_target_table_data()
         by_name = _rows_by_name(rows)

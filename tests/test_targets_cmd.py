@@ -41,7 +41,6 @@ class TestTargetsCommand:
         assert "npm" in output
         assert "pypi" in output
         assert "go" in output
-        assert "docs" in output
 
     def test_shows_header_row(self):
         """Output starts with a header row containing column names."""
@@ -91,23 +90,6 @@ class TestTargetsCommand:
         for line in lines:
             assert "no" in line
 
-    def test_docs_target_shows_selfdoc_json_version_file(self):
-        """Docs target shows 'selfdoc.json' for version file."""
-        from rlsbl.commands.targets_cmd import run_cmd
-
-        buf = StringIO()
-        with patch("sys.stdout", buf):
-            run_cmd(None, [], {}, project_root=".")
-
-        output = buf.getvalue()
-        for line in output.splitlines():
-            if line.startswith("docs"):
-                assert "selfdoc.json" in line
-                break
-        else:
-            pytest.fail("docs line not found in output")
-
-
 class TestMultiTargetRelease:
     """Tests for multi-target release: secondary targets get build/publish called."""
 
@@ -147,10 +129,10 @@ class TestMultiTargetRelease:
     def test_secondary_targets_called_when_detected(
         self, _selfdoc_gen, _selfdoc_check, _changes_dir, _extract, _finalize, _gen_ver_file, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, _commit_files, mock_run, _push
     ):
-        """When a secondary target (docs) is detected, its build is called."""
-        # Create selfdoc.json so docs target is detected
-        with open("selfdoc.json", "w") as f:
-            json.dump({"language": "python"}, f)
+        """When a secondary target (spec) is detected, its build is called."""
+        # Create version.json so spec target is detected
+        with open("version.json", "w") as f:
+            json.dump({"version": "1.0.0"}, f)
 
         # Mock run() responses:
         # 1. git fetch origin --quiet (remote-ahead check)
@@ -170,23 +152,23 @@ class TestMultiTargetRelease:
         # 14. gh release create -> "abc123"
         mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", "", "/tmp/fake-repo", "", "pre123", "", "", "", "abc123"]
 
-        # Mock the docs target's build to track calls (publish is now handled by pipelines)
+        # Mock the spec target's build to track calls
         from rlsbl.targets import TARGETS
-        original_build = TARGETS["docs"].build
+        original_build = TARGETS["spec"].build
         build_mock = MagicMock()
-        TARGETS["docs"].build = build_mock
+        TARGETS["spec"].build = build_mock
 
         try:
             from rlsbl.commands.release import run_cmd
 
             with patch("sys.stdout", StringIO()):
-                run_cmd(_rc(include=["npm", "docs"]), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
+                run_cmd(_rc(include=["npm", "spec"]), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
 
-            # Verify docs target build was called (publish is dispatched via pipelines now)
+            # Verify spec target build was called
             build_mock.assert_called_once_with(".", "1.0.1")
         finally:
             # Restore original methods
-            TARGETS["docs"].build = original_build
+            TARGETS["spec"].build = original_build
 
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
@@ -207,9 +189,9 @@ class TestMultiTargetRelease:
         self, _selfdoc_gen, _selfdoc_check, _changes_dir, _extract, _finalize, _gen_ver_file, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, _commit_files, mock_run, _push
     ):
         """If a secondary target's build raises, release still completes."""
-        # Create selfdoc.json so docs target is detected
-        with open("selfdoc.json", "w") as f:
-            json.dump({"language": "python"}, f)
+        # Create version.json so spec target is detected
+        with open("version.json", "w") as f:
+            json.dump({"version": "1.0.0"}, f)
 
         # Same mock sequence as test_secondary_targets_called_when_detected:
         # 1. git fetch  2. git rev-list  3-4. tag -l x2
@@ -219,8 +201,8 @@ class TestMultiTargetRelease:
         mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", "", "/tmp/fake-repo", "", "pre123", "", "", "", "abc123"]
 
         from rlsbl.targets import TARGETS
-        original_build = TARGETS["docs"].build
-        TARGETS["docs"].build = MagicMock(side_effect=RuntimeError("build failed"))
+        original_build = TARGETS["spec"].build
+        TARGETS["spec"].build = MagicMock(side_effect=RuntimeError("build failed"))
 
         try:
             from rlsbl.commands.release import run_cmd
@@ -228,10 +210,10 @@ class TestMultiTargetRelease:
             # Should not raise -- secondary failures are non-fatal
             buf = StringIO()
             with patch("sys.stdout", StringIO()), patch("sys.stderr", buf):
-                run_cmd(_rc(include=["npm", "docs"]), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
+                run_cmd(_rc(include=["npm", "spec"]), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
 
             # Verify warnings were emitted
             stderr_output = buf.getvalue()
-            assert "docs target build failed" in stderr_output
+            assert "spec target build failed" in stderr_output
         finally:
-            TARGETS["docs"].build = original_build
+            TARGETS["spec"].build = original_build

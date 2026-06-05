@@ -171,16 +171,16 @@ def test_no_targets_returns_error(tmp_project, fake_run, all_tools_present, caps
 
 
 def test_unsupported_target_skipped(tmp_project, fake_run, all_tools_present, capsys):
-    # docs is a registered target with no dev_install_command override (inherits None from BaseTarget)
+    # plain is a registered target with no dev_install_command override (inherits None from BaseTarget)
     os.makedirs(str(tmp_project / ".rlsbl"))
     with open(str(tmp_project / ".rlsbl" / "config.json"), "w") as f:
-        json.dump({"targets": ["docs"]}, f)
+        json.dump({"targets": ["plain"]}, f)
     rc = run_install({}, project_root=".")
     # No supported targets -> nothing ran, no error.
     assert rc == 0
     assert fake_run.calls == []
     captured = capsys.readouterr()
-    assert "Skipping docs" in captured.out
+    assert "Skipping plain" in captured.out
     assert "install not yet supported" in captured.out
 
 
