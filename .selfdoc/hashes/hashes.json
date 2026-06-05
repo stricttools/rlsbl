@@ -488,27 +488,27 @@
     "description": "3266032dac809db8f09c10099004c4e51b3cb844eee75935bacd58ccd240ef85"
   },
   "en/rlsbl-targets-base.md": {
-    "content": "8fbcc5859b16666b625a030498d0f5fd78f9895bb9d34dab51d810f96ad361f1",
+    "content": "db2712100b5bac2e58213036fb66e994cd9563f07cedb42f223179a1e88031cf",
     "description": "9c45f2d173069765b86d5b12cc6ace11871012cf64a449c29879627cba6d68d1"
   },
   "en/rlsbl-targets-cargo.md": {
-    "content": "b256d21ceeea6323c7e039c373788ecd1340a6d36e9e552cd06eb41eca3e275f",
+    "content": "7009d27d8c10ab0dcea2f08bb03f99dfa78913d89d0a7d315f11c5b744beb82f",
     "description": "27abe540c3addc3fe385af67ad58acc34db997ff89a028fcdae8a2e78c2b41e4"
   },
   "en/rlsbl-targets-dart.md": {
-    "content": "7db0a87be9609ffe5927e2b06faba6a02e64b40c53c158355bc87065724497f9",
+    "content": "053855787df72ff7806e5b25e0d1cacef0df1b0959c05b21f084d27eb538d058",
     "description": "df505dec2d0e66ad6c0962286c923baf8fb9bad45d8a243ad825e490740aa7a7"
   },
   "en/rlsbl-targets-deno.md": {
-    "content": "953c84e66e05241a0cbd11f7facf7344fff223feac563d4177daf42597854200",
+    "content": "b3a55ea328d0f56b81db863a813f6e11b7c36935d24175a89a9b2210e2e08bb0",
     "description": "8982097fe00d57557550d0794f71182544daa6a75caea3e4ed48375a1f7dcbbc"
   },
   "en/rlsbl-targets-docker.md": {
-    "content": "97409f8aa260b22017284f06b9fdcb20fd2ed65146253a01f74f78b3d50d24e5",
+    "content": "1b472059416592a47472be0df886b5acb6cb61be9df02cf8279245d3ce0bc88c",
     "description": "d3f8ecf64893217adb6d6d1e4ea06125e4a1938da0a46356806ef508fb029563"
   },
   "en/rlsbl-targets-docs.md": {
-    "content": "0b0a2e4e182662f73a3a6c144046fdb41511a437f11ee67e067eb56b3c1a02d1",
+    "content": "251bdccc2db882f057cbd60db186c83e0a57daff0f8f4a8728579747d3fd4ead",
     "description": "076c53e27fcca2bf0fd2d0d68c8cf05a3f1225b8c0faf4af8c5f172a0941ba0a"
   },
   "en/rlsbl-targets-flutter_android.md": {
@@ -520,11 +520,11 @@
     "description": "2b53608c176fdd828e3df356553414cbac2cf521f9546871e42d83b47eb0457f"
   },
   "en/rlsbl-targets-go.md": {
-    "content": "f97ffd7cad2abd22f542551b0963ce5934574f0622bb529ad143a2d7d4103c39",
+    "content": "cbf4d55826950a271ab46dce5ba7de3efde9163bf0b621f7c7ba9baadb7237a4",
     "description": "9d42427937256cf18c6f9b2c34b668350ddfdc06e661a50d0b39f1259f13380d"
   },
   "en/rlsbl-targets-hex.md": {
-    "content": "23f2ab5e38312f35fbe6f84e109544b0bb3a7ba6271b7b24246971b978841d42",
+    "content": "40fe39b4f44f76ce8195a747c2f45191195e6eae54a7bd21f74b6ae2bb2e90c7",
     "description": "8916f87d3ea421f479a169c9a16ecd405e23b0a029367cdeac9d4960eb975144"
   },
   "en/rlsbl-targets-introspect.md": {
@@ -532,7 +532,7 @@
     "description": "472429dc403508507d48396e76bb84b8fd948a065c7ebf100df626b78cebb533"
   },
   "en/rlsbl-targets-maven.md": {
-    "content": "e6f66677aa5c32e625f40c32d20a7fe65964fbcebb1a1d1f7309e1ed6ad9b3ba",
+    "content": "b42b85d40b75b9acc2ba85e019902b1de7bffed7c0d9e7feb89d16cf97060b75",
     "description": "0c61d194e83652f219ad7c15f3d849779cbd0272fc6d53c7daaaa46d2258b851"
   },
   "en/rlsbl-targets-native_changes.md": {
@@ -540,35 +540,35 @@
     "description": "a01fb003aac1ef1791a6a50b56833d1717e6dc54b9486209b7118c2e6c9c5bbf"
   },
   "en/rlsbl-targets-npm.md": {
-    "content": "32bc672186336798778f5d3fb3b2319a1ecf19d94802a73d6f05ebfc8965ed06",
+    "content": "b51dcc9814c65807c7c6fcbc835f70fa94d629e47f3fe430c0e6a10d22b6c2ac",
     "description": "c3b1baee52612dc981379bd297c5b6c229d27ad606d0d514baff62f2ee71c360"
   },
   "en/rlsbl-targets-pgdesign.md": {
-    "content": "ad8f1eab98ba1ca8131b38ea5765d1960c1f33ae7f70821d3493738274802bc0",
+    "content": "ca2b9daf63494ddedd338c0bd2f0f14c36fcc87cb39b5906e829074215bddece",
     "description": "f3ceb031c3e6601abbe13292c63e4d0eeb6da1a568fb774c6f7fb4c5625aeeef"
   },
   "en/rlsbl-targets-plain.md": {
-    "content": "765168ebd1d42e403ded62f3d2eedae051adf37ae7c421acd467c72221c9a23d",
+    "content": "c6eb34a4122cb5926eb857d1f0f904db3db292a2d8fe056c41cad1953c495d16",
     "description": "f1c5b9ef00991b226a5d97b96a2ea0fa68ee0a35946a5a062eef2b67e74942af"
   },
   "en/rlsbl-targets-protocol.md": {
-    "content": "e19d11cc0c2f5e261a4d5bd2289ef1fc78f68a66568094b7794c68272fa28c6c",
+    "content": "a018c46273ea0d9d219beab85386c269dcc4a829ead8b0e02f018eaed851da19",
     "description": "5732af4332c5b53a141aac2b4bb87cc90dbf1bf26dd06235dd2a9dbb92d7d20d"
   },
   "en/rlsbl-targets-pypi.md": {
-    "content": "deea52762c227624df5e1fa6039cc4fc7f747585f3c33e5e396249a505b4e0bb",
+    "content": "740deb746b8f5f2c91e578e35b60818a5bbfbe2c4155c62bed0072adaddea056",
     "description": "08730d9c6f4b56924c278f9df4f1739470c2b2edc610266ec247ea3658fee261"
   },
   "en/rlsbl-targets-spec.md": {
-    "content": "fd5f940633b5a02f599927112e857ee15077e211a99ce34503cb20b5592b1d1f",
+    "content": "1ef445165564a0ecab069398e57ce54181185f2ed0f1e9d0991f7bc808c4eb26",
     "description": "12124ce50311fb3753a7ef338dc6af459d0e6e7869b4a8f58608b8afa0b42bd0"
   },
   "en/rlsbl-targets-swift.md": {
-    "content": "cb2d532a2cddd2902a60f91c4a427fa92ab8dbe3076b432e0d1856f66116f41c",
+    "content": "8876fd042b8553b2fef73b64b5b93c48128cc5e16d26cfe876a70ebd6d80b3e9",
     "description": "7e1734648734143d96661d5336d695ad34c415500624166458835c1dfc3ab219"
   },
   "en/rlsbl-targets-swift_apple.md": {
-    "content": "21eeba0ddb0269d3c2ec95871e4d46f6dd33745c601325e23ce4d40904d131cb",
+    "content": "a506178531005e1de7e450512538b7b187df2124577f189190f9656bb2943ccb",
     "description": "8ed5ea6efc94661a60570314c16634163e5332e19c9cf0e1cc1ec4060dab1fd1"
   },
   "en/rlsbl-targets-utils.md": {
@@ -576,7 +576,7 @@
     "description": "26f603f36164038522eb9654ef5c9472ad0dbe0b58ef374ac6efb1cb642a4e5a"
   },
   "en/rlsbl-targets-zig.md": {
-    "content": "882e04a687f22b934c4e6c80e9b48f91e6cdef5a2c7cf6cdb02f8fc5f4bb10c3",
+    "content": "e7c947e1a91d00dae74deb3a1d5605540bf000a4c8ebfaeba1630c01c8100de9",
     "description": "0323aae3e1a9a10bcab0868da607c7ca4e6c2091436d5c83a26c0b4e4b59d959"
   },
   "en/rlsbl-targets-zig_version.md": {
@@ -604,7 +604,7 @@
     "description": "846d7106c20777b824e0116e8e62127eb6c86ab277fe4904e1cbecc2e9839d43"
   },
   "en/targets.md": {
-    "content": "3308829eafce073a3d4420df18f85d7eeeb79f6039a2f994f8e474fec405c19e",
+    "content": "c677f75e077d2518cb145ddd04f150bf215adbe7a4c2d221c3bca818bb97fbbf",
     "description": "62c8a6de021399d13729bfbf5ece8d1ecf5b80f8186bae11549b019cc9c77397"
   },
   "gen-index.md": {
