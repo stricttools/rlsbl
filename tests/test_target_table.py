@@ -30,9 +30,9 @@ class TestHeaders:
 
 
 class TestRows:
-    def test_returns_16_rows(self):
+    def test_returns_18_rows(self):
         _, rows = generate_target_table_data()
-        assert len(rows) == 16
+        assert len(rows) == 18
 
     def test_rows_match_header_length(self):
         headers, rows = generate_target_table_data()
