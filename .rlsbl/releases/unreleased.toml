@@ -1,8 +1,0 @@
-# Version bump type: patch, minor, or major
-bump = "minor"
-# Short description of this release (required)
-description = "Target introspection: capabilities, ecosystem, and auto-generated target table."
-# Optional context explaining why these changes were made
-context = "All 18 release targets now declare capabilities (publish, build_assets, read_name, read_metadata, ci_templates, dev_install), ecosystem labels, and auto-detectability. A new table-targets selfdoc directive auto-generates a comprehensive target details table, replacing the stale manual table. MATRIX_COLUMNS is now derived from TARGETS.keys() for DRY consistency."
-include = ["npm", "pypi", "docs"]
-exclude = []
