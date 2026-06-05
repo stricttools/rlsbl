@@ -45,6 +45,44 @@ from ..utils import (
 VALID_BUMP_TYPES = ("patch", "minor", "major")
 
 
+def _bump_selfdoc_version(project_dir, new_version):
+    """Bump version in selfdoc.json if it exists. Returns list of modified file paths."""
+    import tempfile
+
+    config_path = os.path.join(project_dir, "selfdoc.json")
+    if not os.path.exists(config_path):
+        return []
+
+    with open(config_path, "r", encoding="utf-8") as f:
+        raw = f.read()
+    data = json.loads(raw)
+    data["version"] = new_version
+    versions = data.get("versions")
+    if versions and isinstance(versions, list):
+        versions[-1]["version"] = new_version
+
+    # Detect indent from existing file
+    indent = 2
+    for line in raw.splitlines()[1:]:
+        stripped = line.lstrip()
+        if stripped:
+            indent = len(line) - len(stripped)
+            break
+
+    new_content = json.dumps(data, indent=indent, ensure_ascii=False) + "\n"
+    fd, tmp_path = tempfile.mkstemp(
+        dir=project_dir, prefix=".selfdoc.json.", suffix=".tmp",
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(new_content)
+        os.replace(tmp_path, config_path)
+    except BaseException:
+        os.unlink(tmp_path)
+        raise
+    return ["selfdoc.json"]
+
+
 def _compute_content_hash(content):
     """SHA-256 of content with trailing whitespace stripped."""
     return hashlib.sha256(content.rstrip().encode("utf-8")).hexdigest()
@@ -1285,19 +1323,15 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                     if other_modified:
                         log(f"Synced version to {', '.join(target_vpath(t_path, r) for r in other_modified)}")
 
-            # Ensure selfdoc.json is bumped even when "docs" is not in the
-            # explicit targets list.  DocsTarget.detect() checks for the file.
+            # Bump selfdoc.json version inline (no DocsTarget dependency).
             bumped_files = set(files_to_commit)
-            selfdoc_path = os.path.join(project_dir, "selfdoc.json")
-            if os.path.exists(selfdoc_path) and "docs" not in target_paths:
-                from ..targets.docs import DocsTarget
-                docs_modified = DocsTarget().write_version(project_dir, new_version, ctx=ctx)
-                for rel in docs_modified:
-                    fpath = vpath(rel)
-                    if fpath not in bumped_files:
-                        files_to_commit.append(fpath)
-                if docs_modified:
-                    log(f"Synced version to {', '.join(vpath(r) for r in docs_modified)}")
+            selfdoc_modified = _bump_selfdoc_version(project_dir, new_version)
+            for rel in selfdoc_modified:
+                fpath = vpath(rel)
+                if fpath not in bumped_files:
+                    files_to_commit.append(fpath)
+            if selfdoc_modified:
+                log(f"Synced version to {', '.join(vpath(r) for r in selfdoc_modified)}")
 
         # Ecosystem tagging: add keyword to manifests if enabled
         if should_tag(flags, ctx.config):
