@@ -283,10 +283,9 @@ class GoTarget(BaseTarget):
             {"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"},
         ]
         if not self._is_library(project_root):
-            mappings.extend([
-                {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
+            mappings.append(
                 {"template": "goreleaser.yml.tpl", "target": ".goreleaser.yml"},
-            ])
+            )
             if not self._has_version_var(project_root):
                 mappings.append(
                     {"template": "version.go.tpl", "target": "version.go"},

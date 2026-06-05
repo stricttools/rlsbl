@@ -170,14 +170,9 @@ class CargoTarget(BaseTarget):
         return result
 
     def template_mappings(self, ctx):
-        project_root = str(ctx.project_root)
         mappings = [
             {"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"},
         ]
-        if not self._is_library(project_root):
-            mappings.append(
-                {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
-            )
         return mappings
 
     def check_project_exists(self, dir_path):

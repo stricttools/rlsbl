@@ -102,7 +102,6 @@ class HexTarget(BaseTarget):
     def template_mappings(self, ctx):
         return [
             {"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"},
-            {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
         ]
 
     def check_project_exists(self, dir_path):

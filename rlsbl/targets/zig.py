@@ -147,7 +147,6 @@ class ZigTarget(BaseTarget):
         return [
             {"template": "VERSION.tpl", "target": "VERSION"},
             {"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"},
-            {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
         ]
 
     def shared_template_mappings(self, ctx):
