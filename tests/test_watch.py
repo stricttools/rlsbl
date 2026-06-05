@@ -1,7 +1,8 @@
-"""Tests for rlsbl.commands.watch — workflow audit reporting and --run-id flag."""
+"""Tests for rlsbl.commands.watch — workflow audit reporting, --run-id flag, auto-retry, and notifications."""
 
 import json
 import os
+import subprocess
 
 import pytest
 from unittest.mock import patch, MagicMock, call
@@ -9,8 +10,13 @@ from unittest.mock import patch, MagicMock, call
 from rlsbl.commands.watch import (
     _has_publish_workflow_on_disk,
     _is_publish_workflow,
+    _notify,
+    _open_url,
     _print_workflow_audit,
+    _release_url,
     _resolve_run_ids,
+    _retry_workflow,
+    _watch_single_run,
     run_cmd,
 )
 
@@ -344,7 +350,7 @@ class TestResolveRunIds:
         assert result[0]["databaseId"] == 12345
         assert result[0]["name"] == "CI"
         mock_run.assert_called_once_with(
-            "gh", ["run", "view", "12345", "--json", "databaseId,name,status"]
+            "gh", ["run", "view", "12345", "--json", "databaseId,name,status,headBranch,workflowName"]
         )
 
     @patch("rlsbl.commands.watch.run")
@@ -478,6 +484,289 @@ class TestMutualExclusivity:
         with pytest.raises(SystemExit) as exc_info:
             rlsbl.cmd_watch(target="", run_id=["123"], sha="abc123")
         assert exc_info.value.code == 1
+
+
+class TestAutoRetry:
+    """Tests for auto-retry logic when a CI workflow fails."""
+
+    @patch("rlsbl.commands.watch.run")
+    @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.subprocess.run")
+    def test_retry_attempted_on_first_failure(self, mock_subproc, mock_time, mock_run, capsys):
+        """When a workflow fails, _watch_single_run triggers a retry."""
+        ci_run = {"databaseId": 100, "name": "CI", "headBranch": "main"}
+
+        # First gh run watch fails (CalledProcessError)
+        # Then gh workflow run succeeds (retry trigger)
+        # Then gh run list returns the retry run
+        # Then gh run watch on retry succeeds
+        mock_subproc.side_effect = [
+            subprocess.CalledProcessError(1, "gh"),  # original watch fails
+            MagicMock(returncode=0),  # gh workflow run succeeds
+            MagicMock(returncode=0),  # retry watch succeeds
+        ]
+        mock_run.return_value = json.dumps(
+            [{"databaseId": 200, "name": "CI", "status": "in_progress", "createdAt": "2026-01-01"}]
+        )
+
+        result = _watch_single_run(ci_run, "test-label", "user/repo")
+
+        assert result["passed"] is True
+        assert result["name"] == "CI"
+        err = capsys.readouterr().err
+        assert "CI failed, retrying once..." in err
+        assert "retry passed" in err
+
+    @patch("rlsbl.commands.watch.run")
+    @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.subprocess.run")
+    def test_retry_success_reports_overall_success(self, mock_subproc, mock_time, mock_run, capsys):
+        """When the retry passes, the overall result is success."""
+        ci_run = {"databaseId": 100, "name": "CI", "headBranch": "main"}
+
+        mock_subproc.side_effect = [
+            subprocess.CalledProcessError(1, "gh"),  # original watch fails
+            MagicMock(returncode=0),  # gh workflow run trigger
+            MagicMock(returncode=0),  # retry watch succeeds
+        ]
+        mock_run.return_value = json.dumps(
+            [{"databaseId": 200, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]
+        )
+
+        result = _watch_single_run(ci_run, "test-label", "user/repo")
+        assert result["passed"] is True
+        assert result["run_id"] == "200"
+
+    @patch("rlsbl.commands.watch.run")
+    @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.subprocess.run")
+    def test_double_failure_reports_failure(self, mock_subproc, mock_time, mock_run, capsys):
+        """When both original and retry fail, the result is failure."""
+        ci_run = {"databaseId": 100, "name": "CI", "headBranch": "main"}
+
+        mock_subproc.side_effect = [
+            subprocess.CalledProcessError(1, "gh"),  # original watch fails
+            MagicMock(returncode=0),  # gh workflow run trigger
+            subprocess.CalledProcessError(1, "gh"),  # retry watch also fails
+        ]
+        mock_run.return_value = json.dumps(
+            [{"databaseId": 200, "name": "CI", "status": "in_progress", "createdAt": "2026-01-01"}]
+        )
+
+        result = _watch_single_run(ci_run, "test-label", "user/repo")
+
+        assert result["passed"] is False
+        assert result["run_id"] == "200"
+        err = capsys.readouterr().err
+        assert "retry also failed" in err
+
+    @patch("rlsbl.commands.watch.subprocess.run")
+    def test_no_retry_without_branch(self, mock_subproc, capsys):
+        """When headBranch is missing, no retry is attempted."""
+        ci_run = {"databaseId": 100, "name": "CI"}  # no headBranch
+
+        mock_subproc.side_effect = [
+            subprocess.CalledProcessError(1, "gh"),  # original watch fails
+        ]
+
+        result = _watch_single_run(ci_run, "test-label", "user/repo")
+        assert result["passed"] is False
+        err = capsys.readouterr().err
+        assert "retrying" not in err
+
+    @patch("rlsbl.commands.watch.run")
+    @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.subprocess.run")
+    def test_retry_trigger_failure_returns_original_failure(self, mock_subproc, mock_time, mock_run, capsys):
+        """When the retry trigger itself fails, the original failure is returned."""
+        ci_run = {"databaseId": 100, "name": "CI", "headBranch": "main"}
+
+        mock_subproc.side_effect = [
+            subprocess.CalledProcessError(1, "gh"),  # original watch fails
+            subprocess.CalledProcessError(1, "gh"),  # gh workflow run trigger fails
+        ]
+
+        result = _watch_single_run(ci_run, "test-label", "user/repo")
+        assert result["passed"] is False
+        assert result["run_id"] == "100"  # original run ID, not retry
+        err = capsys.readouterr().err
+        assert "retry trigger failed" in err
+
+
+class TestRetryWorkflow:
+    """Unit tests for _retry_workflow."""
+
+    @patch("rlsbl.commands.watch.run")
+    @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.subprocess.run")
+    def test_retry_passes(self, mock_subproc, mock_time, mock_run, capsys):
+        """Successful retry returns passed=True."""
+        mock_subproc.side_effect = [
+            MagicMock(returncode=0),  # gh workflow run
+            MagicMock(returncode=0),  # gh run watch
+        ]
+        mock_run.return_value = json.dumps(
+            [{"databaseId": 300, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]
+        )
+
+        result = _retry_workflow("CI", "main", "user/repo", "test-label")
+        assert result is not None
+        assert result["passed"] is True
+        assert result["run_id"] == "300"
+
+    @patch("rlsbl.commands.watch.run")
+    @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.subprocess.run")
+    def test_retry_run_not_found(self, mock_subproc, mock_time, mock_run, capsys):
+        """When the retry run never appears, returns None."""
+        mock_subproc.return_value = MagicMock(returncode=0)  # gh workflow run trigger
+        mock_run.side_effect = Exception("not found")  # all poll attempts fail
+
+        result = _retry_workflow("CI", "main", "user/repo", "test-label")
+        assert result is None
+        err = capsys.readouterr().err
+        assert "retry run not found" in err
+
+
+class TestNotifyUrl:
+    """Tests for _notify with URL opening and _open_url."""
+
+    @patch("rlsbl.commands.watch._open_url")
+    @patch("rlsbl.commands.watch.require_tool", return_value=None)
+    def test_notify_opens_url_when_provided(self, mock_tool, mock_open):
+        """When url is passed, _open_url is called."""
+        _notify("title", "body", url="https://example.com")
+        mock_open.assert_called_once_with("https://example.com")
+
+    @patch("rlsbl.commands.watch._open_url")
+    @patch("rlsbl.commands.watch.require_tool", return_value=None)
+    def test_notify_skips_url_when_none(self, mock_tool, mock_open):
+        """When url is None, _open_url is not called."""
+        _notify("title", "body")
+        mock_open.assert_not_called()
+
+    @patch("rlsbl.commands.watch._open_url")
+    @patch("rlsbl.commands.watch.require_tool", return_value=None)
+    def test_notify_skips_url_when_not_passed(self, mock_tool, mock_open):
+        """When url kwarg is omitted, _open_url is not called."""
+        _notify("title", "body")
+        mock_open.assert_not_called()
+
+    @patch("rlsbl.commands.watch.subprocess.run")
+    def test_open_url_linux(self, mock_subproc):
+        """On Linux, _open_url calls xdg-open."""
+        with patch("rlsbl.commands.watch.sys") as mock_sys:
+            mock_sys.platform = "linux"
+            _open_url("https://example.com")
+            mock_subproc.assert_called_once_with(
+                ["xdg-open", "https://example.com"], timeout=5, capture_output=True
+            )
+
+    @patch("rlsbl.commands.watch.subprocess.run")
+    def test_open_url_macos(self, mock_subproc):
+        """On macOS, _open_url calls open."""
+        with patch("rlsbl.commands.watch.sys") as mock_sys:
+            mock_sys.platform = "darwin"
+            _open_url("https://example.com")
+            mock_subproc.assert_called_once_with(
+                ["open", "https://example.com"], timeout=5, capture_output=True
+            )
+
+    @patch("rlsbl.commands.watch.subprocess.run", side_effect=FileNotFoundError)
+    def test_open_url_nonfatal(self, mock_subproc):
+        """_open_url silently ignores errors."""
+        _open_url("https://example.com")  # should not raise
+
+
+class TestReleaseUrl:
+    """Tests for _release_url helper."""
+
+    @patch("rlsbl.commands.watch.run")
+    def test_returns_url_for_latest_tag(self, mock_run):
+        """Returns a release URL when gh release list succeeds."""
+        mock_run.return_value = "v1.2.3"
+        url = _release_url("user/repo")
+        assert url == "https://github.com/user/repo/releases/tag/v1.2.3"
+
+    @patch("rlsbl.commands.watch.run", side_effect=Exception("no releases"))
+    def test_returns_none_on_failure(self, mock_run):
+        """Returns None when gh release list fails."""
+        url = _release_url("user/repo")
+        assert url is None
+
+    def test_returns_none_for_empty_slug(self):
+        """Returns None when repo_slug is empty."""
+        url = _release_url("")
+        assert url is None
+
+    def test_returns_none_for_none_slug(self):
+        """Returns None when repo_slug is None."""
+        url = _release_url(None)
+        assert url is None
+
+
+class TestNotifyUrlInRunCmd:
+    """Tests that run_cmd passes the right URL to _notify."""
+
+    @patch("rlsbl.commands.watch._open_url")
+    @patch("rlsbl.commands.watch._print_workflow_audit", return_value=False)
+    @patch("rlsbl.commands.watch._watch_runs")
+    @patch("rlsbl.commands.watch.poll_runs")
+    @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.run")
+    def test_failure_notification_opens_actions_url(
+        self, mock_run, mock_time, mock_poll, mock_watch, mock_audit, mock_open_url
+    ):
+        """On failure, _notify is called with the failed run's Actions URL."""
+        ci_run = {"databaseId": 100, "name": "CI", "status": "in_progress"}
+        mock_poll.side_effect = [
+            [ci_run],
+            [ci_run],
+        ]
+        mock_run.side_effect = [
+            "abc123full",
+            json.dumps({"nameWithOwner": "user/repo", "name": "repo"}),
+            "v1.0.0",
+        ]
+        mock_watch.return_value = [{"name": "CI", "passed": False, "run_id": "100"}]
+
+        with pytest.raises(SystemExit) as exc_info:
+            run_cmd(None, ["abc123"], {})
+
+        assert exc_info.value.code == 1
+        mock_open_url.assert_called_once_with(
+            "https://github.com/user/repo/actions/runs/100"
+        )
+
+    @patch("rlsbl.commands.watch._open_url")
+    @patch("rlsbl.commands.watch._print_workflow_audit", return_value=False)
+    @patch("rlsbl.commands.watch._watch_runs")
+    @patch("rlsbl.commands.watch.poll_runs")
+    @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.run")
+    def test_success_notification_opens_release_url_with_tag(
+        self, mock_run, mock_time, mock_poll, mock_watch, mock_audit, mock_open_url
+    ):
+        """On success with a tag, _notify opens the release page for that tag."""
+        ci_run = {"databaseId": 100, "name": "CI", "status": "in_progress"}
+        mock_poll.side_effect = [
+            [ci_run],
+            [ci_run],
+        ]
+        mock_run.side_effect = [
+            "abc123full",
+            json.dumps({"nameWithOwner": "user/repo", "name": "repo"}),
+            "v2.0.0",  # tag found
+        ]
+        mock_watch.return_value = [{"name": "CI", "passed": True, "run_id": "100"}]
+
+        with pytest.raises(SystemExit) as exc_info:
+            run_cmd(None, ["abc123"], {})
+
+        assert exc_info.value.code == 0
+        mock_open_url.assert_called_once_with(
+            "https://github.com/user/repo/releases/tag/v2.0.0"
+        )
 
 
 if __name__ == "__main__":
