@@ -2,9 +2,34 @@
 
 # Changelog
 
-## 0.61.1
+## 0.62.0
 
-Fix feature matrix column order and add directive tests.
+Capability-gated publish/build_assets, Swift inheritance cleanup, version_file dir_path, and bug fixes.
+
+<details>
+<summary>Context</summary>
+
+Breaking: BaseTarget.build_assets() returns [] instead of raising NotImplementedError. publish() and build_assets() calls are now gated on target.capabilities. SwiftAppleTarget inherits from SwiftTarget. version_file() accepts optional dir_path for dynamic filename resolution. Plain exclusion list fixed. Flutter table cells corrected.
+
+</details>
+
+### Breaking
+
+- **Breaking.** `BaseTarget.build_assets()` returns an empty list instead of raising `NotImplementedError`. Custom targets that relied on the exception should declare `build_assets` in their capabilities frozenset.
+
+### Features
+
+- **Refactor.** SwiftAppleTarget now inherits from SwiftTarget, eliminating 9 duplicated methods.
+- **New feature.** `publish()` and `build_assets()` are now gated on target capabilities. Targets that don't declare the capability are skipped instead of calling no-op methods.
+- **New feature.** `version_file()` now accepts an optional `dir_path` parameter. DenoTarget uses it to resolve `deno.json` vs `deno.jsonc` dynamically.
+
+### Fixes
+
+- **Fix.** Release confirmation prompt now shows the correct version filename for Deno projects using `deno.jsonc`.
+- **Fix.** PlainTarget no longer auto-detects alongside the docs target when both `VERSION` and `selfdoc.json` are present.
+- **Fix.** Flutter targets now show `pubspec.yaml (flutter)` in the target table instead of `---` for detection files.
+
+## 0.61.1
 
 ### Fixes
 
