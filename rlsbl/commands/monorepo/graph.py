@@ -22,16 +22,15 @@ def _collect_graph_data(root, projects, graph):
         name = proj["name"]
         path = proj["path"]
 
-        # Detect target
+        # Detect targets
         target_entries = detect_targets(os.path.join(root, path))
-        target_name = target_entries[0].name if target_entries else "none"
+        target_names = [e.name for e in target_entries]
 
-        # Read version
+        # Read version (use first target -- one version per project)
         version = "?"
-        if target_name != "none" and target_name in TARGETS:
-            target_path = target_entries[0].path if target_entries else os.path.join(root, path)
+        if target_entries and target_entries[0].name in TARGETS:
             try:
-                version = TARGETS[target_name].read_version(target_path)
+                version = TARGETS[target_entries[0].name].read_version(target_entries[0].path)
             except Exception:
                 version = "?"
 
@@ -53,7 +52,7 @@ def _collect_graph_data(root, projects, graph):
         packages[name] = {
             "deps": dep_names,
             "rdeps": rdep_names,
-            "target": target_name,
+            "targets": target_names,
             "version": version,
             "dev_node": dev_node,
             "library": library,
