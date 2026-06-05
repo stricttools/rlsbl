@@ -1,10 +1,27 @@
 """Pipeline registry mapping type strings to pipeline classes for config-driven publish orchestration."""
 
 from .protocol import Pipeline
+from .npm import NpmPipeline
+from .pypi import PypiPipeline
+from .go import GoPipeline
+from .cargo import CargoPipeline
+from .deno import DenoPipeline
+from .hex import HexPipeline
+from .maven import MavenPipeline
+from .docker import DockerPipeline
+from .cloudflare_pages import CloudflarePagesPipeline
 
-# Maps pipeline type strings to pipeline classes.
-# Populated in phase 4 when concrete pipeline implementations are added.
-PIPELINE_TYPES: dict[str, type] = {}
+PIPELINE_TYPES: dict[str, type] = {
+    "npm": NpmPipeline,
+    "pypi": PypiPipeline,
+    "go": GoPipeline,
+    "cargo": CargoPipeline,
+    "deno": DenoPipeline,
+    "hex": HexPipeline,
+    "maven": MavenPipeline,
+    "docker": DockerPipeline,
+    "cloudflare-pages": CloudflarePagesPipeline,
+}
 
 
 def load_pipelines(config: dict) -> dict[str, "Pipeline"]:
