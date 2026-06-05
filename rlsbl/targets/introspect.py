@@ -42,7 +42,7 @@ def generate_target_table_data() -> tuple[list[str], list[list[str]]]:
         # Detection files
         if target_name == "plain":
             detection = "VERSION (conditional)"
-        elif target_name in ("flutter-ios", "flutter-android"):
+        elif target_name == "flutter":
             detection = "pubspec.yaml (flutter)"
         elif target.detection_files:
             detection = ", ".join(target.detection_files)

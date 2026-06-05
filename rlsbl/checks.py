@@ -106,8 +106,8 @@ CHECK_EXCLUDED_TARGETS: dict[str, dict[str, str]] = {
 # listed here, startup fails loudly.
 MATRIX_COLUMNS: tuple[str, ...] = (
     "pypi", "go", "npm", "dart", "cargo", "deno", "hex", "zig",
-    "swift", "swift-apple", "maven", "docker", "flutter-ios",
-    "flutter-android", "pgdesign", "plain", "docs", "spec",
+    "swift", "swift-apple", "maven", "docker", "flutter",
+    "pgdesign", "plain", "docs", "spec",
 )
 assert set(MATRIX_COLUMNS) == set(TARGETS.keys()), (
     f"MATRIX_COLUMNS is out of sync with TARGETS: "

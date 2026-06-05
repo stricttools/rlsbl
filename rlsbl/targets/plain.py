@@ -16,7 +16,7 @@ _OTHER_TARGET_MANIFESTS = (
     "pyproject.toml",      # pypi
     "go.mod",              # go
     "Cargo.toml",          # cargo
-    "pubspec.yaml",        # dart, flutter-ios, flutter-android
+    "pubspec.yaml",        # dart, flutter
     "Package.swift",       # swift, swift-apple
     "mix.exs",             # hex
     "deno.json",           # deno
