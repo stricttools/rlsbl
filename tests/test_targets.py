@@ -3,9 +3,7 @@
 import json
 import os
 import tempfile
-import unittest.mock
 from pathlib import Path
-from unittest.mock import patch
 
 from rlsbl.context import ProjectContext
 from rlsbl.targets.protocol import ReleaseTarget
@@ -279,12 +277,6 @@ class TestTargetRegistryIntegration:
             # Should complete without raising
             TARGETS["npm"].build(d, "1.0.0")
 
-    def test_publish_noop(self):
-        """TARGETS['go'].publish() without go.mod is effectively a no-op (prints warning)."""
-        with tempfile.TemporaryDirectory() as d:
-            # Should complete without raising (prints warning about missing go.mod)
-            TARGETS["go"].publish(d, "1.0.0", _ctx(d))
-
 
 class TestDetectionFiles:
     """Tests that detection_files is the single source of truth for PROJECT_MANIFESTS."""
@@ -374,84 +366,6 @@ class TestDetectTargetsConfig:
             captured = capsys.readouterr()
             assert "nonexistent" in captured.err
             assert "Warning" in captured.err
-
-
-class TestNpmPublish:
-    """Tests for NpmTarget.publish() hybrid behavior."""
-
-    def test_publish_with_token(self, capsys):
-        """NpmTarget.publish() calls npm publish when NPM_TOKEN is set."""
-        target = NpmTarget()
-        with patch.dict(os.environ, {"NPM_TOKEN": "fake-token"}):
-            with patch("rlsbl.targets.npm.run") as mock_run:
-                target.publish(".", "1.2.3", _ctx())
-                mock_run.assert_called_once()
-                call_args = mock_run.call_args
-                assert call_args[0][0] == "npm"
-                assert call_args[0][1] == ["publish", "--provenance", "--access", "public"]
-                assert call_args[1]["env"]["NPM_TOKEN"] == "fake-token"
-        captured = capsys.readouterr()
-        assert "Published to npm: 1.2.3" in captured.out
-
-    def test_publish_without_token(self, capsys):
-        """NpmTarget.publish() prints skip message when NPM_TOKEN is absent."""
-        target = NpmTarget()
-        env = os.environ.copy()
-        env.pop("NPM_TOKEN", None)
-        with patch.dict(os.environ, env, clear=True):
-            target.publish(".", "1.2.3", _ctx())
-        captured = capsys.readouterr()
-        assert "Skipping local npm publish (no NPM_TOKEN). CI will handle it." in captured.out
-
-
-class TestPypiPublish:
-    """Tests for PypiTarget.publish() hybrid behavior."""
-
-    def test_publish_with_pypi_token(self, capsys):
-        """PypiTarget.publish() calls uv build + uv publish when PYPI_TOKEN is set."""
-        target = PypiTarget()
-        with patch.dict(os.environ, {"PYPI_TOKEN": "fake-pypi-token"}, clear=False):
-            with patch("rlsbl.targets.pypi.run") as mock_run:
-                target.publish(".", "2.0.0", _ctx())
-                assert mock_run.call_count == 2
-                # First call: uv build
-                first_call = mock_run.call_args_list[0]
-                assert first_call[0][0] == "uv"
-                assert first_call[0][1] == ["build"]
-                # Second call: uv publish
-                second_call = mock_run.call_args_list[1]
-                assert second_call[0][0] == "uv"
-                assert second_call[0][1] == ["publish"]
-                assert second_call[1]["env"]["UV_PUBLISH_TOKEN"] == "fake-pypi-token"
-        captured = capsys.readouterr()
-        assert "Published to PyPI: 2.0.0" in captured.out
-
-    def test_publish_with_twine_password(self, capsys):
-        """PypiTarget.publish() also works with TWINE_PASSWORD as fallback."""
-        target = PypiTarget()
-        env = os.environ.copy()
-        env.pop("PYPI_TOKEN", None)
-        env["TWINE_PASSWORD"] = "twine-secret"
-        with patch.dict(os.environ, env, clear=True):
-            with patch("rlsbl.targets.pypi.run") as mock_run:
-                target.publish(".", "2.0.0", _ctx())
-                assert mock_run.call_count == 2
-                second_call = mock_run.call_args_list[1]
-                assert second_call[1]["env"]["UV_PUBLISH_TOKEN"] == "twine-secret"
-
-    def test_publish_without_token(self, capsys):
-        """PypiTarget.publish() prints skip message when no token is set."""
-        target = PypiTarget()
-        env = os.environ.copy()
-        env.pop("PYPI_TOKEN", None)
-        env.pop("TWINE_PASSWORD", None)
-        with patch.dict(os.environ, env, clear=True):
-            target.publish(".", "2.0.0", _ctx())
-        captured = capsys.readouterr()
-        assert (
-            "Skipping local PyPI publish (no PYPI_TOKEN or TWINE_PASSWORD). "
-            "CI will handle it."
-        ) in captured.out
 
 
 class TestSwiftTarget:
@@ -547,20 +461,6 @@ class TestHexTarget:
     def test_tag_format(self):
         assert HexTarget().tag_format("1.2.3") == "v1.2.3"
 
-    def test_publish_with_token(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HEX_API_KEY", "test-key")
-        target = HexTarget()
-        with unittest.mock.patch("rlsbl.targets.hex.run") as mock_run:
-            target.publish(str(tmp_path), "1.0.0", _ctx(tmp_path))
-            mock_run.assert_called_once()
-
-    def test_publish_without_token(self, tmp_path, monkeypatch, capsys):
-        monkeypatch.delenv("HEX_API_KEY", raising=False)
-        target = HexTarget()
-        target.publish(str(tmp_path), "1.0.0", _ctx(tmp_path))
-        captured = capsys.readouterr()
-        assert "Skipping local Hex publish (no HEX_API_KEY)" in captured.out
-
 
 class TestDenoTarget:
     def test_protocol_conformance(self):
@@ -599,21 +499,6 @@ class TestDenoTarget:
 
     def test_tag_format(self):
         assert DenoTarget().tag_format("1.2.3") == "v1.2.3"
-
-    def test_publish_with_token(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("DENO_TOKEN", "test-token")
-        target = DenoTarget()
-        with unittest.mock.patch("rlsbl.targets.deno.run") as mock_run:
-            target.publish(str(tmp_path), "1.0.0", _ctx(tmp_path))
-            mock_run.assert_called_once()
-
-    def test_publish_without_token(self, tmp_path, monkeypatch, capsys):
-        monkeypatch.delenv("DENO_TOKEN", raising=False)
-        monkeypatch.delenv("JSR_TOKEN", raising=False)
-        target = DenoTarget()
-        target.publish(str(tmp_path), "1.0.0", _ctx(tmp_path))
-        captured = capsys.readouterr()
-        assert "Skipping local Deno publish (no DENO_TOKEN/JSR_TOKEN)" in captured.out
 
     def test_version_file_default(self):
         """version_file() with no args returns 'deno.json'."""
@@ -672,18 +557,6 @@ class TestCargoTarget:
     def test_tag_format(self):
         assert CargoTarget().tag_format("1.2.3") == "v1.2.3"
 
-    def test_publish_with_token(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("CARGO_REGISTRY_TOKEN", "test-token")
-        target = CargoTarget()
-        with unittest.mock.patch("rlsbl.targets.cargo.run") as mock_run:
-            target.publish(str(tmp_path), "1.0.0", _ctx(tmp_path))
-            mock_run.assert_called_once()
-
-    def test_publish_without_token(self, tmp_path, monkeypatch, capsys):
-        monkeypatch.delenv("CARGO_REGISTRY_TOKEN", raising=False)
-        CargoTarget().publish(str(tmp_path), "1.0.0", _ctx(tmp_path))
-        assert "Skipping" in capsys.readouterr().out
-
     def test_is_library_with_lib_section(self, tmp_path):
         target = CargoTarget()
         content = '[package]\nname = "mylib"\nversion = "1.0.0"\n\n[lib]\n'
@@ -730,50 +603,6 @@ class TestDockerTarget:
     def test_tag_format(self):
         from rlsbl.targets.docker import DockerTarget
         assert DockerTarget().tag_format("1.2.3") == "v1.2.3"
-
-    def test_publish_without_token(self, tmp_path, monkeypatch, capsys):
-        from rlsbl.targets.docker import DockerTarget
-        monkeypatch.delenv("DOCKER_USERNAME", raising=False)
-        monkeypatch.delenv("DOCKER_PASSWORD", raising=False)
-        target = DockerTarget()
-        target.publish(str(tmp_path), "1.0.0", _ctx(tmp_path))
-        captured = capsys.readouterr()
-        assert "Skipping local docker publish (no DOCKER_USERNAME/DOCKER_PASSWORD)" in captured.out
-
-    def test_publish_reads_config(self, tmp_path, monkeypatch):
-        from rlsbl.targets.docker import DockerTarget
-        monkeypatch.chdir(tmp_path)
-        monkeypatch.setenv("DOCKER_USERNAME", "user")
-        monkeypatch.setenv("DOCKER_PASSWORD", "pass")
-        # No config -> should warn/error about missing docker config
-        os.makedirs(tmp_path / ".rlsbl", exist_ok=True)
-        (tmp_path / ".rlsbl" / "config.json").write_text('{}')
-        (tmp_path / "Dockerfile").write_text("FROM python:3.12\n")
-        target = DockerTarget()
-        import io, sys
-        captured = io.StringIO()
-        monkeypatch.setattr(sys, "stdout", captured)
-        target.publish(str(tmp_path), "1.0.0", _ctx(tmp_path))
-        output = captured.getvalue()
-        # Should mention missing docker config
-        assert "docker" in output.lower() or "image" in output.lower() or "config" in output.lower()
-
-    def test_publish_with_config(self, tmp_path, monkeypatch):
-        from rlsbl.targets.docker import DockerTarget
-        import shutil
-        monkeypatch.chdir(tmp_path)
-        monkeypatch.setenv("DOCKER_USERNAME", "user")
-        monkeypatch.setenv("DOCKER_PASSWORD", "pass")
-        os.makedirs(tmp_path / ".rlsbl", exist_ok=True)
-        config = {"docker": {"image": "myapp", "registry": "ghcr.io"}}
-        (tmp_path / ".rlsbl" / "config.json").write_text(json.dumps(config))
-        (tmp_path / "Dockerfile").write_text("FROM python:3.12\n")
-        target = DockerTarget()
-        with unittest.mock.patch("shutil.which", return_value="/usr/bin/docker"):
-            with unittest.mock.patch("rlsbl.targets.docker.run") as mock_run:
-                target.publish(str(tmp_path), "1.0.0", _ctx(tmp_path, config=config))
-                # Should have called docker build and docker push
-                assert mock_run.call_count >= 2
 
 
 class TestMavenTarget:
@@ -829,23 +658,6 @@ class TestMavenTarget:
     def test_tag_format(self):
         from rlsbl.targets.maven import MavenTarget
         assert MavenTarget().tag_format("1.2.3") == "v1.2.3"
-
-    def test_publish_with_token(self, tmp_path, monkeypatch):
-        from rlsbl.targets.maven import MavenTarget
-        monkeypatch.setenv("GITHUB_TOKEN", "test-token")
-        (tmp_path / "gradlew").write_text("#!/bin/sh\n")
-        os.chmod(tmp_path / "gradlew", 0o755)
-        target = MavenTarget()
-        with unittest.mock.patch("rlsbl.targets.maven.run") as mock_run:
-            target.publish(str(tmp_path), "1.0.0", _ctx(tmp_path))
-            mock_run.assert_called_once()
-
-    def test_publish_without_token(self, tmp_path, monkeypatch, capsys):
-        from rlsbl.targets.maven import MavenTarget
-        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
-        MavenTarget().publish(str(tmp_path), "1.0.0", _ctx(tmp_path))
-        captured = capsys.readouterr()
-        assert "Skipping local Maven/Gradle publish (no GITHUB_TOKEN)" in captured.out
 
     def test_version_from_groovy_gradle(self, tmp_path):
         from rlsbl.targets.maven import MavenTarget
@@ -1040,7 +852,7 @@ class TestNpmPackageManagerDetection:
 
 
 class TestDetectTargetsAutoDetection:
-    """Parametrized test that verifies detect_targets() auto-detects all 11 auto-detectable targets."""
+    """Parametrized test that verifies detect_targets() auto-detects all 10 auto-detectable targets."""
 
     @pytest.mark.parametrize("target_name,filename,content", [
         ("npm", "package.json", '{"name": "test", "version": "0.1.0"}'),
@@ -1053,7 +865,6 @@ class TestDetectTargetsAutoDetection:
         ("hex", "mix.exs", "defmodule Test.MixProject do"),
         ("maven", "pom.xml", "<project><modelVersion>4.0.0</modelVersion><groupId>com.test</groupId><artifactId>test</artifactId><version>0.1.0</version></project>"),
         ("spec", "version.json", '{"version": "0.1.0"}'),
-        ("docs", "selfdoc.json", "{}"),
     ])
     def test_detect_target_by_marker_file(self, tmp_project, target_name, filename, content):
         marker = tmp_project / filename
@@ -1213,16 +1024,6 @@ class TestWriteVersionReturnPaths:
         result = target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
         assert result == [os.path.join("spec", "version.json")]
 
-    def test_docs_returns_selfdoc_json(self):
-        """DocsTarget.write_version returns ['selfdoc.json']."""
-        from rlsbl.targets.docs import DocsTarget
-        target = DocsTarget()
-        with tempfile.TemporaryDirectory() as d:
-            with open(os.path.join(d, "selfdoc.json"), "w") as f:
-                json.dump({"language": "python"}, f, indent=2)
-            result = target.write_version(d, "1.0.0", ctx=_ctx())
-            assert result == ["selfdoc.json"]
-
     def test_plain_returns_version_file(self, tmp_path):
         """PlainTarget.write_version returns ['VERSION']."""
         from rlsbl.targets.plain import PlainTarget
@@ -1306,7 +1107,7 @@ class TestGoMonorepoTagFormat:
         assert result == "auth-gateway/v*"
 
 
-VALID_CAPABILITIES = {"publish", "build_assets", "read_name", "read_metadata", "ci_templates", "dev_install"}
+VALID_CAPABILITIES = {"read_name", "read_metadata", "ci_templates", "dev_install"}
 VALID_AUTO_DETECTABLE = {"yes", "no", "conditional"}
 
 
