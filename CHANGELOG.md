@@ -2,9 +2,29 @@
 
 # Changelog
 
-## 0.60.1
+## 0.61.0
 
-Feature matrix n/a support for toolchain-native checks
+Target introspection: capabilities, ecosystem, and auto-generated target table.
+
+<details>
+<summary>Context</summary>
+
+All 18 release targets now declare capabilities (publish, build_assets, read_name, read_metadata, ci_templates, dev_install), ecosystem labels, and auto-detectability. A new table-targets selfdoc directive auto-generates a comprehensive target details table, replacing the stale manual table. MATRIX_COLUMNS is now derived from TARGETS.keys() for DRY consistency.
+
+</details>
+
+### Features
+
+- **Refactor.** Feature matrix directive now uses `selfdoc.tables.render_markdown_table` and `generate_feature_matrix_data()` returns raw data instead of markdown.
+- **New feature.** All 18 release targets now declare `capabilities`, `ecosystem`, and `auto_detectable` attributes. Capabilities are a frozenset of strings (`publish`, `build_assets`, `read_name`, `read_metadata`, `ci_templates`, `dev_install`) describing what each target supports. Ecosystem is a human-readable label. Auto-detectable indicates whether the target can be auto-detected from project files.
+- **New feature.** Auto-generated target details table via `:-: table-targets` selfdoc directive, showing all 18 targets with ecosystem, detection files, version file, tag formats, capabilities, and dev install commands.
+- **Refactor.** `MATRIX_COLUMNS` in checks is now derived from `TARGETS.keys()` instead of a hardcoded tuple, ensuring the feature matrix stays in sync when targets are added.
+
+### Fixes
+
+- **Docs.** Replaced stale manual target table in docs with auto-generated directive. Fixed all target count references across docs and CLI help strings (was 12/14/17, now 18).
+
+## 0.60.1
 
 ### Features
 
