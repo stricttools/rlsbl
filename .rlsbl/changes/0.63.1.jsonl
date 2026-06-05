@@ -1,0 +1,3 @@
+{"commits":["f22f1f5b97b989c86f1176e485b10296d08cc00e","e89c3f8a706a5f7c5da382e9d0999ab247b3b19c"],"user_facing":false}
+{"commits":["0816a0f87281232defe86f50719cd139eda3ec61"],"user_facing":true,"description":"**New feature.** Custom asset build commands now receive the dist directory via the `RLSBL_DIST_DIR` environment variable, eliminating the need for hardcoded paths.","type":"feature"}
+{"commits":["6abaa58bcc669b1cd56873620ba3ce70bea2a5a3"],"user_facing":false}
