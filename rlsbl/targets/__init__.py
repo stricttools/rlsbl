@@ -7,7 +7,6 @@ from typing import NamedTuple
 from .npm import NpmTarget
 from .pypi import PypiTarget
 from .go import GoTarget
-from .docs import DocsTarget
 from .swift import SwiftTarget
 from .swift_apple import SwiftAppleTarget
 from .spec import SpecTarget
@@ -36,7 +35,6 @@ TARGETS = {
     "npm": NpmTarget(),
     "pypi": PypiTarget(),
     "go": GoTarget(),
-    "docs": DocsTarget(),
     "swift": SwiftTarget(),
     "swift-apple": SwiftAppleTarget(),
     "spec": SpecTarget(),
