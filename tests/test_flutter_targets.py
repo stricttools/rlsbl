@@ -1,4 +1,4 @@
-"""Tests for Flutter iOS and Android targets, release file mode validation, and native change detection."""
+"""Tests for the unified Flutter target, release file mode validation, and native change detection."""
 
 import json
 import os
@@ -8,8 +8,7 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 from conftest import make_ctx
-from rlsbl.targets.flutter_ios import FlutterIosTarget
-from rlsbl.targets.flutter_android import FlutterAndroidTarget
+from rlsbl.targets.flutter import FlutterTarget
 from rlsbl.targets.dart import DartTarget
 from rlsbl.targets.protocol import ReleaseTarget
 from rlsbl.targets import TARGETS, detect_targets
@@ -61,51 +60,30 @@ def _read(path):
 
 # -- Detection tests --
 
-class TestFlutterIosDetect:
-    """FlutterIosTarget.detect() returns True only for Flutter projects."""
+class TestFlutterDetect:
+    """FlutterTarget.detect() returns True only for Flutter projects."""
 
     def test_detect_flutter_project(self):
-        target = FlutterIosTarget()
+        target = FlutterTarget()
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "pubspec.yaml"), SAMPLE_FLUTTER_PUBSPEC)
             assert target.detect(d) is True
 
     def test_detect_false_for_dart_project(self):
-        target = FlutterIosTarget()
+        target = FlutterTarget()
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "pubspec.yaml"), SAMPLE_DART_PUBSPEC)
             assert target.detect(d) is False
 
     def test_detect_false_without_pubspec(self):
-        target = FlutterIosTarget()
+        target = FlutterTarget()
         with tempfile.TemporaryDirectory() as d:
             assert target.detect(d) is False
 
     def test_detect_false_with_empty_file(self):
-        target = FlutterIosTarget()
+        target = FlutterTarget()
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "pubspec.yaml"), "")
-            assert target.detect(d) is False
-
-
-class TestFlutterAndroidDetect:
-    """FlutterAndroidTarget.detect() returns True only for Flutter projects."""
-
-    def test_detect_flutter_project(self):
-        target = FlutterAndroidTarget()
-        with tempfile.TemporaryDirectory() as d:
-            _write(os.path.join(d, "pubspec.yaml"), SAMPLE_FLUTTER_PUBSPEC)
-            assert target.detect(d) is True
-
-    def test_detect_false_for_dart_project(self):
-        target = FlutterAndroidTarget()
-        with tempfile.TemporaryDirectory() as d:
-            _write(os.path.join(d, "pubspec.yaml"), SAMPLE_DART_PUBSPEC)
-            assert target.detect(d) is False
-
-    def test_detect_false_without_pubspec(self):
-        target = FlutterAndroidTarget()
-        with tempfile.TemporaryDirectory() as d:
             assert target.detect(d) is False
 
 
@@ -128,15 +106,14 @@ class TestDartExcludesFlutter:
 # -- Auto-detection tests --
 
 class TestAutoDetection:
-    """Auto-detection discovers both flutter-ios and flutter-android for Flutter projects."""
+    """Auto-detection discovers the single flutter target for Flutter projects."""
 
-    def test_flutter_project_detects_both_platforms(self):
+    def test_flutter_project_detects_flutter(self):
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "pubspec.yaml"), SAMPLE_FLUTTER_PUBSPEC)
             found = detect_targets(d)
-            names = sorted(t.name for t in found)
-            assert "flutter-ios" in names
-            assert "flutter-android" in names
+            names = [t.name for t in found]
+            assert "flutter" in names
             assert "dart" not in names
 
     def test_dart_project_detects_only_dart(self):
@@ -145,72 +122,41 @@ class TestAutoDetection:
             found = detect_targets(d)
             names = [t.name for t in found]
             assert "dart" in names
-            assert "flutter-ios" not in names
-            assert "flutter-android" not in names
+            assert "flutter" not in names
 
 
 # -- Tag format tests --
 
-class TestFlutterIosTagFormats:
-    """FlutterIosTarget uses {name}-ios@v{version} tag format."""
+class TestFlutterTagFormats:
+    """FlutterTarget uses standard {name}@v{version} tag format (inherited from BaseTarget)."""
 
     def test_monorepo_tag_format(self):
-        target = FlutterIosTarget()
-        assert target.monorepo_tag_format("myapp", "1.2.3") == "myapp-ios@v1.2.3"
+        target = FlutterTarget()
+        assert target.monorepo_tag_format("myapp", "1.2.3") == "myapp@v1.2.3"
 
     def test_monorepo_tag_glob(self):
-        target = FlutterIosTarget()
-        assert target.monorepo_tag_glob("myapp") == "myapp-ios@v*"
+        target = FlutterTarget()
+        assert target.monorepo_tag_glob("myapp") == "myapp@v*"
 
     def test_tag_format_inherited(self):
         """tag_format is inherited from BaseTarget (plain v{version})."""
-        target = FlutterIosTarget()
-        assert target.tag_format("1.2.3") == "v1.2.3"
-
-
-class TestFlutterAndroidTagFormats:
-    """FlutterAndroidTarget uses {name}-android@v{version} tag format."""
-
-    def test_monorepo_tag_format(self):
-        target = FlutterAndroidTarget()
-        assert target.monorepo_tag_format("myapp", "1.2.3") == "myapp-android@v1.2.3"
-
-    def test_monorepo_tag_glob(self):
-        target = FlutterAndroidTarget()
-        assert target.monorepo_tag_glob("myapp") == "myapp-android@v*"
-
-    def test_tag_format_inherited(self):
-        target = FlutterAndroidTarget()
+        target = FlutterTarget()
         assert target.tag_format("1.2.3") == "v1.2.3"
 
 
 # -- Version read/write inheritance tests --
 
 class TestFlutterVersionInheritance:
-    """Flutter targets inherit version read/write from DartTarget."""
+    """Flutter target inherits version read/write from DartTarget."""
 
-    def test_ios_read_version(self):
-        target = FlutterIosTarget()
+    def test_read_version(self):
+        target = FlutterTarget()
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "pubspec.yaml"), SAMPLE_FLUTTER_PUBSPEC)
             assert target.read_version(d) == "1.0.0"
 
-    def test_android_read_version(self):
-        target = FlutterAndroidTarget()
-        with tempfile.TemporaryDirectory() as d:
-            _write(os.path.join(d, "pubspec.yaml"), SAMPLE_FLUTTER_PUBSPEC)
-            assert target.read_version(d) == "1.0.0"
-
-    def test_ios_write_version(self):
-        target = FlutterIosTarget()
-        with tempfile.TemporaryDirectory() as d:
-            _write(os.path.join(d, "pubspec.yaml"), SAMPLE_FLUTTER_PUBSPEC)
-            modified = target.write_version(d, "2.0.0", make_ctx(d))
-            assert modified == ["pubspec.yaml"]
-            assert target.read_version(d) == "2.0.0"
-
-    def test_android_write_version(self):
-        target = FlutterAndroidTarget()
+    def test_write_version(self):
+        target = FlutterTarget()
         with tempfile.TemporaryDirectory() as d:
             _write(os.path.join(d, "pubspec.yaml"), SAMPLE_FLUTTER_PUBSPEC)
             modified = target.write_version(d, "2.0.0", make_ctx(d))
@@ -218,52 +164,41 @@ class TestFlutterVersionInheritance:
             assert target.read_version(d) == "2.0.0"
 
     def test_version_file(self):
-        assert FlutterIosTarget().version_file() == "pubspec.yaml"
-        assert FlutterAndroidTarget().version_file() == "pubspec.yaml"
+        assert FlutterTarget().version_file() == "pubspec.yaml"
 
 
 # -- Properties tests --
 
 class TestFlutterTargetProperties:
-    """Static properties of Flutter targets."""
+    """Static properties of the Flutter target."""
 
-    def test_ios_name(self):
-        assert FlutterIosTarget().name == "flutter-ios"
+    def test_name(self):
+        assert FlutterTarget().name == "flutter"
 
-    def test_android_name(self):
-        assert FlutterAndroidTarget().name == "flutter-android"
-
-    def test_ios_is_release_target(self):
-        assert isinstance(FlutterIosTarget(), ReleaseTarget)
-
-    def test_android_is_release_target(self):
-        assert isinstance(FlutterAndroidTarget(), ReleaseTarget)
+    def test_is_release_target(self):
+        assert isinstance(FlutterTarget(), ReleaseTarget)
 
 
 # -- Registration tests --
 
 class TestFlutterTargetRegistration:
-    """Flutter targets are registered in TARGETS dict."""
+    """Flutter target is registered in TARGETS dict."""
 
-    def test_ios_registered(self):
-        assert "flutter-ios" in TARGETS
-        assert isinstance(TARGETS["flutter-ios"], FlutterIosTarget)
-
-    def test_android_registered(self):
-        assert "flutter-android" in TARGETS
-        assert isinstance(TARGETS["flutter-android"], FlutterAndroidTarget)
+    def test_registered(self):
+        assert "flutter" in TARGETS
+        assert isinstance(TARGETS["flutter"], FlutterTarget)
 
 
 # -- Release file mode validation tests --
 
 class TestReleaseFileFlutterMode:
-    """Flutter targets require mode in release file."""
+    """Flutter target requires mode in release file."""
 
     def test_flutter_target_requires_mode(self, tmp_path):
         f = tmp_path / "release.toml"
         f.write_text(
             'bump = "patch"\n'
-            'include = ["flutter-ios"]\n'
+            'include = ["flutter"]\n'
             'exclude = []\n'
         )
         with pytest.raises(ValueError, match="requires.*mode"):
@@ -273,63 +208,29 @@ class TestReleaseFileFlutterMode:
         f = tmp_path / "release.toml"
         f.write_text(
             'bump = "patch"\n'
-            'include = ["flutter-ios"]\n'
+            'include = ["flutter"]\n'
             'exclude = []\n'
             'description = "test release"\n'
             "\n"
-            "[targets.flutter-ios]\n"
+            "[targets.flutter]\n"
             'mode = "ota"\n'
         )
         cfg = read_release_file(str(f))
-        assert cfg.targets["flutter-ios"]["mode"] == "ota"
+        assert cfg.targets["flutter"]["mode"] == "ota"
 
     def test_flutter_target_with_mode_build(self, tmp_path):
         f = tmp_path / "release.toml"
         f.write_text(
             'bump = "minor"\n'
-            'include = ["flutter-android"]\n'
+            'include = ["flutter"]\n'
             'exclude = []\n'
             'description = "test release"\n'
             "\n"
-            "[targets.flutter-android]\n"
+            "[targets.flutter]\n"
             'mode = "build"\n'
         )
         cfg = read_release_file(str(f))
-        assert cfg.targets["flutter-android"]["mode"] == "build"
-
-    def test_both_flutter_targets_same_mode_ok(self, tmp_path):
-        f = tmp_path / "release.toml"
-        f.write_text(
-            'bump = "patch"\n'
-            'include = ["flutter-ios", "flutter-android"]\n'
-            'exclude = []\n'
-            'description = "test release"\n'
-            "\n"
-            "[targets.flutter-ios]\n"
-            'mode = "ota"\n'
-            "\n"
-            "[targets.flutter-android]\n"
-            'mode = "ota"\n'
-        )
-        cfg = read_release_file(str(f))
-        assert cfg.targets["flutter-ios"]["mode"] == "ota"
-        assert cfg.targets["flutter-android"]["mode"] == "ota"
-
-    def test_flutter_targets_different_modes_error(self, tmp_path):
-        f = tmp_path / "release.toml"
-        f.write_text(
-            'bump = "patch"\n'
-            'include = ["flutter-ios", "flutter-android"]\n'
-            'exclude = []\n'
-            "\n"
-            "[targets.flutter-ios]\n"
-            'mode = "ota"\n'
-            "\n"
-            "[targets.flutter-android]\n"
-            'mode = "build"\n'
-        )
-        with pytest.raises(ValueError, match="same mode"):
-            read_release_file(str(f))
+        assert cfg.targets["flutter"]["mode"] == "build"
 
     def test_non_flutter_target_no_mode_required(self, tmp_path):
         """Non-flutter targets do not require a mode field."""

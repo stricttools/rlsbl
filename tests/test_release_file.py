@@ -45,23 +45,19 @@ class TestReadReleaseFileValid:
         f = tmp_path / "release.toml"
         f.write_text(
             'bump = "minor"\n'
-            'include = ["flutter-ios", "flutter-android"]\n'
+            'include = ["flutter"]\n'
             'exclude = ["npm"]\n'
             'description = "test release"\n'
             "\n"
-            "[targets.flutter-ios]\n"
-            'mode = "ota"\n'
-            "\n"
-            "[targets.flutter-android]\n"
+            "[targets.flutter]\n"
             'mode = "ota"\n'
         )
         cfg = read_release_file(str(f))
         assert cfg.bump == "minor"
-        assert cfg.include == ["flutter-ios", "flutter-android"]
+        assert cfg.include == ["flutter"]
         assert cfg.exclude == ["npm"]
         assert cfg.targets == {
-            "flutter-ios": {"mode": "ota"},
-            "flutter-android": {"mode": "ota"},
+            "flutter": {"mode": "ota"},
         }
 
     def test_returns_dataclass(self, tmp_path):
@@ -146,7 +142,7 @@ class TestReadReleaseFileErrors:
             'include = ["pypi"]\n'
             'exclude = []\n'
             "\n"
-            "[targets.flutter-ios]\n"
+            "[targets.flutter]\n"
             'mode = "ota"\n'
         )
         with pytest.raises(ValueError, match="not in include"):
@@ -156,10 +152,10 @@ class TestReadReleaseFileErrors:
         f = tmp_path / "release.toml"
         f.write_text(
             'bump = "patch"\n'
-            'include = ["flutter-ios"]\n'
+            'include = ["flutter"]\n'
             'exclude = []\n'
             "\n"
-            "[targets.flutter-ios]\n"
+            "[targets.flutter]\n"
             'mode = "deploy"\n'
         )
         with pytest.raises(ValueError, match="invalid mode"):
@@ -169,10 +165,10 @@ class TestReadReleaseFileErrors:
         f = tmp_path / "release.toml"
         f.write_text(
             'bump = "patch"\n'
-            'include = ["flutter-ios"]\n'
+            'include = ["flutter"]\n'
             'exclude = []\n'
             "\n"
-            "[targets.flutter-ios]\n"
+            "[targets.flutter]\n"
             'flavor = "production"\n'
         )
         with pytest.raises(ValueError, match="unknown field"):

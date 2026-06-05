@@ -40,8 +40,8 @@ flutter:
 class TestBatchReleaseInitFlutter:
     """Batch release-init scaffolds Flutter target config sections."""
 
-    def test_flutter_ios_target_section(self, mock_git_repo):
-        """Flutter-ios project gets [packages.<name>.targets.flutter-ios] with mode=build."""
+    def test_flutter_target_section(self, mock_git_repo):
+        """Flutter project gets [packages.<name>.targets.flutter] with mode=build."""
         make_workspace(mock_git_repo, [
             {"path": "app", "name": "app"},
         ])
@@ -61,54 +61,8 @@ class TestBatchReleaseInitFlutter:
         assert "app" in data["packages"]
         pkg = data["packages"]["app"]
         assert "targets" in pkg
-        assert "flutter-ios" in pkg["targets"]
-        assert pkg["targets"]["flutter-ios"]["mode"] == "build"
-
-    def test_flutter_android_target_section(self, mock_git_repo):
-        """Flutter-android project gets [packages.<name>.targets.flutter-android] with mode=build."""
-        make_workspace(mock_git_repo, [
-            {"path": "app", "name": "app"},
-        ])
-
-        app_dir = mock_git_repo / "app"
-        app_dir.mkdir()
-        (app_dir / "pubspec.yaml").write_text(SAMPLE_FLUTTER_PUBSPEC)
-
-        run_git(mock_git_repo, "add", ".")
-        run_git(mock_git_repo, "commit", "-q", "-m", "add workspace")
-
-        _cmd_batch_release_init(project_root=mock_git_repo)
-
-        batch_path = get_batch_release_file_path(str(mock_git_repo))
-        data = tomlkit.loads(open(batch_path).read())
-
-        pkg = data["packages"]["app"]
-        assert "flutter-android" in pkg["targets"]
-        assert pkg["targets"]["flutter-android"]["mode"] == "build"
-
-    def test_both_flutter_targets_scaffolded(self, mock_git_repo):
-        """Both flutter-ios and flutter-android get target sections."""
-        make_workspace(mock_git_repo, [
-            {"path": "app", "name": "app"},
-        ])
-
-        app_dir = mock_git_repo / "app"
-        app_dir.mkdir()
-        (app_dir / "pubspec.yaml").write_text(SAMPLE_FLUTTER_PUBSPEC)
-
-        run_git(mock_git_repo, "add", ".")
-        run_git(mock_git_repo, "commit", "-q", "-m", "add workspace")
-
-        _cmd_batch_release_init(project_root=mock_git_repo)
-
-        batch_path = get_batch_release_file_path(str(mock_git_repo))
-        data = tomlkit.loads(open(batch_path).read())
-
-        pkg = data["packages"]["app"]
-        assert "flutter-ios" in pkg["targets"]
-        assert "flutter-android" in pkg["targets"]
-        assert pkg["targets"]["flutter-ios"]["mode"] == "build"
-        assert pkg["targets"]["flutter-android"]["mode"] == "build"
+        assert "flutter" in pkg["targets"]
+        assert pkg["targets"]["flutter"]["mode"] == "build"
 
     def test_non_flutter_project_no_targets(self, mock_git_repo):
         """Non-Flutter projects do not get a targets section."""
@@ -159,7 +113,7 @@ class TestBatchReleaseInitFlutter:
 
         # Flutter project has targets
         assert "targets" in data["packages"]["app"]
-        assert "flutter-ios" in data["packages"]["app"]["targets"]
+        assert "flutter" in data["packages"]["app"]["targets"]
 
         # npm project does not
         assert "targets" not in data["packages"]["lib"]
@@ -190,8 +144,7 @@ class TestBatchReleaseInitFlutter:
 
         # Should parse without error
         config = read_batch_release_file(batch_path)
-        assert config.packages["app"].targets["flutter-ios"]["mode"] == "build"
-        assert config.packages["app"].targets["flutter-android"]["mode"] == "build"
+        assert config.packages["app"].targets["flutter"]["mode"] == "build"
 
 
 # ---------------------------------------------------------------------------
@@ -386,7 +339,7 @@ class TestSharedValidation:
         """Flutter mode validation works without prefix."""
         data = {
             "bump": "patch",
-            "include": ["flutter-ios"],
+            "include": ["flutter"],
             "exclude": [],
             "description": "test",
         }
@@ -397,42 +350,12 @@ class TestSharedValidation:
         """Flutter mode validation works with prefix."""
         data = {
             "bump": "patch",
-            "include": ["flutter-ios"],
+            "include": ["flutter"],
             "exclude": [],
             "description": "test",
         }
         with pytest.raises(ValueError, match=r"\[packages\.app\].*requires.*mode"):
             _validate_release_config(data, prefix="[packages.app] ")
-
-    def test_flutter_same_mode_no_prefix(self):
-        """Flutter same-mode check works without prefix."""
-        data = {
-            "bump": "patch",
-            "include": ["flutter-ios", "flutter-android"],
-            "exclude": [],
-            "description": "test",
-            "targets": {
-                "flutter-ios": {"mode": "ota"},
-                "flutter-android": {"mode": "build"},
-            },
-        }
-        with pytest.raises(ValueError, match="same mode"):
-            _validate_release_config(data)
-
-    def test_flutter_same_mode_with_prefix(self):
-        """Flutter same-mode check works with prefix."""
-        data = {
-            "bump": "patch",
-            "include": ["flutter-ios", "flutter-android"],
-            "exclude": [],
-            "description": "test",
-            "targets": {
-                "flutter-ios": {"mode": "ota"},
-                "flutter-android": {"mode": "build"},
-            },
-        }
-        with pytest.raises(ValueError, match=r"\[packages\.myapp\].*same mode"):
-            _validate_release_config(data, prefix="[packages.myapp] ")
 
     def test_include_exclude_overlap_no_prefix(self):
         data = {
@@ -506,61 +429,37 @@ class TestSharedValidation:
 class TestSharedValidationViaPublicAPIs:
     """Verify read_release_file and read_batch_release_file both use shared validation.
 
-    These tests check that both paths handle Flutter validation identically --
-    previously batch was missing Flutter mode requirement and same-mode checks.
+    These tests check that both paths handle Flutter validation identically.
     """
 
     def test_batch_flutter_requires_mode(self, tmp_path):
-        """Batch path now rejects Flutter targets without mode (was previously missing)."""
+        """Batch path rejects Flutter target without mode."""
         f = tmp_path / "batch.toml"
         f.write_text(
             '[packages.myapp]\n'
             'bump = "patch"\n'
             'description = "test"\n'
-            'include = ["flutter-ios"]\n'
+            'include = ["flutter"]\n'
             'exclude = []\n'
         )
         with pytest.raises(ValueError, match="requires.*mode"):
             read_batch_release_file(str(f))
 
-    def test_batch_flutter_same_mode_required(self, tmp_path):
-        """Batch path now rejects Flutter targets with different modes."""
-        f = tmp_path / "batch.toml"
-        f.write_text(
-            '[packages.myapp]\n'
-            'bump = "patch"\n'
-            'description = "test"\n'
-            'include = ["flutter-ios", "flutter-android"]\n'
-            'exclude = []\n'
-            '\n'
-            '[packages.myapp.targets.flutter-ios]\n'
-            'mode = "ota"\n'
-            '\n'
-            '[packages.myapp.targets.flutter-android]\n'
-            'mode = "build"\n'
-        )
-        with pytest.raises(ValueError, match="same mode"):
-            read_batch_release_file(str(f))
-
     def test_batch_flutter_valid(self, tmp_path):
-        """Batch path accepts Flutter targets with valid mode config."""
+        """Batch path accepts Flutter target with valid mode config."""
         f = tmp_path / "batch.toml"
         f.write_text(
             '[packages.myapp]\n'
             'bump = "minor"\n'
             'description = "test release"\n'
-            'include = ["flutter-ios", "flutter-android"]\n'
+            'include = ["flutter"]\n'
             'exclude = []\n'
             '\n'
-            '[packages.myapp.targets.flutter-ios]\n'
-            'mode = "build"\n'
-            '\n'
-            '[packages.myapp.targets.flutter-android]\n'
+            '[packages.myapp.targets.flutter]\n'
             'mode = "build"\n'
         )
         config = read_batch_release_file(str(f))
-        assert config.packages["myapp"].targets["flutter-ios"]["mode"] == "build"
-        assert config.packages["myapp"].targets["flutter-android"]["mode"] == "build"
+        assert config.packages["myapp"].targets["flutter"]["mode"] == "build"
 
     def test_single_and_batch_same_valid_result(self, tmp_path):
         """Same config parsed via single and batch paths produces identical ReleaseConfig."""

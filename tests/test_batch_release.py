@@ -127,14 +127,14 @@ class TestReadBatchReleaseFile:
         batch_file.write_text(
             '[packages.myapp]\n'
             'bump = "minor"\ndescription = "test release"\n'
-            'include = ["flutter-ios"]\n'
+            'include = ["flutter"]\n'
             'exclude = []\n'
             '\n'
-            '[packages.myapp.targets.flutter-ios]\n'
+            '[packages.myapp.targets.flutter]\n'
             'mode = "ota"\n'
         )
         config = read_batch_release_file(str(batch_file))
-        assert config.packages["myapp"].targets == {"flutter-ios": {"mode": "ota"}}
+        assert config.packages["myapp"].targets == {"flutter": {"mode": "ota"}}
 
     def test_missing_packages_section(self, tmp_path):
         """Missing [packages] section raises ValueError."""

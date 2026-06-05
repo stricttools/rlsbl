@@ -91,39 +91,29 @@ class TestReleaseInitMultipleTargets:
 
 
 class TestReleaseInitFlutterTargets:
-    """Flutter targets -> [targets] section with mode = 'build'."""
+    """Flutter target -> [targets] section with mode = 'build'."""
 
-    def test_flutter_ios(self, tmp_path, monkeypatch):
-        entries = [TargetEntry(name="flutter-ios", path=str(tmp_path))]
+    def test_flutter(self, tmp_path, monkeypatch):
+        entries = [TargetEntry(name="flutter", path=str(tmp_path))]
         _run_release_init(tmp_path, entries, monkeypatch)
 
         release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
         data = _read_scaffolded_toml(str(release_path))
-        assert list(data["include"]) == ["flutter-ios"]
-        assert data["targets"]["flutter-ios"]["mode"] == "build"
-
-    def test_flutter_android(self, tmp_path, monkeypatch):
-        entries = [TargetEntry(name="flutter-android", path=str(tmp_path))]
-        _run_release_init(tmp_path, entries, monkeypatch)
-
-        release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
-        data = _read_scaffolded_toml(str(release_path))
-        assert data["targets"]["flutter-android"]["mode"] == "build"
+        assert list(data["include"]) == ["flutter"]
+        assert data["targets"]["flutter"]["mode"] == "build"
 
     def test_mixed_flutter_and_regular(self, tmp_path, monkeypatch):
         entries = [
             TargetEntry(name="pypi", path=str(tmp_path)),
-            TargetEntry(name="flutter-ios", path=str(tmp_path)),
-            TargetEntry(name="flutter-android", path=str(tmp_path)),
+            TargetEntry(name="flutter", path=str(tmp_path)),
         ]
         _run_release_init(tmp_path, entries, monkeypatch)
 
         release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
         data = _read_scaffolded_toml(str(release_path))
-        assert list(data["include"]) == ["pypi", "flutter-ios", "flutter-android"]
+        assert list(data["include"]) == ["pypi", "flutter"]
         assert list(data["exclude"]) == []
-        assert data["targets"]["flutter-ios"]["mode"] == "build"
-        assert data["targets"]["flutter-android"]["mode"] == "build"
+        assert data["targets"]["flutter"]["mode"] == "build"
         # pypi should NOT have a targets section
         assert "pypi" not in data["targets"]
 
@@ -210,20 +200,17 @@ class TestReleaseInitRoundTrip:
 
     def test_roundtrip_with_flutter(self, tmp_path, monkeypatch):
         entries = [
-            TargetEntry(name="flutter-ios", path=str(tmp_path)),
-            TargetEntry(name="flutter-android", path=str(tmp_path)),
+            TargetEntry(name="flutter", path=str(tmp_path)),
         ]
         _run_release_init(tmp_path, entries, monkeypatch)
 
         release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
         data = _read_scaffolded_toml(str(release_path))
         assert data["bump"] == ""
-        assert list(data["include"]) == ["flutter-ios", "flutter-android"]
+        assert list(data["include"]) == ["flutter"]
         assert list(data["exclude"]) == []
-        assert "flutter-ios" in data["targets"]
-        assert "flutter-android" in data["targets"]
-        assert data["targets"]["flutter-ios"]["mode"] == "build"
-        assert data["targets"]["flutter-android"]["mode"] == "build"
+        assert "flutter" in data["targets"]
+        assert data["targets"]["flutter"]["mode"] == "build"
 
 
 class TestReleaseInitDescriptionContext:

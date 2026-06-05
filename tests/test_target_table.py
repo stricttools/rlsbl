@@ -30,9 +30,9 @@ class TestHeaders:
 
 
 class TestRows:
-    def test_returns_18_rows(self):
+    def test_returns_17_rows(self):
         _, rows = generate_target_table_data()
-        assert len(rows) == 18
+        assert len(rows) == 17
 
     def test_rows_match_header_length(self):
         headers, rows = generate_target_table_data()
@@ -108,22 +108,20 @@ class TestSpecificTargets:
         assert "v{version}" in value
 
     def test_flutter_detection_files(self):
-        """Flutter targets show pubspec.yaml (flutter) as detection method."""
+        """Flutter target shows pubspec.yaml (flutter) as detection method."""
         _, rows = generate_target_table_data()
         by_name = _rows_by_name(rows)
         headers = EXPECTED_HEADERS
         df_idx = headers.index("Detection files")
-        assert by_name["flutter-ios"][df_idx] == "pubspec.yaml (flutter)"
-        assert by_name["flutter-android"][df_idx] == "pubspec.yaml (flutter)"
+        assert by_name["flutter"][df_idx] == "pubspec.yaml (flutter)"
 
     def test_flutter_monorepo_tag_format(self):
-        """Flutter targets use name-based monorepo tag formats with platform suffix."""
+        """Flutter target uses standard {name}@v{version} monorepo tag format."""
         _, rows = generate_target_table_data()
         by_name = _rows_by_name(rows)
         headers = EXPECTED_HEADERS
         mono_idx = headers.index("Monorepo tag format")
-        assert by_name["flutter-ios"][mono_idx] == "{name}-ios@v{version}"
-        assert by_name["flutter-android"][mono_idx] == "{name}-android@v{version}"
+        assert by_name["flutter"][mono_idx] == "{name}@v{version}"
 
     def test_dev_install_formatting(self):
         """Targets with both global and venv show both; targets with only global show just global."""
