@@ -3,10 +3,8 @@
 import os
 import re
 import subprocess
-import sys
 
 from .base import BaseTarget
-from ..config import get_publish_config
 from ..utils import run
 
 
@@ -14,7 +12,7 @@ class HexTarget(BaseTarget):
     """Release target for Hex/Elixir projects (mix.exs)."""
 
     detection_files = ("mix.exs",)
-    capabilities = frozenset({"publish", "read_name", "ci_templates", "dev_install"})
+    capabilities = frozenset({"read_name", "ci_templates", "dev_install"})
     ecosystem = "Elixir / Hex"
 
     @property
@@ -106,38 +104,6 @@ class HexTarget(BaseTarget):
             {"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"},
             {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
         ]
-
-    def publish(self, dir_path, version, ctx):
-        """Publish to Hex based on per-target config and HEX_API_KEY availability.
-
-        ctx: ProjectContext carrying project_root, monorepo_root, and config.
-        """
-        pub_config = get_publish_config(self.name, ctx.config)
-
-        if pub_config.get("local") is False:
-            print(f"Skipping local {self.name} publish (config: local=false). CI will handle it.")
-            return
-
-        token_var = pub_config.get("token_var", "HEX_API_KEY")
-        token = os.environ.get(token_var)
-        if not token:
-            if pub_config.get("local") is True:
-                print(
-                    f"ERROR: {self.name} publish requested (local=true) but {token_var} is not set.",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-            print(f"Skipping local Hex publish (no {token_var}). CI will handle it.")
-            return
-
-        try:
-            run("mix", ["hex.publish", "--yes"], env={
-                **os.environ,
-                "HEX_API_KEY": token,
-            })
-            print(f"Published to Hex: {version}")
-        except subprocess.CalledProcessError as exc:
-            raise RuntimeError(f"mix hex.publish failed: {exc}") from exc
 
     def check_project_exists(self, dir_path):
         return os.path.exists(os.path.join(dir_path, "mix.exs"))

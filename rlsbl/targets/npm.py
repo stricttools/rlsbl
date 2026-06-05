@@ -1,15 +1,10 @@
 """npm release target that manages version tracking in package.json and scaffolds CI workflows for automated publishing to the npm registry."""
 
-import glob
 import json
 import os
 import re
-import subprocess
-import sys
 
 from .base import BaseTarget
-from ..config import get_publish_config
-from ..utils import run
 
 _MIN_VERSION_RE = re.compile(r">=\s*(\d+(?:\.\d+)*)")
 
@@ -18,7 +13,7 @@ class NpmTarget(BaseTarget):
     """Release target for npm/Node.js projects (package.json)."""
 
     detection_files = ("package.json",)
-    capabilities = frozenset({"publish", "build_assets", "read_name", "read_metadata", "ci_templates", "dev_install"})
+    capabilities = frozenset({"read_name", "read_metadata", "ci_templates", "dev_install"})
     ecosystem = "Node.js / npm"
 
     @property
@@ -192,44 +187,6 @@ class NpmTarget(BaseTarget):
             {"template": publish_template, "target": ".github/workflows/publish.yml"},
             {"template": "npmignore.tpl", "target": ".npmignore"},
         ]
-
-    def build_assets(self, dir_path, version, dist_dir, ctx):
-        """Pack a tarball for GH Release upload."""
-        os.makedirs(dist_dir, exist_ok=True)
-        run("npm", ["pack", "--pack-destination", dist_dir], cwd=dir_path)
-        return sorted(glob.glob(os.path.join(dist_dir, "*.tgz")))
-
-    def publish(self, dir_path, version, ctx):
-        """Publish to npm based on per-target config and NPM_TOKEN availability.
-
-        ctx: ProjectContext carrying project_root, monorepo_root, and config.
-        """
-        pub_config = get_publish_config(self.name, ctx.config)
-
-        if pub_config.get("local") is False:
-            print(f"Skipping local {self.name} publish (config: local=false). CI will handle it.")
-            return
-
-        token_var = pub_config.get("token_var", "NPM_TOKEN")
-        token = os.environ.get(token_var)
-        if not token:
-            if pub_config.get("local") is True:
-                print(
-                    f"ERROR: {self.name} publish requested (local=true) but {token_var} is not set.",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-            print(f"Skipping local npm publish (no {token_var}). CI will handle it.")
-            return
-
-        try:
-            run("npm", ["publish", "--provenance", "--access", "public"], env={
-                **os.environ,
-                "NPM_TOKEN": token,
-            })
-            print(f"Published to npm: {version}")
-        except subprocess.CalledProcessError as exc:
-            raise RuntimeError(f"npm publish failed: {exc}") from exc
 
     def check_project_exists(self, dir_path):
         return os.path.exists(os.path.join(dir_path, "package.json"))

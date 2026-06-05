@@ -1,16 +1,11 @@
 """Cargo (Rust) release target that uses tomlkit for round-trip Cargo.toml editing with hybrid publish support via CARGO_REGISTRY_TOKEN."""
 
-import glob
 import os
 import re
-import shutil
-import subprocess
-import sys
 
 import tomlkit
 
 from .base import BaseTarget
-from ..config import get_publish_config
 from ..utils import run
 
 
@@ -18,7 +13,7 @@ class CargoTarget(BaseTarget):
     """Release target for Rust/Cargo projects (Cargo.toml)."""
 
     detection_files = ("Cargo.toml",)
-    capabilities = frozenset({"publish", "build_assets", "read_name", "read_metadata", "ci_templates", "dev_install"})
+    capabilities = frozenset({"read_name", "read_metadata", "ci_templates", "dev_install"})
     ecosystem = "Rust / crates.io"
 
     @property
@@ -184,51 +179,6 @@ class CargoTarget(BaseTarget):
                 {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
             )
         return mappings
-
-    def build_assets(self, dir_path, version, dist_dir, ctx):
-        """Build Rust binary in release mode and copy to dist_dir."""
-        os.makedirs(dist_dir, exist_ok=True)
-        run("cargo", ["build", "--release"], cwd=dir_path)
-
-        # Determine the binary name from Cargo.toml
-        name = self.read_name(dir_path, ctx=ctx) or ""
-        target_release = os.path.join(dir_path, "target", "release", name)
-        if os.path.isfile(target_release):
-            shutil.copy2(target_release, dist_dir)
-
-        return sorted(glob.glob(os.path.join(dist_dir, "*")))
-
-    def publish(self, dir_path, version, ctx):
-        """Publish to crates.io based on per-target config and token availability.
-
-        ctx: ProjectContext carrying project_root, monorepo_root, and config.
-        """
-        pub_config = get_publish_config(self.name, ctx.config)
-
-        if pub_config.get("local") is False:
-            print(f"Skipping local {self.name} publish (config: local=false). CI will handle it.")
-            return
-
-        token_var = pub_config.get("token_var", "CARGO_REGISTRY_TOKEN")
-        token = os.environ.get(token_var)
-        if not token:
-            if pub_config.get("local") is True:
-                print(
-                    f"ERROR: {self.name} publish requested (local=true) but {token_var} is not set.",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-            print(f"Skipping local cargo publish (no {token_var}). CI will handle it.")
-            return
-
-        try:
-            run("cargo", ["publish"], env={
-                **os.environ,
-                "CARGO_REGISTRY_TOKEN": token,
-            })
-            print(f"Published to crates.io: {version}")
-        except subprocess.CalledProcessError as exc:
-            raise RuntimeError(f"cargo publish failed: {exc}") from exc
 
     def check_project_exists(self, dir_path):
         return self.detect(dir_path)

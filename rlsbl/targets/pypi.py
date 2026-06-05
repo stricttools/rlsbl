@@ -1,18 +1,15 @@
 """PyPI release target that manages version tracking in pyproject.toml and scaffolds CI workflows for OIDC-based publishing to the PyPI index."""
 
-import glob
 import os
 import re
 import shutil
 import subprocess
-import sys
 import tempfile
 import tomllib
 
 import tomlkit
 
 from .base import BaseTarget
-from ..config import get_publish_config
 from ..utils import run
 
 _MIN_VERSION_RE = re.compile(r">=\s*(\d+\.\d+(?:\.\d+)?)")
@@ -22,7 +19,7 @@ class PypiTarget(BaseTarget):
     """Release target for Python projects (pyproject.toml)."""
 
     detection_files = ("pyproject.toml",)
-    capabilities = frozenset({"publish", "build_assets", "read_name", "read_metadata", "ci_templates", "dev_install"})
+    capabilities = frozenset({"read_name", "read_metadata", "ci_templates", "dev_install"})
     ecosystem = "Python / PyPI"
 
     @property
@@ -285,56 +282,6 @@ class PypiTarget(BaseTarget):
             )
         finally:
             shutil.rmtree(tmp_dir, ignore_errors=True)
-
-    def build_assets(self, dir_path, version, dist_dir, ctx):
-        """Build sdist and wheel for GH Release upload."""
-        os.makedirs(dist_dir, exist_ok=True)
-        run("uv", ["build", "--out-dir", dist_dir], env=os.environ, cwd=dir_path)
-        return sorted(glob.glob(os.path.join(dist_dir, "*")))
-
-    def publish(self, dir_path, version, ctx):
-        """Publish to PyPI based on per-target config and token availability.
-
-        Without config, accepts either PYPI_TOKEN or TWINE_PASSWORD. With
-        config that sets token_var, only the named variable is consulted.
-
-        ctx: ProjectContext carrying project_root, monorepo_root, and config.
-        """
-        pub_config = get_publish_config(self.name, ctx.config)
-
-        if pub_config.get("local") is False:
-            print(f"Skipping local {self.name} publish (config: local=false). CI will handle it.")
-            return
-
-        token_var = pub_config.get("token_var")
-        if token_var:
-            token = os.environ.get(token_var)
-            missing_msg = f"no {token_var}"
-            missing_var_label = token_var
-        else:
-            token = os.environ.get("PYPI_TOKEN") or os.environ.get("TWINE_PASSWORD")
-            missing_msg = "no PYPI_TOKEN or TWINE_PASSWORD"
-            missing_var_label = "PYPI_TOKEN or TWINE_PASSWORD"
-
-        if not token:
-            if pub_config.get("local") is True:
-                print(
-                    f"ERROR: {self.name} publish requested (local=true) but {missing_var_label} is not set.",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-            print(f"Skipping local PyPI publish ({missing_msg}). CI will handle it.")
-            return
-
-        try:
-            run("uv", ["build"], env=os.environ, cwd=dir_path)
-            run("uv", ["publish"], env={
-                **os.environ,
-                "UV_PUBLISH_TOKEN": token,
-            }, cwd=dir_path)
-            print(f"Published to PyPI: {version}")
-        except subprocess.CalledProcessError as exc:
-            raise RuntimeError(f"PyPI publish failed: {exc}") from exc
 
     def check_project_exists(self, dir_path):
         return os.path.exists(os.path.join(dir_path, "pyproject.toml"))

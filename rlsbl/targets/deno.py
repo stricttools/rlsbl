@@ -4,10 +4,8 @@ import json
 import os
 import re
 import subprocess
-import sys
 
 from .base import BaseTarget
-from ..config import get_publish_config
 from ..utils import run
 
 
@@ -15,7 +13,7 @@ class DenoTarget(BaseTarget):
     """Release target for Deno projects (deno.json / deno.jsonc)."""
 
     detection_files = ("deno.json", "deno.jsonc")
-    capabilities = frozenset({"publish", "read_name", "ci_templates", "dev_install"})
+    capabilities = frozenset({"read_name", "ci_templates", "dev_install"})
     ecosystem = "Deno / JSR"
 
     @property
@@ -155,48 +153,6 @@ class DenoTarget(BaseTarget):
             {"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"},
             {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
         ]
-
-    def publish(self, dir_path, version, ctx):
-        """Publish to JSR based on per-target config and token availability.
-
-        Without config, accepts DENO_TOKEN or JSR_TOKEN. With config that sets
-        token_var, only the named variable is consulted.
-
-        ctx: ProjectContext carrying project_root, monorepo_root, and config.
-        """
-        pub_config = get_publish_config(self.name, ctx.config)
-
-        if pub_config.get("local") is False:
-            print(f"Skipping local {self.name} publish (config: local=false). CI will handle it.")
-            return
-
-        token_var = pub_config.get("token_var")
-        if token_var:
-            token = os.environ.get(token_var)
-            missing_msg = f"no {token_var}"
-        else:
-            token = os.environ.get("DENO_TOKEN") or os.environ.get("JSR_TOKEN")
-            missing_msg = "no DENO_TOKEN/JSR_TOKEN"
-
-        if not token:
-            if pub_config.get("local") is True:
-                effective_var = token_var or "DENO_TOKEN"
-                print(
-                    f"ERROR: {self.name} publish requested (local=true) but {effective_var} is not set.",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-            print(f"Skipping local Deno publish ({missing_msg}). CI will handle it.")
-            return
-
-        try:
-            run("deno", ["publish"], env={
-                **os.environ,
-                "DENO_TOKEN": token,
-            })
-            print(f"Published to JSR: {version}")
-        except subprocess.CalledProcessError as exc:
-            raise RuntimeError(f"deno publish failed: {exc}") from exc
 
     def check_project_exists(self, dir_path):
         return self.detect(dir_path)

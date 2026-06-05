@@ -3,11 +3,8 @@
 import glob
 import os
 import re
-import shutil
-import subprocess
 
 from .base import BaseTarget
-from ..utils import require_tool
 from ..npm_wrapper import (
     build_artifacts,
     build_npm_publish_jobs,
@@ -44,7 +41,7 @@ class GoTarget(BaseTarget):
     """Release target for Go projects (go.mod + VERSION file)."""
 
     detection_files = ("go.mod",)
-    capabilities = frozenset({"publish", "build_assets", "read_name", "ci_templates", "dev_install"})
+    capabilities = frozenset({"read_name", "ci_templates", "dev_install"})
     ecosystem = "Go modules"
 
     @property
@@ -121,86 +118,6 @@ class GoTarget(BaseTarget):
         with open(matches[0], encoding="utf-8") as f:
             first_line = f.readline()
         return bool(re.match(r"^package\s+main\b", first_line))
-
-    def build_assets(self, dir_path, version, dist_dir, ctx):
-        """Build Go binaries into dist_dir.
-
-        Uses goreleaser for cross-compilation when available, falling back
-        to ``go build`` (host platform only) otherwise.
-        """
-        os.makedirs(dist_dir, exist_ok=True)
-
-        if shutil.which("goreleaser"):
-            try:
-                return self._build_with_goreleaser(dir_path, dist_dir)
-            except (subprocess.CalledProcessError, OSError) as exc:
-                print(f"Warning: goreleaser failed ({exc}), falling back to go build.")
-
-        else:
-            print("goreleaser not found, building for host platform only.")
-
-        # Fallback: host-only build
-        run("go", ["build", "-o", dist_dir + "/", "./..."], cwd=dir_path)
-        return sorted(glob.glob(os.path.join(dist_dir, "*")))
-
-    def _build_with_goreleaser(self, dir_path, dist_dir):
-        """Run goreleaser build and collect cross-compiled binaries into *dist_dir*."""
-        run(
-            "goreleaser",
-            ["build", "--snapshot", "--clean"],
-            cwd=dir_path,
-        )
-        goreleaser_dist = os.path.join(dir_path, "dist")
-        artifacts = []
-        for direntry in sorted(os.scandir(goreleaser_dist), key=lambda e: e.name):
-            if not direntry.is_dir():
-                continue
-            for fentry in sorted(os.scandir(direntry.path), key=lambda e: e.name):
-                if fentry.is_file() and not fentry.name.startswith("."):
-                    dest = os.path.join(dist_dir, f"{direntry.name}__{fentry.name}")
-                    shutil.copy2(fentry.path, dest)
-                    artifacts.append(dest)
-        return sorted(artifacts)
-
-    def publish(self, dir_path, version, ctx):
-        """Notify the Go module proxy so the new version is immediately available."""
-        module_path = self._read_module_path(dir_path)
-        if not module_path:
-            print("Warning: could not read module path from go.mod, skipping proxy notification")
-            return
-
-        if not require_tool("go", fatal=False):
-            print("Warning: 'go' not found on PATH, skipping proxy notification")
-            return
-
-        ref = f"{module_path}@v{version}"
-        env = {**os.environ, "GOPROXY": "proxy.golang.org"}
-        try:
-            run("go", ["list", "-m", ref], env=env)
-            print(f"Notified Go module proxy: {ref}")
-        except (subprocess.CalledProcessError, FileNotFoundError) as exc:
-            print(f"Warning: proxy notification failed for {ref}: {exc}")
-
-        # Install the binary locally for CLI projects
-        if self._has_cmd_main(dir_path):
-            matches = glob.glob(os.path.join(dir_path, "cmd", "*", "main.go"))
-            cmd_name = os.path.basename(os.path.dirname(matches[0]))
-            install_path = f"./cmd/{cmd_name}"
-        elif self._has_root_main(dir_path):
-            install_path = "."
-        else:
-            install_path = None
-
-        if install_path:
-            try:
-                subprocess.run(
-                    ["go", "install", install_path],
-                    cwd=dir_path,
-                    check=True,
-                )
-                print(f"Installed: go install {install_path}")
-            except (subprocess.CalledProcessError, FileNotFoundError) as exc:
-                print(f"Warning: go install failed: {exc}")
 
     def read_version(self, dir_path):
         """Read version from the VERSION file."""

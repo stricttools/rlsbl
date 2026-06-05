@@ -1,11 +1,9 @@
 """Docker release target using a VERSION file as source of truth, with opt-in activation via config and image publishing to a registry."""
 
 import os
-import sys
 
 from .base import BaseTarget
-from ..config import get_publish_config
-from ..utils import require_tool, run
+from ..utils import run
 
 VERSION_FILE = "VERSION"
 
@@ -14,7 +12,7 @@ class DockerTarget(BaseTarget):
     """Release target for Docker projects (Dockerfile + VERSION file)."""
 
     detection_files = ("Dockerfile",)
-    capabilities = frozenset({"publish", "read_name", "ci_templates"})
+    capabilities = frozenset({"read_name", "ci_templates"})
     ecosystem = "Docker"
 
     @property
@@ -64,61 +62,6 @@ class DockerTarget(BaseTarget):
 
     def tag_format(self, version):
         return f"v{version}"
-
-    def publish(self, dir_path, version, ctx):
-        """Build and push Docker image to the configured registry.
-
-        ctx: ProjectContext carrying project_root, monorepo_root, and config.
-        """
-        pub_config = get_publish_config(self.name, ctx.config)
-
-        if pub_config.get("local") is False:
-            print(f"Skipping local {self.name} publish (config: local=false). CI will handle it.")
-            return
-
-        # Docker uses two env vars (username + password). Config may override either.
-        username_var = pub_config.get("username_var", "DOCKER_USERNAME")
-        password_var = pub_config.get("password_var", "DOCKER_PASSWORD")
-        username = os.environ.get(username_var)
-        password = os.environ.get(password_var)
-        if not username or not password:
-            if pub_config.get("local") is True:
-                print(
-                    f"ERROR: {self.name} publish requested (local=true) but "
-                    f"{username_var}/{password_var} are not set.",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-            print(f"Skipping local docker publish (no {username_var}/{password_var}). CI will handle it.")
-            return
-
-        docker_config = ctx.config.get("docker", {})
-        image = docker_config.get("image")
-        registry = docker_config.get("registry")
-
-        if not image or not registry:
-            print("Error: docker config missing. Set 'docker.image' and "
-                  "'docker.registry' in .rlsbl/config.json")
-            return
-
-        if not require_tool("docker", fatal=False):
-            print("Error: 'docker' not found on PATH, cannot publish")
-            return
-
-        full_image = f"{registry}/{image}"
-        versioned_tag = f"{full_image}:{version}"
-        latest_tag = f"{full_image}:latest"
-
-        # Build
-        run("docker", ["build", "-t", versioned_tag,
-                       "--build-arg", f"VERSION={version}", "."])
-        # Push versioned
-        run("docker", ["push", versioned_tag])
-        # Tag and push latest
-        run("docker", ["tag", versioned_tag, latest_tag])
-        run("docker", ["push", latest_tag])
-
-        print(f"Published Docker image: {versioned_tag}")
 
     def template_dir(self):
         return os.path.join(

@@ -2,12 +2,9 @@
 
 import os
 import re
-import subprocess
-import sys
 import xml.etree.ElementTree as ET
 
 from .base import BaseTarget
-from ..config import get_publish_config
 from ..utils import run
 
 
@@ -15,7 +12,7 @@ class MavenTarget(BaseTarget):
     """Release target for Maven/Gradle (Java/Kotlin) projects."""
 
     detection_files = ("build.gradle.kts", "build.gradle", "pom.xml")
-    capabilities = frozenset({"publish", "read_name", "ci_templates"})
+    capabilities = frozenset({"read_name", "ci_templates"})
     ecosystem = "Java / Maven"
 
     @property
@@ -275,47 +272,6 @@ class MavenTarget(BaseTarget):
             {"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"},
             {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
         ]
-
-    def publish(self, dir_path, version, ctx):
-        """Publish via Gradle or Maven based on per-target config and token availability.
-
-        ctx: ProjectContext carrying project_root, monorepo_root, and config.
-        """
-        pub_config = get_publish_config(self.name, ctx.config)
-
-        if pub_config.get("local") is False:
-            print(f"Skipping local {self.name} publish (config: local=false). CI will handle it.")
-            return
-
-        token_var = pub_config.get("token_var", "GITHUB_TOKEN")
-        token = os.environ.get(token_var)
-        if not token:
-            if pub_config.get("local") is True:
-                print(
-                    f"ERROR: {self.name} publish requested (local=true) but {token_var} is not set.",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-            print(
-                f"Skipping local Maven/Gradle publish (no {token_var}). CI will handle it."
-            )
-            return
-
-        gradlew = os.path.join(dir_path, "gradlew")
-        if os.path.exists(gradlew):
-            try:
-                run("./gradlew", ["publish"], env={**os.environ})
-                print(f"Published via Gradle: {version}")
-            except subprocess.CalledProcessError as exc:
-                raise RuntimeError(f"Gradle publish failed: {exc}") from exc
-        elif os.path.exists(os.path.join(dir_path, "pom.xml")):
-            try:
-                run("mvn", ["deploy"], env={**os.environ})
-                print(f"Published via Maven: {version}")
-            except subprocess.CalledProcessError as exc:
-                raise RuntimeError(f"Maven deploy failed: {exc}") from exc
-        else:
-            print("No gradlew or pom.xml found for publish.")
 
     def check_project_exists(self, dir_path):
         return self.detect(dir_path)
