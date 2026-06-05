@@ -94,7 +94,7 @@ class PgdesignTarget(BaseTarget):
         os.replace(tmp_path, path)
         return [os.path.relpath(path, dir_path)]
 
-    def version_file(self):
+    def version_file(self, dir_path=None):
         return "pgdesign.toml"
 
     def build(self, dir_path, version):

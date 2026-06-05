@@ -96,7 +96,7 @@ class PlainTarget(BaseTarget):
 
         return modified
 
-    def version_file(self):
+    def version_file(self, dir_path=None):
         return VERSION_FILE
 
     def template_dir(self):

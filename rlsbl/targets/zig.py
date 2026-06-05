@@ -72,7 +72,7 @@ class ZigTarget(BaseTarget):
         """
         return write_zig_version(dir_path, version)
 
-    def version_file(self):
+    def version_file(self, dir_path=None):
         return VERSION_FILE
 
     def template_dir(self):

@@ -86,7 +86,7 @@ class CargoTarget(BaseTarget):
         os.replace(tmp_path, cargo_path)
         return [self.version_file()]
 
-    def version_file(self):
+    def version_file(self, dir_path=None):
         return "Cargo.toml"
 
     def tag_format(self, version):

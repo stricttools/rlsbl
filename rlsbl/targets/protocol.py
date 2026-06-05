@@ -45,8 +45,12 @@ class ReleaseTarget(Protocol):
         """Write a new version to the target's manifest file (atomic)."""
         ...
 
-    def version_file(self) -> str | None:
-        """Filename that holds the version (e.g. 'package.json'), or None if inherited."""
+    def version_file(self, dir_path: str | None = None) -> str | None:
+        """Filename that holds the version (e.g. 'package.json'), or None if inherited.
+
+        When dir_path is provided, implementations may resolve the filename
+        dynamically (e.g. Deno choosing between deno.json and deno.jsonc).
+        """
         ...
 
     def tag_format(self, version: str) -> str:

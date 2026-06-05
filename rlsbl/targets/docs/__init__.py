@@ -74,7 +74,7 @@ class DocsTarget(BaseTarget):
             raise
         return ["selfdoc.json"]
 
-    def version_file(self):
+    def version_file(self, dir_path=None):
         """Version is stored in selfdoc.json."""
         return "selfdoc.json"
 

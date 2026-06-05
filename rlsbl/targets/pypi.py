@@ -126,7 +126,7 @@ class PypiTarget(BaseTarget):
             break
         return None
 
-    def version_file(self):
+    def version_file(self, dir_path=None):
         return "pyproject.toml"
 
     def tag_format(self, version):

@@ -234,7 +234,7 @@ class MavenTarget(BaseTarget):
         os.replace(tmp_path, filepath)
         return [rel_path]
 
-    def version_file(self):
+    def version_file(self, dir_path=None):
         # Dynamic: depends on project. Return None and let callers use read_version.
         return None
 

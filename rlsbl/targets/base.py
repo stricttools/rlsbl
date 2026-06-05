@@ -18,7 +18,7 @@ class BaseTarget:
     ecosystem: ClassVar[str] = ""
     auto_detectable: ClassVar[str] = "yes"
 
-    def version_file(self):
+    def version_file(self, dir_path=None):
         return None
 
     def tag_format(self, version):

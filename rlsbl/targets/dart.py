@@ -90,7 +90,7 @@ class DartTarget(BaseTarget):
             return f"{new_semver}+{old_build}"
         return new_semver
 
-    def version_file(self):
+    def version_file(self, dir_path=None):
         return "pubspec.yaml"
 
     def read_name(self, dir_path, ctx):

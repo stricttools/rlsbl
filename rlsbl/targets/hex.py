@@ -67,7 +67,7 @@ class HexTarget(BaseTarget):
         os.replace(tmp_path, mix_path)
         return [self.version_file()]
 
-    def version_file(self):
+    def version_file(self, dir_path=None):
         return "mix.exs"
 
     def tag_format(self, version):
