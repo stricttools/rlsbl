@@ -75,9 +75,11 @@ During `rlsbl release run`, the validation and build steps run in this order:
 2. Strictcli schema dump (`--dump-schema`, for projects using strictcli)
 3. Selfdoc gen (`selfdoc gen --no-commit`, regenerates docs from source)
 4. Selfdoc check (verifies generated docs are up-to-date)
-5. Built-in tests (`uv run pytest`, `go test`, `npm test`)
-6. Built-in lint (library projects only)
+5. Built-in tests (`uv run pytest`, `go test`, `npm test`) -- skipped if pre-release hook is customized
+6. Built-in lint (library projects only) -- skipped if pre-release hook is customized
 7. Pre-release hook (`.rlsbl/hooks/pre-release.sh`)
+
+**Hooks override:** When the pre-release hook has been customized (its content differs from any known scaffold template version, determined by content hash comparison), built-in tests and lint are skipped. The hook is expected to handle testing and linting itself. An unmodified scaffold template or a missing hook file is considered "effectively empty" and does not trigger the override -- built-in tests and lint run normally.
 
 ## Conventions
 
@@ -91,18 +93,46 @@ During `rlsbl release run`, the validation and build steps run in this order:
 
 `.rlsbl/config.json` holds per-project settings. Notable keys:
 
-- `publish` -- per-target publish configuration (e.g. `publish.pypi`, `publish.npm`, `publish.docker`). Each entry can set:
-    - `local` (bool) -- whether to publish from the developer machine; when `false`, the local publish step is skipped and CI handles it.
-    - `token_var` -- name of the env var holding the publish token (used by pypi, npm, hex, deno, maven, etc.)
-    - `username_var` / `password_var` -- name of the env vars for username/password auth (used by docker)
-    - `assets` (bool) -- enables building and uploading artifacts to GitHub Releases. When true, the release step builds target-specific artifacts and attaches them to the GitHub Release.
-    - `max_asset_size_mb` (int, required when `assets` is true) -- maximum artifact size in MB. Releases fail if any artifact exceeds this limit.
+- `pipelines` -- publish pipelines keyed by user-chosen name (replaces the old `publish` key, which is now rejected during `rlsbl release run`). Each entry is a dict with mandatory `type` (string) and `local` (bool) fields, plus type-specific optional fields. See [Pipelines](#pipelines) below.
 - `private` (bool, required) -- safety guardrail for private repositories. When `true`, blocks publishing to public registries (npm, PyPI, etc.). Must be explicitly set in `config.json` -- there is no default.
 - `release_branches` -- list of branch names that trigger the manual-release-push warning. Defaults to `["main", "master"]` when the key is absent. An empty list is now an error -- either remove the key or list at least one branch.
 - `batch_limits` -- limits and exclusions for the `batch_size_commits` and `batch_size_entries` changelog validation checks. Both checks are blocking errors when they fail. Keys:
     - `max_commits_per_entry` (int, default `5`) -- maximum number of commit hashes allowed in a single JSONL entry.
     - `max_entries_per_commit` (int, default `5`) -- maximum number of JSONL entries that may reference the same commit hash.
     - `exclusions` (list of dicts, default `[]`) -- per-violation silencers. Each exclusion must have a `reason` (string, mandatory audit trail) plus at least one of `commits` or `entries`.
+
+## Pipelines
+
+Pipelines handle publishing and are configured separately from targets (which handle versioning). A project's targets determine which files get version-bumped; its pipelines determine where and how the release is published. This separation means a project can have, for example, an npm target for versioning but a cloudflare-pages pipeline for publishing.
+
+The `pipelines` key in `.rlsbl/config.json` is a dict where each key is a user-chosen pipeline name and each value has:
+
+- `type` (string, required) -- one of the 9 built-in pipeline types: `npm`, `pypi`, `go`, `cargo`, `deno`, `hex`, `maven`, `docker`, `cloudflare-pages`
+- `local` (bool, required) -- whether to publish from the developer machine. When `false`, the local publish step is skipped and CI handles it.
+- `token_var` (string, optional) -- name of the env var holding the publish token. Used by token-based pipelines (npm, pypi, hex, deno, maven, cargo, go). Each type has a default (e.g. `NPM_TOKEN` for npm).
+- `username_var` / `password_var` (string, optional) -- name of the env vars for username/password auth. Used by credential-based pipelines (docker).
+- `assets` (bool, optional) -- enables building and uploading target-specific artifacts to GitHub Releases.
+- `max_asset_size_mb` (int, required when `assets` is true or `custom_assets` is present) -- maximum artifact size in MB. Releases fail if any artifact exceeds this limit.
+- `custom_assets` (list, optional) -- list of custom build artifacts to attach to GitHub Releases. Each entry has `name` (string, output filename in `$RLSBL_DIST_DIR`) and `build` (string, shell command to execute). The build command receives `$RLSBL_DIST_DIR` as an env var pointing to the distribution directory. Requires `max_asset_size_mb`.
+
+Example:
+
+```json
+{
+  "pipelines": {
+    "npm-publish": {
+      "type": "npm",
+      "local": false
+    },
+    "docs-deploy": {
+      "type": "cloudflare-pages",
+      "local": true
+    }
+  }
+}
+```
+
+The old `publish` key in `.rlsbl/config.json` is no longer recognized. Running `rlsbl release run` with a `publish` key present is a hard error -- migrate to `pipelines`.
 
 ## Check system
 
@@ -132,7 +162,7 @@ The release/undo commands set `RLSBL_RELEASE_PUSH=1` in the push environment so 
 
 ## Private repos and asset uploads
 
-Private repositories set `"private": true` in `.rlsbl/config.json` to block accidental publishing to public registries. Asset upload (building and attaching artifacts to GitHub Releases) is now a built-in release step configured via `publish.<target>.assets` and `publish.<target>.max_asset_size_mb` in the config. The old private hook template for asset uploads is removed -- the `private-hook-stale` check detects leftover private hook files and warns that they should be deleted in favor of the built-in asset configuration.
+Private repositories set `"private": true` in `.rlsbl/config.json` to block accidental publishing to public registries. Asset upload (building and attaching artifacts to GitHub Releases) is configured per-pipeline via `pipelines.<name>.assets` and `pipelines.<name>.max_asset_size_mb`. Custom build artifacts use the `custom_assets` list on the pipeline config (see [Pipelines](#pipelines)). The `private-hook-stale` check detects leftover private hook files and warns that they should be deleted.
 
 ## Strictcli schema
 
