@@ -90,7 +90,7 @@ class TestReleaseWithDeployTargets:
         _run_release_mutating(
             registry="npm",
             reg=type("FakeReg", (), {
-                "version_file": lambda self: None,
+                "version_file": lambda self, dir_path=None: None,
                 "write_version": lambda self, p, v, ctx=None: [],
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, ctx: None,
@@ -186,7 +186,7 @@ class TestReleaseDeployFailureContinues:
         _run_release_mutating(
             registry="npm",
             reg=type("FakeReg", (), {
-                "version_file": lambda self: None,
+                "version_file": lambda self, dir_path=None: None,
                 "write_version": lambda self, p, v, ctx=None: [],
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, ctx: None,
@@ -257,7 +257,7 @@ class TestReleaseNoDeployConfig:
         _run_release_mutating(
             registry="npm",
             reg=type("FakeReg", (), {
-                "version_file": lambda self: None,
+                "version_file": lambda self, dir_path=None: None,
                 "write_version": lambda self, p, v, ctx=None: [],
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, ctx: None,
@@ -329,7 +329,7 @@ class TestReleaseDeployConfigErrors:
         _run_release_mutating(
             registry="npm",
             reg=type("FakeReg", (), {
-                "version_file": lambda self: None,
+                "version_file": lambda self, dir_path=None: None,
                 "write_version": lambda self, p, v, ctx=None: [],
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, ctx: None,
@@ -404,7 +404,7 @@ class TestReleaseStopsAtFirstDeployFailure:
         _run_release_mutating(
             registry="npm",
             reg=type("FakeReg", (), {
-                "version_file": lambda self: None,
+                "version_file": lambda self, dir_path=None: None,
                 "write_version": lambda self, p, v, ctx=None: [],
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, ctx: None,
