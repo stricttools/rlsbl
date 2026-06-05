@@ -18,6 +18,16 @@ class DenoPipeline(TokenPipeline):
 
     _default_token_var = "DENO_TOKEN"
 
+    def template_dir(self) -> str | None:
+        return os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "templates", "deno"
+        )
+
+    def template_mappings(self, ctx) -> list[dict[str, str]]:
+        return [
+            {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
+        ]
+
     def publish(self, dir_path: str, version: str, ctx) -> None:
         if not self.local:
             print(f"  Skipping pipeline '{self.name}' local publish (config: local=false)")

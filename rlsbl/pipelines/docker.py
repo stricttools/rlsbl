@@ -1,5 +1,6 @@
 """Docker pipeline -- builds and pushes Docker images using username/password credentials."""
 
+import os
 import subprocess
 
 from .base import CredentialPipeline
@@ -14,6 +15,16 @@ class DockerPipeline(CredentialPipeline):
 
     _default_username_var = "DOCKER_USERNAME"
     _default_password_var = "DOCKER_PASSWORD"
+
+    def template_dir(self) -> str | None:
+        return os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "templates", "docker"
+        )
+
+    def template_mappings(self, ctx) -> list[dict[str, str]]:
+        return [
+            {"template": "publish.yml.tpl", "target": ".github/workflows/docker-publish.yml"},
+        ]
 
     def _publish_command(self, dir_path: str, version: str, username: str, password: str) -> None:
         image = self.config.get("image")

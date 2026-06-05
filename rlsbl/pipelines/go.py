@@ -17,6 +17,16 @@ class GoPipeline(BasePipeline):
     ``go install``.
     """
 
+    def template_dir(self) -> str | None:
+        return os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "templates", "go"
+        )
+
+    def template_mappings(self, ctx) -> list[dict[str, str]]:
+        return [
+            {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
+        ]
+
     def build_assets(self, dir_path: str, version: str, dist_dir: str, ctx) -> list[str]:
         from .build import build_go_assets
         return build_go_assets(dir_path, version, dist_dir)

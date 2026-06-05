@@ -12,6 +12,16 @@ class HexPipeline(TokenPipeline):
 
     _default_token_var = "HEX_API_KEY"
 
+    def template_dir(self) -> str | None:
+        return os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "templates", "hex"
+        )
+
+    def template_mappings(self, ctx) -> list[dict[str, str]]:
+        return [
+            {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
+        ]
+
     def _publish_command(self, dir_path: str, version: str, token: str) -> None:
         try:
             run("mix", ["hex.publish", "--yes"], env={
