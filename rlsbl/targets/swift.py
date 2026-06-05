@@ -65,10 +65,6 @@ class SwiftTarget(BaseTarget):
     def tag_format(self, version):
         return f"v{version}"
 
-    def publish(self, dir_path, version, ctx):
-        """No-op: the git tag IS the publication for SPM."""
-        pass
-
     def template_dir(self):
         return os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "templates", "swift"

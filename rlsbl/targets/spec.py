@@ -84,10 +84,6 @@ class SpecTarget(BaseTarget):
     def tag_format(self, version):
         return f"spec-v{version}"
 
-    def publish(self, dir_path, version, ctx):
-        """No-op: the git tag IS the publication."""
-        pass
-
     def template_dir(self):
         return os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "templates", "spec"
