@@ -1,4 +1,4 @@
-"""Target introspection -- generates raw table data for all release targets and their properties."""
+"""Target introspection -- generates raw table data for all release targets showing ecosystem, detection files, capabilities, and tag formats."""
 
 from . import TARGETS
 
