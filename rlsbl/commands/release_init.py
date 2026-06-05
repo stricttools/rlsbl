@@ -49,8 +49,8 @@ def run_cmd(project_root):
     doc.add("include", target_names)
     doc.add("exclude", [])
 
-    # Add per-target config sections for Flutter targets
-    flutter_targets = [n for n in target_names if "flutter" in n]
+    # Add per-target config sections for Flutter target
+    flutter_targets = [n for n in target_names if n == "flutter"]
     if flutter_targets:
         targets_table = tomlkit.table(is_super_table=True)
         for ft in flutter_targets:

@@ -103,26 +103,14 @@ def _validate_release_config(data: dict, prefix: str = "") -> ReleaseConfig:
                     )
             targets[name] = dict(cfg)
 
-    # Flutter targets require a mode field in their per-target config
+    # Flutter target requires a mode field in its per-target config
     for name in include:
-        if name.startswith("flutter-"):
+        if name == "flutter":
             if name not in targets or "mode" not in targets[name]:
                 raise err(
                     f"Flutter target {name!r} requires a [targets.{name}] section "
                     f"with mode = \"ota\" or mode = \"build\""
                 )
-
-    # Both flutter-ios and flutter-android must have the same mode when both present
-    flutter_names = [n for n in include if n.startswith("flutter-")]
-    if len(flutter_names) >= 2:
-        modes = {n: targets[n]["mode"] for n in flutter_names}
-        unique_modes = set(modes.values())
-        if len(unique_modes) > 1:
-            mode_list = ", ".join(f"{n}={m!r}" for n, m in sorted(modes.items()))
-            raise err(
-                f"All Flutter targets must have the same mode, "
-                f"but got: {mode_list}"
-            )
 
     # --- description (required) ---
     if "description" not in data:
