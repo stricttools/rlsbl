@@ -8,3 +8,4 @@
 {"commits":["20009ad2962dce68780a0ba5937577c416e041c8"],"user_facing":true,"description":"**Refactor.** `MATRIX_COLUMNS` in checks is now derived from `TARGETS.keys()` instead of a hardcoded tuple, ensuring the feature matrix stays in sync when targets are added.","type":"feature"}
 {"commits":["a440622b31beb44cbc24cd52f1e9c26ed6904dad","81fd6a3eecb299ec267a98bcdac81680d5989423","f05c6c14a4fdda5ea93d10f8da4f1f1fb289d9c4"],"user_facing":false}
 {"commits":["bab094c39437c0ba7808788445e066edf02e3d54","28142b6968b1de6a57d0040dc125dfd7a90d803c","88ebb352eab484ab6bd20bb863d2bcd34dbecbad"],"user_facing":false}
+{"commits":["45797808d20cb22a7107d4cd896b140bc3824601","19a92f834e7c717e33e36690beb2f555334cf4cb"],"user_facing":false}
