@@ -1,0 +1,1 @@
+{"commits":["d61f36f16e699dad4b148cbf15d2b6484a937b8d"],"user_facing":true,"description":"**Fix.** CI test no longer fails when selfdoc is not installed in the test environment.","type":"fix"}
