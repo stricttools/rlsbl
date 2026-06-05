@@ -1055,14 +1055,9 @@ def upload_release_assets(tag, new_version, log, flags, *, ctx):
             continue
 
         # Build assets
-        try:
-            artifacts = target_obj.build_assets(entry.path, new_version, dist_dir, ctx=ctx)
-        except NotImplementedError:
-            print(
-                f"Warning: target '{entry.name}' does not support asset builds, skipping.",
-                file=sys.stderr,
-            )
+        if "build_assets" not in target_obj.capabilities:
             continue
+        artifacts = target_obj.build_assets(entry.path, new_version, dist_dir, ctx=ctx)
 
         if not artifacts:
             log(f"No artifacts produced for target '{entry.name}', skipping upload.")
