@@ -168,7 +168,7 @@ class TestReleaseUnexpectedFiles:
                     "quiet": True,
                 },
             
-                ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False}),
+                ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}),
 )
 
         # Verify the release actually completed: the version was bumped
@@ -230,7 +230,7 @@ class TestReleaseUnexpectedFiles:
                         "quiet": True,
                     },
                 
-                    ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False}),
+                    ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}),
 )
 
         assert exc_info.value.code == 1, (

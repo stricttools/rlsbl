@@ -125,7 +125,7 @@ class TestNoWatchPrintsHint:
             _rc(),
             {"dry-run": True, "quiet": False, "yes": True, "watch": False},
         
-            ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False}),
+            ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}),
 )
 
         captured = capsys.readouterr()
@@ -175,7 +175,7 @@ class TestWatchInvokesWatchCmd:
             _rc(),
             {"dry-run": True, "quiet": False, "yes": True, "watch": True},
         
-            ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False}),
+            ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}),
 )
 
         captured = capsys.readouterr()
@@ -204,10 +204,8 @@ class TestWatchInvokedAfterRelease:
     @patch("rlsbl.commands.release.read_deploy_config", return_value=([], []))
     @patch("rlsbl.commands.release.should_tag", return_value=False)
     @patch("rlsbl.commands.release.upload_release_assets")
-    @patch("rlsbl.commands.release.get_publish_config", return_value={})
     def test_watch_flag_invokes_watch_run_cmd(
         self,
-        _pub_cfg,
         _upload,
         _tag,
         _deploy,
@@ -269,7 +267,7 @@ class TestWatchInvokedAfterRelease:
                 _rc(),
                 {"yes": True, "quiet": False, "watch": True},
             
-                ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False}),
+                ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}),
 )
             mock_watch.assert_called_once_with(None, [fake_sha], {})
 
@@ -292,10 +290,8 @@ class TestWatchInvokedAfterRelease:
     @patch("rlsbl.commands.release.read_deploy_config", return_value=([], []))
     @patch("rlsbl.commands.release.should_tag", return_value=False)
     @patch("rlsbl.commands.release.upload_release_assets")
-    @patch("rlsbl.commands.release.get_publish_config", return_value={})
     def test_no_watch_flag_prints_hint(
         self,
-        _pub_cfg,
         _upload,
         _tag,
         _deploy,
@@ -349,7 +345,7 @@ class TestWatchInvokedAfterRelease:
                 _rc(),
                 {"yes": True, "quiet": False, "watch": False},
             
-                ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False}),
+                ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}),
 )
             mock_watch.assert_not_called()
 

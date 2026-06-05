@@ -365,7 +365,7 @@ class TestDevNodeReleaseSkipsChangelog:
         ctx = ProjectContext(
             project_root=Path(str(dev_node_dir)),
             workspace_root=Path(str(root)),
-            config={"private": False},
+            config={"private": False, "pipelines": {}},
         )
 
         rc = ReleaseConfig(bump="patch", include=["npm"], exclude=[],
@@ -431,7 +431,7 @@ class TestDevNodeReleaseRequiresDescription:
         ctx = ProjectContext(
             project_root=Path(str(dev_node_dir)),
             workspace_root=Path(str(root)),
-            config={"private": False},
+            config={"private": False, "pipelines": {}},
         )
 
         rc = ReleaseConfig(bump="patch", include=["npm"], exclude=[], description="")
@@ -476,7 +476,7 @@ class TestDevNodeReleaseRequiresDescription:
         ctx = ProjectContext(
             project_root=Path(str(dev_node_dir)),
             workspace_root=Path(str(root)),
-            config={"private": False},
+            config={"private": False, "pipelines": {}},
         )
 
         rc = ReleaseConfig(

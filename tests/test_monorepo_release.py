@@ -109,7 +109,7 @@ class TestMonorepoRelease:
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False}))
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False, "pipelines": {}}))
 
         output = mock_out.getvalue()
         assert "tooling@v1.0.0" in output
@@ -134,7 +134,7 @@ class TestMonorepoRelease:
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False}))
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False, "pipelines": {}}))
 
         output = mock_out.getvalue()
         assert "tooling: release v1.0.0" in output
@@ -165,7 +165,7 @@ class TestMonorepoRelease:
         mock_run.side_effect = ["", "0", "tooling@v1.0.0", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False}))
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False, "pipelines": {}}))
 
         output = mock_out.getvalue()
         assert "tooling@v1.0.1" in output
@@ -189,7 +189,7 @@ class TestMonorepoRelease:
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False}))
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False, "pipelines": {}}))
 
         output = mock_out.getvalue()
         assert "Project:   tooling (tooling)" in output
@@ -228,7 +228,7 @@ class TestMonorepoRelease:
             run_cmd(_rc(), {
                 "dry-run": True, "quiet": True,
             },
-            ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False}),
+            ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False, "pipelines": {}}),
 )
         assert exc_info.value.code == 1
 
@@ -270,7 +270,7 @@ class TestMonorepoRelease:
         mock_run.side_effect = ["", "0", "v2.0.0", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False}))
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
 
         output = mock_out.getvalue()
         assert "Tag:       v2.0.1" in output
@@ -308,7 +308,7 @@ class TestMonorepoRelease:
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False}))
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False, "pipelines": {}}))
 
         output = mock_out.getvalue()
         # Should read 1.0.0 from libs/core/package.json, not 9.9.9 from root
@@ -344,7 +344,7 @@ class TestMonorepoRelease:
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False}))
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False, "pipelines": {}}))
 
         output = mock_out.getvalue()
         assert "Initial release of core component" in output
@@ -414,7 +414,7 @@ class TestSubtreePublish:
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False}))
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False, "pipelines": {}}))
 
         output = mock_out.getvalue()
         assert "Subtree:" in output
@@ -441,7 +441,7 @@ class TestSubtreePublish:
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False}))
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False, "pipelines": {}}))
 
         output = mock_out.getvalue()
         assert "Subtree:" not in output
@@ -484,4 +484,4 @@ class TestSubtreePublish:
 
         # The release should complete without raising, despite subtree failure
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False}))
+            run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False, "pipelines": {}}))

@@ -215,7 +215,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
                 _rc(), {"dry-run": True, "yes": True},
                 ctx=ProjectContext(
                     project_root=Path("."), workspace_root=None,
-                    config={"private": False},
+                    config={"private": False, "pipelines": {}},
                 ),
             )
 
@@ -269,7 +269,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
                 _rc(), {"dry-run": True, "yes": True},
                 ctx=ProjectContext(
                     project_root=Path("."), workspace_root=None,
-                    config={"private": False},
+                    config={"private": False, "pipelines": {}},
                 ),
             )
 
@@ -322,7 +322,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
                 _rc(), {"dry-run": True, "quiet": True, "yes": True},
                 ctx=ProjectContext(
                     project_root=Path("."), workspace_root=None,
-                    config={"private": False},
+                    config={"private": False, "pipelines": {}},
                 ),
             )
 
@@ -374,7 +374,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
                 _rc(), {"dry-run": True, "quiet": True, "yes": True},
                 ctx=ProjectContext(
                     project_root=Path("."), workspace_root=None,
-                    config={"private": False},
+                    config={"private": False, "pipelines": {}},
                 ),
             )
 

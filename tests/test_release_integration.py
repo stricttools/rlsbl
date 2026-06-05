@@ -125,7 +125,7 @@ def _make_ctx(repo):
     return ProjectContext(
         project_root=Path(str(repo)),
         workspace_root=None,
-        config={"private": False},
+        config={"private": False, "pipelines": {}},
     )
 
 

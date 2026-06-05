@@ -156,7 +156,7 @@ class TestReleaseAbortCleanup:
                         "quiet": True,
                     },
                 
-                    ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False}),
+                    ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}),
 )
 
         assert exc_info.value.code == 1, "release should exit 1 on hook failure"
@@ -207,7 +207,7 @@ class TestReleaseAbortCleanup:
                         "quiet": True,
                     },
                 
-                    ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False}),
+                    ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}),
 )
 
         assert exc_info.value.code == 1
@@ -288,7 +288,7 @@ class TestReleaseAbortCleanup:
                         "quiet": True,
                     },
                 
-                    ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False}),
+                    ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}),
 )
 
         # .validated may be written by changelog validation; tolerate that
@@ -395,7 +395,7 @@ class TestReleaseAbortCleanup:
                         "yes": True,
                         "quiet": True,
                     },
-                    ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False}),
+                    ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}),
                 )
 
         assert exc_info.value.code == 1, (

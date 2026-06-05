@@ -47,7 +47,7 @@ def _write_config(repo_path, config):
 # ---------------------------------------------------------------------------
 
 class TestReleaseWithDeployTargets:
-    """Deploy targets configured and valid: deploy_target gets called after publish."""
+    """Deploy targets configured and valid: deploy_target gets called after pipeline dispatch."""
 
     def test_release_with_deploy_targets(self, mock_git_repo, monkeypatch, capsys):
         deploy_targets = [_minimal_target()]
@@ -93,7 +93,6 @@ class TestReleaseWithDeployTargets:
                 "version_file": lambda self, dir_path=None: None,
                 "write_version": lambda self, p, v, ctx=None: [],
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, ctx: None,
                 "tag_format": lambda self, v: f"v{v}",
             })(),
             flags={"yes": True, "no-tag": True},
@@ -108,10 +107,8 @@ class TestReleaseWithDeployTargets:
             target=type("FakeTarget", (), {
                 "tag_format": lambda self, v: f"v{v}",
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, ctx: None,
-                "capabilities": frozenset({"publish"}),
             })(),
-            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False, "deploy": deploy_targets}),
+            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False, "pipelines": {}, "deploy": deploy_targets}),
         )
 
         assert len(deploy_calls) == 1
@@ -190,7 +187,6 @@ class TestReleaseDeployFailureContinues:
                 "version_file": lambda self, dir_path=None: None,
                 "write_version": lambda self, p, v, ctx=None: [],
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, ctx: None,
                 "tag_format": lambda self, v: f"v{v}",
             })(),
             flags={"yes": True, "no-tag": True},
@@ -205,10 +201,8 @@ class TestReleaseDeployFailureContinues:
             target=type("FakeTarget", (), {
                 "tag_format": lambda self, v: f"v{v}",
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, ctx: None,
-                "capabilities": frozenset({"publish"}),
             })(),
-            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False, "deploy": deploy_targets}),
+            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False, "pipelines": {}, "deploy": deploy_targets}),
         )
 
         captured = capsys.readouterr()
@@ -262,7 +256,6 @@ class TestReleaseNoDeployConfig:
                 "version_file": lambda self, dir_path=None: None,
                 "write_version": lambda self, p, v, ctx=None: [],
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, ctx: None,
                 "tag_format": lambda self, v: f"v{v}",
             })(),
             flags={"yes": True, "no-tag": True},
@@ -277,10 +270,8 @@ class TestReleaseNoDeployConfig:
             target=type("FakeTarget", (), {
                 "tag_format": lambda self, v: f"v{v}",
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, ctx: None,
-                "capabilities": frozenset({"publish"}),
             })(),
-            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False}),
+            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False, "pipelines": {}}),
         )
 
         # deploy_target should never have been called
@@ -335,7 +326,6 @@ class TestReleaseDeployConfigErrors:
                 "version_file": lambda self, dir_path=None: None,
                 "write_version": lambda self, p, v, ctx=None: [],
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, ctx: None,
                 "tag_format": lambda self, v: f"v{v}",
             })(),
             flags={"yes": True, "no-tag": True},
@@ -350,10 +340,8 @@ class TestReleaseDeployConfigErrors:
             target=type("FakeTarget", (), {
                 "tag_format": lambda self, v: f"v{v}",
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, ctx: None,
-                "capabilities": frozenset({"publish"}),
             })(),
-            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False, "deploy": deploy_targets}),
+            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False, "pipelines": {}, "deploy": deploy_targets}),
         )
 
         # deploy_target should never have been called (config has errors)
@@ -411,7 +399,6 @@ class TestReleaseStopsAtFirstDeployFailure:
                 "version_file": lambda self, dir_path=None: None,
                 "write_version": lambda self, p, v, ctx=None: [],
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, ctx: None,
                 "tag_format": lambda self, v: f"v{v}",
             })(),
             flags={"yes": True, "no-tag": True},
@@ -426,10 +413,8 @@ class TestReleaseStopsAtFirstDeployFailure:
             target=type("FakeTarget", (), {
                 "tag_format": lambda self, v: f"v{v}",
                 "build": lambda self, p, v: None,
-                "publish": lambda self, p, v, ctx: None,
-                "capabilities": frozenset({"publish"}),
             })(),
-            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False, "deploy": deploy_targets}),
+            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False, "pipelines": {}, "deploy": deploy_targets}),
         )
 
         # Only staging was attempted; prod was NOT attempted

@@ -147,7 +147,7 @@ class TestMultiTargetRelease:
     def test_secondary_targets_called_when_detected(
         self, _selfdoc_gen, _selfdoc_check, _changes_dir, _extract, _finalize, _gen_ver_file, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, _commit_files, mock_run, _push
     ):
-        """When a secondary target (docs) is detected, its build/publish are called."""
+        """When a secondary target (docs) is detected, its build is called."""
         # Create selfdoc.json so docs target is detected
         with open("selfdoc.json", "w") as f:
             json.dump({"language": "python"}, f)
@@ -170,28 +170,23 @@ class TestMultiTargetRelease:
         # 14. gh release create -> "abc123"
         mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", "", "/tmp/fake-repo", "", "pre123", "", "", "", "abc123"]
 
-        # Mock the docs target's build and publish to track calls
+        # Mock the docs target's build to track calls (publish is now handled by pipelines)
         from rlsbl.targets import TARGETS
         original_build = TARGETS["docs"].build
-        original_publish = TARGETS["docs"].publish
         build_mock = MagicMock()
-        publish_mock = MagicMock()
         TARGETS["docs"].build = build_mock
-        TARGETS["docs"].publish = publish_mock
 
         try:
             from rlsbl.commands.release import run_cmd
 
             with patch("sys.stdout", StringIO()):
-                run_cmd(_rc(include=["npm", "docs"]), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False}))
+                run_cmd(_rc(include=["npm", "docs"]), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
 
-            # Verify docs target build/publish were called
+            # Verify docs target build was called (publish is dispatched via pipelines now)
             build_mock.assert_called_once_with(".", "1.0.1")
-            publish_mock.assert_called_once_with(".", "1.0.1", ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False}))
         finally:
             # Restore original methods
             TARGETS["docs"].build = original_build
-            TARGETS["docs"].publish = original_publish
 
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
@@ -211,7 +206,7 @@ class TestMultiTargetRelease:
     def test_secondary_target_failure_is_non_fatal(
         self, _selfdoc_gen, _selfdoc_check, _changes_dir, _extract, _finalize, _gen_ver_file, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, _commit_files, mock_run, _push
     ):
-        """If a secondary target's build/publish raises, release still completes."""
+        """If a secondary target's build raises, release still completes."""
         # Create selfdoc.json so docs target is detected
         with open("selfdoc.json", "w") as f:
             json.dump({"language": "python"}, f)
@@ -225,9 +220,7 @@ class TestMultiTargetRelease:
 
         from rlsbl.targets import TARGETS
         original_build = TARGETS["docs"].build
-        original_publish = TARGETS["docs"].publish
         TARGETS["docs"].build = MagicMock(side_effect=RuntimeError("build failed"))
-        TARGETS["docs"].publish = MagicMock(side_effect=RuntimeError("publish failed"))
 
         try:
             from rlsbl.commands.release import run_cmd
@@ -235,12 +228,10 @@ class TestMultiTargetRelease:
             # Should not raise -- secondary failures are non-fatal
             buf = StringIO()
             with patch("sys.stdout", StringIO()), patch("sys.stderr", buf):
-                run_cmd(_rc(include=["npm", "docs"]), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False}))
+                run_cmd(_rc(include=["npm", "docs"]), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
 
             # Verify warnings were emitted
             stderr_output = buf.getvalue()
             assert "docs target build failed" in stderr_output
-            assert "docs target publish failed" in stderr_output
         finally:
             TARGETS["docs"].build = original_build
-            TARGETS["docs"].publish = original_publish

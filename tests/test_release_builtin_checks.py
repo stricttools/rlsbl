@@ -671,7 +671,7 @@ class TestTwoHookModel:
 
             from rlsbl.commands.release import run_cmd
 
-            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"private": False}))
+            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"private": False, "pipelines": {}}))
 
             # The hook should have actually run and created the marker
             assert marker.exists(), "pre-checks.sh should have created the marker file"
@@ -722,7 +722,7 @@ class TestTwoHookModel:
 
             from rlsbl.commands.release import run_cmd
 
-            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"private": False}))
+            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"private": False, "pipelines": {}}))
 
             # pre-release hook runs after tests/lint but is still executed for dry-run
             # (based on the code, pre-release hook runs before dry-run return)
@@ -768,7 +768,7 @@ class TestTwoHookModel:
             from rlsbl.commands.release import run_cmd
 
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(_rc(), {"quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"private": False}))
+                run_cmd(_rc(), {"quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"private": False, "pipelines": {}}))
 
             assert exc_info.value.code == 1
             # Tests and lint should NOT have been called
@@ -843,7 +843,7 @@ class TestFullFlowOrder:
         ):
             from rlsbl.commands.release import run_cmd
 
-            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"private": False}))
+            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"private": False, "pipelines": {}}))
 
         # Read hook execution order from the file
         assert order_file.exists(), "Hooks should have written to order file"
