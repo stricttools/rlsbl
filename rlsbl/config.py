@@ -91,50 +91,6 @@ def read_deploy_config(config):
     return targets, errors
 
 
-def get_publish_config(target_name, config):
-    """Read per-target publish config from a project config dict.
-
-    Returns a dict like {"local": True, "token_var": "PYPI_TOKEN"}.
-    Returns empty dict if no config exists for this target.
-    """
-    publish = config.get("publish", {})
-    if not isinstance(publish, dict):
-        return {}
-    target_config = publish.get(target_name, {})
-    return target_config if isinstance(target_config, dict) else {}
-
-
-def validate_publish_config(config, target_name):
-    """Validate per-target publish config, especially the ``assets`` schema.
-
-    Raises ``ValueError`` if:
-    - ``assets`` is ``true`` but ``max_asset_size_mb`` is missing.
-    - ``max_asset_size_mb`` is present but not a positive integer.
-    """
-    publish = config.get("publish", {})
-    if not isinstance(publish, dict):
-        return
-    target_cfg = publish.get(target_name, {})
-    if not isinstance(target_cfg, dict):
-        return
-
-    assets_enabled = target_cfg.get("assets", False)
-    max_size = target_cfg.get("max_asset_size_mb")
-
-    if max_size is not None:
-        if not isinstance(max_size, int) or max_size <= 0:
-            raise ValueError(
-                f"publish.{target_name}.max_asset_size_mb must be a positive integer, "
-                f"got {max_size!r}"
-            )
-
-    if assets_enabled and max_size is None:
-        raise ValueError(
-            f"publish.{target_name}.assets is true but max_asset_size_mb is not set. "
-            f"Add publish.{target_name}.max_asset_size_mb (positive integer, in MB)."
-        )
-
-
 def get_changelog_validation_config(config):
     """Read changelog validation config from a project config dict.
 

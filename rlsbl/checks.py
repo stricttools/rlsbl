@@ -264,8 +264,8 @@ def register_checks(app):
             except Exception:
                 versions[name] = None
 
-        # Include selfdoc.json even when "docs" is not in the explicit
-        # targets list, so version drift is always caught.
+        # Include selfdoc.json in version consistency checks. selfdoc.json
+        # is not a release target, but its version must stay in sync.
         detected_names = {name for name, _path in target_entries}
         if "selfdoc" not in detected_names:
             selfdoc_path = os.path.join(str(ctx.project_root), "selfdoc.json")
@@ -419,22 +419,19 @@ def register_checks(app):
 
     @app.check("config-schema")
     def check_config_schema(ctx):
-        """Validate .rlsbl/config.json schema: private key and publish config."""
-        from .config import validate_publish_config
-
+        """Validate .rlsbl/config.json schema: private key and pipelines config."""
         config = ctx.config
         errors = []
 
         if "private" not in config:
             errors.append('"private" key missing from .rlsbl/config.json')
 
-        publish = config.get("publish", {})
-        if isinstance(publish, dict):
-            for target_name in publish:
-                try:
-                    validate_publish_config(config, target_name)
-                except ValueError as e:
-                    errors.append(str(e))
+        # Validate pipelines config if present
+        from .config import validate_pipelines_config
+        try:
+            validate_pipelines_config(config)
+        except ValueError as e:
+            errors.append(str(e))
 
         if errors:
             return CheckResult("fail", f"{len(errors)} config error(s)", details=errors)
