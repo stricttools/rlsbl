@@ -38,6 +38,7 @@
   ],
   "directives": {
     "table-feature-matrix": "docs/directives/feature_matrix.py",
+    "table-pipelines": "docs/directives/pipeline_table.py",
     "table-targets": "docs/directives/target_table.py"
   }
 }
