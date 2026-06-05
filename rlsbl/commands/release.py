@@ -330,16 +330,12 @@ def _run_builtin_lint(flags, is_library=False, project_dir=None):
     return True
 
 
-def _run_selfdoc_gen(flags, project_dir=None, docs_excluded=False):
+def _run_selfdoc_gen(flags, project_dir=None):
     """Run selfdoc gen if selfdoc.json exists in the project directory.
 
     Regenerates documentation pages from source before the selfdoc check step,
     ensuring the check validates fresh content rather than stale pages.
     """
-    if docs_excluded:
-        print("Skipping selfdoc gen (docs excluded in release file)")
-        return True
-
     check_dir = project_dir if project_dir else "."
     selfdoc_config = os.path.join(check_dir, "selfdoc.json")
     if not os.path.exists(selfdoc_config):
@@ -367,18 +363,14 @@ def _run_selfdoc_gen(flags, project_dir=None, docs_excluded=False):
     return True
 
 
-def _run_selfdoc_check(flags, project_dir=None, docs_excluded=False):
+def _run_selfdoc_check(flags, project_dir=None):
     """Run selfdoc check if selfdoc.json exists in the project directory.
 
     Checks documentation consistency before releasing. Non-fatal if selfdoc
     is not installed; fatal if it is installed and the check fails.
     When project_dir is set (monorepo mode), checks are resolved relative to it.
-    When docs_excluded is True (the "docs" target is in the release file's
-    exclude list), the check is skipped automatically.
     """
-    if docs_excluded or flags.get("dry-run"):
-        if docs_excluded:
-            print("Skipping selfdoc check (docs excluded in release file)")
+    if flags.get("dry-run"):
         return True
 
     check_dir = project_dir if project_dir else "."
@@ -667,9 +659,6 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
                     )
                     sys.exit(1)
 
-    # Infer docs skip from the release file's exclude list
-    docs_excluded = "docs" in release_config.exclude
-
     bump_arg = release_config.bump
     args = [bump_arg]
 
@@ -932,10 +921,10 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
     _run_strictcli_schema_dump(flags, log, project_dir=project_dir)
 
     # Regenerate selfdoc pages so the subsequent check validates fresh content
-    _run_selfdoc_gen(flags, project_dir=project_dir, docs_excluded=docs_excluded)
+    _run_selfdoc_gen(flags, project_dir=project_dir)
 
     # Built-in selfdoc check (before tests so doc issues surface early)
-    _run_selfdoc_check(flags, project_dir=project_dir, docs_excluded=docs_excluded)
+    _run_selfdoc_check(flags, project_dir=project_dir)
 
     # Check if the pre-release hook has been customized. When it has,
     # skip built-in tests and lint -- the hook is expected to handle them.
