@@ -1,0 +1,1 @@
+{"commits":["8d2dd07510e0688cb687e778354196c76c0441fe"],"user_facing":true,"description":"**Refactor.** SwiftAppleTarget now inherits from SwiftTarget, eliminating 9 duplicated methods.","type":"feature"}
