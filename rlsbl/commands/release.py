@@ -1,5 +1,6 @@
 """Release command: bumps version, validates changelog, runs hooks, regenerates selfdoc, syncs lockfiles, tags, pushes, and creates a GitHub Release."""
 
+import hashlib
 import json
 import os
 import shutil
@@ -15,7 +16,8 @@ from ..changelog import (
     get_changes_dir,
     validate_unreleased,
 )
-from ..config import get_publish_config, read_deploy_config, read_json_config, should_tag, validate_publish_config
+from ..config import read_deploy_config, read_json_config, should_tag
+from ..pipelines import load_pipelines
 from ..deploy import deploy_target
 from ..lock import acquire_lock, release_lock
 from ..targets import TARGETS, detect_targets, _parse_target_entry
@@ -41,6 +43,73 @@ from ..utils import (
 )
 
 VALID_BUMP_TYPES = ("patch", "minor", "major")
+
+
+def _compute_content_hash(content):
+    """SHA-256 of content with trailing whitespace stripped."""
+    return hashlib.sha256(content.rstrip().encode("utf-8")).hexdigest()
+
+
+# Lazily computed on first access via _get_pre_release_template_hashes().
+_PRE_RELEASE_TEMPLATE_HASHES = None
+
+
+def _get_pre_release_template_hashes():
+    """Return a frozenset of content hashes for known scaffold template versions of pre-release.sh.
+
+    Currently there is only one version (the template has never changed),
+    but using a set follows the same pattern as hook_hashes.py, making it
+    easy to add historical versions later.
+    """
+    global _PRE_RELEASE_TEMPLATE_HASHES
+    if _PRE_RELEASE_TEMPLATE_HASHES is not None:
+        return _PRE_RELEASE_TEMPLATE_HASHES
+
+    template_path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)),
+        "templates", "shared", "hooks", "pre-release.sh.tpl",
+    )
+    with open(template_path, "r", encoding="utf-8") as f:
+        template_content = f.read()
+
+    # V1: original scaffold template (before the comment was updated to
+    # describe the override behavior).
+    _V1 = (
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        "# Project-specific pre-release checks.\n"
+        "# Built-in checks (tests, lint) run automatically before this hook.\n"
+        "# Add custom validation here, e.g.:\n"
+        "#   - Check for uncommitted documentation\n"
+        "#   - Verify external service connectivity\n"
+        "#   - Run integration tests not covered by the test suite\n"
+    )
+
+    _PRE_RELEASE_TEMPLATE_HASHES = frozenset({
+        _compute_content_hash(template_content),
+        _compute_content_hash(_V1),
+    })
+    return _PRE_RELEASE_TEMPLATE_HASHES
+
+
+def _is_hook_effectively_empty(hook_path):
+    """Check if a pre-release hook file is effectively empty (matches scaffold template).
+
+    Returns True (hook is boilerplate / not customized) when:
+    - The hook file does not exist
+    - The hook file's content hash matches a known scaffold template version
+
+    Returns False (hook has been customized) when:
+    - The hook exists and its content does not match any known template version
+    """
+    if not os.path.exists(hook_path):
+        return True
+
+    with open(hook_path, "r", encoding="utf-8") as f:
+        hook_content = f.read()
+
+    hook_hash = _compute_content_hash(hook_content)
+    return hook_hash in _get_pre_release_template_hashes()
 
 
 def _rel_to_git_root(path, git_root):
@@ -591,31 +660,21 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
         )
         sys.exit(1)
 
-    # Private repos must not have any target with publish.<target>.local = true
+    # Private repos must not have any pipeline with local = true
     if config["private"]:
-        publish = config.get("publish", {})
-        if isinstance(publish, dict):
-            for target_name, target_cfg in publish.items():
-                if isinstance(target_cfg, dict) and target_cfg.get("local"):
+        pipelines_cfg = config.get("pipelines", {})
+        if isinstance(pipelines_cfg, dict):
+            for pipeline_name, pipeline_cfg in pipelines_cfg.items():
+                if isinstance(pipeline_cfg, dict) and pipeline_cfg.get("local"):
                     print(
-                        f"Error: private repo cannot publish to public registries.",
+                        "Error: private repo cannot publish to public registries.",
                         file=sys.stderr,
                     )
                     print(
-                        f'Remove publish.{target_name}.local or set "private": false.',
+                        f'Remove pipelines.{pipeline_name}.local or set "private": false.',
                         file=sys.stderr,
                     )
                     sys.exit(1)
-
-    # Validate publish config for each target
-    publish = config.get("publish", {})
-    if isinstance(publish, dict):
-        for target_name in publish:
-            try:
-                validate_publish_config(config, target_name)
-            except ValueError as e:
-                print(f"Error: {e}", file=sys.stderr)
-                sys.exit(1)
 
     env_file = config.get("env_file")
     if env_file:
@@ -840,11 +899,22 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
     # Built-in selfdoc check (before tests so doc issues surface early)
     _run_selfdoc_check(flags, project_dir=project_dir, docs_excluded=docs_excluded)
 
-    # Built-in test runner
-    _run_builtin_tests(registry, flags, project_dir=project_dir, ctx=ctx)
+    # Check if the pre-release hook has been customized. When it has,
+    # skip built-in tests and lint -- the hook is expected to handle them.
+    pre_release_script = os.path.join(project_dir, ".rlsbl", "hooks", "pre-release.sh")
+    hook_is_customized = not _is_hook_effectively_empty(pre_release_script)
 
-    # Built-in lint runner
-    _run_builtin_lint(flags, is_library=is_library, project_dir=project_dir)
+    # Built-in test runner (skipped when pre-release hook is customized)
+    if hook_is_customized:
+        log("Skipping built-in tests (pre-release hook handles testing)")
+    else:
+        _run_builtin_tests(registry, flags, project_dir=project_dir, ctx=ctx)
+
+    # Built-in lint runner (skipped when pre-release hook is customized)
+    if hook_is_customized:
+        log("Skipping built-in lint (pre-release hook handles linting)")
+    else:
+        _run_builtin_lint(flags, is_library=is_library, project_dir=project_dir)
 
     # Run pre-release hook if present
     pre_release_script = os.path.join(project_dir, ".rlsbl", "hooks", "pre-release.sh")
