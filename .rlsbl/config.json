@@ -7,7 +7,20 @@
   },
   "targets": [
     "npm",
-    "pypi",
-    "docs"
-  ]
+    "pypi"
+  ],
+  "pipelines": {
+    "npm": {
+      "type": "npm",
+      "local": false
+    },
+    "pypi": {
+      "type": "pypi",
+      "local": false
+    },
+    "docs-deploy": {
+      "type": "cloudflare-pages",
+      "local": true
+    }
+  }
 }
