@@ -266,9 +266,10 @@ class TestReleaseAbortCleanup:
         real_run = subprocess.run
 
         def fake_run(cmd, *args, **kwargs):
-            if isinstance(cmd, (list, tuple)) and len(cmd) >= 2 and cmd[0] == "selfdoc" and cmd[1] == "check":
-                # Mimic a failing `selfdoc check` with check=True.
-                raise subprocess.CalledProcessError(returncode=1, cmd=list(cmd))
+            if isinstance(cmd, (list, tuple)) and len(cmd) >= 1 and cmd[0] == "selfdoc":
+                if len(cmd) >= 2 and cmd[1] == "check":
+                    raise subprocess.CalledProcessError(returncode=1, cmd=list(cmd))
+                return subprocess.CompletedProcess(cmd, 0)
             return real_run(cmd, *args, **kwargs)
 
         with (
