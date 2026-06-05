@@ -1,0 +1,8 @@
+# Version bump type: patch, minor, or major
+bump = ""
+# Short description of this release (required)
+description = ""
+# Optional context explaining why these changes were made
+context = ""
+include = ["npm", "pypi"]
+exclude = []
