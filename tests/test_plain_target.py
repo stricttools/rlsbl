@@ -67,6 +67,16 @@ class TestPlainTargetDetect:
                 f.write("# Hello\n")
             assert target.detect(d) is False
 
+    def test_detect_false_with_selfdoc_json(self):
+        """VERSION + selfdoc.json means docs target, not plain."""
+        target = PlainTarget()
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "VERSION"), "w") as f:
+                f.write("1.0.0\n")
+            with open(os.path.join(d, "selfdoc.json"), "w") as f:
+                f.write("{}")
+            assert target.detect(d) is False
+
     def test_detect_true_version_with_unrelated_files(self):
         """VERSION exists with non-manifest files -- should detect."""
         target = PlainTarget()
