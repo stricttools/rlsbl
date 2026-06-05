@@ -1,0 +1,8 @@
+# Version bump type: patch, minor, or major
+bump = "minor"
+# Short description of this release (required)
+description = "Capability-gated publish/build_assets, Swift inheritance cleanup, version_file dir_path, and bug fixes."
+# Optional context explaining why these changes were made
+context = "Breaking: BaseTarget.build_assets() returns [] instead of raising NotImplementedError. publish() and build_assets() calls are now gated on target.capabilities. SwiftAppleTarget inherits from SwiftTarget. version_file() accepts optional dir_path for dynamic filename resolution. Plain exclusion list fixed. Flutter table cells corrected."
+include = ["npm", "pypi", "docs"]
+exclude = []
