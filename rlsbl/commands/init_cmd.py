@@ -11,6 +11,7 @@ import tempfile
 from ..action_versions import format_action, UnknownActionError
 from ..config import read_deploy_config, should_tag, write_project_config
 from ..lock import acquire_lock, release_lock
+from ..pipelines import PIPELINE_TYPES, load_pipelines
 from ..targets import TARGETS, detect_targets
 from ..tagging import ensure_tags
 from ..utils import commit_files, is_private_repo
@@ -866,11 +867,6 @@ def _resolve_private(flags, ctx):
     return False
 
 
-def _filter_mappings_for_private(mappings):
-    """Remove publish template mappings (private repos don't publish to registries)."""
-    return [m for m in mappings if "publish" not in m["template"]]
-
-
 def _append_deploy_workflow_if_configured(mappings, config):
     """Add deploy workflow template to mappings if deploy config exists."""
     deploy_targets, _ = read_deploy_config(config)
@@ -893,6 +889,41 @@ def _print_private_summary():
     print('  Python: uv pip install "pkg @ git+ssh://git@github.com/owner/repo@vX.Y.Z"')
     print("  npm:    npm install git+ssh://git@github.com/owner/repo#vX.Y.Z")
     print("  Go:     go get github.com/owner/repo@vX.Y.Z")
+
+
+def _ensure_pipeline_config(registries, ctx):
+    """Generate default pipeline config for detected targets if not already present.
+
+    For each detected target whose name matches a PIPELINE_TYPES key,
+    creates a pipeline entry with name=target_name, type=target_name, local=false.
+    If multiple targets share the same pipeline type, errors with a message
+    telling the user to name pipelines manually.
+
+    Writes the generated pipeline entries to config.json under the "pipelines" key.
+    Skips if "pipelines" already exists in config.
+    """
+    if "pipelines" in ctx.config:
+        return
+
+    pipelines = {}
+    seen_types = {}
+    for target_name in registries:
+        if target_name in PIPELINE_TYPES:
+            if target_name in seen_types:
+                print(
+                    f"Error: multiple targets use the same pipeline type '{target_name}'. "
+                    f"Configure pipelines manually in .rlsbl/config.json.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            seen_types[target_name] = True
+            pipelines[target_name] = {
+                "type": target_name,
+                "local": False,
+            }
+
+    if pipelines:
+        ctx.config = write_project_config("pipelines", pipelines, ctx.project_root)
 
 
 def _trigger_monorepo_sync(no_commit=False):
@@ -957,6 +988,10 @@ def run_cmd(registry, args, flags, ctx):
         if not dry_run:
             ctx.config = write_project_config("private", private, project_root)
 
+        # Generate default pipeline config if not present
+        if not dry_run and not private:
+            _ensure_pipeline_config([registry], ctx)
+
         # Gather template variables
         vars_dict = reg.template_vars(".", ctx)
         from datetime import datetime
@@ -966,15 +1001,25 @@ def run_cmd(registry, args, flags, ctx):
 
         existing_hashes = load_hashes()
 
-        # Process registry-specific templates
+        # Process registry-specific templates (CI only, no publish)
         reg_mappings = reg.template_mappings(ctx)
-        if private:
-            reg_mappings = _filter_mappings_for_private(reg_mappings)
 
         reg_plans = plan_mappings(
             reg.template_dir(), reg_mappings, vars_dict, force,
             required_vars={"name", "registryUrl"},
         )
+
+        # Process pipeline publish templates (skip for private repos)
+        pipeline_plans = []
+        if not private:
+            pipelines = load_pipelines(ctx.config)
+            for pipeline in pipelines.values():
+                p_mappings = pipeline.template_mappings(ctx)
+                p_dir = pipeline.template_dir()
+                if p_mappings and p_dir:
+                    pipeline_plans.extend(plan_mappings(
+                        p_dir, p_mappings, vars_dict, force,
+                    ))
 
         shared_plans = []
         if not flags.get("skip-shared"):
@@ -993,16 +1038,17 @@ def run_cmd(registry, args, flags, ctx):
             )
 
         if dry_run:
-            _print_dry_run_report([reg_plans, shared_plans], registry=registry,
-                                   registries=[registry])
+            _print_dry_run_report([reg_plans, pipeline_plans, shared_plans],
+                                   registry=registry, registries=[registry])
             return
 
         reg_created, reg_skipped, reg_warnings, reg_hashes = apply_plans(reg_plans)
+        pipe_created, pipe_skipped, pipe_warnings, pipe_hashes = apply_plans(pipeline_plans)
         shared_created, shared_skipped, shared_warnings, shared_hashes = apply_plans(shared_plans)
 
-        created = reg_created + shared_created
-        skipped = reg_skipped + shared_skipped
-        warnings = reg_warnings + shared_warnings
+        created = reg_created + pipe_created + shared_created
+        skipped = reg_skipped + pipe_skipped + shared_skipped
+        warnings = reg_warnings + pipe_warnings + shared_warnings
 
         # Warn if Go project has main in cmd/ but not at root
         if registry == "go":
@@ -1015,7 +1061,7 @@ def run_cmd(registry, args, flags, ctx):
                 )
 
         _finalize_scaffold(
-            existing_hashes, [reg_hashes, shared_hashes],
+            existing_hashes, [reg_hashes, pipe_hashes, shared_hashes],
             created, skipped, warnings, registry=registry,
             flags=flags, registries=[registry],
             npm_lockfile_missing=npm_lockfile_missing,
@@ -1524,6 +1570,10 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         if not dry_run:
             ctx.config = write_project_config("private", private, project_root)
 
+        # Generate default pipeline config if not present
+        if not dry_run and not private:
+            _ensure_pipeline_config(registries_list, ctx)
+
         print(f"Multiple registries detected: {', '.join(registries_list)}")
         if private:
             print("Scaffolding for private repository (no publish workflow).")
@@ -1536,8 +1586,8 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         force = flags.get("force", False)
         existing_hashes = load_hashes()
 
-        # Process primary registry CI template only (publish will come from merged)
-        ci_mappings = [m for m in reg.template_mappings(ctx) if "publish" not in m["template"]]
+        # Process primary registry CI templates (targets no longer return publish)
+        ci_mappings = reg.template_mappings(ctx)
         ci_plans = plan_mappings(
             reg.template_dir(), ci_mappings, vars_dict, force,
             required_vars={"name", "registryUrl"},
@@ -1564,6 +1614,7 @@ def run_cmd_multi(registries_list, args, flags, ctx):
                 ))
 
         # Plan the merged publish workflow (skip for private repos)
+        # Read publish templates from pipeline types instead of targets
         merged_plans = []
         if not private:
             publish_target = os.path.join(".github", "workflows", "publish.yml")
