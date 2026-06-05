@@ -107,14 +107,14 @@ class TestSpecificTargets:
         assert "{path}" in value
         assert "v{version}" in value
 
-    def test_flutter_detection_files_is_dash(self):
-        """Flutter targets have empty detection_files, rendered as '---'."""
+    def test_flutter_detection_files(self):
+        """Flutter targets show pubspec.yaml (flutter) as detection method."""
         _, rows = generate_target_table_data()
         by_name = _rows_by_name(rows)
         headers = EXPECTED_HEADERS
         df_idx = headers.index("Detection files")
-        assert by_name["flutter-ios"][df_idx] == "---"
-        assert by_name["flutter-android"][df_idx] == "---"
+        assert by_name["flutter-ios"][df_idx] == "pubspec.yaml (flutter)"
+        assert by_name["flutter-android"][df_idx] == "pubspec.yaml (flutter)"
 
     def test_flutter_monorepo_tag_format(self):
         """Flutter targets use name-based monorepo tag formats with platform suffix."""
