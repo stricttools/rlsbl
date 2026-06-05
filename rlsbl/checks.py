@@ -100,9 +100,20 @@ CHECK_EXCLUDED_TARGETS: dict[str, dict[str, str]] = {
     "circular-deps": {"go": "compiler rejects circular imports"},
 }
 
-# Canonical column order for the feature matrix, derived from TARGETS
-# so both the matrix and the target table share the same source of truth.
-MATRIX_COLUMNS: tuple[str, ...] = tuple(sorted(TARGETS.keys()))
+# Canonical column order for the feature matrix.  The order is the
+# original display order the feature matrix has always used.  The
+# assertion guarantees completeness: if a 19th target is added but not
+# listed here, startup fails loudly.
+MATRIX_COLUMNS: tuple[str, ...] = (
+    "pypi", "go", "npm", "dart", "cargo", "deno", "hex", "zig",
+    "swift", "swift-apple", "maven", "docker", "flutter-ios",
+    "flutter-android", "pgdesign", "plain", "docs", "spec",
+)
+assert set(MATRIX_COLUMNS) == set(TARGETS.keys()), (
+    f"MATRIX_COLUMNS is out of sync with TARGETS: "
+    f"missing={set(TARGETS.keys()) - set(MATRIX_COLUMNS)}, "
+    f"extra={set(MATRIX_COLUMNS) - set(TARGETS.keys())}"
+)
 
 
 def get_feature_matrix() -> dict[str, dict[str, str]]:
