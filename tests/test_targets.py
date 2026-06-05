@@ -615,6 +615,24 @@ class TestDenoTarget:
         captured = capsys.readouterr()
         assert "Skipping local Deno publish (no DENO_TOKEN/JSR_TOKEN)" in captured.out
 
+    def test_version_file_default(self):
+        """version_file() with no args returns 'deno.json'."""
+        assert DenoTarget().version_file() == "deno.json"
+
+    def test_version_file_json_project(self, tmp_path):
+        """version_file(dir_path) returns 'deno.json' when deno.json exists."""
+        (tmp_path / "deno.json").write_text('{"version": "1.0.0"}')
+        assert DenoTarget().version_file(str(tmp_path)) == "deno.json"
+
+    def test_version_file_jsonc_project(self, tmp_path):
+        """version_file(dir_path) returns 'deno.jsonc' when only deno.jsonc exists."""
+        (tmp_path / "deno.jsonc").write_text('// config\n{"version": "1.0.0"}')
+        assert DenoTarget().version_file(str(tmp_path)) == "deno.jsonc"
+
+    def test_version_file_no_file(self, tmp_path):
+        """version_file(dir_path) falls back to 'deno.json' when no config file exists."""
+        assert DenoTarget().version_file(str(tmp_path)) == "deno.json"
+
 
 class TestCargoTarget:
     def test_protocol_conformance(self):
