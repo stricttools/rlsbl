@@ -1079,58 +1079,65 @@ def _print_stale_dep_advisory(monorepo_name, new_version, monorepo_root=None):
 
 
 def upload_release_assets(tag, new_version, log, flags, *, ctx):
-    """Build and upload release assets for targets with ``publish.<target>.assets: true``.
+    """Build and upload release assets for pipelines with ``assets: true`` or ``custom_assets``.
 
-    For each detected target that has assets enabled in its publish config:
-    1. Create a dist directory under ``.rlsbl/dist/<target>/``
-    2. Call ``target.build_assets()`` to build artifacts
+    For each pipeline that has assets enabled:
+    1. Create a dist directory under ``.rlsbl/dist/<pipeline_name>/``
+    2. Call ``pipeline.build_assets()`` and/or ``pipeline.build_custom_assets()``
     3. Check each artifact against ``max_asset_size_mb``
     4. Upload via ``gh release upload``
     5. Clean up the dist directory
 
-    Skips silently if no targets have assets enabled.
-    Skips targets that lack the ``build_assets`` capability.
+    Skips silently if no pipelines have assets enabled.
 
     ctx: ProjectContext carrying project_root, monorepo_root, and config.
     """
     project_dir = str(ctx.project_root)
-    entries = detect_targets(project_dir)
     config = ctx.config
 
-    targets_with_assets = []
-    for entry in entries:
-        pub_cfg = config.get("publish", {})
-        if isinstance(pub_cfg, dict):
-            target_pub = pub_cfg.get(entry.name, {})
-            if isinstance(target_pub, dict) and target_pub.get("assets"):
-                targets_with_assets.append(entry)
+    pipelines_cfg = config.get("pipelines", {})
+    if not isinstance(pipelines_cfg, dict):
+        return
 
-    if not targets_with_assets:
+    # Find pipelines with assets or custom_assets
+    pipelines_with_assets = {}
+    for name, entry in pipelines_cfg.items():
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("assets") or entry.get("custom_assets"):
+            pipelines_with_assets[name] = entry
+
+    if not pipelines_with_assets:
         return
 
     dry_run = flags.get("dry-run", False)
 
-    for entry in targets_with_assets:
-        target_obj = TARGETS.get(entry.name)
-        if target_obj is None:
+    # Load pipeline instances for asset building
+    all_pipelines = load_pipelines(config)
+
+    for name, entry in pipelines_with_assets.items():
+        pipeline = all_pipelines.get(name)
+        if pipeline is None:
             continue
 
-        pub_cfg = get_publish_config(entry.name, ctx.config)
-        max_size_mb = pub_cfg.get("max_asset_size_mb")
-
-        dist_dir = os.path.join(project_dir, ".rlsbl", "dist", entry.name)
+        max_size_mb = entry.get("max_asset_size_mb")
+        dist_dir = os.path.join(project_dir, ".rlsbl", "dist", name)
 
         if dry_run:
-            log(f"Would build and upload assets for target '{entry.name}' to release {tag}")
+            log(f"Would build and upload assets for pipeline '{name}' to release {tag}")
             continue
 
-        # Build assets
-        if "build_assets" not in target_obj.capabilities:
-            continue
-        artifacts = target_obj.build_assets(entry.path, new_version, dist_dir, ctx=ctx)
+        # Build standard assets
+        artifacts = []
+        if entry.get("assets"):
+            artifacts.extend(pipeline.build_assets(project_dir, new_version, dist_dir, ctx))
+
+        # Build custom assets
+        if entry.get("custom_assets"):
+            artifacts.extend(pipeline.build_custom_assets(dist_dir))
 
         if not artifacts:
-            log(f"No artifacts produced for target '{entry.name}', skipping upload.")
+            log(f"No artifacts produced for pipeline '{name}', skipping upload.")
             continue
 
         # Size check
@@ -1146,7 +1153,7 @@ def upload_release_assets(tag, new_version, log, flags, *, ctx):
                     actual_mb = file_size / (1024 * 1024)
                     print(
                         f"Error: artifact '{file_name}' is {actual_mb:.1f}MB, "
-                        f"exceeds max_asset_size_mb ({max_size_mb}MB) for target '{entry.name}'.",
+                        f"exceeds max_asset_size_mb ({max_size_mb}MB) for pipeline '{name}'.",
                         file=sys.stderr,
                     )
                     # Clean up dist before aborting
@@ -1157,9 +1164,9 @@ def upload_release_assets(tag, new_version, log, flags, *, ctx):
         # Upload
         try:
             run("gh", ["release", "upload", tag] + artifacts + ["--clobber"])
-            log(f"Uploaded {len(artifacts)} asset(s) for target '{entry.name}'")
+            log(f"Uploaded {len(artifacts)} asset(s) for pipeline '{name}'")
         except Exception as e:
-            print(f"Warning: asset upload failed for target '{entry.name}': {e}", file=sys.stderr)
+            print(f"Warning: asset upload failed for pipeline '{name}': {e}", file=sys.stderr)
 
         # Clean up dist directory
         if os.path.isdir(dist_dir):
@@ -1544,19 +1551,51 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
             if os.path.exists(tmp):
                 os.unlink(tmp)
 
-    # Upload release assets for targets with publish.<target>.assets: true
+    # Upload release assets for pipelines with assets/custom_assets config
     upload_release_assets(tag, new_version, log, flags, ctx=ctx)
+
+    # Three-state pipeline config cascade
+    release_config = ctx.config
+    if release_config.get("publish") is not None:
+        print(
+            "Error: the 'publish' key in .rlsbl/config.json is no longer recognized. "
+            "Use 'pipelines' instead.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if release_config.get("pipelines") is None:
+        print(
+            "Error: no 'pipelines' key in .rlsbl/config.json. "
+            "Add a pipelines section or run 'rlsbl scaffold'.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    # Load pipelines and validate env vars for local pipelines
+    release_pipelines = load_pipelines(release_config)
+    missing_vars = []
+    for pl_name, pl in release_pipelines.items():
+        if pl.local:
+            for var in pl.required_env_vars():
+                if var not in os.environ:
+                    missing_vars.append(f"  pipeline '{pl_name}' requires {var}")
+    if missing_vars:
+        print("Error: missing environment variables for local pipelines:", file=sys.stderr)
+        for line in missing_vars:
+            print(line, file=sys.stderr)
+        sys.exit(1)
 
     # Publish step: skip for private repos (they don't publish to registries)
     is_private = ctx.config.get("private", False)
     if not is_private:
-        if "publish" in target.capabilities:
+        # Pipeline dispatch: run publish for each pipeline (runs once per release, not per-target)
+        for pl_name, pl in release_pipelines.items():
             try:
-                target.publish(primary_path, new_version, ctx=ctx)
+                pl.publish(primary_path, new_version, ctx=ctx)
             except Exception as e:
-                print(f"Warning: target publish step failed: {e}", file=sys.stderr)
+                print(f"Warning: pipeline '{pl_name}' publish failed: {e}", file=sys.stderr)
 
-        # Multi-target: run build/publish for secondary targets resolved earlier
+        # Multi-target: run build for secondary targets (build stays on targets, not pipelines)
         if secondary_targets:
             from ..targets import TARGETS as ALL_TARGETS
             for sec_name in sorted(secondary_targets):
@@ -1568,11 +1607,6 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                     sec_target.build(sec_path, new_version)
                 except Exception as e:
                     print(f"Warning: {sec_name} target build failed: {e}", file=sys.stderr)
-                if "publish" in sec_target.capabilities:
-                    try:
-                        sec_target.publish(sec_path, new_version, ctx=ctx)
-                    except Exception as e:
-                        print(f"Warning: {sec_name} target publish failed: {e}", file=sys.stderr)
 
     # Deploy phase (after publish, before post-release hook)
     deploy_targets, deploy_errors = read_deploy_config(ctx.config)
