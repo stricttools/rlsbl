@@ -3,3 +3,4 @@
 {"commits":["f4853151ef4dd6d857e46726f3bc03c54460dd4c"],"user_facing":false}
 {"commits":["410ac82fcbc3c1938bbd882ceeace09cd83f333f"],"user_facing":true,"description":"**Breaking.** `BaseTarget.build_assets()` returns an empty list instead of raising `NotImplementedError`. Custom targets that relied on the exception should declare `build_assets` in their capabilities frozenset.","type":"breaking"}
 {"commits":["be8dcdb413dfc5ba2511a3e38b208f864f8c43ac","c30f891cb701351bb82d42e6c04e192a25fb61a6"],"user_facing":true,"description":"**New feature.** `version_file()` now accepts an optional `dir_path` parameter. DenoTarget uses it to resolve `deno.json` vs `deno.jsonc` dynamically.","type":"feature"}
+{"commits":["2b222902195c3e8c4d2bbd7a10fa353c7c4fd611"],"user_facing":true,"description":"**Fix.** Release confirmation prompt now shows the correct version filename for Deno projects using `deno.jsonc`.","type":"fix"}
