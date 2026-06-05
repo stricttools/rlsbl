@@ -61,8 +61,14 @@ EXPECTED_CHECKS = [
     "deps-dev-in-lib",
     "dead-modules",
     "scaffold-unreplaced-vars",
+    "scaffold-conflict-markers",
     "dead-workspace-packages",
     "circular-deps",
+    # Phase 12 project checks
+    "private-publish-workflow",
+    "npm-private-mismatch",
+    "target-version-readable",
+    "selfdoc-version-drift",
 ]
 
 

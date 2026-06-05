@@ -92,6 +92,12 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "library-lint": frozenset({"pypi", "go", "npm"}),
     # --- quality tag (universal) ---
     "scaffold-unreplaced-vars": None,
+    "scaffold-conflict-markers": None,
+    # --- phase 12 project checks ---
+    "private-publish-workflow": None,
+    "npm-private-mismatch": frozenset({"npm"}),
+    "target-version-readable": None,
+    "selfdoc-version-drift": None,
 }
 
 # Excluded targets: checks where a target is deliberately excluded because
@@ -1493,3 +1499,190 @@ def register_checks(app):
                 details=errors,
             )
         return CheckResult("pass", "no unreplaced template variables")
+
+    # ------------------------------------------------------------------
+    # Scaffold conflict markers
+    # ------------------------------------------------------------------
+
+    @app.check("scaffold-conflict-markers")
+    def check_scaffold_conflict_markers(ctx):
+        """Scaffold and workflow files must not contain git merge conflict markers."""
+        import glob
+
+        root_str = str(ctx.project_root)
+
+        scan_patterns = [
+            os.path.join(root_str, ".rlsbl", "**", "*"),
+            os.path.join(root_str, ".github", "workflows", "*.yml"),
+        ]
+
+        conflict_markers = ("<<<<<<< ", "=======", ">>>>>>> ")
+        errors = []
+
+        for pattern in scan_patterns:
+            for filepath in glob.glob(pattern, recursive=True):
+                if not os.path.isfile(filepath):
+                    continue
+                rel_path = os.path.relpath(filepath, root_str)
+                try:
+                    with open(filepath, "r", encoding="utf-8") as f:
+                        for lineno, line in enumerate(f, 1):
+                            for marker in conflict_markers:
+                                if line.startswith(marker):
+                                    errors.append(
+                                        f"{rel_path}:{lineno}: conflict marker '{marker.strip()}'"
+                                    )
+                except (OSError, UnicodeDecodeError):
+                    continue
+
+        if errors:
+            return CheckResult(
+                "fail",
+                f"{len(errors)} conflict marker(s) found",
+                details=errors,
+            )
+        return CheckResult("pass", "no conflict markers")
+
+    # ------------------------------------------------------------------
+    # Private publish workflow
+    # ------------------------------------------------------------------
+
+    @app.check("private-publish-workflow")
+    def check_private_publish_workflow(ctx):
+        """Private repos must not have publish workflows."""
+        if not ctx.config.get("private"):
+            return CheckResult("pass", "not a private repo")
+
+        import glob
+
+        root_str = str(ctx.project_root)
+        wf_dir = os.path.join(root_str, ".github", "workflows")
+        if not os.path.isdir(wf_dir):
+            return CheckResult("pass", "no .github/workflows/ directory")
+
+        publish_files = []
+        for filepath in glob.glob(os.path.join(wf_dir, "*.yml")):
+            basename = os.path.basename(filepath)
+            if "publish" in basename.lower():
+                publish_files.append(basename)
+                continue
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    content = f.read()
+                if "release:" in content and "published" in content:
+                    publish_files.append(basename)
+            except (OSError, UnicodeDecodeError):
+                continue
+
+        if publish_files:
+            return CheckResult(
+                "fail",
+                f"private repo has publish workflow(s): {', '.join(sorted(publish_files))}",
+            )
+        return CheckResult("pass", "no publish workflows in private repo")
+
+    # ------------------------------------------------------------------
+    # npm private mismatch
+    # ------------------------------------------------------------------
+
+    @app.check("npm-private-mismatch")
+    def check_npm_private_mismatch(ctx):
+        """package.json private:true must not contradict config private:false."""
+        root_str = str(ctx.project_root)
+        pkg_path = os.path.join(root_str, "package.json")
+        if not os.path.exists(pkg_path):
+            return CheckResult("skip", "no package.json")
+
+        try:
+            with open(pkg_path, "r", encoding="utf-8") as f:
+                pkg = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            return CheckResult("skip", "cannot read package.json")
+
+        npm_private = pkg.get("private", False)
+        config_private = ctx.config.get("private")
+
+        if npm_private is True and config_private is False:
+            return CheckResult(
+                "fail",
+                'package.json has "private": true but .rlsbl/config.json has "private": false',
+            )
+        return CheckResult("pass", "npm private flag consistent with config")
+
+    # ------------------------------------------------------------------
+    # Target version readable
+    # ------------------------------------------------------------------
+
+    @app.check("target-version-readable")
+    def check_target_version_readable(ctx):
+        """Every detected target must be able to read its version without error."""
+        from .targets import TARGETS, detect_targets
+
+        target_entries = detect_targets(str(ctx.project_root))
+        if not target_entries:
+            return CheckResult("skip", "no targets detected")
+
+        errors = []
+        for name, path in target_entries:
+            target = TARGETS[name]
+            try:
+                target.read_version(path)
+            except Exception as exc:
+                errors.append(f"{name}: {exc}")
+
+        if errors:
+            return CheckResult(
+                "fail",
+                f"{len(errors)} target(s) cannot read version",
+                details=errors,
+            )
+        return CheckResult(
+            "pass",
+            f"all {len(target_entries)} target(s) version readable",
+        )
+
+    # ------------------------------------------------------------------
+    # Selfdoc version drift
+    # ------------------------------------------------------------------
+
+    @app.check("selfdoc-version-drift")
+    def check_selfdoc_version_drift(ctx):
+        """selfdoc.json version must match the primary target's version."""
+        root_str = str(ctx.project_root)
+        selfdoc_path = os.path.join(root_str, "selfdoc.json")
+        if not os.path.exists(selfdoc_path):
+            return CheckResult("skip", "no selfdoc.json")
+
+        try:
+            with open(selfdoc_path, "r", encoding="utf-8") as f:
+                selfdoc_data = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            return CheckResult("skip", "cannot read selfdoc.json")
+
+        selfdoc_version = selfdoc_data.get("version")
+        if selfdoc_version is None:
+            return CheckResult("skip", "selfdoc.json has no version field")
+
+        from .targets import TARGETS, detect_targets
+
+        target_entries = detect_targets(root_str)
+        if not target_entries:
+            return CheckResult("skip", "no targets detected")
+
+        first_name, first_path = target_entries[0]
+        target = TARGETS[first_name]
+        try:
+            primary_version = target.read_version(first_path)
+        except Exception:
+            return CheckResult("skip", "cannot read primary target version")
+
+        if primary_version is None:
+            return CheckResult("skip", "primary target reports no version")
+
+        if selfdoc_version != primary_version:
+            return CheckResult(
+                "fail",
+                f"selfdoc.json version ({selfdoc_version}) != "
+                f"primary target {first_name} version ({primary_version})",
+            )
+        return CheckResult("pass", f"selfdoc.json version matches ({selfdoc_version})")
