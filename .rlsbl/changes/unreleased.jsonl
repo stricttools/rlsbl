@@ -7,5 +7,6 @@
 {"commits":["85ec564f3f39eff9b524a152fa6325c0711df808"],"user_facing":true,"description":"**Fix.** PlainTarget no longer auto-detects alongside the docs target when both `VERSION` and `selfdoc.json` are present.","type":"fix"}
 {"commits":["39046d28ff0a48a60f30c343df761d6e762871de"],"user_facing":true,"description":"**Fix.** Flutter targets now show `pubspec.yaml (flutter)` in the target table instead of `---` for detection files.","type":"fix"}
 {"commits":["75b0b6baa80e8fc93169b100c33267bec809c5a2"],"user_facing":false}
-{"commits":["535a50d2f3b285f237ed904b896e04d636207de6","5651634e3a4089e8c301d17f408c706e9080f9b9","c8956f1aab70c86b6da047775188e39f6d2c3bb1","ce20c31510f7fba94e6e4a1113a5f043fef380cb","7560d84e6219688de394996610612967b099b144","112f69823020b29ec012586fee9c1863b9432cb8"],"user_facing":false}
+{"commits":["535a50d2f3b285f237ed904b896e04d636207de6","5651634e3a4089e8c301d17f408c706e9080f9b9","c8956f1aab70c86b6da047775188e39f6d2c3bb1","ce20c31510f7fba94e6e4a1113a5f043fef380cb","7560d84e6219688de394996610612967b099b144"],"user_facing":false}
+{"commits":["112f69823020b29ec012586fee9c1863b9432cb8"],"user_facing":false}
 {"commits":["7ff0b060b946f8eb10cee2e7cbfd1c24cf476676","3d4c5c5ba0e21966d5c8a4a2c72bfce9f100a15d"],"user_facing":false}
