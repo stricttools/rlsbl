@@ -10,8 +10,32 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from ..utils import require_tool, run
 
 
-def _notify(title, body):
-    """Send a desktop notification. Non-fatal if unavailable."""
+def _open_url(url):
+    """Open a URL in the default browser. Non-fatal if unavailable."""
+    try:
+        if sys.platform == "darwin":
+            subprocess.run(["open", url], timeout=5, capture_output=True)
+        else:
+            subprocess.run(["xdg-open", url], timeout=5, capture_output=True)
+    except Exception:
+        pass
+
+
+def _release_url(repo_slug):
+    """Try to find the latest release tag and return its GitHub URL. Returns None on failure."""
+    if not repo_slug:
+        return None
+    try:
+        raw = run("gh", ["release", "list", "--limit", "1", "--json", "tagName", "-q", ".[0].tagName"])
+        if raw:
+            return f"https://github.com/{repo_slug}/releases/tag/{raw}"
+    except Exception:
+        pass
+    return None
+
+
+def _notify(title, body, url=None):
+    """Send a desktop notification and optionally open a URL. Non-fatal if unavailable."""
     try:
         if sys.platform == "darwin":
             # Escape double quotes to prevent AppleScript injection
@@ -29,6 +53,8 @@ def _notify(title, body):
             )
     except Exception:
         pass
+    if url:
+        _open_url(url)
 
 
 def _retry_workflow(workflow_name, branch, repo_slug, label):
@@ -271,10 +297,15 @@ def run_cmd(registry, args, flags):
             failed = len(results) - passed
             if failed:
                 body = f"{passed}/{len(results)} passed, {failed} failed"
-                _notify(f"{label}: CI FAILED", body)
+                failed_run = next((r for r in results if not r["passed"]), None)
+                fail_url = None
+                if failed_run and repo_slug and failed_run.get("run_id"):
+                    fail_url = f"https://github.com/{repo_slug}/actions/runs/{failed_run['run_id']}"
+                _notify(f"{label}: CI FAILED", body, url=fail_url)
             else:
                 body = f"{len(results)}/{len(results)} passed"
-                _notify(f"{label}: CI passed", body)
+                success_url = _release_url(repo_slug)
+                _notify(f"{label}: CI passed", body, url=success_url)
 
             sys.exit(1 if failed else 0)
         except KeyboardInterrupt:
@@ -365,10 +396,19 @@ def run_cmd(registry, args, flags):
         failed = len(results) - passed
         if failed:
             body = f"{passed}/{len(results)} passed, {failed} failed"
-            _notify(f"{label}: CI FAILED", body)
+            failed_run = next((r for r in results if not r["passed"]), None)
+            fail_url = None
+            if failed_run and repo_slug and failed_run.get("run_id"):
+                fail_url = f"https://github.com/{repo_slug}/actions/runs/{failed_run['run_id']}"
+            _notify(f"{label}: CI FAILED", body, url=fail_url)
         else:
             body = f"{len(results)}/{len(results)} passed"
-            _notify(f"{label}: CI passed", body)
+            success_url = None
+            if repo_slug and tag and not tag.startswith(commit_sha[:8]):
+                success_url = f"https://github.com/{repo_slug}/releases/tag/{tag}"
+            else:
+                success_url = _release_url(repo_slug)
+            _notify(f"{label}: CI passed", body, url=success_url)
 
         sys.exit(1 if failed else 0)
     except KeyboardInterrupt:
