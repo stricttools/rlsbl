@@ -267,16 +267,15 @@ def register_checks(app):
         # Include selfdoc.json even when "docs" is not in the explicit
         # targets list, so version drift is always caught.
         detected_names = {name for name, _path in target_entries}
-        if "docs" not in detected_names:
-            import os as _os
-            selfdoc_path = _os.path.join(str(ctx.project_root), "selfdoc.json")
-            if _os.path.exists(selfdoc_path):
-                from .targets.docs import DocsTarget
+        if "selfdoc" not in detected_names:
+            selfdoc_path = os.path.join(str(ctx.project_root), "selfdoc.json")
+            if os.path.exists(selfdoc_path):
                 try:
-                    v = DocsTarget().read_version(str(ctx.project_root))
-                    versions["docs"] = v
-                except Exception:
-                    versions["docs"] = None
+                    with open(selfdoc_path, "r", encoding="utf-8") as f:
+                        selfdoc_data = json.load(f)
+                    versions["selfdoc"] = selfdoc_data.get("version", "0.0.0")
+                except (OSError, json.JSONDecodeError):
+                    versions["selfdoc"] = None
 
         unique = set(v for v in versions.values() if v is not None)
         if len(unique) == 0:
