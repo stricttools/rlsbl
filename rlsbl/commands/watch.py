@@ -31,8 +31,69 @@ def _notify(title, body):
         pass
 
 
+def _retry_workflow(workflow_name, branch, repo_slug, label):
+    """Re-trigger a workflow once and watch the retry run.
+
+    Returns a result dict with name, passed, and run_id.
+    Returns None if the retry could not be triggered or found.
+    """
+    print(f"rlsbl: {label}: [{workflow_name}] CI failed, retrying once...", file=sys.stderr)
+    try:
+        subprocess.run(
+            ["gh", "workflow", "run", workflow_name, "--ref", branch],
+            capture_output=True, text=True, timeout=30, check=True,
+        )
+    except Exception as exc:
+        print(f"rlsbl: {label}: [{workflow_name}] retry trigger failed: {exc}", file=sys.stderr)
+        return None
+
+    # Poll for the new run to appear (up to 30s)
+    retry_run = None
+    for _ in range(15):
+        time.sleep(2)
+        try:
+            raw = run("gh", ["run", "list",
+                             f"--workflow={workflow_name}",
+                             f"--branch={branch}",
+                             "--json", "databaseId,name,status,createdAt",
+                             "--limit", "1"])
+            parsed = json.loads(raw)
+            if parsed:
+                retry_run = parsed[0]
+                break
+        except Exception:
+            pass
+
+    if not retry_run:
+        print(f"rlsbl: {label}: [{workflow_name}] retry run not found after 30s", file=sys.stderr)
+        return None
+
+    retry_id = str(retry_run["databaseId"])
+    print(f"rlsbl: {label}: [{workflow_name}] watching retry run {retry_id}...", file=sys.stderr)
+
+    try:
+        subprocess.run(
+            ["gh", "run", "watch", retry_id, "--exit-status"],
+            capture_output=True, text=True, timeout=3600, check=True,
+        )
+        print(f"rlsbl: {label}: [{workflow_name}] retry passed", file=sys.stderr)
+        return {"name": workflow_name, "passed": True, "run_id": retry_id}
+    except subprocess.CalledProcessError:
+        print(f"rlsbl: {label}: [{workflow_name}] retry also failed", file=sys.stderr)
+        if repo_slug:
+            print(f"rlsbl: https://github.com/{repo_slug}/actions/runs/{retry_id}",
+                  file=sys.stderr)
+        return {"name": workflow_name, "passed": False, "run_id": retry_id}
+    except subprocess.TimeoutExpired:
+        print(f"rlsbl: {label}: [{workflow_name}] retry timed out after 1h", file=sys.stderr)
+        return {"name": workflow_name, "passed": False, "run_id": retry_id}
+    except Exception as exc:
+        print(f"rlsbl: {label}: [{workflow_name}] retry error: {exc}", file=sys.stderr)
+        return {"name": workflow_name, "passed": False, "run_id": retry_id}
+
+
 def _watch_single_run(ci_run, label, repo_slug):
-    """Watch a single CI run. Returns a dict with name, passed, and message."""
+    """Watch a single CI run. Returns a dict with name, passed, and run_id."""
     run_id = str(ci_run["databaseId"])
     workflow_name = ci_run.get("name", f"run {run_id}")
 
@@ -46,22 +107,28 @@ def _watch_single_run(ci_run, label, repo_slug):
         )
         msg = f"rlsbl: {label}: [{workflow_name}] passed"
         print(msg, file=sys.stderr)
-        return {"name": workflow_name, "passed": True}
+        return {"name": workflow_name, "passed": True, "run_id": run_id}
     except subprocess.CalledProcessError:
         msg = f"rlsbl: {label}: [{workflow_name}] FAILED"
         print(msg, file=sys.stderr)
         if repo_slug:
             print(f"rlsbl: https://github.com/{repo_slug}/actions/runs/{run_id}",
                   file=sys.stderr)
-        return {"name": workflow_name, "passed": False}
+        # Auto-retry once before reporting failure
+        branch = ci_run.get("headBranch")
+        if branch and workflow_name:
+            retry_result = _retry_workflow(workflow_name, branch, repo_slug, label)
+            if retry_result is not None:
+                return retry_result
+        return {"name": workflow_name, "passed": False, "run_id": run_id}
     except subprocess.TimeoutExpired:
         msg = f"rlsbl: {label}: [{workflow_name}] timed out after 1h"
         print(msg, file=sys.stderr)
-        return {"name": workflow_name, "passed": False}
+        return {"name": workflow_name, "passed": False, "run_id": run_id}
     except Exception as exc:
         msg = f"rlsbl: {label}: [{workflow_name}] error: {exc}"
         print(msg, file=sys.stderr)
-        return {"name": workflow_name, "passed": False}
+        return {"name": workflow_name, "passed": False, "run_id": run_id}
 
 
 def _watch_runs(runs, label, repo_slug):
@@ -143,7 +210,7 @@ def _resolve_run_ids(run_ids):
     runs = []
     for rid in run_ids:
         try:
-            output = run("gh", ["run", "view", str(rid), "--json", "databaseId,name,status"])
+            output = run("gh", ["run", "view", str(rid), "--json", "databaseId,name,status,headBranch,workflowName"])
             info = json.loads(output)
             runs.append(info)
         except Exception as e:
@@ -160,7 +227,7 @@ def poll_runs(commit_sha, max_attempts=15, interval=2):
     for _ in range(max_attempts):
         try:
             raw = run("gh", ["run", "list", "--commit", commit_sha,
-                             "--json", "databaseId,name,status"])
+                             "--json", "databaseId,name,status,headBranch,workflowName"])
             parsed = json.loads(raw)
             if parsed:
                 return parsed
