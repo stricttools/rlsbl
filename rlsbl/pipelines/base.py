@@ -60,6 +60,7 @@ class BasePipeline:
                 shell=True,
                 capture_output=True,
                 text=True,
+                env={**os.environ, "RLSBL_DIST_DIR": dist_dir},
             )
             if result.returncode != 0:
                 print(

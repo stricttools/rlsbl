@@ -23,7 +23,7 @@ class TestBuildCustomAssetsSuccess:
     def test_simple_build_creates_file(self, tmp_path):
         dist = str(tmp_path / "dist")
         p = _pipeline([
-            {"name": "output.txt", "build": f"echo hello > {tmp_path}/dist/output.txt"},
+            {"name": "output.txt", "build": "echo hello > $RLSBL_DIST_DIR/output.txt"},
         ])
         result = p.build_custom_assets(dist)
         assert len(result) == 1
@@ -33,8 +33,8 @@ class TestBuildCustomAssetsSuccess:
     def test_multiple_assets(self, tmp_path):
         dist = str(tmp_path / "dist")
         p = _pipeline([
-            {"name": "a.txt", "build": f"echo a > {tmp_path}/dist/a.txt"},
-            {"name": "b.txt", "build": f"echo b > {tmp_path}/dist/b.txt"},
+            {"name": "a.txt", "build": "echo a > $RLSBL_DIST_DIR/a.txt"},
+            {"name": "b.txt", "build": "echo b > $RLSBL_DIST_DIR/b.txt"},
         ])
         result = p.build_custom_assets(dist)
         assert len(result) == 2
@@ -44,7 +44,7 @@ class TestBuildCustomAssetsSuccess:
     def test_creates_dist_dir(self, tmp_path):
         dist = str(tmp_path / "nonexistent" / "dist")
         p = _pipeline([
-            {"name": "out.txt", "build": f"echo x > {dist}/out.txt"},
+            {"name": "out.txt", "build": "echo x > $RLSBL_DIST_DIR/out.txt"},
         ])
         result = p.build_custom_assets(dist)
         assert os.path.isdir(dist)
@@ -125,7 +125,7 @@ class TestBuildCustomAssetsOversized:
         os.makedirs(dist, exist_ok=True)
         # Create a file that exceeds 1MB limit
         p = _pipeline(
-            [{"name": "big.bin", "build": f"dd if=/dev/zero of={dist}/big.bin bs=1024 count=1100 2>/dev/null"}],
+            [{"name": "big.bin", "build": "dd if=/dev/zero of=$RLSBL_DIST_DIR/big.bin bs=1024 count=1100 2>/dev/null"}],
             max_asset_size_mb=1,
         )
         with pytest.raises(SystemExit) as exc_info:
@@ -136,7 +136,7 @@ class TestBuildCustomAssetsOversized:
         dist = str(tmp_path / "dist")
         os.makedirs(dist, exist_ok=True)
         p = _pipeline(
-            [{"name": "big.bin", "build": f"dd if=/dev/zero of={dist}/big.bin bs=1024 count=1100 2>/dev/null"}],
+            [{"name": "big.bin", "build": "dd if=/dev/zero of=$RLSBL_DIST_DIR/big.bin bs=1024 count=1100 2>/dev/null"}],
             max_asset_size_mb=1,
         )
         with pytest.raises(SystemExit):
@@ -150,7 +150,7 @@ class TestBuildCustomAssetsOversized:
         os.makedirs(dist, exist_ok=True)
         # Create a file exactly at 1MB (1048576 bytes) -- should pass (> not >=)
         p = _pipeline(
-            [{"name": "exact.bin", "build": f"dd if=/dev/zero of={dist}/exact.bin bs=1048576 count=1 2>/dev/null"}],
+            [{"name": "exact.bin", "build": "dd if=/dev/zero of=$RLSBL_DIST_DIR/exact.bin bs=1048576 count=1 2>/dev/null"}],
             max_asset_size_mb=1,
         )
         result = p.build_custom_assets(dist)
