@@ -26,17 +26,17 @@ npm i -g rlsbl
 ## Quick start
 
 ```
-rlsbl scaffold          # set up CI/CD, hooks, changelog
+rlsbl scaffold          # set up CI/CD, hooks, changelog, pipelines
 # ... develop, commit ...
 rlsbl release init      # scaffold .rlsbl/releases/unreleased.toml
-# ... edit bump type, targets ...
-rlsbl release run       # bump, tag, push, create GitHub Release
+# ... edit bump type, targets, pipelines ...
+rlsbl release run       # bump, tag, push, publish, create GitHub Release
 rlsbl watch <sha>       # monitor CI for that release
 ```
 
 ## Commands
 
-All commands auto-detect registries from project files (`package.json`, `pyproject.toml`, `go.mod`). Use `--target <npm|pypi|go>` to target a specific one.
+All commands auto-detect targets (versioning) from project files (`package.json`, `pyproject.toml`, `go.mod`) and pipelines (publishing) from `.rlsbl/config.json`. Targets handle version bumps; pipelines handle where releases are published.
 
 :-: table-commands path="rlsbl/"
 
@@ -62,7 +62,7 @@ When you run `rlsbl release run`:
 14. Tags and pushes to `origin`
 15. Finalizes JSONL changelog (renames `unreleased.jsonl`, generates CHANGELOG.md)
 16. Creates a GitHub Release with the changelog entry as notes
-17. Runs secondary release targets (e.g., docs via selfdoc)
+17. Runs publish pipelines (configured in `.rlsbl/config.json` under `pipelines`)
 18. Runs `.rlsbl/hooks/post-release.sh` if present (non-fatal)
 19. Prints `Watch CI: rlsbl watch <sha>`
 
@@ -212,6 +212,7 @@ Supports architectural layer rules via `[layers]` in `workspace.toml` for enforc
 |----------|---------|-------------|
 | `RLSBL_PUSH_TIMEOUT` | `120` | Timeout in seconds for `git push` operations |
 | `RLSBL_VERSION` | -- | Set when running pre-release and post-release hooks; contains the version being released |
+| `RLSBL_DIST_DIR` | -- | Set when running `custom_assets` build commands; points to the distribution directory for output files |
 | `GITHUB_TOKEN` | -- | Used by `gh` CLI for GitHub API calls; `discover` works unauthenticated for public repos |
 
 ## First publish
