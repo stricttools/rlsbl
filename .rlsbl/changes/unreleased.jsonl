@@ -1,0 +1,1 @@
+{"commits":["606737e0a395d016ef61e05b79f1c278f3f1bc31"],"user_facing":true,"description":"**Refactor.** Feature matrix directive now uses `selfdoc.tables.render_markdown_table` and `generate_feature_matrix_data()` returns raw data instead of markdown.","type":"feature"}
