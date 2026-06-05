@@ -76,7 +76,7 @@ def _make_cargo_project(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# BaseTarget raises NotImplementedError
+# BaseTarget returns empty list (no build_assets capability)
 # ---------------------------------------------------------------------------
 
 
@@ -95,11 +95,11 @@ class ConcreteBase(BaseTarget):
 
 
 class TestBaseTarget:
-    def test_build_assets_raises(self, tmp_path):
+    def test_build_assets_returns_empty(self, tmp_path):
         target = ConcreteBase()
         dist = str(tmp_path / "dist")
-        with pytest.raises(NotImplementedError, match="Asset builds not supported for target 'test'"):
-            target.build_assets(str(tmp_path), "1.0.0", dist, ctx=_ctx(tmp_path))
+        result = target.build_assets(str(tmp_path), "1.0.0", dist, ctx=_ctx(tmp_path))
+        assert result == []
 
 
 # ---------------------------------------------------------------------------

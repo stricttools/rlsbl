@@ -4,7 +4,7 @@ Verifies:
 1. When no targets have ``assets: true``, the step is skipped.
 2. When a target has ``assets: true``, ``build_assets()`` is called and artifacts are uploaded.
 3. When an artifact exceeds ``max_asset_size_mb``, the upload is aborted with an error.
-4. When ``build_assets()`` raises ``NotImplementedError``, the target is skipped with a warning.
+4. When a target lacks the ``build_assets`` capability, it is skipped silently.
 5. Dry-run prints what would happen without building or uploading.
 """
 
@@ -108,6 +108,7 @@ class TestAssetBuildAndUpload:
 
         # Create a fake target that produces artifacts
         mock_target = MagicMock()
+        mock_target.capabilities = frozenset({"build_assets"})
         artifact_path = os.path.join(self.tmp_dir, "fake-artifact.tgz")
 
         def fake_build_assets(project_dir, version, dist_dir, ctx):
@@ -151,6 +152,7 @@ class TestAssetBuildAndUpload:
             json.dump({"name": "test-pkg", "version": "1.0.0"}, f)
 
         mock_target = MagicMock()
+        mock_target.capabilities = frozenset({"build_assets"})
         mock_target.build_assets.return_value = []
 
         messages = []
@@ -188,6 +190,7 @@ class TestAssetSizeExceeded:
         oversized_path = os.path.join(self.tmp_dir, "huge.tar.gz")
 
         mock_target = MagicMock()
+        mock_target.capabilities = frozenset({"build_assets"})
 
         def fake_build_assets(project_dir, version, dist_dir, ctx):
             os.makedirs(dist_dir, exist_ok=True)
@@ -214,16 +217,16 @@ class TestAssetSizeExceeded:
         assert "1MB" in captured.err
 
 
-class TestBuildAssetsNotImplemented:
-    """When build_assets() raises NotImplementedError, the target is skipped."""
+class TestBuildAssetsNoCapability:
+    """When a target lacks the build_assets capability, it is skipped."""
 
     @pytest.fixture(autouse=True)
     def _setup(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         self.tmp_dir = str(tmp_path)
 
-    def test_not_implemented_warns_and_skips(self, capsys):
-        """NotImplementedError prints a warning and skips the target."""
+    def test_no_capability_skips_silently(self):
+        """Target without build_assets capability is skipped; build_assets() is never called."""
         _write_config(self.tmp_dir, {
             "targets": ["npm"],
             "publish": {"npm": {"assets": True, "max_asset_size_mb": 50}},
@@ -232,7 +235,7 @@ class TestBuildAssetsNotImplemented:
             json.dump({"name": "test-pkg", "version": "1.0.0"}, f)
 
         mock_target = MagicMock()
-        mock_target.build_assets.side_effect = NotImplementedError("not supported")
+        mock_target.capabilities = frozenset()  # no build_assets capability
 
         ctx = ProjectContext(project_root=Path("."), workspace_root=None, config={
             "targets": ["npm"],
@@ -240,13 +243,11 @@ class TestBuildAssetsNotImplemented:
         })
         with patch("rlsbl.commands.release.TARGETS", {"npm": mock_target}):
             with patch("rlsbl.commands.release.run") as mock_run:
-                # Should not raise
                 upload_release_assets("v1.0.0", "1.0.0", lambda m: None, {}, ctx=ctx)
+                # build_assets should never be called
+                mock_target.build_assets.assert_not_called()
                 # No upload call
                 mock_run.assert_not_called()
-
-        captured = capsys.readouterr()
-        assert "does not support asset builds" in captured.err
 
 
 class TestDryRun:
@@ -267,6 +268,7 @@ class TestDryRun:
             json.dump({"name": "test-pkg", "version": "1.0.0"}, f)
 
         mock_target = MagicMock()
+        mock_target.capabilities = frozenset({"build_assets"})
 
         messages = []
         log = lambda msg: messages.append(msg)
