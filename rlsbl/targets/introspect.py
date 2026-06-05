@@ -2,11 +2,11 @@
 
 from . import TARGETS
 
-CAPABILITY_COLUMNS = ("publish", "build_assets", "read_name", "read_metadata", "ci_templates")
+CAPABILITY_COLUMNS = ("read_name", "read_metadata", "ci_templates")
 
 HEADERS = [
     "Name", "Ecosystem", "Detection files", "Version file", "Auto-detectable",
-    "Tag format", "Monorepo tag format", "publish", "build_assets", "read_name",
+    "Tag format", "Monorepo tag format", "read_name",
     "read_metadata", "ci_templates", "dev_install",
 ]
 
@@ -32,8 +32,8 @@ def _format_dev_install(target) -> str:
 def generate_target_table_data() -> tuple[list[str], list[list[str]]]:
     """Generate raw data for a markdown table of all release targets.
 
-    Returns ``(headers, rows)`` where *headers* is a 13-element list and
-    each row is a 13-element list of strings, sorted alphabetically by
+    Returns ``(headers, rows)`` where *headers* is an 11-element list and
+    each row is an 11-element list of strings, sorted alphabetically by
     target name.
     """
     rows: list[list[str]] = []
