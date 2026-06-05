@@ -2,9 +2,15 @@
 
 # Changelog
 
-## 0.63.1
+## 0.63.2
 
-Pass RLSBL_DIST_DIR env var to custom_assets build commands.
+Fix CI test failure when selfdoc not installed.
+
+### Fixes
+
+- **Fix.** CI test no longer fails when selfdoc is not installed in the test environment.
+
+## 0.63.1
 
 ### Features
 
