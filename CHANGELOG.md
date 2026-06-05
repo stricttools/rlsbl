@@ -2,16 +2,15 @@
 
 # Changelog
 
+## 0.61.1
+
+Fix feature matrix column order and add directive tests.
+
+### Fixes
+
+- **Fix.** Restored original display order for feature matrix columns (was inadvertently alphabetized).
+
 ## 0.61.0
-
-Target introspection: capabilities, ecosystem, and auto-generated target table.
-
-<details>
-<summary>Context</summary>
-
-All 18 release targets now declare capabilities (publish, build_assets, read_name, read_metadata, ci_templates, dev_install), ecosystem labels, and auto-detectability. A new table-targets selfdoc directive auto-generates a comprehensive target details table, replacing the stale manual table. MATRIX_COLUMNS is now derived from TARGETS.keys() for DRY consistency.
-
-</details>
 
 ### Features
 
