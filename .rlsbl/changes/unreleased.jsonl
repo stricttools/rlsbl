@@ -1,3 +1,4 @@
 {"commits":["7918736744a5025dbf341d23b72161c8f0620ca6"],"user_facing":false}
 {"commits":["c7914a37195222077e04aff0e77def3821db8c5a"],"user_facing":true,"description":"**Fix.** Restored original display order for feature matrix columns (was inadvertently alphabetized).","type":"fix"}
 {"commits":["4888714079810b2df8965179864574fda5cf90d0"],"user_facing":false}
+{"commits":["76fe5fc9894127ea457acbcdf8e4ff51b996c940","083b9652026147a59d7a03385c10d9f512d22452"],"user_facing":false}
