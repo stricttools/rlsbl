@@ -1485,10 +1485,11 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
     # Publish step: skip for private repos (they don't publish to registries)
     is_private = ctx.config.get("private", False)
     if not is_private:
-        try:
-            target.publish(primary_path, new_version, ctx=ctx)
-        except Exception as e:
-            print(f"Warning: target publish step failed: {e}", file=sys.stderr)
+        if "publish" in target.capabilities:
+            try:
+                target.publish(primary_path, new_version, ctx=ctx)
+            except Exception as e:
+                print(f"Warning: target publish step failed: {e}", file=sys.stderr)
 
         # Multi-target: run build/publish for secondary targets resolved earlier
         if secondary_targets:
@@ -1502,10 +1503,11 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                     sec_target.build(sec_path, new_version)
                 except Exception as e:
                     print(f"Warning: {sec_name} target build failed: {e}", file=sys.stderr)
-                try:
-                    sec_target.publish(sec_path, new_version, ctx=ctx)
-                except Exception as e:
-                    print(f"Warning: {sec_name} target publish failed: {e}", file=sys.stderr)
+                if "publish" in sec_target.capabilities:
+                    try:
+                        sec_target.publish(sec_path, new_version, ctx=ctx)
+                    except Exception as e:
+                        print(f"Warning: {sec_name} target publish failed: {e}", file=sys.stderr)
 
     # Deploy phase (after publish, before post-release hook)
     deploy_targets, deploy_errors = read_deploy_config(ctx.config)
