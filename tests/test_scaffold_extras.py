@@ -33,7 +33,7 @@ def test_pre_release_template_is_minimal_stub():
         / "pre-release.sh.tpl"
     )
     content = tpl_path.read_text()
-    assert "Built-in checks" in content
+    assert "built-in tests and lint are skipped" in content
     # Should NOT contain the old test/lint commands
     assert "go vet" not in content
     assert "uv run pytest" not in content

@@ -805,29 +805,35 @@ class TestFullFlowOrder:
         _push,
         tmp_project,
     ):
-        """Verify order: pre-checks hook -> tests -> lint -> pre-release hook."""
+        """Verify order: pre-checks hook -> tests -> lint -> pre-release hook.
+
+        The pre-release hook must contain the scaffold template content so
+        that _is_hook_effectively_empty() returns True and built-in tests/lint
+        are not skipped by the hooks-override behavior.
+        """
         _setup_npm_project(tmp_project, test_script=None)
         hooks_dir = tmp_project / ".rlsbl" / "hooks"
         hooks_dir.mkdir(parents=True)
 
-        # Track the order of execution
+        # Track the order of all execution steps in a single list.
         execution_order = []
 
-        # Create both hook scripts that record their execution
-        order_file = tmp_project / "order.txt"
+        # pre-checks hook: custom script that records its execution.
         (hooks_dir / "pre-checks.sh").write_text(
-            f"#!/bin/bash\necho pre-checks >> {order_file}\n"
+            "#!/bin/bash\nexit 0\n"
         )
         (hooks_dir / "pre-checks.sh").chmod(0o755)
-        (hooks_dir / "pre-release.sh").write_text(
-            f"#!/bin/bash\necho pre-release >> {order_file}\n"
+
+        # pre-release hook: must match the scaffold template so it is treated
+        # as "effectively empty" (built-in tests/lint still run).
+        tpl_path = (
+            Path(__file__).resolve().parent.parent
+            / "rlsbl" / "templates" / "shared" / "hooks" / "pre-release.sh.tpl"
         )
+        (hooks_dir / "pre-release.sh").write_text(tpl_path.read_text())
         (hooks_dir / "pre-release.sh").chmod(0o755)
 
         mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
-
-        original_tests = _run_builtin_tests
-        original_lint = _run_builtin_lint
 
         def tracking_tests(registry, flags, *, project_dir=None, ctx):
             execution_order.append("tests")
@@ -837,20 +843,25 @@ class TestFullFlowOrder:
             execution_order.append("lint")
             return True
 
+        # Wrap subprocess.run to record hook invocations by name.
+        original_subprocess_run = subprocess.run
+
+        def tracking_subprocess_run(*args, **kwargs):
+            cmd = args[0] if args else kwargs.get("args", [])
+            if isinstance(cmd, list) and len(cmd) >= 2 and "pre-checks.sh" in cmd[1]:
+                execution_order.append("pre-checks")
+            elif isinstance(cmd, list) and len(cmd) >= 2 and "pre-release.sh" in cmd[1]:
+                execution_order.append("pre-release")
+            return original_subprocess_run(*args, **kwargs)
+
         with (
             patch("rlsbl.commands.release._run_builtin_tests", side_effect=tracking_tests),
             patch("rlsbl.commands.release._run_builtin_lint", side_effect=tracking_lint),
+            patch("subprocess.run", side_effect=tracking_subprocess_run),
         ):
             from rlsbl.commands.release import run_cmd
 
             run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"private": False, "pipelines": {}}))
 
-        # Read hook execution order from the file
-        assert order_file.exists(), "Hooks should have written to order file"
-        hook_lines = order_file.read_text().strip().splitlines()
-
-        # Build full order: hooks from file, tests/lint from tracking
-        # pre-checks runs first, then tests, then lint, then pre-release
-        assert hook_lines[0] == "pre-checks"
-        assert execution_order == ["tests", "lint"]
-        assert hook_lines[1] == "pre-release"
+        # Full execution order: pre-checks -> tests -> lint -> pre-release
+        assert execution_order == ["pre-checks", "tests", "lint", "pre-release"]
