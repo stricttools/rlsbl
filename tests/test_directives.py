@@ -94,6 +94,11 @@ def _target_table_resolve(attrs, config, body):
     return mod.resolve(attrs, config, body)
 
 
+def _pipeline_table_resolve(attrs, config, body):
+    mod = _load_directive("pipeline_table")
+    return mod.resolve(attrs, config, body)
+
+
 # ---------------------------------------------------------------------------
 # Feature matrix directive tests
 # ---------------------------------------------------------------------------
@@ -150,4 +155,38 @@ class TestTargetTableResolve:
         result = _target_table_resolve({}, None, None)
         assert "✓" in result, (
             "Expected at least one checkmark character in output"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Pipeline table directive tests
+# ---------------------------------------------------------------------------
+
+EXPECTED_PIPELINE_TYPES = sorted([
+    "cargo", "cloudflare-pages", "deno", "docker", "go",
+    "hex", "maven", "npm", "pypi",
+])
+
+
+class TestPipelineTableResolve:
+    def test_returns_markdown(self):
+        """resolve({}, None, None) returns a non-empty string with pipes."""
+        result = _pipeline_table_resolve({}, None, None)
+        assert isinstance(result, str)
+        assert len(result) > 0
+        assert "|" in result
+
+    def test_contains_all_pipeline_types(self):
+        """Output contains all 9 pipeline type names."""
+        result = _pipeline_table_resolve({}, None, None)
+        missing = [t for t in EXPECTED_PIPELINE_TYPES if t not in result]
+        assert not missing, (
+            f"Missing pipeline types in output: {missing}"
+        )
+
+    def test_contains_auth_methods(self):
+        """Output contains at least one auth method value."""
+        result = _pipeline_table_resolve({}, None, None)
+        assert "token" in result or "credential" in result or "none" in result, (
+            "Expected at least one auth method in output"
         )

@@ -9,7 +9,7 @@ from rlsbl.targets.introspect import (
 
 EXPECTED_HEADERS = [
     "Name", "Ecosystem", "Detection files", "Version file", "Auto-detectable",
-    "Tag format", "Monorepo tag format", "publish", "build_assets", "read_name",
+    "Tag format", "Monorepo tag format", "read_name",
     "read_metadata", "ci_templates", "dev_install",
 ]
 
@@ -20,9 +20,9 @@ def _rows_by_name(rows):
 
 
 class TestHeaders:
-    def test_returns_13_headers(self):
+    def test_returns_11_headers(self):
         headers, _ = generate_target_table_data()
-        assert len(headers) == 13
+        assert len(headers) == 11
 
     def test_header_names_match(self):
         headers, _ = generate_target_table_data()
