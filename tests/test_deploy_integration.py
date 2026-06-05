@@ -109,6 +109,7 @@ class TestReleaseWithDeployTargets:
                 "tag_format": lambda self, v: f"v{v}",
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, ctx: None,
+                "capabilities": frozenset({"publish"}),
             })(),
             ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False, "deploy": deploy_targets}),
         )
@@ -205,6 +206,7 @@ class TestReleaseDeployFailureContinues:
                 "tag_format": lambda self, v: f"v{v}",
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, ctx: None,
+                "capabilities": frozenset({"publish"}),
             })(),
             ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False, "deploy": deploy_targets}),
         )
@@ -276,6 +278,7 @@ class TestReleaseNoDeployConfig:
                 "tag_format": lambda self, v: f"v{v}",
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, ctx: None,
+                "capabilities": frozenset({"publish"}),
             })(),
             ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False}),
         )
@@ -348,6 +351,7 @@ class TestReleaseDeployConfigErrors:
                 "tag_format": lambda self, v: f"v{v}",
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, ctx: None,
+                "capabilities": frozenset({"publish"}),
             })(),
             ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False, "deploy": deploy_targets}),
         )
@@ -423,6 +427,7 @@ class TestReleaseStopsAtFirstDeployFailure:
                 "tag_format": lambda self, v: f"v{v}",
                 "build": lambda self, p, v: None,
                 "publish": lambda self, p, v, ctx: None,
+                "capabilities": frozenset({"publish"}),
             })(),
             ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False, "deploy": deploy_targets}),
         )
