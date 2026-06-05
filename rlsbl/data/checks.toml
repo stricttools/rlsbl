@@ -240,6 +240,14 @@ pure = true
 needs_network = false
 depends_on = []
 
+[checks.subtree-remote-reachable]
+tags = ["workspace"]
+severity = "error"
+fast = false
+pure = false
+needs_network = true
+depends_on = []
+
 [checks.layers-violations]
 tags = []
 severity = "error"

@@ -46,6 +46,10 @@ class WorkspaceProject:
     def depends_on(self) -> list[str]:
         return self._data.get("depends_on", [])
 
+    @property
+    def registry_name(self) -> str:
+        return self._data.get("registry_name", "")
+
     def get(self, key, default=None):
         """Dict-like access for backward compatibility."""
         return self._data.get(key, default)

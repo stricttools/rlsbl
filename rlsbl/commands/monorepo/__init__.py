@@ -20,6 +20,8 @@ from .graph import _cmd_graph
 
 from .impact import _cmd_impact
 
+from .mirror_cmd import _cmd_mirror
+
 from .snapshot_cmd import _cmd_snapshot
 
 from .sync import (
@@ -49,6 +51,7 @@ __all__ = [
     "_cmd_batch_release_init",
     "_cmd_graph",
     "_cmd_impact",
+    "_cmd_mirror",
     "_cmd_snapshot",
     "_evaluate_constraint",
     "_parse_version_tuple",

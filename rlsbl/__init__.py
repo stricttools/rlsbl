@@ -527,7 +527,7 @@ def cmd_discover(mine, **_kwargs):
 
 @app.command(name="watch", help="Poll GitHub Actions CI workflow runs for a specific commit SHA and report pass or fail status. Defaults to HEAD if no SHA is provided. Useful after rlsbl release to monitor the publish pipeline.")
 @strictcli.flag(name="target", type=str, help="Target a specific registry", default="")
-@strictcli.flag(name="run-id", type=str, help="CI workflow run ID to watch", repeatable=True)
+@strictcli.flag(name="run-id", type=str, help="CI workflow run ID to watch", repeatable=True, unique=True)
 @strictcli.arg(name="sha", help="Commit SHA to watch (defaults to HEAD)", required=False)
 def cmd_watch(target, run_id, sha=None, **_kwargs):
     if sha and run_id:
@@ -817,6 +817,14 @@ def cmd_mono_snapshot(check, **_kwargs):
     root = _require_project_root()
     from .commands.monorepo import _cmd_snapshot
     _cmd_snapshot({"check": check}, project_root=root)
+
+
+@mono.command(name="mirror", help="Initialize a subtree mirror repository for a monorepo project. Splits the project's subtree, pushes it to the configured subtree_remote, clones the mirror, scaffolds rlsbl CI, and pushes the result.")
+@strictcli.arg(name="project", help="Name of the workspace project to mirror")
+def cmd_mono_mirror(project, **_kwargs):
+    root = _require_project_root()
+    from .commands.monorepo import _cmd_mirror
+    _cmd_mirror({"project": project}, project_root=root)
 
 
 @mono.command(name="graph", help="Export the monorepo dependency graph in JSON, DOT (Graphviz), or indented text tree format. Supports filtering by a root package (transitive deps) or reverse package (transitive rdeps), with optional depth limiting. Use --output to write to a file instead of stdout.")

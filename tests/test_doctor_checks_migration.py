@@ -63,6 +63,7 @@ EXPECTED_CHECKS = [
     "scaffold-unreplaced-vars",
     "scaffold-conflict-markers",
     "dead-workspace-packages",
+    "subtree-remote-reachable",
     "circular-deps",
     # Phase 12 project checks
     "private-publish-workflow",
