@@ -156,6 +156,105 @@ def get_changelog_validation_config(config):
 
 
 
+def validate_pipelines_config(config):
+    """Validate the ``pipelines`` section of a project config.
+
+    Raises ``ValueError`` if:
+    - ``pipelines`` is present but not a dict
+    - An entry is not a dict
+    - An entry is missing ``type`` (str) or ``local`` (bool)
+    - ``type`` is not a registered pipeline type
+    - ``assets`` is true but ``max_asset_size_mb`` is missing or not a positive int
+    - ``custom_assets`` is present but ``max_asset_size_mb`` is missing or not a positive int
+    - ``custom_assets`` entries are malformed (missing ``name`` or ``build``)
+    """
+    from rlsbl.pipelines import PIPELINE_TYPES
+
+    pipelines = config.get("pipelines")
+    if pipelines is None:
+        return
+
+    if not isinstance(pipelines, dict):
+        raise ValueError(
+            f"pipelines must be a dict, got {type(pipelines).__name__}"
+        )
+
+    for name, entry in pipelines.items():
+        if not isinstance(entry, dict):
+            raise ValueError(
+                f"pipeline '{name}' must be a dict, got {type(entry).__name__}"
+            )
+
+        # type is required and must be a registered pipeline type
+        if "type" not in entry:
+            raise ValueError(f"pipeline '{name}' is missing required key 'type'")
+        ptype = entry["type"]
+        if not isinstance(ptype, str):
+            raise ValueError(
+                f"pipeline '{name}'.type must be a string, got {type(ptype).__name__}"
+            )
+        if ptype not in PIPELINE_TYPES:
+            raise ValueError(
+                f"pipeline '{name}'.type '{ptype}' is not a registered pipeline type. "
+                f"Valid types: {', '.join(sorted(PIPELINE_TYPES.keys())) or '(none registered)'}"
+            )
+
+        # local is required and must be a bool
+        if "local" not in entry:
+            raise ValueError(f"pipeline '{name}' is missing required key 'local'")
+        if not isinstance(entry["local"], bool):
+            raise ValueError(
+                f"pipeline '{name}'.local must be a boolean, got {type(entry['local']).__name__}"
+            )
+
+        # assets validation
+        if entry.get("assets"):
+            max_size = entry.get("max_asset_size_mb")
+            if max_size is None:
+                raise ValueError(
+                    f"pipeline '{name}' has assets=true but max_asset_size_mb is not set"
+                )
+            if not isinstance(max_size, int) or max_size <= 0:
+                raise ValueError(
+                    f"pipeline '{name}'.max_asset_size_mb must be a positive integer, "
+                    f"got {max_size!r}"
+                )
+
+        # custom_assets validation
+        custom_assets = entry.get("custom_assets")
+        if custom_assets is not None:
+            if not isinstance(custom_assets, list):
+                raise ValueError(
+                    f"pipeline '{name}'.custom_assets must be a list, "
+                    f"got {type(custom_assets).__name__}"
+                )
+            # custom_assets requires max_asset_size_mb
+            max_size = entry.get("max_asset_size_mb")
+            if max_size is None:
+                raise ValueError(
+                    f"pipeline '{name}' has custom_assets but max_asset_size_mb is not set"
+                )
+            if not isinstance(max_size, int) or max_size <= 0:
+                raise ValueError(
+                    f"pipeline '{name}'.max_asset_size_mb must be a positive integer, "
+                    f"got {max_size!r}"
+                )
+            for i, asset in enumerate(custom_assets):
+                if not isinstance(asset, dict):
+                    raise ValueError(
+                        f"pipeline '{name}'.custom_assets[{i}] must be a dict, "
+                        f"got {type(asset).__name__}"
+                    )
+                if "name" not in asset or not isinstance(asset["name"], str):
+                    raise ValueError(
+                        f"pipeline '{name}'.custom_assets[{i}] is missing required string key 'name'"
+                    )
+                if "build" not in asset or not isinstance(asset["build"], str):
+                    raise ValueError(
+                        f"pipeline '{name}'.custom_assets[{i}] is missing required string key 'build'"
+                    )
+
+
 def write_project_config(key, value, project_root):
     """Write or update a key in .rlsbl/config.json (creates dir if needed).
 
