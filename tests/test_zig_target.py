@@ -284,10 +284,10 @@ class TestZigTargetTemplateMappings:
         targets = [m["target"] for m in mappings]
         assert "VERSION.tpl" in templates
         assert "ci.yml.tpl" in templates
-        assert "publish.yml.tpl" in templates
+        # publish.yml.tpl is now owned by the pipeline, not the target
+        assert "publish.yml.tpl" not in templates
         assert "VERSION" in targets
         assert ".github/workflows/ci.yml" in targets
-        assert ".github/workflows/publish.yml" in targets
 
     def test_mappings_are_list_of_dicts(self):
         target = ZigTarget()

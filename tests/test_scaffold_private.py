@@ -6,7 +6,6 @@ from pathlib import Path
 import pytest
 
 from rlsbl.commands.init_cmd import (
-    _filter_mappings_for_private,
     process_mappings,
 )
 
@@ -72,31 +71,27 @@ class TestPrivateScaffoldUsesStandardHook:
         assert "gh release upload" not in hook_content
 
 
-class TestFilterMappingsForPrivate:
-    """_filter_mappings_for_private removes publish workflows but keeps others."""
+class TestFilterMappingsForPrivateRemoved:
+    """_filter_mappings_for_private has been removed -- targets no longer return publish templates."""
 
-    def test_removes_publish_workflows(self):
-        """Mappings with 'publish' in template name are removed."""
-        mappings = [
-            {"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"},
-            {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
-            {"template": "VERSION.tpl", "target": "VERSION"},
-        ]
-        filtered = _filter_mappings_for_private(mappings)
-        templates = [m["template"] for m in filtered]
-        assert "publish.yml.tpl" not in templates
-        assert "ci.yml.tpl" in templates
-        assert "VERSION.tpl" in templates
+    def test_filter_function_removed(self):
+        """_filter_mappings_for_private must no longer exist in init_cmd."""
+        import rlsbl.commands.init_cmd as init_cmd
+        assert not hasattr(init_cmd, "_filter_mappings_for_private"), (
+            "_filter_mappings_for_private should have been removed"
+        )
 
-    def test_keeps_goreleaser_for_go(self):
-        """goreleaser.yml.tpl does not contain 'publish' so it survives filtering."""
-        mappings = [
-            {"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"},
-            {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
-            {"template": "goreleaser.yml.tpl", "target": ".goreleaser.yml"},
-            {"template": "VERSION.tpl", "target": "VERSION"},
-        ]
-        filtered = _filter_mappings_for_private(mappings)
-        templates = [m["template"] for m in filtered]
-        assert "goreleaser.yml.tpl" in templates
-        assert "publish.yml.tpl" not in templates
+    def test_targets_dont_return_publish_templates(self):
+        """Target template_mappings should not contain any publish templates."""
+        from rlsbl.targets import TARGETS
+        from rlsbl.context import ProjectContext
+        from pathlib import Path
+
+        # Use a minimal context for targets that need it
+        ctx = ProjectContext(project_root=Path("."), workspace_root=None, config={})
+        for name, target in TARGETS.items():
+            mappings = target.template_mappings(ctx)
+            for m in mappings:
+                assert "publish" not in m["template"], (
+                    f"Target '{name}' still returns publish template: {m['template']}"
+                )

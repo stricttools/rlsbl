@@ -11,7 +11,6 @@ from pathlib import Path
 
 from rlsbl.commands.init_cmd import (
     _resolve_private,
-    _filter_mappings_for_private,
     process_mappings,
     run_cmd,
 )
@@ -182,19 +181,10 @@ class TestPrivateFlagScaffold:
 class TestFilterMappings:
     """Unit tests for mapping filter helpers."""
 
-    def test_filter_removes_publish_templates(self):
-        """_filter_mappings_for_private removes any mapping with 'publish' in template."""
-        mappings = [
-            {"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"},
-            {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
-            {"template": "goreleaser.yml.tpl", "target": ".goreleaser.yml"},
-        ]
-        result = _filter_mappings_for_private(mappings)
-        assert len(result) == 2
-        templates = [m["template"] for m in result]
-        assert "publish.yml.tpl" not in templates
-        assert "ci.yml.tpl" in templates
-        assert "goreleaser.yml.tpl" in templates
+    def test_filter_function_removed(self):
+        """_filter_mappings_for_private no longer exists (targets don't return publish templates)."""
+        import rlsbl.commands.init_cmd as init_cmd
+        assert not hasattr(init_cmd, "_filter_mappings_for_private")
 
     def test_replace_function_removed(self):
         """_replace_post_release_hook_for_private no longer exists."""
