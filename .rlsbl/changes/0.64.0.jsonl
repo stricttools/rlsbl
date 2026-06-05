@@ -1,0 +1,7 @@
+{"commits":["5f42c5acf8a6b9a8c762e934c60f59a761120630"],"user_facing":true,"description":"**New command.** `monorepo mirror` copies monorepo sub-project state (version, changelog, docs) into a standalone mirror repository for independent distribution.","type":"feature"}
+{"commits":["bc1d015a44affa36e7f28c196745d49a5913f4f4"],"user_facing":true,"description":"**New target.** `native-android` release target for Android application projects using Gradle, with automatic mutual exclusion against the `maven` target to prevent conflicts.","type":"feature"}
+{"commits":["8d4dd23c507a05502288e7ed58b80fa5c4aabc13"],"user_facing":true,"description":"**New target.** `native-ios` release target for iOS application projects with Xcode and Tuist support.","type":"feature"}
+{"commits":["bf920ce4fba77493463f8b6e01fba6899822f301"],"user_facing":false}
+{"commits":["fe9955c8b61f2d7572d6a2ff8492af8b1c1e6847"],"user_facing":false}
+{"commits":["8b7bd8ef9e662009358af2af5871e49aaa5d1f62","4d27b6b8eb72104b729d872b8271dac4371fc426","6b64f50f4e1b7a08a7f08b8fc633518e29222331"],"user_facing":false}
+{"commits":["6c84faf7cf91a3e544bd6180f3cfa3cee2bd7990"],"user_facing":false}
