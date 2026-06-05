@@ -82,12 +82,6 @@ class BaseTarget:
     def build(self, dir_path, version):
         pass
 
-    def publish(self, dir_path, version, ctx):
-        pass
-
-    def build_assets(self, dir_path, version, dist_dir, ctx):
-        return []
-
     def dev_install_command(self, project_dir):
         """Specs for local install via `rlsbl dev install`, keyed by mode.
 

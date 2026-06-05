@@ -95,25 +95,11 @@ class ReleaseTarget(Protocol):
         """Human-readable hint for initializing a project for this target."""
         return ""
 
-    # --- Optional: Build and publish ---
+    # --- Optional: Build ---
 
     def build(self, dir_path: str, version: str) -> None:
         """Pre-publish build step (e.g. generate docs). No-op by default."""
         pass
-
-    def publish(self, dir_path: str, version: str, ctx) -> None:
-        """Post-push publish/deploy step. No-op by default.
-
-        ctx: ProjectContext carrying project_root, monorepo_root, and config.
-        """
-        pass
-
-    def build_assets(self, dir_path: str, version: str, dist_dir: str, ctx) -> list[str]:
-        """Build distributable artifacts for GH Release upload.
-
-        Returns list of artifact file paths in dist_dir.
-        """
-        ...
 
     # --- Optional: Developer-mode local install ---
 
