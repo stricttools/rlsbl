@@ -2,16 +2,36 @@
 
 # Changelog
 
-## 0.62.0
+## 0.63.0
 
-Capability-gated publish/build_assets, Swift inheritance cleanup, version_file dir_path, and bug fixes.
+Pipeline separation: versioning and publishing are now independent concerns.
 
 <details>
 <summary>Context</summary>
 
-Breaking: BaseTarget.build_assets() returns [] instead of raising NotImplementedError. publish() and build_assets() calls are now gated on target.capabilities. SwiftAppleTarget inherits from SwiftTarget. version_file() accepts optional dir_path for dynamic filename resolution. Plain exclusion list fixed. Flutter table cells corrected.
+Breaking: publish() and build_assets() removed from targets, replaced by pipeline types. DocsTarget removed (use cloudflare-pages pipeline). flutter-ios/flutter-android merged into single flutter target. The publish config key is no longer recognized -- use pipelines. New: 9 built-in pipeline types, custom_assets, hooks override built-ins, 5 new checks, pipeline introspect table. Fix: multi-target array bugs in snapshot/graph/status.
 
 </details>
+
+### Breaking
+
+- **Pipeline system replaces target.publish().** The `publish` config key is no longer recognized; use `pipelines` instead. BaseTarget no longer has publish() or build_assets() methods.
+- **DocsTarget removed.** Docs deployment is now a cloudflare-pages pipeline, not a target.
+- **Flutter targets merged.** flutter-ios and flutter-android merged into a single flutter target.
+
+### Features
+
+- **Pipeline infrastructure.** 9 built-in pipeline types: npm, pypi, go, cargo, deno, hex, maven, docker, cloudflare-pages.
+- **custom_assets support.** Arbitrary artifact builds via pipeline config.
+- **Hooks override built-ins.** Customized pre-release hooks skip built-in tests/lint.
+- **5 new checks.** private-publish-workflow, scaffold-conflict-markers, npm-private-mismatch, target-version-readable, selfdoc-version-drift.
+- **Pipeline introspect table.** Shows registered pipeline types in selfdoc output.
+
+### Fixes
+
+- **Multi-target bug fixes.** Fixed snapshot, graph, and status commands to handle multi-target projects instead of taking only the first target.
+
+## 0.62.0
 
 ### Breaking
 
