@@ -99,7 +99,7 @@ class TestGenerateSnapshot:
 
         models = snapshot["packages"]["models"]
         assert models["path"] == "packages/models"
-        assert models["target"] == "pypi"
+        assert models["targets"] == ["pypi"]
         assert models["version"] == "2.1.0"
         assert models["description"] == "Core data models"
         assert models["deps"] == ["schema"]

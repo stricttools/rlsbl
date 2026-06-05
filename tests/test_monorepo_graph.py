@@ -55,7 +55,7 @@ class TestGraphJSON:
         models = data["packages"]["models"]
         assert "schema" in models["deps"]
         assert "app" in models["rdeps"]
-        assert models["target"] == "npm"
+        assert models["targets"] == ["npm"]
         assert models["version"] == "1.2.0"
 
         # Check schema package
