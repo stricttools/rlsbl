@@ -111,9 +111,9 @@ class TestCheckBatchSizeCommits:
         cfg = {"max_commits_per_entry": 5, "exclusions": []}
         passed, details = check_batch_size_commits(entries, cfg)
         assert passed is False
-        assert len(details) == 1
         assert "6 commits" in details[0]
         assert "max: 5" in details[0]
+        assert any("--allow-batch" in d for d in details)
 
     def test_override_max_3_passes(self, git_repo):
         entries = [ChangelogEntry(commits=["a" * 7, "b" * 7, "c" * 7], user_facing=False)]
