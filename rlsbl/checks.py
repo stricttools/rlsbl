@@ -1511,17 +1511,26 @@ def register_checks(app):
         # Exclude GitHub Actions ${{ ... }} syntax (preceded by $)
         template_re = _re.compile(r"(?<!\$)\{\{\w+(?:\.\w+)*\}\}")
 
+        # Docker metadata-action uses {{version}}, {{major}}, etc. as its
+        # own template syntax on lines like "type=semver,pattern={{version}}".
+        # These are not rlsbl template variables and must be excluded.
+        docker_meta_re = _re.compile(r"type=semver,pattern=")
+
         errors = []
         for pattern in scan_patterns:
             for filepath in glob.glob(pattern):
                 rel_path = os.path.relpath(filepath, root_str)
                 try:
                     with open(filepath, "r", encoding="utf-8") as f:
-                        content = f.read()
+                        lines = f.readlines()
                 except (OSError, UnicodeDecodeError):
                     continue
 
-                matches = template_re.findall(content)
+                matches = []
+                for line in lines:
+                    if docker_meta_re.search(line):
+                        continue
+                    matches.extend(template_re.findall(line))
                 if matches:
                     unique = sorted(set(matches))
                     errors.append(
