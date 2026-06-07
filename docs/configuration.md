@@ -18,8 +18,46 @@ Project-level configuration file created by `rlsbl config init` or `rlsbl scaffo
 | pipelines | object | Publish pipelines keyed by user-chosen name (see [Pipeline config](#pipeline-config) below) |
 | tag | bool | Enable/disable ecosystem tagging (default: true) |
 | private | bool (required) | Safety guardrail: when true, blocks publishing to public registries |
+| release_branches | array | Branch names that trigger the manual-release-push warning. Default: `["main", "master"]` when absent. An empty list is a hard error -- either omit the key entirely or list at least one branch. |
+| changelog_format | string | Controls the format of generated CHANGELOG.md. Default: `"grouped"`. Currently the only supported value, which produces version sections with `### Breaking`, `### Features`, `### Fixes` sub-headers. |
+| batch_limits | object | Limits and exclusions for changelog batch-size validation checks. See [batch_limits](#batch_limits) below. |
 
 Configuration precedence for tagging: CLI flag (`--no-tag`) > project config > user config (`~/.rlsbl/config.json`) > default (true).
+
+### batch_limits
+
+The `batch_limits` object controls the `batch_size_commits` and `batch_size_entries` changelog validation checks. Both checks produce blocking errors when they fail.
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `max_commits_per_entry` | int | 5 | Maximum number of commit hashes allowed in a single JSONL entry. Entries exceeding this limit fail the `batch_size_commits` check. |
+| `max_entries_per_commit` | int | 5 | Maximum number of JSONL entries that may reference the same commit hash. Commits exceeding this limit fail the `batch_size_entries` check. |
+| `exclusions` | array | `[]` | Per-violation silencers for known exceptions (see below). |
+
+Each entry in `exclusions` is a dict with:
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `reason` | string | Yes | Mandatory audit trail explaining why this exclusion exists. |
+| `commits` | array | At least one of `commits` or `entries` | Commit hashes to exclude from the `batch_size_entries` check. |
+| `entries` | array | At least one of `commits` or `entries` | Entry identifiers (commit lists) to exclude from the `batch_size_commits` check. |
+
+Example:
+
+```json
+{
+  "batch_limits": {
+    "max_commits_per_entry": 5,
+    "max_entries_per_commit": 5,
+    "exclusions": [
+      {
+        "reason": "Large refactor commit touches many changelog areas",
+        "commits": ["a1b2c3d"]
+      }
+    ]
+  }
+}
+```
 
 ### Pipeline config
 
@@ -44,6 +82,20 @@ Pipeline types use different auth patterns:
 - **Token-based** (npm, pypi, go, cargo, deno, hex, maven): authenticate via a single env var specified by `token_var`
 - **Credential-based** (docker): authenticate via `username_var` and `password_var`
 - **Other** (cloudflare-pages): type-specific auth configured per pipeline
+
+#### Per-pipeline-type reference
+
+| Type | Default token_var | Auth pattern | Publish action |
+| --- | --- | --- | --- |
+| `npm` | `NPM_TOKEN` | Token | Runs `npm publish` (or pnpm/yarn equivalent based on lockfile detection) |
+| `pypi` | `PYPI_TOKEN` (or `TWINE_PASSWORD`) | Token / OIDC | OIDC Trusted Publishing preferred; falls back to token-based upload via twine |
+| `go` | None | None | Notifies Go module proxy (`GOPROXY=proxy.golang.org`); no authentication required |
+| `cargo` | `CARGO_REGISTRY_TOKEN` | Token | Runs `cargo publish` to crates.io |
+| `deno` | `DENO_TOKEN` (or `JSR_TOKEN`) | Token | Runs `deno publish` to JSR |
+| `hex` | `HEX_API_KEY` | Token | Runs `mix hex.publish` to hex.pm |
+| `maven` | `MAVEN_TOKEN` (or `GITHUB_TOKEN`) | Token | Runs gradle or maven publish task to configured repository |
+| `docker` | N/A | Username + Password | Authenticates via `DOCKER_USERNAME` + `DOCKER_PASSWORD`, then runs `docker push` |
+| `cloudflare-pages` | None | Selfdoc CLI | Uses the selfdoc CLI for deploy; no token needed locally (CF credentials sourced from env) |
 
 #### custom_assets
 
