@@ -1,0 +1,1 @@
+{"commits":["7e4aa186d90cff4d715075ff2b8a791b50939482"],"user_facing":true,"description":"**Fix.** Desktop notification no longer auto-opens browser unconditionally; URL opens only when the user clicks the notification action button.","type":"fix"}
