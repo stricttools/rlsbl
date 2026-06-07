@@ -2,9 +2,19 @@
 
 # Changelog
 
-## 0.65.1
+## 0.65.2
 
-Fix CI test failure from batch hint message
+Watch retry dedup, no-runs exit 0, docs polish
+
+### Features
+
+- **Feature.** Documentation expanded: new utility commands guide, fixed pipeline per-type inaccuracies, added Flutter release config and deploy env var expansion docs, improved section intros for AI citation.
+
+### Fixes
+
+- **Fix.** Watch auto-retry now deduplicates by workflow name, preventing multiple retries when parallel runs from the same workflow fail. Watch exits 0 (not 1) when no CI runs are found, since the release already succeeded.
+
+## 0.65.1
 
 ### Fixes
 
