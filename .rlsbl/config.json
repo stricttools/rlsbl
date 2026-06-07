@@ -3,7 +3,12 @@
   "env_file": "~/Projects/.env",
   "push_timeout": 120,
   "batch_limits": {
-    "exclusions": []
+    "exclusions": [
+      {
+        "reason": "Documentation overhaul: 13 commits for one cohesive feature",
+        "entries": [{"version": "unreleased", "line": 2}]
+      }
+    ]
   },
   "targets": [
     "npm",
