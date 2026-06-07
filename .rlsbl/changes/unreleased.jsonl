@@ -1,0 +1,1 @@
+{"commits":["ffa7805f381c1e3c9cbed99775dcc199d8b31b92"],"user_facing":true,"description":"**Fix.** Exclude Docker metadata-action `type=semver,pattern=` lines from the `scaffold-unreplaced-vars` check. These lines use `{{version}}`, `{{major}}`, `{{minor}}`, and `{{patch}}` as Docker's own template syntax, not unreplaced rlsbl variables.","type":"fix"}
