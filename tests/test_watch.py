@@ -167,9 +167,9 @@ class TestNoRunsHint:
         with pytest.raises(SystemExit) as exc_info:
             run_cmd(None, ["abc123"], {})
 
-        assert exc_info.value.code == 1
+        assert exc_info.value.code == 0
         err = capsys.readouterr().err
-        assert "no CI runs found after 30s" in err
+        assert "No CI runs found for abc123full" in err
         assert "rlsbl: hint: GitHub Release v1.2.0 exists but no workflows ran" in err
         assert "rlsbl release retry" in err
 
@@ -188,9 +188,9 @@ class TestNoRunsHint:
         with pytest.raises(SystemExit) as exc_info:
             run_cmd(None, ["abc123"], {})
 
-        assert exc_info.value.code == 1
+        assert exc_info.value.code == 0
         err = capsys.readouterr().err
-        assert "no CI runs found after 30s" in err
+        assert "No CI runs found for abc123full" in err
         assert "hint:" not in err
 
     @patch("rlsbl.commands.watch.poll_runs", return_value=[])
@@ -207,9 +207,9 @@ class TestNoRunsHint:
         with pytest.raises(SystemExit) as exc_info:
             run_cmd(None, ["abc123"], {})
 
-        assert exc_info.value.code == 1
+        assert exc_info.value.code == 0
         err = capsys.readouterr().err
-        assert "no CI runs found after 30s" in err
+        assert "No CI runs found for abc123full" in err
         assert "hint:" not in err
 
     @patch("rlsbl.commands.watch._notify")

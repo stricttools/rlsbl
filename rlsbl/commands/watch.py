@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -118,8 +119,13 @@ def _retry_workflow(workflow_name, branch, repo_slug, label):
         return {"name": workflow_name, "passed": False, "run_id": retry_id}
 
 
-def _watch_single_run(ci_run, label, repo_slug):
-    """Watch a single CI run. Returns a dict with name, passed, and run_id."""
+def _watch_single_run(ci_run, label, repo_slug, retried_lock=None, retried_workflows=None):
+    """Watch a single CI run. Returns a dict with name, passed, and run_id.
+
+    When retried_lock and retried_workflows are provided, deduplicates retries
+    so that only one retry is dispatched per workflow name even when multiple
+    runs from the same workflow fail concurrently.
+    """
     run_id = str(ci_run["databaseId"])
     workflow_name = ci_run.get("name", f"run {run_id}")
 
@@ -140,12 +146,20 @@ def _watch_single_run(ci_run, label, repo_slug):
         if repo_slug:
             print(f"rlsbl: https://github.com/{repo_slug}/actions/runs/{run_id}",
                   file=sys.stderr)
-        # Auto-retry once before reporting failure
+        # Auto-retry once before reporting failure (deduplicated by workflow name)
         branch = ci_run.get("headBranch")
         if branch and workflow_name:
-            retry_result = _retry_workflow(workflow_name, branch, repo_slug, label)
-            if retry_result is not None:
-                return retry_result
+            should_retry = True
+            if retried_lock is not None and retried_workflows is not None:
+                with retried_lock:
+                    if workflow_name in retried_workflows:
+                        should_retry = False
+                    else:
+                        retried_workflows.add(workflow_name)
+            if should_retry:
+                retry_result = _retry_workflow(workflow_name, branch, repo_slug, label)
+                if retry_result is not None:
+                    return retry_result
         return {"name": workflow_name, "passed": False, "run_id": run_id}
     except subprocess.TimeoutExpired:
         msg = f"rlsbl: {label}: [{workflow_name}] timed out after 1h"
@@ -163,10 +177,13 @@ def _watch_runs(runs, label, repo_slug):
         # No need for threads when there's only one run
         return [_watch_single_run(runs[0], label, repo_slug)]
 
+    retried_lock = threading.Lock()
+    retried_workflows = set()
+
     results = []
     with ThreadPoolExecutor(max_workers=len(runs)) as executor:
         futures = {
-            executor.submit(_watch_single_run, ci_run, label, repo_slug): ci_run
+            executor.submit(_watch_single_run, ci_run, label, repo_slug, retried_lock, retried_workflows): ci_run
             for ci_run in runs
         }
         for future in as_completed(futures):
@@ -245,10 +262,11 @@ def _resolve_run_ids(run_ids):
     return runs
 
 
-def poll_runs(commit_sha, max_attempts=15, interval=2):
+def poll_runs(commit_sha, max_attempts=30, interval=4):
     """Poll gh run list until at least one run appears.
 
     Returns a list of run dicts (may be empty if nothing found after all attempts).
+    Default timeout is ~120s (30 attempts * 4s interval).
     """
     for _ in range(max_attempts):
         try:
@@ -348,7 +366,11 @@ def run_cmd(registry, args, flags):
         runs = poll_runs(commit_sha)
 
         if not runs:
-            print(f"rlsbl: {label}: no CI runs found after 30s", file=sys.stderr)
+            print(
+                f"No CI runs found for {commit_sha[:12]}. GitHub Actions may not have "
+                f"triggered yet. Run `rlsbl watch {commit_sha[:12]}` to check later.",
+                file=sys.stderr,
+            )
             # Best-effort hint: if this commit has a GitHub Release but no
             # workflows ran, suggest `rlsbl release retry`.
             try:
@@ -364,7 +386,7 @@ def run_cmd(registry, args, flags):
                     pass
             except Exception:
                 pass
-            sys.exit(1)
+            sys.exit(0)
 
         print(f"rlsbl: {label}: found {len(runs)} CI run(s), watching...", file=sys.stderr)
 
