@@ -1,8 +1,0 @@
-# Version bump type: patch, minor, or major
-bump = "minor"
-# Short description of this release (required)
-description = "Documentation overhaul and notification UX fix"
-# Optional context explaining why these changes were made
-context = "Comprehensive docs rewrite (13 new guide pages, 2600+ lines), notification click-to-open fix, pipeline env var validation ordering fix, and new --allow-batch flag for changelog add."
-include = ["npm", "pypi"]
-exclude = []
