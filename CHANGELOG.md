@@ -2,9 +2,21 @@
 
 # Changelog
 
-## 0.64.0
+## 0.64.1
 
-Monorepo mirror command, native-android and native-ios targets.
+Fix dead-modules false positives and watch test notification leak.
+
+### Features
+
+- **New.** Auto-retry failed CI workflows once before reporting failure.
+- **New.** Open GitHub Actions page on CI failure and Release page on success when watch notifications fire.
+
+### Fixes
+
+- **Fix.** Exclude `.selfdoc`, `_build`, and browser asset directories from dead-modules scan to prevent false positives.
+- **Fix.** Mock notifications and URL opens in watch tests to prevent desktop notification spam during test runs.
+
+## 0.64.0
 
 ### Features
 
