@@ -4,3 +4,4 @@
 {"commits":["25092c25caae529bbf1ce377857970e70121b81b"],"user_facing":true,"description":"**Fix.** Local pipeline env var validation now runs before mutating operations, preventing partial state on missing credentials.","type":"fix"}
 {"commits":["357408a4e944c352db13373b419760faaba27fa5"],"user_facing":true,"description":"**Feature.** `changelog add --allow-batch` flag auto-creates a batch_limits exclusion when an entry exceeds the commit limit, preventing agents from splitting cohesive entries. Batch size check now runs at add-time (not just during release validation).","type":"feature"}
 {"commits":["24a6f9b35baf2b3ba02b6b214ed6aaf356e14d81"],"user_facing":false}
+{"commits":["e054b8a0e2401f184837387382a53b3013feab20"],"user_facing":false}
