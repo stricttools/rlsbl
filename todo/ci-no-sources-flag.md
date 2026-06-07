@@ -17,3 +17,10 @@ The pypi CI template at `rlsbl/templates/pypi/ci.yml.tpl` — the install/sync s
 ## Scope
 
 11 projects under ~/Projects/ have `[tool.uv.sources]` and are affected. Fixing the template propagates to all future scaffolds. Existing projects need individual `ci.yml` fixes (or a re-scaffold).
+
+## Upstream: uv feature request
+
+- Issue: https://github.com/astral-sh/uv/issues/19701
+- What was requested: `--no-path-sources` flag to ignore path/editable entries while preserving workspace sources
+- Status: filed, waiting on uv team
+- This todo is blocked until uv ships the feature (or an alternative selective source mechanism)
