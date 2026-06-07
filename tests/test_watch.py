@@ -709,13 +709,14 @@ class TestNotifyUrlInRunCmd:
     """Tests that run_cmd passes the right URL to _notify."""
 
     @patch("rlsbl.commands.watch._open_url")
+    @patch("rlsbl.commands.watch.require_tool", return_value=None)
     @patch("rlsbl.commands.watch._print_workflow_audit", return_value=False)
     @patch("rlsbl.commands.watch._watch_runs")
     @patch("rlsbl.commands.watch.poll_runs")
     @patch("rlsbl.commands.watch.time")
     @patch("rlsbl.commands.watch.run")
     def test_failure_notification_opens_actions_url(
-        self, mock_run, mock_time, mock_poll, mock_watch, mock_audit, mock_open_url
+        self, mock_run, mock_time, mock_poll, mock_watch, mock_audit, mock_tool, mock_open_url
     ):
         """On failure, _notify is called with the failed run's Actions URL."""
         ci_run = {"databaseId": 100, "name": "CI", "status": "in_progress"}
@@ -739,13 +740,14 @@ class TestNotifyUrlInRunCmd:
         )
 
     @patch("rlsbl.commands.watch._open_url")
+    @patch("rlsbl.commands.watch.require_tool", return_value=None)
     @patch("rlsbl.commands.watch._print_workflow_audit", return_value=False)
     @patch("rlsbl.commands.watch._watch_runs")
     @patch("rlsbl.commands.watch.poll_runs")
     @patch("rlsbl.commands.watch.time")
     @patch("rlsbl.commands.watch.run")
     def test_success_notification_opens_release_url_with_tag(
-        self, mock_run, mock_time, mock_poll, mock_watch, mock_audit, mock_open_url
+        self, mock_run, mock_time, mock_poll, mock_watch, mock_audit, mock_tool, mock_open_url
     ):
         """On success with a tag, _notify opens the release page for that tag."""
         ci_run = {"databaseId": 100, "name": "CI", "status": "in_progress"}
