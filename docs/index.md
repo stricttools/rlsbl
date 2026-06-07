@@ -1,16 +1,41 @@
 ---
-description: "rlsbl is a release orchestration CLI for npm, PyPI, Go, Cargo, Deno, and more — handling versions, changelogs, tags, and CI scaffolding."
+description: "Documentation index for rlsbl -- release orchestration CLI for npm, PyPI, Go, Cargo, and 14 more ecosystems."
 ---
 
 # rlsbl
 
-Release orchestration and project scaffolding CLI for npm, PyPI, Go, Cargo, Hex, Deno, Maven, Swift, Docker, and more.
+rlsbl is a release orchestration CLI that handles version bumping, structured JSONL changelogs, CI scaffolding, tagging, and GitHub Releases across 18 ecosystems. It supports single-target projects, multi-target projects, and monorepo workspaces with independent versioning.
 
-Handles version bumping, changelog validation, tagging, GitHub Releases, CI scaffolding, and CI monitoring. Supports both single-target and multi-target projects, as well as monorepo workspaces.
+## Getting started
 
-## Pages
+See the [README](https://github.com/smm-h/rlsbl#readme) for installation and quick start. Key commands:
 
-- [CLI reference](cli-index.md) -- all CLI commands and options
+- `rlsbl scaffold` -- set up a new project
+- `rlsbl release run --watch --yes` -- perform a release
+- `rlsbl status` -- check current state
+
+## Guides
+
+- [Release workflow](release-workflow.md) -- end-to-end release process, bump types, release file format
+- [Changelog system](changelog.md) -- JSONL entries, validation, coverage enforcement
+- [Scaffold and templates](scaffold.md) -- CI/CD generation, three-way merge, hooks
+- [Check system](checks.md) -- 30 diagnostic checks across 5 tags
+- [Deployment](deploy.md) -- deploy targets, post-release hooks, Cloudflare Pages
+- [Development workflow](dev-workflow.md) -- editable installs, pre-push hook, local testing
+
+## Architecture
+
+- [Import scanning](import-scanning.md) -- tree-sitter-based dependency detection
+- [Dependency validation](dep-validation.md) -- cross-project dependency checks
+- [Pipeline architecture](pipelines.md) -- publish pipeline types, asset uploads, configuration
+- [Layer enforcement](layers.md) -- architectural layer rules for monorepos
+- [Native mobile targets](native-targets.md) -- Android and iOS version bumping
+
+## Reference
+
+- [Configuration](configuration.md) -- `.rlsbl/config.json` format and all keys
 - [Release targets](targets.md) -- the 18 supported ecosystems
-- [Monorepo guide](monorepo.md) -- workspace management and subtree publishing
-- [Configuration reference](configuration.md) -- config file formats
+- [Monorepo](monorepo.md) -- workspace management, subtree publishing, batch releases
+- [CI customization](ci-customization.md) -- custom workflow files that survive scaffold
+- [CLI reference](cli-index.md) -- all commands and options (auto-generated)
+- [API reference](gen-index.md) -- module documentation (auto-generated)
