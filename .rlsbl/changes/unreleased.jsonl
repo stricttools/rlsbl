@@ -1,0 +1,1 @@
+{"commits":["f9550fd2c616bd8e09967adbe93b87a4f0a7f04d"],"user_facing":true,"description":"**Fix.** Watch auto-retry now deduplicates by workflow name, preventing multiple retries when parallel runs from the same workflow fail. Watch exits 0 (not 1) when no CI runs are found, since the release already succeeded.","type":"fix"}
