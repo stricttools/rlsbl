@@ -2,9 +2,19 @@
 
 # Changelog
 
-## 0.64.1
+## 0.64.2
 
-Fix dead-modules false positives and watch test notification leak.
+Fix Docker metadata false positive in scaffold check, add SSH host validation for subtree remotes.
+
+### Features
+
+- **New feature.** Validate that subtree remote SSH hosts match the origin remote host, catching misconfigured mirror URLs early.
+
+### Fixes
+
+- **Fix.** Exclude Docker metadata-action `type=semver,pattern=` lines from the `scaffold-unreplaced-vars` check. These lines use `{{version}}`, `{{major}}`, `{{minor}}`, and `{{patch}}` as Docker's own template syntax, not unreplaced rlsbl variables.
+
+## 0.64.1
 
 ### Features
 
