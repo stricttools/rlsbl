@@ -212,7 +212,7 @@
     "description": "f934ebcc70f1b9dc3c86b2020fcfac4db46bd2cd252d78e4d5989f59cc429886"
   },
   "en/configuration.md": {
-    "content": "d165de3f7aaaeb49565c8e24cf6b085c5f36d345fb08e25244726608e17bb12b",
+    "content": "1d3eef641f63f21c841b32951add7624fb40a5319d5d8b28a9576649ee2b2c9a",
     "description": "2b299140b2d961d153c7d61904667008c1a2e33081bb58950272063a9eb3c519"
   },
   "en/dep-validation.md": {
@@ -252,7 +252,7 @@
     "description": "ca9471a2ce000308cfb11084b3f86109c722f10f835ddddab6dae624881b77d6"
   },
   "en/pipelines.md": {
-    "content": "b1cf492275ab298b6cdd24805e8b57d2c880e7a26ee65dcd089f964b17e8cc37",
+    "content": "58e71ce3aa22e5159159600cf5d3bf773d6bf51deaf89bce7e04682b2665cd02",
     "description": "e4917a2539e1ecd39d47407fd8ef61030e1269ba0bd03dd093af4826acb1dd7c"
   },
   "en/release-workflow.md": {
@@ -416,7 +416,7 @@
     "description": "a9c0938a30ef1aacfdeab9df2cf3701459a8dd0a01cbe0a703742e9c897e110c"
   },
   "en/rlsbl-commands-watch.md": {
-    "content": "18a8839b1222fa180c502a20a5e313106c4943164d689ce67336b008c8288886",
+    "content": "ec185537eb094ac5a7d13111a7781f930fbfc7444fc886fbccd22699fd6a9d12",
     "description": "843dedbc392e99defd28a25c885a848b66921b1cd23bddfb6b3884b521f2fd3d"
   },
   "en/rlsbl-commands-yank.md": {
@@ -720,7 +720,7 @@
     "description": "dde07f52c4d5e3d08d727807719615f86fd1fa3d22a9a9110ee8fe6f39bd53cf"
   },
   "en/targets.md": {
-    "content": "bf1efe5926339dd9d3a19951e1f46d3e74495ed8152ff2498b35f3a87bd2c816",
+    "content": "2e7812949612fc31cc6b4a5891678ea7ecb8f112e4c1459f2023cb725fd1eb54",
     "description": "8bcbe7503223060111d5451512a58bc6852de68f5d5f5def88d6b6a5731837c0"
   },
   "gen-index.md": {
