@@ -22,6 +22,7 @@ See the [README](https://github.com/smm-h/rlsbl#readme) for installation and qui
 - [Check system](checks.md) -- 44 diagnostic checks across 5 tags
 - [Deployment](deploy.md) -- deploy targets, post-release hooks, Cloudflare Pages
 - [Development workflow](dev-workflow.md) -- editable installs, pre-push hook, local testing
+- [Utility commands](utilities.md) -- status, discover, migrate, record-gif, and other helpers
 
 ## Architecture
 
