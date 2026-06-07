@@ -711,6 +711,38 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
         if "CF_ACCOUNT_ID" in os.environ and "CLOUDFLARE_ACCOUNT_ID" not in os.environ:
             os.environ["CLOUDFLARE_ACCOUNT_ID"] = os.environ["CF_ACCOUNT_ID"]
 
+    # Validate pipeline config and env vars BEFORE any mutating operations.
+    # These checks used to run after commit/tag/push/GitHub Release, which
+    # meant a failed check would leave a half-published release.
+    if config.get("publish") is not None:
+        print(
+            "Error: the 'publish' key in .rlsbl/config.json is no longer recognized. "
+            "Use 'pipelines' instead.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if config.get("pipelines") is None:
+        print(
+            "Error: no 'pipelines' key in .rlsbl/config.json. "
+            "Add a pipelines section or run 'rlsbl scaffold'.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    # Load pipelines and validate env vars for local pipelines
+    _early_pipelines = load_pipelines(config)
+    missing_vars = []
+    for pl_name, pl in _early_pipelines.items():
+        if pl.local:
+            for var in pl.required_env_vars():
+                if var not in os.environ:
+                    missing_vars.append(f"  pipeline '{pl_name}' requires {var}")
+    if missing_vars:
+        print("Error: missing environment variables for local pipelines:", file=sys.stderr)
+        for line in missing_vars:
+            print(line, file=sys.stderr)
+        sys.exit(1)
+
     reg = TARGETS[registry]
 
     # Check prerequisites
@@ -1579,36 +1611,8 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
     # Upload release assets for pipelines with assets/custom_assets config
     upload_release_assets(tag, new_version, log, flags, ctx=ctx)
 
-    # Three-state pipeline config cascade
-    release_config = ctx.config
-    if release_config.get("publish") is not None:
-        print(
-            "Error: the 'publish' key in .rlsbl/config.json is no longer recognized. "
-            "Use 'pipelines' instead.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-    if release_config.get("pipelines") is None:
-        print(
-            "Error: no 'pipelines' key in .rlsbl/config.json. "
-            "Add a pipelines section or run 'rlsbl scaffold'.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    # Load pipelines and validate env vars for local pipelines
-    release_pipelines = load_pipelines(release_config)
-    missing_vars = []
-    for pl_name, pl in release_pipelines.items():
-        if pl.local:
-            for var in pl.required_env_vars():
-                if var not in os.environ:
-                    missing_vars.append(f"  pipeline '{pl_name}' requires {var}")
-    if missing_vars:
-        print("Error: missing environment variables for local pipelines:", file=sys.stderr)
-        for line in missing_vars:
-            print(line, file=sys.stderr)
-        sys.exit(1)
+    # Load pipelines for the publish step (validation already ran in run_cmd)
+    release_pipelines = load_pipelines(ctx.config)
 
     # Publish step: skip for private repos (they don't publish to registries)
     is_private = ctx.config.get("private", False)
