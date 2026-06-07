@@ -1,1 +1,2 @@
 {"commits":["1e9a957390e51f2d96fb4c496f6c2a4ff614955d"],"user_facing":true,"description":"**Fix.** Batch size check test updated to account for hint message in failure details.","type":"fix"}
+{"commits":["c6b0200fc7142996dbf4b5c772015c8b09bb9876"],"user_facing":false}
