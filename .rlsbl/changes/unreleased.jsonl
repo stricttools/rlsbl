@@ -1,3 +1,0 @@
-{"commits":["ffa7805f381c1e3c9cbed99775dcc199d8b31b92"],"user_facing":true,"description":"**Fix.** Exclude Docker metadata-action `type=semver,pattern=` lines from the `scaffold-unreplaced-vars` check. These lines use `{{version}}`, `{{major}}`, `{{minor}}`, and `{{patch}}` as Docker's own template syntax, not unreplaced rlsbl variables.","type":"fix"}
-{"commits":["45890190d6c891e94ef4838998ea21af7113c42c"],"user_facing":true,"description":"**New feature.** Validate that subtree remote SSH hosts match the origin remote host, catching misconfigured mirror URLs early.","type":"feature"}
-{"commits":["e7300ddbe740fcb12c3f5a21acb116269598ec78"],"user_facing":false}
