@@ -30,6 +30,22 @@ Deploy targets are defined in `.rlsbl/config.json` under the `deploy_targets` ke
 | `health` | object | (none) | Health check configuration (see below) |
 | `rollback_steps` | array of strings | (none) | Commands to execute if health check fails after deployment |
 
+## Environment variable expansion
+
+The `host` and `ssh_key` fields support `$VAR` syntax for referencing environment variables. Expansion happens from the process environment (`os.environ`) at deploy time — both during config validation and during execution.
+
+The pattern matches `$` followed by a valid identifier (`[A-Za-z_][A-Za-z0-9_]*`). If the referenced variable is not set in the environment, the deploy fails with a hard error: `Environment variable $VAR is not set`.
+
+Examples:
+
+- `"host": "$DEPLOY_HOST"` resolves from `os.environ["DEPLOY_HOST"]`
+- `"ssh_key": "$HOME/.ssh/deploy_key"` expands `$HOME` from the environment, leaving `/.ssh/deploy_key` as a literal suffix
+- `"host": "10.0.0.$SUFFIX"` expands only `$SUFFIX`, keeping the prefix literal
+
+Multiple variables in a single value are expanded independently. The expansion is not recursive — the result of expanding one variable is not scanned for further `$` references.
+
+The `env` field (environment variables exported on the remote host) does NOT undergo local expansion. Those values are passed as-is to the remote shell.
+
 ## Health checks
 
 Health checks verify that the deployment succeeded by probing the remote service. Three types are supported:

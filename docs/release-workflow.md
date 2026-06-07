@@ -54,6 +54,36 @@ For pre-stable projects (0.x.x), breaking changes are a minor bump. Never bump t
 - **description** (mandatory): A short summary of the release. Appears as a paragraph under the version heading in CHANGELOG.md and as the GitHub Release title suffix.
 - **context** (optional): Multiline explanation of design decisions, rename rationale, or migration notes. Renders as a collapsible `<details>` block in CHANGELOG.md.
 
+### Per-target configuration sections
+
+Some targets require additional configuration in the release file via `[targets.<name>]` sections. Currently, this applies to the Flutter target.
+
+**Flutter target** requires a `[targets.flutter]` section with a `mode` field. Valid modes:
+
+| Mode | Description |
+| --- | --- |
+| `ota` | Over-the-air update (code push without a full app store rebuild) |
+| `build` | Full build release (triggers app store build pipeline) |
+
+If a Flutter target is listed in `include` but has no corresponding `[targets.flutter]` section with a `mode` field, the release file validation fails with a hard error.
+
+Example with Flutter per-target config:
+
+```toml
+# .rlsbl/releases/unreleased.toml
+bump = "minor"
+description = "Add offline sync support"
+include = ["flutter"]
+exclude = []
+
+[targets.flutter]
+mode = "build"
+```
+
+`rlsbl release init` auto-generates the `[targets.flutter]` section with `mode = "build"` as the default when a Flutter target is detected. Change the mode before running `rlsbl release run` if an OTA release is intended.
+
+Target config sections for targets not listed in `include` are rejected as validation errors. Only fields documented for a target type are allowed — unknown fields cause a hard error.
+
 ## Release pipeline order
 
 The 18 steps execute in this exact order:
