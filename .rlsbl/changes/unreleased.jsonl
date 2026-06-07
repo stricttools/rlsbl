@@ -1,1 +1,2 @@
 {"commits":["5059d2f665a0ecb85e268925c1cf830f9994cad4"],"user_facing":true,"description":"**Fix.** Exclude `.selfdoc`, `_build`, and browser asset directories from dead-modules scan to prevent false positives.","type":"fix"}
+{"commits":["669995d950067dae26bbed211600807bb17e1239"],"user_facing":true,"description":"**Fix.** Mock notifications and URL opens in watch tests to prevent desktop notification spam during test runs.","type":"fix"}
