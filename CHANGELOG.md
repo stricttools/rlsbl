@@ -2,16 +2,15 @@
 
 # Changelog
 
+## 0.65.1
+
+Fix CI test failure from batch hint message
+
+### Fixes
+
+- **Fix.** Batch size check test updated to account for hint message in failure details.
+
 ## 0.65.0
-
-Documentation overhaul and notification UX fix
-
-<details>
-<summary>Context</summary>
-
-Comprehensive docs rewrite (13 new guide pages, 2600+ lines), notification click-to-open fix, pipeline env var validation ordering fix, and new --allow-batch flag for changelog add.
-
-</details>
 
 ### Features
 
