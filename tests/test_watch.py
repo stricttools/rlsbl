@@ -632,11 +632,26 @@ class TestNotifyUrl:
     """Tests for _notify with URL opening and _open_url."""
 
     @patch("rlsbl.commands.watch._open_url")
-    @patch("rlsbl.commands.watch.require_tool", return_value=None)
-    def test_notify_opens_url_when_provided(self, mock_tool, mock_open):
-        """When url is passed, _open_url is called."""
-        _notify("title", "body", url="https://example.com")
+    @patch("rlsbl.commands.watch.subprocess.run")
+    @patch("rlsbl.commands.watch.require_tool", return_value=True)
+    def test_notify_opens_url_on_action_click(self, mock_tool, mock_run, mock_open):
+        """When user clicks the notification action, _open_url is called."""
+        mock_run.return_value = subprocess.CompletedProcess([], 0, stdout="open\n", stderr="")
+        with patch("rlsbl.commands.watch.sys") as mock_sys:
+            mock_sys.platform = "linux"
+            _notify("title", "body", url="https://example.com")
         mock_open.assert_called_once_with("https://example.com")
+
+    @patch("rlsbl.commands.watch._open_url")
+    @patch("rlsbl.commands.watch.subprocess.run")
+    @patch("rlsbl.commands.watch.require_tool", return_value=True)
+    def test_notify_no_open_on_dismiss(self, mock_tool, mock_run, mock_open):
+        """When notification is dismissed without clicking, _open_url is not called."""
+        mock_run.return_value = subprocess.CompletedProcess([], 0, stdout="", stderr="")
+        with patch("rlsbl.commands.watch.sys") as mock_sys:
+            mock_sys.platform = "linux"
+            _notify("title", "body", url="https://example.com")
+        mock_open.assert_not_called()
 
     @patch("rlsbl.commands.watch._open_url")
     @patch("rlsbl.commands.watch.require_tool", return_value=None)
@@ -708,15 +723,14 @@ class TestReleaseUrl:
 class TestNotifyUrlInRunCmd:
     """Tests that run_cmd passes the right URL to _notify."""
 
-    @patch("rlsbl.commands.watch._open_url")
-    @patch("rlsbl.commands.watch.require_tool", return_value=None)
+    @patch("rlsbl.commands.watch._notify")
     @patch("rlsbl.commands.watch._print_workflow_audit", return_value=False)
     @patch("rlsbl.commands.watch._watch_runs")
     @patch("rlsbl.commands.watch.poll_runs")
     @patch("rlsbl.commands.watch.time")
     @patch("rlsbl.commands.watch.run")
-    def test_failure_notification_opens_actions_url(
-        self, mock_run, mock_time, mock_poll, mock_watch, mock_audit, mock_tool, mock_open_url
+    def test_failure_notification_passes_actions_url(
+        self, mock_run, mock_time, mock_poll, mock_watch, mock_audit, mock_notify
     ):
         """On failure, _notify is called with the failed run's Actions URL."""
         ci_run = {"databaseId": 100, "name": "CI", "status": "in_progress"}
@@ -735,21 +749,19 @@ class TestNotifyUrlInRunCmd:
             run_cmd(None, ["abc123"], {})
 
         assert exc_info.value.code == 1
-        mock_open_url.assert_called_once_with(
-            "https://github.com/user/repo/actions/runs/100"
-        )
+        mock_notify.assert_called_once()
+        assert mock_notify.call_args[1]["url"] == "https://github.com/user/repo/actions/runs/100"
 
-    @patch("rlsbl.commands.watch._open_url")
-    @patch("rlsbl.commands.watch.require_tool", return_value=None)
+    @patch("rlsbl.commands.watch._notify")
     @patch("rlsbl.commands.watch._print_workflow_audit", return_value=False)
     @patch("rlsbl.commands.watch._watch_runs")
     @patch("rlsbl.commands.watch.poll_runs")
     @patch("rlsbl.commands.watch.time")
     @patch("rlsbl.commands.watch.run")
-    def test_success_notification_opens_release_url_with_tag(
-        self, mock_run, mock_time, mock_poll, mock_watch, mock_audit, mock_tool, mock_open_url
+    def test_success_notification_passes_release_url_with_tag(
+        self, mock_run, mock_time, mock_poll, mock_watch, mock_audit, mock_notify
     ):
-        """On success with a tag, _notify opens the release page for that tag."""
+        """On success with a tag, _notify is called with the release page URL."""
         ci_run = {"databaseId": 100, "name": "CI", "status": "in_progress"}
         mock_poll.side_effect = [
             [ci_run],
@@ -766,9 +778,8 @@ class TestNotifyUrlInRunCmd:
             run_cmd(None, ["abc123"], {})
 
         assert exc_info.value.code == 0
-        mock_open_url.assert_called_once_with(
-            "https://github.com/user/repo/releases/tag/v2.0.0"
-        )
+        mock_notify.assert_called_once()
+        assert mock_notify.call_args[1]["url"] == "https://github.com/user/repo/releases/tag/v2.0.0"
 
 
 if __name__ == "__main__":

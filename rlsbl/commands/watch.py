@@ -35,10 +35,9 @@ def _release_url(repo_slug):
 
 
 def _notify(title, body, url=None):
-    """Send a desktop notification and optionally open a URL. Non-fatal if unavailable."""
+    """Send a desktop notification. If url is provided, opens it only when the user clicks the notification action."""
     try:
         if sys.platform == "darwin":
-            # Escape double quotes to prevent AppleScript injection
             escaped_title = title.replace('"', '\\"')
             escaped_body = body.replace('"', '\\"')
             subprocess.run(
@@ -47,14 +46,15 @@ def _notify(title, body, url=None):
                 timeout=5, capture_output=True,
             )
         elif require_tool("notify-send", fatal=False):
-            subprocess.run(
-                ["notify-send", "-u", "normal", title, body],
-                timeout=5, capture_output=True,
-            )
+            cmd = ["notify-send", "-u", "normal"]
+            if url:
+                cmd += ["--action", "open=Open"]
+            cmd += [title, body]
+            result = subprocess.run(cmd, timeout=120, capture_output=True, text=True)
+            if url and result.stdout.strip() == "open":
+                _open_url(url)
     except Exception:
         pass
-    if url:
-        _open_url(url)
 
 
 def _retry_workflow(workflow_name, branch, repo_slug, label):
