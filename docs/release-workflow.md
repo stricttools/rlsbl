@@ -12,7 +12,7 @@ Releases are atomic — if any step fails, the release aborts without leaving pa
 
 ## Prerequisites
 
-Before running `rlsbl release run`, ensure:
+Before running `rlsbl release run`, the project must satisfy several preconditions. Each is enforced as a hard error at the start of the release flow — the release aborts immediately with a clear message indicating which requirement failed and how to fix it. Addressing these upfront avoids partial releases that need manual cleanup.
 
 | Requirement | How to verify | What happens if missing |
 | --- | --- | --- |
@@ -113,7 +113,7 @@ Steps 9 and 10 are conditionally skipped — see the hooks override mechanism be
 
 ## Hooks
 
-Three hook files in `.rlsbl/hooks/`:
+Three shell scripts in `.rlsbl/hooks/` provide extension points at different stages of the release pipeline. Each hook runs in the project root directory with the new version available as `$RLSBL_VERSION`. A non-zero exit code from `pre-checks.sh` or `pre-release.sh` aborts the release immediately, while `post-release.sh` failures are logged but do not roll back the already-published release.
 
 | Hook | Runs at step | Ownership | Three-way merged on scaffold | Failure behavior |
 | --- | --- | --- | --- | --- |
@@ -136,6 +136,8 @@ This means an unmodified scaffold hook or a missing hook file is considered "eff
 
 ## Flags
 
+`rlsbl release run` accepts both global flags (shared with all rlsbl commands) and release-specific flags that control working tree validation and post-release CI monitoring. The `--watch` and `--no-watch` flags are mutually exclusive — exactly one must be specified when running non-interactively with `--yes`.
+
 | Flag | Effect |
 | --- | --- |
 | `--dry-run` | Preview the entire flow without making changes (no commits, tags, pushes, or GitHub Releases) |
@@ -147,6 +149,8 @@ This means an unmodified scaffold hook or a missing hook file is considered "eff
 `--dry-run`, `--yes`, and `--quiet` are global flags available on all rlsbl commands. `--allow-dirty`, `--watch`, and `--no-watch` are release-specific.
 
 ## Related commands
+
+The `release` command group provides 6 subcommands covering the full release lifecycle — from scaffolding the release file through post-release corrections and rollbacks. Each subcommand is designed for a specific phase: `init` prepares, `run` executes, `retry` recovers from CI failures, `edit` corrects release notes, `undo` reverts a bad release, and `yank` deprecates old versions.
 
 | Command | Purpose |
 | --- | --- |

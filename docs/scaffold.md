@@ -1,5 +1,5 @@
 ---
-description: "How rlsbl scaffold generates CI workflows, git hooks, and config files, with three-way merge for safe repeated updates."
+description: "How rlsbl scaffold generates CI workflows, git hooks, and config files, with three-way merge preserving your customizations on repeated updates."
 ---
 
 # Scaffold system
@@ -56,7 +56,7 @@ For legacy projects scaffolded before the merge system existed, there is no base
 
 ## File ownership
 
-Scaffold distinguishes two ownership categories that determine update behavior.
+Scaffold distinguishes two ownership categories that determine update behavior. User-owned files are created once and never touched again by scaffold, even with `--force` — they are fully yours to modify. Scaffold-managed files are maintained via the three-way merge system described above, receiving template updates while preserving your local edits wherever possible.
 
 ### User-owned files
 
@@ -93,7 +93,7 @@ Use `--force` when:
 
 ## Template variables
 
-Templates use `{{variableName}}` placeholders resolved at scaffold time. Variables come from the target's `template_vars()` method and project metadata.
+Templates use `{{variableName}}` placeholders resolved at scaffold time. Variables come from the target's `template_vars()` method and project metadata. Each release target (npm, pypi, go, etc.) provides its own set of variables, and scaffold renders all templates in a single pass — unresolved placeholders are treated as hard errors rather than being left in the output as broken references.
 
 Common variables:
 
@@ -151,7 +151,7 @@ Each sub-project gets its own `.rlsbl/` directory with config, hooks, and change
 
 ## Related checks
 
-Two quality checks detect scaffold problems:
+Two quality checks detect scaffold problems that would otherwise surface only at CI time or cause silent misbehavior. Both run as part of `rlsbl check --all` and `rlsbl check --tag quality`, so they are evaluated automatically during the release pipeline and can also be invoked independently for quick verification after a scaffold run.
 
 | Check | Severity | What it detects |
 | --- | --- | --- |
