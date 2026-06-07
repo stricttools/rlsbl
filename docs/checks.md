@@ -1,5 +1,5 @@
 ---
-description: "Complete reference for rlsbl's 44 project checks across 5 tags, including check metadata, severity levels, and target applicability."
+description: "Complete reference for rlsbl's 44 checks across 5 tags, including check metadata, severity levels, and target applicability."
 ---
 
 # Check system
