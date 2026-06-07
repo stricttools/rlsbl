@@ -1,3 +1,4 @@
 {"commits":["f9550fd2c616bd8e09967adbe93b87a4f0a7f04d"],"user_facing":true,"description":"**Fix.** Watch auto-retry now deduplicates by workflow name, preventing multiple retries when parallel runs from the same workflow fail. Watch exits 0 (not 1) when no CI runs are found, since the release already succeeded.","type":"fix"}
 {"commits":["f24a0f8cbad323e933737bcc56e96205792ff286","c64c6c54d713106784f2819d09aaca29855ba2db","f6dc99baf9f1f502434ec086cad8079da39fb2c4","8b2ff787cb4a33a9b78f4715dabf229bf66d1eae"],"user_facing":true,"description":"**Feature.** Documentation expanded: new utility commands guide, fixed pipeline per-type inaccuracies, added Flutter release config and deploy env var expansion docs, improved section intros for AI citation.","type":"feature"}
 {"commits":["7e8956cc8a1dccaf015061b12c06910e7608ab93","ace1019748dd285d848e6713504aa4ba88d57818"],"user_facing":false}
+{"commits":["4ff1fb4c5d8db307fdd50821071c1d6f52675a5e"],"user_facing":false}
