@@ -3,3 +3,4 @@
 {"commits":["824dc7a443c529fbe7f604a2dfea9248dab6269c","b8915df7e2a993faad7d73f2c610e94becc70b57"],"user_facing":false}
 {"commits":["2ecd321e9e08f7a98d0f8ba6598487eb592996fe"],"user_facing":true,"description":"**New.** Auto-retry failed CI workflows once before reporting failure.","type":"feature"}
 {"commits":["aacb64263e5e43b742e561da2cd21fc4b008d93b"],"user_facing":true,"description":"**New.** Open GitHub Actions page on CI failure and Release page on success when watch notifications fire.","type":"feature"}
+{"commits":["84d1e727439e2c31e20d8248b2c70621a1448942"],"user_facing":false}
