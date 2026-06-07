@@ -105,7 +105,7 @@ Custom assets allow attaching arbitrary build artifacts to GitHub Releases. The 
 
 ## Capability gating
 
-Pipeline steps are gated on target capabilities:
+Pipeline steps are gated on target capabilities. Each release target declares which pipeline operations it supports, and rlsbl skips steps the target cannot handle rather than failing. This allows you to configure pipelines broadly without worrying about targets that lack publish or build support — the system gracefully omits inapplicable steps while still executing the rest of the release flow.
 
 | Capability | Effect when absent |
 | --- | --- |
@@ -116,7 +116,7 @@ This means a target that does not support publishing (e.g., a documentation-only
 
 ## Migration from old publish key
 
-The old `publish` key in `.rlsbl/config.json` is no longer recognized. Running `rlsbl release run` with a `publish` key present produces a **hard error** — no fallback, no deprecation warning.
+The old `publish` key in `.rlsbl/config.json` is no longer recognized. Running `rlsbl release run` with a `publish` key present produces a **hard error** — no fallback, no deprecation warning. The migration is mechanical: the new `pipelines` format is a strict superset of the old `publish` value, adding only a user-chosen name for each entry and an explicit `local` field. Most projects need fewer than 5 lines changed in their config.
 
 To migrate:
 
@@ -206,18 +206,18 @@ PyPI publishing happens in CI; docs deploy happens locally in a post-release hoo
 - **Class:** `TokenPipeline`
 - **Default token env var:** `NPM_TOKEN`
 - **Auth pattern:** Single token. CI workflow sets `//registry.npmjs.org/:_authToken` from the secret.
-- **Publish command:** Detects which package manager the project uses (npm, pnpm, or yarn) and runs the corresponding publish command (`npm publish`, `pnpm publish`, or `yarn npm publish`).
-- **CI template:** Generates the appropriate install and publish steps for the detected package manager.
-- **Quirks:** Package manager detection is based on lockfile presence (`package-lock.json` for npm, `pnpm-lock.yaml` for pnpm, `yarn.lock` for yarn). If multiple lockfiles exist, priority order is pnpm > yarn > npm.
+- **Publish command:** `npm publish --provenance --access public` (always uses npm CLI directly for local publish, regardless of which package manager the project uses).
+- **CI template:** Detects which package manager the project uses (npm, pnpm, or yarn) and generates the appropriate install and publish steps for that package manager.
+- **Quirks:** Package manager detection is based on lockfile presence (`package-lock.json` for npm, `pnpm-lock.yaml` for pnpm, `yarn.lock` for yarn). Priority order is pnpm > yarn > npm. Detection walks up directories until it finds a `.git` directory. The detection only affects CI template selection, not the local publish command.
 
 ### pypi
 
 - **Class:** `TokenPipeline`
 - **Default token env var:** `PYPI_TOKEN` (fallback: `TWINE_PASSWORD`)
 - **Auth pattern:** Dual-token fallback. Checks `PYPI_TOKEN` first, then `TWINE_PASSWORD`. However, the preferred approach is OIDC Trusted Publishing, which requires no token at all — CI authenticates via GitHub's OIDC provider and `pypa/gh-action-pypi-publish`.
-- **Publish command:** `uv publish` (preferred) or `twine upload dist/*` as fallback.
+- **Publish command:** `uv build` followed by `uv publish` (passes token via `UV_PUBLISH_TOKEN` env var). No twine fallback.
 - **CI template:** Uses `pypa/gh-action-pypi-publish` with `id-token: write` permission for OIDC.
-- **Quirks:** For new packages, a pending publisher must be configured on pypi.org before the first release. No local `uv publish` or token needed when using Trusted Publishing.
+- **Quirks:** For new packages, a pending publisher must be configured on pypi.org before the first release. No local `uv publish` or token needed when using Trusted Publishing. Overrides the base `TokenPipeline.publish()` method to implement dual-token resolution.
 
 ### go
 
@@ -258,26 +258,26 @@ PyPI publishing happens in CI; docs deploy happens locally in a post-release hoo
 ### maven
 
 - **Class:** `BasePipeline` (flexible auth)
-- **Default token env var:** Configurable; defaults to `MAVEN_TOKEN` or `GITHUB_TOKEN` depending on the target registry.
-- **Auth pattern:** Flexible — supports token-based auth for GitHub Packages and credential-based auth for Maven Central. Auth is typically configured in `~/.m2/settings.xml` or passed via environment variables.
+- **Default token env var:** `GITHUB_TOKEN` (configurable via `token_var` in pipeline config).
+- **Auth pattern:** Single token read from the configured `token_var` env var (defaults to `GITHUB_TOKEN`). Subclasses `BasePipeline` directly rather than `TokenPipeline` because it implements its own token resolution with a different default.
 - **Publish command:** Detects gradle vs maven build system. Runs `./gradlew publish` for Gradle projects or `mvn deploy` for Maven projects.
 - **CI template:** Generates appropriate publish steps based on detected build system and target registry.
-- **Quirks:** Build system detection is based on the presence of `build.gradle`, `build.gradle.kts` (Gradle), or `pom.xml` (Maven). Subclasses `BasePipeline` directly rather than `TokenPipeline` because auth configuration varies significantly between registries.
+- **Quirks:** Build system detection is based on the presence of a `gradlew` script (Gradle) or `pom.xml` (Maven) in the project directory. Errors if neither is found. Does not check for `build.gradle` or `build.gradle.kts` directly.
 
 ### docker
 
 - **Class:** `CredentialPipeline`
-- **Default token env var:** `DOCKER_USERNAME` + `DOCKER_PASSWORD`
+- **Default credential env vars:** `DOCKER_USERNAME` + `DOCKER_PASSWORD`
 - **Auth pattern:** Username and password pair. Both must be set. Configured via `username_var` and `password_var` in the pipeline config.
-- **Publish command:** `docker login` with the credentials, then `docker push` with the configured image and tag.
+- **Publish command:** `docker build` with `--build-arg VERSION=<version>`, then `docker push` with the versioned tag, then `docker tag` to create a `latest` tag, then pushes `latest`. No explicit `docker login` step in local publish (credentials are validated but login is assumed to be pre-configured).
 - **CI template:** Login step followed by build and push steps.
-- **Quirks:** Requires `image` and `registry` fields in the pipeline config to construct the full image reference. The image is tagged with the release version automatically.
+- **Quirks:** Requires `image` and `registry` fields in the pipeline config to construct the full image reference (`<registry>/<image>:<version>`). Both the versioned and `latest` tags are pushed.
 
 ### cloudflare-pages
 
 - **Class:** `BasePipeline`
-- **Default token env var:** None for local deploys (uses ambient auth via selfdoc CLI or Wrangler).
-- **Auth pattern:** No token needed for local deploys. Uses `CF_PAGES_API_TOKEN` and `CF_ACCOUNT_ID` from the environment when publishing locally via post-release hooks.
-- **Publish command:** Wraps `selfdoc deploy` or Wrangler CLI for direct Cloudflare Pages deployment.
+- **Default token env var:** None (uses `CF_PAGES_API_TOKEN` and `CF_ACCOUNT_ID` env vars for local deploys).
+- **Auth pattern:** Requires `CF_ACCOUNT_ID` and `CF_PAGES_API_TOKEN` from the environment when publishing locally. These are reported by `required_env_vars()`.
+- **Publish command:** `selfdoc deploy` (requires `selfdoc` on PATH). No Wrangler fallback.
 - **CI template:** Minimal — most Cloudflare Pages projects deploy locally from post-release hooks rather than CI.
-- **Quirks:** The simplest pipeline implementation. Primarily used for documentation sites that deploy alongside library releases. No registry authentication dance — just a deploy command.
+- **Quirks:** The simplest pipeline implementation. Primarily used for documentation sites that deploy alongside library releases. Requires `selfdoc` tool on PATH; errors if not found. 300-second timeout on the deploy command.
