@@ -7,6 +7,8 @@ from pathlib import Path
 _EXCLUDED_DIRS = frozenset({
     ".venv", "venv", "__pycache__", ".git", "node_modules",
     "build", "dist", ".tox", ".mypy_cache", ".pytest_cache", ".ruff_cache",
+    ".selfdoc", "_build",
+    "static", "public", "assets",
 })
 
 
