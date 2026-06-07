@@ -6,6 +6,7 @@ import subprocess
 import sys
 import time
 
+from ...git_util import validate_subtree_remote_ssh_host
 from ...utils import commit_files
 from ...workspace import find_workspace_root, load_workspace, save_workspace, WORKSPACE_DIR, WORKSPACE_FILE
 from ...workspace_graph import WorkspaceGraph
@@ -110,6 +111,10 @@ def _cmd_add(args, flags, project_root):
             if dep_name not in existing_names:
                 print(f"Error: Dependency '{dep_name}' does not exist in workspace.", file=sys.stderr)
                 sys.exit(1)
+
+    # Validate SSH host consistency between subtree_remote and origin
+    if subtree_remote:
+        validate_subtree_remote_ssh_host(subtree_remote, root)
 
     project = {"path": path, "name": name}
     if watch_raw:

@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 
+from ...git_util import validate_subtree_remote_ssh_host
 from ...utils import run
 from ...workspace import find_workspace_root, load_workspace
 
@@ -37,6 +38,9 @@ def _cmd_mirror(flags, project_root):
         print(f"Error: project '{project_name}' has no subtree_remote configured.", file=sys.stderr)
         print("Set it with: rlsbl monorepo add --subtree-remote <url> <path>", file=sys.stderr)
         sys.exit(1)
+
+    # Validate SSH host consistency between subtree_remote and origin
+    validate_subtree_remote_ssh_host(subtree_remote, root)
 
     # Validate remote is reachable
     try:

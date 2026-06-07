@@ -1,12 +1,15 @@
 """Shared path-filtering utilities for matching commits to projects.
 
 Provides functions to retrieve files changed by a commit, check whether
-a file belongs to a project (by path prefix or watch globs), and filter
-a set of commits to those touching a specific project's files.
+a file belongs to a project (by path prefix or watch globs), filter
+a set of commits to those touching a specific project's files, and
+validate SSH host consistency between origin and subtree remotes.
 """
 
 import fnmatch
+import re
 import subprocess
+import sys
 
 
 def get_commit_files(sha):
@@ -70,3 +73,75 @@ def filter_commits_for_project(commits, project):
                 filtered.add(sha)
                 break
     return filtered
+
+
+# -- SSH host validation for subtree remotes ---------------------------------
+
+# Matches git@HOST:owner/repo.git (SCP-like syntax)
+_SCP_RE = re.compile(r"^[^@]+@([^:]+):")
+
+# Matches ssh://git@HOST/owner/repo.git
+_SSH_URL_RE = re.compile(r"^ssh://[^@]+@([^/]+)")
+
+
+def extract_ssh_host(git_url):
+    """Extract the SSH host from a git URL.
+
+    Supports SCP-like syntax (git@host:owner/repo.git) and explicit SSH URLs
+    (ssh://git@host/owner/repo.git). Returns the host string, or None for
+    HTTPS URLs, empty strings, or unparseable formats.
+    """
+    if not git_url:
+        return None
+
+    # Check ssh:// scheme first to avoid the SCP regex matching it
+    m = _SSH_URL_RE.match(git_url)
+    if m:
+        return m.group(1)
+
+    m = _SCP_RE.match(git_url)
+    if m:
+        return m.group(1)
+
+    return None
+
+
+def validate_subtree_remote_ssh_host(subtree_remote, project_root):
+    """Validate that subtree_remote and origin use the same SSH host.
+
+    Hard error (sys.exit(1)) when both URLs are SSH and their hosts differ.
+    Silently passes when either URL is not SSH or when origin cannot be read.
+    """
+    # Read origin URL
+    try:
+        result = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            cwd=project_root,
+        )
+        if result.returncode != 0:
+            return
+        origin_url = result.stdout.strip()
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return
+
+    if not origin_url:
+        return
+
+    origin_host = extract_ssh_host(origin_url)
+    subtree_host = extract_ssh_host(subtree_remote)
+
+    # Only validate when both are SSH
+    if origin_host is None or subtree_host is None:
+        return
+
+    if origin_host != subtree_host:
+        print(
+            f"Error: subtree_remote uses SSH host '{subtree_host}' "
+            f"but origin uses '{origin_host}'. "
+            f"Use a URL with host '{origin_host}' instead.",
+            file=sys.stderr,
+        )
+        sys.exit(1)

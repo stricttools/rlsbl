@@ -16,6 +16,7 @@ from ..changelog import (
     get_changes_dir,
     validate_unreleased,
 )
+from ..git_util import validate_subtree_remote_ssh_host
 from ..config import read_deploy_config, read_json_config, should_tag
 from ..pipelines import load_pipelines
 from ..deploy import deploy_target
@@ -1546,6 +1547,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                 subtree_remote = None
 
             if subtree_remote:
+                validate_subtree_remote_ssh_host(subtree_remote, str(ctx.project_root))
                 plain_tag = target.tag_format(new_version)
                 log(f"Publishing subtree to {subtree_remote}...")
                 try:
