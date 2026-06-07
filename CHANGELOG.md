@@ -2,9 +2,28 @@
 
 # Changelog
 
-## 0.64.2
+## 0.65.0
 
-Fix Docker metadata false positive in scaffold check, add SSH host validation for subtree remotes.
+Documentation overhaul and notification UX fix
+
+<details>
+<summary>Context</summary>
+
+Comprehensive docs rewrite (13 new guide pages, 2600+ lines), notification click-to-open fix, pipeline env var validation ordering fix, and new --allow-batch flag for changelog add.
+
+</details>
+
+### Features
+
+- **Feature.** Comprehensive documentation overhaul: 13 new guide pages covering release workflow, changelog, scaffold, checks, deploy, dev workflow, import scanning, dependency validation, pipelines, layers, and native targets. Expanded targets, monorepo, and configuration references. Fixed stale check counts.
+- **Feature.** `changelog add --allow-batch` flag auto-creates a batch_limits exclusion when an entry exceeds the commit limit, preventing agents from splitting cohesive entries. Batch size check now runs at add-time (not just during release validation).
+
+### Fixes
+
+- **Fix.** Desktop notification no longer auto-opens browser unconditionally; URL opens only when the user clicks the notification action button.
+- **Fix.** Local pipeline env var validation now runs before mutating operations, preventing partial state on missing credentials.
+
+## 0.64.2
 
 ### Features
 

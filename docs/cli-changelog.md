@@ -24,6 +24,7 @@ Append a structured changelog entry to the project's unreleased.jsonl file. Each
 | `--type` |  | str |  |  | Entry type (feature, fix, breaking) |
 | `--no-user-facing` |  | bool |  |  | Mark as non-user-facing |
 | `--no-commit` |  | bool |  |  | Skip auto-commit of unreleased.jsonl |
+| `--allow-batch` |  | bool |  |  | Auto-create an exclusion if this entry exceeds the commit batch limit |
 
 ## changelog generate
 
