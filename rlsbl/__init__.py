@@ -663,7 +663,8 @@ chlog = app.group("changelog", help="Structured changelog management using JSONL
 @strictcli.flag(name="type", type=str, help="Entry type (feature, fix, breaking)", default="")
 @strictcli.flag(name="no-user-facing", type=bool, help="Mark as non-user-facing")
 @strictcli.flag(name="no-commit", type=bool, help="Skip auto-commit of unreleased.jsonl")
-def cmd_chlog_add(commits, description, type, no_user_facing, no_commit, **_kwargs):
+@strictcli.flag(name="allow-batch", type=bool, help="Auto-create an exclusion if this entry exceeds the commit batch limit")
+def cmd_chlog_add(commits, description, type, no_user_facing, no_commit, allow_batch, **_kwargs):
     root = _require_sub_project_root()
     flags = {
         "commits": commits,
@@ -671,6 +672,7 @@ def cmd_chlog_add(commits, description, type, no_user_facing, no_commit, **_kwar
         "type": type,
         "no-user-facing": no_user_facing,
         "no-commit": no_commit,
+        "allow-batch": allow_batch,
     }
     from .commands.changelog_cmd import cmd_add
     cmd_add(flags, project_root=root)

@@ -1,5 +1,6 @@
 """Changelog subcommands for adding new entries, amending released versions, and generating Markdown changelogs from JSONL sources."""
 
+import json
 import os
 import subprocess
 import sys
@@ -15,6 +16,8 @@ from ..changelog.files import (
 from ..changelog.generate import generate_changelog
 from ..changelog.resolve import resolve_hash
 from ..changelog.schema import ChangelogEntry, parse_jsonl, validate_schema
+from ..changelog.validate import _get_batch_limits_config
+from ..config import read_project_config
 from ..git_util import filter_commits_for_project
 from ..utils import commit_files
 from ..workspace import find_workspace_root, resolve_project
@@ -152,6 +155,42 @@ def cmd_add(flags, project_root):
         for err in errors:
             print(f"Error: schema validation: {err}", file=sys.stderr)
         sys.exit(1)
+
+    # Check batch size limit before writing
+    config = read_project_config(project_root)
+    batch_config = _get_batch_limits_config(config)
+    max_commits = batch_config.get("max_commits_per_entry", 5)
+    if len(resolved_commits) > max_commits:
+        allow_batch = flags.get("allow-batch", False)
+        if not allow_batch:
+            print(
+                f"Error: entry has {len(resolved_commits)} commits but the limit is "
+                f"{max_commits} (batch_limits.max_commits_per_entry in .rlsbl/config.json).\n"
+                f"Either split into smaller entries, add an exclusion to "
+                f"batch_limits.exclusions in .rlsbl/config.json, or re-run with "
+                f"--allow-batch to auto-create an exclusion.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        # Auto-create an exclusion in config.json
+        changes_dir_for_line = get_changes_dir(project_root)
+        existing_for_line = read_unreleased(changes_dir_for_line)
+        line_number = len(existing_for_line) + 1
+        reason = description[:60] if description else "non-user-facing batch"
+        exclusion = {
+            "reason": reason,
+            "entries": [{"version": "unreleased", "line": line_number}],
+        }
+        config_path = os.path.join(project_root, ".rlsbl", "config.json")
+        with open(config_path, "r", encoding="utf-8") as f:
+            config_data = json.load(f)
+        batch_limits = config_data.setdefault("batch_limits", {})
+        exclusions = batch_limits.setdefault("exclusions", [])
+        exclusions.append(exclusion)
+        with open(config_path, "w", encoding="utf-8") as f:
+            json.dump(config_data, f, indent=2)
+            f.write("\n")
+        print(f"Auto-created batch exclusion for line {line_number} in .rlsbl/config.json")
 
     changes_dir = get_changes_dir(project_root)
     existing = read_unreleased(changes_dir)

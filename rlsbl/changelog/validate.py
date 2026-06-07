@@ -454,6 +454,11 @@ def check_batch_size_commits(
                 f"{version}.jsonl line {line_num}: {len(entry.commits)} commits "
                 f"(max: {max_commits}) [{short_commits}]"
             )
+    if details:
+        details.append(
+            "Hint: add an exclusion to batch_limits.exclusions in .rlsbl/config.json, "
+            "or use `rlsbl changelog add --allow-batch` to auto-create one."
+        )
     return (len(details) == 0, details)
 
 
