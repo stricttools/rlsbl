@@ -1,1 +1,2 @@
 {"commits":["878311b45cf8e0080a706b58b5dee72f7dec0c0b"],"user_facing":true,"description":"**Fix.** Deprecated pre-push hook (old format) now creates proper workspace context at monorepo root, enabling all prepush checks including `test-suite-workspace`.","type":"fix"}
+{"commits":["27702812c8caa97a17c4fb47d658f816af0b4c41"],"user_facing":true,"description":"**Fix.** `check-name --target` now supports multiple values. Passing `--target npm --target pypi` checks both registries instead of silently ignoring the first. Invalid target names produce a hard error.","type":"fix"}
