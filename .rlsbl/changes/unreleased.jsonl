@@ -1,2 +1,3 @@
 {"commits":["07d8e35d9fc8a38494e7f19bbe8194e08daebd7b","3c5fc62b43907d90b1e3b3df9e24ca11f91ed5cc"],"user_facing":true,"description":"**Fix.** `deps-undeclared` check no longer flags imports inside `try/except ImportError` or `try/except ModuleNotFoundError` blocks. These are standard Python optional-dependency patterns and are now correctly recognized as intentionally unguarded.","type":"fix"}
 {"commits":["ba38c9b292c7fe8f0550df624c58a2c2eddcaa2e"],"user_facing":false}
+{"commits":["12f6881827eb470e4bf8b5a3f44acf390867b62a"],"user_facing":false}
