@@ -139,7 +139,7 @@ Created files are committed automatically by default.
 | `.rlsbl/hooks/pre-checks.sh` | User-customizable pre-checks validation |
 | `.rlsbl/hooks/pre-release.sh` | User-customizable pre-release validation |
 | `.rlsbl/hooks/post-release.sh` | User-customizable post-release actions |
-| `.git/hooks/pre-push` | One-liner: `exec rlsbl pre-push-check "$@"` |
+| `.git/hooks/pre-push` | Captures push refs, runs `rlsbl check --tag prepush` |
 | `.rlsbl/bases/` | Three-way merge bases for scaffold |
 
 **Three-way merge:** Bases are stored at scaffold time. On re-run, user customizations and template updates merge via `git merge-file`. Conflicts get git-style conflict markers.
@@ -169,7 +169,7 @@ rlsbl includes 50 checks across 6 tags.
 | (untagged) | 4 | Additional validation checks |
 
 ```
-rlsbl check --all              # run all 49 checks
+rlsbl check --all              # run all 50 checks
 rlsbl check --tag changelog    # run checks by tag
 rlsbl check --name lock        # run a single check
 ```
@@ -211,17 +211,22 @@ On partial failure, prints a structured summary table with remediation commands 
 
 ## Pre-push hook
 
-The `.git/hooks/pre-push` hook calls `rlsbl pre-push-check`, which:
+The `.git/hooks/pre-push` hook captures push refs from git and runs `rlsbl check --tag prepush`, which enforces:
 
-1. Detects project type (`package.json`, `pyproject.toml`, or `VERSION`)
-2. Extracts the current version
-3. Checks that `CHANGELOG.md` contains a `## <version>` heading
-4. Blocks the push if the entry is missing
+1. **Changelog coverage** -- every pushed commit must have a JSONL entry
+2. **Gitignore guard** -- rlsbl-managed files must not be gitignored
+3. **Manual push warning** -- warns when pushing to a release branch outside `rlsbl release`
+4. **Test suite** -- runs project tests (single-project) or affected project tests (monorepo)
+
+Old hooks that call `rlsbl pre-push-check` still work but show a deprecation warning. Run `rlsbl scaffold` to update to the current hook format.
 
 To reinstall manually:
 
 ```
-echo '#!/bin/sh' > .git/hooks/pre-push && echo 'exec rlsbl pre-push-check "$@"' >> .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+echo '#!/usr/bin/env bash' > .git/hooks/pre-push
+echo 'export RLSBL_PUSH_STDIN="$(cat)"' >> .git/hooks/pre-push
+echo 'exec rlsbl check --tag prepush' >> .git/hooks/pre-push
+chmod +x .git/hooks/pre-push
 ```
 
 ## Ecosystem tagging
