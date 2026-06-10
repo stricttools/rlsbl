@@ -131,4 +131,6 @@ The `only_on` field restricts which git branches can deploy to each target, prev
 
 ## Deploy module
 
+The deploy module implements target resolution, branch restriction enforcement, dry-run simulation, and the orchestration logic that connects named deploy configurations to their execution pipelines. It reads from `.rlsbl/config.json` and validates all preconditions before executing any deployment step.
+
 :-: ref path="rlsbl.deploy" lang="python"

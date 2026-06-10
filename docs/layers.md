@@ -116,7 +116,7 @@ This permits the `schema` project (a lower layer) to depend on `app` (a higher l
 
 ## Validation
 
-`validate_layer_assignments()` runs as part of layer checking and enforces structural correctness of the layer configuration itself, catching misconfigurations before dependency direction is even evaluated. It checks 4 invariants:
+`validate_layer_assignments()` runs as part of layer checking and enforces structural correctness of the layer configuration itself, catching misconfigurations before dependency direction is even evaluated. This validation step prevents confusing runtime errors by ensuring the layer definitions are internally consistent and cover all workspace projects. It checks 4 invariants:
 
 1. Every project in the workspace is assigned to exactly one layer (no gaps)
 2. No project matches patterns in multiple layers (no overlaps)

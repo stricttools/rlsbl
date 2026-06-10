@@ -24,7 +24,7 @@ A project with no pipelines configured simply does not publish anywhere — vers
 
 ## Configuration
 
-Each entry in the `pipelines` object is keyed by a user-chosen name:
+Pipelines are configured in `.rlsbl/config.json` under the `pipelines` key. Each entry is keyed by a user-chosen name (any valid JSON string) and requires at minimum a `type` field (one of 9 built-in types) and a `local` boolean field indicating whether publishing happens on the developer machine or in CI:
 
 ```json
 {
@@ -52,11 +52,13 @@ Each entry in the `pipelines` object is keyed by a user-chosen name:
 
 ## Pipeline types
 
+There are 9 built-in pipeline types covering all major package registries and deployment platforms. Each type implements ecosystem-specific authentication, build commands, and publish logic while sharing the common `BasePipeline` interface for custom assets and lifecycle hooks.
+
 :-: table-pipelines
 
 ## Class hierarchy
 
-All pipeline implementations inherit from `BasePipeline`, which provides no-op defaults for publish and build steps plus the shared `build_custom_assets()` implementation.
+All 9 pipeline implementations inherit from `BasePipeline`, which provides no-op defaults for publish and build steps plus the shared `build_custom_assets()` implementation. Two intermediate mixins add authentication patterns: `TokenPipeline` for single-token auth (5 pipelines) and `CredentialPipeline` for username/password pairs (1 pipeline).
 
 | Class | Auth pattern | Pipelines |
 | --- | --- | --- |
@@ -68,7 +70,7 @@ All pipeline implementations inherit from `BasePipeline`, which provides no-op d
 
 ## Custom assets
 
-Custom assets allow attaching arbitrary build artifacts to GitHub Releases. The flow during `rlsbl release run`:
+Custom assets allow attaching arbitrary build artifacts to GitHub Releases alongside the source code archive. Each asset has a user-defined build command, an expected output filename, and a configurable maximum file size enforced via `max_asset_size_mb` (no default -- must be explicitly set when assets are enabled). The complete 7-step flow during `rlsbl release run`:
 
 1. Config defines build commands and output filenames in `custom_assets`
 2. Creates distribution directory: `.rlsbl/dist/<pipeline-name>/`

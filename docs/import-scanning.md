@@ -61,7 +61,7 @@ Classifies a file as production vs test code by checking its path against known 
 
 ### _NON_PRODUCTION_PATTERNS
 
-Shared constant exposing the classification patterns as a dict with keys `test_dirs`, `example_dirs`, and `test_file_patterns`. Reused by both import_scanners.py and dep_validation.py to keep exclusion logic consistent.
+Shared constant exposing the file classification patterns as a dict with 3 keys: `test_dirs` (5 directory names like `test`, `tests`, `__tests__`), `example_dirs` (2 directory names), and `test_file_patterns` (7 glob patterns for test file naming conventions). This dict is reused by both `import_scanners.py` and `dep_validation.py` to keep production vs test classification consistent across all dependency checks.
 
 ## Per-language details
 
@@ -123,6 +123,8 @@ Dead-module analysis requires knowing which files serve as roots for BFS reachab
 | Dart | `lib/<package_name>.dart` (barrel file from `pubspec.yaml` name field) + all `bin/*.dart` scripts |
 
 ## Source modules
+
+The import scanning implementation spans 3 modules: `import_scanners` provides the per-language AST parsers and workspace-level import collection, `lint.protocol` defines the shared interface for lint rule implementations, and `lint.utils` contains utility functions for file walking, pattern matching, and result aggregation.
 
 :-: ref path="rlsbl.import_scanners" lang="python"
 

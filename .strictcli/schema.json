@@ -36,7 +36,7 @@
   },
   "project_id": "rlsbl",
   "name": "rlsbl",
-  "version": "0.66.4",
+  "version": "0.67.0",
   "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 32 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
   "global_flags": [
     {
@@ -189,7 +189,10 @@
         {
           "name": "target",
           "type": "str",
-          "help": "Target registry (npm, pypi, or go)"
+          "help": "Target registry (npm, pypi, or go)",
+          "default": [],
+          "repeatable": true,
+          "unique": true
         },
         {
           "name": "delay",
@@ -725,7 +728,7 @@
         },
         "mirror": {
           "name": "mirror",
-          "help": "Initialize a subtree mirror repository for a monorepo project. Splits the project's subtree, pushes it to the configured subtree_remote, clones the mirror, scaffolds rlsbl CI, and pushes the result.",
+          "help": "Initialize a subtree mirror repository for a monorepo project by performing a full git subtree split of the project's history, pushing the extracted tree to the configured subtree_remote URL, cloning the resulting standalone mirror repository, running rlsbl scaffold to generate CI workflows for independent publishing, and pushing the scaffolded mirror to its remote.",
           "args": [
             {
               "name": "project",

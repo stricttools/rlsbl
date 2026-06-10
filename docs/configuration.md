@@ -26,7 +26,7 @@ Configuration precedence for tagging: CLI flag (`--no-tag`) > project config > u
 
 ### batch_limits
 
-The `batch_limits` object controls the `batch_size_commits` and `batch_size_entries` changelog validation checks. Both checks produce blocking errors when they fail.
+The `batch_limits` object controls the `batch_size_commits` and `batch_size_entries` changelog validation checks, which prevent excessively large changelog entries that obscure individual change attribution. Both checks produce blocking errors when they fail, and violations must be resolved before releasing. Default limits allow a maximum of 5 commits per entry and 5 entries per commit.
 
 | Field | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -140,6 +140,8 @@ Example config:
 
 ## User-level configuration
 
+The user-level configuration file at `~/.rlsbl/config.json` provides personal defaults that apply across all rlsbl-managed projects on the machine. It uses the same JSON schema as the project-level config, but with lower precedence -- project-level settings always override user-level ones, and CLI flags override both.
+
 Location: `~/.rlsbl/config.json`
 
 This optional file uses the same JSON format as the project-level `.rlsbl/config.json`. It provides personal defaults that apply to all rlsbl-managed projects when a given key is not set at the project level.
@@ -169,7 +171,7 @@ Example `~/.rlsbl/config.json`:
 
 ## CLI flag overrides
 
-Some CLI flags override config.json keys for a single invocation. Most global flags are runtime-only and have no persistent config equivalent.
+Some CLI flags override config.json keys for a single invocation, providing temporary behavior changes without modifying the persistent configuration. Most global flags like `--dry-run`, `--yes`, and `--quiet` are runtime-only and have no persistent config equivalent, affecting only the current command execution.
 
 | Flag | Config key | Scope | Effect |
 | --- | --- | --- | --- |

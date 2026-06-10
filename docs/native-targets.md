@@ -26,7 +26,7 @@ Both targets are **conditionally auto-detectable** — they only activate when s
 
 ### Detection
 
-The native-ios target uses a multi-step activation check that ensures it only applies to genuine Xcode app projects, not Swift packages or other iOS-adjacent project types. The target activates when:
+The native-ios target uses a 3-step activation check that ensures it only applies to genuine Xcode app projects, not Swift packages or other iOS-adjacent project types. The target activates when all 3 conditions are met:
 
 1. No `Package.swift` is present in the project root (SPM projects use the `swift` target instead)
 2. At least one `*.xcodeproj` directory exists containing a `project.pbxproj` file
@@ -36,7 +36,7 @@ Alternatively, Tuist-managed projects are detected via `Project.swift` containin
 
 ### Version reading
 
-Version is extracted from the Xcode project's pbxproj file using regex-based inline parsing. The pattern matches the `MARKETING_VERSION` build setting, which corresponds to `CFBundleShortVersionString` in the app bundle:
+Version is extracted from the Xcode project's pbxproj file using regex-based inline parsing rather than a full plist parser, since pbxproj files use a non-standard ASCII plist variant. The pattern matches the `MARKETING_VERSION` build setting, which corresponds to `CFBundleShortVersionString` in the app bundle and is the user-visible version string displayed on the App Store:
 
 ```
 MARKETING_VERSION\s*=\s*([^;]+);
@@ -46,11 +46,11 @@ The matched value is stripped of whitespace and quotes.
 
 ### Build number
 
-`CURRENT_PROJECT_VERSION` is auto-incremented as an integer on each release, independent of the marketing version. This corresponds to `CFBundleVersion` in the app's Info.plist and is required by App Store Connect for each binary submission. Apple requires the build number to be strictly increasing within each marketing version.
+`CURRENT_PROJECT_VERSION` is auto-incremented as an integer (e.g., 1, 2, 3, ...) on each release, independent of the marketing version string. This corresponds to `CFBundleVersion` in the app's Info.plist and is required by App Store Connect for each binary submission. Apple requires the build number to be strictly increasing within each marketing version, so rlsbl reads the current integer value and writes value + 1 during every release bump.
 
 ### Multi-target projects
 
-When multiple `*.xcodeproj` directories exist, the target uses the **first** xcodeproj (alphabetically) that contains version keys in its pbxproj. All version-containing xcodeproj files are updated during a version bump.
+When multiple `*.xcodeproj` directories exist in the project root, the target uses the **first** xcodeproj (sorted alphabetically) that contains version keys in its pbxproj for reading the current version. During a version bump, all xcodeproj files containing version keys are updated simultaneously to maintain consistency across app targets, extensions, and frameworks within the same project.
 
 ### Tuist support
 
@@ -68,7 +68,7 @@ Returns `None` because the actual file depends on which xcodeproj is found at ru
 
 ### Detection
 
-The native-android target uses content inspection to distinguish Android application modules from library modules, preventing false positives on projects that should use the Maven target instead. The target activates when:
+The native-android target uses content inspection with 3 conditions to distinguish Android application modules from library modules, preventing false positives on projects that should use the Maven target instead. The target activates when:
 
 1. A `build.gradle` or `build.gradle.kts` file exists in the project root
 2. The file contains the `com.android.application` plugin declaration
@@ -92,7 +92,7 @@ Both Groovy DSL (build.gradle) and Kotlin DSL (build.gradle.kts) use the same pa
 
 ### Build number
 
-`versionCode` is auto-incremented (integer bump) on each release. This integer is required by Google Play for each APK/AAB upload and must be strictly increasing.
+`versionCode` is auto-incremented as an integer (e.g., 1, 2, 3, ...) on each release, independent of the semver version string. This integer is required by Google Play for each APK/AAB upload and must be strictly increasing -- rlsbl reads the current value from build.gradle and writes value + 1 during every version bump.
 
 ### Version writing
 

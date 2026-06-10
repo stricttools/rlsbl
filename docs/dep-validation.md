@@ -59,12 +59,12 @@ Detects source files that are unreachable from any entry point via BFS on the fi
 3. BFS from all entry points
 4. Report files in production code that are never reached
 
-**Exclusions (common to all languages):**
+**Exclusions (6 categories, common to all languages):**
 
-- Test files (matching `_NON_PRODUCTION_PATTERNS`)
+- Test files (matching 7 patterns from `_NON_PRODUCTION_PATTERNS`)
 - `.selfdoc` directories
 - `_build` directories
-- Browser asset directories (`static`, `public`, `assets`)
+- Browser asset directories (`static`, `public`, `assets` -- 3 directory names)
 - Generated files (`.g.dart` for Dart)
 
 **Per-language behavior:**
@@ -78,7 +78,7 @@ Detects source files that are unreachable from any entry point via BFS on the fi
 
 ### circular-deps
 
-Strongly connected components (Tarjan's algorithm) in the file-level import graph. Only cycles with 2+ nodes are reported (self-loops are not flagged).
+Detects circular dependencies by computing strongly connected components using Tarjan's algorithm on the file-level import graph. Only cycles involving 2 or more distinct nodes are reported as violations; self-loops (a file importing itself) are not flagged since they are harmless in all supported languages.
 
 **Severity by language:**
 
@@ -91,7 +91,7 @@ Strongly connected components (Tarjan's algorithm) in the file-level import grap
 
 ### library-lint
 
-Enforces quality constraints specific to library packages by detecting imports and patterns that are inappropriate for reusable code consumed by other projects:
+Enforces quality constraints specific to library packages published for consumption by other projects. This check detects imports, I/O patterns, and platform-specific APIs that are inappropriate for reusable library code and would cause problems for downstream consumers:
 
 - Detects imports inappropriate for library code (e.g., `dart:io` in a pure Dart library)
 - Detects stdout/stderr writes in library code (libraries should not print directly)
@@ -118,6 +118,8 @@ The `dead-workspace-packages` check operates at the workspace level, identifying
 Published libraries may still be consumed externally, so zero workspace importers is a warning, not an error.
 
 ## Language support matrix
+
+The following matrix shows which dependency validation checks are supported for each of the 4 languages with import scanning (Python, Go, npm/JS/TS, and Dart). Not all checks apply to every language -- for example, Go's compiler natively rejects circular imports, so rlsbl skips that check for Go projects.
 
 :-: table-feature-matrix
 
@@ -147,6 +149,8 @@ Controls batch size validation for changelog entries, limiting how many commits 
 | `exclusions` | array | `[]` | Per-violation silencers, each with mandatory `reason` plus `commits` or `entries` |
 
 ## Source modules
+
+The dependency validation system is implemented in two core modules: `dep_validation` handles workspace-level checks (unused, undeclared, test-only, dev-in-lib, dead packages) while `import_scanners` provides the per-language AST-based import extraction that feeds all dependency analysis.
 
 :-: ref path="rlsbl.dep_validation" lang="python"
 

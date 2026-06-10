@@ -8,7 +8,7 @@ rlsbl is a release orchestration CLI that handles version bumping, structured JS
 
 ## Getting started
 
-See the [README](https://github.com/smm-h/rlsbl#readme) for installation and quick start. Key commands:
+Install rlsbl via `uv tool install rlsbl` (Python) or `npx rlsbl` (npm wrapper). Initialize a project with `rlsbl scaffold` to generate CI workflows, git hooks, and changelog infrastructure. See the [README](https://github.com/smm-h/rlsbl#readme) for full installation instructions and quick start examples. Key commands:
 
 - `rlsbl scaffold` -- set up a new project
 - `rlsbl release run --watch --yes` -- perform a release

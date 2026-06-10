@@ -123,7 +123,7 @@ Scaffold installs `.git/hooks/pre-push` with the V5 hook template, which capture
 
 ### Safe upgrade via hash detection
 
-The hook content has changed across rlsbl versions. Five historical hook versions are tracked (V1 through V5). To safely upgrade without clobbering user customizations, scaffold:
+The hook content has changed across 5 rlsbl versions (V1 through V5), each introducing new checks or changing the invocation pattern. To safely upgrade hooks without clobbering user customizations or losing any manual additions, scaffold uses SHA-256 fingerprinting against a known set of historical hook hashes:
 
 1. Reads the existing hook file
 2. Computes its SHA-256 hash (trailing whitespace stripped for tolerance)

@@ -859,7 +859,7 @@ def cmd_mono_snapshot(check, **_kwargs):
     _cmd_snapshot({"check": check}, project_root=root)
 
 
-@mono.command(name="mirror", help="Initialize a subtree mirror repository for a monorepo project. Splits the project's subtree, pushes it to the configured subtree_remote, clones the mirror, scaffolds rlsbl CI, and pushes the result.")
+@mono.command(name="mirror", help="Initialize a subtree mirror repository for a monorepo project by performing a full git subtree split of the project's history, pushing the extracted tree to the configured subtree_remote URL, cloning the resulting standalone mirror repository, running rlsbl scaffold to generate CI workflows for independent publishing, and pushing the scaffolded mirror to its remote.")
 @strictcli.arg(name="project", help="Name of the workspace project to mirror")
 def cmd_mono_mirror(project, **_kwargs):
     root = _require_project_root()

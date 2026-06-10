@@ -25,7 +25,7 @@ A project can have a target for versioning without a corresponding pipeline (e.g
 
 ## Auto-detection
 
-When `rlsbl release run`, `rlsbl scaffold`, or `rlsbl targets` needs to know which targets apply, it calls `detect_targets(dir_path)`. The detection logic follows two paths:
+When `rlsbl release run`, `rlsbl scaffold`, or `rlsbl targets` needs to know which targets apply, it calls `detect_targets(dir_path)` which scans the project directory for manifest files and applies content-based disambiguation when multiple targets could match. The detection logic follows two paths:
 
 1. **Explicit configuration** — If `.rlsbl/config.json` contains a `targets` array, that list is authoritative. Each entry is either a string (`"npm"`) or a dict with `name` and optional `path` (for subdirectory targets). Unknown target names are warned and skipped.
 
@@ -41,7 +41,7 @@ The `auto_detectable` ClassVar on each target controls detection behavior:
 
 ### Detection priority
 
-When multiple targets could match (e.g., a project with both `pubspec.yaml` and a `flutter:` section), targets use content-based checks to disambiguate:
+When multiple targets could match the same manifest file (e.g., a project with both `pubspec.yaml` and a `flutter:` section, or `build.gradle` matching both native-android and maven), targets use content-based checks to disambiguate and ensure exactly one target claims each project:
 
 - **dart** excludes projects where `pubspec.yaml` contains a `flutter:` key
 - **flutter** requires `pubspec.yaml` with a `flutter:` key
@@ -50,7 +50,7 @@ When multiple targets could match (e.g., a project with both `pubspec.yaml` and 
 
 ## Detection files
 
-Each target declares a `detection_files` ClassVar listing the filenames whose presence triggers detection. These are aggregated into `PROJECT_MANIFESTS` for workspace-level checks (e.g., detecting unregistered projects).
+Each of the 18 target classes declares a `detection_files` ClassVar listing the filenames whose presence triggers detection. These filenames are aggregated into the `PROJECT_MANIFESTS` set used by workspace-level checks to detect unregistered projects in a monorepo. The table below shows each target's detection files:
 
 | Target | Detection files |
 | ------ | --------------- |
@@ -277,5 +277,7 @@ Some checks are universal (they run for any target), while others only apply to 
 All checks not listed here are universal and run for every target.
 
 ## Target implementations
+
+The base target class defines the shared interface for version reading, version writing, detection, and version file location. All 18 concrete target implementations inherit from this base and override the methods relevant to their ecosystem's versioning conventions.
 
 :-: ref path="rlsbl.targets.base"

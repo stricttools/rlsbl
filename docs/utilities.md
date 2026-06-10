@@ -112,7 +112,7 @@ rlsbl targets
 
 ### Output (targets)
 
-A table with three columns showing the detection status of all 18 supported release targets in the current project directory:
+A table with 3 columns showing the detection status of all 18 supported release targets in the current project directory. Each row indicates whether the target's manifest file was found and which file stores the version:
 
 | Column | Description |
 | --- | --- |
@@ -143,7 +143,7 @@ rlsbl discover --mine   # only your own repos
 
 ### Output (discover)
 
-A table of rlsbl-tagged repositories on GitHub, sorted by last updated and paginated up to 1000 results. Each row shows:
+A table of rlsbl-tagged repositories on GitHub, sorted by last updated timestamp and paginated up to 1000 results via the GitHub Search API. With authentication, queries can use up to 5000 API requests per hour. Each row shows:
 - `owner/repo` -- full repository name
 - `description` -- repo description (truncated to 40 chars)
 - `updated` -- relative time since last update (e.g., `2d ago`)
@@ -185,7 +185,7 @@ rlsbl migrate --status   # show which migrations are pending
 
 ### Requirements
 
-Migrations are executed by an external tool called `migrable`, which must be installed separately. It handles schema transformations as versioned migration scripts:
+Migrations are executed by an external tool called `migrable`, which must be installed separately as a Go binary. It handles schema transformations as versioned migration scripts, applying them in order and tracking which migrations have already run to prevent double-application:
 
 ```
 go install github.com/smm-h/migrable/cmd/migrable@latest
@@ -200,7 +200,7 @@ go install github.com/smm-h/migrable/cmd/migrable@latest
 
 ### When to use
 
-After upgrading rlsbl to a new version that introduces config format changes. If `rlsbl check` reports schema issues, run `rlsbl migrate --status` to see if a migration is available.
+Run `rlsbl migrate` after upgrading rlsbl to a new version that introduces config format changes, such as renamed JSON keys, restructured objects, or new required fields. If `rlsbl check` reports schema issues or validation errors against your `.rlsbl/config.json`, run `rlsbl migrate --status` to see if a migration is available that can automatically transform the config to the new schema.
 
 ## `rlsbl record-gif`
 

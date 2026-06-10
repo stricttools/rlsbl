@@ -173,4 +173,6 @@ Dev nodes are projects at the edge of the dependency graph — test infrastructu
 
 ## Source reference
 
+The release workflow is implemented in the `rlsbl.commands.release` module, which orchestrates the full 17-step release pipeline from validation through GitHub Release creation. This module coordinates version bumping, JSONL finalization, git operations, and hook execution.
+
 :-: ref path="rlsbl.commands.release"
