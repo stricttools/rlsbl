@@ -116,6 +116,7 @@ order: 90
 - [rlsbl.targets.utils](rlsbl-targets-utils.html)
 - [rlsbl.targets.zig](rlsbl-targets-zig.html)
 - [rlsbl.targets.zig_version](rlsbl-targets-zig_version.html)
+- [rlsbl.testing](rlsbl-testing.html)
 - [rlsbl.utils](rlsbl-utils.html)
 - [rlsbl.workspace](rlsbl-workspace.html)
 - [rlsbl.workspace_graph](rlsbl-workspace_graph.html)
