@@ -105,6 +105,7 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "prepush-gitignore-guard": None,
     "prepush-manual-warning": None,
     "test-suite": frozenset({"pypi", "go", "npm"}),
+    "test-suite-workspace": "workspace",
 }
 
 # Excluded targets: checks where a target is deliberately excluded because
@@ -1794,13 +1795,11 @@ def register_checks(app):
         """Every pushed commit must have a JSONL changelog entry."""
         from .changelog import changes_dir_exists
         from .commands.pre_push_check import (
-            _affected_projects,
             _check_jsonl_changelog,
-            _get_changed_files,
             _get_pushed_commits,
             _parse_stdin_refs,
         )
-        from .git_util import filter_commits_for_project
+        from .git_util import affected_projects, filter_commits_for_project, get_push_changed_files
 
         if ctx.push_stdin is None:
             return CheckResult("skip", "not in push context")
@@ -1815,12 +1814,12 @@ def register_checks(app):
             from .workspace import load_workspace
 
             ws_root = str(ctx.workspace_root)
-            changed_files = _get_changed_files(refs)
+            changed_files = get_push_changed_files(refs)
             if changed_files is None:
                 return CheckResult("skip", "could not determine changed files")
 
             projects = load_workspace(ws_root)
-            affected = _affected_projects(changed_files, projects)
+            affected = affected_projects(changed_files, projects)
             if not affected:
                 return CheckResult("pass", "no affected projects")
 
@@ -1915,3 +1914,65 @@ def register_checks(app):
         if passed:
             return CheckResult("pass", f"{target_name} tests passed")
         return CheckResult("fail", f"{target_name} tests failed")
+
+    @app.check("test-suite-workspace")
+    def check_test_suite_workspace(ctx):
+        """Run tests for affected workspace projects."""
+        if not isinstance(ctx, WorkspaceCheckContext):
+            return CheckResult("skip", "not a workspace")
+
+        if ctx.push_stdin is None:
+            return CheckResult("skip", "not in push context")
+
+        from .commands.pre_push_check import _parse_stdin_refs
+        from .git_util import affected_projects as _affected, get_push_changed_files
+        from .targets import detect_targets
+        from .testing import run_project_tests
+
+        stdin_lines = ctx.push_stdin.strip().splitlines()
+        refs = _parse_stdin_refs(stdin_lines)
+        if refs is None:
+            return CheckResult("skip", "no refs parsed from push stdin")
+
+        changed_files = get_push_changed_files(refs)
+        if changed_files is None:
+            return CheckResult("skip", "could not determine changed files")
+
+        affected = _affected(changed_files, ctx.projects)
+
+        # Filter out dev_node projects
+        affected = [p for p in affected if not p.get("dev_node")]
+
+        if not affected:
+            return CheckResult("pass", "no affected projects need testing")
+
+        recognized = {"pypi", "go", "npm"}
+        failed_projects = []
+        passed_count = 0
+
+        for proj in affected:
+            project_dir = os.path.join(str(ctx.workspace_root), proj["path"])
+            target_entries = detect_targets(project_dir)
+
+            target_name = None
+            for name, _path in target_entries:
+                if name in recognized:
+                    target_name = name
+                    break
+
+            if target_name is None:
+                # No testable target -- skip this project
+                continue
+
+            passed = run_project_tests(target_name, project_dir=project_dir)
+            if passed:
+                passed_count += 1
+            else:
+                failed_projects.append(proj["name"])
+
+        if failed_projects:
+            return CheckResult(
+                "fail",
+                f"tests failed for: {', '.join(failed_projects)}",
+            )
+        return CheckResult("pass", f"{passed_count} project(s) tests passed")

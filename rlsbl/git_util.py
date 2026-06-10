@@ -149,6 +149,62 @@ def validate_subtree_remote_ssh_host(subtree_remote, project_root):
         sys.exit(1)
 
 
+def get_push_changed_files(refs):
+    """Get the list of files changed across all pushed refs.
+
+    Takes a list of (local_sha, remote_sha) tuples (as returned by
+    ``_parse_stdin_refs`` in pre_push_check.py).
+
+    Returns a set of file paths relative to the repo root, or None if
+    git commands fail.
+    """
+    zero_sha = "0" * 40
+    changed = set()
+
+    for local_sha, remote_sha in refs:
+        if local_sha == zero_sha:
+            # Branch being deleted -- nothing to check
+            continue
+
+        try:
+            if remote_sha == zero_sha:
+                # New branch: get files in commits not yet on any remote
+                result = subprocess.run(
+                    ["git", "log", "--name-only", "--pretty=format:", local_sha,
+                     "--not", "--remotes"],
+                    capture_output=True, text=True, timeout=30,
+                )
+            else:
+                result = subprocess.run(
+                    ["git", "diff", "--name-only", f"{remote_sha}..{local_sha}"],
+                    capture_output=True, text=True, timeout=30,
+                )
+            if result.returncode == 0:
+                for f in result.stdout.strip().splitlines():
+                    f = f.strip()
+                    if f:
+                        changed.add(f)
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            return None
+
+    return changed
+
+
+def affected_projects(changed_files, projects):
+    """Determine which projects are affected by the changed files.
+
+    Returns a list of project dicts that have at least one changed file
+    matching their path prefix or watch globs.
+    """
+    result = []
+    for proj in projects:
+        for f in changed_files:
+            if file_matches_project(f, proj):
+                result.append(proj)
+                break
+    return result
+
+
 def detect_manual_push_branches(stdin_lines, release_branches):
     """Return list of release branch names being pushed to manually.
 
