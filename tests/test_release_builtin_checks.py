@@ -82,8 +82,8 @@ class TestBuiltinTestRunner:
         _setup_pypi_project(tmp_project)
 
         with (
-            patch("rlsbl.commands.release.require_tool") as mock_which,
-            patch("rlsbl.commands.release.subprocess.run") as mock_run,
+            patch("rlsbl.testing.require_tool") as mock_which,
+            patch("rlsbl.testing.subprocess.run") as mock_run,
         ):
             mock_which.return_value = "/usr/bin/uv"
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -103,8 +103,8 @@ class TestBuiltinTestRunner:
         _setup_pypi_project(tmp_project)
 
         with (
-            patch("rlsbl.commands.release.require_tool") as mock_which,
-            patch("rlsbl.commands.release.subprocess.run") as mock_run,
+            patch("rlsbl.testing.require_tool") as mock_which,
+            patch("rlsbl.testing.subprocess.run") as mock_run,
         ):
             def which_side_effect(name, *args, **kwargs):
                 if name == "uv":
@@ -126,7 +126,7 @@ class TestBuiltinTestRunner:
         """When registry is go, run go test ./... -race -short -count=1."""
         _setup_go_project(tmp_project)
 
-        with patch("rlsbl.commands.release.subprocess.run") as mock_run:
+        with patch("rlsbl.testing.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
 
             result = _run_builtin_tests("go", {}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={}))
@@ -141,7 +141,7 @@ class TestBuiltinTestRunner:
         """When registry is npm and package.json has a test script, run npm test."""
         _setup_npm_project(tmp_project, test_script="jest")
 
-        with patch("rlsbl.commands.release.subprocess.run") as mock_run:
+        with patch("rlsbl.testing.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
 
             result = _run_builtin_tests("npm", {}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={}))
@@ -154,7 +154,7 @@ class TestBuiltinTestRunner:
         """When npm package.json has no test script, skip tests."""
         _setup_npm_project(tmp_project, test_script=None)
 
-        with patch("rlsbl.commands.release.subprocess.run") as mock_run:
+        with patch("rlsbl.testing.subprocess.run") as mock_run:
             result = _run_builtin_tests("npm", {}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={}))
 
             assert result is True
@@ -164,7 +164,7 @@ class TestBuiltinTestRunner:
         """When test command returns non-zero, sys.exit(1) is called."""
         _setup_npm_project(tmp_project, test_script="jest")
 
-        with patch("rlsbl.commands.release.subprocess.run") as mock_run:
+        with patch("rlsbl.testing.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(
                 args=[], returncode=1
             )
@@ -178,7 +178,7 @@ class TestBuiltinTestRunner:
         """--dry-run flag prevents any test command from running."""
         _setup_npm_project(tmp_project, test_script="jest")
 
-        with patch("rlsbl.commands.release.subprocess.run") as mock_run:
+        with patch("rlsbl.testing.subprocess.run") as mock_run:
             result = _run_builtin_tests("npm", {"dry-run": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={}))
 
             assert result is True
@@ -197,8 +197,8 @@ class TestBuiltinTestRunnerCwd:
         _setup_pypi_project(tmp_project)
 
         with (
-            patch("rlsbl.commands.release.require_tool") as mock_which,
-            patch("rlsbl.commands.release.subprocess.run") as mock_run,
+            patch("rlsbl.testing.require_tool") as mock_which,
+            patch("rlsbl.testing.subprocess.run") as mock_run,
         ):
             mock_which.return_value = "/usr/bin/uv"
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -214,8 +214,8 @@ class TestBuiltinTestRunnerCwd:
         project_dir = str(tmp_project / "libs" / "mylib")
 
         with (
-            patch("rlsbl.commands.release.require_tool") as mock_which,
-            patch("rlsbl.commands.release.subprocess.run") as mock_run,
+            patch("rlsbl.testing.require_tool") as mock_which,
+            patch("rlsbl.testing.subprocess.run") as mock_run,
         ):
             mock_which.return_value = "/usr/bin/uv"
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -232,8 +232,8 @@ class TestBuiltinTestRunnerCwd:
         project_dir = str(tmp_project / "libs" / "mylib")
 
         with (
-            patch("rlsbl.commands.release.require_tool") as mock_which,
-            patch("rlsbl.commands.release.subprocess.run") as mock_run,
+            patch("rlsbl.testing.require_tool") as mock_which,
+            patch("rlsbl.testing.subprocess.run") as mock_run,
         ):
             def which_side_effect(name, *args, **kwargs):
                 if name == "uv":
@@ -255,7 +255,7 @@ class TestBuiltinTestRunnerCwd:
         _setup_go_project(tmp_project)
         project_dir = str(tmp_project / "libs" / "mygolib")
 
-        with patch("rlsbl.commands.release.subprocess.run") as mock_run:
+        with patch("rlsbl.testing.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
 
             _run_builtin_tests("go", {}, project_dir=project_dir, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={}))
@@ -267,7 +267,7 @@ class TestBuiltinTestRunnerCwd:
         """Go test command gets cwd=None in standalone mode."""
         _setup_go_project(tmp_project)
 
-        with patch("rlsbl.commands.release.subprocess.run") as mock_run:
+        with patch("rlsbl.testing.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
 
             _run_builtin_tests("go", {}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={}))
@@ -282,7 +282,7 @@ class TestBuiltinTestRunnerCwd:
         pkg = {"name": "test-pkg", "version": "1.0.0", "scripts": {"test": "jest"}}
         (project_dir / "package.json").write_text(json.dumps(pkg) + "\n")
 
-        with patch("rlsbl.commands.release.subprocess.run") as mock_run:
+        with patch("rlsbl.testing.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
 
             _run_builtin_tests("npm", {}, project_dir=str(project_dir), ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={}))
@@ -294,7 +294,7 @@ class TestBuiltinTestRunnerCwd:
         """npm test command gets cwd=None in standalone mode."""
         _setup_npm_project(tmp_project, test_script="jest")
 
-        with patch("rlsbl.commands.release.subprocess.run") as mock_run:
+        with patch("rlsbl.testing.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
 
             _run_builtin_tests("npm", {}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={}))
@@ -310,7 +310,7 @@ class TestBuiltinTestRunnerCwd:
         pkg = {"name": "test-pkg", "version": "1.0.0", "scripts": {"test": "jest"}}
         (project_dir / "package.json").write_text(json.dumps(pkg) + "\n")
 
-        with patch("rlsbl.commands.release.subprocess.run") as mock_run:
+        with patch("rlsbl.testing.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
 
             result = _run_builtin_tests("npm", {}, project_dir=str(project_dir), ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={}))

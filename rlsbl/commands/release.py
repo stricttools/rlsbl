@@ -25,6 +25,7 @@ from ..targets import TARGETS, detect_targets, _parse_target_entry
 from ..tagging import ensure_github_topic, ensure_npm_keyword, ensure_pypi_keyword
 from ..strictcli_detect import detect_strictcli
 from ..workspace import load_workspace, resolve_project
+from ..testing import run_project_tests
 from ..utils import (
     bump_version,
     check_gh_auth,
@@ -236,59 +237,19 @@ def resolve_release_targets(primary, flags, project_dir=".", *, config):
 def _run_builtin_tests(registry, flags, *, project_dir=None, ctx):
     """Run built-in tests for the detected project type.
 
-    Detects the project type from registry and runs the appropriate test command.
-    When project_dir is set (monorepo mode), subprocess calls use it as cwd and
-    filesystem checks are resolved relative to it.
+    Delegates to run_project_tests() for the actual test execution.
+    Handles the release-specific concern of aborting (sys.exit) on failure.
     Returns True if tests pass, calls sys.exit(1) on failure.
     """
-    if flags.get("dry-run"):
-        return True
-
-    print("Running tests...")
-
-    if registry == "pypi":
-        config = ctx.config
-        uv_verbose = config.get("uv_sync_verbose", False)
-        if require_tool("uv", fatal=False):
-            sync_cmd = ["uv", "sync"]
-            if not uv_verbose:
-                sync_cmd.append("--quiet")
-            result = subprocess.run(sync_cmd, cwd=project_dir)
-            if result.returncode != 0:
-                print("Error: uv sync failed.", file=sys.stderr)
-                sys.exit(1)
-            result = subprocess.run(["uv", "run", "pytest"], cwd=project_dir)
-        elif require_tool("pytest", fatal=False):
-            result = subprocess.run(["pytest"], cwd=project_dir)
-        else:
-            print("Warning: neither uv nor pytest found, skipping tests.", file=sys.stderr)
-            return True
-    elif registry == "go":
-        result = subprocess.run(["go", "test", "./...", "-race", "-short", "-count=1"], cwd=project_dir)
-    elif registry == "npm":
-        pkg_path = os.path.join(project_dir, "package.json") if project_dir else "package.json"
-        if os.path.exists(pkg_path):
-            try:
-                with open(pkg_path, "r", encoding="utf-8") as f:
-                    pkg = json.load(f)
-                if pkg.get("scripts", {}).get("test"):
-                    result = subprocess.run(["npm", "test"], cwd=project_dir)
-                else:
-                    print("No test script in package.json, skipping tests.")
-                    return True
-            except (json.JSONDecodeError, OSError):
-                print("Warning: could not read package.json, skipping tests.", file=sys.stderr)
-                return True
-        else:
-            return True
-    else:
-        # Unknown registry, skip tests
-        return True
-
-    if result.returncode != 0:
+    success = run_project_tests(
+        registry,
+        project_dir=project_dir,
+        config=ctx.config,
+        dry_run=flags.get("dry-run", False),
+    )
+    if not success:
         print("Error: tests failed.", file=sys.stderr)
         sys.exit(1)
-
     return True
 
 
