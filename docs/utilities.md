@@ -82,9 +82,9 @@ rlsbl unreleased          # plain text
 rlsbl unreleased --json   # structured JSON
 ```
 
-### Output
+### Output (unreleased)
 
-Each commit is listed with:
+Each commit in the unreleased range is listed with full details for preparing a release. The coverage status column indicates whether a corresponding JSONL entry exists, making it easy to identify which commits still need changelog entries:
 - Full SHA
 - Subject line
 - Author
@@ -110,9 +110,9 @@ List all release targets detected in the current project directory, showing whic
 rlsbl targets
 ```
 
-### Output
+### Output (targets)
 
-A table with three columns:
+A table with three columns showing the detection status of all 18 supported release targets in the current project directory:
 
 | Column | Description |
 | --- | --- |
@@ -141,9 +141,9 @@ rlsbl discover --mine   # only your own repos
 - Without authentication: 60 API requests/hour
 - With authentication: 5000 API requests/hour
 
-### Output
+### Output (discover)
 
-A table showing:
+A table of rlsbl-tagged repositories on GitHub, sorted by last updated and paginated up to 1000 results. Each row shows:
 - `owner/repo` -- full repository name
 - `description` -- repo description (truncated to 40 chars)
 - `updated` -- relative time since last update (e.g., `2d ago`)

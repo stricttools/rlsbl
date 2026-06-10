@@ -8,7 +8,7 @@ description: "SSH-based deployment system with configurable health checks, autom
 
 ## Configuration
 
-Deploy targets are defined in `.rlsbl/config.json` under the `deploy_targets` key, which is a list of target objects.
+Deploy targets are defined in `.rlsbl/config.json` under the `deploy_targets` key, which is a list of target objects. Each target specifies a remote host, SSH credentials, shell commands to execute, branch restrictions, and optional health check and rollback configurations.
 
 ### Required fields
 
@@ -48,7 +48,7 @@ The `env` field (environment variables exported on the remote host) does NOT und
 
 ## Health checks
 
-Health checks verify that the deployment succeeded by probing the remote service. Three types are supported:
+Health checks verify that the deployment succeeded by probing the remote service after all deploy steps complete. Three probe types are supported, each with a configurable timeout (default 30 seconds) and type-specific connection parameters:
 
 | Type | Required fields | Optional fields | Behavior |
 | --- | --- | --- | --- |
@@ -60,7 +60,7 @@ Health checks run immediately after all steps complete. If no health check is co
 
 ## Automatic rollback
 
-When a health check fails and `rollback_steps` is configured:
+When a health check fails and `rollback_steps` is configured, rlsbl executes the rollback sequence using the same SSH connection parameters as the deploy steps, then re-runs the health check to verify service recovery:
 
 1. Each rollback step executes sequentially via SSH (same host/user/directory/env as deploy steps)
 2. After rollback completes, the health check re-runs
@@ -71,7 +71,7 @@ If no `rollback_steps` are configured and health fails, the deploy simply report
 
 ## Branch restrictions
 
-The `only_on` field restricts which git branches can deploy to each target. When the current branch is not in the list:
+The `only_on` field restricts which git branches can deploy to each target, preventing accidental deployments from feature branches or other non-release branches. The field is required and must contain at least one branch name. When the current branch is not in the list:
 
 - Without `--force`: the command exits with an error showing allowed branches
 - With `--force`: the restriction is bypassed and deployment proceeds

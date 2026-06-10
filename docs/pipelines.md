@@ -6,7 +6,7 @@ description: "Pipeline architecture for publish orchestration — types, auth pa
 
 ## Overview
 
-Pipelines handle **publishing** — where and how a release is distributed. They are configured in `.rlsbl/config.json` under the `pipelines` key. Each pipeline entry has a user-chosen name and specifies its type, auth mechanism, and optional asset configuration.
+Pipelines handle **publishing** — where and how a release is distributed. They are configured in `.rlsbl/config.json` under the `pipelines` key, which supports 9 built-in pipeline types across 3 authentication patterns (token, credential, and unauthenticated). Each pipeline entry has a user-chosen name and specifies its type, auth mechanism, and optional asset configuration.
 
 Pipelines are distinct from targets: targets determine which files get version-bumped (auto-detected from manifests), while pipelines determine where the release artifact is published (explicitly configured). A project can have an npm target for versioning but a cloudflare-pages pipeline for publishing, or multiple pipelines publishing to different registries.
 
@@ -105,7 +105,7 @@ Custom assets allow attaching arbitrary build artifacts to GitHub Releases. The 
 
 ## Capability gating
 
-Pipeline steps are gated on target capabilities. Each release target declares which pipeline operations it supports, and rlsbl skips steps the target cannot handle rather than failing. This allows you to configure pipelines broadly without worrying about targets that lack publish or build support — the system gracefully omits inapplicable steps while still executing the rest of the release flow.
+Pipeline steps are gated on 2 target capabilities (`publish` and `build_assets`). Each release target declares which pipeline operations it supports, and rlsbl skips steps the target cannot handle rather than failing. This allows you to configure pipelines broadly without worrying about targets that lack publish or build support — the system gracefully omits inapplicable steps while still executing the rest of the release flow.
 
 | Capability | Effect when absent |
 | --- | --- |

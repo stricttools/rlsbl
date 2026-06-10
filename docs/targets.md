@@ -12,7 +12,7 @@ All targets share core release functionality: version bumping, git tagging, and 
 
 ## Target vs Pipeline
 
-Targets and pipelines serve orthogonal purposes:
+Targets and pipelines serve orthogonal purposes in the release flow. Targets handle versioning (reading and writing version strings in manifest files), while pipelines handle publishing (uploading artifacts to registries). This separation allows flexible combinations where the versioning ecosystem differs from the publish destination:
 
 | Concern | Targets | Pipelines |
 | ------- | ------- | --------- |
@@ -75,7 +75,7 @@ Each target declares a `detection_files` ClassVar listing the filenames whose pr
 
 ## The ReleaseTarget protocol
 
-All targets implement a runtime-checkable Protocol. The key methods:
+All 18 targets implement a runtime-checkable Protocol that defines the interface for version management, detection, tag formatting, and CI template generation. Each target provides concrete implementations for its ecosystem's conventions. The key methods:
 
 | Method | Purpose |
 | ------ | ------- |
@@ -97,7 +97,7 @@ All targets implement a runtime-checkable Protocol. The key methods:
 
 ## BaseTarget defaults
 
-All concrete targets extend `BaseTarget`, which provides sensible defaults:
+All concrete targets extend `BaseTarget`, which provides sensible defaults for common operations so that individual targets only need to override ecosystem-specific behavior. The base class handles tag formatting, shared template mappings, and stub implementations for optional methods:
 
 - Tag format: `v{version}` (standalone) / `{name}@v{version}` (monorepo)
 - Shared template mappings: CHANGELOG.md, .gitignore, hooks, lint configs, unreleased.jsonl
@@ -110,7 +110,7 @@ Individual targets override only the methods specific to their ecosystem.
 
 ## Capabilities
 
-Each target declares a `capabilities` frozenset that gates behavior in the release flow and check system:
+Each target declares a `capabilities` frozenset containing zero or more capability strings that gate behavior in the release flow and check system. Commands and checks query these capabilities at runtime to determine which operations are valid for a given target:
 
 | Capability | Meaning |
 | ---------- | ------- |
@@ -123,7 +123,7 @@ Capabilities are checked at runtime. For example, `rlsbl dev install` skips targ
 
 ## Ecosystem classification
 
-Each target has an `ecosystem` string used for display and grouping:
+Each target has an `ecosystem` string used for display and grouping in commands like `rlsbl targets` and `rlsbl monorepo list`. The 18 targets map to 18 distinct ecosystem labels, providing human-readable names for each registry and platform:
 
 | Ecosystem | Targets |
 | --------- | ------- |

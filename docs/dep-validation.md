@@ -4,7 +4,7 @@ description: "Dependency validation checks for monorepo workspaces: unused deps,
 
 # Dependency validation
 
-rlsbl validates dependencies at two levels: workspace-level (between monorepo packages) and file-level (within a single package). Four workspace checks detect mismatches between declared and actual dependencies. Three intra-package checks detect dead code and import cycles.
+rlsbl validates dependencies at two levels: workspace-level (between monorepo packages) and file-level (within a single package). Four workspace checks detect mismatches between declared and actual dependencies across all 4 supported language ecosystems. Three intra-package checks detect dead code and import cycles using per-file BFS traversal and Tarjan's algorithm for strongly connected components.
 
 ## Workspace dependency checks
 

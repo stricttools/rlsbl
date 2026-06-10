@@ -6,7 +6,7 @@ description: "Complete reference for rlsbl's 49 checks across 6 tags, including 
 
 :-: check-count
 
-Run checks via the `rlsbl check` command. Checks validate project metadata, release state, changelog structure, workspace integrity, code quality, and pre-push enforcement.
+Run checks via the `rlsbl check` command. Checks are organized across 6 tags (project, release, changelog, workspace, quality, prepush) and validate project metadata, release state, changelog structure, workspace integrity, code quality, and pre-push enforcement. Four additional untagged checks run only with `--all` or `--name`.
 
 ## Running checks
 
@@ -23,7 +23,7 @@ rlsbl check --name version-consistency
 
 ## Check results
 
-Each check returns one of four statuses:
+Each check returns one of four statuses that determine how the result is displayed and whether it blocks the release pipeline. The severity is declared per-check in the check metadata and controls which status is reported on failure:
 
 | Status | Meaning | Effect |
 | --- | --- | --- |
@@ -129,7 +129,7 @@ Dependencies: `test-suite` depends on `prepush-changelog-coverage` -- fast check
 
 ## Untagged checks
 
-These checks run only with `--all` or `--name`:
+These 4 checks have no tag assignment and run only when explicitly requested via `--all` or `--name`. They are excluded from tag-based runs because they require specific project configurations (layer rules, workspace manifests) or have longer execution times:
 
 | Check | Severity | Description |
 | --- | --- | --- |
@@ -140,7 +140,7 @@ These checks run only with `--all` or `--name`:
 
 ## Target applicability
 
-Not all checks apply to all targets. Three applicability categories exist:
+Not all checks apply to all 18 targets. Each check declares its applicability as one of three categories, which determines whether it runs for a given project based on the project's detected targets:
 
 - **Universal** (`None`): runs for any target -- most project, release, and changelog checks
 - **Workspace-only** (`"workspace"`): runs only in monorepo workspaces, target-agnostic
@@ -150,7 +150,7 @@ Not all checks apply to all targets. Three applicability categories exist:
 
 ### Excluded targets
 
-Some checks explicitly exclude targets where the compiler or toolchain already enforces the same constraint:
+Some checks explicitly exclude specific targets where the compiler or language toolchain already enforces the same constraint natively, making rlsbl's check redundant. These exclusions prevent false positives and unnecessary warnings:
 
 | Check | Excluded target | Reason |
 | --- | --- | --- |
@@ -158,7 +158,7 @@ Some checks explicitly exclude targets where the compiler or toolchain already e
 
 ## Check metadata
 
-Checks are declared in `rlsbl/data/checks.toml` with the following metadata fields:
+Checks are declared in `rlsbl/data/checks.toml` with metadata that controls execution order, dependency resolution, and result severity. Each check entry has the following fields that the check runner uses to determine when and how to execute the check:
 
 | Field | Type | Description |
 | --- | --- | --- |

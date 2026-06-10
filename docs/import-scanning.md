@@ -4,7 +4,7 @@ description: "Import scanning architecture that validates dependencies and detec
 
 # Import scanning
 
-rlsbl scans source code imports to detect unused dependencies, undeclared dependencies, dead modules, and circular dependencies. It uses tree-sitter for Python, Go, and JavaScript/TypeScript parsing, and regex for Dart.
+rlsbl scans source code imports across 4 language ecosystems to detect unused dependencies, undeclared dependencies, dead modules, and circular dependencies. It uses 3 tree-sitter parsers for Python, Go, and JavaScript/TypeScript parsing, and regex for Dart. Import results are cached per check context to avoid redundant source tree walks across the 4 dependency checks that share scan data.
 
 ## Architecture
 

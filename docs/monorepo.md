@@ -174,9 +174,9 @@ rlsbl monorepo impact packages/mylib/src/core.py
 rlsbl monorepo impact --since v0.5.0
 ```
 
-### Output
+### Output (impact)
 
-The command reports:
+The command reports a structured breakdown of the blast radius, organized by dependency distance from the changed package. Each section helps answer a different question about what to test, review, and release:
 
 | Section | Meaning |
 | ------- | ------- |
@@ -292,7 +292,7 @@ This ensures every project has its CI pipeline properly wired even when using di
 
 ## Workspace checks
 
-Eight checks run under `rlsbl check --tag workspace`, covering CI configuration consistency, project registration hygiene, dependency boundary enforcement, and code liveness. All error-severity checks block releases when they fail:
+Eight checks run under `rlsbl check --tag workspace` (7 error-severity, 1 warning-severity), covering CI configuration consistency, project registration hygiene, dependency boundary enforcement, and code liveness. All error-severity checks block releases when they fail:
 
 | Check | Severity | Description |
 | ----- | -------- | ----------- |

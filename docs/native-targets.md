@@ -6,7 +6,7 @@ description: "Native iOS and Android release targets — detection rules, versio
 
 ## Overview
 
-The `native-ios` and `native-android` targets handle platform-specific versioning for native mobile applications without cross-platform frameworks. They manage marketing versions and build numbers in platform-native project files (Xcode pbxproj, Gradle build files).
+The `native-ios` and `native-android` targets handle platform-specific versioning for native mobile applications without cross-platform frameworks. They manage 2 version fields each (marketing version + build number) in platform-native project files (Xcode pbxproj, Gradle build files), with auto-incremented integer build numbers on every release.
 
 Both targets are **conditionally auto-detectable** — they only activate when specific manifest patterns are found and competing targets are absent.
 

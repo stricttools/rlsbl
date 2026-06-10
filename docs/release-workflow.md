@@ -24,7 +24,7 @@ Before running `rlsbl release run`, the project must satisfy several preconditio
 
 ## The release file
 
-Scaffold the release file with `rlsbl release init`, which auto-detects targets and generates a template:
+The release file at `.rlsbl/releases/unreleased.toml` drives the entire release flow. Scaffold it with `rlsbl release init`, which auto-detects targets, sets a default bump type of `patch`, and generates a template with placeholder fields for description and context:
 
 ```toml
 # .rlsbl/releases/unreleased.toml
@@ -56,7 +56,7 @@ For pre-stable projects (0.x.x), breaking changes are a minor bump. Never bump t
 
 ### Per-target configuration sections
 
-Some targets require additional configuration in the release file via `[targets.<name>]` sections. Currently, this applies to the Flutter target.
+Some targets require additional configuration in the release file via `[targets.<name>]` sections, providing target-specific metadata that cannot be inferred from the project's manifest. Currently, this applies only to the Flutter target, which needs a deployment mode declaration to distinguish OTA updates from full app store builds.
 
 **Flutter target** requires a `[targets.flutter]` section with a `mode` field. Valid modes:
 
@@ -86,7 +86,7 @@ Target config sections for targets not listed in `include` are rejected as valid
 
 ## Release pipeline order
 
-The 18 steps execute in this exact order:
+The release pipeline executes 18 steps in a fixed order, from initial validation through post-release hooks. Each step either succeeds and proceeds to the next, or aborts the entire release with no partial state left behind. Steps 9 and 10 are conditionally skipped when the pre-release hook is customized:
 
 | Step | Action | Abort on failure |
 | --- | --- | --- |
@@ -162,7 +162,7 @@ The `release` command group provides 6 subcommands covering the full release lif
 
 ## Dev node releases
 
-Monorepo projects marked `dev_node = true` in `workspace.toml` have a simplified release flow:
+Monorepo projects marked `dev_node = true` in `workspace.toml` have a simplified release flow that skips the entire changelog system. Since dev nodes are leaf projects with no user-facing dependents, they do not need structured change tracking or generated CHANGELOG.md files:
 
 - Changelog validation is skipped entirely (no `.rlsbl/changes/` directory, no `unreleased.jsonl`)
 - CHANGELOG.md generation is skipped

@@ -26,11 +26,11 @@ description: "How rlsbl scaffold generates CI workflows, git hooks, and config f
 
 ## Three-way merge
 
-When scaffold runs on a project that already has scaffolded files, it performs a three-way merge to reconcile template updates with your local modifications.
+When scaffold runs on a project that already has scaffolded files, it performs a three-way merge to reconcile template updates with your local modifications. This ensures that upgrading rlsbl never silently overwrites your customizations to CI workflows, hooks, or configuration files, while still applying any template improvements from newer versions.
 
 ### How it works
 
-After each scaffold run, the rendered template content is saved as a **base** in `.rlsbl/bases/<target-path>`. On the next scaffold run, three versions exist:
+After each scaffold run, the rendered template content is saved as a **base** in `.rlsbl/bases/<target-path>`. This base acts as the common ancestor for the next merge. On the next scaffold run, three versions exist for each file, allowing scaffold to compute a precise diff between what changed on each side:
 
 - **Ours**: the file currently on disk (may include your edits)
 - **Base**: the last scaffolded version (what was written last time)
@@ -49,7 +49,7 @@ When `git merge-file` cannot resolve all hunks, conflict markers (`<<<<<<<`, `==
 
 ### No base stored
 
-For legacy projects scaffolded before the merge system existed, there is no base file. In this case:
+For legacy projects scaffolded before the three-way merge system existed, there is no base file stored in `.rlsbl/bases/`. Without a common ancestor, scaffold cannot determine which side changed, so it takes a conservative approach to avoid overwriting your work. In this case:
 
 - If the file on disk matches the new template: seed the base and skip.
 - If they differ: save the new template as base for next time but do not overwrite. A warning is printed advising `scaffold --force` to reset.
@@ -60,7 +60,7 @@ Scaffold distinguishes two ownership categories that determine update behavior. 
 
 ### User-owned files
 
-These files are created once by scaffold and **never overwritten or merged**, even with `--force`:
+These files are created once by scaffold and **never overwritten or merged**, even with `--force`. They are fully yours to modify, delete, or extend. Scaffold will not touch them on subsequent runs, ensuring your changelog entries, custom CI jobs, and hook logic remain exactly as you wrote them:
 
 - `CHANGELOG.md`
 - `.npmignore`
@@ -71,7 +71,7 @@ These files are created once by scaffold and **never overwritten or merged**, ev
 
 ### Scaffold-managed files
 
-These files are created and maintained by scaffold via three-way merge:
+These files are created and maintained by scaffold via three-way merge. When a new rlsbl version updates their templates, scaffold merges the changes into your copy, preserving any local edits you have made while incorporating the template improvements:
 
 - `.github/workflows/ci.yml`
 - `.github/workflows/publish.yml`
@@ -81,7 +81,7 @@ These files are created and maintained by scaffold via three-way merge:
 
 ## The --force flag
 
-`--force` overwrites all scaffold-managed files with the current template output, ignoring bases and skipping the three-way merge. After `--force`, new bases are saved for the freshly written content.
+`--force` overwrites all scaffold-managed files with the current template output, ignoring stored bases and skipping the three-way merge entirely. After `--force`, new bases are saved for the freshly written content. This is a destructive operation that discards all local customizations to scaffold-managed files, so use it only when a clean reset is needed.
 
 `--force` does **not** touch user-owned files. Those are always safe from overwrite regardless of flags.
 
@@ -107,19 +107,19 @@ Common variables:
 
 ### Required variables
 
-Certain variables (`name`, `registryUrl`) are mandatory. If a target's `template_vars()` does not provide them, scaffold raises a `ValueError` at render time rather than leaving unresolved `{{...}}` placeholders in the output.
+Certain variables (`name`, `registryUrl`) are mandatory for every target and must be provided by the target's `template_vars()` method. If a required variable is missing, scaffold raises a `ValueError` at render time rather than leaving unresolved `{{...}}` placeholders in the output, which would cause CI workflow failures that are harder to diagnose.
 
 ### Escaped placeholders
 
-Templates that need literal `{{...}}` in their output (e.g., Docker metadata-action's `{{version}}`) use the escape syntax `\{{...}}`. The backslash is consumed during rendering, and the braces pass through unchanged.
+Templates that need literal `{{...}}` in their output (e.g., Docker metadata-action's `{{version}}`) use the escape syntax `\{{...}}`. The backslash is consumed during rendering, and the braces pass through unchanged. Without escaping, scaffold would attempt to resolve them as rlsbl variables and raise an error for unrecognized names.
 
 ### Action placeholders
 
-`{{action "owner/name"}}` placeholders resolve against rlsbl's central action-version table (`rlsbl/data/action_versions.toml`), pinning GitHub Actions to known-good versions. An unknown action name is a hard error.
+`{{action "owner/name"}}` placeholders resolve against rlsbl's central action-version table (`rlsbl/data/action_versions.toml`), pinning GitHub Actions to known-good versions across all scaffolded projects. An unknown action name is a hard error, ensuring that every action reference in generated workflows maps to a verified version.
 
 ## Pre-push hook
 
-Scaffold installs `.git/hooks/pre-push` with the V5 hook template, which captures git's stdin into `RLSBL_PUSH_STDIN` and runs `rlsbl check --tag prepush`.
+Scaffold installs `.git/hooks/pre-push` with the V5 hook template, which captures git's stdin into `RLSBL_PUSH_STDIN` and runs `rlsbl check --tag prepush`. This hook enforces changelog coverage and other pre-push validations on every push, blocking pushes that would bypass the JSONL commit coverage requirement.
 
 ### Safe upgrade via hash detection
 

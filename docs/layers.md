@@ -12,7 +12,7 @@ This prevents architectural erosion where foundation code accumulates dependenci
 
 ## Configuration
 
-Layers are configured in the `[layers]` section of `.rlsbl-monorepo/workspace.toml`.
+Layers are configured in the `[layers]` section of `.rlsbl-monorepo/workspace.toml`. The configuration defines the layer ordering, assigns projects to layers via glob patterns, and optionally declares override rules for cross-layer exceptions. All three subsections (order, assignments, overrides) are validated at check time.
 
 ### Structure
 
@@ -45,7 +45,7 @@ target = "app"
 
 ### Order semantics
 
-The `order` list defines the allowed dependency direction:
+The `order` list defines the allowed dependency direction using a zero-indexed hierarchy where lower indices represent foundational layers and higher indices represent application layers. Dependencies flow downward (high to low) but never upward:
 
 - Index 0 is the **bottom** (most foundational)
 - Last index is the **top** (most application-specific)
@@ -69,7 +69,7 @@ app = ["app"]
 
 ### Glob pattern syntax
 
-Patterns use Python's `fnmatch` module for matching.
+Patterns use Python's `fnmatch` module for matching project names against layer assignments. Since project names are flat strings without path separators, the patterns operate on simple name matching rather than filesystem path resolution:
 
 | Pattern | Meaning |
 | --- | --- |
@@ -86,7 +86,7 @@ In layer assignments, **first matching pattern wins**. If a project name matches
 
 ## Overrides
 
-The `[layers.overrides]` table provides three exception mechanisms:
+The `[layers.overrides]` table provides three exception mechanisms for cases where strict layer ordering is insufficient. Overrides are evaluated during the `layers-violations` check and modify which dependency edges are considered violations versus allowed exceptions:
 
 | Override | Type | Effect |
 | --- | --- | --- |
@@ -116,7 +116,7 @@ This permits the `schema` project (a lower layer) to depend on `app` (a higher l
 
 ## Validation
 
-`validate_layer_assignments()` runs as part of layer checking and enforces:
+`validate_layer_assignments()` runs as part of layer checking and enforces structural correctness of the layer configuration itself, catching misconfigurations before dependency direction is even evaluated. It checks 4 invariants:
 
 1. Every project in the workspace is assigned to exactly one layer (no gaps)
 2. No project matches patterns in multiple layers (no overlaps)
@@ -127,7 +127,7 @@ Violations produce clear error messages identifying which project is unassigned 
 
 ## Running the check
 
-The `layers-violations` check is registered under the `workspace` tag:
+The `layers-violations` check is an untagged check that runs only with `--all` or `--name`. It walks the workspace dependency graph and reports every edge that violates the configured layer ordering, including the source and target project names and their respective layer positions:
 
 ```bash
 # Run just the layers check
