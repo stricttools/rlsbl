@@ -438,21 +438,25 @@ def cmd_scaffold(target, force, private, no_commit, skip_shared, no_tag, dry_run
 # ---------------------------------------------------------------------------
 
 @app.command(name="check-name", help="Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.")
-@strictcli.flag(name="target", type=str, help="Target registry (npm, pypi, or go)")
+@strictcli.flag(name="target", type=str, help="Target registry (npm, pypi, or go)", repeatable=True, unique=True)
 @strictcli.flag(name="delay", type=str, help="Delay between checks in ms", default="200")
 def cmd_check_name(target, delay, **_kwargs):
-    # --target is required for check-name
-    if not target:
+    # --target is required for check-name; with repeatable=True, target is a list
+    targets = target if target else []
+    if not targets:
         print(
             "Error: --target is required. "
             "Usage: rlsbl check-name <name> [<name2> ...] --target <npm|pypi|go>",
             file=sys.stderr,
         )
         sys.exit(1)
-    from .targets import TARGETS
-    if target not in TARGETS:
+    # Validate ALL targets upfront before any network calls
+    valid_targets = {"npm", "pypi", "go"}
+    invalid = [t for t in targets if t not in valid_targets]
+    if invalid:
         print(
-            f"Error: unknown target '{target}'. Valid: {', '.join(TARGETS.keys())}",
+            f"Error: unknown target(s): {', '.join(repr(t) for t in invalid)}. "
+            f"Valid: npm, pypi, go",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -460,7 +464,8 @@ def cmd_check_name(target, delay, **_kwargs):
     names = _variadic_args
     flags = {"delay": delay}
     from .commands.check import run_cmd
-    run_cmd(target, names, flags)
+    for tgt in targets:
+        run_cmd(tgt, names, flags)
 
 
 # ---------------------------------------------------------------------------
@@ -562,8 +567,14 @@ def cmd_pre_push_check(**_kwargs):
         ws_path = Path(workspace_root)
         project = resolve_project(workspace_root, str(cwd))
         if project is None and cwd.resolve() == ws_path.resolve():
-            # CWD is at workspace root (e.g. git runs hooks from repo root)
-            ctx = create_context(ws_path, workspace_root=ws_path)
+            # CWD is at workspace root (e.g. git runs hooks from repo root).
+            # Use the check context factory to build a proper
+            # WorkspaceCheckContext with projects and graph.
+            try:
+                ctx = _check_context_factory()
+            except Exception as exc:
+                print(f"Error: failed to build workspace context: {exc}", file=sys.stderr)
+                sys.exit(1)
         elif project is not None:
             # CWD is inside a registered sub-project
             sub_path = ws_path / project["path"]
