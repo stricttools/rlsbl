@@ -96,7 +96,7 @@ Created files are committed automatically by default.
 | `.rlsbl/hooks/pre-checks.sh` | User-customizable pre-checks validation |
 | `.rlsbl/hooks/pre-release.sh` | User-customizable pre-release validation |
 | `.rlsbl/hooks/post-release.sh` | User-customizable post-release actions |
-| `.git/hooks/pre-push` | One-liner: `exec rlsbl pre-push-check "$@"` |
+| `.git/hooks/pre-push` | Captures push refs, runs `rlsbl check --tag prepush` |
 | `.rlsbl/bases/` | Three-way merge bases for scaffold |
 
 **Three-way merge:** Bases are stored at scaffold time. On re-run, user customizations and template updates merge via `git merge-file`. Conflicts get git-style conflict markers.
