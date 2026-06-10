@@ -1,4 +1,4 @@
-"""npm pipeline -- publishes to npm registry using NPM_TOKEN."""
+"""npm pipeline implementation that publishes packages to the npm registry, authenticating via NPM_TOKEN and handling scoped package access."""
 
 import os
 import re

@@ -1,4 +1,4 @@
-"""Cargo pipeline -- publishes to crates.io using CARGO_REGISTRY_TOKEN."""
+"""Cargo pipeline implementation that publishes Rust crates to crates.io, authenticating via the CARGO_REGISTRY_TOKEN environment variable."""
 
 import os
 import subprocess

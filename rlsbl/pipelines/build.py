@@ -1,4 +1,4 @@
-"""Standalone build_assets functions for each ecosystem.
+"""Standalone build_assets functions for each ecosystem that compile artifacts and return sorted output file paths.
 
 Each function takes a project directory, version, and dist directory,
 builds the appropriate artifacts, and returns a sorted list of output

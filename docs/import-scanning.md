@@ -1,5 +1,5 @@
 ---
-description: "Import scanning architecture for dependency validation and dead code detection using tree-sitter and regex parsers."
+description: "Import scanning architecture that validates dependencies and detects dead modules using tree-sitter parsers for Python, Go, and JS/TS plus regex for Dart."
 ---
 
 # Import scanning

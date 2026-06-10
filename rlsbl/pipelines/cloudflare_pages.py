@@ -1,4 +1,4 @@
-"""Cloudflare Pages pipeline -- deploys documentation via selfdoc deploy."""
+"""Cloudflare Pages pipeline that deploys generated documentation sites to Cloudflare Pages by invoking selfdoc deploy as a local step."""
 
 import subprocess
 import sys

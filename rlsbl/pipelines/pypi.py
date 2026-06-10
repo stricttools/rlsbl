@@ -1,4 +1,4 @@
-"""PyPI pipeline -- publishes Python packages using PYPI_TOKEN or TWINE_PASSWORD."""
+"""PyPI pipeline implementation that builds and publishes Python packages to PyPI, authenticating via PYPI_TOKEN or TWINE_PASSWORD credentials."""
 
 import os
 import subprocess

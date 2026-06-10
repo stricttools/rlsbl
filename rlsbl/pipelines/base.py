@@ -1,4 +1,4 @@
-"""Base classes for release pipelines providing shared defaults and common auth patterns."""
+"""Base classes for release pipelines, including no-op defaults for optional methods and token/credential authentication mixins."""
 
 import os
 import subprocess

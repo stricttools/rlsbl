@@ -1,4 +1,4 @@
-"""Maven/Gradle pipeline -- publishes JVM packages via gradlew or mvn."""
+"""Maven and Gradle pipeline that publishes JVM packages to Maven Central by auto-detecting and invoking gradlew publishToMavenLocal or mvn deploy."""
 
 import os
 import subprocess

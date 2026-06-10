@@ -1,4 +1,4 @@
-"""Hex pipeline -- publishes Elixir packages to hex.pm using HEX_API_KEY."""
+"""Hex pipeline implementation that publishes Elixir and Erlang packages to hex.pm, authenticating via the HEX_API_KEY environment variable."""
 
 import os
 import subprocess

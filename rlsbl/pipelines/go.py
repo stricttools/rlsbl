@@ -1,4 +1,4 @@
-"""Go pipeline -- notifies the Go module proxy and optionally installs the binary."""
+"""Go pipeline that notifies the Go module proxy of new versions, verifies module availability, and optionally installs the binary locally."""
 
 import glob
 import os

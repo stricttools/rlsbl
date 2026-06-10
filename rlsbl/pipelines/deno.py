@@ -1,4 +1,4 @@
-"""Deno pipeline -- publishes to JSR using DENO_TOKEN or JSR_TOKEN."""
+"""Deno pipeline implementation that publishes TypeScript and JavaScript modules to the JSR registry using DENO_TOKEN or JSR_TOKEN."""
 
 import os
 import subprocess

@@ -1,4 +1,4 @@
-"""Flutter release target extending DartTarget with detection requiring the flutter: section in pubspec.yaml."""
+"""Flutter release target that extends DartTarget, detecting Flutter projects by requiring the flutter: section in pubspec.yaml for version bumps."""
 
 import os
 

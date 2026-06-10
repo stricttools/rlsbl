@@ -1,4 +1,4 @@
-"""Pipeline registry mapping type strings to pipeline classes for config-driven publish orchestration."""
+"""Pipeline registry that maps type strings from config.json to concrete pipeline classes, enabling config-driven publish orchestration across ecosystems."""
 
 from .protocol import Pipeline
 from .npm import NpmPipeline

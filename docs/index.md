@@ -1,5 +1,5 @@
 ---
-description: "Documentation index for rlsbl -- release orchestration CLI for npm, PyPI, Go, Cargo, and 14 more ecosystems."
+description: "Documentation index for rlsbl, a release orchestration CLI handling version bumps, JSONL changelogs, CI scaffolding, and GitHub Releases across 18 ecosystems."
 ---
 
 # rlsbl

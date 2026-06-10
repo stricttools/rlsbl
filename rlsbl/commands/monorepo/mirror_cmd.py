@@ -1,4 +1,4 @@
-"""Monorepo mirror command: initial subtree split+push and CI scaffold for a mirror repo."""
+"""Monorepo mirror command that performs the initial git subtree split, pushes to a standalone mirror repository, and scaffolds CI workflows."""
 
 import json
 import os

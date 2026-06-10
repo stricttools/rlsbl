@@ -1,4 +1,4 @@
-"""Native Android release target managing versionName and versionCode in build.gradle files."""
+"""Native Android release target that reads and bumps versionName and auto-increments versionCode in build.gradle for Android app releases."""
 
 import os
 import re
