@@ -1870,26 +1870,16 @@ def register_checks(app):
     def check_prepush_manual_warning(ctx):
         """Warn when pushing to a release branch outside rlsbl release."""
         from .commands.pre_push_check import _get_release_branches
+        from .git_util import detect_manual_push_branches
 
         if ctx.push_stdin is None:
             return CheckResult("skip", "not in push context")
 
-        if os.environ.get("RLSBL_RELEASE_PUSH") == "1":
-            return CheckResult("pass", "legitimate release push")
-
         stdin_lines = ctx.push_stdin.strip().splitlines()
         release_branches = _get_release_branches(ctx)
-        pushed_release_branches = []
-        for line in stdin_lines:
-            parts = line.split()
-            if len(parts) < 4:
-                continue
-            local_ref = parts[0]
-            if not local_ref.startswith("refs/heads/"):
-                continue
-            branch_name = local_ref[len("refs/heads/"):]
-            if branch_name in release_branches:
-                pushed_release_branches.append(branch_name)
+        pushed_release_branches = detect_manual_push_branches(
+            stdin_lines, release_branches,
+        )
 
         if pushed_release_branches:
             branches_str = ", ".join(sorted(set(pushed_release_branches)))

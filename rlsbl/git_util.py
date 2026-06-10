@@ -2,11 +2,13 @@
 
 Provides functions to retrieve files changed by a commit, check whether
 a file belongs to a project (by path prefix or watch globs), filter
-a set of commits to those touching a specific project's files, and
-validate SSH host consistency between origin and subtree remotes.
+a set of commits to those touching a specific project's files,
+validate SSH host consistency between origin and subtree remotes,
+and detect manual pushes to release branches.
 """
 
 import fnmatch
+import os
 import re
 import subprocess
 import sys
@@ -145,3 +147,32 @@ def validate_subtree_remote_ssh_host(subtree_remote, project_root):
             file=sys.stderr,
         )
         sys.exit(1)
+
+
+def detect_manual_push_branches(stdin_lines, release_branches):
+    """Return list of release branch names being pushed to manually.
+
+    Parses pre-push hook stdin lines for ``refs/heads/<branch>`` patterns
+    and returns branch names that match *release_branches*.
+
+    Returns an empty list if no release branches are being pushed to,
+    if *stdin_lines* is empty/None, or if ``RLSBL_RELEASE_PUSH`` is set
+    (indicating a legitimate release push).
+    """
+    if os.environ.get("RLSBL_RELEASE_PUSH") == "1":
+        return []
+    if not stdin_lines:
+        return []
+
+    pushed = []
+    for line in stdin_lines:
+        parts = line.split()
+        if len(parts) < 4:
+            continue
+        local_ref = parts[0]
+        if not local_ref.startswith("refs/heads/"):
+            continue
+        branch_name = local_ref[len("refs/heads/"):]
+        if branch_name in release_branches:
+            pushed.append(branch_name)
+    return pushed
