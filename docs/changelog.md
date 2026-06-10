@@ -84,7 +84,7 @@ The command:
 
 ## Validation
 
-`rlsbl check --tag changelog` runs 10 checks. All must pass before a release proceeds.
+`rlsbl check --tag changelog` runs 9 checks. All must pass before a release proceeds.
 
 | # | Check | What it verifies |
 | --- | --- | --- |

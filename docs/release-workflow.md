@@ -92,7 +92,7 @@ The 18 steps execute in this exact order:
 | --- | --- | --- |
 | 1 | Verify `gh` auth and clean working tree | Yes |
 | 2 | Read `unreleased.toml` for bump type, description, context, and target selection | Yes |
-| 3 | Validate JSONL changelog (all 10 checks) | Yes |
+| 3 | Validate JSONL changelog (all 9 checks) | Yes |
 | 4 | Generate CHANGELOG.md from all JSONL files | Yes |
 | 5 | Run `pre-checks.sh` hook | Yes |
 | 6 | Run strictcli schema dump (`--dump-schema`) if project uses strictcli | Yes |
