@@ -3,7 +3,26 @@
   "env_file": "~/Projects/.env",
   "push_timeout": 120,
   "batch_limits": {
-    "exclusions": []
+    "exclusions": [
+      {
+        "reason": "**Feature.** Comprehensive documentation update: rewrote pre",
+        "entries": [
+          {
+            "version": "unreleased",
+            "line": 3
+          }
+        ]
+      },
+      {
+        "reason": "non-user-facing batch",
+        "entries": [
+          {
+            "version": "unreleased",
+            "line": 4
+          }
+        ]
+      }
+    ]
   },
   "targets": [
     "npm",
