@@ -411,3 +411,11 @@ fast = false
 pure = false
 needs_network = false
 depends_on = ["prepush-changelog-coverage"]
+
+[checks.test-suite-workspace]
+tags = ["prepush", "workspace"]
+severity = "error"
+fast = false
+pure = false
+needs_network = false
+depends_on = ["prepush-changelog-coverage"]

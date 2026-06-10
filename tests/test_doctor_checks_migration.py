@@ -76,6 +76,7 @@ EXPECTED_CHECKS = [
     "prepush-gitignore-guard",
     "prepush-manual-warning",
     "test-suite",
+    "test-suite-workspace",
 ]
 
 

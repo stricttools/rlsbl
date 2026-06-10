@@ -409,3 +409,165 @@ class TestTestSuiteHardErrorsAtWorkspaceRoot:
         result = app._check_defs["test-suite"].impl(ctx)
         assert result.status == "fail"
         assert "workspace root" in result.message
+
+
+# ------------------------------------------------------------------
+# Tests: test-suite-workspace
+# ------------------------------------------------------------------
+
+
+class TestWorkspaceTestSuiteSkipsNonWorkspace:
+    """test-suite-workspace returns skip for non-workspace context."""
+
+    def test_non_workspace_skips(self, prepush_repo):
+        ctx = make_ctx(prepush_repo)
+        ctx.push_stdin = "refs/heads/main abc123 refs/heads/main 000000"
+
+        result = app._check_defs["test-suite-workspace"].impl(ctx)
+        assert result.status == "skip"
+        assert "not a workspace" in result.message
+
+
+class TestWorkspaceTestSuiteSkipsNoPushContext:
+    """test-suite-workspace returns skip when push_stdin is not set."""
+
+    def test_no_push_context_skips(self, tmp_path):
+        ws_root = tmp_path / "monorepo"
+        ws_root.mkdir()
+
+        ctx = WorkspaceCheckContext(
+            project_root=ws_root,
+            workspace_root=ws_root,
+            config={},
+            projects=[],
+            graph=None,
+        )
+        # push_stdin defaults to None
+        assert ctx.push_stdin is None
+
+        result = app._check_defs["test-suite-workspace"].impl(ctx)
+        assert result.status == "skip"
+        assert "not in push context" in result.message
+
+
+class TestWorkspaceTestSuiteRunsAffectedProjects:
+    """test-suite-workspace calls run_project_tests for affected projects."""
+
+    def test_runs_affected_projects(self, tmp_path, monkeypatch):
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+
+        run_git(repo, "init", "-q", "-b", "main")
+        run_git(repo, "config", "user.email", "test@test.local")
+        run_git(repo, "config", "user.name", "Test")
+
+        (repo / "README.md").write_text("# test\n")
+        run_git(repo, "add", "README.md")
+        run_git(repo, "commit", "-q", "-m", "initial")
+        run_git(repo, "tag", "v0.0.0")
+
+        # Create a sub-project with pyproject.toml
+        pkg = repo / "packages" / "alpha"
+        pkg.mkdir(parents=True)
+        (pkg / "pyproject.toml").write_text(
+            '[project]\nname = "alpha"\nversion = "0.1.0"\n'
+        )
+
+        make_workspace(repo, [{"path": "packages/alpha", "name": "alpha"}])
+
+        run_git(repo, "add", ".")
+        run_git(repo, "commit", "-q", "-m", "scaffold workspace")
+
+        base_sha = git_head(repo)
+
+        # Make a commit in the sub-project
+        (pkg / "src.py").write_text("x = 1\n")
+        run_git(repo, "add", "packages/alpha/src.py")
+        run_git(repo, "commit", "-q", "-m", "feat: alpha feature")
+        head_sha = git_head(repo)
+
+        push_stdin = f"refs/heads/main {head_sha} refs/heads/main {base_sha}"
+
+        from rlsbl.workspace import load_workspace
+
+        projects = load_workspace(str(repo))
+
+        ctx = WorkspaceCheckContext(
+            project_root=Path(str(repo)),
+            workspace_root=Path(str(repo)),
+            config={},
+            projects=projects,
+            graph=None,
+        )
+        ctx.push_stdin = push_stdin
+
+        with patch("rlsbl.testing.run_project_tests", return_value=True) as mock_tests:
+            result = app._check_defs["test-suite-workspace"].impl(ctx)
+
+        assert result.status == "pass"
+        mock_tests.assert_called_once_with("pypi", project_dir=str(pkg))
+
+
+class TestWorkspaceTestSuiteSkipsDevNodes:
+    """test-suite-workspace does not test dev_node projects."""
+
+    def test_dev_node_skipped(self, tmp_path, monkeypatch):
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+
+        run_git(repo, "init", "-q", "-b", "main")
+        run_git(repo, "config", "user.email", "test@test.local")
+        run_git(repo, "config", "user.name", "Test")
+
+        (repo / "README.md").write_text("# test\n")
+        run_git(repo, "add", "README.md")
+        run_git(repo, "commit", "-q", "-m", "initial")
+        run_git(repo, "tag", "v0.0.0")
+
+        # Create a dev_node sub-project
+        pkg = repo / "packages" / "devtool"
+        pkg.mkdir(parents=True)
+        (pkg / "pyproject.toml").write_text(
+            '[project]\nname = "devtool"\nversion = "0.1.0"\n'
+        )
+
+        make_workspace(
+            repo,
+            [{"path": "packages/devtool", "name": "devtool", "dev_node": True}],
+        )
+
+        run_git(repo, "add", ".")
+        run_git(repo, "commit", "-q", "-m", "scaffold workspace")
+
+        base_sha = git_head(repo)
+
+        # Make a commit in the dev_node project
+        (pkg / "src.py").write_text("x = 1\n")
+        run_git(repo, "add", "packages/devtool/src.py")
+        run_git(repo, "commit", "-q", "-m", "feat: devtool feature")
+        head_sha = git_head(repo)
+
+        push_stdin = f"refs/heads/main {head_sha} refs/heads/main {base_sha}"
+
+        from rlsbl.workspace import load_workspace
+
+        projects = load_workspace(str(repo))
+
+        ctx = WorkspaceCheckContext(
+            project_root=Path(str(repo)),
+            workspace_root=Path(str(repo)),
+            config={},
+            projects=projects,
+            graph=None,
+        )
+        ctx.push_stdin = push_stdin
+
+        with patch("rlsbl.testing.run_project_tests") as mock_tests:
+            result = app._check_defs["test-suite-workspace"].impl(ctx)
+
+        # dev_node projects should be filtered out, so no tests run
+        mock_tests.assert_not_called()
+        assert result.status == "pass"
+        assert "no affected projects" in result.message
