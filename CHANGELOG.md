@@ -2,9 +2,15 @@
 
 # Changelog
 
-## 0.66.3
+## 0.66.4
 
-deps-undeclared respects try/except ImportError for optional imports
+Dynamic check-count directive, quality count fix, exclusion cleanup integration test
+
+### Features
+
+- **Feature.** New `check-count` selfdoc directive auto-generates the check count from checks.toml, eliminating manual count maintenance in docs.
+
+## 0.66.3
 
 ### Fixes
 
