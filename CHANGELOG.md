@@ -2,9 +2,15 @@
 
 # Changelog
 
-## 0.65.3
+## 0.65.4
 
-safegit --yes, doc gaps, SEO fixes, retry dedup test
+Fix CI test failure from --yes flag in safegit commit calls
+
+### Fixes
+
+- **Fix.** Updated commit command tests to expect the new `--yes` flag in safegit calls.
+
+## 0.65.3
 
 ### Features
 
