@@ -1,0 +1,1 @@
+{"commits":["dfb0a8157d01df3e9dbc0f09e8ab8f4d7b87ebaa"],"user_facing":true,"description":"**Fix.** Pre-push hook now works from monorepo root directory. `test-suite` check hard-errors in workspace context with a clear message directing to `test-suite-workspace`.","type":"fix"}
