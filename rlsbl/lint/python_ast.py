@@ -72,11 +72,16 @@ def _try_catches_import_error(try_node, error_names):
                 if ec_child.text.decode("utf-8") in error_names:
                     return True
             elif ec_child.type == "as_pattern":
-                # except ImportError as e: -- the identifier is inside as_pattern
+                # except ImportError as e: or except (ImportError, X) as e:
                 for ap_child in ec_child.children:
                     if ap_child.type == "identifier":
                         if ap_child.text.decode("utf-8") in error_names:
                             return True
+                    elif ap_child.type == "tuple":
+                        for t_child in ap_child.children:
+                            if t_child.type == "identifier":
+                                if t_child.text.decode("utf-8") in error_names:
+                                    return True
             elif ec_child.type == "tuple":
                 # except (ImportError, ValueError): -- identifiers inside tuple
                 for t_child in ec_child.children:

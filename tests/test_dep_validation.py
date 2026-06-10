@@ -292,6 +292,26 @@ class TestCheckUndeclaredDeps:
         )
         assert errors == []
 
+    def test_import_in_try_except_tuple_as_pattern_skipped(self, tmp_path):
+        """Imports inside try/except (ImportError, X) as e are optional."""
+        project_dir = tmp_path / "app"
+        project_dir.mkdir()
+        (project_dir / "pyproject.toml").write_text(_PYPROJECT)
+        (project_dir / "main.py").write_text(
+            "try:\n"
+            "    import optional_pkg\n"
+            "except (ImportError, ModuleNotFoundError) as e:\n"
+            "    optional_pkg = None\n"
+        )
+
+        errors = check_undeclared_deps(
+            project_name="app",
+            project_dir=str(project_dir),
+            manifest_deps=set(),
+            workspace_names={"app", "optional_pkg"},
+        )
+        assert errors == []
+
     def test_import_in_try_except_exception_NOT_skipped(self, tmp_path):
         """Imports inside try/except Exception are NOT optional (too broad)."""
         project_dir = tmp_path / "app"
