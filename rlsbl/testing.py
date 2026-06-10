@@ -1,4 +1,4 @@
-"""Shared test-running logic for detected project types.
+"""Shared test-running logic that auto-detects project types and invokes the correct test runner (pytest, go test, npm test) for releases and checks.
 
 Extracted from the release pipeline so it can be reused by other commands
 (e.g., pre-push checks, CI, standalone test invocations).
