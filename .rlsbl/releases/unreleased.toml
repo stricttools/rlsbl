@@ -1,8 +1,0 @@
-# Version bump type: patch, minor, or major
-bump = "patch"
-# Short description of this release (required)
-description = "V4 shim workspace fix, check-name multi-target, zero SEO warnings"
-# Optional context explaining why these changes were made
-context = ""
-include = ["npm", "pypi"]
-exclude = []
