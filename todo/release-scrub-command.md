@@ -25,7 +25,7 @@ Safety: requires --yes (same as other destructive operations). No extra confirma
 
 ## Blocked on
 
-safegit shipping `--json` SHA mapping output for scrub commands. Todo filed: safegit/todo/scrub-json-sha-mapping.md
+UNBLOCKED. safegit 0.18.0 shipped `scrub match --json` and `scrub file --json`. Output format verified: JSON with version, dry_run, pattern, match counts, and SHA mappings.
 
 ## Effort
 
