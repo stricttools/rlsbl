@@ -114,7 +114,7 @@ See [docs/ci-customization.md](docs/ci-customization.md) for an example.
 
 ## Check system
 
-49 checks organized by tag:
+:-: check-count
 
 | Tag | Checks | Description |
 |-----|--------|-------------|

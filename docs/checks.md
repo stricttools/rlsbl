@@ -4,7 +4,9 @@ description: "Complete reference for rlsbl's 49 checks across 6 tags, including 
 
 # Check system
 
-rlsbl includes 49 checks across 6 tags, run via the `rlsbl check` command. Checks validate project metadata, release state, changelog structure, workspace integrity, code quality, and pre-push enforcement.
+:-: check-count
+
+Run checks via the `rlsbl check` command. Checks validate project metadata, release state, changelog structure, workspace integrity, code quality, and pre-push enforcement.
 
 ## Running checks
 
