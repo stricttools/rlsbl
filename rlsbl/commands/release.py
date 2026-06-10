@@ -1194,6 +1194,29 @@ def upload_release_assets(tag, new_version, log, flags, *, ctx):
             shutil.rmtree(dist_dir)
 
 
+def _cleanup_release_artifacts(project_dir: str, version: str) -> None:
+    """Best-effort removal of generated files that become orphaned after rollback.
+
+    After `git reset --hard` reverts the release commits, files created during
+    finalization (renamed JSONL, per-version markdown, renamed release TOML) are
+    left as untracked because they never existed in the pre-release history.
+    Removing them prevents a dirty working tree that blocks the next attempt.
+    """
+    try:
+        candidates = [
+            os.path.join(project_dir, ".rlsbl", "changes", f"{version}.jsonl"),
+            os.path.join(project_dir, ".rlsbl", "changes", f"{version}.md"),
+            os.path.join(project_dir, ".rlsbl", "releases", f"v{version}.toml"),
+        ]
+        for path in candidates:
+            if os.path.exists(path):
+                # Released JSONL files are chmod 444; make writable before unlinking
+                os.chmod(path, 0o644)
+                os.unlink(path)
+    except Exception:
+        pass  # Best-effort: never mask the original error
+
+
 def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current_version,
                           bump_type, tag, branch, changelog_entry, target, *,
                           secondary_targets=None, monorepo_name=None,
@@ -1499,6 +1522,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
         # Release was explicitly aborted (e.g., unexpected dirty files).
         # Roll back version-bumped files so the working tree is clean.
         run("git", ["reset", "--hard", pre_release_sha])
+        _cleanup_release_artifacts(project_dir, new_version)
         print(str(e), file=sys.stderr)
         print(
             f"Local state has been rolled back to {pre_release_sha[:10]}.",
@@ -1514,6 +1538,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
         except Exception:
             pass
         run("git", ["reset", "--hard", pre_release_sha])
+        _cleanup_release_artifacts(project_dir, new_version)
         print(
             f"Error: release failed. Local state has been rolled back to {pre_release_sha[:10]}.",
             file=sys.stderr,
