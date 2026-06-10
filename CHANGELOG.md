@@ -2,16 +2,19 @@
 
 # Changelog
 
+## 0.66.1
+
+Fix uv sync stripping pytest in workspaces, add workspace-unbuildable check
+
+### Features
+
+- **Feature.** New `workspace-unbuildable` check detects workspace members with broken build configs before `uv sync --all-packages` fails at release time.
+
+### Fixes
+
+- **Fix.** `uv sync` now uses `--all-packages` to prevent stripping pytest from workspace member venvs. Fixes test runner falling through to system Python in uv workspaces.
+
 ## 0.66.0
-
-Prepush check system: test-suite check, version-tag skip removal, hook V5
-
-<details>
-<summary>Context</summary>
-
-Major overhaul of the pre-push hook system. All pre-push logic migrated into the rlsbl check system under a new 'prepush' tag. The hook now runs 'rlsbl check --tag prepush' with 4 checks (changelog coverage, gitignore guard, manual-push warning, test-suite). Version-tag skip removed -- checks always run. Shared testing.py module extracted from release flow.
-
-</details>
 
 ### Features
 
