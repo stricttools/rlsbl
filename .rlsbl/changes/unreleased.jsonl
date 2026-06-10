@@ -1,0 +1,1 @@
+{"commits":["cc6d2b427fc8340250a0f743e2fa7d71b42be809"],"user_facing":true,"description":"**Fix.** `uv sync` now uses `--all-packages` to prevent stripping pytest from workspace member venvs. Fixes test runner falling through to system Python in uv workspaces.","type":"fix"}
