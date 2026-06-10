@@ -1,0 +1,4 @@
+{"commits":["cc6d2b427fc8340250a0f743e2fa7d71b42be809"],"user_facing":true,"description":"**Fix.** `uv sync` now uses `--all-packages` to prevent stripping pytest from workspace member venvs. Fixes test runner falling through to system Python in uv workspaces.","type":"fix"}
+{"commits":["bdf7db7cf0a970118be2c7f333a12bb87869e786"],"user_facing":true,"description":"**Feature.** New `workspace-unbuildable` check detects workspace members with broken build configs before `uv sync --all-packages` fails at release time.","type":"feature"}
+{"commits":["23b2200fee6e12ce56d236f06bdef38d53d811c3"],"user_facing":false}
+{"commits":["6ece7fe5746c5764105c42937f4fa1e11c86b511"],"user_facing":false}
