@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.native_android
-description: "Native Android release target managing versionName and versionCode in build.gradle files."
+description: "Native Android release target that reads and bumps versionName and auto-increments versionCode in build.gradle for Android app releases."
 generated: true
 nav_group: "API Reference"
 nav_order: 93

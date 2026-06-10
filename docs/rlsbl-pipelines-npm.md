@@ -1,6 +1,6 @@
 ---
 title: rlsbl.pipelines.npm
-description: "npm pipeline -- publishes to npm registry using NPM_TOKEN."
+description: "npm pipeline implementation that publishes packages to the npm registry, authenticating via NPM_TOKEN and handling scoped package access."
 generated: true
 nav_group: "API Reference"
 nav_order: 75

@@ -1,6 +1,6 @@
 ---
 title: rlsbl.pipelines.cargo
-description: "Cargo pipeline -- publishes to crates.io using CARGO_REGISTRY_TOKEN."
+description: "Cargo pipeline implementation that publishes Rust crates to crates.io, authenticating via the CARGO_REGISTRY_TOKEN environment variable."
 generated: true
 nav_group: "API Reference"
 nav_order: 67

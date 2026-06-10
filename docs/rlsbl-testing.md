@@ -1,6 +1,6 @@
 ---
 title: rlsbl.testing
-description: "Shared test-running logic for detected project types."
+description: "Shared test-running logic that auto-detects project types and invokes the correct test runner (pytest, go test, npm test) for releases and checks."
 generated: true
 nav_group: "API Reference"
 nav_order: 107

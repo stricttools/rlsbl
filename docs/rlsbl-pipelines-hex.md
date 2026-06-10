@@ -1,6 +1,6 @@
 ---
 title: rlsbl.pipelines.hex
-description: "Hex pipeline -- publishes Elixir packages to hex.pm using HEX_API_KEY."
+description: "Hex pipeline implementation that publishes Elixir and Erlang packages to hex.pm, authenticating via the HEX_API_KEY environment variable."
 generated: true
 nav_group: "API Reference"
 nav_order: 72

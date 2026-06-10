@@ -1,6 +1,6 @@
 ---
 title: rlsbl.pipelines.pypi
-description: "PyPI pipeline -- publishes Python packages using PYPI_TOKEN or TWINE_PASSWORD."
+description: "PyPI pipeline implementation that builds and publishes Python packages to PyPI, authenticating via PYPI_TOKEN or TWINE_PASSWORD credentials."
 generated: true
 nav_group: "API Reference"
 nav_order: 77

@@ -1,6 +1,6 @@
 ---
 title: rlsbl.pipelines.base
-description: "Base classes for release pipelines providing shared defaults and common auth patterns."
+description: "Base classes for release pipelines, including no-op defaults for optional methods and token/credential authentication mixins."
 generated: true
 nav_group: "API Reference"
 nav_order: 65

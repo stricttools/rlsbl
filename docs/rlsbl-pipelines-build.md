@@ -1,6 +1,6 @@
 ---
 title: rlsbl.pipelines.build
-description: "Standalone build_assets functions for each ecosystem."
+description: "Standalone build_assets functions for each ecosystem that compile platform-specific artifacts and return sorted output file paths for upload."
 generated: true
 nav_group: "API Reference"
 nav_order: 66

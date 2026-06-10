@@ -1,6 +1,6 @@
 ---
 title: rlsbl.pipelines.docker
-description: "Docker pipeline -- builds and pushes Docker images using username/password credentials."
+description: "Docker pipeline that builds container images, authenticates to a registry via username/password credentials, and pushes tagged images."
 generated: true
 nav_group: "API Reference"
 nav_order: 70

@@ -1,6 +1,6 @@
 ---
 title: rlsbl.pipelines.cloudflare_pages
-description: "Cloudflare Pages pipeline -- deploys documentation via selfdoc deploy."
+description: "Cloudflare Pages pipeline that deploys generated documentation sites to Cloudflare Pages by invoking selfdoc deploy as a local step."
 generated: true
 nav_group: "API Reference"
 nav_order: 68

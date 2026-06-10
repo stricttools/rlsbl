@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.monorepo.mirror_cmd
-description: "Monorepo mirror command: initial subtree split+push and CI scaffold for a mirror repo."
+description: "Monorepo mirror command that performs the initial git subtree split, pushes to a standalone mirror repository, and scaffolds CI workflows."
 generated: true
 nav_group: "API Reference"
 nav_order: 26

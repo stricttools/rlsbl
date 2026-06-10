@@ -1,6 +1,6 @@
 ---
 title: rlsbl.pipelines.maven
-description: "Maven/Gradle pipeline -- publishes JVM packages via gradlew or mvn."
+description: "Maven and Gradle pipeline that publishes JVM packages to Maven Central by auto-detecting and invoking gradlew publishToMavenLocal or mvn deploy."
 generated: true
 nav_group: "API Reference"
 nav_order: 74

@@ -1,6 +1,6 @@
 ---
 title: rlsbl.pipelines.go
-description: "Go pipeline -- notifies the Go module proxy and optionally installs the binary."
+description: "Go pipeline that notifies the Go module proxy of new versions, verifies module availability, and optionally installs the binary locally."
 generated: true
 nav_group: "API Reference"
 nav_order: 71

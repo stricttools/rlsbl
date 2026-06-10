@@ -1,6 +1,6 @@
 ---
 title: rlsbl.pipelines.deno
-description: "Deno pipeline -- publishes to JSR using DENO_TOKEN or JSR_TOKEN."
+description: "Deno pipeline implementation that publishes TypeScript and JavaScript modules to the JSR registry using DENO_TOKEN or JSR_TOKEN."
 generated: true
 nav_group: "API Reference"
 nav_order: 69

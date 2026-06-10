@@ -1,6 +1,6 @@
 ---
 title: rlsbl.pipelines
-description: "Pipeline registry mapping type strings to pipeline classes for config-driven publish orchestration."
+description: "Pipeline registry that maps type strings from config.json to concrete pipeline classes, enabling config-driven publish orchestration across ecosystems."
 generated: true
 nav_group: "API Reference"
 nav_order: 64
