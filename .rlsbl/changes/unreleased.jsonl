@@ -1,0 +1,1 @@
+{"commits":["b10ec179e72cff29ed3ca6f625a7b23f671c5bc1"],"user_facing":true,"description":"**Feature.** Passes `--yes` to safegit commit calls, future-proofing against interactive prompts in safegit.","type":"feature"}
