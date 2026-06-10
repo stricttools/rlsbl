@@ -1,0 +1,1 @@
+{"commits":["878311b45cf8e0080a706b58b5dee72f7dec0c0b"],"user_facing":true,"description":"**Fix.** Deprecated pre-push hook (old format) now creates proper workspace context at monorepo root, enabling all prepush checks including `test-suite-workspace`.","type":"fix"}
