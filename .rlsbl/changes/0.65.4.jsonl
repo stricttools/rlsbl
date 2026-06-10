@@ -1,0 +1,2 @@
+{"commits":["5f41ea75ba0036bbf2229048056fe284210811cc"],"user_facing":true,"description":"**Fix.** Updated commit command tests to expect the new `--yes` flag in safegit calls.","type":"fix"}
+{"commits":["51693da943a962a234e857948874644f8b8989d4"],"user_facing":false}
