@@ -2,3 +2,4 @@
 {"commits":["9e316ff261d7c2e680e2e329e07aefe8cba0fd85","4b70a50949f490b1164a58dac7f84327031739ba"],"user_facing":true,"description":"**Feature.** Extracted shared test-running logic to `rlsbl/testing.py`. Release flow and test-suite check both use the same function, eliminating duplication.","type":"feature"}
 {"commits":["6abc3413bbf341cb1b646dcf2cdfcc4cf7de057d","ebd942b7183f9d1b5c1666e18e27ce9114eebeaf"],"user_facing":true,"description":"**Feature.** Updated documentation for prepush check system, fixed stale check counts.","type":"feature"}
 {"commits":["67d140dc9bf6ffca3b01883c665e78493adae9c4","4854c520af2f4aa2033c74b582ca33254aeac0cb","f743ff1692df71fcfe4b73f4e510b5ea5640b249","acc8a6fdbd43327d0c48dbb30502d2b7e2690633"],"user_facing":false}
+{"commits":["4c2e1793a6c17bacb05c39eedaa7ac70d2728663"],"user_facing":false}
