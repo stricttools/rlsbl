@@ -384,57 +384,26 @@ def _run_monorepo_check(workspace_root, projects, changed_files, refs=None):
 
 
 def run_cmd(registry, args, flags, *, ctx):
-    """Check that CHANGELOG.md has an entry for the current project version.
+    """Deprecated: delegates to ``rlsbl check --tag prepush``.
 
-    In monorepo mode (when a workspace root is detected), parses the pushed
-    ref range from stdin to determine which projects are affected, then checks
-    each affected project's changelog independently.
-
-    In single-project mode, checks the current directory's changelog.
-
-    Exits 1 if any changelog entry is missing; exits 0 silently on success.
+    Old V4 hooks call ``rlsbl pre-push-check`` directly.  This shim reads
+    stdin (the push refs that git passes to pre-push hooks), sets
+    ``RLSBL_PUSH_STDIN`` so the check system can see it, then spawns
+    ``rlsbl check --tag prepush`` and forwards its exit code.
     """
-    root_str = str(ctx.project_root)
+    print(
+        "Warning: pre-push-check is deprecated. "
+        "Update your hook with 'rlsbl scaffold'.",
+        file=sys.stderr,
+    )
 
-    # Read stdin once -- used for ref parsing
+    # Read stdin once (git passes push refs on stdin to the hook)
     stdin_lines = _read_stdin_lines()
+    os.environ["RLSBL_PUSH_STDIN"] = "\n".join(stdin_lines) if stdin_lines else ""
 
-    # Warn if this looks like a manual push to a release branch (the env
-    # marker is only set by `rlsbl release run` and `rlsbl release undo`). Non-blocking.
-    _warn_if_manual_release_push(stdin_lines, ctx=ctx)
-
-    # Detect monorepo context
-    workspace_root = find_workspace_root(root_str)
-    if workspace_root:
-        refs = _parse_stdin_refs(stdin_lines)
-        if refs is not None:
-            changed_files = _get_changed_files(refs)
-            if changed_files is not None:
-                projects = load_workspace(workspace_root)
-                _run_monorepo_check(workspace_root, projects, changed_files, refs=refs)
-                # _run_monorepo_check always calls sys.exit, so this is unreachable
-
-    # Single-project fallback
-
-    # Gitignore guard: block push if rlsbl-managed files are gitignored
-    gitignore_error = _check_gitignore_guard(root_str)
-    if gitignore_error:
-        print(f"Error: {gitignore_error}", file=sys.stderr)
-        sys.exit(1)
-
-    if not changes_dir_exists(root_str):
-        # JSONL changelog not set up -- warn but don't block
-        print("Warning: JSONL changelog not set up. Run 'rlsbl scaffold' to create .rlsbl/changes/", file=sys.stderr)
-        sys.exit(0)
-
-    # JSONL mode: check commit coverage
-    refs = _parse_stdin_refs(stdin_lines)
-    if refs is not None:
-        error = _check_jsonl_changelog(root_str, refs)
-        if error is None:
-            sys.exit(0)
-        print(f"Error: {error}.", file=sys.stderr)
-        print("Add JSONL changelog entries covering all pushed commits.", file=sys.stderr)
-        sys.exit(1)
-    # No refs available (not called from pre-push hook) -- skip
-    sys.exit(0)
+    # Delegate to the check system
+    result = subprocess.run(
+        [sys.executable, "-m", "rlsbl", "check", "--tag", "prepush"],
+        timeout=120,
+    )
+    sys.exit(result.returncode)

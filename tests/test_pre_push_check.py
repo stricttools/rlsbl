@@ -58,10 +58,10 @@ class TestRunCmdEntryExists:
         assert exc_info.value.code == 0
 
 
-class TestRunCmdWithoutJsonl:
-    """run_cmd warns and exits 0 when JSONL changelog is not set up."""
+class TestRunCmdDeprecationShim:
+    """run_cmd prints deprecation warning and delegates to check system."""
 
-    def test_warns_no_jsonl(self, tmp_project, capsys):
+    def test_prints_deprecation_warning(self, tmp_project, capsys):
         (tmp_project / "package.json").write_text(
             json.dumps({"name": "test-pkg", "version": "1.0.0"})
         )
@@ -72,7 +72,7 @@ class TestRunCmdWithoutJsonl:
 
         assert exc_info.value.code == 0
         captured = capsys.readouterr()
-        assert "JSONL changelog not set up" in captured.err
+        assert "pre-push-check is deprecated" in captured.err
 
     def test_no_changelog_exits_zero(self, tmp_project, capsys):
         (tmp_project / "package.json").write_text(
