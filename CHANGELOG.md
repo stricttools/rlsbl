@@ -2,9 +2,24 @@
 
 # Changelog
 
-## 0.65.4
+## 0.66.0
 
-Fix CI test failure from --yes flag in safegit commit calls
+Prepush check system: test-suite check, version-tag skip removal, hook V5
+
+<details>
+<summary>Context</summary>
+
+Major overhaul of the pre-push hook system. All pre-push logic migrated into the rlsbl check system under a new 'prepush' tag. The hook now runs 'rlsbl check --tag prepush' with 4 checks (changelog coverage, gitignore guard, manual-push warning, test-suite). Version-tag skip removed -- checks always run. Shared testing.py module extracted from release flow.
+
+</details>
+
+### Features
+
+- **Feature.** New `prepush` check tag with 4 checks: `prepush-changelog-coverage`, `prepush-gitignore-guard`, `prepush-manual-warning`, and `test-suite`. Pre-push hook now runs `rlsbl check --tag prepush` instead of the deprecated `rlsbl pre-push-check`. Version-tag skip removed -- all checks always run. Fast-fail ordering via `depends_on`: test-suite skips if changelog coverage fails.
+- **Feature.** Extracted shared test-running logic to `rlsbl/testing.py`. Release flow and test-suite check both use the same function, eliminating duplication.
+- **Feature.** Updated documentation for prepush check system, fixed stale check counts.
+
+## 0.65.4
 
 ### Fixes
 
