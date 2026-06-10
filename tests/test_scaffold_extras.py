@@ -263,7 +263,7 @@ def test_pre_push_hook_does_not_pass_args(mock_git_repo, capsys):
     content = hook_path.read_text()
     assert '"$@"' not in content, "Hook must not pass $@ (strictcli rejects extra args)"
     assert "'$@'" not in content, "Hook must not pass $@ (strictcli rejects extra args)"
-    assert "pre-push-check" in content, "Hook should delegate to pre-push-check"
+    assert "rlsbl check --tag prepush" in content, "Hook should delegate to check system"
 
 
 # --- .npmignore scaffolding tests ---
@@ -520,7 +520,7 @@ def test_pre_push_hook_installed_from_subdirectory(mock_git_repo, monkeypatch, c
         "even when scaffold runs from a sub-directory"
     )
     content = hook_path.read_text()
-    assert "pre-push-check" in content
+    assert "rlsbl check --tag prepush" in content
 
     # Verify no .git directory was created in the subdirectory
     assert not (subdir / ".git").exists(), (

@@ -253,7 +253,7 @@ class TestPrePushWithoutJsonl:
 
         assert exc_info.value.code == 0
         captured = capsys.readouterr()
-        assert "JSONL changelog not set up" in captured.err
+        assert "pre-push-check is deprecated" in captured.err
 
 
 # ---------------------------------------------------------------------------

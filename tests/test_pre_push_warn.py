@@ -16,7 +16,7 @@ from rlsbl.commands.pre_push_check import (
 from rlsbl.context import ProjectContext
 
 
-WARN_MARKER = "Manual push to release branch"
+WARN_MARKER = "manual push to release branch"
 
 
 @pytest.fixture
@@ -95,8 +95,8 @@ class TestWarnSuppressedWhenEnvSet:
                 run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
 
         captured = capsys.readouterr()
-        assert WARN_MARKER not in captured.err
-        assert WARN_MARKER not in captured.out
+        combined = captured.out + captured.err
+        assert WARN_MARKER not in combined
         assert exc_info.value.code == 0
 
 
@@ -114,7 +114,8 @@ class TestWarnOnManualMainPush:
                 run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
 
         captured = capsys.readouterr()
-        assert WARN_MARKER in captured.err
+        combined = captured.out + captured.err
+        assert WARN_MARKER in combined
         # Hook still exits 0 -- warning is non-blocking.
         assert exc_info.value.code == 0
 
@@ -129,7 +130,8 @@ class TestWarnOnManualMainPush:
                 run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
 
         captured = capsys.readouterr()
-        assert WARN_MARKER in captured.err
+        combined = captured.out + captured.err
+        assert WARN_MARKER in combined
         assert exc_info.value.code == 0
 
 
@@ -147,14 +149,15 @@ class TestNoWarnOnFeatureBranch:
                 run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
 
         captured = capsys.readouterr()
-        assert WARN_MARKER not in captured.err
+        combined = captured.out + captured.err
+        assert WARN_MARKER not in combined
         assert exc_info.value.code == 0
 
 
-class TestWarningGoesToStderr:
-    """Verify the warning goes to stderr, not stdout."""
+class TestWarningGoesToStdout:
+    """Verify the warning goes to stdout (check system output format)."""
 
-    def test_stderr_not_stdout(self, jsonl_git_repo, capsys):
+    def test_stdout_output(self, jsonl_git_repo, capsys):
         repo = jsonl_git_repo
         base, sha = _add_covered_commit(repo)
         stdin_data = _push_stdin("refs/heads/main", sha, remote_sha=base)
@@ -165,8 +168,7 @@ class TestWarningGoesToStderr:
                 run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
 
         captured = capsys.readouterr()
-        assert WARN_MARKER in captured.err
-        assert WARN_MARKER not in captured.out
+        assert WARN_MARKER in captured.out
 
 
 class TestExitsZeroWhenWarning:
@@ -183,7 +185,8 @@ class TestExitsZeroWhenWarning:
                 run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
 
         captured = capsys.readouterr()
-        assert WARN_MARKER in captured.err
+        combined = captured.out + captured.err
+        assert WARN_MARKER in combined
         assert exc_info.value.code == 0
 
 
@@ -205,7 +208,8 @@ class TestTagOnlyPushNoWarning:
                 run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
 
         captured = capsys.readouterr()
-        assert WARN_MARKER not in captured.err
+        combined = captured.out + captured.err
+        assert WARN_MARKER not in combined
         # JSONL check passes (commit is covered) -> exit 0.
         assert exc_info.value.code == 0
 
@@ -221,7 +225,8 @@ class TestTagOnlyPushNoWarning:
                 run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
 
         captured = capsys.readouterr()
-        assert WARN_MARKER not in captured.err
+        combined = captured.out + captured.err
+        assert WARN_MARKER not in combined
         assert exc_info.value.code == 0
 
 
@@ -240,7 +245,8 @@ class TestReleaseBranchesConfigOverride:
                 run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"release_branches": ["develop"]}))
 
         captured = capsys.readouterr()
-        assert WARN_MARKER not in captured.err
+        combined = captured.out + captured.err
+        assert WARN_MARKER not in combined
         assert exc_info.value.code == 0
 
     def test_override_includes_develop(self, jsonl_git_repo, capsys):
@@ -255,7 +261,8 @@ class TestReleaseBranchesConfigOverride:
                 run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"release_branches": ["develop"]}))
 
         captured = capsys.readouterr()
-        assert WARN_MARKER in captured.err
+        combined = captured.out + captured.err
+        assert WARN_MARKER in combined
         assert exc_info.value.code == 0
 
 

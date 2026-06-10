@@ -163,7 +163,7 @@ class TestSingleProjectWithoutJsonl:
             run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
         assert exc_info.value.code == 0
         captured = capsys.readouterr()
-        assert "JSONL changelog not set up" in captured.err
+        assert "pre-push-check is deprecated" in captured.err
 
     def test_exits_zero_with_no_project(self, tmp_project):
         with pytest.raises(SystemExit) as exc_info:
