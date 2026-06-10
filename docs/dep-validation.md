@@ -18,6 +18,7 @@ Detects workspace dependencies declared in the project manifest that are not act
 - A dep is unused if zero source files import it (regardless of context)
 - Supports overrides via `.rlsbl-monorepo/dep-overrides.toml` with mandatory `reason` field
 - Override format: `[[unused_allowed]]` entries with `package`, `dep`, and `reason` keys
+- Imports inside `try/except ImportError` blocks are not counted as usage. A declared hard dependency that is only imported optionally will be flagged as unused -- declaring a hard dependency but importing it conditionally is contradictory.
 
 ### deps-undeclared
 

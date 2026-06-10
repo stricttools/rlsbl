@@ -1,5 +1,5 @@
 ---
-description: "Complete reference for rlsbl's 49 checks across 6 tags, including check metadata, severity levels, and target applicability."
+description: "Complete reference for rlsbl's 50 checks across 6 tags, including check metadata, severity levels, and target applicability."
 ---
 
 # Check system
@@ -43,7 +43,7 @@ Severity is declared per-check in metadata. A check with `severity = "error"` re
 | `changelog` | JSONL changelog validation and structure | 9 |
 | `workspace` | Monorepo workspace integrity and dependency rules | 9 |
 | `quality` | Code quality, dependency analysis, scaffold hygiene | 8 |
-| `prepush` | Pre-push enforcement: changelog coverage, gitignore guard, manual-push warning, tests | 4 |
+| `prepush` | Pre-push enforcement: changelog coverage, gitignore guard, manual-push warning, tests | 5 |
 
 Note: `test-suite` is tagged both `prepush` and `quality`, so it appears in both tag counts. Four checks (`layers-violations`, `deps-unused`, `deps-undeclared`, `deps-stale`) have no tag and only run with `--all` or `--name`.
 
@@ -124,8 +124,9 @@ Dependencies: `changelog-range` and `changelog-coverage` depend on `changelog-ha
 | `prepush-gitignore-guard` | error | Blocks push if rlsbl-managed files are gitignored |
 | `prepush-manual-warning` | warn | Warns on manual push to release branch (non-blocking) |
 | `test-suite` | error | Runs project tests (`pytest` / `go test` / `npm test`) |
+| `test-suite-workspace` | error | Runs tests for affected workspace projects (monorepo only) |
 
-Dependencies: `test-suite` depends on `prepush-changelog-coverage` -- fast checks fail first, so the test suite is skipped if changelog coverage fails. `test-suite` is also tagged `quality`, so it runs under both `rlsbl check --tag prepush` and `rlsbl check --tag quality`.
+Dependencies: `test-suite` and `test-suite-workspace` both depend on `prepush-changelog-coverage` -- fast checks fail first, so the test suite is skipped if changelog coverage fails. `test-suite` is also tagged `quality`, so it runs under both `rlsbl check --tag prepush` and `rlsbl check --tag quality`.
 
 ## Untagged checks
 

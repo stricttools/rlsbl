@@ -89,6 +89,10 @@ The `.git/hooks/pre-push` hook captures git's stdin into the `RLSBL_PUSH_STDIN` 
 - **Fast-fail ordering.** Dependency ordering ensures cheap checks run before expensive ones. If `prepush-changelog-coverage` fails, `test-suite` is skipped entirely.
 - **Unified check system.** The pre-push hook uses the same `rlsbl check` infrastructure as release validation, with consistent reporting and severity handling.
 
+### Monorepo behavior
+
+In monorepos, the pre-push hook runs from the repo root. The `test-suite` check hard-errors at workspace root because it needs a specific project directory. The `test-suite-workspace` check handles this: it automatically detects affected projects from push refs, runs tests for each, and skips `dev_node` projects. If changelog coverage fails, `test-suite-workspace` is skipped (it depends on `prepush-changelog-coverage`).
+
 ### Standalone usage
 
 `rlsbl check --tag prepush` can be run outside of a git push context. Push-specific checks (`prepush-changelog-coverage`, `prepush-gitignore-guard`, `prepush-manual-warning`) skip gracefully when `RLSBL_PUSH_STDIN` is not set. `test-suite` always runs regardless of push context.
