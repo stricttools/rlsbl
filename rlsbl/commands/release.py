@@ -1448,6 +1448,20 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
         else:
             log("No .rlsbl/changes/ directory; skipping changelog finalization")
 
+        # Clean stale batch_limits exclusions that referenced unreleased.jsonl
+        from ..config import clean_stale_exclusions
+        config_path = os.path.join(project_dir, ".rlsbl", "config.json")
+        if os.path.exists(config_path):
+            removed = clean_stale_exclusions(config_path)
+            if removed:
+                config_rel = _rel_to_git_root(config_path, _git_root)
+                commit_files(
+                    f"chore: clean {removed} stale batch exclusion(s) from config.json",
+                    [config_rel],
+                    cwd=_git_root,
+                )
+                log(f"Cleaned {removed} stale batch exclusion(s) from config.json")
+
         # Finalize release file: rename unreleased.toml to vX.Y.Z.toml
         # Only if the release file exists (backward compat with legacy path)
         from ..release_file import get_release_file_path

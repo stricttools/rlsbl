@@ -3,17 +3,7 @@
   "env_file": "~/Projects/.env",
   "push_timeout": 120,
   "batch_limits": {
-    "exclusions": [
-      {
-        "reason": "**Feature.** New `prepush` check tag with 4 checks: `prepush",
-        "entries": [
-          {
-            "version": "unreleased",
-            "line": 1
-          }
-        ]
-      }
-    ]
+    "exclusions": []
   },
   "targets": [
     "npm",

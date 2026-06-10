@@ -211,6 +211,46 @@ def validate_pipelines_config(config):
                     )
 
 
+def clean_stale_exclusions(config_path):
+    """Remove batch_limits exclusions that reference version="unreleased".
+
+    After release finalization renames unreleased.jsonl to X.Y.Z.jsonl,
+    exclusions with version="unreleased" become dead references. This
+    function cleans them up.
+
+    Returns the number of exclusions removed. Returns 0 and does not
+    write to disk if nothing changed.
+    """
+    config = read_json_config(config_path)
+    batch_limits = config.get("batch_limits")
+    if not isinstance(batch_limits, dict):
+        return 0
+    exclusions = batch_limits.get("exclusions")
+    if not isinstance(exclusions, list) or not exclusions:
+        return 0
+
+    def _has_unreleased_entry(exclusion):
+        entries = exclusion.get("entries", [])
+        return any(
+            isinstance(e, dict) and e.get("version") == "unreleased"
+            for e in entries
+        )
+
+    cleaned = [ex for ex in exclusions if not _has_unreleased_entry(ex)]
+    removed = len(exclusions) - len(cleaned)
+    if removed == 0:
+        return 0
+
+    batch_limits["exclusions"] = cleaned
+    # Atomic write: tmp file then replace
+    tmp_path = config_path + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    os.replace(tmp_path, config_path)
+    return removed
+
+
 def write_project_config(key, value, project_root):
     """Write or update a key in .rlsbl/config.json (creates dir if needed).
 
