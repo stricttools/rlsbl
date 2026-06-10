@@ -82,6 +82,7 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "deps-stale": "workspace",
     "dead-workspace-packages": "workspace",
     "subtree-remote-reachable": "workspace",
+    "workspace-unbuildable": "workspace",
     # --- workspace + language-specific import scanners ---
     "deps-unused": frozenset({"pypi", "dart", "npm", "go"}),
     "deps-undeclared": frozenset({"pypi", "dart", "npm", "go"}),
@@ -1079,6 +1080,53 @@ def register_checks(app):
                 details=errors,
             )
         return CheckResult("pass", f"all {checked} subtree remote(s) reachable")
+
+    # ------------------------------------------------------------------
+    # Workspace unbuildable members
+    # ------------------------------------------------------------------
+
+    @app.check("workspace-unbuildable")
+    def check_workspace_unbuildable(ctx):
+        """Detect workspace members that fail ``uv sync --all-packages``."""
+        if not isinstance(ctx, WorkspaceCheckContext):
+            return CheckResult("skip", "not a workspace")
+
+        # Only relevant when there are pypi-target projects in the workspace
+        from .targets import detect_targets
+
+        root = str(ctx.workspace_root)
+        has_pypi = False
+        for proj in ctx.projects:
+            proj_dir = os.path.join(root, proj["path"])
+            target_entries = detect_targets(proj_dir)
+            if any(e.name == "pypi" for e in target_entries):
+                has_pypi = True
+                break
+
+        if not has_pypi:
+            return CheckResult("skip", "no pypi-target projects in workspace")
+
+        try:
+            result = subprocess.run(
+                ["uv", "sync", "--all-packages", "--dry-run"],
+                cwd=root,
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+        except FileNotFoundError:
+            return CheckResult("skip", "uv not installed")
+        except subprocess.TimeoutExpired:
+            return CheckResult("fail", "uv sync --all-packages --dry-run timed out after 120s")
+
+        if result.returncode == 0:
+            return CheckResult("pass", "all workspace members buildable")
+
+        # Parse stderr for details about the failure
+        stderr = result.stderr.strip()
+        details = [line for line in stderr.splitlines() if line.strip()]
+        summary = details[0] if details else "uv sync --all-packages --dry-run failed"
+        return CheckResult("fail", summary, details=details)
 
     # ------------------------------------------------------------------
     # Dependency validation

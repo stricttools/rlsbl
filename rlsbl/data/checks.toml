@@ -248,6 +248,14 @@ pure = false
 needs_network = true
 depends_on = []
 
+[checks.workspace-unbuildable]
+tags = ["workspace"]
+severity = "error"
+fast = false
+pure = true
+needs_network = false
+depends_on = []
+
 [checks.layers-violations]
 tags = []
 severity = "error"
