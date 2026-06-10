@@ -367,3 +367,39 @@ fast = true
 pure = true
 needs_network = false
 depends_on = []
+
+# ---------------------------------------------------------------------------
+# Pre-push checks
+# ---------------------------------------------------------------------------
+
+[checks.prepush-changelog-coverage]
+tags = ["prepush"]
+severity = "error"
+fast = false
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.prepush-gitignore-guard]
+tags = ["prepush"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.prepush-manual-warning]
+tags = ["prepush"]
+severity = "warn"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.test-suite]
+tags = ["prepush", "quality"]
+severity = "error"
+fast = false
+pure = false
+needs_network = false
+depends_on = ["prepush-changelog-coverage"]

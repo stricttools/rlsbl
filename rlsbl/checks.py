@@ -1731,3 +1731,27 @@ def register_checks(app):
                 f"primary target {first_name} version ({primary_version})",
             )
         return CheckResult("pass", f"selfdoc.json version matches ({selfdoc_version})")
+
+    # ------------------------------------------------------------------
+    # Pre-push checks
+    # ------------------------------------------------------------------
+
+    @app.check("prepush-changelog-coverage")
+    def check_prepush_changelog_coverage(ctx):
+        """Every pushed commit must have a JSONL changelog entry."""
+        return CheckResult("skip", "not implemented yet")
+
+    @app.check("prepush-gitignore-guard")
+    def check_prepush_gitignore_guard(ctx):
+        """Pushed commits must not add gitignored files."""
+        return CheckResult("skip", "not implemented yet")
+
+    @app.check("prepush-manual-warning")
+    def check_prepush_manual_warning(ctx):
+        """Warn when pushing to a release branch outside rlsbl release."""
+        return CheckResult("skip", "not implemented yet")
+
+    @app.check("test-suite")
+    def check_test_suite(ctx):
+        """Run the project's test suite."""
+        return CheckResult("skip", "not implemented yet")
