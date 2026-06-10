@@ -11,7 +11,6 @@ from conftest import run_git as _run_git, git_head as _git_head
 from rlsbl.commands.pre_push_check import (
     _check_gitignore_guard,
     _check_jsonl_changelog,
-    _has_version_tag_push,
     run_cmd,
 )
 from rlsbl.context import ProjectContext
@@ -223,127 +222,6 @@ class TestReleaseFileCommitFiltering:
         refs = [(sha, base_sha)]
         error = _check_jsonl_changelog(str(repo), refs)
         assert error is not None  # Mixed commit is NOT exempt
-
-
-class TestHasVersionTagPush:
-    """Unit tests for _has_version_tag_push."""
-
-    def test_simple_version_tag(self):
-        lines = ["refs/tags/v1.2.3 abc123 refs/tags/v1.2.3 def456"]
-        assert _has_version_tag_push(lines) is True
-
-    def test_monorepo_scoped_tag(self):
-        lines = ["refs/tags/mylib@v1.2.3 abc123 refs/tags/mylib@v1.2.3 def456"]
-        assert _has_version_tag_push(lines) is True
-
-    def test_branch_push_no_tag(self):
-        lines = ["refs/heads/main abc123 refs/heads/main def456"]
-        assert _has_version_tag_push(lines) is False
-
-    def test_non_version_tag(self):
-        """A tag that does not match the version pattern is not a release."""
-        lines = ["refs/tags/some-label abc123 refs/tags/some-label def456"]
-        assert _has_version_tag_push(lines) is False
-
-    def test_mixed_branch_and_version_tag(self):
-        """If any line is a version tag, the result is True."""
-        lines = [
-            "refs/heads/main abc123 refs/heads/main def456",
-            "refs/tags/v2.0.0 aaa111 refs/tags/v2.0.0 bbb222",
-        ]
-        assert _has_version_tag_push(lines) is True
-
-    def test_mixed_branch_and_non_version_tag(self):
-        lines = [
-            "refs/heads/main abc123 refs/heads/main def456",
-            "refs/tags/nightly abc123 refs/tags/nightly def456",
-        ]
-        assert _has_version_tag_push(lines) is False
-
-    def test_v_prefix_required(self):
-        """Tag must start with 'v' followed by a digit."""
-        lines = ["refs/tags/version-1.0 abc123 refs/tags/version-1.0 def456"]
-        assert _has_version_tag_push(lines) is False
-
-    def test_empty_lines(self):
-        assert _has_version_tag_push([]) is False
-
-
-class TestVersionTagPushSkipsCheck:
-    """run_cmd exits 0 immediately when the push includes a version tag."""
-
-    def test_version_tag_skips_jsonl_check(self, jsonl_git_repo):
-        """Pushing a version tag skips the JSONL check entirely."""
-        repo = jsonl_git_repo
-
-        # Make a commit without JSONL coverage -- would normally fail
-        (repo / "src.py").write_text("x = 1\n")
-        _run_git(repo, "add", "src.py")
-        _run_git(repo, "commit", "-q", "-m", "feat: uncovered")
-        sha = _git_head(repo)
-
-        stdin_data = f"refs/tags/v1.0.0 {sha} refs/tags/v1.0.0 {'0' * 40}\n"
-
-        with patch("sys.stdin", StringIO(stdin_data)), \
-             patch("sys.stdin.isatty", return_value=False):
-            with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
-            assert exc_info.value.code == 0
-
-    def test_monorepo_tag_skips_jsonl_check(self, jsonl_git_repo):
-        """Pushing a monorepo scoped version tag skips the JSONL check."""
-        repo = jsonl_git_repo
-
-        (repo / "src.py").write_text("x = 1\n")
-        _run_git(repo, "add", "src.py")
-        _run_git(repo, "commit", "-q", "-m", "feat: uncovered")
-        sha = _git_head(repo)
-
-        stdin_data = f"refs/tags/mylib@v2.0.0 {sha} refs/tags/mylib@v2.0.0 {'0' * 40}\n"
-
-        with patch("sys.stdin", StringIO(stdin_data)), \
-             patch("sys.stdin.isatty", return_value=False):
-            with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
-            assert exc_info.value.code == 0
-
-    def test_branch_push_still_checks(self, jsonl_git_repo):
-        """Pushing a branch (no tags) still runs the JSONL check."""
-        repo = jsonl_git_repo
-
-        # Make a commit without JSONL coverage
-        (repo / "src.py").write_text("x = 1\n")
-        _run_git(repo, "add", "src.py")
-        _run_git(repo, "commit", "-q", "-m", "feat: uncovered")
-        sha = _git_head(repo)
-        base_sha = "0" * 40
-
-        stdin_data = f"refs/heads/main {sha} refs/heads/main {base_sha}\n"
-
-        with patch("sys.stdin", StringIO(stdin_data)), \
-             patch("sys.stdin.isatty", return_value=False):
-            with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
-            # Should fail because the commit has no JSONL coverage
-            assert exc_info.value.code == 1
-
-    def test_non_version_tag_still_checks(self, jsonl_git_repo):
-        """Pushing a non-version tag does NOT skip the JSONL check."""
-        repo = jsonl_git_repo
-
-        (repo / "src.py").write_text("x = 1\n")
-        _run_git(repo, "add", "src.py")
-        _run_git(repo, "commit", "-q", "-m", "feat: uncovered")
-        sha = _git_head(repo)
-
-        stdin_data = f"refs/tags/some-label {sha} refs/tags/some-label {'0' * 40}\n"
-
-        with patch("sys.stdin", StringIO(stdin_data)), \
-             patch("sys.stdin.isatty", return_value=False):
-            with pytest.raises(SystemExit) as exc_info:
-                run_cmd(None, [], {}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
-            # Should fail -- non-version tag doesn't skip the check
-            assert exc_info.value.code == 1
 
 
 class TestGitignoreGuard:

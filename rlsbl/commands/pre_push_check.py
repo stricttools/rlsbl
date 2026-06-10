@@ -1,7 +1,6 @@
 """Pre-push-check command that verifies CHANGELOG.md contains an entry for the current version before allowing a git push to proceed."""
 
 import os
-import re
 import subprocess
 import sys
 
@@ -247,24 +246,6 @@ def _read_stdin_lines():
     return lines if lines else None
 
 
-def _has_version_tag_push(stdin_lines):
-    """Check whether any stdin line is pushing a version tag.
-
-    Version tags match ``refs/tags/v*`` (single-project) or
-    ``refs/tags/*@v*`` (monorepo scoped tags like ``mylib@v1.2.3``).
-
-    Returns True if at least one line pushes a version tag.
-    """
-    pattern = re.compile(r"^refs/tags/(v\d|.+/v\d|[^/]+@v\d)")
-    for line in stdin_lines:
-        parts = line.split()
-        if len(parts) >= 4:
-            local_ref = parts[0]
-            if pattern.match(local_ref):
-                return True
-    return False
-
-
 def _parse_stdin_refs(stdin_lines=None):
     """Parse pre-push hook stdin to extract (local_sha, remote_sha) pairs.
 
@@ -415,14 +396,8 @@ def run_cmd(registry, args, flags, *, ctx):
     """
     root_str = str(ctx.project_root)
 
-    # Read stdin once -- used for tag detection and ref parsing
+    # Read stdin once -- used for ref parsing
     stdin_lines = _read_stdin_lines()
-
-    # Optimisation: if the push includes a version tag, skip JSONL checks
-    # entirely.  The release flow (rlsbl release) already validates
-    # changelog coverage before pushing, so re-checking is redundant.
-    if stdin_lines is not None and _has_version_tag_push(stdin_lines):
-        sys.exit(0)
 
     # Warn if this looks like a manual push to a release branch (the env
     # marker is only set by `rlsbl release run` and `rlsbl release undo`). Non-blocking.
