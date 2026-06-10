@@ -24,15 +24,82 @@ def _node_line(node):
     return node.start_point[0] + 1
 
 
+def _is_in_try_except_import_error(node):
+    """Check if an import node is inside a try body protected by except ImportError/ModuleNotFoundError.
+
+    Walks up the parent chain looking for a try_statement ancestor where:
+    1. The import is in the try body (not inside an except_clause's block)
+    2. At least one except_clause catches ImportError or ModuleNotFoundError
+
+    Returns True if ANY ancestor try_statement satisfies both conditions.
+    """
+    _IMPORT_ERROR_NAMES = frozenset({"ImportError", "ModuleNotFoundError"})
+
+    current = node.parent
+    while current is not None:
+        if current.type == "except_clause":
+            # The import is inside an except body -- walk past this
+            # try_statement without matching it (it's a fallback import,
+            # not an optional one). Skip to the parent of the enclosing
+            # try_statement.
+            parent = current.parent  # the try_statement
+            if parent is not None:
+                current = parent.parent
+            else:
+                break
+            continue
+
+        if current.type == "try_statement":
+            # The import is in the try body (we didn't pass through an
+            # except_clause to get here). Check if any except_clause
+            # catches ImportError or ModuleNotFoundError.
+            if _try_catches_import_error(current, _IMPORT_ERROR_NAMES):
+                return True
+
+        current = current.parent
+
+    return False
+
+
+def _try_catches_import_error(try_node, error_names):
+    """Check if a try_statement has an except_clause catching ImportError/ModuleNotFoundError."""
+    for child in try_node.children:
+        if child.type != "except_clause":
+            continue
+        # Look at the except_clause's children for the exception type(s)
+        for ec_child in child.children:
+            if ec_child.type == "identifier":
+                if ec_child.text.decode("utf-8") in error_names:
+                    return True
+            elif ec_child.type == "as_pattern":
+                # except ImportError as e: -- the identifier is inside as_pattern
+                for ap_child in ec_child.children:
+                    if ap_child.type == "identifier":
+                        if ap_child.text.decode("utf-8") in error_names:
+                            return True
+            elif ec_child.type == "tuple":
+                # except (ImportError, ValueError): -- identifiers inside tuple
+                for t_child in ec_child.children:
+                    if t_child.type == "identifier":
+                        if t_child.text.decode("utf-8") in error_names:
+                            return True
+    return False
+
+
 def _collect_all_imports(tree, filepath):
     """Walk AST and collect all imported top-level module names.
 
     Returns a set of (package_name, file_path, line_number) tuples.
+    Skips imports inside try/except ImportError blocks (optional deps).
     """
     imports = set()
 
     def _walk(node):
         if node.type == "import_statement":
+            if _is_in_try_except_import_error(node):
+                for child in node.children:
+                    _walk(child)
+                return
             for child in node.children:
                 if child.type == "dotted_name":
                     module = child.text.decode("utf-8")
@@ -45,6 +112,10 @@ def _collect_all_imports(tree, filepath):
                         top_level = module.split(".")[0]
                         imports.add((top_level, filepath, _node_line(node)))
         elif node.type == "import_from_statement":
+            if _is_in_try_except_import_error(node):
+                for child in node.children:
+                    _walk(child)
+                return
             module_node = child_by_field(node, "module_name")
             if module_node:
                 module = module_node.text.decode("utf-8")

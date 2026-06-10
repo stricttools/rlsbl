@@ -212,6 +212,190 @@ class TestCheckUndeclaredDeps:
         )
         assert errors == []
 
+    def test_import_in_try_except_importerror_not_flagged(self, tmp_path):
+        """Imports inside try/except ImportError blocks are optional and not flagged."""
+        project_dir = tmp_path / "app"
+        project_dir.mkdir()
+        (project_dir / "pyproject.toml").write_text(_PYPROJECT)
+        (project_dir / "main.py").write_text(
+            "try:\n"
+            "    from optional_pkg import something\n"
+            "except ImportError:\n"
+            "    pass\n"
+        )
+
+        errors = check_undeclared_deps(
+            project_name="app",
+            project_dir=str(project_dir),
+            manifest_deps=set(),
+            workspace_names={"app", "optional_pkg"},
+        )
+        assert errors == []
+
+    def test_import_in_try_except_module_not_found_error_skipped(self, tmp_path):
+        """Imports inside try/except ModuleNotFoundError are optional."""
+        project_dir = tmp_path / "app"
+        project_dir.mkdir()
+        (project_dir / "pyproject.toml").write_text(_PYPROJECT)
+        (project_dir / "main.py").write_text(
+            "try:\n"
+            "    import optional_pkg\n"
+            "except ModuleNotFoundError:\n"
+            "    optional_pkg = None\n"
+        )
+
+        errors = check_undeclared_deps(
+            project_name="app",
+            project_dir=str(project_dir),
+            manifest_deps=set(),
+            workspace_names={"app", "optional_pkg"},
+        )
+        assert errors == []
+
+    def test_import_in_try_except_tuple_importerror_skipped(self, tmp_path):
+        """Imports inside try/except (ImportError, ValueError) are optional."""
+        project_dir = tmp_path / "app"
+        project_dir.mkdir()
+        (project_dir / "pyproject.toml").write_text(_PYPROJECT)
+        (project_dir / "main.py").write_text(
+            "try:\n"
+            "    from optional_pkg import feature\n"
+            "except (ImportError, ValueError):\n"
+            "    feature = None\n"
+        )
+
+        errors = check_undeclared_deps(
+            project_name="app",
+            project_dir=str(project_dir),
+            manifest_deps=set(),
+            workspace_names={"app", "optional_pkg"},
+        )
+        assert errors == []
+
+    def test_import_in_try_except_as_pattern_skipped(self, tmp_path):
+        """Imports inside try/except ImportError as e are optional."""
+        project_dir = tmp_path / "app"
+        project_dir.mkdir()
+        (project_dir / "pyproject.toml").write_text(_PYPROJECT)
+        (project_dir / "main.py").write_text(
+            "try:\n"
+            "    import optional_pkg\n"
+            "except ImportError as e:\n"
+            "    optional_pkg = None\n"
+        )
+
+        errors = check_undeclared_deps(
+            project_name="app",
+            project_dir=str(project_dir),
+            manifest_deps=set(),
+            workspace_names={"app", "optional_pkg"},
+        )
+        assert errors == []
+
+    def test_import_in_try_except_exception_NOT_skipped(self, tmp_path):
+        """Imports inside try/except Exception are NOT optional (too broad)."""
+        project_dir = tmp_path / "app"
+        project_dir.mkdir()
+        (project_dir / "pyproject.toml").write_text(_PYPROJECT)
+        (project_dir / "main.py").write_text(
+            "try:\n"
+            "    import optional_pkg\n"
+            "except Exception:\n"
+            "    optional_pkg = None\n"
+        )
+
+        errors = check_undeclared_deps(
+            project_name="app",
+            project_dir=str(project_dir),
+            manifest_deps=set(),
+            workspace_names={"app", "optional_pkg"},
+        )
+        assert len(errors) == 1
+        assert "optional_pkg" in errors[0]
+
+    def test_import_in_try_except_bare_NOT_skipped(self, tmp_path):
+        """Imports inside bare except: are NOT optional (too broad)."""
+        project_dir = tmp_path / "app"
+        project_dir.mkdir()
+        (project_dir / "pyproject.toml").write_text(_PYPROJECT)
+        (project_dir / "main.py").write_text(
+            "try:\n"
+            "    import optional_pkg\n"
+            "except:\n"
+            "    optional_pkg = None\n"
+        )
+
+        errors = check_undeclared_deps(
+            project_name="app",
+            project_dir=str(project_dir),
+            manifest_deps=set(),
+            workspace_names={"app", "optional_pkg"},
+        )
+        assert len(errors) == 1
+        assert "optional_pkg" in errors[0]
+
+    def test_import_in_except_body_NOT_skipped(self, tmp_path):
+        """Imports inside except ImportError body are real deps (fallbacks)."""
+        project_dir = tmp_path / "app"
+        project_dir.mkdir()
+        (project_dir / "pyproject.toml").write_text(_PYPROJECT)
+        (project_dir / "main.py").write_text(
+            "try:\n"
+            "    from optional_pkg import feature\n"
+            "except ImportError:\n"
+            "    from fallback_pkg import feature\n"
+        )
+
+        errors = check_undeclared_deps(
+            project_name="app",
+            project_dir=str(project_dir),
+            manifest_deps=set(),
+            workspace_names={"app", "optional_pkg", "fallback_pkg"},
+        )
+        # optional_pkg should be skipped (in try body), but fallback_pkg
+        # should be flagged (in except body -- it's a required fallback)
+        assert len(errors) == 1
+        assert "fallback_pkg" in errors[0]
+
+    def test_import_outside_try_still_flagged(self, tmp_path):
+        """Normal imports outside try/except are still flagged as undeclared."""
+        project_dir = tmp_path / "app"
+        project_dir.mkdir()
+        (project_dir / "pyproject.toml").write_text(_PYPROJECT)
+        (project_dir / "main.py").write_text("import undeclared_pkg\n")
+
+        errors = check_undeclared_deps(
+            project_name="app",
+            project_dir=str(project_dir),
+            manifest_deps=set(),
+            workspace_names={"app", "undeclared_pkg"},
+        )
+        assert len(errors) == 1
+        assert "undeclared_pkg" in errors[0]
+
+    def test_nested_try_outer_catches_importerror(self, tmp_path):
+        """Import in nested try where outer catches ImportError is skipped."""
+        project_dir = tmp_path / "app"
+        project_dir.mkdir()
+        (project_dir / "pyproject.toml").write_text(_PYPROJECT)
+        (project_dir / "main.py").write_text(
+            "try:\n"
+            "    try:\n"
+            "        import optional_pkg\n"
+            "    except ValueError:\n"
+            "        pass\n"
+            "except ImportError:\n"
+            "    optional_pkg = None\n"
+        )
+
+        errors = check_undeclared_deps(
+            project_name="app",
+            project_dir=str(project_dir),
+            manifest_deps=set(),
+            workspace_names={"app", "optional_pkg"},
+        )
+        assert errors == []
+
 
 class TestLoadDepOverrides:
     """load_dep_overrides reads the whitelist config file."""
