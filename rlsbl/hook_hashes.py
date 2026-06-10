@@ -2,7 +2,8 @@
 
 rlsbl installs a `.git/hooks/pre-push` hook in scaffolded projects. The hook
 content has changed over time (older versions were 44-line standalone bash
-scripts; the current version is a 2-line dispatcher to `rlsbl pre-push-check`).
+scripts; the current version captures push stdin and delegates to
+`rlsbl check --tag prepush`).
 
 To safely upgrade an old hook without clobbering a user-customized one, we
 compare its content hash against the set of every hook version rlsbl has
@@ -13,7 +14,7 @@ and show the user a diff so they can decide what to do.
 import hashlib
 
 
-CURRENT_PRE_PUSH_HOOK = "#!/usr/bin/env bash\nexec rlsbl pre-push-check\n"
+CURRENT_PRE_PUSH_HOOK = '#!/usr/bin/env bash\nexport RLSBL_PUSH_STDIN="$(cat)"\nexec rlsbl check --tag prepush\n'
 
 
 # Historical pre-push hook contents. These are the literal bytes rlsbl
@@ -122,8 +123,11 @@ fi
 # todo/fix-pre-push-hook-args.md.
 _PRE_PUSH_HOOK_V3 = '#!/usr/bin/env bash\nexec rlsbl pre-push-check "$@"\n'
 
-# Version 4 (current): two-line dispatcher without "$@".
-_PRE_PUSH_HOOK_V4 = CURRENT_PRE_PUSH_HOOK
+# Version 4: two-line dispatcher without "$@".
+_PRE_PUSH_HOOK_V4 = '#!/usr/bin/env bash\nexec rlsbl pre-push-check\n'
+
+# Version 5 (current): captures git's push stdin and delegates to the check system.
+_PRE_PUSH_HOOK_V5 = CURRENT_PRE_PUSH_HOOK
 
 
 def compute_hook_hash(content):
@@ -146,6 +150,7 @@ PRE_PUSH_HOOK_HASHES = frozenset({
     compute_hook_hash(_PRE_PUSH_HOOK_V2),
     compute_hook_hash(_PRE_PUSH_HOOK_V3),
     compute_hook_hash(_PRE_PUSH_HOOK_V4),
+    compute_hook_hash(_PRE_PUSH_HOOK_V5),
 })
 
 
