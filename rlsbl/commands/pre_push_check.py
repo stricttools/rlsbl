@@ -388,8 +388,8 @@ def run_cmd(registry, args, flags, *, ctx):
 
     Old V4 hooks call ``rlsbl pre-push-check`` directly.  This shim reads
     stdin (the push refs that git passes to pre-push hooks), sets
-    ``RLSBL_PUSH_STDIN`` so the check system can see it, then spawns
-    ``rlsbl check --tag prepush`` and forwards its exit code.
+    ``RLSBL_PUSH_STDIN`` so the check system can see it, then runs the
+    prepush checks in-process and forwards the exit code.
     """
     print(
         "Warning: pre-push-check is deprecated. "
@@ -399,11 +399,18 @@ def run_cmd(registry, args, flags, *, ctx):
 
     # Read stdin once (git passes push refs on stdin to the hook)
     stdin_lines = _read_stdin_lines()
-    os.environ["RLSBL_PUSH_STDIN"] = "\n".join(stdin_lines) if stdin_lines else ""
+    push_stdin = "\n".join(stdin_lines) if stdin_lines else ""
+    os.environ["RLSBL_PUSH_STDIN"] = push_stdin
 
-    # Delegate to the check system
-    result = subprocess.run(
-        [sys.executable, "-m", "rlsbl", "check", "--tag", "prepush"],
-        timeout=120,
-    )
-    sys.exit(result.returncode)
+    # Attach push_stdin to the context so check implementations can read it
+    ctx.push_stdin = push_stdin
+
+    # Run prepush checks in-process via strictcli's check runner
+    import strictcli
+    from .. import app
+
+    selected = strictcli._filter_checks(app._check_defs, "prepush", None, False)
+    order = strictcli._resolve_check_order(app._check_defs, selected)
+    results, exit_code = strictcli._run_checks(app, order, ctx, True)
+    strictcli._check_format_human(results, False)
+    sys.exit(exit_code)
