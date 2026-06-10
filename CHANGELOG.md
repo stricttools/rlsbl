@@ -2,9 +2,15 @@
 
 # Changelog
 
-## 0.66.2
+## 0.66.3
 
-Auto-cleanup stale exclusions, DRY refactor manual-warning, hook V5 e2e test
+deps-undeclared respects try/except ImportError for optional imports
+
+### Fixes
+
+- **Fix.** `deps-undeclared` check no longer flags imports inside `try/except ImportError` or `try/except ModuleNotFoundError` blocks. These are standard Python optional-dependency patterns and are now correctly recognized as intentionally unguarded.
+
+## 0.66.2
 
 ### Features
 
