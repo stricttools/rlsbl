@@ -41,8 +41,8 @@ class TestPypiTarget:
 
             assert result is True
             assert mock_run.call_count == 2
-            # First call: uv sync --quiet
-            assert mock_run.call_args_list[0][0][0] == ["uv", "sync", "--quiet"]
+            # First call: uv sync --all-packages --quiet
+            assert mock_run.call_args_list[0][0][0] == ["uv", "sync", "--all-packages", "--quiet"]
             # Second call: uv run pytest
             assert mock_run.call_args_list[1][0][0] == ["uv", "run", "pytest"]
 
@@ -63,7 +63,7 @@ class TestPypiTarget:
 
             assert result is True
             sync_call = mock_run.call_args_list[0][0][0]
-            assert sync_call == ["uv", "sync"]  # no --quiet
+            assert sync_call == ["uv", "sync", "--all-packages"]  # no --quiet
 
     def test_pypi_uv_sync_failure_returns_false(self, tmp_project):
         """When uv sync fails, returns False immediately."""

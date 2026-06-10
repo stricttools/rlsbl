@@ -301,7 +301,7 @@ class PypiTarget(BaseTarget):
             "venv": {
                 "tool": "uv",
                 "purpose": "for syncing the project venv",
-                "args": ["sync"],
+                "args": ["sync", "--all-packages"],
                 "uninstall_args_template": None,
             },
         }

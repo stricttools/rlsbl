@@ -50,7 +50,7 @@ def _run_pypi_tests(*, project_dir: str | None, config: dict) -> bool:
     """Run Python tests via uv or bare pytest."""
     uv_verbose = config.get("uv_sync_verbose", False)
     if require_tool("uv", fatal=False):
-        sync_cmd = ["uv", "sync"]
+        sync_cmd = ["uv", "sync", "--all-packages"]
         if not uv_verbose:
             sync_cmd.append("--quiet")
         result = subprocess.run(sync_cmd, cwd=project_dir)

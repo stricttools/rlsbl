@@ -363,7 +363,7 @@ def test_pypi_venv_runs_uv_sync(tmp_project, fake_run, all_tools_present):
     rc = run_install({"venv": True}, project_root=".")
     assert rc == 0
     assert len(fake_run.calls) == 1
-    assert fake_run.calls[0]["cmd"] == ["uv", "sync"]
+    assert fake_run.calls[0]["cmd"] == ["uv", "sync", "--all-packages"]
 
 
 def test_npm_venv_runs_npm_install(tmp_project, fake_run, all_tools_present):

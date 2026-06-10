@@ -94,7 +94,7 @@ class TestBuiltinTestRunner:
             # Should have called uv sync --quiet then uv run pytest
             assert mock_run.call_count == 2
             sync_call = mock_run.call_args_list[0]
-            assert sync_call[0][0] == ["uv", "sync", "--quiet"]
+            assert sync_call[0][0] == ["uv", "sync", "--all-packages", "--quiet"]
             pytest_call = mock_run.call_args_list[1]
             assert pytest_call[0][0] == ["uv", "run", "pytest"]
 
