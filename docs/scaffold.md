@@ -12,7 +12,7 @@ description: "How rlsbl scaffold generates CI workflows, git hooks, and config f
 | --- | --- |
 | `.github/workflows/ci.yml` | CI workflow (tests on push/PR) |
 | `.github/workflows/publish.yml` | Publish workflow (triggered on GitHub Release) |
-| `.git/hooks/pre-push` | Pre-push hook calling `rlsbl pre-push-check` |
+| `.git/hooks/pre-push` | Pre-push hook calling `rlsbl check --tag prepush` |
 | `.rlsbl/config.json` | Project configuration (targets, pipelines, private flag) |
 | `.rlsbl/changes/unreleased.jsonl` | JSONL changelog for unreleased commits |
 | `.rlsbl/hooks/pre-checks.sh` | User-owned pre-checks hook (runs before tests) |
@@ -119,19 +119,19 @@ Templates that need literal `{{...}}` in their output (e.g., Docker metadata-act
 
 ## Pre-push hook
 
-Scaffold installs `.git/hooks/pre-push` with the current hook content (a two-line dispatcher to `rlsbl pre-push-check`).
+Scaffold installs `.git/hooks/pre-push` with the V5 hook template, which captures git's stdin into `RLSBL_PUSH_STDIN` and runs `rlsbl check --tag prepush`.
 
 ### Safe upgrade via hash detection
 
-The hook content has changed across rlsbl versions. To safely upgrade without clobbering user customizations, scaffold:
+The hook content has changed across rlsbl versions. Five historical hook versions are tracked (V1 through V5). To safely upgrade without clobbering user customizations, scaffold:
 
 1. Reads the existing hook file
 2. Computes its SHA-256 hash (trailing whitespace stripped for tolerance)
-3. Compares against a set of all known historical hook hashes rlsbl has shipped
-4. If it matches a known hash: overwrite with the current version
+3. Compares against the set of all known historical hook hashes (V1 through V5)
+4. If it matches a known hash (e.g., V4 or earlier): overwrite with the current V5 version
 5. If it does not match: leave untouched and print a diff warning
 
-This means any hook content you write yourself (or modify from the scaffold version) is permanently safe from scaffold overwrites.
+This means any hook content you write yourself (or modify from the scaffold version) is permanently safe from scaffold overwrites. Projects with V4 hooks (which called `rlsbl pre-push-check`) are safely upgraded to V5 (which calls `rlsbl check --tag prepush`) on the next `rlsbl scaffold` run.
 
 ## Monorepo scaffold
 

@@ -1,10 +1,10 @@
 ---
-description: "Complete reference for rlsbl's 44 checks across 5 tags, including check metadata, severity levels, and target applicability."
+description: "Complete reference for rlsbl's 48 checks across 6 tags, including check metadata, severity levels, and target applicability."
 ---
 
 # Check system
 
-rlsbl includes 44 checks across 5 tags, run via the `rlsbl check` command. Checks validate project metadata, release state, changelog structure, workspace integrity, and code quality.
+rlsbl includes 48 checks across 6 tags, run via the `rlsbl check` command. Checks validate project metadata, release state, changelog structure, workspace integrity, code quality, and pre-push enforcement.
 
 ## Running checks
 
@@ -40,9 +40,10 @@ Severity is declared per-check in metadata. A check with `severity = "error"` re
 | `release` | Git tag and GitHub Release validation | 4 |
 | `changelog` | JSONL changelog validation and structure | 9 |
 | `workspace` | Monorepo workspace integrity and dependency rules | 8 |
-| `quality` | Code quality, dependency analysis, scaffold hygiene | 7 |
+| `quality` | Code quality, dependency analysis, scaffold hygiene | 8 |
+| `prepush` | Pre-push enforcement: changelog coverage, gitignore guard, manual-push warning, tests | 4 |
 
-Four checks (`layers-violations`, `deps-unused`, `deps-undeclared`, `deps-stale`) have no tag and only run with `--all` or `--name`.
+Note: `test-suite` is tagged both `prepush` and `quality`, so it appears in both tag counts. Four checks (`layers-violations`, `deps-unused`, `deps-undeclared`, `deps-stale`) have no tag and only run with `--all` or `--name`.
 
 ## Project checks
 
@@ -112,6 +113,17 @@ Dependencies: `changelog-range` and `changelog-coverage` depend on `changelog-ha
 | `deps-dev-in-lib` | error | Dev dependencies used in library source (should be runtime deps) |
 | `scaffold-unreplaced-vars` | error | Leftover `{{...}}` template placeholders in workflow files |
 | `scaffold-conflict-markers` | error | Unresolved merge conflict markers in scaffolded files |
+
+## Prepush checks
+
+| Check | Severity | Description |
+| --- | --- | --- |
+| `prepush-changelog-coverage` | error | Verifies every pushed commit has a JSONL changelog entry |
+| `prepush-gitignore-guard` | error | Blocks push if rlsbl-managed files are gitignored |
+| `prepush-manual-warning` | warn | Warns on manual push to release branch (non-blocking) |
+| `test-suite` | error | Runs project tests (`pytest` / `go test` / `npm test`) |
+
+Dependencies: `test-suite` depends on `prepush-changelog-coverage` -- fast checks fail first, so the test suite is skipped if changelog coverage fails. `test-suite` is also tagged `quality`, so it runs under both `rlsbl check --tag prepush` and `rlsbl check --tag quality`.
 
 ## Untagged checks
 
