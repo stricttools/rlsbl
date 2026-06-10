@@ -1,8 +1,0 @@
-# Version bump type: patch, minor, or major
-bump = "minor"
-# Short description of this release (required)
-description = "Prepush check system: test-suite check, version-tag skip removal, hook V5"
-# Optional context explaining why these changes were made
-context = "Major overhaul of the pre-push hook system. All pre-push logic migrated into the rlsbl check system under a new 'prepush' tag. The hook now runs 'rlsbl check --tag prepush' with 4 checks (changelog coverage, gitignore guard, manual-push warning, test-suite). Version-tag skip removed -- checks always run. Shared testing.py module extracted from release flow."
-include = ["npm", "pypi"]
-exclude = []
