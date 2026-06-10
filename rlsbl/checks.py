@@ -99,6 +99,11 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "npm-private-mismatch": frozenset({"npm"}),
     "target-version-readable": None,
     "selfdoc-version-drift": None,
+    # --- prepush tag ---
+    "prepush-changelog-coverage": None,
+    "prepush-gitignore-guard": None,
+    "prepush-manual-warning": None,
+    "test-suite": frozenset({"pypi", "go", "npm"}),
 }
 
 # Excluded targets: checks where a target is deliberately excluded because
@@ -1739,19 +1744,133 @@ def register_checks(app):
     @app.check("prepush-changelog-coverage")
     def check_prepush_changelog_coverage(ctx):
         """Every pushed commit must have a JSONL changelog entry."""
-        return CheckResult("skip", "not implemented yet")
+        from .changelog import changes_dir_exists
+        from .commands.pre_push_check import (
+            _affected_projects,
+            _check_jsonl_changelog,
+            _get_changed_files,
+            _get_pushed_commits,
+            _parse_stdin_refs,
+        )
+        from .git_util import filter_commits_for_project
+
+        if ctx.push_stdin is None:
+            return CheckResult("skip", "not in push context")
+
+        stdin_lines = ctx.push_stdin.strip().splitlines()
+        refs = _parse_stdin_refs(stdin_lines)
+        if refs is None:
+            return CheckResult("skip", "no refs parsed from push stdin")
+
+        # Monorepo mode: check each affected project independently
+        if ctx.workspace_root is not None:
+            from .workspace import load_workspace
+
+            ws_root = str(ctx.workspace_root)
+            changed_files = _get_changed_files(refs)
+            if changed_files is None:
+                return CheckResult("skip", "could not determine changed files")
+
+            projects = load_workspace(ws_root)
+            affected = _affected_projects(changed_files, projects)
+            if not affected:
+                return CheckResult("pass", "no affected projects")
+
+            all_pushed = _get_pushed_commits(refs)
+            if all_pushed is None:
+                return CheckResult("skip", "could not determine pushed commits")
+
+            failures = []
+            for proj in affected:
+                if proj.get("dev_node"):
+                    continue
+                proj_dir = os.path.join(ws_root, proj["path"])
+                if not changes_dir_exists(proj_dir):
+                    continue
+                proj_commits = filter_commits_for_project(all_pushed, proj)
+                if not proj_commits:
+                    continue
+                error = _check_jsonl_changelog(proj_dir, refs, pushed_commits=proj_commits)
+                if error:
+                    failures.append(f"{proj['name']}: {error}")
+
+            if failures:
+                return CheckResult("fail", "; ".join(failures))
+            return CheckResult("pass", f"all {len(affected)} affected project(s) covered")
+
+        # Single-project mode
+        root_str = str(ctx.project_root)
+        if not changes_dir_exists(root_str):
+            return CheckResult("skip", "JSONL changelog not set up")
+
+        error = _check_jsonl_changelog(root_str, refs)
+        if error is not None:
+            return CheckResult("fail", error)
+        return CheckResult("pass", "all pushed commits covered")
 
     @app.check("prepush-gitignore-guard")
     def check_prepush_gitignore_guard(ctx):
-        """Pushed commits must not add gitignored files."""
-        return CheckResult("skip", "not implemented yet")
+        """rlsbl-managed files must not be gitignored."""
+        from .commands.pre_push_check import _check_gitignore_guard
+
+        error = _check_gitignore_guard(str(ctx.project_root))
+        if error is not None:
+            return CheckResult("fail", error)
+        return CheckResult("pass", "no rlsbl-managed files are gitignored")
 
     @app.check("prepush-manual-warning")
     def check_prepush_manual_warning(ctx):
         """Warn when pushing to a release branch outside rlsbl release."""
-        return CheckResult("skip", "not implemented yet")
+        from .commands.pre_push_check import _get_release_branches
+
+        if ctx.push_stdin is None:
+            return CheckResult("skip", "not in push context")
+
+        if os.environ.get("RLSBL_RELEASE_PUSH") == "1":
+            return CheckResult("pass", "legitimate release push")
+
+        stdin_lines = ctx.push_stdin.strip().splitlines()
+        release_branches = _get_release_branches(ctx)
+        pushed_release_branches = []
+        for line in stdin_lines:
+            parts = line.split()
+            if len(parts) < 4:
+                continue
+            local_ref = parts[0]
+            if not local_ref.startswith("refs/heads/"):
+                continue
+            branch_name = local_ref[len("refs/heads/"):]
+            if branch_name in release_branches:
+                pushed_release_branches.append(branch_name)
+
+        if pushed_release_branches:
+            branches_str = ", ".join(sorted(set(pushed_release_branches)))
+            return CheckResult(
+                "warn",
+                f"manual push to release branch ({branches_str}) -- not via 'rlsbl release'",
+            )
+        return CheckResult("pass", "not pushing to a release branch")
 
     @app.check("test-suite")
     def check_test_suite(ctx):
         """Run the project's test suite."""
-        return CheckResult("skip", "not implemented yet")
+        from .targets import detect_targets
+        from .testing import run_project_tests
+
+        target_entries = detect_targets(str(ctx.project_root))
+        recognized = {"pypi", "go", "npm"}
+        target_name = None
+        for name, _path in target_entries:
+            if name in recognized:
+                target_name = name
+                break
+
+        if target_name is None:
+            return CheckResult("skip", "no recognized test target (pypi, go, npm)")
+
+        passed = run_project_tests(
+            target_name, project_dir=str(ctx.project_root), config=ctx.config
+        )
+        if passed:
+            return CheckResult("pass", f"{target_name} tests passed")
+        return CheckResult("fail", f"{target_name} tests failed")
