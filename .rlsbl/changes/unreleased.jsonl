@@ -1,0 +1,1 @@
+{"commits":["8fa771dede03f6a94be79ceff4258ff57d7d61cc"],"user_facing":true,"description":"**Feature.** New `check-count` selfdoc directive auto-generates the check count from checks.toml, eliminating manual count maintenance in docs.","type":"feature"}
