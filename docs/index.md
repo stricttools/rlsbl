@@ -19,7 +19,7 @@ See the [README](https://github.com/smm-h/rlsbl#readme) for installation and qui
 - [Release workflow](release-workflow.md) -- end-to-end release process, bump types, release file format
 - [Changelog system](changelog.md) -- JSONL entries, validation, coverage enforcement
 - [Scaffold and templates](scaffold.md) -- CI/CD generation, three-way merge, hooks
-- [Check system](checks.md) -- 44 diagnostic checks across 5 tags
+- [Check system](checks.md) -- 49 diagnostic checks across 6 tags
 - [Deployment](deploy.md) -- deploy targets, post-release hooks, Cloudflare Pages
 - [Development workflow](dev-workflow.md) -- editable installs, pre-push hook, local testing
 - [Utility commands](utilities.md) -- status, discover, migrate, record-gif, and other helpers

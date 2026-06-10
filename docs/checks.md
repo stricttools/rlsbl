@@ -1,10 +1,10 @@
 ---
-description: "Complete reference for rlsbl's 48 checks across 6 tags, including check metadata, severity levels, and target applicability."
+description: "Complete reference for rlsbl's 49 checks across 6 tags, including check metadata, severity levels, and target applicability."
 ---
 
 # Check system
 
-rlsbl includes 48 checks across 6 tags, run via the `rlsbl check` command. Checks validate project metadata, release state, changelog structure, workspace integrity, code quality, and pre-push enforcement.
+rlsbl includes 49 checks across 6 tags, run via the `rlsbl check` command. Checks validate project metadata, release state, changelog structure, workspace integrity, code quality, and pre-push enforcement.
 
 ## Running checks
 
@@ -39,7 +39,7 @@ Severity is declared per-check in metadata. A check with `severity = "error"` re
 | `project` | Project-level metadata, config schema, version consistency | 12 |
 | `release` | Git tag and GitHub Release validation | 4 |
 | `changelog` | JSONL changelog validation and structure | 9 |
-| `workspace` | Monorepo workspace integrity and dependency rules | 8 |
+| `workspace` | Monorepo workspace integrity and dependency rules | 9 |
 | `quality` | Code quality, dependency analysis, scaffold hygiene | 8 |
 | `prepush` | Pre-push enforcement: changelog coverage, gitignore guard, manual-push warning, tests | 4 |
 
