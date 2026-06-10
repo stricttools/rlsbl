@@ -105,7 +105,7 @@ Generate a committed JSON artifact at .rlsbl-monorepo/snapshot.json summarizing 
 
 ## monorepo mirror
 
-Initialize a subtree mirror repository for a monorepo project. Splits the project's subtree, pushes it to the configured subtree_remote, clones the mirror, scaffolds rlsbl CI, and pushes the result.
+Initialize a subtree mirror repository for a monorepo project by performing a full git subtree split of the project's history, pushing the extracted tree to the configured subtree_remote URL, cloning the resulting standalone mirror repository, running rlsbl scaffold to generate CI workflows for independent publishing, and pushing the scaffolded mirror to its remote.
 
 ### Arguments
 
