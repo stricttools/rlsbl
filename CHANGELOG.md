@@ -2,9 +2,20 @@
 
 # Changelog
 
-## 0.66.4
+## 0.67.0
 
-Dynamic check-count directive, quality count fix, exclusion cleanup integration test
+Monorepo pre-push support, test-suite-workspace check, release rollback cleanup
+
+### Features
+
+- **Feature.** New `test-suite-workspace` check runs tests for affected workspace projects during pre-push. Detects changed files from push refs, maps to projects via watch patterns, skips dev_node projects.
+
+### Fixes
+
+- **Fix.** Pre-push hook now works from monorepo root directory. `test-suite` check hard-errors in workspace context with a clear message directing to `test-suite-workspace`.
+- **Fix.** Release rollback now cleans up orphaned generated files (versioned JSONL, markdown, release TOML) that previously blocked retry with 'working tree not clean'.
+
+## 0.66.4
 
 ### Features
 

@@ -36,7 +36,7 @@
   },
   "project_id": "rlsbl",
   "name": "rlsbl",
-  "version": "0.66.3",
+  "version": "0.66.4",
   "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 32 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
   "global_flags": [
     {
@@ -1360,6 +1360,19 @@
       "tags": [
         "prepush",
         "quality"
+      ],
+      "severity": "error",
+      "fast": false,
+      "pure": false,
+      "needs_network": false,
+      "depends_on": [
+        "prepush-changelog-coverage"
+      ]
+    },
+    "test-suite-workspace": {
+      "tags": [
+        "prepush",
+        "workspace"
       ],
       "severity": "error",
       "fast": false,
