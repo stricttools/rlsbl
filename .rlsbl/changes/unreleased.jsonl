@@ -2,3 +2,4 @@
 {"commits":["7e350ea7d48f5a6be30d0b5c9f9e8a19fb4f15ac","a719e33e9b28fe80a02197ff193310954cc707d1","93e0e6bc0a15e43f8b84a9921519a1456f38a864"],"user_facing":true,"description":"**Feature.** Documentation expanded: glob pattern reference for layers, user-level config docs, flag-to-config mapping table, enriched module docstrings for SEO, and expanded section intros across 5 pages.","type":"feature"}
 {"commits":["209336249662ec673454b97bac6b90c1f3567409"],"user_facing":true,"description":"**Feature.** Added concurrent retry deduplication test verifying only one retry fires per workflow name when multiple runs fail in parallel.","type":"feature"}
 {"commits":["fdbfaebf950a11b614a2813bc8a0285a4c71bf65","6cf8134762edd73e89f33d3200505885c78ebb1e","1ae0182d0bcfc21533a0729f40103719512f7d30"],"user_facing":false}
+{"commits":["cd3bd0f5b5a148e276f0e4361d076ea4ac6532e5"],"user_facing":false}
