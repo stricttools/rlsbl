@@ -1892,6 +1892,9 @@ def register_checks(app):
     @app.check("test-suite")
     def check_test_suite(ctx):
         """Run the project's test suite."""
+        if ctx.workspace_root is not None and str(ctx.project_root) == str(ctx.workspace_root):
+            return CheckResult("fail", "test-suite cannot run from workspace root — use rlsbl check --name test-suite-workspace")
+
         from .targets import detect_targets
         from .testing import run_project_tests
 

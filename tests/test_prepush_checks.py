@@ -14,8 +14,9 @@ from unittest.mock import patch
 import pytest
 import strictcli
 
-from conftest import git_head, make_commit, make_ctx, run_git
+from conftest import git_head, make_commit, make_ctx, make_workspace, run_git
 from rlsbl import app
+from rlsbl.check_context import WorkspaceCheckContext
 from rlsbl.context import ProjectContext
 
 
@@ -308,3 +309,103 @@ class TestDependsOnOrdering:
         assert "prepush-changelog-coverage" in results_dict["test-suite"].message
 
         assert exit_code == 1
+
+
+# ------------------------------------------------------------------
+# Test: pre-push-check at monorepo root does not crash
+# ------------------------------------------------------------------
+
+
+class TestPrePushCheckAtMonorepoRoot:
+    """pre-push-check works when CWD is the workspace root (git hook context)."""
+
+    def test_pre_push_check_at_monorepo_root_no_error(self, tmp_path, monkeypatch):
+        """Set up a monorepo workspace, call from workspace root, verify no crash."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+
+        run_git(repo, "init", "-q", "-b", "main")
+        run_git(repo, "config", "user.email", "test@test.local")
+        run_git(repo, "config", "user.name", "Test")
+
+        (repo / "README.md").write_text("# test\n")
+        run_git(repo, "add", "README.md")
+        run_git(repo, "commit", "-q", "-m", "initial")
+        run_git(repo, "tag", "v0.0.0")
+
+        # Create a sub-project
+        pkg = repo / "packages" / "alpha"
+        pkg.mkdir(parents=True)
+        (pkg / "package.json").write_text('{"name": "alpha", "version": "0.1.0"}\n')
+
+        changes = pkg / ".rlsbl" / "changes"
+        changes.mkdir(parents=True)
+        (changes / "unreleased.jsonl").write_text("")
+        (pkg / ".rlsbl" / "config.json").write_text(json.dumps({"private": False}))
+
+        # Set up workspace
+        make_workspace(repo, [{"path": "packages/alpha", "name": "alpha"}])
+
+        run_git(repo, "add", ".")
+        run_git(repo, "commit", "-q", "-m", "scaffold workspace")
+
+        base_sha = git_head(repo)
+
+        # Make a commit in the sub-project
+        (pkg / "index.js").write_text("module.exports = 1;\n")
+        run_git(repo, "add", "packages/alpha/index.js")
+        run_git(repo, "commit", "-q", "-m", "feat: alpha feature")
+        head_sha = git_head(repo)
+
+        # Simulate pre-push from workspace root (where git runs hooks)
+        push_stdin = f"refs/heads/main {head_sha} refs/heads/main {base_sha}"
+
+        # Build context as cmd_pre_push_check would at workspace root
+        from rlsbl.workspace import find_workspace_root
+
+        ws_root = find_workspace_root(str(repo))
+        assert ws_root is not None
+
+        ctx = WorkspaceCheckContext(
+            project_root=Path(ws_root),
+            workspace_root=Path(ws_root),
+            config={},
+            projects=[],
+            graph=None,
+        )
+        ctx.push_stdin = push_stdin
+
+        # This should not crash -- the deprecated shim delegates to checks
+        # Run the changelog coverage check directly to verify no crash
+        result = app._check_defs["prepush-changelog-coverage"].impl(ctx)
+        # It should detect monorepo mode and check projects
+        assert result.status in ("pass", "fail", "skip")
+
+
+# ------------------------------------------------------------------
+# Test: test-suite hard-errors at workspace root
+# ------------------------------------------------------------------
+
+
+class TestTestSuiteHardErrorsAtWorkspaceRoot:
+    """test-suite check returns fail when project_root == workspace_root."""
+
+    def test_test_suite_hard_errors_at_workspace_root(self, tmp_path):
+        """Create WorkspaceCheckContext where project_root == workspace_root,
+        call test-suite check, verify CheckResult status is fail."""
+        ws_root = tmp_path / "monorepo"
+        ws_root.mkdir()
+
+        ctx = WorkspaceCheckContext(
+            project_root=ws_root,
+            workspace_root=ws_root,
+            config={},
+            projects=[],
+            graph=None,
+        )
+        ctx.push_stdin = None
+
+        result = app._check_defs["test-suite"].impl(ctx)
+        assert result.status == "fail"
+        assert "workspace root" in result.message

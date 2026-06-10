@@ -552,10 +552,30 @@ def cmd_watch(target, run_id, sha=None, **_kwargs):
 
 @app.command(name="pre-push-check", help="Verify that CHANGELOG.md contains an entry matching the current project version. Designed to run as a git pre-push hook to prevent pushing releases without documented changes.")
 def cmd_pre_push_check(**_kwargs):
-    root = _require_sub_project_root()
-    from .workspace import find_workspace_root
-    monorepo_root = find_workspace_root(str(root))
-    ctx = create_context(root, workspace_root=Path(monorepo_root) if monorepo_root else None)
+    from .workspace import find_workspace_root, resolve_project
+
+    root = _require_project_root()
+    workspace_root = find_workspace_root(str(root))
+
+    if workspace_root is not None:
+        cwd = Path.cwd()
+        ws_path = Path(workspace_root)
+        project = resolve_project(workspace_root, str(cwd))
+        if project is None and cwd.resolve() == ws_path.resolve():
+            # CWD is at workspace root (e.g. git runs hooks from repo root)
+            ctx = create_context(ws_path, workspace_root=ws_path)
+        elif project is not None:
+            # CWD is inside a registered sub-project
+            sub_path = ws_path / project["path"]
+            ctx = create_context(sub_path, workspace_root=ws_path, project=project)
+        else:
+            print(f"Error: CWD is inside monorepo at {workspace_root} but not inside any registered project.", file=sys.stderr)
+            print("Run 'rlsbl monorepo add <path>' to register this project.", file=sys.stderr)
+            sys.exit(1)
+    else:
+        # Standalone project (no monorepo)
+        ctx = create_context(root)
+
     from .commands.pre_push_check import run_cmd
     run_cmd(None, [], {}, ctx=ctx)
 
