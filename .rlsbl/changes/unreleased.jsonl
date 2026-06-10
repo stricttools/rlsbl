@@ -1,5 +1,0 @@
-{"commits":["dfb0a8157d01df3e9dbc0f09e8ab8f4d7b87ebaa"],"user_facing":true,"description":"**Fix.** Pre-push hook now works from monorepo root directory. `test-suite` check hard-errors in workspace context with a clear message directing to `test-suite-workspace`.","type":"fix"}
-{"commits":["61fb2c145fa391dd1bf9de116edd2e5a7ac3b579"],"user_facing":true,"description":"**Feature.** New `test-suite-workspace` check runs tests for affected workspace projects during pre-push. Detects changed files from push refs, maps to projects via watch patterns, skips dev_node projects.","type":"feature"}
-{"commits":["318a7ea2eb405e220d6ea370c43c3474b4acfc04"],"user_facing":true,"description":"**Fix.** Release rollback now cleans up orphaned generated files (versioned JSONL, markdown, release TOML) that previously blocked retry with 'working tree not clean'.","type":"fix"}
-{"commits":["0e562f7890e3fa23295ff9464c8276cfddb5927e","8a4bfa0ef28df2caa6876f36b06b363412d00dc4","7f681d80daa233fb3dc1fecc6ad9d52076eddbd2"],"user_facing":false}
-{"commits":["39c797a328682f1d65c1422d4b10f9828b92a5be"],"user_facing":false}
