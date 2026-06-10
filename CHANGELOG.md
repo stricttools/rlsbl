@@ -2,9 +2,20 @@
 
 # Changelog
 
-## 0.67.0
+## 0.67.1
 
-Monorepo pre-push support, test-suite-workspace check, release rollback cleanup
+V4 shim workspace fix, check-name multi-target, zero SEO warnings
+
+### Features
+
+- **Feature.** Comprehensive documentation update: rewrote pre-push hook section, added test-suite-workspace docs, monorepo pre-push behavior, deps-unused note, and eliminated all SEO warnings (was 104, now 0).
+
+### Fixes
+
+- **Fix.** Deprecated pre-push hook (old format) now creates proper workspace context at monorepo root, enabling all prepush checks including `test-suite-workspace`.
+- **Fix.** `check-name --target` now supports multiple values. Passing `--target npm --target pypi` checks both registries instead of silently ignoring the first. Invalid target names produce a hard error.
+
+## 0.67.0
 
 ### Features
 
