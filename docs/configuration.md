@@ -138,6 +138,48 @@ Example config:
 
 :-: ref path="rlsbl.config"
 
+## User-level configuration
+
+Location: `~/.rlsbl/config.json`
+
+This optional file uses the same JSON format as the project-level `.rlsbl/config.json`. It provides personal defaults that apply to all rlsbl-managed projects when a given key is not set at the project level.
+
+**Precedence (highest to lowest):**
+
+1. CLI flags (e.g., `--no-tag`)
+2. Project config (`.rlsbl/config.json`)
+3. User config (`~/.rlsbl/config.json`)
+4. Built-in defaults
+
+The file is optional — a missing `~/.rlsbl/config.json` is not an error. When absent, built-in defaults apply for any key not set at the project level.
+
+Currently supported keys:
+
+| Key | Type | Default | Description |
+| --- | --- | --- | --- |
+| `tag` | bool | `true` | Controls whether ecosystem tags (e.g., npm dist-tags) are created during release. |
+
+Example `~/.rlsbl/config.json`:
+
+```json
+{
+  "tag": false
+}
+```
+
+## CLI flag overrides
+
+Some CLI flags override config.json keys for a single invocation. Most global flags are runtime-only and have no persistent config equivalent.
+
+| Flag | Config key | Scope | Effect |
+| --- | --- | --- | --- |
+| `--no-tag` | `tag` | project + user | Disables ecosystem tagging for this invocation |
+| `--allow-dirty` | (none) | release only | Skips clean working tree check |
+| `--watch`/`--no-watch` | (none) | release only | Controls CI monitoring after push |
+| `RLSBL_PUSH_TIMEOUT` env | `push_timeout` | project | Push timeout in seconds (default 120) |
+
+Global flags `--dry-run`, `--yes`, and `--quiet` are runtime-only and have no `config.json` equivalent. They affect the current invocation but are never persisted to configuration.
+
 ## .rlsbl-monorepo/workspace.toml
 
 Monorepo workspace definition that lists all sub-projects, their relative paths, and optional names. rlsbl walks up from the current directory to find this file, so you can run release commands from within any sub-project. See the [monorepo guide](monorepo.md) for setup instructions, workspace commands, and subtree publishing.

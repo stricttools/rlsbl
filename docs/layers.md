@@ -67,7 +67,22 @@ flows = ["checkout_flow", "onboarding_flow"]
 app = ["app"]
 ```
 
-Glob patterns follow standard shell glob rules (`*` matches any characters, `?` matches one character).
+### Glob pattern syntax
+
+Patterns use Python's `fnmatch` module for matching.
+
+| Pattern | Meaning |
+| --- | --- |
+| `*` | Matches any sequence of characters (including empty) |
+| `?` | Matches exactly one character |
+| `[seq]` | Matches any character in *seq* |
+| `[!seq]` | Matches any character not in *seq* |
+
+`**` is **not** supported as a recursive wildcard. `fnmatch` treats `**` as two consecutive `*` wildcards, which behaves identically to a single `*` since project names are flat strings (no path separators).
+
+Patterns are matched against **project names only** (the `name` field in workspace.toml), not file paths or directory names.
+
+In layer assignments, **first matching pattern wins**. If a project name matches patterns in multiple layers, `validate_layer_assignments()` reports an error identifying the overlapping layers. Every project must be assigned to exactly one layer — both unassigned and multiply-assigned projects are validation failures.
 
 ## Overrides
 
