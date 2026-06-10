@@ -2,9 +2,17 @@
 
 # Changelog
 
-## 0.65.2
+## 0.65.3
 
-Watch retry dedup, no-runs exit 0, docs polish
+safegit --yes, doc gaps, SEO fixes, retry dedup test
+
+### Features
+
+- **Feature.** Passes `--yes` to safegit commit calls, future-proofing against interactive prompts in safegit.
+- **Feature.** Documentation expanded: glob pattern reference for layers, user-level config docs, flag-to-config mapping table, enriched module docstrings for SEO, and expanded section intros across 5 pages.
+- **Feature.** Added concurrent retry deduplication test verifying only one retry fires per workflow name when multiple runs fail in parallel.
+
+## 0.65.2
 
 ### Features
 
