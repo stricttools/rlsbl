@@ -23,7 +23,7 @@ rlsbl check --name version-consistency
 
 ## Check results
 
-Each check returns one of four statuses that determine how the result is displayed and whether it blocks the release pipeline. The severity is declared per-check in the check metadata and controls which status is reported on failure:
+Each check returns one of four statuses that determine how the result is displayed and whether it blocks the release pipeline. The severity level (error or warn) is declared per-check in the check metadata stored in `checks.toml` and controls which status is reported on failure versus advisory findings:
 
 | Status | Meaning | Effect |
 | --- | --- | --- |

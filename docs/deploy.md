@@ -60,7 +60,7 @@ Health checks run immediately after all steps complete. If no health check is co
 
 ## Automatic rollback
 
-When a health check fails and `rollback_steps` is configured, rlsbl executes the rollback sequence using the same SSH connection parameters as the deploy steps, then re-runs the health check to verify service recovery:
+When a health check fails and `rollback_steps` is configured, rlsbl executes the rollback sequence using the same SSH connection parameters (host, user, directory, env) as the original deploy steps, then re-runs the health check to verify service recovery. The outcome is reported as one of four states depending on whether rollback was attempted and whether the service recovered:
 
 1. Each rollback step executes sequentially via SSH (same host/user/directory/env as deploy steps)
 2. After rollback completes, the health check re-runs
