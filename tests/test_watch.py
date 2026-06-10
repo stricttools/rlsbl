@@ -16,6 +16,7 @@ from rlsbl.commands.watch import (
     _release_url,
     _resolve_run_ids,
     _retry_workflow,
+    _watch_runs,
     _watch_single_run,
     run_cmd,
 )
@@ -780,6 +781,88 @@ class TestNotifyUrlInRunCmd:
         assert exc_info.value.code == 0
         mock_notify.assert_called_once()
         assert mock_notify.call_args[1]["url"] == "https://github.com/user/repo/releases/tag/v2.0.0"
+
+
+class TestRetryDedup:
+    """Tests for concurrent retry deduplication in _watch_runs.
+
+    When multiple runs of the same workflow fail concurrently, only one
+    retry should be dispatched (the first thread to acquire the lock adds
+    the workflow name to retried_workflows; subsequent threads find it
+    already present and skip).
+    """
+
+    @patch("rlsbl.commands.watch.run")
+    @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.subprocess.run")
+    def test_multiple_runs_same_workflow_retry_once(self, mock_subproc, mock_time, mock_run, capsys):
+        """Three CI runs fail concurrently but only one retry is dispatched."""
+        runs = [
+            {"databaseId": 100, "name": "CI", "headBranch": "main"},
+            {"databaseId": 200, "name": "CI", "headBranch": "main"},
+            {"databaseId": 300, "name": "CI", "headBranch": "main"},
+        ]
+
+        # Track which subprocess commands are called to assert retry count.
+        # We need careful ordering: each thread calls `gh run watch <id>`
+        # which fails, then only ONE thread calls `gh workflow run CI`,
+        # then that thread watches the retry run.
+        #
+        # subprocess.run is called with:
+        #   ["gh", "run", "watch", "<id>", "--exit-status"] -- 3 times, all fail
+        #   ["gh", "workflow", "run", "CI", "--ref", "main"] -- 1 time (retry trigger)
+        #   ["gh", "run", "watch", "<retry_id>", "--exit-status"] -- 1 time (retry watch)
+        #
+        # Since threads run concurrently, we can't predict exact call order,
+        # so we use side_effect as a function that inspects the command.
+
+        workflow_run_call_count = 0
+
+        def subproc_side_effect(cmd, **kwargs):
+            nonlocal workflow_run_call_count
+            if cmd[:3] == ["gh", "run", "watch"]:
+                run_id = cmd[3]
+                # Original watches (IDs 100, 200, 300) all fail
+                if run_id in ("100", "200", "300"):
+                    raise subprocess.CalledProcessError(1, "gh")
+                # Retry watch (ID 400) succeeds
+                return MagicMock(returncode=0)
+            elif cmd[:3] == ["gh", "workflow", "run"]:
+                workflow_run_call_count += 1
+                return MagicMock(returncode=0)
+            return MagicMock(returncode=0)
+
+        mock_subproc.side_effect = subproc_side_effect
+
+        # Mock rlsbl.commands.watch.run for the `gh run list` call in _retry_workflow
+        # that polls for the new retry run
+        mock_run.return_value = json.dumps(
+            [{"databaseId": 400, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]
+        )
+
+        results = _watch_runs(runs, "test-label", "user/repo")
+
+        # Only ONE retry should have been dispatched
+        assert workflow_run_call_count == 1, (
+            f"Expected exactly 1 retry dispatch, got {workflow_run_call_count}"
+        )
+
+        # All 3 runs should produce results
+        assert len(results) == 3
+
+        # Exactly one result should be the retry success (run_id 400),
+        # the other two should be the original failures (run_ids 100/200/300)
+        retry_results = [r for r in results if r.get("run_id") == "400"]
+        original_failures = [r for r in results if r.get("run_id") in ("100", "200", "300")]
+
+        assert len(retry_results) == 1
+        assert retry_results[0]["passed"] is True
+        assert retry_results[0]["name"] == "CI"
+
+        assert len(original_failures) == 2
+        for r in original_failures:
+            assert r["passed"] is False
+            assert r["name"] == "CI"
 
 
 if __name__ == "__main__":
