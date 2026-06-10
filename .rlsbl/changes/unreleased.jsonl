@@ -1,0 +1,1 @@
+{"commits":["f379d154f77a613e3d368005eec5d00517b06595"],"user_facing":true,"description":"**Feature.** Stale batch_limits exclusions (referencing `version: unreleased`) are automatically removed from config.json during release finalization.","type":"feature"}
