@@ -157,7 +157,7 @@ See [docs/ci-customization.md](docs/ci-customization.md) for an example.
 
 ## Check system
 
-49 checks organized by tag:
+rlsbl includes 49 checks across 6 tags.
 
 | Tag | Checks | Description |
 |-----|--------|-------------|
@@ -165,7 +165,7 @@ See [docs/ci-customization.md](docs/ci-customization.md) for an example.
 | `release` | 4 | Local/remote tag, GitHub Release, branch sync |
 | `changelog` | 9 | Hash resolution, range, coverage, orphans, schema, user-facing, batch limits, entry |
 | `workspace` | 9 | CI router, CI sync, targets, unregistered, stale entries, dev-node boundary, dead packages, subtree remote, layers |
-| `quality` | 7 | Dead modules, circular deps, library lint, deps unused/undeclared/runtime-test-only/dev-in-lib, scaffold checks |
+| `quality` | 8 | Dead modules, circular deps, library lint, deps unused/undeclared/runtime-test-only/dev-in-lib, scaffold checks, test suite |
 | (untagged) | 4 | Additional validation checks |
 
 ```
