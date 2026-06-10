@@ -19,6 +19,7 @@ class ProjectContext:
     workspace_root: Path | None
     config: dict
     project: WorkspaceProject | None = field(default=None)
+    push_stdin: str | None = field(default=None)
 
 
 def create_context(

@@ -175,11 +175,14 @@ def _check_context_factory():
     Returns WorkspaceCheckContext if in a monorepo, otherwise ProjectCheckContext.
     Imports are deferred to avoid circular dependencies and to keep the factory lazy.
     """
+    import os
     from pathlib import Path
 
     from .check_context import WorkspaceCheckContext
     from .context import ProjectContext, create_context
     from .workspace import find_workspace_root, load_workspace
+
+    push_stdin = os.environ.get("RLSBL_PUSH_STDIN")
 
     workspace_root = find_workspace_root()
     if workspace_root is not None:
@@ -188,14 +191,18 @@ def _check_context_factory():
         projects = load_workspace(workspace_root)
         graph = WorkspaceGraph(workspace_root, projects)
         ctx = create_context(Path.cwd(), workspace_root=Path(workspace_root))
-        return WorkspaceCheckContext(
+        wctx = WorkspaceCheckContext(
             project_root=ctx.project_root,
             workspace_root=ctx.workspace_root,
             config=ctx.config,
             projects=projects,
             graph=graph,
         )
-    return create_context(Path.cwd())
+        wctx.push_stdin = push_stdin
+        return wctx
+    ctx = create_context(Path.cwd())
+    ctx.push_stdin = push_stdin
+    return ctx
 
 
 app.set_check_context(_check_context_factory)
