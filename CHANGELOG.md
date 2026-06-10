@@ -2,9 +2,15 @@
 
 # Changelog
 
-## 0.66.1
+## 0.66.2
 
-Fix uv sync stripping pytest in workspaces, add workspace-unbuildable check
+Auto-cleanup stale exclusions, DRY refactor manual-warning, hook V5 e2e test
+
+### Features
+
+- **Feature.** Stale batch_limits exclusions (referencing `version: unreleased`) are automatically removed from config.json during release finalization.
+
+## 0.66.1
 
 ### Features
 
