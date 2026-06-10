@@ -216,7 +216,7 @@
     "description": "2b299140b2d961d153c7d61904667008c1a2e33081bb58950272063a9eb3c519"
   },
   "en/dep-validation.md": {
-    "content": "16e1419fa18239b1c5447e1d461afb2d43038f313c86cba3910c3a9c05898ce7",
+    "content": "3b881ddcd8a0759952a3af79e682e35dac1efe01edc53d8c0f06846769c5fd08",
     "description": "57a9b15a4d733a304906b13dee8c8fd6121a1369b5bc5bd3a94f85a5a76b4764"
   },
   "en/deploy.md": {
@@ -232,7 +232,7 @@
     "description": "bb3cd9d34f014c0674a9285c25ee14b5b4abc5cf941f0d83594c301405e8f3b6"
   },
   "en/import-scanning.md": {
-    "content": "9275b6118f49a4bae06f2bcb8fd6354e9c3fe826e5cf1a25a1f3168f9146dc27",
+    "content": "5fab45993a2719d370474e8182776d7a9dcc7bc60874f7e99871c0212983db6d",
     "description": "223a4a8beae8b01051419dbb3d584f2f4e2e909ee7f277d8270679d09c623aab"
   },
   "en/index.md": {
@@ -244,11 +244,11 @@
     "description": "a1f0cfcb22389d01c5dab80b9b6be0783a0b97223ffc56dd9c0d8d3be71646b3"
   },
   "en/monorepo.md": {
-    "content": "1b5e70f54f675a1b3a8ac5651bee34d2f9333a746be7be5e31de18e9c58b0658",
+    "content": "13da5a8f875ebc028f62fcb3d4973b4265358386939e6e112b7d1c34043765eb",
     "description": "488bc6db7924c824637db476b2722e0fcf98f6f934c1e9bccafc0014b6d71e50"
   },
   "en/native-targets.md": {
-    "content": "cbf5ebdc4aa8e33533e65c20097782b64e5bc99635de0e93ab05dc9ac203e921",
+    "content": "0199b829f5685c909ee8bd3da46362035c3d3b54a43ea71e51fc4a91888f91c7",
     "description": "ca9471a2ce000308cfb11084b3f86109c722f10f835ddddab6dae624881b77d6"
   },
   "en/pipelines.md": {
@@ -724,7 +724,7 @@
     "description": "8bcbe7503223060111d5451512a58bc6852de68f5d5f5def88d6b6a5731837c0"
   },
   "en/utilities.md": {
-    "content": "0864817b0bd2b31562b6afc00b51a7dac5e2367ae232d6fd0dc4274a2d864929",
+    "content": "6e3b0aab79b45bb0c87c21f569435ca18102314807a003d894581ca1de1832e5",
     "description": "b86b45eb9ac448b18cc5a2214e3ae0beef3c295cd9eb0469649752f57f50d6cf"
   },
   "gen-index.md": {
