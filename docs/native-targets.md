@@ -26,7 +26,7 @@ Both targets are **conditionally auto-detectable** — they only activate when s
 
 ### Detection
 
-The native-ios target activates when:
+The native-ios target uses a multi-step activation check that ensures it only applies to genuine Xcode app projects, not Swift packages or other iOS-adjacent project types. The target activates when:
 
 1. No `Package.swift` is present in the project root (SPM projects use the `swift` target instead)
 2. At least one `*.xcodeproj` directory exists containing a `project.pbxproj` file
@@ -36,7 +36,7 @@ Alternatively, Tuist-managed projects are detected via `Project.swift` containin
 
 ### Version reading
 
-Version is extracted from pbxproj using a regex pattern:
+Version is extracted from the Xcode project's pbxproj file using regex-based inline parsing. The pattern matches the `MARKETING_VERSION` build setting, which corresponds to `CFBundleShortVersionString` in the app bundle:
 
 ```
 MARKETING_VERSION\s*=\s*([^;]+);
@@ -46,7 +46,7 @@ The matched value is stripped of whitespace and quotes.
 
 ### Build number
 
-`CURRENT_PROJECT_VERSION` is auto-incremented (integer bump) on each release. This corresponds to `CFBundleVersion` in the app's Info.plist and is required by App Store Connect for each submission.
+`CURRENT_PROJECT_VERSION` is auto-incremented as an integer on each release, independent of the marketing version. This corresponds to `CFBundleVersion` in the app's Info.plist and is required by App Store Connect for each binary submission. Apple requires the build number to be strictly increasing within each marketing version.
 
 ### Multi-target projects
 
@@ -54,7 +54,7 @@ When multiple `*.xcodeproj` directories exist, the target uses the **first** xco
 
 ### Tuist support
 
-For Tuist-managed projects (detected via `Project.swift`):
+For Tuist-managed projects, rlsbl detects the presence of a `Project.swift` manifest and reads version information from the Tuist project configuration rather than raw pbxproj files. This supports teams that generate their Xcode project from a Swift-based DSL:
 
 - Looks for `CFBundleShortVersionString` in the Swift manifest
 - Version reading and writing use the Tuist project configuration rather than raw pbxproj
@@ -68,7 +68,7 @@ Returns `None` because the actual file depends on which xcodeproj is found at ru
 
 ### Detection
 
-The native-android target activates when:
+The native-android target uses content inspection to distinguish Android application modules from library modules, preventing false positives on projects that should use the Maven target instead. The target activates when:
 
 1. A `build.gradle` or `build.gradle.kts` file exists in the project root
 2. The file contains the `com.android.application` plugin declaration
@@ -82,7 +82,7 @@ Android libraries (`com.android.library` plugin) are excluded from native-androi
 
 ### Version reading
 
-Version is extracted from build.gradle using regex-based inline parsing (~15 lines). The pattern matches:
+Version is extracted from the detected build.gradle file using regex-based inline parsing that handles both Groovy DSL and Kotlin DSL syntax. The same pattern works for both DSL variants because they share the same `versionName` property syntax. The pattern matches:
 
 ```
 versionName\s+["']([^"']+)["']
@@ -96,11 +96,11 @@ Both Groovy DSL (build.gradle) and Kotlin DSL (build.gradle.kts) use the same pa
 
 ### Version writing
 
-Both `versionName` and `versionCode` are updated in-place using regex substitution on the same build.gradle file where they were found.
+Both `versionName` and `versionCode` are updated in-place using regex substitution on the same build.gradle file where they were originally found during detection. The version name is set to the new semver string and the version code is auto-incremented as an integer, ensuring both values stay synchronized in a single atomic write.
 
 ## No CI templates
 
-Neither native target generates CI workflow templates during `rlsbl scaffold`. This is intentional:
+Neither native target generates CI workflow templates during `rlsbl scaffold`, unlike npm, PyPI, Go, and other targets that include ready-to-use GitHub Actions workflows. This is intentional because native mobile builds have platform-specific requirements that vary too widely for a generic template:
 
 | Platform | Requirement | Why no template |
 | --- | --- | --- |

@@ -8,11 +8,11 @@ rlsbl scans source code imports to detect unused dependencies, undeclared depend
 
 ## Architecture
 
-The import scanning system has two layers, each serving a different purpose:
+The import scanning system has two layers, each serving a different purpose. The workspace layer maps imports to project names for dependency validation, while the file layer builds intra-project graphs for dead-module and circular-dependency detection:
 
 ### Workspace-level scanners (import_scanners.py)
 
-These scanners map imports to workspace project names. They answer: "which workspace siblings does this project actually import?"
+These scanners parse source files and map discovered import statements to workspace project names. They answer the question "which workspace siblings does this project actually import?" and feed their results to the four dependency validation checks (unused, undeclared, runtime-test-only, dev-in-lib).
 
 - `PythonImportScanner` -- uses `PythonAstLinter.scan_imports()`, filters by workspace membership
 - `GoImportScanner` -- uses `scan_imports()` from `lint.go_ast`, matches against workspace Go module paths
@@ -23,7 +23,7 @@ All scanners return `list[ImportInfo]`, where each `ImportInfo` carries the matc
 
 ### File-level graph builders (dep_validation.py)
 
-These functions build intra-package import graphs for dead-module and circular-dependency detection. They answer: "which files within this project reference each other?"
+These functions build intra-package import graphs by resolving each import statement to a concrete file path within the same project. They answer the question "which files within this project reference each other?" and produce the adjacency data used by dead-module BFS traversal and circular-dependency detection via Tarjan's algorithm.
 
 - `_build_python_import_graph()` -- implied by `find_dead_modules()` which uses `_collect_python_imports()`
 - `find_dead_go_packages()` -- uses `scan_imports()` per file, groups by package directory
@@ -44,7 +44,7 @@ This is the interface that low-level AST linters implement. The workspace-level 
 
 ### walk_source_files() (lint/utils.py)
 
-File discovery utility used by both layers. Features:
+File discovery utility shared by both the workspace-level scanners and the file-level graph builders. It walks the project directory tree, filters by file extension, and excludes non-source directories to produce the set of files that should be scanned for imports. Key features:
 
 - Extension matching (e.g., `(".py",)`, `(".go",)`, `(".js", ".ts", ".mjs", ".cjs", ".tsx")`)
 - Built-in exclusion of common non-source directories: `.venv`, `node_modules`, `__pycache__`, `.git`, `build`, `dist`, `.selfdoc`, `_build`, `static`, `public`, `assets`
@@ -54,7 +54,7 @@ File discovery utility used by both layers. Features:
 
 ### _is_test_context()
 
-Classifies a file as production vs test code based on:
+Classifies a file as production vs test code by checking its path against known test directory names and file naming conventions. This classification determines whether an import counts toward runtime dependency usage or test-only usage, which directly affects the deps-runtime-test-only and deps-dev-in-lib checks. Classification is based on:
 
 - **Directory names**: `test`, `tests`, `__tests__`, `examples`, `example`
 - **File name patterns**: `test_*.py`, `*_test.py`, `*_test.go`, `*_test.dart`, `*.test.[jt]sx?`, `*.spec.[jt]sx?`, `conftest.py`
@@ -74,7 +74,7 @@ Shared constant exposing the classification patterns as a dict with keys `test_d
 
 ## Go module path mapping
 
-`GoImportScanner` builds a reverse lookup from Go module paths to workspace project names:
+`GoImportScanner` handles Go's module-path-based import system by building a reverse lookup from Go module paths to workspace project names. This mapping is necessary because Go imports use full module paths like `github.com/org/repo/pkg`, not bare package names:
 
 1. Reads `go.mod` from each workspace project to extract its `module` declaration
 2. Builds a `module_path_map: dict[str, str]` mapping workspace project name to module path
@@ -85,7 +85,7 @@ This handles Go's module-path-based import system where `github.com/org/repo/int
 
 ## npm resolution
 
-The npm file-level graph builder (`_build_npm_import_graph()`) handles JavaScript/TypeScript module resolution conventions:
+The npm file-level graph builder (`_build_npm_import_graph()`) implements a subset of Node.js module resolution to accurately map import statements to source files. This is necessary because JavaScript and TypeScript have several implicit resolution conventions that affect which file an import actually refers to:
 
 - **Extension appending**: tries `.ts`, `.tsx`, `.js`, `.mjs`, `.cjs` when bare path has no extension
 - **`.js` to `.ts` mapping**: TypeScript projects compile `.ts` to `.js`; resolves `.js` references back to `.ts` source
@@ -95,7 +95,7 @@ The npm file-level graph builder (`_build_npm_import_graph()`) handles JavaScrip
 
 ## Caching
 
-Workspace-level import results are cached on the check context object (`ctx._dep_import_cache`). The `_build_dep_import_cache()` function in `checks.py`:
+Workspace-level import results are cached on the check context object (`ctx._dep_import_cache`) to avoid scanning the same source trees multiple times. Since four separate checks all need the same import data, caching reduces the total number of source tree walks from four per project to one. The `_build_dep_import_cache()` function in `checks.py`:
 
 1. Iterates all workspace projects once
 2. Computes `(lib_imports, test_imports)` per project using `_get_imported_workspace_packages()`
@@ -113,7 +113,7 @@ The intra-package checks (`dead-modules`, `circular-deps`) build their own file-
 
 ## Entry point detection
 
-Dead-module analysis requires knowing which files are "roots" for BFS reachability. Entry point detection varies by language:
+Dead-module analysis requires knowing which files serve as roots for BFS reachability traversal. A file is considered an entry point if it is part of the package's public API or an executable script that users invoke directly. Entry point detection varies by language because each ecosystem has different conventions for declaring public surfaces:
 
 | Language | Entry points |
 |----------|-------------|

@@ -32,7 +32,7 @@ rlsbl monorepo list
 
 ## workspace.toml format
 
-The workspace file lives at `.rlsbl-monorepo/workspace.toml`. It uses TOML array-of-tables syntax for project declarations:
+The workspace file lives at `.rlsbl-monorepo/workspace.toml` and serves as the single source of truth for all project registrations, dependency declarations, and architectural layer rules. It uses TOML array-of-tables syntax for project declarations, with one `[[projects]]` block per sub-project:
 
 ```toml
 [[projects]]
@@ -83,13 +83,13 @@ unrestricted = ["tests"]
 
 ### Layers section
 
-The optional `[layers]` section enforces dependency direction. See [layers.md](layers.md) for full configuration reference.
+The optional `[layers]` section enforces architectural dependency direction by grouping projects into ordered layers and blocking imports that violate the hierarchy. Higher layers may depend on lower layers, but not vice versa. See [layers.md](layers.md) for full configuration reference.
 
 ## Project types
 
 ### Regular projects
 
-Standard projects get the full release experience:
+Standard projects get the full release experience, including changelog enforcement, CI pipeline generation, and all workspace validation checks. This is the default project type when neither `library` nor `dev_node` flags are set:
 
 - JSONL changelog with commit coverage enforcement
 - Generated CHANGELOG.md
@@ -99,7 +99,7 @@ Standard projects get the full release experience:
 
 ### Library projects (`library = true`)
 
-Libraries are packages consumed by other workspace projects. They get everything regular projects have, plus:
+Libraries are packages consumed by other workspace projects as runtime or dev dependencies. They get everything regular projects have, plus additional quality checks that ensure shared code stays clean and is actually used within the workspace:
 
 - `library-lint` quality check (runs language-specific lint rules)
 - `dead-workspace-packages` detection (warns if the library has no dependents)
@@ -119,7 +119,7 @@ Dev nodes are projects at the edge of the dependency graph that nothing user-fac
 
 ## Dependency graph
 
-The workspace builds a directed dependency graph from two sources:
+The workspace builds a directed dependency graph from two complementary sources, combining automatic manifest scanning with explicit declarations to capture all inter-project relationships:
 
 1. **Manifest scanning** — pluggable scanners (`PypiScanner`, `NpmScanner`, `DartScanner`) parse each project's manifest file looking for intra-workspace dependencies
 2. **Explicit `depends_on`** — the workspace.toml field adds edges the scanners cannot detect
@@ -159,7 +159,7 @@ Uses Kahn's algorithm. Projects with no dependencies appear first. Detects and r
 
 ## Impact analysis
 
-`rlsbl monorepo impact` computes the blast radius of a change using BFS on the reverse dependency graph.
+`rlsbl monorepo impact` computes the blast radius of a change by performing BFS on the reverse dependency graph, showing every direct and transitive dependent that could be affected. This helps determine which packages need testing and which are release candidates after a change.
 
 ### Three input modes
 
@@ -190,7 +190,7 @@ Supports `--depth N` to limit BFS traversal depth.
 
 ## Batch release
 
-`rlsbl monorepo release` releases multiple packages in a single coordinated flow, respecting topological order (leaves first, dependents after their dependencies complete).
+`rlsbl monorepo release` releases multiple packages in a single coordinated flow, respecting topological order so that leaf packages (those with no intra-workspace dependencies) are released first, followed by their dependents. This ensures downstream packages always reference the latest versions of their workspace dependencies.
 
 ### Workflow
 
@@ -200,7 +200,7 @@ Supports `--depth N` to limit BFS traversal depth.
 
 ### release-init scaffolding
 
-`rlsbl monorepo release-init` auto-detects targets for each project and generates per-package sections:
+`rlsbl monorepo release-init` auto-detects release targets for each workspace project and generates a TOML file with pre-populated per-package sections. Packages with no unreleased commits are commented out, and dev nodes are excluded entirely since they bypass the changelog system:
 
 ```toml
 [packages.mylib]
@@ -223,7 +223,7 @@ include = ["npm"]
 
 ### Execution
 
-Each package is released sequentially using the standard single-package release flow. The order is:
+Each package is released sequentially using the standard single-package release flow (validation, tests, version bump, commit, tag, push, GitHub Release). The batch orchestrator determines execution order from the workspace dependency graph:
 
 1. Validate all listed packages exist in workspace
 2. Build topological order from the full workspace graph
@@ -236,7 +236,7 @@ If a package's release fails mid-batch, there is no automatic resume. The comman
 
 ## Snapshot
 
-`rlsbl monorepo snapshot` generates a committed JSON artifact at `.rlsbl-monorepo/snapshot.json` summarizing the entire workspace state.
+`rlsbl monorepo snapshot` generates a committed JSON artifact at `.rlsbl-monorepo/snapshot.json` that captures the entire workspace state, including package metadata, dependency edges, and the computed topological order. This artifact is useful for CI verification and external tooling that needs to inspect workspace structure without parsing TOML.
 
 ```bash
 # Generate and commit snapshot
@@ -278,7 +278,7 @@ After initial setup, `rlsbl monorepo sync` keeps mirror repositories updated aft
 
 ## Sync
 
-`rlsbl monorepo sync` copies per-project CI workflows to the shared `.github/workflows/` directory at the repository root, performing template variable resolution along the way.
+`rlsbl monorepo sync` copies per-project CI workflows to the shared `.github/workflows/` directory at the repository root, performing template variable resolution and trigger rewriting along the way. This is required because GitHub Actions only reads workflows from the repository root, not from individual project subdirectories.
 
 The sync process:
 
@@ -292,7 +292,7 @@ This ensures every project has its CI pipeline properly wired even when using di
 
 ## Workspace checks
 
-Eight checks run under `rlsbl check --tag workspace`:
+Eight checks run under `rlsbl check --tag workspace`, covering CI configuration consistency, project registration hygiene, dependency boundary enforcement, and code liveness. All error-severity checks block releases when they fail:
 
 | Check | Severity | Description |
 | ----- | -------- | ----------- |
@@ -315,7 +315,7 @@ See [checks.md](checks.md) for the full check reference across all tags.
 
 ## Dev node boundary
 
-The `dev-node-boundary` check is a structural guardrail preventing misuse of the `dev_node` flag. The rule:
+The `dev-node-boundary` check is a structural guardrail that prevents misuse of the `dev_node` flag by ensuring dev-only projects remain true leaf nodes in the dependency graph, consumed by nothing user-facing. The rule:
 
 > If a non-dev-node project has a **runtime dependency** on a dev_node project, `rlsbl check --tag workspace` errors.
 

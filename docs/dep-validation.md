@@ -8,11 +8,11 @@ rlsbl validates dependencies at two levels: workspace-level (between monorepo pa
 
 ## Workspace dependency checks
 
-These checks use the shared import scan cache (`ctx._dep_import_cache`) to avoid redundant source tree walks. All four run during `rlsbl check --tag workspace`.
+These four checks compare declared dependencies in workspace manifests against actual import usage discovered by scanning source code. They share a common import scan cache (`ctx._dep_import_cache`) to avoid redundant source tree walks, and all four run during `rlsbl check --tag workspace`.
 
 ### deps-unused
 
-Declared workspace dependencies not actually imported anywhere in the project's source code.
+Detects workspace dependencies declared in the project manifest that are not actually imported anywhere in the project's source code. An unused dependency adds unnecessary coupling and bloats the install footprint for consumers.
 
 - Scans both lib and test code for imports matching workspace sibling names
 - A dep is unused if zero source files import it (regardless of context)
@@ -21,7 +21,7 @@ Declared workspace dependencies not actually imported anywhere in the project's 
 
 ### deps-undeclared
 
-Imports found for workspace packages not declared as dependencies.
+Detects imports of workspace sibling packages that are not declared as dependencies in the project's manifest. Undeclared dependencies work locally because all packages share a repository, but break when the project is installed standalone.
 
 - Only checks production code (non-test context) -- test files have more lenient rules
 - Self-imports are excluded (a package importing its own submodules is fine)
@@ -29,7 +29,7 @@ Imports found for workspace packages not declared as dependencies.
 
 ### deps-runtime-test-only
 
-Runtime dependencies that are only used in test code (should be dev dependencies).
+Detects runtime dependencies that are only imported in test code and never in production source files. These should be declared as dev dependencies instead, since shipping them as runtime dependencies forces consumers to install packages they will never use.
 
 - Checks deps with `scope="runtime"` in the workspace manifest
 - Flags any runtime dep that appears in `test_imports` but not in `lib_imports`
@@ -37,7 +37,7 @@ Runtime dependencies that are only used in test code (should be dev dependencies
 
 ### deps-dev-in-lib
 
-Dev dependencies imported in production code (should be runtime dependencies).
+Detects dev dependencies that are imported in production code, indicating they should be declared as runtime dependencies instead. When a dev dependency is used in library or application code, consumers who install the package will get import errors because dev dependencies are not installed transitively.
 
 - Checks deps with `scope="dev"` in the workspace manifest
 - Flags any dev dep that appears in `lib_imports`
@@ -45,11 +45,11 @@ Dev dependencies imported in production code (should be runtime dependencies).
 
 ## Intra-package checks
 
-These checks build per-file import graphs within a single project. They do not use the workspace import cache.
+These checks build per-file import graphs within a single project to detect structural problems like unreachable code and circular dependencies. They operate at file granularity rather than package granularity and do not share the workspace import cache.
 
 ### dead-modules
 
-Source files unreachable from entry points via BFS on the file-level import graph.
+Detects source files that are unreachable from any entry point via BFS on the file-level import graph. Dead modules are production code that can never be executed because no import chain connects them to the package's public API or executable entry points.
 
 **Algorithm:**
 
@@ -90,7 +90,7 @@ Strongly connected components (Tarjan's algorithm) in the file-level import grap
 
 ### library-lint
 
-Forbidden import detection for library packages:
+Enforces quality constraints specific to library packages by detecting imports and patterns that are inappropriate for reusable code consumed by other projects:
 
 - Detects imports inappropriate for library code (e.g., `dart:io` in a pure Dart library)
 - Detects stdout/stderr writes in library code (libraries should not print directly)
@@ -98,7 +98,7 @@ Forbidden import detection for library packages:
 
 ## Dead workspace packages
 
-The `dead-workspace-packages` check operates at the workspace level. It identifies library packages that no workspace sibling imports.
+The `dead-workspace-packages` check operates at the workspace level, identifying library packages that no workspace sibling imports. A library with zero importers may indicate abandoned code, an incomplete migration, or a package that is only consumed by external projects outside the monorepo.
 
 **Criteria:**
 
@@ -124,7 +124,7 @@ Published libraries may still be consumed externally, so zero workspace importer
 
 ### dep-overrides.toml
 
-Located at `.rlsbl-monorepo/dep-overrides.toml`. Allows suppressing `deps-unused` errors for intentional cases.
+Located at `.rlsbl-monorepo/dep-overrides.toml`, this configuration file allows suppressing `deps-unused` errors for dependencies that are intentionally declared but not statically detectable by import scanning (e.g., dynamic imports, plugin loading, or runtime reflection).
 
 ```toml
 [[unused_allowed]]
@@ -137,7 +137,7 @@ Every entry requires all three fields (`package`, `dep`, `reason`). Empty `reaso
 
 ### batch_limits in config.json
 
-Controls batch size validation for changelog entries (not directly related to dep validation, but part of the same check infrastructure):
+Controls batch size validation for changelog entries, limiting how many commits a single entry can reference and how many entries can reference the same commit. While not directly related to dependency validation, these limits are part of the same check infrastructure and run alongside dep checks during `rlsbl check`:
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
