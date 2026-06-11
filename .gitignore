@@ -13,3 +13,6 @@ dist/
 .env
 .env.local
 *.local-only
+.wrangler/
+docs/_build/
+uv.lock
