@@ -11,5 +11,5 @@
   ".rlsbl/lint/npm.toml": "baa36014e65923d8cc5c8b83c77fa651da79351627570476402da66840027645",
   ".npmignore": "7c0eea9785c0318aeb39bf8b670ce8384f4a5b812fde69ce23d7d018057325a3",
   ".gitignore": "c89d76c6c43e7f0897b3472a15b7c0103e0be5b3a04c2b44e585fa48bdcda2bb",
-  ".github/workflows/ci-pypi.yml": "bb6f69766b0d95866db90298698c9b3ca83705cb22a560f00f2866911478c166"
+  ".github/workflows/ci-pypi.yml": "459fff1b71ccb4290037238064a5357ab8394543ef15bbfdfb98f763994d28a4"
 }
