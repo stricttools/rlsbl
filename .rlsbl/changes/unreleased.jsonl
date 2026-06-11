@@ -1,0 +1,1 @@
+{"commits":["1d2a6974729bc93b5bec3878784a5a550a1f8f0a"],"user_facing":true,"description":"**Fix.** CI template uses `uv sync --no-sources` to ignore local path overrides and resolve from PyPI in CI. Works correctly in both standalone projects and monorepo workspaces.","type":"fix"}
