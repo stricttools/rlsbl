@@ -2,9 +2,16 @@
 
 # Changelog
 
-## 0.68.1
+## 0.68.2
 
-Per-target CI files, YAML indent fix, monorepo sync update
+CI uses --no-sources for portable uv sync
+
+### Fixes
+
+- **Fix.** CI template uses `uv sync --no-sources` to ignore local path overrides and resolve from PyPI in CI. Works correctly in both standalone projects and monorepo workspaces.
+- **Fix.** `test-suite` check skips gracefully at workspace root instead of hard-erroring.
+
+## 0.68.1
 
 ### Features
 
