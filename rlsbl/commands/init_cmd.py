@@ -1373,6 +1373,7 @@ def _generate_merged_publish(targets, template_vars, target_paths=None):
     # Serialize with ruamel.yaml
     yml = YAML()
     yml.default_flow_style = False
+    yml.indent(mapping=2, sequence=4, offset=2)
 
     # Use flow style for short lists (e.g., types: [published])
     from ruamel.yaml.representer import RoundTripRepresenter
