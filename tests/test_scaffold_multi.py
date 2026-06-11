@@ -73,18 +73,18 @@ class TestRunCmdMulti:
         assert "pypi-publish" in content or "uv build" in content
 
     def test_ci_workflow_created(self, dual_registry_project):
-        """CI workflow from primary registry (npm) is generated."""
+        """CI workflow for pypi is generated (npm CI skipped for wrapper packages)."""
         with patch("sys.stdout", new_callable=StringIO):
             run_cmd_multi(["npm", "pypi"], [], {}, ctx=_ctx())
 
-        ci_path = os.path.join(".github", "workflows", "ci.yml")
+        ci_path = os.path.join(".github", "workflows", "ci-pypi.yml")
         assert os.path.exists(ci_path)
 
         with open(ci_path) as f:
             content = f.read()
 
         assert "CI" in content
-        assert "npm test" in content
+        assert "uv" in content or "pytest" in content
 
     def test_shared_templates_processed_once(self, dual_registry_project):
         """Shared templates (CHANGELOG.md, .gitignore) are written once, not duplicated."""
@@ -159,8 +159,8 @@ class TestRunCmdMulti:
         with patch("sys.stdout", new_callable=StringIO):
             run_cmd_multi(["npm", "pypi"], [], {}, ctx=_ctx())
 
-        # Modify CI file
-        ci_path = os.path.join(".github", "workflows", "ci.yml")
+        # Modify CI file (npm CI skipped for wrapper, so pypi CI is generated)
+        ci_path = os.path.join(".github", "workflows", "ci-pypi.yml")
         with open(ci_path, "w") as f:
             f.write("# user modified\n")
 
@@ -642,8 +642,8 @@ class TestSubdirectoryNpmTarget:
             # Should not raise FileNotFoundError
             run_cmd_multi(["pypi", "npm"], [], {}, ctx=_ctx())
 
-        # Verify scaffold completed successfully
-        ci_path = os.path.join(".github", "workflows", "ci.yml")
+        # Verify scaffold completed successfully (npm CI skipped for wrapper)
+        ci_path = os.path.join(".github", "workflows", "ci-pypi.yml")
         assert os.path.exists(ci_path)
 
     def test_ensure_npm_keyword_in_subdirectory(self, npm_subdir_project):
