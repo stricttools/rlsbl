@@ -18,5 +18,5 @@ jobs:
       - uses: {{action "actions/checkout"}}
       - uses: {{action "astral-sh/setup-uv"}}
       - run: uv python install ${{ matrix.python-version }}
-      - run: uv sync
+      - run: uv sync --no-sources
       - run: uv run python -c "import {{importName}}"
