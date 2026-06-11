@@ -294,7 +294,7 @@ class TestDependsOnOrdering:
             app._check_defs, "prepush", None, False,
         )
         order = strictcli._resolve_check_order(app._check_defs, selected)
-        results, exit_code = strictcli._run_checks(app, order, ctx, True)
+        results, exit_code = strictcli._run_checks(app._check_defs, order, ctx, True)
 
         results_dict = {name: result for name, result in results}
 
