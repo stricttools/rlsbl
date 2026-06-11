@@ -1637,8 +1637,16 @@ def run_cmd_multi(registries_list, args, flags, ctx):
                 m["target"] = os.path.join(dirname, new_basename)
 
             if ci_mappings:
+                # Build per-target vars: overlay this target's namespaced vars
+                # un-namespaced so {{importName}} etc. resolve even when this
+                # target is not the primary.
+                prefix = f"{r}."
+                ci_vars = dict(vars_dict)
+                for key, value in vars_dict.items():
+                    if key.startswith(prefix):
+                        ci_vars[key[len(prefix):]] = value
                 ci_plans.extend(plan_mappings(
-                    target_obj.template_dir(), ci_mappings, vars_dict, force,
+                    target_obj.template_dir(), ci_mappings, ci_vars, force,
                 ))
 
             # Collect non-workflow files (deduplicated)
