@@ -1,0 +1,1 @@
+{"commits":["e3ef84500b4e5b63f5a77f12c1392948170af072"],"user_facing":true,"description":"**Breaking.** Removed `pre-push-check` command. Run `rlsbl scaffold` to upgrade your hook to the current format (`rlsbl check --tag prepush`).","type":"breaking"}
