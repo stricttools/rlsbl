@@ -522,6 +522,49 @@ def cmd_release_yank(reason, use, hard, dry_run, yes, version, **_kwargs):
 
 
 # ---------------------------------------------------------------------------
+# release scrub
+# ---------------------------------------------------------------------------
+
+@release_group.command(
+    name="scrub",
+    help="Scrub sensitive content from git history and update release metadata (JSONL hashes, tags, GitHub Releases). Wraps safegit scrub with automatic post-rewrite cleanup.",
+    mutex=[
+        strictcli.MutexGroup(flags=[
+            strictcli.Flag(name="pattern", type=str, help="Regex pattern to match (for scrub match)"),
+            strictcli.Flag(name="file", type=str, help="File path to scrub (for scrub file)"),
+        ]),
+        strictcli.MutexGroup(flags=[
+            strictcli.Flag(name="replace", type=str, help="Replacement text for matched content"),
+            strictcli.Flag(name="mangle", type=bool, negatable=False, help="Replace matched content with random ASCII of same length"),
+        ]),
+        strictcli.MutexGroup(flags=[
+            strictcli.Flag(name="from-commit", type=str, help="Start rewriting from this commit (inclusive)"),
+            strictcli.Flag(name="entire-history", type=bool, negatable=False, help="Rewrite entire repository history"),
+        ]),
+    ],
+)
+@strictcli.flag(name="reason", type=str, help="Reason for scrubbing (required, used in commit message)", default="")
+def cmd_release_scrub(pattern, file, replace, mangle, from_commit, entire_history, reason, dry_run, yes, **_kwargs):
+    root = _require_project_root()
+    from .workspace import find_workspace_root
+    monorepo_root = find_workspace_root(str(root))
+    ctx = create_context(root, workspace_root=Path(monorepo_root) if monorepo_root else None)
+    flags = {
+        "pattern": pattern or None,
+        "file": file or None,
+        "replace": replace or None,
+        "mangle": mangle,
+        "from-commit": from_commit or None,
+        "entire-history": entire_history,
+        "reason": reason or None,
+        "dry-run": dry_run,
+        "yes": yes,
+    }
+    from .commands.release_scrub import run_cmd
+    run_cmd(flags, ctx=ctx)
+
+
+# ---------------------------------------------------------------------------
 # discover
 # ---------------------------------------------------------------------------
 
