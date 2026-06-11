@@ -80,6 +80,21 @@ def _check_npm_lockfile_missing(start_dir="."):
     )
     return True
 
+
+def _is_npm_wrapper(npm_dir_path):
+    """Check if the npm package at npm_dir_path is a wrapper (no test script).
+
+    Returns True if package.json has no scripts.test field or it's empty.
+    """
+    pkg_path = os.path.join(npm_dir_path, "package.json")
+    if not os.path.exists(pkg_path):
+        return True
+    with open(pkg_path, "r", encoding="utf-8") as f:
+        pkg = json.load(f)
+    test_script = pkg.get("scripts", {}).get("test", "")
+    return not test_script.strip()
+
+
 # Files owned by the user after initial scaffold -- never overwrite or merge
 USER_OWNED = {
     "CHANGELOG.md",
@@ -1532,9 +1547,9 @@ def _plan_merged_publish(publish_target, merged_content, force):
 
 
 def run_cmd_multi(registries_list, args, flags, ctx):
-    """Scaffold for multiple registries with a merged publish workflow.
+    """Scaffold for multiple registries with per-target CI and merged publish.
 
-    Uses the primary registry for template vars and CI, then writes a merged
+    Generates per-target CI workflows (ci-{target}.yml) and a merged
     publish.yml that contains jobs for all detected registries.
     """
     project_root = ctx.project_root if ctx else None
@@ -1587,32 +1602,52 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         force = flags.get("force", False)
         existing_hashes = load_hashes()
 
-        # Process primary registry CI templates (targets no longer return publish)
-        ci_mappings = reg.template_mappings(ctx)
-        ci_plans = plan_mappings(
-            reg.template_dir(), ci_mappings, vars_dict, force,
-            required_vars={"name", "registryUrl"},
-        )
-
-        # Collect non-workflow files from non-primary targets (e.g. .npmignore
-        # from npm, VERSION/.goreleaser.yml from Go).  The primary target's
-        # non-workflow files are already included in ci_mappings above;
-        # non-primary targets only contribute files outside .github/workflows/.
-        seen_targets = {m["target"] for m in ci_mappings}
-        extra_plans = []
+        # Process per-target CI templates: each target gets its own ci-{name}.yml
         _wf_prefix = os.path.join(".github", "workflows", "")
-        for r in registries_list[1:]:
-            secondary = TARGETS[r]
-            secondary_extra = [
-                m for m in secondary.template_mappings(ctx)
-                if not m["target"].startswith(_wf_prefix) and m["target"] not in seen_targets
-            ]
-            if secondary_extra:
-                for m in secondary_extra:
-                    seen_targets.add(m["target"])
-                extra_plans.extend(plan_mappings(
-                    secondary.template_dir(), secondary_extra, vars_dict, force,
+        _ci_prefix = os.path.join(".github", "workflows", "ci")
+        ci_plans = []
+        seen_targets = set()
+        extra_plans = []
+        for r in registries_list:
+            target_obj = TARGETS[r]
+            all_mappings = target_obj.template_mappings(ctx)
+
+            # Split into CI mappings and non-workflow mappings
+            ci_mappings = []
+            non_wf_mappings = []
+            for m in all_mappings:
+                if m["target"].startswith(_ci_prefix):
+                    ci_mappings.append(m)
+                elif not m["target"].startswith(_wf_prefix):
+                    non_wf_mappings.append(m)
+
+            # Skip npm CI for wrapper packages (no test script)
+            if r == "npm" and ci_mappings:
+                npm_dir = target_paths.get("npm", ".")
+                if _is_npm_wrapper(npm_dir):
+                    print("Skipping npm CI (no test script in package.json)")
+                    ci_mappings = []
+
+            # Rewrite CI target filenames: ci.yml -> ci-{target}.yml
+            for m in ci_mappings:
+                original = m["target"]
+                dirname = os.path.dirname(original)
+                basename = os.path.basename(original)
+                new_basename = basename.replace("ci.yml", f"ci-{r}.yml")
+                m["target"] = os.path.join(dirname, new_basename)
+
+            if ci_mappings:
+                ci_plans.extend(plan_mappings(
+                    target_obj.template_dir(), ci_mappings, vars_dict, force,
                 ))
+
+            # Collect non-workflow files (deduplicated)
+            for m in non_wf_mappings:
+                if m["target"] not in seen_targets:
+                    seen_targets.add(m["target"])
+                    extra_plans.extend(plan_mappings(
+                        target_obj.template_dir(), [m], vars_dict, force,
+                    ))
 
         # Plan the merged publish workflow (skip for private repos)
         # Read publish templates from pipeline types instead of targets
@@ -1650,6 +1685,15 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         extra_created, extra_skipped, extra_warnings, extra_hashes = apply_plans(extra_plans)
         merged_created, merged_skipped, merged_warnings, merged_hashes = apply_plans(merged_plans)
         shared_created, shared_skipped, shared_warnings, shared_hashes = apply_plans(shared_plans)
+
+        # Clean up old ci.yml (replaced by per-target CI files)
+        old_ci = os.path.join(".github", "workflows", "ci.yml")
+        if os.path.exists(old_ci):
+            os.unlink(old_ci)
+            old_ci_base = os.path.join(".rlsbl", "bases", ".github", "workflows", "ci.yml")
+            if os.path.exists(old_ci_base):
+                os.unlink(old_ci_base)
+            print("Removed old ci.yml (replaced by per-target CI files)")
 
         created = ci_created + extra_created + merged_created + shared_created
         skipped = ci_skipped + extra_skipped + merged_skipped + shared_skipped
