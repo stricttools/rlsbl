@@ -1,1 +1,2 @@
 {"commits":["298e711c802d3bb7b33ac35de698a0e1d2a61323"],"user_facing":true,"description":"**Fix.** CI template sets `UV_NO_SOURCES=1` env var at workflow level, covering both `uv sync` and `uv run` commands.","type":"fix"}
+{"commits":["b0b7382eb580c250266de54fe69a1974ce674301"],"user_facing":false}
