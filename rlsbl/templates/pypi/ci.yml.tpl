@@ -7,6 +7,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+env:
+  UV_NO_SOURCES: "1"
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -18,5 +21,5 @@ jobs:
       - uses: {{action "actions/checkout"}}
       - uses: {{action "astral-sh/setup-uv"}}
       - run: uv python install ${{ matrix.python-version }}
-      - run: uv sync --no-sources
+      - run: uv sync
       - run: uv run python -c "import {{importName}}"
