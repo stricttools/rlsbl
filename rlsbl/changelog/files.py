@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+from dataclasses import dataclass
+
 import os
 import re
 import stat
@@ -11,6 +14,14 @@ import tempfile
 from .schema import ChangelogEntry, parse_entry, parse_jsonl, serialize_entry
 
 _VERSION_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)\.jsonl$")
+
+
+@dataclass
+class RemapResult:
+    """Result of remapping hashes in one JSONL file."""
+    path: str
+    entries_modified: int
+    hashes_remapped: int
 
 
 def _parse_semver(filename: str) -> tuple[int, int, int] | None:
@@ -217,3 +228,98 @@ def is_read_only(path: str) -> bool:
         return False
     mode = os.stat(path).st_mode
     return not (mode & (stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH))
+
+
+@contextmanager
+def writable_jsonl(path):
+    """Context manager that temporarily makes a read-only JSONL file writable.
+
+    If the file is already writable, yields without changing permissions.
+    On exit (even after exceptions), restores original read-only state.
+    """
+    was_ro = is_read_only(path)
+    if was_ro:
+        os.chmod(path, 0o644)
+    try:
+        yield path
+    finally:
+        if was_ro:
+            os.chmod(path, 0o444)
+
+
+def remap_jsonl_hashes(changes_dir, sha_map):
+    """Replace commit hashes in all JSONL files using a mapping.
+
+    Scans unreleased.jsonl and all versioned *.jsonl files in changes_dir.
+    Only modifies files that contain hashes present in sha_map.
+    Uses writable_jsonl to handle read-only versioned files.
+
+    Returns a list of RemapResult for each file that was modified.
+    Returns an empty list if changes_dir does not exist or no files match.
+    """
+    if not os.path.isdir(changes_dir):
+        return []
+
+    results = []
+
+    # Collect all JSONL files: unreleased + versioned
+    jsonl_files = []
+    unreleased = os.path.join(changes_dir, "unreleased.jsonl")
+    if os.path.isfile(unreleased):
+        jsonl_files.append(unreleased)
+    for _version, path in list_versioned_files(changes_dir):
+        jsonl_files.append(path)
+
+    for filepath in jsonl_files:
+        entries = parse_jsonl(filepath)
+        entries_modified = 0
+        hashes_remapped = 0
+
+        new_entries = []
+        for entry in entries:
+            new_commits = []
+            entry_changed = False
+            for h in entry.commits:
+                if h in sha_map:
+                    new_commits.append(sha_map[h])
+                    hashes_remapped += 1
+                    entry_changed = True
+                else:
+                    new_commits.append(h)
+            if entry_changed:
+                entries_modified += 1
+            new_entries.append(ChangelogEntry(
+                commits=new_commits,
+                user_facing=entry.user_facing,
+                description=entry.description,
+                type=entry.type,
+                release_type=entry.release_type,
+            ))
+
+        if entries_modified == 0:
+            continue
+
+        # Write atomically: temp file + os.replace
+        lines = [serialize_entry(e) + "\n" for e in new_entries]
+        content = "".join(lines)
+
+        with writable_jsonl(filepath):
+            fd, tmp_path = tempfile.mkstemp(
+                dir=os.path.dirname(filepath), suffix=".tmp"
+            )
+            try:
+                os.write(fd, content.encode("utf-8"))
+                os.close(fd)
+                os.replace(tmp_path, filepath)
+            except BaseException:
+                if os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
+                raise
+
+        results.append(RemapResult(
+            path=filepath,
+            entries_modified=entries_modified,
+            hashes_remapped=hashes_remapped,
+        ))
+
+    return results

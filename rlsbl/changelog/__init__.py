@@ -12,6 +12,7 @@ from .schema import (
 )
 
 from .files import (
+    RemapResult,
     append_entry,
     changes_dir_exists,
     finalize_version,
@@ -19,7 +20,9 @@ from .files import (
     is_read_only,
     list_versioned_files,
     read_unreleased,
+    remap_jsonl_hashes,
     unfinalize_version,
+    writable_jsonl,
 )
 
 from .generate import generate_changelog, generate_version_file, generate_version_section
@@ -30,6 +33,7 @@ from .validate import validate_unreleased
 
 __all__ = [
     "ChangelogEntry",
+    "RemapResult",
     "append_entry",
     "changes_dir_exists",
     "finalize_version",
@@ -42,10 +46,12 @@ __all__ = [
     "parse_entry",
     "parse_jsonl",
     "read_unreleased",
-    "unfinalize_version",
+    "remap_jsonl_hashes",
     "resolve_hash",
     "resolve_hashes",
     "serialize_entry",
+    "unfinalize_version",
     "validate_schema",
     "validate_unreleased",
+    "writable_jsonl",
 ]
