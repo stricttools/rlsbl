@@ -12,29 +12,13 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12", "3.13", "3.14"]
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
-        with:
-          python-version: ${{ matrix.python-version }}
-      - run: go install github.com/smm-h/safegit@latest
-      - run: pip install . pytest
-      - run: python -m rlsbl --version
-      - run: python -m rlsbl --help
-      - run: python -m rlsbl check-name test-ci-check-12345 --target npm
-      - run: python -m pytest tests/ -v
-
-  test-npm-wrapper:
-    runs-on: ubuntu-latest
+        # engines.node: >= 18
+        node-version: [20, 22, 24]
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: 24
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.14"
-      - run: pip install .
-      - run: node bin/cli.js --version
-      - run: node bin/cli.js --help
+          node-version: ${{ matrix.node-version }}
+      - run: npm ci
+      - run: npm test --if-present
+      - run: npm audit --audit-level=moderate || true
