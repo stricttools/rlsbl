@@ -171,6 +171,31 @@ Monorepo projects marked `dev_node = true` in `workspace.toml` have a simplified
 
 Dev nodes are projects at the edge of the dependency graph — test infrastructure, conformance suites, dev tooling. Nothing user-facing depends on them. The `dev-node-boundary` check (`rlsbl check --tag workspace`) enforces this constraint.
 
+## Scrubbing sensitive content
+
+When sensitive content is discovered in git history (credentials, confidential project names, etc.), `rlsbl release scrub` wraps safegit's history rewriting with automatic release metadata cleanup.
+
+Usage:
+```
+rlsbl release scrub --pattern "secret_token_.*" --replace "REDACTED" --reason "Remove leaked API keys" --entire-history
+rlsbl release scrub --file config/secrets.yml --mangle --reason "Remove secrets file" --from v0.50.0
+```
+
+The command:
+1. Runs safegit scrub (match or file mode) to rewrite git history
+2. Remaps commit hashes in all JSONL changelog files using the old-to-new SHA mapping
+3. Regenerates CHANGELOG.md from updated JSONL
+4. Invalidates validation caches
+5. Commits the metadata updates
+6. Force-pushes the branch (--force-with-lease) and affected tags (--force)
+7. Recreates GitHub Releases for affected tags with updated changelog notes
+
+Flags: `--pattern` or `--file` (what to scrub), `--replace` or `--mangle` (replacement strategy), `--reason` (required, appears in commit message), `--from` or `--entire-history` (scope).
+
+Error recovery: if the command fails partway, `.rlsbl/releases/scrub-result.json` preserves the safegit output. Re-running the command resumes from the last completed step without re-running safegit.
+
+Requires safegit 0.18.0+ (for --json output).
+
 ## Source reference
 
 The release workflow is implemented in the `rlsbl.commands.release` module, which orchestrates the full 17-step release pipeline from validation through GitHub Release creation. This module coordinates version bumping, JSONL finalization, git operations, and hook execution.
