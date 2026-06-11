@@ -2,9 +2,15 @@
 
 # Changelog
 
-## 0.68.2
+## 0.68.3
 
-CI uses --no-sources for portable uv sync
+CI template UV_NO_SOURCES fix
+
+### Fixes
+
+- **Fix.** CI template sets `UV_NO_SOURCES=1` env var at workflow level, covering both `uv sync` and `uv run` commands.
+
+## 0.68.2
 
 ### Fixes
 
