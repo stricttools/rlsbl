@@ -6,8 +6,6 @@ registered on the strictcli check system, including depends_on ordering.
 """
 
 import json
-import os
-import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
@@ -17,7 +15,6 @@ import strictcli
 from conftest import git_head, make_commit, make_ctx, make_workspace, run_git
 from rlsbl import app
 from rlsbl.check_context import WorkspaceCheckContext
-from rlsbl.context import ProjectContext
 
 
 # ------------------------------------------------------------------
@@ -573,73 +570,3 @@ class TestWorkspaceTestSuiteSkipsDevNodes:
         assert "no affected projects" in result.message
 
 
-# ------------------------------------------------------------------
-# Test: V4 shim creates WorkspaceCheckContext at workspace root
-# ------------------------------------------------------------------
-
-
-class TestV4ShimCreatesWorkspaceContextAtRoot:
-    """The deprecated V4 shim must create a WorkspaceCheckContext (not a
-    plain ProjectContext) when invoked from the workspace root, so that
-    workspace-aware checks have access to projects and graph."""
-
-    def test_v4_shim_creates_workspace_context_at_root(self, tmp_path, monkeypatch):
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        monkeypatch.chdir(repo)
-
-        run_git(repo, "init", "-q", "-b", "main")
-        run_git(repo, "config", "user.email", "test@test.local")
-        run_git(repo, "config", "user.name", "Test")
-
-        (repo / "README.md").write_text("# test\n")
-        run_git(repo, "add", "README.md")
-        run_git(repo, "commit", "-q", "-m", "initial")
-        run_git(repo, "tag", "v0.0.0")
-
-        # Create a sub-project
-        pkg = repo / "packages" / "alpha"
-        pkg.mkdir(parents=True)
-        (pkg / "package.json").write_text(
-            '{"name": "alpha", "version": "0.1.0"}\n'
-        )
-        changes = pkg / ".rlsbl" / "changes"
-        changes.mkdir(parents=True)
-        (changes / "unreleased.jsonl").write_text("")
-        (pkg / ".rlsbl" / "config.json").write_text(
-            json.dumps({"private": False})
-        )
-
-        make_workspace(repo, [{"path": "packages/alpha", "name": "alpha"}])
-
-        run_git(repo, "add", ".")
-        run_git(repo, "commit", "-q", "-m", "scaffold workspace")
-
-        # Capture the context that _run_checks receives
-        captured_ctx = []
-
-        def capturing_run_checks(application, order, ctx, *args, **kwargs):
-            captured_ctx.append(ctx)
-            # Return immediately with no results, exit code 0
-            return [], 0
-
-        # Mock stdin to avoid reading real stdin, and _run_checks to
-        # capture the context without actually running checks.
-        # Mock _require_project_root to return repo (our workspace root).
-        with patch("rlsbl.commands.pre_push_check._read_stdin_lines", return_value=None), \
-             patch("strictcli._run_checks", side_effect=capturing_run_checks), \
-             patch("strictcli._check_format_human"):
-            from rlsbl import cmd_pre_push_check
-
-            with pytest.raises(SystemExit) as exc_info:
-                cmd_pre_push_check()
-
-            assert exc_info.value.code == 0
-            assert len(captured_ctx) == 1
-
-            # THE KEY ASSERTION: the context must be WorkspaceCheckContext
-            assert isinstance(captured_ctx[0], WorkspaceCheckContext), (
-                f"Expected WorkspaceCheckContext, got {type(captured_ctx[0]).__name__}"
-            )
-            assert hasattr(captured_ctx[0], "projects")
-            assert len(captured_ctx[0].projects) > 0

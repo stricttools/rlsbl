@@ -1,19 +1,13 @@
 """Tests for dev node projects skipping changelog infrastructure."""
 
 import json
-import os
-from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
 
-from conftest import run_git, git_head, make_commit, make_workspace
-from rlsbl.commands.pre_push_check import (
-    _run_monorepo_check,
-    _affected_projects,
-)
+from conftest import run_git, make_commit, make_workspace
 from rlsbl.commands.changelog_cmd import cmd_add
 from rlsbl.commands.release import run_cmd as release_run_cmd
 from rlsbl.commands.edit_release import run_cmd as edit_run_cmd
@@ -90,85 +84,6 @@ def dev_node_monorepo(tmp_path, monkeypatch):
         dev_node_dir=dev_node_dir,
         regular_dir=regular_dir,
     )
-
-
-def _write_jsonl_entry(proj_dir, commits, user_facing=False):
-    """Append a JSONL entry to a project's unreleased.jsonl."""
-    changes_dir = proj_dir / ".rlsbl" / "changes"
-    entry = {"commits": commits, "user_facing": user_facing}
-    if user_facing:
-        entry["description"] = "Test change."
-        entry["type"] = "feature"
-    with open(changes_dir / "unreleased.jsonl", "a") as f:
-        f.write(json.dumps(entry) + "\n")
-
-
-class TestDevNodeProjectPrePush:
-    """Dev node projects should be skipped in pre-push changelog checks."""
-
-    def test_dev_node_project_skips_pre_push_coverage(self, dev_node_monorepo, capsys):
-        """Push touching dev node project without JSONL entries exits 0."""
-        root = dev_node_monorepo.root
-        projects = dev_node_monorepo.projects
-
-        # Make a commit that touches the dev node project
-        sha = make_commit(root, "internal-pkg/main.js", "dev node change")
-
-        # Do NOT add any JSONL entry for the dev node project
-        changed_files = {"internal-pkg/main.js"}
-
-        with patch("rlsbl.commands.pre_push_check._get_pushed_commits",
-                   return_value={sha}):
-            with pytest.raises(SystemExit) as exc_info:
-                _run_monorepo_check(str(root), projects, changed_files, refs=[("fake", "fake")])
-            # Should pass because dev node project is skipped
-            assert exc_info.value.code == 0
-
-    def test_non_dev_node_still_enforced(self, dev_node_monorepo, capsys):
-        """Regular (non-dev-node) project still requires JSONL coverage."""
-        root = dev_node_monorepo.root
-        projects = dev_node_monorepo.projects
-
-        # Make a commit that touches the regular project
-        sha = make_commit(root, "regular-pkg/main.js", "regular change")
-
-        # Do NOT add any JSONL entry for the regular project
-        changed_files = {"regular-pkg/main.js"}
-
-        with patch("rlsbl.commands.pre_push_check._get_pushed_commits",
-                   return_value={sha}):
-            with pytest.raises(SystemExit) as exc_info:
-                _run_monorepo_check(str(root), projects, changed_files, refs=[("fake", "fake")])
-            # Should fail because regular project lacks coverage
-            assert exc_info.value.code == 1
-            captured = capsys.readouterr()
-            assert "mypkg-regular" in captured.err
-
-    def test_dev_node_skipped_while_regular_checked(self, dev_node_monorepo, capsys):
-        """When both projects have changes, dev node is skipped and regular is checked."""
-        root = dev_node_monorepo.root
-        projects = dev_node_monorepo.projects
-
-        # Make a commit touching both
-        (root / "internal-pkg" / "a.js").write_text("// a\n")
-        (root / "regular-pkg" / "b.js").write_text("// b\n")
-        run_git(root, "add", "internal-pkg/a.js", "regular-pkg/b.js")
-        run_git(root, "commit", "-q", "-m", "cross-project change")
-        sha = git_head(root)
-
-        # Add coverage ONLY for regular project
-        _write_jsonl_entry(dev_node_monorepo.regular_dir, [sha[:12]])
-        run_git(root, "add", "regular-pkg/.rlsbl/changes/unreleased.jsonl")
-        run_git(root, "commit", "-q", "-m", "changelog: regular entry")
-
-        changed_files = {"internal-pkg/a.js", "regular-pkg/b.js"}
-
-        with patch("rlsbl.commands.pre_push_check._get_pushed_commits",
-                   return_value={sha}):
-            with pytest.raises(SystemExit) as exc_info:
-                _run_monorepo_check(str(root), projects, changed_files, refs=[("fake", "fake")])
-            # Should pass: dev node is skipped, regular has coverage
-            assert exc_info.value.code == 0
 
 
 class TestDevNodeProjectChecks:

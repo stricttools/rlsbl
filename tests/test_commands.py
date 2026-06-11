@@ -1049,63 +1049,6 @@ class TestCheck:
 
 
 # ---------------------------------------------------------------------------
-# Pre-push check command tests
-# ---------------------------------------------------------------------------
-
-
-class TestPrePushCheck:
-    """Tests for rlsbl.commands.pre_push_check -- version detection."""
-
-    @pytest.fixture(autouse=True)
-    def _setup(self, tmp_path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        self.tmp_dir = str(tmp_path)
-
-    def test_detects_npm_version(self):
-        """Detects version from package.json."""
-        with open("package.json", "w") as f:
-            json.dump({"name": "my-pkg", "version": "2.3.4"}, f)
-
-        from rlsbl.commands.pre_push_check import _detect_version
-
-        version, reg_name = _detect_version()
-        assert version == "2.3.4"
-        assert reg_name == "npm"
-
-    def test_detects_pypi_version(self):
-        """Detects version from pyproject.toml."""
-        with open("pyproject.toml", "w") as f:
-            f.write('[project]\nname = "my-pkg"\nversion = "0.5.0"\n')
-
-        from rlsbl.commands.pre_push_check import _detect_version
-
-        version, reg_name = _detect_version()
-        assert version == "0.5.0"
-        assert reg_name == "pypi"
-
-    def test_detects_go_version(self):
-        """Detects version from go.mod + VERSION file."""
-        with open("go.mod", "w") as f:
-            f.write("module github.com/user/myapp\n\ngo 1.22\n")
-        with open("VERSION", "w") as f:
-            f.write("1.4.0\n")
-
-        from rlsbl.commands.pre_push_check import _detect_version
-
-        version, reg_name = _detect_version()
-        assert version == "1.4.0"
-        assert reg_name == "go"
-
-    def test_no_project(self):
-        """Empty directory should return (None, None)."""
-        from rlsbl.commands.pre_push_check import _detect_version
-
-        version, reg_name = _detect_version()
-        assert version is None
-        assert reg_name is None
-
-
-# ---------------------------------------------------------------------------
 # Release target configuration tests
 # ---------------------------------------------------------------------------
 

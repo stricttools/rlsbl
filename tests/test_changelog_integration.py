@@ -232,30 +232,6 @@ class TestPrePushWithJsonl:
         assert "no jsonl changelog entries found" in error.lower()
 
 
-class TestPrePushWithoutJsonl:
-    """Pre-push check warns when no .rlsbl/changes/ but doesn't block."""
-
-    def test_warns_no_jsonl(self, tmp_project, capsys):
-        """Without .rlsbl/changes/, warns and exits 0."""
-        (tmp_project / "package.json").write_text(
-            json.dumps({"name": "test-pkg", "version": "1.0.0"})
-        )
-        (tmp_project / "CHANGELOG.md").write_text("# Changelog\n\n## 1.0.0\n\n- Init\n")
-
-        assert not changes_dir_exists(".")
-
-        from pathlib import Path
-        from rlsbl.commands.pre_push_check import run_cmd
-        from rlsbl.context import ProjectContext
-
-        with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {}, ctx=ProjectContext(project_root=tmp_project, workspace_root=None, config={}))
-
-        assert exc_info.value.code == 0
-        captured = capsys.readouterr()
-        assert "pre-push-check is deprecated" in captured.err
-
-
 # ---------------------------------------------------------------------------
 # Unreleased integration tests
 # ---------------------------------------------------------------------------
