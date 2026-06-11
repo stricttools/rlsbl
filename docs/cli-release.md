@@ -75,3 +75,19 @@ Mark a past release as deprecated (soft yank) or delete it (hard yank). Soft yan
 | Name | Required | Description |
 | --- | --- | --- |
 | `version` | yes | Version to yank (e.g. 0.9.1 or v0.9.1) |
+
+## release scrub
+
+Scrub sensitive content from git history and update release metadata (JSONL hashes, tags, GitHub Releases). Wraps safegit scrub with automatic post-rewrite cleanup.
+
+### Flags
+
+| Name | Short | Type | Default | Env | Description |
+| --- | --- | --- | --- | --- | --- |
+| `--reason` |  | str |  |  | Reason for scrubbing (required, used in commit message) |
+| `--pattern` |  | str |  |  | Regex pattern to match (for scrub match) |
+| `--file` |  | str |  |  | File path to scrub (for scrub file) |
+| `--replace` |  | str |  |  | Replacement text for matched content |
+| `--mangle` |  | bool |  |  | Replace matched content with random ASCII of same length |
+| `--from-commit` |  | str |  |  | Start rewriting from this commit (inclusive) |
+| `--entire-history` |  | bool |  |  | Rewrite entire repository history |

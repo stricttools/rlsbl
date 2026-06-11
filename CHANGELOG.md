@@ -2,9 +2,23 @@
 
 # Changelog
 
-## 0.67.1
+## 0.68.0
 
-V4 shim workspace fix, check-name multi-target, zero SEO warnings
+release scrub command, V4 hook removal
+
+### Breaking
+
+- **Breaking.** Removed `pre-push-check` command. Run `rlsbl scaffold` to upgrade your hook to the current format (`rlsbl check --tag prepush`).
+
+### Features
+
+- **Feature.** New `rlsbl release scrub` command wraps safegit scrub with automatic release metadata cleanup: remaps JSONL changelog hashes, regenerates CHANGELOG.md, force-pushes rewritten history, and recreates GitHub Releases for affected tags. Includes error recovery via scrub-result.json.
+
+### Fixes
+
+- **Fix.** Merged publish.yml now uses correct 6-space indentation for GitHub Actions steps, matching the standard 2-space-per-level convention. Previously, multi-pipeline projects got 4-space indentation due to missing ruamel.yaml indent configuration.
+
+## 0.67.1
 
 ### Features
 
