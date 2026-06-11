@@ -10,5 +10,6 @@
   ".rlsbl/lint/go.toml": "807d5cf760baad6d571a5bfd43cb163efe356f7462ba9f1918d72de45f62339f",
   ".rlsbl/lint/npm.toml": "baa36014e65923d8cc5c8b83c77fa651da79351627570476402da66840027645",
   ".npmignore": "7c0eea9785c0318aeb39bf8b670ce8384f4a5b812fde69ce23d7d018057325a3",
-  ".gitignore": "c89d76c6c43e7f0897b3472a15b7c0103e0be5b3a04c2b44e585fa48bdcda2bb"
+  ".gitignore": "c89d76c6c43e7f0897b3472a15b7c0103e0be5b3a04c2b44e585fa48bdcda2bb",
+  ".github/workflows/ci-pypi.yml": "0c408fe1a1c85fef3cdbbe8f7eac8e8e64ac13bef9b413a739746c140584ea6c"
 }
