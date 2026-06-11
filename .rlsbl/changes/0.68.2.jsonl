@@ -1,0 +1,5 @@
+{"commits":["1d2a6974729bc93b5bec3878784a5a550a1f8f0a"],"user_facing":true,"description":"**Fix.** CI template uses `uv sync --no-sources` to ignore local path overrides and resolve from PyPI in CI. Works correctly in both standalone projects and monorepo workspaces.","type":"fix"}
+{"commits":["88790a019f3ccff19a25dcfb5776608c1ca3f221"],"user_facing":true,"description":"**Fix.** `test-suite` check skips gracefully at workspace root instead of hard-erroring.","type":"fix"}
+{"commits":["b6dc65739b20eba2314741ef92f8abdc12cc37bd","7f7183ce77a832675b5bb0d66b79e32c068b9df3","2c4b0e0ea3f471f0b31557a7584e8a4b8eddf60b"],"user_facing":false}
+{"commits":["fbf3033dc5200451437e6e78d6b7228b0aee09ef"],"user_facing":false}
+{"commits":["35a2bad3a2dff21510b3c147d8df7c518d370e99"],"user_facing":false}
