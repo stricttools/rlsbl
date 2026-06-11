@@ -2,3 +2,4 @@
 {"commits":["ec9b9ce50d57a61702324ad653ee8e540b24578f"],"user_facing":true,"description":"**Feature.** Monorepo sync handles per-target CI files: globs `ci-*.yml` from sub-projects, syncs each with project-name prefix, cleans up stale files.","type":"feature"}
 {"commits":["17004f5d867cc637a7bfea3b5f329ebc6a43409c","36c0381d3f67ca2dba1257d36e865f05575ee2ac","96b32748bc9c8acc5f6328c80a1ba1596c7cdf6b","e4b7fafa93a29c220124d0bd5ac4925292a2bd22","39d11863ee3ab0efbf5e213074afd38afb90894f"],"user_facing":false}
 {"commits":["a4dc9f615269450a1dc55a47a2fe57957998d7f0"],"user_facing":false}
+{"commits":["090cdce42917a05b522a1770140023bbf4301b93"],"user_facing":false}
