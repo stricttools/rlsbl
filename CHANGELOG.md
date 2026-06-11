@@ -2,9 +2,16 @@
 
 # Changelog
 
-## 0.68.0
+## 0.68.1
 
-release scrub command, V4 hook removal
+Per-target CI files, YAML indent fix, monorepo sync update
+
+### Features
+
+- **Feature.** Multi-target projects now generate per-target CI workflow files (`ci-pypi.yml`, `ci-go.yml`, etc.) instead of a single `ci.yml` from the primary target. npm wrapper packages (no test script) skip CI generation entirely. Old `ci.yml` is automatically cleaned up on re-scaffold.
+- **Feature.** Monorepo sync handles per-target CI files: globs `ci-*.yml` from sub-projects, syncs each with project-name prefix, cleans up stale files.
+
+## 0.68.0
 
 ### Breaking
 
