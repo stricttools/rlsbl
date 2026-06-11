@@ -45,6 +45,7 @@ order: 90
 - [rlsbl.commands.release](rlsbl-commands-release.html)
 - [rlsbl.commands.release_init](rlsbl-commands-release_init.html)
 - [rlsbl.commands.release_retry](rlsbl-commands-release_retry.html)
+- [rlsbl.commands.release_scrub](rlsbl-commands-release_scrub.html)
 - [rlsbl.commands.status](rlsbl-commands-status.html)
 - [rlsbl.commands.targets_cmd](rlsbl-commands-targets_cmd.html)
 - [rlsbl.commands.undo](rlsbl-commands-undo.html)

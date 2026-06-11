@@ -228,7 +228,7 @@
     "description": "8909eda4fd51ca2ffd6ded1b7ec9ab0dce01924c31e9cd097b6fe8281a0e9e7d"
   },
   "en/gen-index.md": {
-    "content": "4cb80b861dce0f8796b4cefa4492b0937186b70c8c2a05c057012f76460b5fcb",
+    "content": "b27b96bb5bf0b1be224bcc2b81590bcd3c58da72d45b4b973901f266c460608e",
     "description": "bb3cd9d34f014c0674a9285c25ee14b5b4abc5cf941f0d83594c301405e8f3b6"
   },
   "en/import-scanning.md": {
@@ -256,7 +256,7 @@
     "description": "e4917a2539e1ecd39d47407fd8ef61030e1269ba0bd03dd093af4826acb1dd7c"
   },
   "en/release-workflow.md": {
-    "content": "0b053012ce3a654b65a70ad6e846fe6e083bc6f1d04ea1c90d030421d12b3d4e",
+    "content": "4ac6f1aea564d5608e26c8eb7668a6077c3b4c097ed2a56eb064378ebd06a64f",
     "description": "54beb83b6a2b2d82d12a2e05f1dc8cff9197c9837bf9ded136bbabd6648b28e4"
   },
   "en/rlsbl-__main__.md": {
@@ -268,7 +268,7 @@
     "description": "5dcebe0f05bd2dd423087ed852f1310689c2ee0a89edf61cbd5bc9aad4a3bde3"
   },
   "en/rlsbl-changelog-files.md": {
-    "content": "f738086f9318c903ae2e0d17cea3cdc26b87ef9f7468f4c42aa23cd5058e0cb8",
+    "content": "c41f50c186d09de19fc2f18a237e01bc51d30178fbff3f9f06c48e7d723a5f12",
     "description": "8d3cfe9c468a10b7815f7219fb98a25538a495d453ad2545e3535b6d76ca63aa"
   },
   "en/rlsbl-changelog-generate.md": {
@@ -376,7 +376,7 @@
     "description": "1fbb92dd36dc1329974a559c3f2467ad168fa0b9b03f72b2d144fc5cb84f1b84"
   },
   "en/rlsbl-commands-pre_push_check.md": {
-    "content": "182e8583141f9d0f64782f720ac29d0677e21cecfbfb1ff7dad9226f33310874",
+    "content": "2f75d9e58edecd47d71753fc29d08efecbc411536e14c484db767af74f7fa4fe",
     "description": "b6e116c6bc7855eee8486946715370913c34080bc4e2995a075be831cdecab34"
   },
   "en/rlsbl-commands-prs.md": {
@@ -398,6 +398,10 @@
   "en/rlsbl-commands-release_retry.md": {
     "content": "74325992e0f7682213f0d6a3f677745ff101f1c6ce59f60c42d3e6a848fcbe44",
     "description": "8c62baaa1542c6c835f6d8561abd56d1dece16493f2536c70d1fbe87c3c66b68"
+  },
+  "en/rlsbl-commands-release_scrub.md": {
+    "content": "2bd43e148aba09b3ab9be6b8865ced1c6d1ca71ac96d3907520a22afbb1cf96e",
+    "description": "d7ad7d10555f83bd472c5bdbc0abcbe10eed7ee25207c39e62ce748f184916b2"
   },
   "en/rlsbl-commands-status.md": {
     "content": "2fe3f41dc58f0882c1f3bc1ef4b51f924d89358b2b1459cb45e6f9086ab4268f",
@@ -716,7 +720,7 @@
     "description": "cbc6efd4505a9d5f40720a9c4b6607789053bc8eb9137163a99e5e3ca41e240e"
   },
   "en/rlsbl.md": {
-    "content": "4f201378d873ed9660bebfa710da84259bc9064a18e5011f224779b8ebdce042",
+    "content": "9f507182e43570f55153ee52645a20cd6ebaa55bcada9a9fd71302060df76723",
     "description": "846d7106c20777b824e0116e8e62127eb6c86ab277fe4904e1cbecc2e9839d43"
   },
   "en/scaffold.md": {
