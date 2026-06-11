@@ -13,8 +13,3 @@ dist/
 .env
 .env.local
 *.local-only
-
-# Local artifacts (not scaffold-managed)
-.wrangler/
-docs/_build/
-uv.lock
