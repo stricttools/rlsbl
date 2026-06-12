@@ -2,9 +2,15 @@
 
 # Changelog
 
-## 0.69.1
+## 0.69.2
 
-Scrub tag matching, cmd_amend fix, strictcli public API, todo cleanup
+Deno publish idempotency, orphan sweep script
+
+### Features
+
+- **Feature.** Deno publish template is now idempotent with JSR version-exists pre-check.
+
+## 0.69.1
 
 ### Fixes
 
