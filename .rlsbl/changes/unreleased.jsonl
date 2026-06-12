@@ -2,3 +2,4 @@
 {"commits":["31bbc228773a55a6a487e30687b38b544269f30a"],"user_facing":true,"description":"**Fix.** `changelog amend` uses `writable_jsonl` context manager, preventing file permission leak if duplicate commit check exits early.","type":"fix"}
 {"commits":["78fae71d5b1171e6941f99b44e9302a9338b4486","22cc95702bd712bf70b426fec7004dbd5e5d937e","8911c5bf4809db786e3fdea2b459ef6d42190033","3edbc399aa5d33714b5f28443ec65b79855f965f","5f91dea80720deee8a6571b942086eb2efd4a275"],"user_facing":false}
 {"commits":["59648d57ae35373d29f06d2cc28ac11b248184f0"],"user_facing":false}
+{"commits":["c91a4fea4bd782e6a0ce210e065474b54d5942d2"],"user_facing":false}
