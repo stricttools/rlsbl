@@ -3,26 +3,7 @@
   "env_file": "~/Projects/.env",
   "push_timeout": 120,
   "batch_limits": {
-    "exclusions": [
-      {
-        "reason": "**Custom exception hierarchy replaces ValueError.** rlsbl now raises ConfigError, WorkspaceError, ChangelogError, VersionError, and ReleaseFileError instead of bare ValueError. Code that catches ValueError from rlsbl APIs must update to catch the new types.",
-        "entries": [
-          {
-            "version": "unreleased",
-            "line": 1
-          }
-        ]
-      },
-      {
-        "reason": "non-user-facing batch",
-        "entries": [
-          {
-            "version": "unreleased",
-            "line": 15
-          }
-        ]
-      }
-    ]
+    "exclusions": []
   },
   "targets": [
     "npm",
