@@ -40,6 +40,7 @@
     "table-feature-matrix": "docs/directives/feature_matrix.py",
     "table-pipelines": "docs/directives/pipeline_table.py",
     "table-targets": "docs/directives/target_table.py",
-    "check-count": "docs/directives/check_count.py"
+    "check-count": "docs/directives/check_count.py",
+    "target-count": "docs/directives/target_count.py"
   }
 }
