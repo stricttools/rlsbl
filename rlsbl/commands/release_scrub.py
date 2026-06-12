@@ -159,6 +159,14 @@ def run_cmd(flags, *, ctx):
             print("Aborted.")
             sys.exit(0)
 
+    # -- Cache workspace projects --
+    workspace_projects = load_workspace(str(ctx.workspace_root)) if ctx.workspace_root else None
+
+    # -- Build tag prefix index for monorepo tag-to-project lookup --
+    tag_prefix_index = None
+    if workspace_projects is not None:
+        tag_prefix_index = {f"{proj.name}@": proj for proj in workspace_projects}
+
     # -- Acquire lock --
     lock_dir = ".rlsbl-monorepo" if ctx.workspace_root else ".rlsbl"
     lock_root = str(ctx.workspace_root) if ctx.workspace_root else str(project_root)
@@ -172,8 +180,7 @@ def run_cmd(flags, *, ctx):
         if "JSONL_REMAPPED" not in completed:
             if ctx.workspace_root:
                 # Monorepo: remap all projects
-                projects = load_workspace(str(ctx.workspace_root))
-                for proj in projects:
+                for proj in workspace_projects:
                     proj_path = os.path.join(str(ctx.workspace_root), proj.path)
                     changes_dir = get_changes_dir(proj_path)
                     all_changes_dirs.append(changes_dir)
@@ -191,8 +198,7 @@ def run_cmd(flags, *, ctx):
         # -- Regenerate CHANGELOG.md --
         if "CHANGELOG_GENERATED" not in completed:
             if ctx.workspace_root:
-                projects = load_workspace(str(ctx.workspace_root))
-                for proj in projects:
+                for proj in workspace_projects:
                     if proj.dev_node:
                         continue
                     proj_path = os.path.join(str(ctx.workspace_root), proj.path)
@@ -207,8 +213,7 @@ def run_cmd(flags, *, ctx):
             if not all_changes_dirs:
                 # Rebuild the list if resuming
                 if ctx.workspace_root:
-                    projects = load_workspace(str(ctx.workspace_root))
-                    all_changes_dirs = [get_changes_dir(os.path.join(str(ctx.workspace_root), p.path)) for p in projects]
+                    all_changes_dirs = [get_changes_dir(os.path.join(str(ctx.workspace_root), p.path)) for p in workspace_projects]
                 else:
                     all_changes_dirs = [get_changes_dir(str(project_root))]
             for changes_dir in all_changes_dirs:
@@ -229,8 +234,7 @@ def run_cmd(flags, *, ctx):
 
             # Add CHANGELOG.md files
             if ctx.workspace_root:
-                projects = load_workspace(str(ctx.workspace_root))
-                for proj in projects:
+                for proj in workspace_projects:
                     if proj.dev_node:
                         continue
                     proj_path = os.path.join(str(ctx.workspace_root), proj.path)
@@ -329,16 +333,35 @@ def run_cmd(flags, *, ctx):
                     # Find the right project's CHANGELOG.md
                     changelog_notes = None
                     if ctx.workspace_root:
-                        # For monorepo tags, find the project by tag prefix
-                        projects = load_workspace(str(ctx.workspace_root))
-                        for proj in projects:
-                            proj_path = os.path.join(str(ctx.workspace_root), proj.path)
+                        # Use prefix index to match tag to project
+                        matched_proj = None
+                        if tag_prefix_index:
+                            for prefix, proj in tag_prefix_index.items():
+                                if tag_name.startswith(prefix):
+                                    matched_proj = proj
+                                    break
+                        if matched_proj is not None:
+                            # Matched a monorepo project by tag prefix
+                            proj_path = os.path.join(str(ctx.workspace_root), matched_proj.path)
                             changelog_path = os.path.join(proj_path, "CHANGELOG.md")
                             if os.path.exists(changelog_path):
-                                entry = extract_changelog_entry(changelog_path, version)
-                                if entry:
-                                    changelog_notes = entry
-                                    break
+                                changelog_notes = extract_changelog_entry(changelog_path, version)
+                        elif re.match(r"^v\d+\.\d+\.\d+$", tag_name):
+                            # Standalone tag format (vX.Y.Z with no project prefix) -- use project root CHANGELOG
+                            changelog_path = os.path.join(str(ctx.workspace_root), "CHANGELOG.md")
+                            if os.path.exists(changelog_path):
+                                changelog_notes = extract_changelog_entry(changelog_path, version)
+                        else:
+                            # Fallback: iterate all projects with a warning
+                            print(f"Warning: no prefix match for tag {tag_name}, scanning all projects", file=sys.stderr)
+                            for proj in workspace_projects:
+                                proj_path = os.path.join(str(ctx.workspace_root), proj.path)
+                                changelog_path = os.path.join(proj_path, "CHANGELOG.md")
+                                if os.path.exists(changelog_path):
+                                    entry = extract_changelog_entry(changelog_path, version)
+                                    if entry:
+                                        changelog_notes = entry
+                                        break
                     else:
                         changelog_path = os.path.join(str(project_root), "CHANGELOG.md")
                         if os.path.exists(changelog_path):
