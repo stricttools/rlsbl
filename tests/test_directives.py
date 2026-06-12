@@ -49,31 +49,16 @@ def _load_directive(name):
     return module
 
 
-@pytest.fixture(autouse=True, scope="module")
-def _inject_selfdoc_tables():
+@pytest.fixture(autouse=True)
+def _inject_selfdoc_tables(monkeypatch):
     """Inject a mock selfdoc.tables module so directive imports work."""
-    had_selfdoc = "selfdoc" in sys.modules
-    had_tables = "selfdoc.tables" in sys.modules
-
     selfdoc_pkg = types.ModuleType("selfdoc")
     selfdoc_pkg.__path__ = []
     tables_mod = types.ModuleType("selfdoc.tables")
     tables_mod.render_markdown_table = _render_markdown_table
 
-    sys.modules["selfdoc"] = selfdoc_pkg
-    sys.modules["selfdoc.tables"] = tables_mod
-
-    yield
-
-    # Restore original state
-    if had_selfdoc:
-        pass  # leave whatever was there
-    else:
-        sys.modules.pop("selfdoc", None)
-    if had_tables:
-        pass
-    else:
-        sys.modules.pop("selfdoc.tables", None)
+    monkeypatch.setitem(sys.modules, "selfdoc", selfdoc_pkg)
+    monkeypatch.setitem(sys.modules, "selfdoc.tables", tables_mod)
 
 
 # ---------------------------------------------------------------------------
