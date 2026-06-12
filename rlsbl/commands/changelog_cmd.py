@@ -227,6 +227,7 @@ def cmd_generate(flags, project_root):
         from ..changelog.files import list_versioned_files, read_unreleased
         from ..changelog.generate import (
             _HEADER_COMMENT,
+            _read_release_metadata,
             generate_version_section,
         )
 
@@ -241,7 +242,10 @@ def cmd_generate(flags, project_root):
             from ..changelog.schema import parse_jsonl
 
             entries = parse_jsonl(jsonl_path)
-            sections.append(generate_version_section(version, entries))
+            ver_desc, ver_ctx = _read_release_metadata(project_root, version)
+            sections.append(generate_version_section(
+                version, entries, description=ver_desc, context=ver_ctx,
+            ))
 
         body = "\n".join(sections)
         content = f"{_HEADER_COMMENT}\n\n# Changelog\n\n{body}"

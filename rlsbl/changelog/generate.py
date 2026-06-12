@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 import sys
 
+import tomlkit
+
 from .files import get_changes_dir, list_versioned_files, read_unreleased
 from .schema import ChangelogEntry, parse_jsonl
 
@@ -16,6 +18,29 @@ _TYPE_ORDER: list[tuple[str, str]] = [
     ("feature", "Features"),
     ("fix", "Fixes"),
 ]
+
+
+def _read_release_metadata(project_path: str, version: str) -> tuple[str, str]:
+    """Read description and context from an archived release toml file.
+
+    Looks for .rlsbl/releases/v{version}.toml and extracts the description
+    and context fields. Returns ("", "") if the file doesn't exist or can't
+    be parsed.
+    """
+    toml_path = os.path.join(project_path, ".rlsbl", "releases", f"v{version}.toml")
+    try:
+        with open(toml_path, "r", encoding="utf-8") as f:
+            data = tomlkit.load(f)
+    except (OSError, tomlkit.exceptions.ParseError):
+        return ("", "")
+
+    description = data.get("description", "")
+    context = data.get("context", "")
+    if not isinstance(description, str):
+        description = ""
+    if not isinstance(context, str):
+        context = ""
+    return (description.strip(), context.strip())
 
 
 def generate_version_section(
@@ -103,15 +128,25 @@ def generate_version_section(
     return "\n".join(parts)
 
 
-def generate_version_file(changes_dir: str, version: str, write_to_disk: bool = True) -> str:
+def generate_version_file(
+    changes_dir: str,
+    version: str,
+    write_to_disk: bool = True,
+    *,
+    description: str = "",
+    context: str = "",
+) -> str:
     """Read the JSONL file for a version, generate markdown, optionally write .md alongside it.
 
     Returns the generated markdown text. When write_to_disk is False, computes the
     markdown without touching the filesystem (used to preview content before pre-checks).
+
+    When ``description`` and ``context`` are provided, they are passed through to
+    ``generate_version_section()`` so release metadata appears in the output.
     """
     jsonl_path = os.path.join(changes_dir, f"{version}.jsonl")
     entries = parse_jsonl(jsonl_path)
-    md = generate_version_section(version, entries)
+    md = generate_version_section(version, entries, description=description, context=context)
 
     if write_to_disk:
         md_path = os.path.join(changes_dir, f"{version}.md")
@@ -169,8 +204,9 @@ def generate_changelog(
     the original behaviour exactly.
 
     ``description`` and ``context`` are applied to the unreleased section only
-    (the current release being prepared). They are not applied to previously
-    released version sections.
+    (the current release being prepared). Previously released version sections
+    read their description and context from archived release files at
+    ``.rlsbl/releases/v{version}.toml``.
     """
     _read_changelog_format(project_path)
 
@@ -187,7 +223,11 @@ def generate_changelog(
 
     # Versioned entries (newest first)
     for version, jsonl_path in list_versioned_files(changes_dir):
-        md = generate_version_file(changes_dir, version, write_to_disk=write_to_disk)
+        ver_desc, ver_ctx = _read_release_metadata(project_path, version)
+        md = generate_version_file(
+            changes_dir, version, write_to_disk=write_to_disk,
+            description=ver_desc, context=ver_ctx,
+        )
         sections.append(md)
 
     body = "\n".join(sections)

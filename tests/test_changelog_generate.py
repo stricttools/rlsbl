@@ -6,6 +6,7 @@ import os
 import pytest
 
 from rlsbl.changelog.generate import (
+    _read_release_metadata,
     generate_changelog,
     generate_version_file,
     generate_version_section,
@@ -529,3 +530,202 @@ class TestGenerateChangelog:
         v2_pos = content.index("## 2.0.0")
         v1_pos = content.index("## 1.0.0")
         assert v2_pos < desc_pos < v1_pos
+
+    def test_versioned_sections_include_archived_description_and_context(
+        self, tmp_path, monkeypatch,
+    ):
+        """Description and context from archived .rlsbl/releases/v*.toml files
+        are included in versioned sections on regeneration."""
+        monkeypatch.chdir(tmp_path)
+        self._setup_project(
+            tmp_path,
+            versions={
+                "1.0.0": [
+                    _jsonl_line(commits=["a"], user_facing=True, description="Initial", type="feature"),
+                ],
+                "2.0.0": [
+                    _jsonl_line(commits=["b"], user_facing=True, description="Big change", type="breaking"),
+                ],
+            },
+        )
+
+        # Create archived release toml files
+        releases_dir = tmp_path / ".rlsbl" / "releases"
+        releases_dir.mkdir(parents=True)
+        (releases_dir / "v1.0.0.toml").write_text(
+            'bump = "major"\ndescription = "First stable release"\ncontext = ""\n'
+            'include = ["pypi"]\nexclude = []\n'
+        )
+        (releases_dir / "v2.0.0.toml").write_text(
+            'bump = "major"\ndescription = "Major rewrite"\n'
+            'context = "Migrated from REST to GraphQL"\n'
+            'include = ["pypi"]\nexclude = []\n'
+        )
+
+        content = generate_changelog(str(tmp_path))
+
+        # v1.0.0 gets its description (no context since empty)
+        assert "First stable release" in content
+        v1_pos = content.index("## 1.0.0")
+        desc1_pos = content.index("First stable release")
+        assert desc1_pos > v1_pos
+
+        # v2.0.0 gets both description and context
+        assert "Major rewrite" in content
+        assert "Migrated from REST to GraphQL" in content
+        v2_pos = content.index("## 2.0.0")
+        desc2_pos = content.index("Major rewrite")
+        ctx2_pos = content.index("Migrated from REST to GraphQL")
+        assert v2_pos < desc2_pos < ctx2_pos
+
+        # Context is in a details block
+        assert "<details>" in content
+        assert "<summary>Context</summary>" in content
+
+    def test_versioned_sections_without_archived_toml_have_no_metadata(
+        self, tmp_path, monkeypatch,
+    ):
+        """Versions without an archived .toml file still generate correctly
+        (no description or context)."""
+        monkeypatch.chdir(tmp_path)
+        self._setup_project(
+            tmp_path,
+            versions={
+                "1.0.0": [
+                    _jsonl_line(commits=["a"], user_facing=True, description="A feat", type="feature"),
+                ],
+            },
+        )
+        # No .rlsbl/releases/ directory at all
+
+        content = generate_changelog(str(tmp_path))
+        assert "## 1.0.0" in content
+        assert "### Features" in content
+        assert "<details>" not in content
+
+    def test_per_version_md_files_include_archived_metadata(
+        self, tmp_path, monkeypatch,
+    ):
+        """Per-version .md files written alongside JSONL include description
+        and context from archived release tomls."""
+        monkeypatch.chdir(tmp_path)
+        self._setup_project(
+            tmp_path,
+            versions={
+                "3.0.0": [
+                    _jsonl_line(commits=["a"], user_facing=True, description="New API", type="feature"),
+                ],
+            },
+        )
+        releases_dir = tmp_path / ".rlsbl" / "releases"
+        releases_dir.mkdir(parents=True)
+        (releases_dir / "v3.0.0.toml").write_text(
+            'bump = "major"\ndescription = "Complete redesign"\n'
+            'context = "Old API was unmaintainable"\n'
+            'include = ["pypi"]\nexclude = []\n'
+        )
+
+        generate_changelog(str(tmp_path))
+
+        md_path = tmp_path / ".rlsbl" / "changes" / "3.0.0.md"
+        assert md_path.exists()
+        md_content = md_path.read_text()
+        assert "Complete redesign" in md_content
+        assert "Old API was unmaintainable" in md_content
+
+
+class TestReadReleaseMetadata:
+    """Tests for _read_release_metadata."""
+
+    def test_reads_description_and_context(self, tmp_path):
+        releases_dir = tmp_path / ".rlsbl" / "releases"
+        releases_dir.mkdir(parents=True)
+        (releases_dir / "v1.0.0.toml").write_text(
+            'bump = "minor"\ndescription = "A release"\ncontext = "Some context"\n'
+            'include = ["pypi"]\nexclude = []\n'
+        )
+        desc, ctx = _read_release_metadata(str(tmp_path), "1.0.0")
+        assert desc == "A release"
+        assert ctx == "Some context"
+
+    def test_returns_empty_when_no_file(self, tmp_path):
+        desc, ctx = _read_release_metadata(str(tmp_path), "1.0.0")
+        assert desc == ""
+        assert ctx == ""
+
+    def test_returns_empty_context_when_context_empty(self, tmp_path):
+        releases_dir = tmp_path / ".rlsbl" / "releases"
+        releases_dir.mkdir(parents=True)
+        (releases_dir / "v2.0.0.toml").write_text(
+            'bump = "minor"\ndescription = "Release"\ncontext = ""\n'
+            'include = ["pypi"]\nexclude = []\n'
+        )
+        desc, ctx = _read_release_metadata(str(tmp_path), "2.0.0")
+        assert desc == "Release"
+        assert ctx == ""
+
+    def test_returns_empty_when_no_description_field(self, tmp_path):
+        releases_dir = tmp_path / ".rlsbl" / "releases"
+        releases_dir.mkdir(parents=True)
+        # Old-style toml without description/context
+        (releases_dir / "v0.1.0.toml").write_text(
+            'bump = "patch"\ninclude = ["pypi"]\nexclude = []\n'
+        )
+        desc, ctx = _read_release_metadata(str(tmp_path), "0.1.0")
+        assert desc == ""
+        assert ctx == ""
+
+    def test_strips_whitespace(self, tmp_path):
+        releases_dir = tmp_path / ".rlsbl" / "releases"
+        releases_dir.mkdir(parents=True)
+        (releases_dir / "v1.0.0.toml").write_text(
+            'bump = "minor"\ndescription = "  padded  "\ncontext = "  also padded  "\n'
+            'include = ["pypi"]\nexclude = []\n'
+        )
+        desc, ctx = _read_release_metadata(str(tmp_path), "1.0.0")
+        assert desc == "padded"
+        assert ctx == "also padded"
+
+
+class TestGenerateVersionFileWithMetadata:
+    """Tests for generate_version_file with description and context kwargs."""
+
+    def test_passes_description_to_section(self, tmp_path):
+        changes = tmp_path / "changes"
+        changes.mkdir()
+        jsonl = changes / "1.0.0.jsonl"
+        jsonl.write_text(
+            _jsonl_line(commits=["a"], user_facing=True, description="A feature", type="feature") + "\n"
+        )
+
+        md = generate_version_file(str(changes), "1.0.0", description="Release summary")
+        assert "Release summary" in md
+        md_path = changes / "1.0.0.md"
+        assert "Release summary" in md_path.read_text()
+
+    def test_passes_context_to_section(self, tmp_path):
+        changes = tmp_path / "changes"
+        changes.mkdir()
+        jsonl = changes / "2.0.0.jsonl"
+        jsonl.write_text(
+            _jsonl_line(commits=["a"], user_facing=True, description="Break", type="breaking") + "\n"
+        )
+
+        md = generate_version_file(str(changes), "2.0.0", context="Needed for perf")
+        assert "<details>" in md
+        assert "Needed for perf" in md
+
+    def test_no_metadata_by_default(self, tmp_path):
+        changes = tmp_path / "changes"
+        changes.mkdir()
+        jsonl = changes / "1.0.0.jsonl"
+        jsonl.write_text(
+            _jsonl_line(commits=["a"], user_facing=True, description="Feat", type="feature") + "\n"
+        )
+
+        md = generate_version_file(str(changes), "1.0.0")
+        assert "<details>" not in md
+        lines = md.strip().splitlines()
+        assert lines[0] == "## 1.0.0"
+        assert lines[1] == ""
+        assert lines[2] == "### Features"
