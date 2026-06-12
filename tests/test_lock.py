@@ -6,7 +6,16 @@ import multiprocessing
 import time
 from unittest.mock import patch
 
+import pytest
+
+import rlsbl.lock
 from rlsbl.lock import acquire_lock, is_stale, release_lock, rlsbl_lock
+
+
+@pytest.fixture(autouse=True)
+def _reset_lock_fd(monkeypatch):
+    """Reset _lock_fd between tests so a failed test doesn't leave stale state."""
+    monkeypatch.setattr(rlsbl.lock, "_lock_fd", None)
 
 
 def test_lock_file_created(tmp_path, monkeypatch):

@@ -10,10 +10,18 @@ from unittest.mock import patch
 import pytest
 
 from pathlib import Path
+
+import rlsbl.lock
 from rlsbl.context import ProjectContext
 
 from rlsbl.lock import acquire_lock, release_lock, rlsbl_lock
 from rlsbl.release_file import ReleaseConfig
+
+
+@pytest.fixture(autouse=True)
+def _reset_lock_fd(monkeypatch):
+    """Reset _lock_fd between tests so a failed test doesn't leave stale state."""
+    monkeypatch.setattr(rlsbl.lock, "_lock_fd", None)
 
 
 def _rc(bump="patch", include=None, exclude=None):
