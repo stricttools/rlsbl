@@ -1,7 +1,7 @@
 [project]
 name = "rlsbl"
 version = "0.69.2"
-description = "Release orchestration and project scaffolding for npm, PyPI, and Go"
+description = "Release orchestration and project scaffolding across package ecosystems"
 license = "MIT"
 authors = [{ name = "smm-h" }]
 readme = "README.md"
