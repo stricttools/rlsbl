@@ -2,6 +2,7 @@
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -200,15 +201,17 @@ def run_cmd(registry, args, flags):
     desc_width = max(len(r[1]) for r in rows)
     time_width = max(len(r[2]) for r in rows)
 
-    # Cap description width to keep output readable
-    max_desc = 40
-    if desc_width > max_desc:
-        desc_width = max_desc
-
     # Ensure minimum widths match headers
     name_width = max(name_width, len("owner/repo"))
-    desc_width = max(desc_width, len("description"))
     time_width = max(time_width, len("updated"))
+
+    # Calculate available description width from terminal size.
+    # Layout: "  {name}  {desc}  {time}" -- 6 chars of padding (2+2+2).
+    term_width = shutil.get_terminal_size().columns
+    available_desc = term_width - name_width - time_width - 6
+    max_desc = max(available_desc, len("description"))
+    if desc_width > max_desc:
+        desc_width = max_desc
 
     # Print header
     print(f"\nrlsbl ecosystem ({len(repos)} projects)\n")
