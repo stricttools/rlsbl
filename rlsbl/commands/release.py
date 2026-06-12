@@ -608,13 +608,8 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
                         f"since last build release ({last_build}):",
                         file=sys.stderr,
                     )
-                    for nf in native_files[:10]:
+                    for nf in native_files:
                         print(f"  {nf}", file=sys.stderr)
-                    if len(native_files) > 10:
-                        print(
-                            f"  ... and {len(native_files) - 10} more",
-                            file=sys.stderr,
-                        )
                     print(
                         "Use mode = \"build\" for a full release instead.",
                         file=sys.stderr,
