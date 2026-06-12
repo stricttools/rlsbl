@@ -12,6 +12,7 @@ from rlsbl.targets.flutter import FlutterTarget
 from rlsbl.targets.dart import DartTarget
 from rlsbl.targets.protocol import ReleaseTarget
 from rlsbl.targets import TARGETS, detect_targets
+from rlsbl.errors import ReleaseFileError
 from rlsbl.release_file import read_release_file
 from rlsbl.targets.native_changes import detect_native_changes
 
@@ -201,7 +202,7 @@ class TestReleaseFileFlutterMode:
             'include = ["flutter"]\n'
             'exclude = []\n'
         )
-        with pytest.raises(ValueError, match="requires.*mode"):
+        with pytest.raises(ReleaseFileError, match="requires.*mode"):
             read_release_file(str(f))
 
     def test_flutter_target_with_mode_ota(self, tmp_path):
