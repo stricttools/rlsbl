@@ -177,7 +177,7 @@ def cmd_add(flags, project_root):
         changes_dir_for_line = get_changes_dir(project_root)
         existing_for_line = read_unreleased(changes_dir_for_line)
         line_number = len(existing_for_line) + 1
-        reason = description[:60] if description else "non-user-facing batch"
+        reason = description if description else "non-user-facing batch"
         exclusion = {
             "reason": reason,
             "entries": [{"version": "unreleased", "line": line_number}],
@@ -202,7 +202,7 @@ def cmd_add(flags, project_root):
     if not flags.get("no-commit"):
         unreleased_path = os.path.join(changes_dir, "unreleased.jsonl")
         if user_facing:
-            commit_msg = f"changelog: {description}"[:72]
+            commit_msg = f"changelog: {description}"
         else:
             commit_msg = "changelog: non-user-facing entry"
         commit_files(commit_msg, [unreleased_path], allow_failure=True)
@@ -375,7 +375,7 @@ def cmd_amend(flags, project_root):
 
     commit_msg = f"changelog: amend {version}"
     if user_facing and description:
-        commit_msg = f"changelog: amend {version}: {description}"[:72]
+        commit_msg = f"changelog: amend {version}: {description}"
     commit_files(commit_msg, changed_files, allow_failure=True)
 
 
