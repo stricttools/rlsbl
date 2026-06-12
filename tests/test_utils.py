@@ -12,72 +12,41 @@ from rlsbl.utils import bump_version, extract_changelog_entry, get_hook_timeout,
 class TestBumpVersion:
     """Tests for bump_version(version, bump_type)."""
 
-    def test_patch_bump(self):
-        assert bump_version("1.2.3", "patch") == "1.2.4"
+    @pytest.mark.parametrize("version, bump_type, expected", [
+        # Standard versions
+        ("1.2.3", "patch", "1.2.4"),
+        ("1.2.3", "minor", "1.3.0"),
+        ("1.2.3", "major", "2.0.0"),
+        # 0.x versions
+        ("0.1.0", "patch", "0.1.1"),
+        ("0.1.0", "minor", "0.2.0"),
+        ("0.1.0", "major", "1.0.0"),
+        # Pre-release suffix handling
+        ("1.0.0-beta.1", "patch", "1.0.1"),
+        ("1.0.0-beta.1", "minor", "1.1.0"),
+        ("1.0.0-beta.1", "major", "2.0.0"),
+        ("2.3.0-rc.2", "patch", "2.3.1"),
+        ("2.3.0-rc.2", "minor", "2.4.0"),
+        ("2.3.0-rc.2", "major", "3.0.0"),
+        ("0.5.0-alpha.3", "patch", "0.5.1"),
+        # Regression check: clean versions after prerelease support
+        ("3.2.1", "patch", "3.2.2"),
+        ("3.2.1", "minor", "3.3.0"),
+        ("3.2.1", "major", "4.0.0"),
+    ])
+    def test_bump(self, version, bump_type, expected):
+        assert bump_version(version, bump_type) == expected
 
-    def test_minor_bump(self):
-        assert bump_version("1.2.3", "minor") == "1.3.0"
-
-    def test_major_bump(self):
-        assert bump_version("1.2.3", "major") == "2.0.0"
-
-    def test_0x_patch(self):
-        assert bump_version("0.1.0", "patch") == "0.1.1"
-
-    def test_0x_minor(self):
-        assert bump_version("0.1.0", "minor") == "0.2.0"
-
-    def test_0x_major(self):
-        assert bump_version("0.1.0", "major") == "1.0.0"
-
-    def test_invalid_version_raises(self):
+    @pytest.mark.parametrize("version, bump_type", [
+        ("not-a-version", "patch"),
+        ("1.2", "patch"),
+        ("1.2.3.4", "patch"),
+        ("1.2.x", "patch"),
+        ("1.2.3", "mega"),
+    ])
+    def test_invalid_raises(self, version, bump_type):
         with pytest.raises(VersionError):
-            bump_version("not-a-version", "patch")
-
-    def test_too_few_parts_raises(self):
-        with pytest.raises(VersionError):
-            bump_version("1.2", "patch")
-
-    def test_too_many_parts_raises(self):
-        with pytest.raises(VersionError):
-            bump_version("1.2.3.4", "patch")
-
-    def test_non_numeric_parts_raises(self):
-        with pytest.raises(VersionError):
-            bump_version("1.2.x", "patch")
-
-    def test_invalid_bump_type_raises(self):
-        with pytest.raises(VersionError):
-            bump_version("1.2.3", "mega")
-
-    # Pre-release suffix handling
-
-    def test_prerelease_beta_patch(self):
-        assert bump_version("1.0.0-beta.1", "patch") == "1.0.1"
-
-    def test_prerelease_beta_minor(self):
-        assert bump_version("1.0.0-beta.1", "minor") == "1.1.0"
-
-    def test_prerelease_beta_major(self):
-        assert bump_version("1.0.0-beta.1", "major") == "2.0.0"
-
-    def test_prerelease_rc_patch(self):
-        assert bump_version("2.3.0-rc.2", "patch") == "2.3.1"
-
-    def test_prerelease_rc_minor(self):
-        assert bump_version("2.3.0-rc.2", "minor") == "2.4.0"
-
-    def test_prerelease_rc_major(self):
-        assert bump_version("2.3.0-rc.2", "major") == "3.0.0"
-
-    def test_prerelease_alpha(self):
-        assert bump_version("0.5.0-alpha.3", "patch") == "0.5.1"
-
-    def test_clean_version_still_works_after_prerelease_support(self):
-        # Regression check: clean versions must remain unchanged
-        assert bump_version("3.2.1", "patch") == "3.2.2"
-        assert bump_version("3.2.1", "minor") == "3.3.0"
-        assert bump_version("3.2.1", "major") == "4.0.0"
+            bump_version(version, bump_type)
 
 
 class TestExtractChangelogEntry:
@@ -142,20 +111,9 @@ class TestGetHookTimeout:
         monkeypatch.setenv("RLSBL_HOOK_TIMEOUT", "30")
         assert get_hook_timeout() == 30
 
-    def test_invalid_string_warns_and_returns_none(self, monkeypatch, capsys):
-        monkeypatch.setenv("RLSBL_HOOK_TIMEOUT", "not-a-number")
-        result = get_hook_timeout()
-        assert result is None
-        assert "invalid RLSBL_HOOK_TIMEOUT" in capsys.readouterr().err
-
-    def test_zero_warns_and_returns_none(self, monkeypatch, capsys):
-        monkeypatch.setenv("RLSBL_HOOK_TIMEOUT", "0")
-        result = get_hook_timeout()
-        assert result is None
-        assert "invalid RLSBL_HOOK_TIMEOUT" in capsys.readouterr().err
-
-    def test_negative_warns_and_returns_none(self, monkeypatch, capsys):
-        monkeypatch.setenv("RLSBL_HOOK_TIMEOUT", "-5")
+    @pytest.mark.parametrize("value", ["not-a-number", "0", "-5"])
+    def test_invalid_value_warns_and_returns_none(self, monkeypatch, capsys, value):
+        monkeypatch.setenv("RLSBL_HOOK_TIMEOUT", value)
         result = get_hook_timeout()
         assert result is None
         assert "invalid RLSBL_HOOK_TIMEOUT" in capsys.readouterr().err
