@@ -2,7 +2,7 @@
 
 # rlsbl
 
-Release orchestration and project scaffolding for npm, PyPI, and Go
+Release orchestration and project scaffolding across package ecosystems
 
 Built in Python 3.11+ with ruamel-yaml, tomlkit, strictcli, and tree-sitter. Also distributed as an npm wrapper package. Current version: check `package.json`.
 

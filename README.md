@@ -6,7 +6,7 @@
 
 # rlsbl
 
-Release orchestration and project scaffolding for npm, PyPI, and Go
+Release orchestration and project scaffolding for npm, PyPI, Go, and [15 more release targets](https://rlsbl.smmh.dev/targets).
 
 ## Install
 
