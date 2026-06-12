@@ -370,7 +370,7 @@ def plan_mappings(template_dir, mappings, vars_dict, force, *, required_vars=Non
             continue
 
         # --- .gitignore: additive set-union merge (append new lines, never remove) ---
-        if target == ".gitignore" and os.path.exists(target) and not force:
+        if target == ".gitignore" and os.path.exists(target):
             with open(target, "r", encoding="utf-8") as f:
                 existing_content = f.read()
             existing_lines = set()
