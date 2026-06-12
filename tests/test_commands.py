@@ -12,6 +12,7 @@ import pytest
 
 from conftest import make_ctx
 from rlsbl.context import ProjectContext
+from rlsbl.errors import ConfigError
 
 from rlsbl.commands.init_cmd import (
     BASES_DIR,
@@ -79,8 +80,8 @@ class TestProcessTemplate:
         assert content == "Hello pkg, year 2026"
         assert unreplaced == []
 
-    def test_required_vars_missing_raises_valueerror(self):
-        with pytest.raises(ValueError, match="name"):
+    def test_required_vars_missing_raises_config_error(self):
+        with pytest.raises(ConfigError, match="name"):
             process_template(
                 "Hello {{name}} {{other}}",
                 {"other": "val"},
@@ -88,7 +89,7 @@ class TestProcessTemplate:
             )
 
     def test_required_vars_missing_includes_template_path(self):
-        with pytest.raises(ValueError, match="mytemplate.tpl"):
+        with pytest.raises(ConfigError, match="mytemplate.tpl"):
             process_template(
                 "{{author}} wrote this",
                 {},
@@ -107,7 +108,7 @@ class TestProcessTemplate:
 
     def test_required_vars_subset_of_unreplaced(self):
         """Only variables in required_vars raise; other unreplaced are fine."""
-        with pytest.raises(ValueError, match="critical") as exc_info:
+        with pytest.raises(ConfigError, match="critical") as exc_info:
             process_template(
                 "{{critical}} and {{optional}}",
                 {},
