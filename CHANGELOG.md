@@ -12,12 +12,16 @@ Deno publish idempotency, orphan sweep script
 
 ## 0.69.1
 
+Scrub tag matching, cmd_amend fix, strictcli public API, todo cleanup
+
 ### Fixes
 
 - **Fix.** Release scrub correctly identifies which project a monorepo tag belongs to using prefix matching instead of version-only lookup. Also caches workspace loading (5 calls reduced to 1).
 - **Fix.** `changelog amend` uses `writable_jsonl` context manager, preventing file permission leak if duplicate commit check exits early.
 
 ## 0.69.0
+
+Managed-files registry, lint config filtering, publish idempotency, monorepo path exemption
 
 ### Features
 
@@ -31,17 +35,23 @@ Deno publish idempotency, orphan sweep script
 
 ## 0.68.4
 
+scaffold --force preserves gitignore entries
+
 ### Fixes
 
 - **Fix.** `scaffold --force` no longer destroys user-added .gitignore entries. The additive merge (only add, never remove) now applies regardless of `--force`.
 
 ## 0.68.3
 
+CI template UV_NO_SOURCES fix
+
 ### Fixes
 
 - **Fix.** CI template sets `UV_NO_SOURCES=1` env var at workflow level, covering both `uv sync` and `uv run` commands.
 
 ## 0.68.2
+
+CI uses --no-sources for portable uv sync
 
 ### Fixes
 
@@ -50,12 +60,16 @@ Deno publish idempotency, orphan sweep script
 
 ## 0.68.1
 
+Per-target CI files, YAML indent fix, monorepo sync update
+
 ### Features
 
 - **Feature.** Multi-target projects now generate per-target CI workflow files (`ci-pypi.yml`, `ci-go.yml`, etc.) instead of a single `ci.yml` from the primary target. npm wrapper packages (no test script) skip CI generation entirely. Old `ci.yml` is automatically cleaned up on re-scaffold.
 - **Feature.** Monorepo sync handles per-target CI files: globs `ci-*.yml` from sub-projects, syncs each with project-name prefix, cleans up stale files.
 
 ## 0.68.0
+
+release scrub command, V4 hook removal
 
 ### Breaking
 
@@ -71,6 +85,8 @@ Deno publish idempotency, orphan sweep script
 
 ## 0.67.1
 
+V4 shim workspace fix, check-name multi-target, zero SEO warnings
+
 ### Features
 
 - **Feature.** Comprehensive documentation update: rewrote pre-push hook section, added test-suite-workspace docs, monorepo pre-push behavior, deps-unused note, and eliminated all SEO warnings (was 104, now 0).
@@ -81,6 +97,8 @@ Deno publish idempotency, orphan sweep script
 - **Fix.** `check-name --target` now supports multiple values. Passing `--target npm --target pypi` checks both registries instead of silently ignoring the first. Invalid target names produce a hard error.
 
 ## 0.67.0
+
+Monorepo pre-push support, test-suite-workspace check, release rollback cleanup
 
 ### Features
 
@@ -93,11 +111,15 @@ Deno publish idempotency, orphan sweep script
 
 ## 0.66.4
 
+Dynamic check-count directive, quality count fix, exclusion cleanup integration test
+
 ### Features
 
 - **Feature.** New `check-count` selfdoc directive auto-generates the check count from checks.toml, eliminating manual count maintenance in docs.
 
 ## 0.66.3
+
+deps-undeclared respects try/except ImportError for optional imports
 
 ### Fixes
 
@@ -105,11 +127,15 @@ Deno publish idempotency, orphan sweep script
 
 ## 0.66.2
 
+Auto-cleanup stale exclusions, DRY refactor manual-warning, hook V5 e2e test
+
 ### Features
 
 - **Feature.** Stale batch_limits exclusions (referencing `version: unreleased`) are automatically removed from config.json during release finalization.
 
 ## 0.66.1
+
+Fix uv sync stripping pytest in workspaces, add workspace-unbuildable check
 
 ### Features
 
@@ -121,6 +147,15 @@ Deno publish idempotency, orphan sweep script
 
 ## 0.66.0
 
+Prepush check system: test-suite check, version-tag skip removal, hook V5
+
+<details>
+<summary>Context</summary>
+
+Major overhaul of the pre-push hook system. All pre-push logic migrated into the rlsbl check system under a new 'prepush' tag. The hook now runs 'rlsbl check --tag prepush' with 4 checks (changelog coverage, gitignore guard, manual-push warning, test-suite). Version-tag skip removed -- checks always run. Shared testing.py module extracted from release flow.
+
+</details>
+
 ### Features
 
 - **Feature.** New `prepush` check tag with 4 checks: `prepush-changelog-coverage`, `prepush-gitignore-guard`, `prepush-manual-warning`, and `test-suite`. Pre-push hook now runs `rlsbl check --tag prepush` instead of the deprecated `rlsbl pre-push-check`. Version-tag skip removed -- all checks always run. Fast-fail ordering via `depends_on`: test-suite skips if changelog coverage fails.
@@ -129,11 +164,15 @@ Deno publish idempotency, orphan sweep script
 
 ## 0.65.4
 
+Fix CI test failure from --yes flag in safegit commit calls
+
 ### Fixes
 
 - **Fix.** Updated commit command tests to expect the new `--yes` flag in safegit calls.
 
 ## 0.65.3
+
+safegit --yes, doc gaps, SEO fixes, retry dedup test
 
 ### Features
 
@@ -142,6 +181,8 @@ Deno publish idempotency, orphan sweep script
 - **Feature.** Added concurrent retry deduplication test verifying only one retry fires per workflow name when multiple runs fail in parallel.
 
 ## 0.65.2
+
+Watch retry dedup, no-runs exit 0, docs polish
 
 ### Features
 
@@ -153,11 +194,22 @@ Deno publish idempotency, orphan sweep script
 
 ## 0.65.1
 
+Fix CI test failure from batch hint message
+
 ### Fixes
 
 - **Fix.** Batch size check test updated to account for hint message in failure details.
 
 ## 0.65.0
+
+Documentation overhaul and notification UX fix
+
+<details>
+<summary>Context</summary>
+
+Comprehensive docs rewrite (13 new guide pages, 2600+ lines), notification click-to-open fix, pipeline env var validation ordering fix, and new --allow-batch flag for changelog add.
+
+</details>
 
 ### Features
 
@@ -171,6 +223,8 @@ Deno publish idempotency, orphan sweep script
 
 ## 0.64.2
 
+Fix Docker metadata false positive in scaffold check, add SSH host validation for subtree remotes.
+
 ### Features
 
 - **New feature.** Validate that subtree remote SSH hosts match the origin remote host, catching misconfigured mirror URLs early.
@@ -180,6 +234,8 @@ Deno publish idempotency, orphan sweep script
 - **Fix.** Exclude Docker metadata-action `type=semver,pattern=` lines from the `scaffold-unreplaced-vars` check. These lines use `{{version}}`, `{{major}}`, `{{minor}}`, and `{{patch}}` as Docker's own template syntax, not unreplaced rlsbl variables.
 
 ## 0.64.1
+
+Fix dead-modules false positives and watch test notification leak.
 
 ### Features
 
@@ -193,6 +249,8 @@ Deno publish idempotency, orphan sweep script
 
 ## 0.64.0
 
+Monorepo mirror command, native-android and native-ios targets.
+
 ### Features
 
 - **New command.** `monorepo mirror` copies monorepo sub-project state (version, changelog, docs) into a standalone mirror repository for independent distribution.
@@ -201,17 +259,30 @@ Deno publish idempotency, orphan sweep script
 
 ## 0.63.2
 
+Fix CI test failure when selfdoc not installed.
+
 ### Fixes
 
 - **Fix.** CI test no longer fails when selfdoc is not installed in the test environment.
 
 ## 0.63.1
 
+Pass RLSBL_DIST_DIR env var to custom_assets build commands.
+
 ### Features
 
 - **New feature.** Custom asset build commands now receive the dist directory via the `RLSBL_DIST_DIR` environment variable, eliminating the need for hardcoded paths.
 
 ## 0.63.0
+
+Pipeline separation: versioning and publishing are now independent concerns.
+
+<details>
+<summary>Context</summary>
+
+Breaking: publish() and build_assets() removed from targets, replaced by pipeline types. DocsTarget removed (use cloudflare-pages pipeline). flutter-ios/flutter-android merged into single flutter target. The publish config key is no longer recognized -- use pipelines. New: 9 built-in pipeline types, custom_assets, hooks override built-ins, 5 new checks, pipeline introspect table. Fix: multi-target array bugs in snapshot/graph/status.
+
+</details>
 
 ### Breaking
 
@@ -233,6 +304,15 @@ Deno publish idempotency, orphan sweep script
 
 ## 0.62.0
 
+Capability-gated publish/build_assets, Swift inheritance cleanup, version_file dir_path, and bug fixes.
+
+<details>
+<summary>Context</summary>
+
+Breaking: BaseTarget.build_assets() returns [] instead of raising NotImplementedError. publish() and build_assets() calls are now gated on target.capabilities. SwiftAppleTarget inherits from SwiftTarget. version_file() accepts optional dir_path for dynamic filename resolution. Plain exclusion list fixed. Flutter table cells corrected.
+
+</details>
+
 ### Breaking
 
 - **Breaking.** `BaseTarget.build_assets()` returns an empty list instead of raising `NotImplementedError`. Custom targets that relied on the exception should declare `build_assets` in their capabilities frozenset.
@@ -251,11 +331,22 @@ Deno publish idempotency, orphan sweep script
 
 ## 0.61.1
 
+Fix feature matrix column order and add directive tests.
+
 ### Fixes
 
 - **Fix.** Restored original display order for feature matrix columns (was inadvertently alphabetized).
 
 ## 0.61.0
+
+Target introspection: capabilities, ecosystem, and auto-generated target table.
+
+<details>
+<summary>Context</summary>
+
+All 18 release targets now declare capabilities (publish, build_assets, read_name, read_metadata, ci_templates, dev_install), ecosystem labels, and auto-detectability. A new table-targets selfdoc directive auto-generates a comprehensive target details table, replacing the stale manual table. MATRIX_COLUMNS is now derived from TARGETS.keys() for DRY consistency.
+
+</details>
 
 ### Features
 
@@ -270,11 +361,15 @@ Deno publish idempotency, orphan sweep script
 
 ## 0.60.1
 
+Feature matrix n/a support for toolchain-native checks
+
 ### Features
 
 - **Feature matrix.** Support "n/a" cells for checks where the toolchain already handles the concern natively (e.g., circular-deps for Go modules).
 
 ## 0.60.0
+
+Go workspace dependency validation, circular dependency detection, Dart dead-module detection, and feature matrix selfdoc directive.
 
 ### Features
 
@@ -285,11 +380,15 @@ Deno publish idempotency, orphan sweep script
 
 ## 0.59.1
 
+Fix false-positive deps-undeclared findings in root-project dep scan when sibling project source files are present.
+
 ### Fixes
 
 - **Fix.** Root-project dep scan no longer produces false-positive deps-undeclared findings from sibling project source files.
 
 ## 0.59.0
+
+Unified manifest detection, PlainTarget auto-detection, monorepo sync template resolution, required template variables, and fixes for sub-directory scaffold operations and release-file commit exemption.
 
 ### Features
 
@@ -305,6 +404,8 @@ Deno publish idempotency, orphan sweep script
 
 ## 0.58.0
 
+New dead-workspace-packages check for detecting unused library packages in monorepo workspaces
+
 ### Features
 
 - **New check.** `dead-workspace-packages` detects workspace library packages never imported by any sibling, with specific messaging for test-only imports.
@@ -315,11 +416,15 @@ Deno publish idempotency, orphan sweep script
 
 ## 0.57.1
 
+Fix Python 3.14 compatibility in monorepo release-init
+
 ### Fixes
 
 - **Fix.** `monorepo release-init` no longer crashes on Python 3.14 when rendering commented-out package sections. The `tomlkit.dumps()` call was replaced with `tomlkit.item().as_string()` to avoid a `ValueError` when serializing arrays.
 
 ## 0.57.0
+
+Batch release-init filtering, retry.toml cleanup, and feature support matrix
 
 ### Features
 
@@ -331,6 +436,15 @@ Deno publish idempotency, orphan sweep script
 - **Fix.** `retry.toml` is now cleaned up when validation fails during release retry, in both the init and retry handlers. Previously, an invalid `retry.toml` could be left behind, blocking subsequent retries.
 
 ## 0.56.0
+
+New checks (license-file, scaffold-unreplaced-vars, dead-modules-npm), batch release-init improvements, and scaffold/release fixes
+
+<details>
+<summary>Context</summary>
+
+LICENSE is no longer scaffold-managed -- projects own their LICENSE file, enforced by the new license-file check. Batch release-init now supports Flutter targets and includes TOML comments. Several fixes for retry.toml cleanup, bare scaffold on plain targets, workspace-unregistered false positives, and shared release config validation.
+
+</details>
 
 ### Breaking
 
@@ -351,6 +465,8 @@ Deno publish idempotency, orphan sweep script
 
 ## 0.55.0
 
+Monorepo release-init command, Go dead-modules detection, scaffold and workspace check fixes
+
 ### Features
 
 - **New command.** `monorepo release-init` scaffolds a batch release file with per-package sections for all workspace projects.
@@ -364,6 +480,8 @@ Deno publish idempotency, orphan sweep script
 
 ## 0.54.2
 
+Batch release description enforcement, scan cache optimization, lint exclusion todo cleanup
+
 ### Fixes
 
 - **Fix.** Batch release files now enforce mandatory description per package, matching single-release behavior.
@@ -371,11 +489,22 @@ Deno publish idempotency, orphan sweep script
 
 ## 0.54.1
 
+Make release description mandatory
+
 ### Breaking
 
 - **Breaking.** Release description is now mandatory in unreleased.toml. Every release must have a short summary.
 
 ## 0.54.0
+
+Dev node architecture, release descriptions, quality checks, and graph enhancements
+
+<details>
+<summary>Context</summary>
+
+The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinterpreted exempt as a desired behavior rather than a graph position. Dev nodes now fully opt out of the changelog system instead of being exempted from enforcement.
+
+</details>
 
 ### Breaking
 
