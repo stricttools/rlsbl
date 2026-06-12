@@ -141,47 +141,23 @@ class TestGetHookTimeout:
         monkeypatch.setenv("RLSBL_HOOK_TIMEOUT", "30")
         assert get_hook_timeout() == 30
 
-    def test_invalid_string_warns_and_returns_none(self, monkeypatch):
+    def test_invalid_string_warns_and_returns_none(self, monkeypatch, capsys):
         monkeypatch.setenv("RLSBL_HOOK_TIMEOUT", "not-a-number")
-        import io
-        import sys
-        captured = io.StringIO()
-        old_stderr = sys.stderr
-        sys.stderr = captured
-        try:
-            result = get_hook_timeout()
-        finally:
-            sys.stderr = old_stderr
+        result = get_hook_timeout()
         assert result is None
-        assert "invalid RLSBL_HOOK_TIMEOUT" in captured.getvalue()
+        assert "invalid RLSBL_HOOK_TIMEOUT" in capsys.readouterr().err
 
-    def test_zero_warns_and_returns_none(self, monkeypatch):
+    def test_zero_warns_and_returns_none(self, monkeypatch, capsys):
         monkeypatch.setenv("RLSBL_HOOK_TIMEOUT", "0")
-        import io
-        import sys
-        captured = io.StringIO()
-        old_stderr = sys.stderr
-        sys.stderr = captured
-        try:
-            result = get_hook_timeout()
-        finally:
-            sys.stderr = old_stderr
+        result = get_hook_timeout()
         assert result is None
-        assert "invalid RLSBL_HOOK_TIMEOUT" in captured.getvalue()
+        assert "invalid RLSBL_HOOK_TIMEOUT" in capsys.readouterr().err
 
-    def test_negative_warns_and_returns_none(self, monkeypatch):
+    def test_negative_warns_and_returns_none(self, monkeypatch, capsys):
         monkeypatch.setenv("RLSBL_HOOK_TIMEOUT", "-5")
-        import io
-        import sys
-        captured = io.StringIO()
-        old_stderr = sys.stderr
-        sys.stderr = captured
-        try:
-            result = get_hook_timeout()
-        finally:
-            sys.stderr = old_stderr
+        result = get_hook_timeout()
         assert result is None
-        assert "invalid RLSBL_HOOK_TIMEOUT" in captured.getvalue()
+        assert "invalid RLSBL_HOOK_TIMEOUT" in capsys.readouterr().err
 
 
 class TestGetPushTimeout:
