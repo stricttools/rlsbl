@@ -349,6 +349,7 @@ class TestRequestWithBackoff(unittest.TestCase):
 class TestDelayFlag(unittest.TestCase):
     """Tests for the --delay value flag."""
 
+    @patch("rlsbl._variadic_args", ["my-pkg"])
     @patch("rlsbl.commands.check._check_single_name")
     def test_delay_parsed_as_value_flag(self, mock_check):
         """--delay is recognized as a value flag and passed to run_cmd."""
@@ -357,15 +358,11 @@ class TestDelayFlag(unittest.TestCase):
             "variants": [], "github_count": 0,
         }
         import rlsbl
-        # Set the variadic args that _extract_variadic_args would populate
-        rlsbl._variadic_args = ["my-pkg"]
-        try:
-            result = rlsbl.app.test(["check-name", "--target", "npm", "--delay", "500"])
-        finally:
-            rlsbl._variadic_args = []
+        result = rlsbl.app.test(["check-name", "--target", "npm", "--delay", "500"])
         self.assertEqual(result.exit_code, 0)
         mock_check.assert_called_once_with("my-pkg", "npm")
 
+    @patch("rlsbl._variadic_args", ["a", "b"])
     @patch("rlsbl.commands.check.time.sleep")
     @patch("rlsbl.commands.check._check_single_name")
     def test_delay_default_value(self, mock_check, mock_sleep):
@@ -377,11 +374,7 @@ class TestDelayFlag(unittest.TestCase):
              "variants": [], "github_count": 0},
         ]
         import rlsbl
-        rlsbl._variadic_args = ["a", "b"]
-        try:
-            result = rlsbl.app.test(["check-name", "--target", "npm"])
-        finally:
-            rlsbl._variadic_args = []
+        result = rlsbl.app.test(["check-name", "--target", "npm"])
         self.assertEqual(result.exit_code, 0)
         # Default delay is 200ms = 0.2s between names
         mock_sleep.assert_called_once_with(0.2)
