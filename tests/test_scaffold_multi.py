@@ -105,6 +105,22 @@ class TestRunCmdMulti:
             gitignore = f.read()
         assert len(gitignore.strip()) > 0
 
+    def test_gitignore_ignores_advisory_lock_files(self, dual_registry_project):
+        """Scaffold-produced .gitignore ignores both advisory lock paths.
+
+        A stale lock left behind by a crashed (SIGKILL'd) rlsbl process must
+        not show up as an untracked file, or it blocks the next release's
+        clean-tree check.
+        """
+        with patch("sys.stdout", new_callable=StringIO):
+            run_cmd_multi(["npm", "pypi"], [], {}, ctx=_ctx())
+
+        with open(".gitignore") as f:
+            lines = [line.strip() for line in f.read().splitlines()]
+
+        assert ".rlsbl/lock" in lines
+        assert ".rlsbl-monorepo/lock" in lines
+
     def test_primary_publish_not_written(self, dual_registry_project):
         """The single-registry publish template from npm should NOT be written separately.
 
