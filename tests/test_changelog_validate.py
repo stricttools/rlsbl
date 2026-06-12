@@ -763,58 +763,32 @@ class TestChangelogOnlyCommitExemption:
 class TestIsChangelogPath:
     """Unit tests for _is_changelog_path."""
 
-    def test_unreleased_jsonl(self):
-        assert _is_changelog_path(".rlsbl/changes/unreleased.jsonl") is True
+    @pytest.mark.parametrize("path", [
+        ".rlsbl/changes/unreleased.jsonl",
+        ".rlsbl/changes/0.30.0.jsonl",
+        ".rlsbl/changes/.validated",
+        ".rlsbl/version",
+        "CHANGELOG.md",
+        "python/.rlsbl/changes/unreleased.jsonl",
+        "python/CHANGELOG.md",
+        "subdir/CHANGELOG.md",
+        ".rlsbl/releases/unreleased.toml",
+        "python/.rlsbl/releases/unreleased.toml",
+        ".rlsbl/releases/retry.toml",
+        ".rlsbl-monorepo/releases/unreleased.toml",
+        ".rlsbl-monorepo/workspace.toml",
+        ".rlsbl-monorepo/snapshot.json",
+        "subproject/.rlsbl-monorepo/releases/foo.toml",
+    ])
+    def test_changelog_path_recognized(self, path):
+        assert _is_changelog_path(path) is True
 
-    def test_versioned_jsonl(self):
-        assert _is_changelog_path(".rlsbl/changes/0.30.0.jsonl") is True
-
-    def test_validated_cache(self):
-        assert _is_changelog_path(".rlsbl/changes/.validated") is True
-
-    def test_rlsbl_version(self):
-        assert _is_changelog_path(".rlsbl/version") is True
-
-    def test_changelog_md(self):
-        assert _is_changelog_path("CHANGELOG.md") is True
-
-    def test_monorepo_prefixed(self):
-        assert _is_changelog_path("python/.rlsbl/changes/unreleased.jsonl") is True
-
-    def test_monorepo_changelog_md(self):
-        assert _is_changelog_path("python/CHANGELOG.md") is True
-
-    def test_source_file(self):
-        assert _is_changelog_path("src/foo.py") is False
-
-    def test_rlsbl_config(self):
-        # .rlsbl/config.json is NOT a changelog file
-        assert _is_changelog_path(".rlsbl/config.json") is False
-
-    def test_random_changelog_elsewhere(self):
-        # A file named CHANGELOG.md nested deeper should still match
-        assert _is_changelog_path("subdir/CHANGELOG.md") is True
-
-    def test_releases_unreleased_toml(self):
-        assert _is_changelog_path(".rlsbl/releases/unreleased.toml") is True
-
-    def test_monorepo_releases_prefixed(self):
-        assert _is_changelog_path("python/.rlsbl/releases/unreleased.toml") is True
-
-    def test_releases_subfile(self):
-        assert _is_changelog_path(".rlsbl/releases/retry.toml") is True
-
-    def test_monorepo_dir_releases(self):
-        assert _is_changelog_path(".rlsbl-monorepo/releases/unreleased.toml") is True
-
-    def test_monorepo_dir_workspace(self):
-        assert _is_changelog_path(".rlsbl-monorepo/workspace.toml") is True
-
-    def test_monorepo_dir_snapshot(self):
-        assert _is_changelog_path(".rlsbl-monorepo/snapshot.json") is True
-
-    def test_monorepo_dir_prefixed(self):
-        assert _is_changelog_path("subproject/.rlsbl-monorepo/releases/foo.toml") is True
+    @pytest.mark.parametrize("path", [
+        "src/foo.py",
+        ".rlsbl/config.json",
+    ])
+    def test_non_changelog_path_rejected(self, path):
+        assert _is_changelog_path(path) is False
 
 
 class TestIsChangelogOnlyCommit:
