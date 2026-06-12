@@ -25,10 +25,27 @@ Deploy targets are defined in `.rlsbl/config.json` under the `deploy` key, which
 | --- | --- | --- | --- |
 | `user` | string | `"root"` | SSH user for the connection |
 | `ssh_key` | string | (none) | Path to private key file. Supports `$VAR` expansion. |
-| `directory` | string | (none) | Working directory on the remote host (commands `cd` here first) |
-| `env` | object | (none) | Environment variables exported before running steps |
+| `directory` | string | (none) | Working directory for local steps (`cwd`) and remote steps (`cd`) |
+| `local_steps` | array of strings | (none) | Shell commands executed locally before SSH steps (e.g., cross-compilation, rsync). Supports `$VAR` expansion. |
+| `env` | object | (none) | Environment variables exported before running remote steps |
 | `health` | object | (none) | Health check configuration (see below) |
 | `rollback_steps` | array of strings | (none) | Commands to execute if health check fails after deployment |
+
+## Local steps
+
+The `local_steps` field runs shell commands on the local machine before any SSH steps execute. This is useful for build steps that must happen locally (cross-compilation, asset bundling) and file transfers (rsync, scp) that move artifacts to the remote host before the remote steps configure and restart services.
+
+Local steps execute sequentially via `subprocess.run(step, shell=True, check=True)`. If any local step fails (non-zero exit), the deploy aborts immediately -- no SSH steps or health checks run. Environment variable references (`$VAR`) in local steps are expanded before execution, using the same expansion as `host` and `ssh_key`.
+
+When `directory` is configured, it is used as the `cwd` for local step execution (same directory is used as the remote `cd` target for SSH steps).
+
+### Execution order
+
+1. Branch restriction check
+2. Local steps (if configured)
+3. SSH steps
+4. Health check (if configured)
+5. Rollback (if health check fails and `rollback_steps` configured)
 
 ## Environment variable expansion
 
@@ -124,6 +141,38 @@ The `only_on` field restricts which git branches can deploy to each target, prev
         "npm ci --production",
         "systemctl restart myapp"
       ]
+    }
+  ]
+}
+```
+
+## Example config with local steps
+
+Cross-compile a Go binary locally, transfer it to the remote host via rsync, then restart the service remotely:
+
+```json
+{
+  "deploy": [
+    {
+      "name": "production",
+      "host": "$DEPLOY_HOST",
+      "user": "deploy",
+      "ssh_key": "$HOME/.ssh/deploy_key",
+      "directory": "/opt/myapp",
+      "only_on": ["main"],
+      "local_steps": [
+        "GOOS=linux GOARCH=amd64 go build -o dist/myapp ./cmd/myapp",
+        "rsync -avz --progress dist/myapp deploy@$DEPLOY_HOST:/opt/myapp/myapp"
+      ],
+      "steps": [
+        "chmod +x /opt/myapp/myapp",
+        "systemctl restart myapp"
+      ],
+      "health": {
+        "type": "http",
+        "url": "http://localhost:8080/health",
+        "timeout": 30
+      }
     }
   ]
 }

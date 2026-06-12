@@ -84,6 +84,14 @@ def validate_deploy_config(targets):
             elif not all(isinstance(s, str) for s in steps):
                 errors.append(f"{prefix}: 'steps' must be a non-empty list of strings")
 
+        # Validate local_steps (optional)
+        local_steps = target.get("local_steps")
+        if local_steps is not None:
+            if not isinstance(local_steps, list) or len(local_steps) == 0:
+                errors.append(f"{prefix}: 'local_steps' must be a non-empty list of strings")
+            elif not all(isinstance(s, str) for s in local_steps):
+                errors.append(f"{prefix}: 'local_steps' must be a non-empty list of strings")
+
         # Expand and validate env var references in host and ssh_key
         host = target.get("host")
         if host is not None:
@@ -280,9 +288,26 @@ def deploy_target(target_config, current_branch):
         ssh_key = expand_env_vars(ssh_key)
     directory = target_config.get("directory")
     env = target_config.get("env")
+    local_steps = target_config.get("local_steps")
     steps = target_config["steps"]
 
-    # 2. Run steps
+    # 2. Run local steps (before SSH)
+    if local_steps:
+        for i, step in enumerate(local_steps):
+            expanded_step = expand_env_vars(step)
+            print(f"[{name}] Local step {i + 1}/{len(local_steps)}: {expanded_step}")
+            try:
+                subprocess.run(
+                    expanded_step, shell=True, check=True,
+                    cwd=directory,
+                )
+            except subprocess.CalledProcessError as e:
+                return DeployResult(
+                    name, False,
+                    f"Local step {i + 1} failed (exit {e.returncode}): {expanded_step}",
+                )
+
+    # 3. Run SSH steps
     for i, step in enumerate(steps):
         print(f"[{name}] Step {i + 1}/{len(steps)}: {step}")
         stdout, stderr, returncode = ssh_run(
@@ -295,7 +320,7 @@ def deploy_target(target_config, current_branch):
                 f"Step {i + 1} failed (exit {returncode}): {stderr or stdout}",
             )
 
-    # 3. Health check
+    # 4. Health check
     health = target_config.get("health")
     if health:
         print(f"[{name}] Running health check...")
@@ -328,7 +353,7 @@ def deploy_target(target_config, current_branch):
             return DeployResult(name, False, message)
         return DeployResult(name, True, message)
 
-    # 4. No health check
+    # 5. No health check
     print(
         f"Warning: [{name}] No health check configured, cannot verify deploy",
         file=sys.stderr,

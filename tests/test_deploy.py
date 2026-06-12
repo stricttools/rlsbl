@@ -93,6 +93,25 @@ class TestValidateDeployConfig:
         assert len(errors) == 1
         assert "steps" in errors[0]
 
+    def test_valid_config_with_local_steps(self):
+        targets = [_minimal_target(local_steps=["make build", "rsync -avz dist/ host:/opt/app/"])]
+        assert validate_deploy_config(targets) == []
+
+    def test_invalid_local_steps_not_a_list(self):
+        errors = validate_deploy_config([_minimal_target(local_steps="make build")])
+        assert len(errors) == 1
+        assert "local_steps" in errors[0]
+
+    def test_invalid_local_steps_empty_list(self):
+        errors = validate_deploy_config([_minimal_target(local_steps=[])])
+        assert len(errors) == 1
+        assert "local_steps" in errors[0]
+
+    def test_invalid_local_steps_non_string_items(self):
+        errors = validate_deploy_config([_minimal_target(local_steps=[123, True])])
+        assert len(errors) == 1
+        assert "local_steps" in errors[0]
+
     def test_duplicate_names(self):
         targets = [_minimal_target(name="web"), _minimal_target(name="web")]
         errors = validate_deploy_config(targets)
@@ -646,6 +665,120 @@ class TestDeployTarget:
         # Verify the SSH call used user="deploy" not user="root"
         assert "deploy@10.0.0.1" in health_ssh_cmd
         assert "root@10.0.0.1" not in health_ssh_cmd
+
+    def test_deploy_local_steps_before_ssh(self, monkeypatch):
+        """Local steps run before SSH steps, in order."""
+        execution_log = []
+
+        def fake_subprocess_run(cmd_or_str, **kwargs):
+            if kwargs.get("shell"):
+                # Local step
+                execution_log.append(("local", cmd_or_str))
+                return subprocess.CompletedProcess(cmd_or_str, 0)
+            else:
+                # SSH call
+                execution_log.append(("ssh", cmd_or_str[-1]))
+                return subprocess.CompletedProcess(cmd_or_str, 0, stdout="ok", stderr="")
+
+        monkeypatch.setattr("subprocess.run", fake_subprocess_run)
+
+        target = _minimal_target(
+            local_steps=["make build", "rsync dist/ host:/opt/"],
+            steps=["systemctl restart app"],
+        )
+        result = deploy_target(target, "main")
+        assert result.success is True
+        assert len(execution_log) == 3
+        assert execution_log[0] == ("local", "make build")
+        assert execution_log[1] == ("local", "rsync dist/ host:/opt/")
+        assert execution_log[2][0] == "ssh"
+
+    def test_deploy_local_step_failure_aborts(self, monkeypatch):
+        """When a local step fails, SSH steps do not execute."""
+        execution_log = []
+
+        def fake_subprocess_run(cmd_or_str, **kwargs):
+            if kwargs.get("shell"):
+                execution_log.append(("local", cmd_or_str))
+                if "bad-cmd" in cmd_or_str:
+                    raise subprocess.CalledProcessError(1, cmd_or_str)
+                return subprocess.CompletedProcess(cmd_or_str, 0)
+            else:
+                execution_log.append(("ssh", cmd_or_str[-1]))
+                return subprocess.CompletedProcess(cmd_or_str, 0, stdout="ok", stderr="")
+
+        monkeypatch.setattr("subprocess.run", fake_subprocess_run)
+
+        target = _minimal_target(
+            local_steps=["good-cmd", "bad-cmd", "never-reached"],
+            steps=["systemctl restart app"],
+        )
+        result = deploy_target(target, "main")
+        assert result.success is False
+        assert "Local step 2 failed" in result.message
+        # Only the first two local steps should have been attempted, no SSH steps
+        assert len(execution_log) == 2
+        assert all(entry[0] == "local" for entry in execution_log)
+
+    def test_deploy_without_local_steps(self, monkeypatch):
+        """Deploy works normally when no local_steps are configured."""
+        executed = []
+
+        def fake_run(cmd, **kwargs):
+            executed.append(cmd[-1])
+            return subprocess.CompletedProcess(cmd, 0, stdout="ok", stderr="")
+
+        monkeypatch.setattr("subprocess.run", fake_run)
+
+        target = _minimal_target(steps=["step1"])
+        assert "local_steps" not in target
+        result = deploy_target(target, "main")
+        assert result.success is True
+        assert len(executed) == 1
+
+    def test_deploy_local_steps_env_expansion(self, monkeypatch):
+        """Environment variables in local steps are expanded."""
+        executed_cmds = []
+
+        def fake_subprocess_run(cmd_or_str, **kwargs):
+            if kwargs.get("shell"):
+                executed_cmds.append(cmd_or_str)
+                return subprocess.CompletedProcess(cmd_or_str, 0)
+            else:
+                return subprocess.CompletedProcess(cmd_or_str, 0, stdout="ok", stderr="")
+
+        monkeypatch.setattr("subprocess.run", fake_subprocess_run)
+        monkeypatch.setenv("BUILD_TARGET", "linux-amd64")
+
+        target = _minimal_target(
+            local_steps=["make build-$BUILD_TARGET"],
+            steps=["systemctl restart app"],
+        )
+        result = deploy_target(target, "main")
+        assert result.success is True
+        assert executed_cmds[0] == "make build-linux-amd64"
+
+    def test_deploy_local_steps_use_cwd(self, monkeypatch):
+        """Local steps use the directory config as cwd."""
+        cwd_log = []
+
+        def fake_subprocess_run(cmd_or_str, **kwargs):
+            if kwargs.get("shell"):
+                cwd_log.append(kwargs.get("cwd"))
+                return subprocess.CompletedProcess(cmd_or_str, 0)
+            else:
+                return subprocess.CompletedProcess(cmd_or_str, 0, stdout="ok", stderr="")
+
+        monkeypatch.setattr("subprocess.run", fake_subprocess_run)
+
+        target = _minimal_target(
+            local_steps=["make build"],
+            steps=["systemctl restart app"],
+            directory="/opt/app",
+        )
+        result = deploy_target(target, "main")
+        assert result.success is True
+        assert cwd_log[0] == "/opt/app"
 
     def test_deploy_health_failure_no_rollback(self, monkeypatch):
         def fake_run(cmd, **kwargs):
