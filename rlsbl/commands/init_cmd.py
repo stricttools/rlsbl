@@ -16,7 +16,8 @@ from ..targets import TARGETS, detect_targets
 from ..tagging import ensure_tags
 from ..utils import commit_files, is_private_repo
 
-HASHES_FILE = os.path.join(".rlsbl", "hashes.json")
+HASHES_FILE = os.path.join(".rlsbl", "managed-files.json")
+_OLD_HASHES_FILE = os.path.join(".rlsbl", "hashes.json")
 BASES_DIR = os.path.join(".rlsbl", "bases")
 
 _NPM_LOCKFILES = ("package-lock.json", "pnpm-lock.yaml", "yarn.lock")
@@ -116,18 +117,29 @@ def file_hash(path):
 
 
 def load_hashes():
-    """Load stored file hashes from .rlsbl/hashes.json."""
+    """Load stored file hashes from .rlsbl/managed-files.json.
+
+    Migrates from the old hashes.json format if present.
+    """
     if os.path.exists(HASHES_FILE):
         with open(HASHES_FILE) as f:
-            return json.load(f)
+            data = json.load(f)
+        return data.get("files", {})
+    # Backward compat: migrate old hashes.json
+    if os.path.exists(_OLD_HASHES_FILE):
+        with open(_OLD_HASHES_FILE) as f:
+            files = json.load(f)
+        save_hashes(files)
+        os.unlink(_OLD_HASHES_FILE)
+        return files
     return {}
 
 
 def save_hashes(hashes):
-    """Write file hashes to .rlsbl/hashes.json."""
+    """Write file hashes to .rlsbl/managed-files.json."""
     os.makedirs(os.path.dirname(HASHES_FILE), exist_ok=True)
     with open(HASHES_FILE, "w") as f:
-        json.dump(hashes, f, indent=2)
+        json.dump({"version": 1, "files": hashes}, f, indent=2)
         f.write("\n")
 
 
