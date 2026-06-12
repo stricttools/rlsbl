@@ -120,7 +120,7 @@ class TestGetHookTimeout:
 
 
 class TestGetPushTimeout:
-    """Tests for get_push_timeout() -- env var > config dict > error."""
+    """Tests for get_push_timeout() -- env var > config dict > default 120."""
 
     @pytest.fixture(autouse=True)
     def _setup(self, tmp_path, monkeypatch):
@@ -134,10 +134,10 @@ class TestGetPushTimeout:
     def test_config_returns_value(self):
         assert get_push_timeout({"push_timeout": 90}) == 90
 
-    def test_neither_raises_error(self):
-        with pytest.raises(ValueError) as exc_info:
-            get_push_timeout({})
-        assert "push_timeout not configured" in str(exc_info.value)
+    def test_neither_returns_default_120(self):
+        # Documented contract: when neither the env var nor the config
+        # field is set, the push timeout defaults to 120 seconds.
+        assert get_push_timeout({}) == 120
 
     def test_env_var_takes_precedence_over_config(self, monkeypatch):
         monkeypatch.setenv("RLSBL_PUSH_TIMEOUT", "45")

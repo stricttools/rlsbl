@@ -121,13 +121,13 @@ class FakeResponse:
 
 @pytest.fixture(autouse=True)
 def _default_push_timeout(monkeypatch):
-    """Set a default push timeout for all tests via the env var.
+    """Pin the push timeout for all tests via the env var.
 
-    Production code requires explicit push_timeout config (no implicit
-    default). Tests need a value so release-flow tests don't fail with
-    'push_timeout not configured'. The env var has highest precedence,
-    so individual tests can still override via monkeypatch or by setting
-    the env var themselves.
+    Production code defaults to 120 when neither the env var nor the
+    push_timeout config field is set, but pinning the env var keeps
+    release-flow tests deterministic regardless of the host environment.
+    The env var has highest precedence, so individual tests can still
+    override via monkeypatch or by setting the env var themselves.
     """
     monkeypatch.setenv("RLSBL_PUSH_TIMEOUT", "120")
 

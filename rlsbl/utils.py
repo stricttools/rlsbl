@@ -74,8 +74,8 @@ def get_current_branch():
 def get_push_timeout(config):
     """Return the push timeout in seconds.
 
-    Precedence: RLSBL_PUSH_TIMEOUT env var > config dict push_timeout.
-    Raises ValueError if neither is set (no implicit default).
+    Precedence: RLSBL_PUSH_TIMEOUT env var > config dict push_timeout
+    > default 120 (the documented contract).
 
     ``config`` is the project config dict (already loaded).
     """
@@ -100,10 +100,7 @@ def get_push_timeout(config):
             )
         return config_val
 
-    raise ValueError(
-        "push_timeout not configured. Set it in .rlsbl/config.json "
-        "or via RLSBL_PUSH_TIMEOUT env var."
-    )
+    return 120
 
 
 def get_hook_timeout():
