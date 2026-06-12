@@ -2,9 +2,16 @@
 
 # Changelog
 
-## 0.69.0
+## 0.69.1
 
-Managed-files registry, lint config filtering, publish idempotency, monorepo path exemption
+Scrub tag matching, cmd_amend fix, strictcli public API, todo cleanup
+
+### Fixes
+
+- **Fix.** Release scrub correctly identifies which project a monorepo tag belongs to using prefix matching instead of version-only lookup. Also caches workspace loading (5 calls reduced to 1).
+- **Fix.** `changelog amend` uses `writable_jsonl` context manager, preventing file permission leak if duplicate commit check exits early.
+
+## 0.69.0
 
 ### Features
 
