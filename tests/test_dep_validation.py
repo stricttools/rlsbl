@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from rlsbl.errors import ConfigError
 from rlsbl.dep_validation import (
     DeadWorkspacePackage,
     check_dev_in_lib,
@@ -447,7 +448,7 @@ class TestLoadDepOverrides:
             'package = "app"\n'
             'dep = "auth"\n'
         )
-        with pytest.raises(ValueError, match="missing required key 'reason'"):
+        with pytest.raises(ConfigError, match="missing required key 'reason'"):
             load_dep_overrides(str(tmp_path))
 
     def test_empty_reason_raises(self, tmp_path):
@@ -460,7 +461,7 @@ class TestLoadDepOverrides:
             'dep = "auth"\n'
             'reason = "  "\n'
         )
-        with pytest.raises(ValueError, match="must not be empty"):
+        with pytest.raises(ConfigError, match="must not be empty"):
             load_dep_overrides(str(tmp_path))
 
     def test_missing_package_raises(self, tmp_path):
@@ -472,7 +473,7 @@ class TestLoadDepOverrides:
             'dep = "auth"\n'
             'reason = "test"\n'
         )
-        with pytest.raises(ValueError, match="missing required key 'package'"):
+        with pytest.raises(ConfigError, match="missing required key 'package'"):
             load_dep_overrides(str(tmp_path))
 
     def test_multiple_entries(self, tmp_path):

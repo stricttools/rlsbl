@@ -6,6 +6,7 @@ import textwrap
 
 import pytest
 
+from rlsbl.errors import WorkspaceError
 from rlsbl.workspace_graph import CycleError, Dependency, WorkspaceGraph
 
 
@@ -696,7 +697,7 @@ class TestExplicitDependsOn:
             {"path": "packages/a", "name": "a", "depends_on": ["nonexistent"]},
         ]
         root, projects = _make_workspace(tmp_path, projects)
-        with pytest.raises(ValueError, match="no workspace project with that name exists"):
+        with pytest.raises(WorkspaceError, match="no workspace project with that name exists"):
             WorkspaceGraph(root, projects)
 
     def test_self_reference_silently_skipped(self, tmp_path):

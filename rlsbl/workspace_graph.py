@@ -9,6 +9,7 @@ from typing import Protocol, runtime_checkable
 
 import tomlkit
 
+from .errors import WorkspaceError
 from .targets.utils import normalize_pypi
 
 
@@ -246,7 +247,7 @@ class WorkspaceGraph:
                 if dep_name == name:
                     continue  # silently skip self-references
                 if dep_name not in workspace_names:
-                    raise ValueError(
+                    raise WorkspaceError(
                         f"Project '{name}' declares depends_on "
                         f"'{dep_name}' but no workspace project "
                         f"with that name exists"

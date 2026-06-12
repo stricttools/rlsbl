@@ -8,6 +8,8 @@ import sys
 import time
 import urllib.request
 
+from .errors import ConfigError
+
 
 REQUIRED_DEPLOY_FIELDS = {"name", "host", "steps", "only_on"}
 
@@ -28,7 +30,7 @@ def expand_env_vars(value):
         var_name = match.group(1)
         val = os.environ.get(var_name)
         if val is None:
-            raise ValueError(f"Environment variable ${var_name} is not set")
+            raise ConfigError(f"Environment variable ${var_name} is not set")
         return val
 
     return re.sub(r"\$([A-Za-z_][A-Za-z0-9_]*)", replacer, value)
@@ -90,7 +92,7 @@ def validate_deploy_config(targets):
             elif "$" in host:
                 try:
                     expand_env_vars(host)
-                except ValueError as e:
+                except ConfigError as e:
                     errors.append(f"{prefix}: {e}")
 
         ssh_key = target.get("ssh_key")
@@ -100,7 +102,7 @@ def validate_deploy_config(targets):
             elif "$" in ssh_key:
                 try:
                     expand_env_vars(ssh_key)
-                except ValueError as e:
+                except ConfigError as e:
                     errors.append(f"{prefix}: {e}")
 
         # Validate health check config

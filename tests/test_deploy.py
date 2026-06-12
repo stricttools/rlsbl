@@ -6,6 +6,7 @@ import urllib.error
 
 import pytest
 
+from rlsbl.errors import ConfigError
 from rlsbl.deploy import (
     DeployResult,
     check_health,
@@ -126,7 +127,7 @@ class TestExpandEnvVars:
 
     def test_missing_env_var(self, monkeypatch):
         monkeypatch.delenv("NONEXISTENT_VAR_12345", raising=False)
-        with pytest.raises(ValueError, match="NONEXISTENT_VAR_12345"):
+        with pytest.raises(ConfigError, match="NONEXISTENT_VAR_12345"):
             expand_env_vars("$NONEXISTENT_VAR_12345")
 
     def test_no_vars_passthrough(self):

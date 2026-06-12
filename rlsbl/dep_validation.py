@@ -12,6 +12,7 @@ import tomllib
 from collections import deque
 from dataclasses import dataclass
 
+from .errors import ConfigError
 from .import_scanners import (
     DartImportScanner,
     GoImportScanner,
@@ -41,20 +42,20 @@ def load_dep_overrides(root: str) -> dict[tuple[str, str], str]:
     result: dict[tuple[str, str], str] = {}
     for i, entry in enumerate(data.get("unused_allowed", [])):
         if not isinstance(entry, dict):
-            raise ValueError(
+            raise ConfigError(
                 f"unused_allowed[{i}] must be a table"
             )
         for key in ("package", "dep", "reason"):
             if key not in entry:
-                raise ValueError(
+                raise ConfigError(
                     f"unused_allowed[{i}] missing required key '{key}'"
                 )
             if not isinstance(entry[key], str):
-                raise ValueError(
+                raise ConfigError(
                     f"unused_allowed[{i}].{key} must be a string"
                 )
         if not entry["reason"].strip():
-            raise ValueError(
+            raise ConfigError(
                 f"unused_allowed[{i}].reason must not be empty"
             )
         result[(entry["package"], entry["dep"])] = entry["reason"]

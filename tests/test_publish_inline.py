@@ -8,6 +8,7 @@ from unittest.mock import patch
 import pytest
 from ruamel.yaml import YAML
 
+from rlsbl.errors import ConfigError
 from rlsbl.commands.monorepo.publish_inline import (
     compute_publish_hashes,
     emit_workflow,
@@ -102,7 +103,7 @@ class TestParsePublishWorkflow:
         wf = tmp_path / "bad.yml"
         wf.write_text(NO_JOBS_WORKFLOW)
 
-        with pytest.raises(ValueError, match="missing a 'jobs' key"):
+        with pytest.raises(ConfigError, match="missing a 'jobs' key"):
             parse_publish_workflow(str(wf))
 
     def test_permissions_and_env_extracted(self, tmp_path):

@@ -10,6 +10,7 @@ from io import StringIO
 
 from ruamel.yaml import YAML
 
+from ...errors import ConfigError
 from .sync import _get_monorepo_tag_prefix
 
 
@@ -30,7 +31,7 @@ def parse_publish_workflow(path: str) -> dict:
         data = YAML(typ='safe').load(f)
 
     if not isinstance(data, dict) or "jobs" not in data:
-        raise ValueError(f"Workflow file {path} is missing a 'jobs' key")
+        raise ConfigError(f"Workflow file {path} is missing a 'jobs' key")
 
     return {
         "jobs": data["jobs"],

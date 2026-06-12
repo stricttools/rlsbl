@@ -9,6 +9,7 @@ import sys
 import tempfile
 
 from ..action_versions import format_action, UnknownActionError
+from ..errors import ConfigError
 from ..config import read_deploy_config, should_tag, write_project_config
 from ..lock import acquire_lock, release_lock
 from ..pipelines import PIPELINE_TYPES, load_pipelines
@@ -266,7 +267,7 @@ def process_template(template_content, vars_dict, template_path=None, *, require
         if missing:
             ctx = f" in {template_path}" if template_path else ""
             names = ", ".join(sorted(missing))
-            raise ValueError(
+            raise ConfigError(
                 f"Required template variable(s) not provided{ctx}: {names}"
             )
 
