@@ -1,6 +1,7 @@
 """Tests for the check feature support matrix in rlsbl.checks."""
 
 import tomllib
+from pathlib import Path
 
 from rlsbl.checks import (
     CHECK_EXCLUDED_TARGETS,
@@ -13,7 +14,8 @@ from rlsbl.checks import (
 
 def _load_checks_toml_names() -> set[str]:
     """Load check names from checks.toml as the source of truth."""
-    with open("rlsbl/data/checks.toml", "rb") as f:
+    checks_path = Path(__file__).resolve().parent.parent / "rlsbl" / "data" / "checks.toml"
+    with open(checks_path, "rb") as f:
         data = tomllib.load(f)
     return set(data["checks"].keys())
 
