@@ -56,28 +56,81 @@ class TestProtocolConformance:
 
 
 # ---------------------------------------------------------------------------
+# Cross-pipeline parametrized tests
+# ---------------------------------------------------------------------------
+
+
+# All pipeline classes with (name, pipeline_type, class) for constructing instances
+_ALL_PIPELINES = [
+    ("npm", "npm", NpmPipeline),
+    ("pypi", "pypi", PypiPipeline),
+    ("go", "go", GoPipeline),
+    ("cargo", "cargo", CargoPipeline),
+    ("deno", "deno", DenoPipeline),
+    ("hex", "hex", HexPipeline),
+    ("maven", "maven", MavenPipeline),
+    ("docker", "docker", DockerPipeline),
+    ("cf", "cloudflare-pages", CloudflarePagesPipeline),
+]
+
+
+class TestRequiredEnvVarsLocalFalse:
+    """All pipelines return [] for required_env_vars when local=False."""
+
+    @pytest.mark.parametrize("name, ptype, cls", _ALL_PIPELINES,
+                             ids=[t[0] for t in _ALL_PIPELINES])
+    def test_required_env_vars_local_false(self, name, ptype, cls):
+        p = cls(name=name, pipeline_type=ptype, local=False, config={})
+        assert p.required_env_vars() == []
+
+
+class TestPublishLocalFalseSkips:
+    """All pipelines print 'local=false' and skip when local=False."""
+
+    @pytest.mark.parametrize("name, ptype, cls", _ALL_PIPELINES,
+                             ids=[t[0] for t in _ALL_PIPELINES])
+    def test_publish_local_false_skips(self, capsys, name, ptype, cls):
+        p = cls(name=name, pipeline_type=ptype, local=False, config={})
+        p.publish(".", "1.0.0", None)
+        assert "local=false" in capsys.readouterr().out
+
+
+# Pipelines with a single token_var attribute and matching required_env_vars
+_TOKEN_PIPELINES = [
+    ("npm", "npm", NpmPipeline, "NPM_TOKEN"),
+    ("cargo", "cargo", CargoPipeline, "CARGO_REGISTRY_TOKEN"),
+    ("hex", "hex", HexPipeline, "HEX_API_KEY"),
+    ("pypi", "pypi", PypiPipeline, "PYPI_TOKEN"),
+    ("deno", "deno", DenoPipeline, "DENO_TOKEN"),
+]
+
+
+class TestDefaultTokenVar:
+    """Token-based pipelines expose the correct default token_var."""
+
+    @pytest.mark.parametrize("name, ptype, cls, expected_var", _TOKEN_PIPELINES,
+                             ids=[t[0] for t in _TOKEN_PIPELINES])
+    def test_default_token_var(self, name, ptype, cls, expected_var):
+        p = cls(name=name, pipeline_type=ptype, local=True, config={})
+        assert p.token_var == expected_var
+
+
+class TestRequiredEnvVarsLocalTrue:
+    """Token-based pipelines return [token_var] when local=True."""
+
+    @pytest.mark.parametrize("name, ptype, cls, expected_var", _TOKEN_PIPELINES,
+                             ids=[t[0] for t in _TOKEN_PIPELINES])
+    def test_required_env_vars_local_true(self, name, ptype, cls, expected_var):
+        p = cls(name=name, pipeline_type=ptype, local=True, config={})
+        assert p.required_env_vars() == [expected_var]
+
+
+# ---------------------------------------------------------------------------
 # Token-based pipelines: npm, cargo, hex
 # ---------------------------------------------------------------------------
 
 
 class TestNpmPipeline:
-    def test_default_token_var(self):
-        p = NpmPipeline(name="npm", pipeline_type="npm", local=True, config={})
-        assert p.token_var == "NPM_TOKEN"
-
-    def test_required_env_vars_local_true(self):
-        p = NpmPipeline(name="npm", pipeline_type="npm", local=True, config={})
-        assert p.required_env_vars() == ["NPM_TOKEN"]
-
-    def test_required_env_vars_local_false(self):
-        p = NpmPipeline(name="npm", pipeline_type="npm", local=False, config={})
-        assert p.required_env_vars() == []
-
-    def test_publish_local_false_skips(self, capsys):
-        p = NpmPipeline(name="npm", pipeline_type="npm", local=False, config={})
-        p.publish(".", "1.0.0", None)
-        assert "local=false" in capsys.readouterr().out
-
     def test_publish_with_token_calls_command(self, monkeypatch):
         calls = []
         monkeypatch.setenv("NPM_TOKEN", "tok123")
@@ -98,23 +151,6 @@ class TestNpmPipeline:
 
 
 class TestCargoPipeline:
-    def test_default_token_var(self):
-        p = CargoPipeline(name="cargo", pipeline_type="cargo", local=True, config={})
-        assert p.token_var == "CARGO_REGISTRY_TOKEN"
-
-    def test_required_env_vars_local_true(self):
-        p = CargoPipeline(name="cargo", pipeline_type="cargo", local=True, config={})
-        assert p.required_env_vars() == ["CARGO_REGISTRY_TOKEN"]
-
-    def test_required_env_vars_local_false(self):
-        p = CargoPipeline(name="cargo", pipeline_type="cargo", local=False, config={})
-        assert p.required_env_vars() == []
-
-    def test_publish_local_false_skips(self, capsys):
-        p = CargoPipeline(name="cargo", pipeline_type="cargo", local=False, config={})
-        p.publish(".", "1.0.0", None)
-        assert "local=false" in capsys.readouterr().out
-
     def test_publish_with_token_calls_command(self, monkeypatch):
         calls = []
         monkeypatch.setenv("CARGO_REGISTRY_TOKEN", "tok456")
@@ -129,23 +165,6 @@ class TestCargoPipeline:
 
 
 class TestHexPipeline:
-    def test_default_token_var(self):
-        p = HexPipeline(name="hex", pipeline_type="hex", local=True, config={})
-        assert p.token_var == "HEX_API_KEY"
-
-    def test_required_env_vars_local_true(self):
-        p = HexPipeline(name="hex", pipeline_type="hex", local=True, config={})
-        assert p.required_env_vars() == ["HEX_API_KEY"]
-
-    def test_required_env_vars_local_false(self):
-        p = HexPipeline(name="hex", pipeline_type="hex", local=False, config={})
-        assert p.required_env_vars() == []
-
-    def test_publish_local_false_skips(self, capsys):
-        p = HexPipeline(name="hex", pipeline_type="hex", local=False, config={})
-        p.publish(".", "1.0.0", None)
-        assert "local=false" in capsys.readouterr().out
-
     def test_publish_with_token_calls_command(self, monkeypatch):
         calls = []
         monkeypatch.setenv("HEX_API_KEY", "hexkey")
@@ -165,27 +184,10 @@ class TestHexPipeline:
 
 
 class TestPypiPipeline:
-    def test_default_token_var(self):
-        p = PypiPipeline(name="pypi", pipeline_type="pypi", local=True, config={})
-        assert p.token_var == "PYPI_TOKEN"
-
-    def test_required_env_vars_local_true(self):
-        p = PypiPipeline(name="pypi", pipeline_type="pypi", local=True, config={})
-        assert p.required_env_vars() == ["PYPI_TOKEN"]
-
-    def test_required_env_vars_local_false(self):
-        p = PypiPipeline(name="pypi", pipeline_type="pypi", local=False, config={})
-        assert p.required_env_vars() == []
-
     def test_required_env_vars_custom_token_var(self):
         p = PypiPipeline(name="pypi", pipeline_type="pypi", local=True,
                          config={"token_var": "CUSTOM_TOK"})
         assert p.required_env_vars() == ["CUSTOM_TOK"]
-
-    def test_publish_local_false_skips(self, capsys):
-        p = PypiPipeline(name="pypi", pipeline_type="pypi", local=False, config={})
-        p.publish(".", "1.0.0", None)
-        assert "local=false" in capsys.readouterr().out
 
     def test_publish_with_pypi_token(self, monkeypatch):
         calls = []
@@ -243,23 +245,6 @@ class TestPypiPipeline:
 
 
 class TestDenoPipeline:
-    def test_default_token_var(self):
-        p = DenoPipeline(name="deno", pipeline_type="deno", local=True, config={})
-        assert p.token_var == "DENO_TOKEN"
-
-    def test_required_env_vars_local_true(self):
-        p = DenoPipeline(name="deno", pipeline_type="deno", local=True, config={})
-        assert p.required_env_vars() == ["DENO_TOKEN"]
-
-    def test_required_env_vars_local_false(self):
-        p = DenoPipeline(name="deno", pipeline_type="deno", local=False, config={})
-        assert p.required_env_vars() == []
-
-    def test_publish_local_false_skips(self, capsys):
-        p = DenoPipeline(name="deno", pipeline_type="deno", local=False, config={})
-        p.publish(".", "1.0.0", None)
-        assert "local=false" in capsys.readouterr().out
-
     def test_publish_with_deno_token(self, monkeypatch):
         calls = []
         monkeypatch.setenv("DENO_TOKEN", "deno123")
@@ -308,15 +293,6 @@ class TestDockerPipeline:
     def test_required_env_vars_local_true(self):
         p = DockerPipeline(name="docker", pipeline_type="docker", local=True, config={})
         assert p.required_env_vars() == ["DOCKER_USERNAME", "DOCKER_PASSWORD"]
-
-    def test_required_env_vars_local_false(self):
-        p = DockerPipeline(name="docker", pipeline_type="docker", local=False, config={})
-        assert p.required_env_vars() == []
-
-    def test_publish_local_false_skips(self, capsys):
-        p = DockerPipeline(name="docker", pipeline_type="docker", local=False, config={})
-        p.publish(".", "1.0.0", None)
-        assert "local=false" in capsys.readouterr().out
 
     def test_publish_missing_image_raises(self, monkeypatch):
         monkeypatch.setenv("DOCKER_USERNAME", "user")
@@ -368,15 +344,6 @@ class TestGoPipeline:
         p = GoPipeline(name="go", pipeline_type="go", local=True, config={})
         assert p.required_env_vars() == []
 
-    def test_required_env_vars_local_false(self):
-        p = GoPipeline(name="go", pipeline_type="go", local=False, config={})
-        assert p.required_env_vars() == []
-
-    def test_publish_local_false_skips(self, capsys):
-        p = GoPipeline(name="go", pipeline_type="go", local=False, config={})
-        p.publish(".", "1.0.0", None)
-        assert "local=false" in capsys.readouterr().out
-
     def test_publish_no_gomod_warns(self, tmp_path, capsys):
         p = GoPipeline(name="go", pipeline_type="go", local=True, config={})
         p.publish(str(tmp_path), "1.0.0", None)
@@ -413,19 +380,10 @@ class TestMavenPipeline:
         p = MavenPipeline(name="maven", pipeline_type="maven", local=True, config={})
         assert p.required_env_vars() == ["GITHUB_TOKEN"]
 
-    def test_required_env_vars_local_false(self):
-        p = MavenPipeline(name="maven", pipeline_type="maven", local=False, config={})
-        assert p.required_env_vars() == []
-
     def test_required_env_vars_custom_token_var(self):
         p = MavenPipeline(name="maven", pipeline_type="maven", local=True,
                           config={"token_var": "MAVEN_TOKEN"})
         assert p.required_env_vars() == ["MAVEN_TOKEN"]
-
-    def test_publish_local_false_skips(self, capsys):
-        p = MavenPipeline(name="maven", pipeline_type="maven", local=False, config={})
-        p.publish(".", "1.0.0", None)
-        assert "local=false" in capsys.readouterr().out
 
     def test_publish_missing_token_exits(self, monkeypatch):
         monkeypatch.delenv("GITHUB_TOKEN", raising=False)
@@ -482,17 +440,6 @@ class TestCloudflarePagesPipeline:
         p = CloudflarePagesPipeline(name="cf", pipeline_type="cloudflare-pages",
                                     local=True, config={})
         assert p.required_env_vars() == ["CF_ACCOUNT_ID", "CF_PAGES_API_TOKEN"]
-
-    def test_required_env_vars_local_false(self):
-        p = CloudflarePagesPipeline(name="cf", pipeline_type="cloudflare-pages",
-                                    local=False, config={})
-        assert p.required_env_vars() == []
-
-    def test_publish_local_false_skips(self, capsys):
-        p = CloudflarePagesPipeline(name="cf", pipeline_type="cloudflare-pages",
-                                    local=False, config={})
-        p.publish(".", "1.0.0", None)
-        assert "local=false" in capsys.readouterr().out
 
     def test_publish_selfdoc_missing_exits(self, monkeypatch):
         monkeypatch.setattr(
