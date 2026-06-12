@@ -110,6 +110,27 @@ USER_OWNED = {
     ".github/workflows/publish-custom.yml",
 }
 
+
+def _is_orphan_protected(path):
+    """Check if a managed-files registry path is protected from orphan deletion.
+
+    Protected paths are never deleted during orphan cleanup:
+    - USER_OWNED files (user-controlled content)
+    - .rlsbl/ internal files, EXCEPT .rlsbl/lint/*.toml and .rlsbl/bases/*
+      (lint configs and bases are scaffold-managed and can be orphaned)
+    """
+    if path in USER_OWNED:
+        return True
+    if path.startswith(os.path.join(".rlsbl", "")):
+        # Allow orphan deletion for lint configs and bases
+        if path.startswith(os.path.join(".rlsbl", "lint", "")):
+            return False
+        if path.startswith(os.path.join(".rlsbl", "bases", "")):
+            return False
+        return True
+    return False
+
+
 def file_hash(path):
     """SHA-256 hash of a file's contents."""
     with open(path, "rb") as f:
@@ -607,7 +628,7 @@ def _print_file_status_table(created, skipped):
         print(f"  {target}{dots}{status}")
 
 
-def _print_dry_run_report(plans_groups, registry=None, registries=None):
+def _print_dry_run_report(plans_groups, registry=None, registries=None, existing_hashes=None):
     """Print the file status table from plans without applying them.
 
     plans_groups is a list of plan lists (registry plans, shared plans, etc.).
@@ -641,6 +662,22 @@ def _print_dry_run_report(plans_groups, registry=None, registries=None):
         print("Warnings:")
         for w in warnings:
             print(f"  {w}")
+
+    # Show orphans that would be removed
+    if existing_hashes:
+        planned_targets = set()
+        for plans in plans_groups:
+            for plan in plans:
+                if plan.get("action") != "warn_only":
+                    planned_targets.add(plan["target"])
+        orphan_keys = set(existing_hashes.keys()) - planned_targets
+        orphans_to_show = sorted(
+            p for p in orphan_keys if not _is_orphan_protected(p)
+        )
+        if orphans_to_show:
+            print()
+            for orphan_path in orphans_to_show:
+                print(f"Would remove: {orphan_path}")
 
     print()
     print("DRY RUN -- no files were written, no commits made.")
@@ -756,6 +793,37 @@ def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnin
     all_new_hashes = {}
     for h in all_hash_dicts:
         all_new_hashes.update(h)
+
+    # Detect and clean up orphaned managed files
+    orphan_keys = set(existing_hashes.keys()) - set(all_new_hashes.keys())
+    dry_run = flags.get("dry-run", False)
+    force = flags.get("force", False)
+    for orphan_path in sorted(orphan_keys):
+        if _is_orphan_protected(orphan_path):
+            continue
+        if dry_run:
+            print(f"Would remove: {orphan_path}")
+            continue
+        if not os.path.exists(orphan_path):
+            # Already gone from disk — just remove from registry
+            del existing_hashes[orphan_path]
+            continue
+        stored_hash = existing_hashes[orphan_path]
+        if force or file_hash(orphan_path) == stored_hash:
+            os.unlink(orphan_path)
+            # Also clean up the merge base if it exists
+            base_path = os.path.join(BASES_DIR, orphan_path)
+            if os.path.exists(base_path):
+                os.unlink(base_path)
+            created.append((orphan_path, "removed (orphan)"))
+            del existing_hashes[orphan_path]
+        else:
+            print(
+                f"Warning: {orphan_path} has been modified — skipping orphan deletion "
+                f"(use --force to override)",
+                file=sys.stderr,
+            )
+
     existing_hashes.update(all_new_hashes)
     save_hashes(existing_hashes)
 
@@ -1066,7 +1134,8 @@ def run_cmd(registry, args, flags, ctx):
 
         if dry_run:
             _print_dry_run_report([reg_plans, pipeline_plans, shared_plans],
-                                   registry=registry, registries=[registry])
+                                   registry=registry, registries=[registry],
+                                   existing_hashes=existing_hashes)
             return
 
         reg_created, reg_skipped, reg_warnings, reg_hashes = apply_plans(reg_plans)
@@ -1698,6 +1767,7 @@ def run_cmd_multi(registries_list, args, flags, ctx):
             _print_dry_run_report(
                 [ci_plans, extra_plans, merged_plans, shared_plans],
                 registries=registries_list,
+                existing_hashes=existing_hashes,
             )
             return
 
