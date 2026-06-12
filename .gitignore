@@ -17,7 +17,3 @@ dist/
 .wrangler/
 docs/_build/
 uv.lock
-
-.wrangler/
-docs/_build/
-uv.lock
