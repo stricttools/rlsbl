@@ -12,6 +12,7 @@ from rlsbl.changelog.schema import (
     serialize_entry,
     validate_schema,
 )
+from rlsbl.errors import ChangelogError
 
 
 class TestChangelogEntry:
@@ -157,23 +158,23 @@ class TestParseEntry:
         assert entry.type == "feature"
 
     def test_malformed_json(self):
-        with pytest.raises(ValueError, match="malformed JSON"):
+        with pytest.raises(ChangelogError, match="malformed JSON"):
             parse_entry("{not json!!")
 
     def test_not_an_object(self):
-        with pytest.raises(ValueError, match="must be a JSON object"):
+        with pytest.raises(ChangelogError, match="must be a JSON object"):
             parse_entry("[1, 2, 3]")
 
     def test_missing_commits(self):
-        with pytest.raises(ValueError, match="missing required field: commits"):
+        with pytest.raises(ChangelogError, match="missing required field: commits"):
             parse_entry('{"user_facing": false}')
 
     def test_missing_user_facing(self):
-        with pytest.raises(ValueError, match="missing required field: user_facing"):
+        with pytest.raises(ChangelogError, match="missing required field: user_facing"):
             parse_entry('{"commits": ["abc"]}')
 
     def test_commits_not_a_list(self):
-        with pytest.raises(ValueError, match="commits must be a list"):
+        with pytest.raises(ChangelogError, match="commits must be a list"):
             parse_entry('{"commits": "abc", "user_facing": false}')
 
 
@@ -267,7 +268,7 @@ class TestParseJsonl:
             + "{bad json}\n"
         )
         path.write_text(content)
-        with pytest.raises(ValueError, match="line 2"):
+        with pytest.raises(ChangelogError, match="line 2"):
             parse_jsonl(str(path))
 
     def test_empty_file(self, tmp_path):

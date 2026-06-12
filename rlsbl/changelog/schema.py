@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 
+from ..errors import ChangelogError
+
 
 VALID_RELEASE_TYPES = ("ota", "build")
 
@@ -41,24 +43,24 @@ def validate_schema(entry: ChangelogEntry) -> list[str]:
 def parse_entry(line: str) -> ChangelogEntry:
     """Parse one JSON line into a ChangelogEntry.
 
-    Raises ValueError on malformed JSON or missing required fields.
+    Raises ChangelogError on malformed JSON or missing required fields.
     """
     try:
         data = json.loads(line)
     except json.JSONDecodeError as exc:
-        raise ValueError(f"malformed JSON: {exc}") from exc
+        raise ChangelogError(f"malformed JSON: {exc}") from exc
 
     if not isinstance(data, dict):
-        raise ValueError("entry must be a JSON object")
+        raise ChangelogError("entry must be a JSON object")
 
     if "commits" not in data:
-        raise ValueError("missing required field: commits")
+        raise ChangelogError("missing required field: commits")
     if "user_facing" not in data:
-        raise ValueError("missing required field: user_facing")
+        raise ChangelogError("missing required field: user_facing")
 
     commits = data["commits"]
     if not isinstance(commits, list):
-        raise ValueError("commits must be a list")
+        raise ChangelogError("commits must be a list")
 
     return ChangelogEntry(
         commits=commits,
@@ -90,7 +92,7 @@ def serialize_entry(entry: ChangelogEntry) -> str:
 def parse_jsonl(path: str) -> list[ChangelogEntry]:
     """Read a .jsonl file and return a list of ChangelogEntry objects.
 
-    Raises ValueError with line number on malformed JSON.
+    Raises ChangelogError with line number on malformed JSON.
     """
     entries: list[ChangelogEntry] = []
     with open(path, "r", encoding="utf-8") as f:
@@ -100,6 +102,6 @@ def parse_jsonl(path: str) -> list[ChangelogEntry]:
                 continue
             try:
                 entries.append(parse_entry(stripped))
-            except ValueError as exc:
-                raise ValueError(f"line {line_num}: {exc}") from exc
+            except ChangelogError as exc:
+                raise ChangelogError(f"line {line_num}: {exc}") from exc
     return entries
