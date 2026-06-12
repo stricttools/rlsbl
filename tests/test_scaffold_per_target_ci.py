@@ -126,6 +126,10 @@ class TestPerTargetCI:
         with open(os.path.join(".rlsbl", "bases", ".github", "workflows", "ci.yml"), "w") as f:
             f.write("old base\n")
 
+        # Register ci.yml in the managed-files registry (simulates prior single-target scaffold)
+        from rlsbl.commands.init_cmd import file_hash, save_hashes
+        save_hashes({os.path.join(".github", "workflows", "ci.yml"): file_hash(os.path.join(".github", "workflows", "ci.yml"))})
+
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             run_cmd_multi(["pypi", "go"], [], {}, ctx=_ctx())
 
@@ -135,7 +139,7 @@ class TestPerTargetCI:
         )
         assert os.path.exists(os.path.join(".github", "workflows", "ci-pypi.yml"))
         assert os.path.exists(os.path.join(".github", "workflows", "ci-go.yml"))
-        assert "Removed old ci.yml (replaced by per-target CI files)" in mock_stdout.getvalue()
+        assert "removed (orphan)" in mock_stdout.getvalue()
 
 
 class TestIsNpmWrapper:
