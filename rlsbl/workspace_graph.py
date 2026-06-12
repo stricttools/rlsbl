@@ -1,9 +1,10 @@
 """Dependency graph builder for monorepo workspaces that parses project manifests and provides topological sorting for ordered operations."""
 
+import heapq
 import json
 import os
 import sys
-from collections import namedtuple
+from collections import deque, namedtuple
 from typing import Protocol, runtime_checkable
 
 import tomlkit
@@ -297,19 +298,18 @@ class WorkspaceGraph:
         # Recompute: in_degree[X] = number of deps X has (not rdeps).
         in_degree = {name: len(deps) for name, deps in self._deps.items()}
 
-        queue = [name for name in self._project_names if in_degree[name] == 0]
+        heap = sorted(name for name in self._project_names if in_degree[name] == 0)
+        heapq.heapify(heap)
         result = []
 
-        while queue:
-            # Sort for deterministic output
-            queue.sort()
-            node = queue.pop(0)
+        while heap:
+            node = heapq.heappop(heap)
             result.append(node)
             # For each project that depends on this node, decrement its in-degree
             for dependent, _scope in self._rdeps.get(node, []):
                 in_degree[dependent] -= 1
                 if in_degree[dependent] == 0:
-                    queue.append(dependent)
+                    heapq.heappush(heap, dependent)
 
         if len(result) != len(self._project_names):
             raise CycleError(
@@ -340,14 +340,14 @@ class WorkspaceGraph:
         result = []
         visited = {name}
         # queue entries: (node_name, current_depth)
-        queue = []
+        queue = deque()
         for dep in self._deps[name]:
             if dep.name not in visited:
                 visited.add(dep.name)
                 queue.append((dep.name, 1))
                 result.append(dep.name)
         while queue:
-            current, d = queue.pop(0)
+            current, d = queue.popleft()
             if depth is not None and d >= depth:
                 continue
             for dep in self._deps.get(current, []):
@@ -371,7 +371,7 @@ class WorkspaceGraph:
             return []
         result = []
         visited = {name}
-        queue = []
+        queue = deque()
         for rdep_name, scope in self._rdeps[name]:
             if scope_filter is not None and scope != scope_filter:
                 continue
@@ -380,7 +380,7 @@ class WorkspaceGraph:
                 queue.append((rdep_name, 1))
                 result.append(rdep_name)
         while queue:
-            current, d = queue.pop(0)
+            current, d = queue.popleft()
             if depth is not None and d >= depth:
                 continue
             for rdep_name, scope in self._rdeps.get(current, []):
