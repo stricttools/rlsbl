@@ -10,6 +10,7 @@ import tomlkit
 from conftest import make_workspace, run_git
 
 from rlsbl.commands.monorepo import _cmd_batch_release_init
+from rlsbl.errors import ReleaseFileError
 from rlsbl.release_file import (
     ReleaseConfig,
     _validate_release_config,
@@ -312,27 +313,27 @@ class TestSharedValidation:
     def test_missing_bump_no_prefix(self):
         """Missing bump without prefix raises with no prefix in message."""
         data = {"include": [], "exclude": []}
-        with pytest.raises(ValueError, match="^missing required field: bump$"):
+        with pytest.raises(ReleaseFileError, match="^missing required field: bump$"):
             _validate_release_config(data)
 
     def test_missing_bump_with_prefix(self):
         """Missing bump with prefix includes prefix in message."""
         data = {"include": [], "exclude": []}
         with pytest.raises(
-            ValueError, match=r"^\[packages\.foo\] missing required field: bump$"
+            ReleaseFileError, match=r"^\[packages\.foo\] missing required field: bump$"
         ):
             _validate_release_config(data, prefix="[packages.foo] ")
 
     def test_invalid_bump_no_prefix(self):
         """Invalid bump without prefix."""
         data = {"bump": "huge", "include": [], "exclude": []}
-        with pytest.raises(ValueError, match="bump must be set.*invalid bump"):
+        with pytest.raises(ReleaseFileError, match="bump must be set.*invalid bump"):
             _validate_release_config(data)
 
     def test_invalid_bump_with_prefix(self):
         """Invalid bump with prefix."""
         data = {"bump": "huge", "include": [], "exclude": []}
-        with pytest.raises(ValueError, match=r"\[packages\.bar\].*invalid bump"):
+        with pytest.raises(ReleaseFileError, match=r"\[packages\.bar\].*invalid bump"):
             _validate_release_config(data, prefix="[packages.bar] ")
 
     def test_flutter_mode_required_no_prefix(self):
@@ -343,7 +344,7 @@ class TestSharedValidation:
             "exclude": [],
             "description": "test",
         }
-        with pytest.raises(ValueError, match="requires.*mode"):
+        with pytest.raises(ReleaseFileError, match="requires.*mode"):
             _validate_release_config(data)
 
     def test_flutter_mode_required_with_prefix(self):
@@ -354,7 +355,7 @@ class TestSharedValidation:
             "exclude": [],
             "description": "test",
         }
-        with pytest.raises(ValueError, match=r"\[packages\.app\].*requires.*mode"):
+        with pytest.raises(ReleaseFileError, match=r"\[packages\.app\].*requires.*mode"):
             _validate_release_config(data, prefix="[packages.app] ")
 
     def test_include_exclude_overlap_no_prefix(self):
@@ -364,7 +365,7 @@ class TestSharedValidation:
             "exclude": ["pypi"],
             "description": "test",
         }
-        with pytest.raises(ValueError, match="both include and exclude"):
+        with pytest.raises(ReleaseFileError, match="both include and exclude"):
             _validate_release_config(data)
 
     def test_include_exclude_overlap_with_prefix(self):
@@ -375,7 +376,7 @@ class TestSharedValidation:
             "description": "test",
         }
         with pytest.raises(
-            ValueError, match=r"\[packages\.x\].*both include and exclude"
+            ReleaseFileError, match=r"\[packages\.x\].*both include and exclude"
         ):
             _validate_release_config(data, prefix="[packages.x] ")
 
@@ -386,7 +387,7 @@ class TestSharedValidation:
             "exclude": [],
             "description": "",
         }
-        with pytest.raises(ValueError, match="description must be set"):
+        with pytest.raises(ReleaseFileError, match="description must be set"):
             _validate_release_config(data)
 
     def test_description_empty_with_prefix(self):
@@ -397,7 +398,7 @@ class TestSharedValidation:
             "description": "",
         }
         with pytest.raises(
-            ValueError, match=r"\[packages\.z\].*description must be set"
+            ReleaseFileError, match=r"\[packages\.z\].*description must be set"
         ):
             _validate_release_config(data, prefix="[packages.z] ")
 
@@ -409,7 +410,7 @@ class TestSharedValidation:
             "description": "test",
             "context": 42,
         }
-        with pytest.raises(ValueError, match="context must be a string"):
+        with pytest.raises(ReleaseFileError, match="context must be a string"):
             _validate_release_config(data)
 
     def test_context_not_string_with_prefix(self):
@@ -421,7 +422,7 @@ class TestSharedValidation:
             "context": True,
         }
         with pytest.raises(
-            ValueError, match=r"\[packages\.q\].*context must be a string"
+            ReleaseFileError, match=r"\[packages\.q\].*context must be a string"
         ):
             _validate_release_config(data, prefix="[packages.q] ")
 
@@ -442,7 +443,7 @@ class TestSharedValidationViaPublicAPIs:
             'include = ["flutter"]\n'
             'exclude = []\n'
         )
-        with pytest.raises(ValueError, match="requires.*mode"):
+        with pytest.raises(ReleaseFileError, match="requires.*mode"):
             read_batch_release_file(str(f))
 
     def test_batch_flutter_valid(self, tmp_path):
