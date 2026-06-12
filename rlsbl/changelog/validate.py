@@ -167,6 +167,7 @@ def _is_changelog_path(path: str) -> bool:
     - ``[prefix/].rlsbl/changes/...``
     - ``[prefix/].rlsbl/releases/...``
     - ``[prefix/].rlsbl/version``
+    - ``[prefix/].rlsbl-monorepo/...``
     - ``[prefix/]CHANGELOG.md``
     """
     # Normalise separators (shouldn't matter on Unix, but be safe)
@@ -180,6 +181,8 @@ def _is_changelog_path(path: str) -> bool:
         if tail.startswith(".rlsbl/releases/"):
             return True
         if tail == ".rlsbl/version":
+            return True
+        if tail.startswith(".rlsbl-monorepo/"):
             return True
         if tail == "CHANGELOG.md":
             return True

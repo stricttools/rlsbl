@@ -804,6 +804,18 @@ class TestIsChangelogPath:
     def test_releases_subfile(self):
         assert _is_changelog_path(".rlsbl/releases/retry.toml") is True
 
+    def test_monorepo_dir_releases(self):
+        assert _is_changelog_path(".rlsbl-monorepo/releases/unreleased.toml") is True
+
+    def test_monorepo_dir_workspace(self):
+        assert _is_changelog_path(".rlsbl-monorepo/workspace.toml") is True
+
+    def test_monorepo_dir_snapshot(self):
+        assert _is_changelog_path(".rlsbl-monorepo/snapshot.json") is True
+
+    def test_monorepo_dir_prefixed(self):
+        assert _is_changelog_path("subproject/.rlsbl-monorepo/releases/foo.toml") is True
+
 
 class TestIsChangelogOnlyCommit:
     """Integration tests for _is_changelog_only_commit with real git commits."""
