@@ -186,6 +186,16 @@ def finalize_version(
         _warn_stale_entries(src, tag_glob)
 
     dst = os.path.join(changes_dir, f"{version}.jsonl")
+    if os.path.exists(dst):
+        # os.rename would silently overwrite dst on Linux, clobbering an
+        # already-finalized changelog despite its read-only permissions.
+        raise ChangelogError(
+            f"refusing to finalize changelog for {version}: {dst} already "
+            f"exists. This usually means a previous release attempt "
+            f"partially completed. Finalized changelog files are read-only "
+            f"by design; inspect the existing file and remove it manually "
+            f"before re-releasing."
+        )
     os.rename(src, dst)
     os.chmod(dst, 0o444)
 

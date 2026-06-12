@@ -17,6 +17,7 @@ from rlsbl.changelog.files import (
     read_unreleased,
 )
 from rlsbl.changelog.schema import ChangelogEntry, parse_jsonl
+from rlsbl.errors import ChangelogError
 
 
 class TestGetChangesDir:
@@ -185,6 +186,34 @@ class TestFinalizeVersion:
 
         with pytest.raises(FileNotFoundError, match="unreleased.jsonl not found"):
             finalize_version(str(changes), "1.0.0")
+
+    def test_refuses_to_overwrite_existing_versioned_file(self, tmp_path):
+        """A re-run after a mid-release failure must not clobber an
+        already-finalized (read-only) changelog file."""
+        changes = tmp_path / "changes"
+        changes.mkdir()
+
+        existing_content = (
+            json.dumps({"commits": ["old1"], "user_facing": False}) + "\n"
+        )
+        existing = changes / "1.2.3.jsonl"
+        existing.write_text(existing_content)
+        os.chmod(str(existing), 0o444)
+
+        unreleased_content = (
+            json.dumps({"commits": ["new1"], "user_facing": False}) + "\n"
+        )
+        unreleased = changes / "unreleased.jsonl"
+        unreleased.write_text(unreleased_content)
+
+        with pytest.raises(ChangelogError, match=r"1\.2\.3\.jsonl"):
+            finalize_version(str(changes), "1.2.3")
+
+        # The already-finalized file is untouched (content and read-only mode)
+        assert existing.read_text() == existing_content
+        assert not (os.stat(str(existing)).st_mode & stat.S_IWUSR)
+        # unreleased.jsonl still exists with its original content
+        assert unreleased.read_text() == unreleased_content
 
 
 class TestFinalizeVersionStaleWarning:
