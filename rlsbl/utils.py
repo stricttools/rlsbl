@@ -8,6 +8,8 @@ import subprocess
 import sys
 import urllib.request
 
+from .errors import VersionError
+
 
 def run(cmd, args=None, timeout=120, env=None, cwd=None):
     """Run a command with args, return trimmed stdout. Raise on failure."""
@@ -303,11 +305,11 @@ def bump_version(version, bump_type):
 
     parts = base_version.split(".")
     if len(parts) != 3:
-        raise ValueError(f'Invalid semver version: "{version}"')
+        raise VersionError(f'Invalid semver version: "{version}"')
     try:
         major, minor, patch = (int(p) for p in parts)
     except ValueError:
-        raise ValueError(f'Invalid semver version: "{version}"')
+        raise VersionError(f'Invalid semver version: "{version}"')
 
     if bump_type == "major":
         return f"{major + 1}.0.0"
@@ -316,7 +318,7 @@ def bump_version(version, bump_type):
     elif bump_type == "patch":
         return f"{major}.{minor}.{patch + 1}"
     else:
-        raise ValueError(f'Invalid bump type: "{bump_type}". Use patch, minor, or major.')
+        raise VersionError(f'Invalid bump type: "{bump_type}". Use patch, minor, or major.')
 
 
 def is_private_repo():

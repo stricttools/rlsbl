@@ -5,6 +5,7 @@ import os
 
 import pytest
 
+from rlsbl.errors import VersionError
 from rlsbl.utils import bump_version, extract_changelog_entry, get_hook_timeout, get_push_timeout
 
 
@@ -30,23 +31,23 @@ class TestBumpVersion:
         assert bump_version("0.1.0", "major") == "1.0.0"
 
     def test_invalid_version_raises(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(VersionError):
             bump_version("not-a-version", "patch")
 
     def test_too_few_parts_raises(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(VersionError):
             bump_version("1.2", "patch")
 
     def test_too_many_parts_raises(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(VersionError):
             bump_version("1.2.3.4", "patch")
 
     def test_non_numeric_parts_raises(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(VersionError):
             bump_version("1.2.x", "patch")
 
     def test_invalid_bump_type_raises(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(VersionError):
             bump_version("1.2.3", "mega")
 
     # Pre-release suffix handling
