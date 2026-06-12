@@ -47,8 +47,9 @@ class TestProtocolConformance:
 class TestCustomScannerIntegration:
     """A custom scanner appended to SCANNERS gets called during graph construction."""
 
-    def test_custom_scanner_called(self, tmp_path):
-        from rlsbl.workspace_graph import SCANNERS as scanners_list, WorkspaceGraph
+    def test_custom_scanner_called(self, tmp_path, monkeypatch):
+        import rlsbl.workspace_graph as wg_mod
+        from rlsbl.workspace_graph import WorkspaceGraph
 
         calls = []
 
@@ -58,26 +59,24 @@ class TestCustomScannerIntegration:
                 return []
 
         spy = SpyScanner()
-        scanners_list.append(spy)
-        try:
-            projects = [
-                {"path": "packages/a", "name": "a"},
-                {"path": "packages/b", "name": "b"},
-            ]
-            for proj in projects:
-                (tmp_path / proj["path"]).mkdir(parents=True, exist_ok=True)
+        monkeypatch.setattr(wg_mod, "SCANNERS", [spy])
 
-            WorkspaceGraph(str(tmp_path), projects)
-            # The spy should have been called once per project
-            assert len(calls) == 2
-            dirs = {c[0] for c in calls}
-            assert str(tmp_path / "packages" / "a") in dirs
-            assert str(tmp_path / "packages" / "b") in dirs
-            # workspace_names should contain both project names
-            for _, names in calls:
-                assert names == {"a", "b"}
-        finally:
-            scanners_list.remove(spy)
+        projects = [
+            {"path": "packages/a", "name": "a"},
+            {"path": "packages/b", "name": "b"},
+        ]
+        for proj in projects:
+            (tmp_path / proj["path"]).mkdir(parents=True, exist_ok=True)
+
+        WorkspaceGraph(str(tmp_path), projects)
+        # The spy should have been called once per project
+        assert len(calls) == 2
+        dirs = {c[0] for c in calls}
+        assert str(tmp_path / "packages" / "a") in dirs
+        assert str(tmp_path / "packages" / "b") in dirs
+        # workspace_names should contain both project names
+        for _, names in calls:
+            assert names == {"a", "b"}
 
 
 class TestPypiScannerDirectly:
