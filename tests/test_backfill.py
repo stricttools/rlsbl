@@ -1,25 +1,30 @@
 """Tests for the backfill_changelog script."""
 
+import importlib.util
 import json
 import os
 import stat
 import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 
-# Import backfill functions directly
-import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
-from backfill_changelog import (
-    build_entries,
-    classify_bullet,
-    extract_keywords,
-    is_no_user_facing,
-    map_commits_to_bullets,
-    parse_bullets,
-    score_match,
-    write_jsonl,
-)
+# Load backfill_changelog by file path instead of modifying sys.path
+_BACKFILL_SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "backfill_changelog.py"
+_spec = importlib.util.spec_from_file_location("backfill_changelog", _BACKFILL_SCRIPT)
+_backfill_mod = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_backfill_mod)
+
+build_entries = _backfill_mod.build_entries
+classify_bullet = _backfill_mod.classify_bullet
+extract_keywords = _backfill_mod.extract_keywords
+is_no_user_facing = _backfill_mod.is_no_user_facing
+map_commits_to_bullets = _backfill_mod.map_commits_to_bullets
+parse_bullets = _backfill_mod.parse_bullets
+score_match = _backfill_mod.score_match
+write_jsonl = _backfill_mod.write_jsonl
+backfill = _backfill_mod.backfill
 from rlsbl.changelog.schema import ChangelogEntry, parse_jsonl
 
 
@@ -293,8 +298,6 @@ class TestBackfillIntegration:
 
         monkeypatch.chdir(repo)
 
-        from backfill_changelog import backfill
-
         summary = backfill(
             str(repo),
             str(changelog),
@@ -342,8 +345,6 @@ class TestBackfillIntegration:
 
         monkeypatch.chdir(repo)
 
-        from backfill_changelog import backfill
-
         # First run
         summary1 = backfill(str(repo), str(changelog))
         assert summary1["versions_processed"] == 1
@@ -371,8 +372,6 @@ class TestBackfillIntegration:
         changes_dir.mkdir(parents=True)
 
         monkeypatch.chdir(repo)
-
-        from backfill_changelog import backfill
 
         # First run
         backfill(str(repo), str(changelog))
@@ -406,8 +405,6 @@ class TestBackfillIntegration:
         changes_dir.mkdir(parents=True)
 
         monkeypatch.chdir(repo)
-
-        from backfill_changelog import backfill
 
         summary = backfill(str(repo), str(changelog), single_version="0.2.0")
         assert summary["versions_processed"] == 1
