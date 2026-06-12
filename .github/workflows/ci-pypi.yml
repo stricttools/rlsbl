@@ -16,10 +16,10 @@ jobs:
     strategy:
       matrix:
         # requires-python: >= 3.11
-        python-version: ["3.12", "3.13", "3.14"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v7
       - run: uv python install ${{ matrix.python-version }}
-      - run: uv sync
-      - run: uv run python -c "import rlsbl"
+      - run: uv sync --group dev
+      - run: uv run pytest -n auto -x -q
