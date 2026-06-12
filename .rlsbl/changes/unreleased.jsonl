@@ -4,3 +4,4 @@
 {"commits":["d6aca0a5cd5276c49f1c06ee7fff403780b88388"],"user_facing":true,"description":"**Fix.** `.rlsbl-monorepo/` paths are now auto-exempted from changelog coverage requirements.","type":"fix"}
 {"commits":["6d14b44de9963770801ab786bd12b98fcc867334","c76cde9e9e1acb6a7fd4dd7d226dd8ddb5d47cb1","5d604a4de5e33e7085041a36c7989bf5e6a8605e","8922d97b3e41f0899648ae0a3e91f94518bb5450","bd1fc464a35b119c50a4666e5c8298fd09450ba4","df8ac46cdabb1702abef902dd3a694dca1cb4085","3e6457e782a1055e8c64708894289443124a0c28"],"user_facing":false}
 {"commits":["a5ca6e4f28de986262c69bb113462297a5312aa9"],"user_facing":false}
+{"commits":["292d318e412347b3673c11d0706a44bfa1fe92bd"],"user_facing":false}
