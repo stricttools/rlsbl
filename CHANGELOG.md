@@ -2,9 +2,21 @@
 
 # Changelog
 
-## 0.68.4
+## 0.69.0
 
-scaffold --force preserves gitignore entries
+Managed-files registry, lint config filtering, publish idempotency, monorepo path exemption
+
+### Features
+
+- **Feature.** Scaffold now tracks generated files in `.rlsbl/managed-files.json` and automatically deletes orphans on re-scaffold. Hash comparison protects user-modified files. Separate from `hashes.json` (change detection).
+- **Feature.** Scaffold only generates lint configs for declared targets (pypi→python.toml, npm→npm.toml, go→go.toml). Unused configs are orphan-detected on next scaffold.
+- **Feature.** All publish workflow templates are now idempotent (safe to retry). PyPI uses `skip-existing`, npm/cargo/hex use version-exists pre-checks.
+
+### Fixes
+
+- **Fix.** `.rlsbl-monorepo/` paths are now auto-exempted from changelog coverage requirements.
+
+## 0.68.4
 
 ### Fixes
 
