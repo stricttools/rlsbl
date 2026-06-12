@@ -126,9 +126,11 @@ class TestPerTargetCI:
         with open(os.path.join(".rlsbl", "bases", ".github", "workflows", "ci.yml"), "w") as f:
             f.write("old base\n")
 
-        # Register ci.yml in the managed-files registry (simulates prior single-target scaffold)
-        from rlsbl.commands.init_cmd import file_hash, save_hashes
-        save_hashes({os.path.join(".github", "workflows", "ci.yml"): file_hash(os.path.join(".github", "workflows", "ci.yml"))})
+        # Register ci.yml in both registries (simulates prior single-target scaffold)
+        from rlsbl.commands.init_cmd import file_hash, save_hashes, save_managed_files
+        ci_entry = {os.path.join(".github", "workflows", "ci.yml"): file_hash(os.path.join(".github", "workflows", "ci.yml"))}
+        save_hashes(ci_entry)
+        save_managed_files(ci_entry)
 
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             run_cmd_multi(["pypi", "go"], [], {}, ctx=_ctx())

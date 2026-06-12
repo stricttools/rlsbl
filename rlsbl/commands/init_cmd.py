@@ -16,8 +16,8 @@ from ..targets import TARGETS, detect_targets
 from ..tagging import ensure_tags
 from ..utils import commit_files, is_private_repo
 
-HASHES_FILE = os.path.join(".rlsbl", "managed-files.json")
-_OLD_HASHES_FILE = os.path.join(".rlsbl", "hashes.json")
+HASHES_FILE = os.path.join(".rlsbl", "hashes.json")
+MANAGED_FILES = os.path.join(".rlsbl", "managed-files.json")
 BASES_DIR = os.path.join(".rlsbl", "bases")
 
 _NPM_LOCKFILES = ("package-lock.json", "pnpm-lock.yaml", "yarn.lock")
@@ -111,26 +111,6 @@ USER_OWNED = {
 }
 
 
-def _is_orphan_protected(path):
-    """Check if a managed-files registry path is protected from orphan deletion.
-
-    Protected paths are never deleted during orphan cleanup:
-    - USER_OWNED files (user-controlled content)
-    - .rlsbl/ internal files, EXCEPT .rlsbl/lint/*.toml and .rlsbl/bases/*
-      (lint configs and bases are scaffold-managed and can be orphaned)
-    """
-    if path in USER_OWNED:
-        return True
-    if path.startswith(os.path.join(".rlsbl", "")):
-        # Allow orphan deletion for lint configs and bases
-        if path.startswith(os.path.join(".rlsbl", "lint", "")):
-            return False
-        if path.startswith(os.path.join(".rlsbl", "bases", "")):
-            return False
-        return True
-    return False
-
-
 def file_hash(path):
     """SHA-256 hash of a file's contents."""
     with open(path, "rb") as f:
@@ -138,29 +118,42 @@ def file_hash(path):
 
 
 def load_hashes():
-    """Load stored file hashes from .rlsbl/managed-files.json.
-
-    Migrates from the old hashes.json format if present.
-    """
+    """Load stored file hashes from .rlsbl/hashes.json."""
     if os.path.exists(HASHES_FILE):
         with open(HASHES_FILE) as f:
-            data = json.load(f)
-        return data.get("files", {})
-    # Backward compat: migrate old hashes.json
-    if os.path.exists(_OLD_HASHES_FILE):
-        with open(_OLD_HASHES_FILE) as f:
-            files = json.load(f)
-        save_hashes(files)
-        os.unlink(_OLD_HASHES_FILE)
-        return files
+            return json.load(f)
     return {}
 
 
 def save_hashes(hashes):
-    """Write file hashes to .rlsbl/managed-files.json."""
+    """Write file hashes to .rlsbl/hashes.json."""
     os.makedirs(os.path.dirname(HASHES_FILE), exist_ok=True)
     with open(HASHES_FILE, "w") as f:
-        json.dump({"version": 1, "files": hashes}, f, indent=2)
+        json.dump(hashes, f, indent=2)
+        f.write("\n")
+
+
+def load_managed_files():
+    """Load the managed-files registry from .rlsbl/managed-files.json.
+
+    The managed-files registry tracks template-derived files from apply_plans
+    for orphan detection. Separate from hashes.json which tracks content hashes
+    for change detection.
+
+    Returns the files dict ({path: hash}), or {} if the file is missing.
+    """
+    if os.path.exists(MANAGED_FILES):
+        with open(MANAGED_FILES) as f:
+            data = json.load(f)
+        return data.get("files", {})
+    return {}
+
+
+def save_managed_files(files):
+    """Write the managed-files registry to .rlsbl/managed-files.json."""
+    os.makedirs(os.path.dirname(MANAGED_FILES), exist_ok=True)
+    with open(MANAGED_FILES, "w") as f:
+        json.dump({"version": 1, "files": files}, f, indent=2)
         f.write("\n")
 
 
@@ -561,6 +554,8 @@ def apply_plans(plans):
                 skipped.append((target, plan["status"]))
             else:
                 created.append((target, plan["status"]))
+            if os.path.exists(target):
+                new_hashes[target] = file_hash(target)
             continue
 
         if action == "save_base_only":
@@ -571,6 +566,8 @@ def apply_plans(plans):
                 created.append((target, plan["status"]))
             if plan.get("warning"):
                 warnings.append(plan["warning"])
+            if os.path.exists(target):
+                new_hashes[target] = file_hash(target)
             continue
 
         if action in ("write", "write_no_base"):
@@ -670,10 +667,9 @@ def _print_dry_run_report(plans_groups, registry=None, registries=None, existing
             for plan in plans:
                 if plan.get("action") != "warn_only":
                     planned_targets.add(plan["target"])
-        orphan_keys = set(existing_hashes.keys()) - planned_targets
-        orphans_to_show = sorted(
-            p for p in orphan_keys if not _is_orphan_protected(p)
-        )
+        old_managed = load_managed_files()
+        orphan_keys = set(old_managed.keys()) - planned_targets
+        orphans_to_show = sorted(orphan_keys)
         if orphans_to_show:
             print()
             for orphan_path in orphans_to_show:
@@ -795,20 +791,19 @@ def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnin
         all_new_hashes.update(h)
 
     # Detect and clean up orphaned managed files
-    orphan_keys = set(existing_hashes.keys()) - set(all_new_hashes.keys())
+    # Orphan detection uses managed-files.json (template-derived files only),
+    # not hashes.json (which tracks all files scaffold touches).
+    old_managed = load_managed_files()
+    orphan_keys = set(old_managed.keys()) - set(all_new_hashes.keys())
     dry_run = flags.get("dry-run", False)
     force = flags.get("force", False)
     for orphan_path in sorted(orphan_keys):
-        if _is_orphan_protected(orphan_path):
-            continue
         if dry_run:
             print(f"Would remove: {orphan_path}")
             continue
         if not os.path.exists(orphan_path):
-            # Already gone from disk — just remove from registry
-            del existing_hashes[orphan_path]
             continue
-        stored_hash = existing_hashes[orphan_path]
+        stored_hash = old_managed[orphan_path]
         if force or file_hash(orphan_path) == stored_hash:
             os.unlink(orphan_path)
             # Also clean up the merge base if it exists
@@ -816,7 +811,6 @@ def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnin
             if os.path.exists(base_path):
                 os.unlink(base_path)
             created.append((orphan_path, "removed (orphan)"))
-            del existing_hashes[orphan_path]
         else:
             print(
                 f"Warning: {orphan_path} has been modified — skipping orphan deletion "
@@ -824,6 +818,10 @@ def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnin
                 file=sys.stderr,
             )
 
+    # Save managed-files registry (template-derived files for orphan tracking)
+    save_managed_files(all_new_hashes)
+
+    # Save hashes (all files for change detection)
     existing_hashes.update(all_new_hashes)
     save_hashes(existing_hashes)
 
@@ -894,7 +892,7 @@ def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnin
             print(f"  {cf}", file=sys.stderr)
     # Include .rlsbl/ internal files written during scaffold
     config_file = os.path.join(".rlsbl", "config.json")
-    for rlsbl_file in [HASHES_FILE, os.path.join(".rlsbl", "version"), config_file]:
+    for rlsbl_file in [HASHES_FILE, MANAGED_FILES, os.path.join(".rlsbl", "version"), config_file]:
         if os.path.exists(rlsbl_file) and rlsbl_file not in files_to_commit:
             files_to_commit.append(rlsbl_file)
     # Include any base files that were saved for the created targets

@@ -439,7 +439,7 @@ class TestScaffold:
     # -- Hash tests --
 
     def test_hashes_saved_after_scaffolding(self):
-        """After scaffolding, .rlsbl/managed-files.json should exist with entries."""
+        """After scaffolding, .rlsbl/hashes.json should exist with entries."""
         self._run_scaffold()
         assert os.path.exists(HASHES_FILE)
         hashes = load_hashes()

@@ -58,6 +58,7 @@ class TestDryRunFreshProject:
         assert not os.path.exists(".rlsbl/hooks/pre-release.sh")
         assert not os.path.exists("CHANGELOG.md")
         assert not os.path.exists(".rlsbl/version")
+        assert not os.path.exists(".rlsbl/hashes.json")
         assert not os.path.exists(".rlsbl/managed-files.json")
 
     def test_dry_run_prints_planned_files(self, npm_project, capsys):
