@@ -1,0 +1,10 @@
+# Version bump type: patch, minor, or major
+bump = "minor"
+# Short description of this release (required)
+description = "Custom exception hierarchy, checks.py modularization, import scanning fixes, deploy local_steps, and 9 truncation removals."
+# Optional context explaining why these changes were made
+context = """
+Codebase investigation surfaced 50 curiosities; 13 were elevated to decisions and executed across 11 phases. The biggest structural changes: 105 bare ValueErrors replaced with 5 typed exception classes, and the 1,978-line checks.py split into a 6-module package. Import scanning got two correctness fixes (guarded imports for deps-unused, root-relative test context detection). The deploy module gained local_steps for pre-SSH commands like cross-compilation. All silent truncation was purged (9 instances). Test suite gained xdist (96s -> 27s), parametrization, and real CI runs.
+"""
+include = ["npm", "pypi"]
+exclude = []
