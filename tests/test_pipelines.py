@@ -5,6 +5,7 @@ import os
 import pytest
 
 import rlsbl.pipelines as _pipelines_mod
+from rlsbl.errors import ConfigError
 from rlsbl.pipelines import Pipeline, PIPELINE_TYPES, load_pipelines
 from rlsbl.pipelines.base import BasePipeline, TokenPipeline, CredentialPipeline
 from rlsbl.config import validate_pipelines_config
@@ -346,27 +347,27 @@ class TestValidatePipelinesConfig:
         validate_pipelines_config({"pipelines": None})
 
     def test_pipelines_not_dict_fails(self):
-        with pytest.raises(ValueError, match="must be a dict"):
+        with pytest.raises(ConfigError, match="must be a dict"):
             validate_pipelines_config({"pipelines": "not-a-dict"})
 
     def test_pipelines_list_fails(self):
-        with pytest.raises(ValueError, match="must be a dict"):
+        with pytest.raises(ConfigError, match="must be a dict"):
             validate_pipelines_config({"pipelines": [{"type": "x"}]})
 
     def test_entry_not_dict_fails(self):
-        with pytest.raises(ValueError, match="pipeline 'bad' must be a dict"):
+        with pytest.raises(ConfigError, match="pipeline 'bad' must be a dict"):
             validate_pipelines_config({"pipelines": {"bad": "string"}})
 
     def test_missing_type_fails(self):
-        with pytest.raises(ValueError, match="missing required key 'type'"):
+        with pytest.raises(ConfigError, match="missing required key 'type'"):
             validate_pipelines_config({"pipelines": {"p": {"local": True}}})
 
     def test_type_not_string_fails(self):
-        with pytest.raises(ValueError, match="type must be a string"):
+        with pytest.raises(ConfigError, match="type must be a string"):
             validate_pipelines_config({"pipelines": {"p": {"type": 42, "local": True}}})
 
     def test_type_not_registered_fails(self):
-        with pytest.raises(ValueError, match="not a registered pipeline type"):
+        with pytest.raises(ConfigError, match="not a registered pipeline type"):
             validate_pipelines_config(
                 {"pipelines": {"p": {"type": "nonexistent", "local": True}}}
             )
@@ -376,7 +377,7 @@ class TestValidatePipelinesConfig:
             _pipelines_mod, "PIPELINE_TYPES",
             {**PIPELINE_TYPES, "test_token": _TestTokenPipeline},
         )
-        with pytest.raises(ValueError, match="missing required key 'local'"):
+        with pytest.raises(ConfigError, match="missing required key 'local'"):
             validate_pipelines_config(
                 {"pipelines": {"p": {"type": "test_token"}}}
             )
@@ -386,7 +387,7 @@ class TestValidatePipelinesConfig:
             _pipelines_mod, "PIPELINE_TYPES",
             {**PIPELINE_TYPES, "test_token": _TestTokenPipeline},
         )
-        with pytest.raises(ValueError, match="local must be a boolean"):
+        with pytest.raises(ConfigError, match="local must be a boolean"):
             validate_pipelines_config(
                 {"pipelines": {"p": {"type": "test_token", "local": "yes"}}}
             )
@@ -405,7 +406,7 @@ class TestValidatePipelinesConfig:
             _pipelines_mod, "PIPELINE_TYPES",
             {**PIPELINE_TYPES, "test_token": _TestTokenPipeline},
         )
-        with pytest.raises(ValueError, match="max_asset_size_mb is not set"):
+        with pytest.raises(ConfigError, match="max_asset_size_mb is not set"):
             validate_pipelines_config(
                 {"pipelines": {"p": {"type": "test_token", "local": True, "assets": True}}}
             )
@@ -427,7 +428,7 @@ class TestValidatePipelinesConfig:
             _pipelines_mod, "PIPELINE_TYPES",
             {**PIPELINE_TYPES, "test_token": _TestTokenPipeline},
         )
-        with pytest.raises(ValueError, match="positive integer"):
+        with pytest.raises(ConfigError, match="positive integer"):
             validate_pipelines_config(
                 {"pipelines": {"p": {
                     "type": "test_token", "local": True,
@@ -440,7 +441,7 @@ class TestValidatePipelinesConfig:
             _pipelines_mod, "PIPELINE_TYPES",
             {**PIPELINE_TYPES, "test_token": _TestTokenPipeline},
         )
-        with pytest.raises(ValueError, match="max_asset_size_mb is not set"):
+        with pytest.raises(ConfigError, match="max_asset_size_mb is not set"):
             validate_pipelines_config(
                 {"pipelines": {"p": {
                     "type": "test_token", "local": True,
@@ -466,7 +467,7 @@ class TestValidatePipelinesConfig:
             _pipelines_mod, "PIPELINE_TYPES",
             {**PIPELINE_TYPES, "test_token": _TestTokenPipeline},
         )
-        with pytest.raises(ValueError, match="missing required string key 'name'"):
+        with pytest.raises(ConfigError, match="missing required string key 'name'"):
             validate_pipelines_config(
                 {"pipelines": {"p": {
                     "type": "test_token", "local": True,
@@ -480,7 +481,7 @@ class TestValidatePipelinesConfig:
             _pipelines_mod, "PIPELINE_TYPES",
             {**PIPELINE_TYPES, "test_token": _TestTokenPipeline},
         )
-        with pytest.raises(ValueError, match="missing required string key 'build'"):
+        with pytest.raises(ConfigError, match="missing required string key 'build'"):
             validate_pipelines_config(
                 {"pipelines": {"p": {
                     "type": "test_token", "local": True,
@@ -494,7 +495,7 @@ class TestValidatePipelinesConfig:
             _pipelines_mod, "PIPELINE_TYPES",
             {**PIPELINE_TYPES, "test_token": _TestTokenPipeline},
         )
-        with pytest.raises(ValueError, match="custom_assets must be a list"):
+        with pytest.raises(ConfigError, match="custom_assets must be a list"):
             validate_pipelines_config(
                 {"pipelines": {"p": {
                     "type": "test_token", "local": True,

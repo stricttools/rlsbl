@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from rlsbl.commands.pre_push_check import _get_release_branches
+from rlsbl.errors import ConfigError
 from rlsbl.context import ProjectContext
 
 
@@ -25,7 +26,7 @@ class TestGetReleaseBranches:
         Treat it as a configuration error: the user should remove the key
         to opt back into the default, or list at least one branch.
         """
-        with pytest.raises(ValueError) as excinfo:
+        with pytest.raises(ConfigError) as excinfo:
             _get_release_branches(ProjectContext(project_root=Path("."), workspace_root=None, config={"release_branches": []}))
         msg = str(excinfo.value)
         assert ".rlsbl/config.json" in msg
@@ -36,7 +37,7 @@ class TestGetReleaseBranches:
 
     def test_non_list_raises(self, tmp_project):
         """A non-list value (string, dict, int) is also a configuration error."""
-        with pytest.raises(ValueError) as excinfo:
+        with pytest.raises(ConfigError) as excinfo:
             _get_release_branches(ProjectContext(project_root=Path("."), workspace_root=None, config={"release_branches": "main"}))
         msg = str(excinfo.value)
         assert ".rlsbl/config.json" in msg

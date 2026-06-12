@@ -10,6 +10,7 @@ import json
 import pytest
 
 from conftest import make_ctx
+from rlsbl.errors import ConfigError
 from rlsbl.targets import TARGETS, TargetEntry, _parse_target_entry, detect_targets
 from rlsbl.commands.release import resolve_release_targets, resolve_target_paths
 from rlsbl.commands.init_cmd import _merge_template_vars
@@ -39,7 +40,7 @@ class TestParseTargetEntry:
         assert result.path == str(tmp_path)
 
     def test_dict_entry_missing_name(self, tmp_path):
-        with pytest.raises(ValueError):
+        with pytest.raises(ConfigError):
             _parse_target_entry({"path": "npm"}, str(tmp_path))
 
     def test_invalid_type(self, tmp_path):

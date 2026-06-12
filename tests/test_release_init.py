@@ -6,6 +6,7 @@ from unittest.mock import patch
 import pytest
 import tomlkit
 
+from rlsbl.errors import ReleaseFileError
 from rlsbl.targets import TargetEntry
 
 
@@ -195,7 +196,7 @@ class TestReleaseInitRoundTrip:
         _run_release_init(tmp_path, entries, monkeypatch)
 
         release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
-        with pytest.raises(ValueError, match="bump must be set"):
+        with pytest.raises(ReleaseFileError, match="bump must be set"):
             read_release_file(str(release_path))
 
     def test_roundtrip_with_flutter(self, tmp_path, monkeypatch):
