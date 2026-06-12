@@ -30,7 +30,7 @@ import pytest
 
 from rlsbl.commands.init_cmd import run_cmd, _is_dev_node_project
 from rlsbl.context import ProjectContext, create_context
-from tests.conftest import make_workspace
+from conftest import make_workspace
 
 
 class TestScaffoldPlainDevNode:
