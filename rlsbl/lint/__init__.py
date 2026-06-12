@@ -2,7 +2,7 @@
 
 Public API:
     lint_library(project_path) -> list[LintResult]
-    scan_imports(project_path) -> set[tuple[str, str, int]]
+    scan_imports(project_path) -> set[tuple[str, str, int, bool]]
     LintResult  (namedtuple: file, line, rule, severity, message)
 """
 
@@ -109,7 +109,7 @@ def lint_library(project_path: str) -> list[LintResult]:
     return results
 
 
-def scan_imports(project_path: str) -> set[tuple[str, str, int]]:
+def scan_imports(project_path: str) -> set[tuple[str, str, int, bool]]:
     """Collect all imports from source files in a project.
 
     Detects languages present and uses AST-based scanners to extract
@@ -118,7 +118,8 @@ def scan_imports(project_path: str) -> set[tuple[str, str, int]]:
     Args:
         project_path: path to the project root directory.
 
-    Returns a set of (package_name, file_path, line_number) tuples.
+    Returns a set of (package_name, file_path, line_number, guarded) tuples.
+    Guarded imports are those inside try/except ImportError blocks (Python).
     """
     project_path = os.path.abspath(project_path)
     languages = _detect_languages(project_path)
@@ -126,7 +127,7 @@ def scan_imports(project_path: str) -> set[tuple[str, str, int]]:
     if not languages:
         return set()
 
-    all_imports: set[tuple[str, str, int]] = set()
+    all_imports: set[tuple[str, str, int, bool]] = set()
     for language in languages:
         scanner = _create_import_scanner(language)
         if scanner is not None:

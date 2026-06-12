@@ -94,38 +94,45 @@ def _try_catches_import_error(try_node, error_names):
 def _collect_all_imports(tree, filepath):
     """Walk AST and collect all imported top-level module names.
 
-    Returns a set of (package_name, file_path, line_number) tuples.
-    Skips imports inside try/except ImportError blocks (optional deps).
+    Returns a set of (package_name, file_path, line_number, guarded) tuples.
+    Imports inside try/except ImportError blocks are marked guarded=True
+    instead of being dropped, so callers can decide how to handle them.
     """
     imports = set()
 
     def _walk(node):
         if node.type == "import_statement":
-            if _is_in_try_except_import_error(node):
+            guarded = _is_in_try_except_import_error(node)
+            if guarded:
+                # Still walk children for nested structures, but also
+                # collect the import as guarded below.
                 for child in node.children:
                     _walk(child)
-                return
             for child in node.children:
                 if child.type == "dotted_name":
                     module = child.text.decode("utf-8")
                     top_level = module.split(".")[0]
-                    imports.add((top_level, filepath, _node_line(node)))
+                    imports.add((top_level, filepath, _node_line(node), guarded))
                 elif child.type == "aliased_import":
                     name_node = child.child_by_field_name("name")
                     if name_node:
                         module = name_node.text.decode("utf-8")
                         top_level = module.split(".")[0]
-                        imports.add((top_level, filepath, _node_line(node)))
+                        imports.add((top_level, filepath, _node_line(node), guarded))
+            if guarded:
+                return
         elif node.type == "import_from_statement":
-            if _is_in_try_except_import_error(node):
+            guarded = _is_in_try_except_import_error(node)
+            if guarded:
                 for child in node.children:
                     _walk(child)
-                return
             module_node = child_by_field(node, "module_name")
             if module_node:
                 module = module_node.text.decode("utf-8")
                 top_level = module.split(".")[0]
-                imports.add((top_level, filepath, _node_line(node)))
+                imports.add((top_level, filepath, _node_line(node), guarded))
+            if guarded:
+                return
         for child in node.children:
             _walk(child)
 
@@ -139,7 +146,7 @@ def _check_forbidden_imports(tree, filepath, config):
     forbidden = frozenset(config.forbidden_imports)
     all_imports = _collect_all_imports(tree, filepath)
 
-    for pkg, fpath, line in all_imports:
+    for pkg, fpath, line, _guarded in all_imports:
         if pkg in forbidden:
             results.append(LintResult(
                 file=fpath,
@@ -292,12 +299,13 @@ class PythonAstLinter:
         self,
         project_path: str,
         exclude_dirs: list[str] | None = None,
-    ) -> set[tuple[str, str, int]]:
+    ) -> set[tuple[str, str, int, bool]]:
         """Collect all imported top-level module names from Python files.
 
-        Returns a set of (package_name, file_path, line_number) tuples.
+        Returns a set of (package_name, file_path, line_number, guarded) tuples.
+        Guarded imports are those inside try/except ImportError blocks.
         """
-        all_imports: set[tuple[str, str, int]] = set()
+        all_imports: set[tuple[str, str, int, bool]] = set()
         parser = _make_parser()
         for filepath in walk_source_files(project_path, (".py",), [], exclude_dirs=exclude_dirs):
             try:

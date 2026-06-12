@@ -50,7 +50,8 @@ def _extract_string(node):
 def _collect_all_imports(tree, filepath):
     """Walk AST and collect all imported package names.
 
-    Returns a set of (package_name, file_path, line_number) tuples.
+    Returns a set of (package_name, file_path, line_number, guarded) tuples.
+    JS/TS has no try/except ImportError pattern, so guarded is always False.
     """
     imports = set()
 
@@ -59,7 +60,7 @@ def _collect_all_imports(tree, filepath):
             for child in node.children:
                 if child.type == "string":
                     pkg = _extract_string(child)
-                    imports.add((pkg, filepath, _node_line(node)))
+                    imports.add((pkg, filepath, _node_line(node), False))
             for child in node.children:
                 _walk(child)
             return
@@ -68,7 +69,7 @@ def _collect_all_imports(tree, filepath):
             for child in node.children:
                 if child.type == "string":
                     pkg = _extract_string(child)
-                    imports.add((pkg, filepath, _node_line(node)))
+                    imports.add((pkg, filepath, _node_line(node), False))
             for child in node.children:
                 _walk(child)
             return
@@ -86,7 +87,7 @@ def _collect_all_imports(tree, filepath):
                     for child in args.children:
                         if child.type == "string":
                             pkg = _extract_string(child)
-                            imports.add((pkg, filepath, _node_line(node)))
+                            imports.add((pkg, filepath, _node_line(node), False))
                             break
 
                 # import('pkg') -- dynamic import
@@ -94,7 +95,7 @@ def _collect_all_imports(tree, filepath):
                     for child in args.children:
                         if child.type == "string":
                             pkg = _extract_string(child)
-                            imports.add((pkg, filepath, _node_line(node)))
+                            imports.add((pkg, filepath, _node_line(node), False))
                             break
 
         for child in node.children:
@@ -110,7 +111,7 @@ def _check_forbidden_imports(tree, filepath, config):
     forbidden = frozenset(config.forbidden_imports)
     all_imports = _collect_all_imports(tree, filepath)
 
-    for pkg, fpath, line in all_imports:
+    for pkg, fpath, line, _guarded in all_imports:
         if pkg in forbidden:
             results.append(LintResult(
                 file=fpath,
@@ -241,12 +242,13 @@ class NpmAstLinter:
         self,
         project_path: str,
         exclude_dirs: list[str] | None = None,
-    ) -> set[tuple[str, str, int]]:
+    ) -> set[tuple[str, str, int, bool]]:
         """Collect all imported package names from JS/TS files.
 
-        Returns a set of (package_name, file_path, line_number) tuples.
+        Returns a set of (package_name, file_path, line_number, guarded) tuples.
+        JS/TS has no try/except ImportError pattern, so guarded is always False.
         """
-        all_imports: set[tuple[str, str, int]] = set()
+        all_imports: set[tuple[str, str, int, bool]] = set()
         for filepath in walk_source_files(project_path, _ALL_EXTENSIONS, [], exclude_dirs=exclude_dirs):
             try:
                 with open(filepath, "r", encoding="utf-8") as f:

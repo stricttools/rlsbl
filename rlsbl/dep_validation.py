@@ -737,7 +737,7 @@ def _build_npm_import_graph(
     raw_imports = linter.scan_imports(project_dir, exclude_dirs=exclude_dirs)
 
     graph: dict[str, set[str]] = {}
-    for specifier, filepath, _line in raw_imports:
+    for specifier, filepath, _line, _guarded in raw_imports:
         # Only process relative imports
         if not specifier.startswith("./") and not specifier.startswith("../"):
             continue
@@ -1068,8 +1068,8 @@ def find_dead_workspace_packages(
     Args:
         projects: list of workspace project dicts (must have "name",
             and optionally "library" and "dev_node" keys).
-        import_cache: mapping of project name to (lib_imports, test_imports)
-            as produced by _build_dep_import_cache in checks.py.
+        import_cache: mapping of project name to (lib_imports, test_imports,
+            guarded_imports) as produced by _build_dep_import_cache in checks.py.
 
     Returns:
         list of DeadWorkspacePackage for packages with no workspace importers.
@@ -1081,7 +1081,7 @@ def find_dead_workspace_packages(
 
     for proj in projects:
         proj_name = proj["name"]
-        lib_imports, test_imports = import_cache.get(proj_name, (set(), set()))
+        lib_imports, test_imports, _guarded = import_cache.get(proj_name, (set(), set(), set()))
         for imported in lib_imports:
             if imported == proj_name:
                 continue  # self-imports don't count

@@ -130,6 +130,56 @@ class TestCheckUnusedDeps:
         )
         assert len(errors) == 2
 
+    def test_guarded_import_not_false_positive(self, tmp_path):
+        """A declared dep imported only in try/except ImportError is NOT unused.
+
+        This is the false-positive fix: guarded imports should count as
+        "used" for the unused-deps check, since the dep is intentionally
+        declared for optional use.
+        """
+        project_dir = tmp_path / "app"
+        project_dir.mkdir()
+        (project_dir / "pyproject.toml").write_text(_PYPROJECT)
+        (project_dir / "main.py").write_text(
+            "try:\n"
+            "    import auth\n"
+            "except ImportError:\n"
+            "    auth = None\n"
+        )
+
+        errors = check_unused_deps(
+            project_name="app",
+            project_dir=str(project_dir),
+            manifest_deps={"auth"},
+            workspace_names={"app", "auth"},
+            whitelist={},
+        )
+        assert errors == []
+
+    def test_guarded_import_undeclared_not_flagged(self, tmp_path):
+        """A guarded import of a declared dep is NOT undeclared.
+
+        Companion to test_guarded_import_not_false_positive: when the dep
+        IS declared, the undeclared check should not flag it either.
+        """
+        project_dir = tmp_path / "app"
+        project_dir.mkdir()
+        (project_dir / "pyproject.toml").write_text(_PYPROJECT)
+        (project_dir / "main.py").write_text(
+            "try:\n"
+            "    import auth\n"
+            "except ImportError:\n"
+            "    auth = None\n"
+        )
+
+        errors = check_undeclared_deps(
+            project_name="app",
+            project_dir=str(project_dir),
+            manifest_deps={"auth"},
+            workspace_names={"app", "auth"},
+        )
+        assert errors == []
+
 
 class TestCheckUndeclaredDeps:
     """check_undeclared_deps detects imported-but-undeclared workspace deps."""
@@ -1190,7 +1240,7 @@ class TestRootProjectDepScan:
         workspace_names = {"root-app", "sibling-lib"}
 
         # Without exclusions, scanning root picks up sibling's import
-        lib_all, test_all = _get_imported_workspace_packages(
+        lib_all, test_all, _guarded_all = _get_imported_workspace_packages(
             str(tmp_path), workspace_names,
         )
         # sibling/app.py imports root_app, which would be a false positive
@@ -1198,7 +1248,7 @@ class TestRootProjectDepScan:
         assert "root-app" in (lib_all | test_all)
 
         # With exclusions, sibling's files are not scanned
-        lib_exc, test_exc = _get_imported_workspace_packages(
+        lib_exc, test_exc, _guarded_exc = _get_imported_workspace_packages(
             str(tmp_path), workspace_names,
             exclude_dirs=[str(sibling)],
         )
@@ -1339,7 +1389,7 @@ class TestRootProjectDepScan:
         # The root project should NOT see root-app as imported
         # (that import lives in sibling/app.py which should be excluded)
         cache = ctx._dep_import_cache
-        root_lib, root_test = cache["root-app"]
+        root_lib, root_test, _root_guarded = cache["root-app"]
         # root-app should not appear in its own scan results
         # (sibling/app.py's "import root_app" should be excluded)
         assert "root-app" not in root_lib
@@ -1808,8 +1858,8 @@ class TestFindDeadWorkspacePackages:
             {"name": "auth", "path": "auth", "library": True},
         ]
         import_cache = {
-            "app": ({"auth"}, set()),   # app imports auth in lib code
-            "auth": (set(), set()),
+            "app": ({"auth"}, set(), set()),   # app imports auth in lib code
+            "auth": (set(), set(), set()),
         }
         dead = find_dead_workspace_packages(projects, import_cache)
         assert dead == []
@@ -1821,8 +1871,8 @@ class TestFindDeadWorkspacePackages:
             {"name": "auth", "path": "auth", "library": True},
         ]
         import_cache = {
-            "app": (set(), set()),
-            "auth": (set(), set()),
+            "app": (set(), set(), set()),
+            "auth": (set(), set(), set()),
         }
         dead = find_dead_workspace_packages(projects, import_cache)
         assert len(dead) == 1
@@ -1837,8 +1887,8 @@ class TestFindDeadWorkspacePackages:
             {"name": "cli", "path": "cli"},
         ]
         import_cache = {
-            "app": (set(), set()),
-            "cli": (set(), set()),
+            "app": (set(), set(), set()),
+            "cli": (set(), set(), set()),
         }
         dead = find_dead_workspace_packages(projects, import_cache)
         assert dead == []
@@ -1850,8 +1900,8 @@ class TestFindDeadWorkspacePackages:
             {"name": "test-utils", "path": "test-utils", "library": True, "dev_node": True},
         ]
         import_cache = {
-            "app": (set(), set()),
-            "test-utils": (set(), set()),
+            "app": (set(), set(), set()),
+            "test-utils": (set(), set(), set()),
         }
         dead = find_dead_workspace_packages(projects, import_cache)
         assert dead == []
@@ -1863,8 +1913,8 @@ class TestFindDeadWorkspacePackages:
             {"name": "testlib", "path": "testlib", "library": True},
         ]
         import_cache = {
-            "app": (set(), {"testlib"}),   # app imports testlib only in tests
-            "testlib": (set(), set()),
+            "app": (set(), {"testlib"}, set()),   # app imports testlib only in tests
+            "testlib": (set(), set(), set()),
         }
         dead = find_dead_workspace_packages(projects, import_cache)
         assert len(dead) == 1
@@ -1879,7 +1929,7 @@ class TestFindDeadWorkspacePackages:
             {"name": "mylib", "path": "mylib", "library": True},
         ]
         import_cache = {
-            "mylib": ({"mylib"}, set()),   # self-import only
+            "mylib": ({"mylib"}, set(), set()),   # self-import only
         }
         dead = find_dead_workspace_packages(projects, import_cache)
         assert len(dead) == 1
@@ -1893,9 +1943,9 @@ class TestFindDeadWorkspacePackages:
             {"name": "lib-b", "path": "lib-b", "library": True},
         ]
         import_cache = {
-            "app": (set(), set()),
-            "lib-a": (set(), set()),
-            "lib-b": (set(), set()),
+            "app": (set(), set(), set()),
+            "lib-a": (set(), set(), set()),
+            "lib-b": (set(), set(), set()),
         }
         dead = find_dead_workspace_packages(projects, import_cache)
         assert len(dead) == 2
@@ -1909,8 +1959,8 @@ class TestFindDeadWorkspacePackages:
             {"name": "utils", "path": "utils", "library": True},
         ]
         import_cache = {
-            "app": ({"utils"}, {"utils"}),
-            "utils": (set(), set()),
+            "app": ({"utils"}, {"utils"}, set()),
+            "utils": (set(), set(), set()),
         }
         dead = find_dead_workspace_packages(projects, import_cache)
         assert dead == []
@@ -1926,7 +1976,7 @@ class TestFindDeadWorkspacePackages:
             {"name": "app", "path": "app", "library": False},
         ]
         import_cache = {
-            "app": (set(), set()),
+            "app": (set(), set(), set()),
         }
         dead = find_dead_workspace_packages(projects, import_cache)
         assert dead == []

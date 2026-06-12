@@ -313,7 +313,7 @@ class NpmImportScanner:
         raw_imports = linter.scan_imports(project_path, exclude_dirs=exclude_dirs)
 
         results = []
-        for specifier, filepath, line_number in raw_imports:
+        for specifier, filepath, line_number, _guarded in raw_imports:
             bare = _extract_npm_bare_name(specifier)
             if bare is None:
                 continue

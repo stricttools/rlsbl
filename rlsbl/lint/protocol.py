@@ -16,9 +16,10 @@ class LanguageLinter(Protocol):
 
 @runtime_checkable
 class ImportScanner(Protocol):
-    def scan_imports(self, project_path: str) -> set[tuple[str, str, int]]:
+    def scan_imports(self, project_path: str) -> set[tuple[str, str, int, bool]]:
         """Collect all imports from source files in a project.
 
-        Returns a set of (package_name, file_path, line_number) tuples.
+        Returns a set of (package_name, file_path, line_number, guarded) tuples.
+        Guarded imports are those inside try/except ImportError blocks.
         """
         ...

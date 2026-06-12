@@ -406,7 +406,7 @@ def register_workspace_checks(app):
             manifest_deps_with_scope = {
                 d.name: d.scope for d in ctx.graph.dependencies(name)
             }
-            lib_imports, test_imports = import_cache[name]
+            lib_imports, test_imports, _guarded = import_cache[name]
             flagged = check_runtime_test_only(
                 manifest_deps_with_scope, lib_imports, test_imports
             )
@@ -440,7 +440,7 @@ def register_workspace_checks(app):
             manifest_deps_with_scope = {
                 d.name: d.scope for d in ctx.graph.dependencies(name)
             }
-            lib_imports, _test_imports = import_cache[name]
+            lib_imports, _test_imports, _guarded = import_cache[name]
             flagged = check_dev_in_lib(manifest_deps_with_scope, lib_imports)
             for dep in flagged:
                 all_flagged.append(

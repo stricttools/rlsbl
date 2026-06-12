@@ -91,10 +91,10 @@ def _sibling_exclude_dirs(root, project_path, all_projects):
 def _build_dep_import_cache(ctx):
     """Build per-project import scan cache for dependency checks.
 
-    Returns a dict mapping project name to (lib_imports, test_imports).
-    All dep checks (unused, undeclared, runtime-test-only, dev-in-lib)
-    share one scan pass via this cache.  The result is memoized on the
-    context object so that multiple checks in the same run reuse a
+    Returns a dict mapping project name to (lib_imports, test_imports,
+    guarded_imports). All dep checks (unused, undeclared, runtime-test-only,
+    dev-in-lib) share one scan pass via this cache. The result is memoized
+    on the context object so that multiple checks in the same run reuse a
     single scan instead of re-walking every project's source tree.
     """
     cached = getattr(ctx, "_dep_import_cache", None)

@@ -25,7 +25,7 @@ class TestPythonImportExtraction:
         )
         linter = PythonAstLinter()
         result = linter.scan_imports(str(tmp_path))
-        pkg_names = {pkg for pkg, _, _ in result}
+        pkg_names = {pkg for pkg, *_ in result}
         assert pkg_names == {"os", "pathlib", "requests"}
 
     def test_line_numbers(self, tmp_path):
@@ -36,7 +36,7 @@ class TestPythonImportExtraction:
         )
         linter = PythonAstLinter()
         result = linter.scan_imports(str(tmp_path))
-        by_pkg = {pkg: line for pkg, _, line in result}
+        by_pkg = {pkg: line for pkg, _, line, _guarded in result}
         assert by_pkg["os"] == 1
         assert by_pkg["pathlib"] == 3
         assert by_pkg["requests"] == 4
@@ -47,7 +47,7 @@ class TestPythonImportExtraction:
         (tmp_path / "lib.py").write_text("import os\n")
         linter = PythonAstLinter()
         result = linter.scan_imports(str(tmp_path))
-        filepaths = {fp for _, fp, _ in result}
+        filepaths = {fp for _, fp, _, _guarded in result}
         assert len(filepaths) == 1
         assert filepaths.pop().endswith("lib.py")
 
@@ -61,7 +61,7 @@ class TestPythonImportExtraction:
         (sub / "c.py").write_text("from collections import OrderedDict\n")
         linter = PythonAstLinter()
         result = linter.scan_imports(str(tmp_path))
-        pkg_names = {pkg for pkg, _, _ in result}
+        pkg_names = {pkg for pkg, *_ in result}
         assert pkg_names == {"os", "json", "sys", "collections"}
 
     def test_empty_project(self, tmp_path):
@@ -77,7 +77,7 @@ class TestPythonImportExtraction:
         (tmp_path / "lib.py").write_text("import numpy as np\n")
         linter = PythonAstLinter()
         result = linter.scan_imports(str(tmp_path))
-        pkg_names = {pkg for pkg, _, _ in result}
+        pkg_names = {pkg for pkg, *_ in result}
         assert "numpy" in pkg_names
 
     def test_dotted_import(self, tmp_path):
@@ -86,7 +86,7 @@ class TestPythonImportExtraction:
         (tmp_path / "lib.py").write_text("import os.path\n")
         linter = PythonAstLinter()
         result = linter.scan_imports(str(tmp_path))
-        pkg_names = {pkg for pkg, _, _ in result}
+        pkg_names = {pkg for pkg, *_ in result}
         assert pkg_names == {"os"}
 
     def test_from_dotted_import(self, tmp_path):
@@ -95,7 +95,7 @@ class TestPythonImportExtraction:
         (tmp_path / "lib.py").write_text("from os.path import join\n")
         linter = PythonAstLinter()
         result = linter.scan_imports(str(tmp_path))
-        pkg_names = {pkg for pkg, _, _ in result}
+        pkg_names = {pkg for pkg, *_ in result}
         assert pkg_names == {"os"}
 
 
@@ -109,7 +109,7 @@ class TestNpmImportExtraction:
         (tmp_path / "lib.js").write_text("import express from 'express';\n")
         linter = NpmAstLinter()
         result = linter.scan_imports(str(tmp_path))
-        pkg_names = {pkg for pkg, _, _ in result}
+        pkg_names = {pkg for pkg, *_ in result}
         assert "express" in pkg_names
 
     def test_require(self, tmp_path):
@@ -119,7 +119,7 @@ class TestNpmImportExtraction:
         (tmp_path / "lib.js").write_text("const fs = require('fs');\n")
         linter = NpmAstLinter()
         result = linter.scan_imports(str(tmp_path))
-        pkg_names = {pkg for pkg, _, _ in result}
+        pkg_names = {pkg for pkg, *_ in result}
         assert "fs" in pkg_names
 
     def test_dynamic_import(self, tmp_path):
@@ -129,7 +129,7 @@ class TestNpmImportExtraction:
         (tmp_path / "lib.js").write_text("const mod = import('lodash');\n")
         linter = NpmAstLinter()
         result = linter.scan_imports(str(tmp_path))
-        pkg_names = {pkg for pkg, _, _ in result}
+        pkg_names = {pkg for pkg, *_ in result}
         assert "lodash" in pkg_names
 
     def test_export_from(self, tmp_path):
@@ -139,7 +139,7 @@ class TestNpmImportExtraction:
         (tmp_path / "lib.js").write_text("export { handler } from 'express';\n")
         linter = NpmAstLinter()
         result = linter.scan_imports(str(tmp_path))
-        pkg_names = {pkg for pkg, _, _ in result}
+        pkg_names = {pkg for pkg, *_ in result}
         assert "express" in pkg_names
 
     def test_multiple_files(self, tmp_path):
@@ -150,7 +150,7 @@ class TestNpmImportExtraction:
         (tmp_path / "b.ts").write_text("import { readFile } from 'fs';\n")
         linter = NpmAstLinter()
         result = linter.scan_imports(str(tmp_path))
-        pkg_names = {pkg for pkg, _, _ in result}
+        pkg_names = {pkg for pkg, *_ in result}
         assert pkg_names == {"express", "fs"}
 
     def test_empty_project(self, tmp_path):
@@ -169,7 +169,7 @@ class TestScanImportsTopLevel:
         (tmp_path / "pyproject.toml").write_text(_PYPROJECT)
         (tmp_path / "lib.py").write_text("import os\nimport json\n")
         result = scan_imports(str(tmp_path))
-        pkg_names = {pkg for pkg, _, _ in result}
+        pkg_names = {pkg for pkg, *_ in result}
         assert pkg_names == {"os", "json"}
 
     def test_npm_project(self, tmp_path):
@@ -178,7 +178,7 @@ class TestScanImportsTopLevel:
         )
         (tmp_path / "lib.js").write_text("import express from 'express';\n")
         result = scan_imports(str(tmp_path))
-        pkg_names = {pkg for pkg, _, _ in result}
+        pkg_names = {pkg for pkg, *_ in result}
         assert "express" in pkg_names
 
     def test_no_language_markers(self, tmp_path):
