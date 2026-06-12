@@ -84,7 +84,9 @@ def _generate_ultranorm_variants(name):
     Starting from the PEP 503 normalized form (lowercase, separators normalized),
     produces all combinations of ambiguous character substitutions:
       l <-> 1, o <-> 0, i <-> 1
-    Returns up to 64 variants, excluding the original name itself.
+    Returns ``(variants, capped)`` where ``variants`` is a list of up to 64
+    variants (excluding the original name) and ``capped`` is True when the
+    total combination count exceeded the cap.
     """
     normalized = normalize_pypi(name)
     # Build a list of character options per position
@@ -104,12 +106,7 @@ def _generate_ultranorm_variants(name):
     for opts in char_options:
         total *= len(opts)
 
-    if total > _ULTRANORM_VARIANT_CAP:
-        print(
-            f"Warning: {total} ultranorm variants for '{name}', "
-            f"capping at {_ULTRANORM_VARIANT_CAP}",
-            file=sys.stderr,
-        )
+    capped = total > _ULTRANORM_VARIANT_CAP
 
     variants = []
     for combo in product(*char_options):
@@ -119,7 +116,7 @@ def _generate_ultranorm_variants(name):
         if variant != normalized:
             variants.append(variant)
 
-    return variants
+    return variants, capped
 
 
 def _normalize_npm_moniker(name):
@@ -581,7 +578,17 @@ def _apply_ultranorm_check(result, registry, ultranorm_flag, delay_ms):
     if result["status"] != "available":
         return
 
-    variants = _generate_ultranorm_variants(result["name"])
+    variants, capped = _generate_ultranorm_variants(result["name"])
+
+    if capped:
+        result["status"] = "error"
+        result["error"] = (
+            f"Too many ambiguous characters in '{result['name']}': "
+            f"variant checking capped at {_ULTRANORM_VARIANT_CAP}. "
+            f"Ultranorm check is incomplete."
+        )
+        return
+
     conflicts = []
     for i, variant in enumerate(variants):
         if i > 0:

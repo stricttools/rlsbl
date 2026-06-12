@@ -521,7 +521,8 @@ class TestGenerateUltranormVariants(unittest.TestCase):
 
     def test_cli_variants(self):
         """'cli' generates variants with l<->1 and i<->1, excluding itself."""
-        variants = _generate_ultranorm_variants("cli")
+        variants, capped = _generate_ultranorm_variants("cli")
+        self.assertFalse(capped)
         self.assertIn("cl1", variants)
         self.assertIn("c1i", variants)
         self.assertIn("c11", variants)
@@ -529,7 +530,8 @@ class TestGenerateUltranormVariants(unittest.TestCase):
 
     def test_hello_variants(self):
         """'hello' generates variants with l<->1 and o<->0 substitutions."""
-        variants = _generate_ultranorm_variants("hello")
+        variants, capped = _generate_ultranorm_variants("hello")
+        self.assertFalse(capped)
         # Some expected variants
         self.assertIn("he1lo", variants)
         self.assertIn("hel1o", variants)
@@ -539,15 +541,16 @@ class TestGenerateUltranormVariants(unittest.TestCase):
 
     def test_no_ambiguous_chars(self):
         """'abc' has no ambiguous characters, returns empty list."""
-        variants = _generate_ultranorm_variants("abc")
+        variants, capped = _generate_ultranorm_variants("abc")
+        self.assertFalse(capped)
         self.assertEqual(variants, [])
 
     def test_cap_at_64(self):
-        """Name with >6 ambiguous chars is capped at 64 variants."""
+        """Name with >6 ambiguous chars hits cap and reports capped=True."""
         # 7 ambiguous chars -> 2^7 = 128 combinations, minus original = 127
         name = "lllllll"
-        with patch("sys.stderr", new_callable=StringIO):
-            variants = _generate_ultranorm_variants(name)
+        variants, capped = _generate_ultranorm_variants(name)
+        self.assertTrue(capped)
         self.assertLessEqual(len(variants), 64)
 
 
@@ -1048,7 +1051,7 @@ class TestUltranormEarlyExit(unittest.TestCase):
     @patch("rlsbl.commands.check.check_pypi_availability")
     def test_first_variant_taken_stops_checking(self, mock_pypi, mock_variants, mock_sleep):
         """When the first variant is taken, only 1 check_pypi_availability call is made."""
-        mock_variants.return_value = ["var1", "var2", "var3"]
+        mock_variants.return_value = (["var1", "var2", "var3"], False)
         mock_pypi.return_value = {"status": "taken"}
 
         result = {
@@ -1067,7 +1070,7 @@ class TestUltranormEarlyExit(unittest.TestCase):
     @patch("rlsbl.commands.check.check_pypi_availability")
     def test_no_variants_taken_checks_all(self, mock_pypi, mock_variants, mock_sleep):
         """When no variants are taken, all 3 check_pypi_availability calls are made."""
-        mock_variants.return_value = ["var1", "var2", "var3"]
+        mock_variants.return_value = (["var1", "var2", "var3"], False)
         mock_pypi.return_value = {"status": "available"}
 
         result = {
@@ -1084,7 +1087,7 @@ class TestUltranormEarlyExit(unittest.TestCase):
     @patch("rlsbl.commands.check.check_pypi_availability")
     def test_single_conflict_reported(self, mock_pypi, mock_variants, mock_sleep):
         """The single conflict found via early exit is reported in ultranorm_conflicts."""
-        mock_variants.return_value = ["var1", "var2", "var3"]
+        mock_variants.return_value = (["var1", "var2", "var3"], False)
         def pypi_side_effect(name):
             if name == "var2":
                 return {"status": "taken"}
@@ -1102,6 +1105,24 @@ class TestUltranormEarlyExit(unittest.TestCase):
         self.assertEqual(result["ultranorm_conflicts"], ["var2"])
         self.assertEqual(result["status"], "taken")
         self.assertEqual(result["reason"], "ultranorm")
+
+    @patch("rlsbl.commands.check._generate_ultranorm_variants")
+    @patch("rlsbl.commands.check.check_pypi_availability")
+    def test_capped_variants_is_hard_error(self, mock_pypi, mock_variants):
+        """When variant generation is capped, result is set to error without checking PyPI."""
+        mock_variants.return_value = (["var1", "var2"], True)
+
+        result = {
+            "name": "lllllll", "registry": "pypi", "status": "available",
+            "variants": [], "github_count": 0,
+        }
+        _apply_ultranorm_check(result, "pypi", True, 200)
+
+        self.assertEqual(result["status"], "error")
+        self.assertIn("capped at 64", result["error"])
+        self.assertIn("Too many ambiguous characters", result["error"])
+        # PyPI should never be queried when capped
+        mock_pypi.assert_not_called()
 
 
 class TestPyPICaveats(unittest.TestCase):
