@@ -7,6 +7,7 @@ import sys
 from ..changelog.files import get_changes_dir, unfinalize_version
 from ..changelog.generate import generate_changelog
 from ..context import ProjectContext
+from ..release_file import unfinalize_release_file
 from ..targets import TARGETS, detect_targets
 from ..utils import run, check_gh_installed, check_gh_auth, get_push_timeout, get_current_branch, push_if_needed, is_clean_tree
 from ..workspace import find_workspace_root, resolve_project
@@ -184,6 +185,22 @@ def run_cmd(registry, args, flags, *, ctx):
             results.append(("Restore changelog", OK, "-"))
         except Exception:
             results.append(("Restore changelog", FAILED, "manually restore .rlsbl/changes/ and regenerate CHANGELOG.md"))
+
+    # Restore the release file (inverse of release-file finalization). When
+    # the finalize commit was reverted above, git already restored the files
+    # and this is a no-op; when it wasn't at HEAD (e.g., post-release hooks
+    # added commits), the finalized read-only vX.Y.Z.toml and the fresh empty
+    # unreleased.toml are still on disk and must be repaired directly.
+    try:
+        project_path = os.path.join(ws_root, monorepo_project_path) if monorepo_name else str(ctx.project_root or ".")
+        releases_dir = os.path.join(project_path, ".rlsbl", "releases")
+        release_file_changed = unfinalize_release_file(releases_dir, bare_version)
+        if release_file_changed:
+            run("git", ["add", releases_dir])
+            run("git", ["commit", "-m", f"chore: restore release file after undo of {tag}"])
+            results.append(("Restore release file", OK, "-"))
+    except Exception:
+        results.append(("Restore release file", FAILED, f"manually restore .rlsbl/releases/unreleased.toml from v{bare_version}.toml"))
 
     # Push the revert commit to remote
     if reverted:

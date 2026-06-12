@@ -1,5 +1,6 @@
 """Tests for rlsbl.commands.undo — happy-path full flow."""
 
+import os
 import unittest
 from io import StringIO
 from pathlib import Path
@@ -244,6 +245,76 @@ class TestUndoTwoCommitPattern(unittest.TestCase):
 
         # Push should still be called after reverting
         mock_push.assert_called_once_with("main", env=ANY, config={})
+
+
+class TestUndoReleaseFileRestore(unittest.TestCase):
+    """Verify undo repairs a finalized release file left on disk."""
+
+    @patch("rlsbl.commands.undo.unfinalize_release_file",
+           return_value=["unreleased.toml", "v1.0.0.toml"])
+    @patch("rlsbl.commands.undo.find_workspace_root", return_value=None)
+    @patch("rlsbl.commands.undo.push_if_needed")
+    @patch("rlsbl.commands.undo.get_current_branch", return_value="main")
+    @patch("rlsbl.commands.undo.is_clean_tree", return_value=True)
+    @patch("rlsbl.commands.undo.check_gh_auth", return_value=True)
+    @patch("rlsbl.commands.undo.check_gh_installed", return_value=True)
+    @patch("rlsbl.commands.undo.run")
+    def test_commits_restored_release_file(self, mock_run, _gh_inst,
+                                           _gh_auth, _clean, mock_branch,
+                                           mock_push, _ws_root,
+                                           mock_unfinalize):
+        """When unfinalize_release_file restores files, undo commits them."""
+
+        mock_run.side_effect = [
+            "v1.0.0",   # git describe --tags --abbrev=0 --match v*
+            "",         # gh release delete v1.0.0 --yes
+            "",         # git push origin :v1.0.0
+            "",         # git tag -d v1.0.0
+            "v1.0.0",   # git log -1 --format=%s (version-bump at HEAD)
+            "",         # git revert --no-edit HEAD
+            "",         # git add <releases_dir> (release-file restoration)
+            "",         # git commit (release-file restoration)
+        ]
+
+        with patch("sys.stdout", new_callable=StringIO):
+            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
+
+        releases_dir = os.path.join(".", ".rlsbl", "releases")
+        mock_unfinalize.assert_called_once_with(releases_dir, "1.0.0")
+        mock_run.assert_has_calls([
+            call("git", ["add", releases_dir]),
+            call("git", ["commit", "-m", "chore: restore release file after undo of v1.0.0"]),
+        ], any_order=False)
+        self.assertEqual(mock_run.call_count, 8)
+
+    @patch("rlsbl.commands.undo.unfinalize_release_file", return_value=[])
+    @patch("rlsbl.commands.undo.find_workspace_root", return_value=None)
+    @patch("rlsbl.commands.undo.push_if_needed")
+    @patch("rlsbl.commands.undo.get_current_branch", return_value="main")
+    @patch("rlsbl.commands.undo.is_clean_tree", return_value=True)
+    @patch("rlsbl.commands.undo.check_gh_auth", return_value=True)
+    @patch("rlsbl.commands.undo.check_gh_installed", return_value=True)
+    @patch("rlsbl.commands.undo.run")
+    def test_no_commit_when_nothing_to_restore(self, mock_run, _gh_inst,
+                                               _gh_auth, _clean, mock_branch,
+                                               mock_push, _ws_root,
+                                               mock_unfinalize):
+        """When the release file needs no repair, no extra commit is made."""
+
+        mock_run.side_effect = [
+            "v1.0.0",   # git describe --tags --abbrev=0 --match v*
+            "",         # gh release delete v1.0.0 --yes
+            "",         # git push origin :v1.0.0
+            "",         # git tag -d v1.0.0
+            "v1.0.0",   # git log -1 --format=%s
+            "",         # git revert --no-edit HEAD
+        ]
+
+        with patch("sys.stdout", new_callable=StringIO):
+            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
+
+        mock_unfinalize.assert_called_once()
+        self.assertEqual(mock_run.call_count, 6)
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@ This module reads and validates that file's internal consistency.
 """
 
 import os
+import sys
 from dataclasses import dataclass, field
 
 import tomlkit
@@ -148,6 +149,49 @@ def read_release_file(path: str) -> ReleaseConfig:
         data = tomlkit.load(f)
 
     return _validate_release_config(data)
+
+
+def unfinalize_release_file(releases_dir: str, version: str) -> list[str]:
+    """Reverse a release-file finalization: restore vX.Y.Z.toml to unreleased.toml.
+
+    Inverse of the finalization step in `release run`, which renames
+    unreleased.toml to vX.Y.Z.toml, chmods it read-only (0o444), and creates
+    a fresh empty unreleased.toml.
+
+    1. No-op (returns []) if the versioned file doesn't exist.
+    2. If unreleased.toml exists with content that differs from the versioned
+       file (finalization only ever writes an empty file, so anything else is
+       user content), warns on stderr and skips -- nothing is deleted.
+    3. Otherwise removes the fresh unreleased.toml, makes the versioned file
+       writable, and renames it back to unreleased.toml.
+
+    Returns the list of changed file paths (for committing).
+    """
+    versioned = os.path.join(releases_dir, f"v{version}.toml")
+    unreleased = os.path.join(releases_dir, "unreleased.toml")
+
+    if not os.path.isfile(versioned):
+        return []
+
+    if os.path.isfile(unreleased):
+        with open(unreleased, "r", encoding="utf-8") as f:
+            unreleased_content = f.read()
+        if unreleased_content != "":
+            with open(versioned, "r", encoding="utf-8") as f:
+                versioned_content = f.read()
+            if unreleased_content != versioned_content:
+                print(
+                    f"warning: {unreleased} has user content that differs "
+                    f"from {versioned}; leaving both files in place. Restore "
+                    f"the release file manually if needed.",
+                    file=sys.stderr,
+                )
+                return []
+        os.unlink(unreleased)
+
+    os.chmod(versioned, 0o644)
+    os.rename(versioned, unreleased)
+    return [unreleased, versioned]
 
 
 @dataclass

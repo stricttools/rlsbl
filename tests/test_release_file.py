@@ -1,6 +1,7 @@
 """Tests for rlsbl.release_file."""
 
 import os
+import stat
 
 import pytest
 
@@ -10,6 +11,7 @@ from rlsbl.release_file import (
     VALID_BUMP_TYPES,
     get_release_file_path,
     read_release_file,
+    unfinalize_release_file,
 )
 
 
@@ -259,3 +261,93 @@ class TestReadReleaseFileDescriptionContext:
         )
         cfg = read_release_file(str(f))
         assert cfg.context == "padded context"
+
+
+class TestUnfinalizeReleaseFile:
+    """Tests for unfinalize_release_file (inverse of release-file finalization).
+
+    Release finalization renames unreleased.toml to vX.Y.Z.toml, chmods it
+    read-only (0o444), and creates a fresh empty unreleased.toml. These tests
+    simulate that post-release state directly on disk.
+    """
+
+    CONTENT = (
+        'bump = "minor"\n'
+        'include = ["pypi"]\n'
+        'exclude = []\n'
+        'description = "my release"\n'
+        'context = "why these changes were made"\n'
+    )
+
+    def _finalized_state(self, tmp_path, version="1.2.3"):
+        """Create the on-disk state left behind by a release finalization."""
+        releases_dir = tmp_path / ".rlsbl" / "releases"
+        releases_dir.mkdir(parents=True)
+        versioned = releases_dir / f"v{version}.toml"
+        versioned.write_text(self.CONTENT)
+        os.chmod(str(versioned), 0o444)
+        unreleased = releases_dir / "unreleased.toml"
+        unreleased.write_text("")  # finalization writes an empty file
+        return releases_dir, versioned, unreleased
+
+    def test_restores_finalized_release_file(self, tmp_path):
+        releases_dir, versioned, unreleased = self._finalized_state(tmp_path)
+
+        changed = unfinalize_release_file(str(releases_dir), "1.2.3")
+
+        # unreleased.toml is back with the original content and is writable
+        assert unreleased.read_text() == self.CONTENT
+        assert os.stat(str(unreleased)).st_mode & stat.S_IWUSR
+        # the versioned file is gone
+        assert not versioned.exists()
+        # both changed paths are reported (for committing)
+        assert set(changed) == {str(unreleased), str(versioned)}
+
+    def test_preserves_user_modified_unreleased(self, tmp_path, capsys):
+        """If unreleased.toml has user content that differs from the
+        finalized file, it must not be deleted; warn and skip instead."""
+        releases_dir, versioned, unreleased = self._finalized_state(tmp_path)
+        user_content = 'bump = "patch"\ndescription = "new work in progress"\n'
+        unreleased.write_text(user_content)
+
+        changed = unfinalize_release_file(str(releases_dir), "1.2.3")
+
+        assert changed == []
+        # user content untouched
+        assert unreleased.read_text() == user_content
+        # versioned file left in place (and still read-only)
+        assert versioned.exists()
+        assert versioned.read_text() == self.CONTENT
+        assert not (os.stat(str(versioned)).st_mode & stat.S_IWUSR)
+        # a warning was reported
+        assert "warning" in capsys.readouterr().err.lower()
+
+    def test_restores_when_unreleased_identical_to_versioned(self, tmp_path):
+        """unreleased.toml identical to the versioned file carries no user
+        information; restoring loses nothing."""
+        releases_dir, versioned, unreleased = self._finalized_state(tmp_path)
+        unreleased.write_text(self.CONTENT)
+
+        changed = unfinalize_release_file(str(releases_dir), "1.2.3")
+
+        assert unreleased.read_text() == self.CONTENT
+        assert not versioned.exists()
+        assert set(changed) == {str(unreleased), str(versioned)}
+
+    def test_restores_when_fresh_unreleased_missing(self, tmp_path):
+        """Restoration proceeds even if the fresh unreleased.toml was removed."""
+        releases_dir, versioned, unreleased = self._finalized_state(tmp_path)
+        os.unlink(str(unreleased))
+
+        changed = unfinalize_release_file(str(releases_dir), "1.2.3")
+
+        assert unreleased.read_text() == self.CONTENT
+        assert not versioned.exists()
+        assert set(changed) == {str(unreleased), str(versioned)}
+
+    def test_noop_when_versioned_file_missing(self, tmp_path):
+        releases_dir = tmp_path / ".rlsbl" / "releases"
+        releases_dir.mkdir(parents=True)
+        (releases_dir / "unreleased.toml").write_text("")
+
+        assert unfinalize_release_file(str(releases_dir), "9.9.9") == []
