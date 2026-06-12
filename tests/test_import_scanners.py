@@ -10,6 +10,7 @@ from rlsbl.import_scanners import (
     ImportInfo,
     NpmImportScanner,
     PythonImportScanner,
+    _is_test_context,
 )
 
 # Minimal pyproject.toml so language detection finds Python
@@ -642,3 +643,123 @@ class TestImportInfo:
         a = ImportInfo("foo", "/a.py", 1, False)
         b = ImportInfo("foo", "/a.py", 1, False)
         assert a == b
+
+
+class TestIsTestContext:
+    """_is_test_context detection for directories and file name patterns.
+
+    Tests the layered matching approach:
+    - __tests__/ and testdata/ match at any depth in the path
+    - test/, tests/, example/, examples/, integration_test/ match only
+      as the first path component (root-relative)
+    - File name patterns (conftest.py, *.test.js, etc.) always match
+    """
+
+    # -- Directory detection: anywhere-match patterns --
+
+    def test_dunder_tests_dir_at_root(self, tmp_path):
+        """__tests__/Component.test.js -- test context (anywhere match)."""
+        filepath = os.path.join(tmp_path, "__tests__", "Component.test.js")
+        assert _is_test_context(filepath, str(tmp_path)) is True
+
+    def test_dunder_tests_dir_deeply_nested(self, tmp_path):
+        """deep/nested/__tests__/foo.test.js -- test context (__tests__ anywhere)."""
+        filepath = os.path.join(
+            tmp_path, "deep", "nested", "__tests__", "foo.test.js"
+        )
+        assert _is_test_context(filepath, str(tmp_path)) is True
+
+    def test_testdata_dir_at_root(self, tmp_path):
+        """testdata/fixtures.json -- test context (anywhere match)."""
+        filepath = os.path.join(tmp_path, "testdata", "fixtures.json")
+        assert _is_test_context(filepath, str(tmp_path)) is True
+
+    def test_testdata_dir_deeply_nested(self, tmp_path):
+        """deep/nested/testdata/fixture.go -- test context (testdata anywhere)."""
+        filepath = os.path.join(
+            tmp_path, "deep", "nested", "testdata", "fixture.go"
+        )
+        assert _is_test_context(filepath, str(tmp_path)) is True
+
+    # -- Directory detection: root-relative-only patterns --
+
+    def test_examples_dir_at_root(self, tmp_path):
+        """examples/demo.py -- test context (root-relative)."""
+        filepath = os.path.join(tmp_path, "examples", "demo.py")
+        assert _is_test_context(filepath, str(tmp_path)) is True
+
+    def test_example_dir_at_root(self, tmp_path):
+        """example/main.dart -- test context (root-relative)."""
+        filepath = os.path.join(tmp_path, "example", "main.dart")
+        assert _is_test_context(filepath, str(tmp_path)) is True
+
+    def test_integration_test_dir_at_root(self, tmp_path):
+        """integration_test/widget_test.dart -- test context (root-relative, Dart)."""
+        filepath = os.path.join(
+            tmp_path, "integration_test", "widget_test.dart"
+        )
+        assert _is_test_context(filepath, str(tmp_path)) is True
+
+    def test_src_test_is_not_test_context(self, tmp_path):
+        """src/test/utils.py -- NOT test context (false positive fix).
+
+        test/ only matches as the first component, not nested under src/.
+        """
+        filepath = os.path.join(tmp_path, "src", "test", "utils.py")
+        assert _is_test_context(filepath, str(tmp_path)) is False
+
+    def test_src_examples_is_not_test_context(self, tmp_path):
+        """src/examples/demo.py -- NOT test context (not first component)."""
+        filepath = os.path.join(tmp_path, "src", "examples", "demo.py")
+        assert _is_test_context(filepath, str(tmp_path)) is False
+
+    def test_src_test_production_code(self, tmp_path):
+        """src/test/production_code.py -- NOT test context (key false positive fix)."""
+        filepath = os.path.join(
+            tmp_path, "src", "test", "production_code.py"
+        )
+        assert _is_test_context(filepath, str(tmp_path)) is False
+
+    # -- File name pattern tests --
+
+    def test_conftest_py_at_root(self, tmp_path):
+        """conftest.py at project root -- test context."""
+        filepath = os.path.join(tmp_path, "conftest.py")
+        assert _is_test_context(filepath, str(tmp_path)) is True
+
+    def test_spec_tsx_file(self, tmp_path):
+        """Component.spec.tsx -- test context."""
+        filepath = os.path.join(tmp_path, "src", "Component.spec.tsx")
+        assert _is_test_context(filepath, str(tmp_path)) is True
+
+    def test_dot_test_js_file(self, tmp_path):
+        """utils.test.js -- test context."""
+        filepath = os.path.join(tmp_path, "src", "utils.test.js")
+        assert _is_test_context(filepath, str(tmp_path)) is True
+
+    def test_underscore_test_py_file(self, tmp_path):
+        """foo_test.py -- test context."""
+        filepath = os.path.join(tmp_path, "foo_test.py")
+        assert _is_test_context(filepath, str(tmp_path)) is True
+
+    def test_widget_test_dart_file(self, tmp_path):
+        """widget_test.dart -- test context."""
+        filepath = os.path.join(tmp_path, "widget_test.dart")
+        assert _is_test_context(filepath, str(tmp_path)) is True
+
+    # -- Negative tests (should NOT be test context) --
+
+    def test_testing_dir_not_matched(self, tmp_path):
+        """testing/foo.py -- NOT test context ("testing" is not in pattern list)."""
+        filepath = os.path.join(tmp_path, "testing", "foo.py")
+        assert _is_test_context(filepath, str(tmp_path)) is False
+
+    def test_tested_dir_not_matched(self, tmp_path):
+        """tested/module.py -- NOT test context ("tested" is not in pattern list)."""
+        filepath = os.path.join(tmp_path, "tested", "module.py")
+        assert _is_test_context(filepath, str(tmp_path)) is False
+
+    def test_contest_py_not_matched(self, tmp_path):
+        """contest.py -- NOT test context (should not match conftest.py)."""
+        filepath = os.path.join(tmp_path, "contest.py")
+        assert _is_test_context(filepath, str(tmp_path)) is False
