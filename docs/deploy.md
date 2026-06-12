@@ -8,7 +8,7 @@ description: "SSH-based deployment system with configurable health checks, autom
 
 ## Configuration
 
-Deploy targets are defined in `.rlsbl/config.json` under the `deploy_targets` key, which is a list of target objects. Each target specifies a remote host, SSH credentials, shell commands to execute, branch restrictions, and optional health check and rollback configurations.
+Deploy targets are defined in `.rlsbl/config.json` under the `deploy` key, which is a list of target objects. Each target specifies a remote host, SSH credentials, shell commands to execute, branch restrictions, and optional health check and rollback configurations.
 
 ### Required fields
 
@@ -96,7 +96,7 @@ The `only_on` field restricts which git branches can deploy to each target, prev
 
 ```json
 {
-  "deploy_targets": [
+  "deploy": [
     {
       "name": "production",
       "host": "$DEPLOY_HOST",
