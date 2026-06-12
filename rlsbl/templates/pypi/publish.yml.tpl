@@ -17,3 +17,5 @@ jobs:
       - uses: {{action "astral-sh/setup-uv"}}
       - run: uv build
       - uses: {{action "pypa/gh-action-pypi-publish"}}
+        with:
+          skip-existing: true

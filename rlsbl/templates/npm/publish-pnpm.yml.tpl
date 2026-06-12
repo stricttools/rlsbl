@@ -19,6 +19,16 @@ jobs:
         with:
           node-version: 24
           registry-url: {{registryUrl}}
+      - name: Check if already published
+        id: check-npm
+        run: |
+          PKG_NAME=$(node -p "require('./package.json').name")
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if npm view "${PKG_NAME}@${PKG_VERSION}" version 2>/dev/null; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Already published: ${PKG_NAME}@${PKG_VERSION}"
+          fi
       - run: pnpm publish --provenance --access public
+        if: steps.check-npm.outputs.skip != 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

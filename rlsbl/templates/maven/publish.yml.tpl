@@ -18,6 +18,8 @@ jobs:
           distribution: temurin
           java-version: "21"
       - uses: {{action "gradle/actions/setup-gradle"}}
+      # GitHub Packages allows re-publishing the same version (overwrites),
+      # so this step is inherently idempotent -- no pre-check needed.
       - run: ./gradlew publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
