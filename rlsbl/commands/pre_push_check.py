@@ -132,7 +132,7 @@ def _check_jsonl_changelog(dir_path, refs, pushed_commits=None):
             missing.append(sha[:12])
 
     if missing:
-        return f"JSONL changelog missing coverage for {len(missing)} commit(s): {', '.join(missing[:5])}"
+        return f"JSONL changelog missing coverage for {len(missing)} commit(s): {', '.join(missing)}"
 
     return None
 
