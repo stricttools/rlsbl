@@ -18,7 +18,7 @@ from .import_scanners import (
     GoImportScanner,
     NpmImportScanner,
     PythonImportScanner,
-    _NON_PRODUCTION_PATTERNS,
+    _is_test_context,
 )
 from .lint.go_ast import scan_imports as _go_scan_imports
 from .lint.utils import walk_source_files
@@ -69,7 +69,7 @@ def _get_imported_workspace_packages(
     exclude_dirs: list[str] | None = None,
     *,
     module_path_map: dict[str, str] | None = None,
-) -> tuple[set[str], set[str]]:
+) -> tuple[set[str], set[str], set[str]]:
     """Scan a project for workspace imports, split by context.
 
     Args:
@@ -79,11 +79,14 @@ def _get_imported_workspace_packages(
         module_path_map: mapping of workspace project name to its Go
             module path (from go.mod). Passed through to GoImportScanner.
 
-    Returns (lib_imports, test_imports) where each is a set of
-    workspace package names found in lib/test contexts respectively.
+    Returns (lib_imports, test_imports, guarded_imports) where each is a
+    set of workspace package names. Guarded imports are those inside
+    try/except ImportError blocks -- they count as "used" (not unused)
+    but should not trigger undeclared-dep errors.
     """
     lib_imports: set[str] = set()
     test_imports: set[str] = set()
+    guarded_imports: set[str] = set()
 
     for scanner in (PythonImportScanner(), DartImportScanner(), NpmImportScanner()):
         try:
@@ -93,7 +96,9 @@ def _get_imported_workspace_packages(
             # skip gracefully for dep validation purposes.
             continue
         for info in results:
-            if info.is_test_context:
+            if info.guarded:
+                guarded_imports.add(info.package_name)
+            elif info.is_test_context:
                 test_imports.add(info.package_name)
             else:
                 lib_imports.add(info.package_name)
@@ -106,12 +111,14 @@ def _get_imported_workspace_packages(
         module_path_map=module_path_map,
     )
     for info in go_results:
-        if info.is_test_context:
+        if info.guarded:
+            guarded_imports.add(info.package_name)
+        elif info.is_test_context:
             test_imports.add(info.package_name)
         else:
             lib_imports.add(info.package_name)
 
-    return lib_imports, test_imports
+    return lib_imports, test_imports, guarded_imports
 
 
 def check_unused_deps(
@@ -121,7 +128,7 @@ def check_unused_deps(
     workspace_names: set[str],
     whitelist: dict[tuple[str, str], str],
     *,
-    _cached_imports: tuple[set[str], set[str]] | None = None,
+    _cached_imports: tuple[set[str], set[str], set[str]] | None = None,
 ) -> list[str]:
     """Check for declared workspace deps that no source file imports.
 
@@ -131,8 +138,9 @@ def check_unused_deps(
         manifest_deps: set of declared intra-workspace dependency names.
         workspace_names: set of all workspace member package names.
         whitelist: mapping of (package, dep) -> reason for allowed unused deps.
-        _cached_imports: optional pre-computed (lib_imports, test_imports) tuple
-            to avoid redundant scans when multiple checks share the same project.
+        _cached_imports: optional pre-computed (lib_imports, test_imports,
+            guarded_imports) tuple to avoid redundant scans when multiple
+            checks share the same project.
 
     Returns:
         list of error strings (empty means all good).
@@ -141,12 +149,13 @@ def check_unused_deps(
         return []
 
     if _cached_imports is not None:
-        lib_imports, test_imports = _cached_imports
+        lib_imports, test_imports, guarded_imports = _cached_imports
     else:
-        lib_imports, test_imports = _get_imported_workspace_packages(
+        lib_imports, test_imports, guarded_imports = _get_imported_workspace_packages(
             project_dir, workspace_names
         )
-    all_imports = lib_imports | test_imports
+    # Guarded imports (try/except ImportError) count as used for unused check
+    all_imports = lib_imports | test_imports | guarded_imports
 
     errors = []
     for dep in sorted(manifest_deps):
@@ -167,28 +176,31 @@ def check_undeclared_deps(
     manifest_deps: set[str],
     workspace_names: set[str],
     *,
-    _cached_imports: tuple[set[str], set[str]] | None = None,
+    _cached_imports: tuple[set[str], set[str], set[str]] | None = None,
 ) -> list[str]:
     """Check for imports from workspace packages not declared as deps.
 
     Only checks lib/ imports (non-test context) against declared
     dependencies. Test files have more lenient rules and are skipped.
+    Guarded imports (try/except ImportError) are excluded -- optional
+    imports don't need to be declared as dependencies.
 
     Args:
         project_name: name of the project being checked.
         project_dir: absolute path to the project directory.
         manifest_deps: set of declared intra-workspace dependency names.
         workspace_names: set of all workspace member package names.
-        _cached_imports: optional pre-computed (lib_imports, test_imports) tuple
-            to avoid redundant scans when multiple checks share the same project.
+        _cached_imports: optional pre-computed (lib_imports, test_imports,
+            guarded_imports) tuple to avoid redundant scans when multiple
+            checks share the same project.
 
     Returns:
         list of error strings (empty means all good).
     """
     if _cached_imports is not None:
-        lib_imports, _test_imports = _cached_imports
+        lib_imports, _test_imports, _guarded_imports = _cached_imports
     else:
-        lib_imports, _test_imports = _get_imported_workspace_packages(
+        lib_imports, _test_imports, _guarded_imports = _get_imported_workspace_packages(
             project_dir, workspace_names
         )
 
@@ -261,22 +273,10 @@ def check_dev_in_lib(
 def _is_non_production_path(filepath: str, project_dir: str) -> bool:
     """Check if a file path is in a non-production context.
 
-    Uses _NON_PRODUCTION_PATTERNS from import_scanners.py to detect
+    Delegates to _is_test_context from import_scanners.py to detect
     test directories, example directories, and test file patterns.
     """
-    rel = os.path.relpath(filepath, project_dir)
-    parts = rel.split(os.sep)
-    non_prod_dirs = (
-        _NON_PRODUCTION_PATTERNS["test_dirs"]
-        | _NON_PRODUCTION_PATTERNS["example_dirs"]
-    )
-    if any(part in non_prod_dirs for part in parts):
-        return True
-    basename = parts[-1]
-    return any(
-        pat.match(basename)
-        for pat in _NON_PRODUCTION_PATTERNS["test_file_patterns"]
-    )
+    return _is_test_context(filepath, project_dir)
 
 
 def _python_module_name(filepath: str, project_dir: str) -> str | None:

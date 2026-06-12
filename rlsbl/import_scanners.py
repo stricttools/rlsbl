@@ -18,11 +18,14 @@ from .targets.utils import normalize_pypi
 # Python 3.10+ provides this; used to exclude stdlib imports.
 _STDLIB_MODULES: frozenset[str] = frozenset(sys.stdlib_module_names)
 
-# Directories that indicate test context.
-_TEST_DIRS = frozenset({"test", "tests", "__tests__"})
+# Layer 1: Directories that ALWAYS indicate test context at any depth.
+_ALWAYS_TEST_DIRS = frozenset({"__tests__", "testdata"})
 
-# Directories that indicate example/demo context (not production code).
-_EXAMPLE_DIRS = frozenset({"examples", "example"})
+# Layer 2: Directories that indicate test/example context only as the
+# first path component (relative to project root).
+_ROOT_TEST_DIRS = frozenset({
+    "test", "tests", "example", "examples", "integration_test",
+})
 
 # File name patterns that indicate test files (checked against basename).
 _TEST_FILE_PATTERNS = (
@@ -34,14 +37,6 @@ _TEST_FILE_PATTERNS = (
     re.compile(r"^.*\.spec\.[jt]sx?$"),
     re.compile(r"^conftest\.py$"),
 )
-
-# Shared constant for non-production context detection. Reusable by lint
-# exclusion and dead-module checks.
-_NON_PRODUCTION_PATTERNS = {
-    "test_dirs": _TEST_DIRS,
-    "example_dirs": _EXAMPLE_DIRS,
-    "test_file_patterns": _TEST_FILE_PATTERNS,
-}
 
 # Regex for Dart package imports: import 'package:foo/bar.dart'
 # Also matches export statements.
@@ -56,19 +51,38 @@ class ImportInfo:
     file_path: str
     line_number: int
     is_test_context: bool
+    guarded: bool = False
 
 
 def _is_test_context(filepath: str, project_path: str) -> bool:
     """Determine whether a file is in a non-production context.
 
-    Checks directory names (test, tests, __tests__, examples, example)
-    and file name patterns (test_*.py, *_test.go, *.spec.ts, etc.).
+    Uses a layered approach to avoid false positives for production
+    paths that happen to contain directory names like "test":
+
+    Layer 1 -- Unconditional directories (match at any depth):
+        __tests__/, testdata/
+
+    Layer 2 -- Root-relative directories (match only as first component):
+        test/, tests/, example/, examples/, integration_test/
+
+    Layer 3 -- File name patterns (checked against basename):
+        test_*.py, *_test.py, *_test.go, *_test.dart,
+        *.test.[jt]sx?, *.spec.[jt]sx?, conftest.py
     """
     rel = os.path.relpath(filepath, project_path)
     parts = rel.split(os.sep)
-    non_prod_dirs = _TEST_DIRS | _EXAMPLE_DIRS
-    if any(part in non_prod_dirs for part in parts):
+
+    # Layer 1: unconditional directory patterns (any depth).
+    # Check all directory components (exclude the filename itself).
+    if any(part in _ALWAYS_TEST_DIRS for part in parts[:-1]):
         return True
+
+    # Layer 2: root-relative test/example directories (first component only).
+    if parts[0] in _ROOT_TEST_DIRS:
+        return True
+
+    # Layer 3: file name patterns.
     basename = parts[-1]
     return any(pat.match(basename) for pat in _TEST_FILE_PATTERNS)
 
@@ -109,7 +123,7 @@ class PythonImportScanner:
         raw_imports = linter.scan_imports(project_path, exclude_dirs=exclude_dirs)
 
         results = []
-        for pkg_name, filepath, line_number in raw_imports:
+        for pkg_name, filepath, line_number, guarded in raw_imports:
             # Skip empty names (relative imports produce empty top-level)
             if not pkg_name:
                 continue
@@ -130,6 +144,7 @@ class PythonImportScanner:
                     file_path=filepath,
                     line_number=line_number,
                     is_test_context=_is_test_context(filepath, project_path),
+                    guarded=guarded,
                 ))
 
         return results
