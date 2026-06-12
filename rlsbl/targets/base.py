@@ -52,17 +52,54 @@ class BaseTarget:
         return []
 
     def shared_template_mappings(self, ctx):
-        return [
+        mappings = [
             {"template": "CHANGELOG.md.tpl", "target": "CHANGELOG.md"},
             {"template": "gitignore.tpl", "target": ".gitignore"},
             {"template": "hooks/pre-checks.sh.tpl", "target": ".rlsbl/hooks/pre-checks.sh"},
             {"template": "hooks/pre-release.sh.tpl", "target": ".rlsbl/hooks/pre-release.sh"},
             {"template": "hooks/post-release.sh.tpl", "target": ".rlsbl/hooks/post-release.sh"},
-            {"template": "lint/python.toml.tpl", "target": ".rlsbl/lint/python.toml"},
-            {"template": "lint/go.toml.tpl", "target": ".rlsbl/lint/go.toml"},
-            {"template": "lint/npm.toml.tpl", "target": ".rlsbl/lint/npm.toml"},
             {"template": "changes/unreleased.jsonl.tpl", "target": ".rlsbl/changes/unreleased.jsonl"},
         ]
+        mappings.extend(self._lint_config_mappings(ctx))
+        return mappings
+
+    def _lint_config_mappings(self, ctx):
+        """Return lint config mappings filtered by declared targets.
+
+        If no targets are configured, all 3 lint configs are included
+        for backward compatibility with unconfigured projects.
+        """
+        all_lint = [
+            ("pypi", {"template": "lint/python.toml.tpl", "target": ".rlsbl/lint/python.toml"}),
+            ("npm", {"template": "lint/npm.toml.tpl", "target": ".rlsbl/lint/npm.toml"}),
+            ("go", {"template": "lint/go.toml.tpl", "target": ".rlsbl/lint/go.toml"}),
+        ]
+        targets = self._extract_target_names(ctx)
+        if not targets:
+            return [mapping for _, mapping in all_lint]
+        return [mapping for target, mapping in all_lint if target in targets]
+
+    @staticmethod
+    def _extract_target_names(ctx):
+        """Extract target name strings from ctx.config["targets"].
+
+        Returns a set of target names, or an empty set if targets
+        is not configured or ctx is unavailable.
+        """
+        if not ctx or not ctx.config:
+            return set()
+        raw = ctx.config.get("targets")
+        if not raw or not isinstance(raw, list):
+            return set()
+        names = set()
+        for entry in raw:
+            if isinstance(entry, str):
+                names.add(entry)
+            elif isinstance(entry, dict):
+                name = entry.get("name")
+                if name:
+                    names.add(name)
+        return names
 
     def check_project_exists(self, dir_path):
         return self.detect(dir_path)
