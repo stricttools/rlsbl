@@ -1,3 +1,2 @@
-{"commits":["298e711c802d3bb7b33ac35de698a0e1d2a61323"],"user_facing":true,"description":"**Fix.** CI template sets `UV_NO_SOURCES=1` env var at workflow level, ensuring all `uv` commands ignore local path source overrides in CI.","type":"fix"}
 {"commits":["f7646503e55d28a081facd69e11ceacef638818f"],"user_facing":true,"description":"**Fix.** `scaffold --force` no longer destroys user-added .gitignore entries. The additive merge (only add, never remove) now applies regardless of `--force`.","type":"fix"}
 {"commits":["8f0f5e6c83ea2c7f480aed01da13af42ada434e6","5393ac441ef055bd952adfeef8f7166949ecaa66","0b5991faf104e3862131dab1c3da6f2576afdbcf"],"user_facing":false}
