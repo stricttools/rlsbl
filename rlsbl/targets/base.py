@@ -86,7 +86,7 @@ class BaseTarget:
         Returns a set of target names, or an empty set if targets
         is not configured or ctx is unavailable.
         """
-        if not ctx or not ctx.config:
+        if not ctx or not hasattr(ctx, "config") or not ctx.config:
             return set()
         raw = ctx.config.get("targets")
         if not raw or not isinstance(raw, list):
