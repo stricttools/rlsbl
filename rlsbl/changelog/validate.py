@@ -393,9 +393,7 @@ def check_no_orphans(entries: list[ChangelogEntry]) -> tuple[bool, list[str]]:
             continue
         resolved = resolve_hashes(entry.commits)
         if all(v is None for v in resolved.values()):
-            hashes_str = ", ".join(entry.commits[:3])
-            if len(entry.commits) > 3:
-                hashes_str += ", ..."
+            hashes_str = ", ".join(entry.commits)
             details.append(f"entry {i + 1}: all hashes unresolvable ({hashes_str})")
 
     return (len(details) == 0, details)
