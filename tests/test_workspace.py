@@ -4,6 +4,7 @@ import os
 
 import pytest
 
+from rlsbl.errors import WorkspaceError
 from rlsbl.workspace import (
     find_workspace_root,
     load_workspace,
@@ -60,25 +61,25 @@ class TestLoadWorkspace:
         with pytest.raises(FileNotFoundError):
             load_workspace(str(tmp_project))
 
-    def test_raises_value_error_missing_projects_key(self, tmp_project):
+    def test_raises_workspace_error_missing_projects_key(self, tmp_project):
         ws_dir = tmp_project / ".rlsbl-monorepo"
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text('title = "hello"\n')
-        with pytest.raises(ValueError, match="missing required 'projects' key"):
+        with pytest.raises(WorkspaceError, match="missing required 'projects' key"):
             load_workspace(str(tmp_project))
 
-    def test_raises_value_error_projects_not_list(self, tmp_project):
+    def test_raises_workspace_error_projects_not_list(self, tmp_project):
         ws_dir = tmp_project / ".rlsbl-monorepo"
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text('[projects]\nfoo = "bar"\n')
-        with pytest.raises(ValueError, match="must be a list"):
+        with pytest.raises(WorkspaceError, match="must be a list"):
             load_workspace(str(tmp_project))
 
-    def test_raises_value_error_missing_path(self, tmp_project):
+    def test_raises_workspace_error_missing_path(self, tmp_project):
         ws_dir = tmp_project / ".rlsbl-monorepo"
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text('[[projects]]\nname = "foo"\n')
-        with pytest.raises(ValueError, match="missing required 'path'"):
+        with pytest.raises(WorkspaceError, match="missing required 'path'"):
             load_workspace(str(tmp_project))
 
     def test_name_defaults_to_basename(self, tmp_project):

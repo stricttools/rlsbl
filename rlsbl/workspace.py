@@ -5,6 +5,8 @@ import tomllib
 
 import tomlkit
 
+from .errors import WorkspaceError
+
 
 WORKSPACE_DIR = ".rlsbl-monorepo"
 WORKSPACE_FILE = "workspace.toml"
@@ -102,25 +104,25 @@ def load_workspace(root):
     dict-like access for backward compatibility.
 
     Raises FileNotFoundError if workspace.toml doesn't exist.
-    Raises ValueError on invalid structure.
+    Raises WorkspaceError on invalid structure.
     """
     path = os.path.join(root, WORKSPACE_DIR, WORKSPACE_FILE)
     with open(path, "rb") as f:
         data = tomllib.load(f)
 
     if "projects" not in data:
-        raise ValueError("workspace.toml missing required 'projects' key")
+        raise WorkspaceError("workspace.toml missing required 'projects' key")
 
     projects = data["projects"]
     if not isinstance(projects, list):
-        raise ValueError("'projects' must be a list of tables")
+        raise WorkspaceError("'projects' must be a list of tables")
 
     result = []
     for i, proj in enumerate(projects):
         if not isinstance(proj, dict):
-            raise ValueError(f"projects[{i}] must be a table, got {type(proj).__name__}")
+            raise WorkspaceError(f"projects[{i}] must be a table, got {type(proj).__name__}")
         if "path" not in proj or not isinstance(proj["path"], str):
-            raise ValueError(f"projects[{i}] missing required 'path' string")
+            raise WorkspaceError(f"projects[{i}] missing required 'path' string")
         entry = dict(proj)
         # Normalize: strip trailing slashes so stored paths are consistent.
         # Belt-and-suspenders with target-level tag format defenses.

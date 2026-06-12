@@ -2,6 +2,7 @@
 
 import pytest
 
+from rlsbl.errors import WorkspaceError
 from rlsbl.layers import (
     LayerConfig,
     check_layer_violations,
@@ -104,7 +105,7 @@ name = "a"
 order = []
 """
         _write_workspace(tmp_project, content)
-        with pytest.raises(ValueError, match="non-empty list"):
+        with pytest.raises(WorkspaceError, match="non-empty list"):
             load_layer_config(str(tmp_project))
 
     def test_assignment_key_not_in_order_raises(self, tmp_project):
@@ -120,7 +121,7 @@ order = ["base"]
 unknown_layer = ["a"]
 """
         _write_workspace(tmp_project, content)
-        with pytest.raises(ValueError, match="not in \\[layers.order\\]"):
+        with pytest.raises(WorkspaceError, match="not in \\[layers.order\\]"):
             load_layer_config(str(tmp_project))
 
     def test_overrides_optional(self, tmp_project):

@@ -10,6 +10,7 @@ import tomllib
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
 
+from .errors import WorkspaceError
 from .workspace import WORKSPACE_DIR, WORKSPACE_FILE
 
 
@@ -26,7 +27,7 @@ def load_layer_config(root: str) -> LayerConfig | None:
     """Read the [layers] section from workspace.toml.
 
     Returns None if the file has no [layers] section.
-    Raises ValueError on invalid structure.
+    Raises WorkspaceError on invalid structure.
     Raises FileNotFoundError if workspace.toml doesn't exist.
     """
     path = os.path.join(root, WORKSPACE_DIR, WORKSPACE_FILE)
@@ -40,33 +41,33 @@ def load_layer_config(root: str) -> LayerConfig | None:
 
     # -- order --
     if "order" not in layers:
-        raise ValueError("[layers] missing required 'order' key")
+        raise WorkspaceError("[layers] missing required 'order' key")
     order = layers["order"]
     if not isinstance(order, list) or len(order) == 0:
-        raise ValueError("[layers.order] must be a non-empty list of strings")
+        raise WorkspaceError("[layers.order] must be a non-empty list of strings")
     for i, item in enumerate(order):
         if not isinstance(item, str):
-            raise ValueError(f"[layers.order][{i}] must be a string, got {type(item).__name__}")
+            raise WorkspaceError(f"[layers.order][{i}] must be a string, got {type(item).__name__}")
 
     order_set = set(order)
 
     # -- assignments --
     assignments_raw = layers.get("assignments", {})
     if not isinstance(assignments_raw, dict):
-        raise ValueError("[layers.assignments] must be a table")
+        raise WorkspaceError("[layers.assignments] must be a table")
     assignments: dict[str, list[str]] = {}
     for key, patterns in assignments_raw.items():
         if key not in order_set:
-            raise ValueError(
+            raise WorkspaceError(
                 f"[layers.assignments] key '{key}' is not in [layers.order]"
             )
         if not isinstance(patterns, list):
-            raise ValueError(
+            raise WorkspaceError(
                 f"[layers.assignments.{key}] must be a list of strings"
             )
         for j, pat in enumerate(patterns):
             if not isinstance(pat, str):
-                raise ValueError(
+                raise WorkspaceError(
                     f"[layers.assignments.{key}][{j}] must be a string, "
                     f"got {type(pat).__name__}"
                 )
@@ -75,7 +76,7 @@ def load_layer_config(root: str) -> LayerConfig | None:
     # -- overrides --
     overrides = layers.get("overrides", {})
     if not isinstance(overrides, dict):
-        raise ValueError("[layers.overrides] must be a table")
+        raise WorkspaceError("[layers.overrides] must be a table")
 
     unrestricted = _validate_string_list(overrides, "unrestricted", "[layers.overrides.unrestricted]")
     forbidden_targets = _validate_string_list(overrides, "forbidden_targets", "[layers.overrides.forbidden_targets]")
@@ -83,18 +84,18 @@ def load_layer_config(root: str) -> LayerConfig | None:
     # -- overrides.allow --
     allow_raw = overrides.get("allow", [])
     if not isinstance(allow_raw, list):
-        raise ValueError("[layers.overrides.allow] must be a list of tables")
+        raise WorkspaceError("[layers.overrides.allow] must be a list of tables")
     allow: list[dict[str, str]] = []
     for i, entry in enumerate(allow_raw):
         if not isinstance(entry, dict):
-            raise ValueError(f"[layers.overrides.allow][{i}] must be a table")
+            raise WorkspaceError(f"[layers.overrides.allow][{i}] must be a table")
         for required_key in ("source", "target"):
             if required_key not in entry:
-                raise ValueError(
+                raise WorkspaceError(
                     f"[layers.overrides.allow][{i}] missing required key '{required_key}'"
                 )
             if not isinstance(entry[required_key], str):
-                raise ValueError(
+                raise WorkspaceError(
                     f"[layers.overrides.allow][{i}].{required_key} must be a string"
                 )
         allow.append({"source": entry["source"], "target": entry["target"]})
@@ -112,10 +113,10 @@ def _validate_string_list(parent: dict, key: str, context: str) -> list[str]:
     """Validate and return an optional list-of-strings field."""
     raw = parent.get(key, [])
     if not isinstance(raw, list):
-        raise ValueError(f"{context} must be a list of strings")
+        raise WorkspaceError(f"{context} must be a list of strings")
     for i, item in enumerate(raw):
         if not isinstance(item, str):
-            raise ValueError(f"{context}[{i}] must be a string, got {type(item).__name__}")
+            raise WorkspaceError(f"{context}[{i}] must be a string, got {type(item).__name__}")
     return list(raw)
 
 
