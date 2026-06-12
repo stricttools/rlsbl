@@ -1,0 +1,175 @@
+"""Changelog checks (tag: changelog).
+
+Checks: changelog-entry, changelog-hashes, changelog-range,
+changelog-coverage, changelog-orphans, changelog-schema,
+changelog-user-facing, changelog-batch-commits, changelog-batch-entries.
+"""
+
+import os
+
+from strictcli import CheckResult
+
+from ._common import _resolve_version_and_tag, _get_changelog_context
+
+
+def register_changelog_checks(app):
+    """Register changelog-tag checks on *app*."""
+
+    @app.check("changelog-entry")
+    def check_changelog_entry(ctx):
+        """CHANGELOG.md must have an entry for the current version."""
+        from ..utils import extract_changelog_entry
+
+        version, _tag = _resolve_version_and_tag(ctx)
+        if not version:
+            return CheckResult("skip", "no version detected")
+
+        changelog_path = os.path.join(str(ctx.project_root), "CHANGELOG.md")
+        if not os.path.exists(changelog_path):
+            return CheckResult("warn", "CHANGELOG.md not found")
+
+        entry = extract_changelog_entry(changelog_path, version)
+        if entry:
+            return CheckResult("pass", f"entry for {version}")
+        return CheckResult("warn", f"no entry for {version}")
+
+    @app.check("changelog-hashes")
+    def check_changelog_hashes(ctx):
+        """Every hash in unreleased.jsonl must resolve via git rev-parse."""
+        from ..changelog.validate import check_hashes_resolve
+
+        info = _get_changelog_context(ctx)
+        if info is None:
+            return CheckResult("skip", "no .rlsbl/changes/ directory")
+        _changes_dir, _tag_glob, _project, entries = info
+
+        passed, details = check_hashes_resolve(entries)
+
+        if passed:
+            return CheckResult("pass", "all hashes resolve")
+        return CheckResult("fail", f"{len(details)} hash(es) failed to resolve", details=details)
+
+    @app.check("changelog-range")
+    def check_changelog_range(ctx):
+        """Every resolved hash must be in the unreleased commit range."""
+        from ..changelog.validate import check_in_range
+
+        info = _get_changelog_context(ctx)
+        if info is None:
+            return CheckResult("skip", "no .rlsbl/changes/ directory")
+        _changes_dir, tag_glob, project, entries = info
+
+        passed, details = check_in_range(entries, tag_glob, project=project)
+
+        if passed:
+            return CheckResult("pass", "all hashes in unreleased range")
+        return CheckResult("fail", f"{len(details)} hash(es) out of range", details=details)
+
+    @app.check("changelog-coverage")
+    def check_changelog_coverage(ctx):
+        """Every unreleased commit must appear in at least one entry."""
+        from ..changelog.validate import check_coverage
+
+        info = _get_changelog_context(ctx)
+        if info is None:
+            return CheckResult("skip", "no .rlsbl/changes/ directory")
+        _changes_dir, tag_glob, project, entries = info
+
+        if project is not None and project.get("dev_node"):
+            return CheckResult("skip", "dev node project")
+
+        passed, details = check_coverage(entries, tag_glob, project=project)
+
+        if passed:
+            return CheckResult("pass", "all unreleased commits covered")
+        # Filter out informational "skipped N ..." lines from the fail count
+        fail_details = [d for d in details if not d.startswith("skipped ")]
+        return CheckResult("fail", f"{len(fail_details)} uncovered commit(s)", details=details)
+
+    @app.check("changelog-orphans")
+    def check_changelog_orphans(ctx):
+        """No entry should have ALL hashes unresolvable (stale/rebased)."""
+        from ..changelog.validate import check_no_orphans
+
+        info = _get_changelog_context(ctx)
+        if info is None:
+            return CheckResult("skip", "no .rlsbl/changes/ directory")
+        _changes_dir, _tag_glob, _project, entries = info
+
+        passed, details = check_no_orphans(entries)
+
+        if passed:
+            return CheckResult("pass", "no orphaned entries")
+        return CheckResult("fail", f"{len(details)} orphaned entry(ies)", details=details)
+
+    @app.check("changelog-schema")
+    def check_changelog_schema(ctx):
+        """Every entry must pass schema validation."""
+        from ..changelog.validate import check_schema
+
+        info = _get_changelog_context(ctx)
+        if info is None:
+            return CheckResult("skip", "no .rlsbl/changes/ directory")
+        _changes_dir, _tag_glob, _project, entries = info
+
+        passed, details = check_schema(entries)
+        if passed:
+            return CheckResult("pass", "all entries valid")
+        return CheckResult("fail", f"{len(details)} schema error(s)", details=details)
+
+    @app.check("changelog-user-facing")
+    def check_changelog_user_facing(ctx):
+        """At least one entry must be user-facing."""
+        from ..changelog.validate import check_has_user_facing
+
+        info = _get_changelog_context(ctx)
+        if info is None:
+            return CheckResult("skip", "no .rlsbl/changes/ directory")
+        _changes_dir, _tag_glob, project, entries = info
+
+        if project is not None and project.get("dev_node"):
+            return CheckResult("skip", "dev node project")
+
+        passed, details = check_has_user_facing(entries)
+        if passed:
+            return CheckResult("pass", "has user-facing entries")
+        return CheckResult("warn", "no user-facing entries", details=details)
+
+    @app.check("changelog-batch-commits")
+    def check_changelog_batch_commits(ctx):
+        """No entry should have more commits than max_commits_per_entry."""
+        from ..changelog.validate import check_batch_size_commits, _get_batch_limits_config
+
+        info = _get_changelog_context(ctx)
+        if info is None:
+            return CheckResult("skip", "no .rlsbl/changes/ directory")
+        _changes_dir, _tag_glob, _project, entries = info
+
+        batch_config = _get_batch_limits_config(ctx.config)
+
+        passed, details = check_batch_size_commits(entries, batch_config, version="unreleased")
+        if passed:
+            return CheckResult("pass", "all entries within commit batch limit")
+        return CheckResult("fail", f"{len(details)} entry(ies) exceed commit limit", details=details)
+
+    @app.check("changelog-batch-entries")
+    def check_changelog_batch_entries(ctx):
+        """No commit should appear in more entries than max_entries_per_commit."""
+        from ..changelog.validate import (
+            check_batch_size_entries,
+            _get_batch_limits_config,
+            _read_all_versioned_entries,
+        )
+
+        info = _get_changelog_context(ctx)
+        if info is None:
+            return CheckResult("skip", "no .rlsbl/changes/ directory")
+        changes_dir, _tag_glob, _project, _entries = info
+
+        batch_config = _get_batch_limits_config(ctx.config)
+        entries_by_version = _read_all_versioned_entries(changes_dir)
+
+        passed, details = check_batch_size_entries(entries_by_version, batch_config)
+        if passed:
+            return CheckResult("pass", "all commits within entry batch limit")
+        return CheckResult("fail", f"{len(details)} commit(s) exceed entry limit", details=details)
