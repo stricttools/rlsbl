@@ -12,6 +12,7 @@ import sys
 import tempfile
 
 from .schema import ChangelogEntry, parse_entry, parse_jsonl, serialize_entry
+from ..errors import ChangelogError
 
 _VERSION_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)\.jsonl$")
 
@@ -135,7 +136,7 @@ def _warn_stale_entries(src: str, tag_glob: str) -> None:
                 continue
             try:
                 entries_with_lines.append((line_num, parse_entry(stripped)))
-            except ValueError:
+            except ChangelogError:
                 # Schema/JSON errors are surfaced by validate; skip here.
                 continue
 

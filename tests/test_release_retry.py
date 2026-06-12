@@ -6,6 +6,7 @@ from io import StringIO
 from unittest.mock import patch, MagicMock
 
 from rlsbl.commands.release_retry import run_cmd, _find_dispatch_workflows
+from rlsbl.errors import ReleaseFileError
 from rlsbl.release_file import RetryConfig
 
 
@@ -432,8 +433,8 @@ class TestReleaseRetry(unittest.TestCase):
         mock_targets_dict.__getitem__ = lambda self, key: target
         mock_run.side_effect = self._run_side_effect
 
-        # _scaffold_retry_file raises ValueError because ref is empty
-        scaffold_error = ValueError("ref must be set in retry.toml (e.g. a tag like v1.2.3 or a branch like main)")
+        # _scaffold_retry_file raises ReleaseFileError because ref is empty
+        scaffold_error = ReleaseFileError("ref must be set in retry.toml (e.g. a tag like v1.2.3 or a branch like main)")
 
         with patch("rlsbl.commands.release_retry._scaffold_retry_file", side_effect=scaffold_error) as mock_scaffold, \
              patch("rlsbl.commands.release_retry.get_retry_file_path", return_value="/fake/retry.toml"):
@@ -473,12 +474,12 @@ class TestReleaseRetry(unittest.TestCase):
         mock_targets_dict.__getitem__ = lambda self, key: target
         mock_run.side_effect = self._run_side_effect
 
-        scaffold_error = ValueError("ref must be set in retry.toml (e.g. a tag like v1.2.3 or a branch like main)")
+        scaffold_error = ReleaseFileError("ref must be set in retry.toml (e.g. a tag like v1.2.3 or a branch like main)")
 
         with tempfile.TemporaryDirectory() as tmpdir:
             retry_path = os.path.join(tmpdir, "retry.toml")
             # Pre-create the file to simulate what _scaffold_retry_file does
-            # before read_retry_file raises ValueError
+            # before read_retry_file raises ReleaseFileError
             with open(retry_path, "w") as f:
                 f.write('version = "0.41.7"\ndispatch = ["ci.yml"]\nref = ""\n')
 
@@ -673,7 +674,7 @@ class TestRetryConfig(unittest.TestCase):
             os.unlink(path)
 
     def test_read_retry_file_missing_version(self):
-        """Missing version field raises ValueError."""
+        """Missing version field raises ReleaseFileError."""
         import tempfile
         import tomlkit as tk
 
@@ -687,14 +688,14 @@ class TestRetryConfig(unittest.TestCase):
 
         try:
             from rlsbl.release_file import read_retry_file
-            with self.assertRaises(ValueError) as ctx:
+            with self.assertRaises(ReleaseFileError) as ctx:
                 read_retry_file(path)
             self.assertIn("version", str(ctx.exception))
         finally:
             os.unlink(path)
 
     def test_read_retry_file_empty_ref(self):
-        """Empty ref field raises ValueError with helpful message."""
+        """Empty ref field raises ReleaseFileError with helpful message."""
         import tempfile
         import tomlkit as tk
 
@@ -709,7 +710,7 @@ class TestRetryConfig(unittest.TestCase):
 
         try:
             from rlsbl.release_file import read_retry_file
-            with self.assertRaises(ValueError) as ctx:
+            with self.assertRaises(ReleaseFileError) as ctx:
                 read_retry_file(path)
             self.assertIn("ref must be set in retry.toml", str(ctx.exception))
         finally:
@@ -757,7 +758,7 @@ class TestScaffoldRetryFile(unittest.TestCase):
                  patch("rlsbl.commands.release_retry.TARGETS", {"pypi": target}), \
                  patch("rlsbl.commands.release_retry._find_dispatch_workflows", return_value=["publish.yml", "ci.yml"]):
                 # read_retry_file will raise because ref is empty
-                with self.assertRaises(ValueError) as ctx:
+                with self.assertRaises(ReleaseFileError) as ctx:
                     _scaffold_retry_file(
                         retry_path, ".", target, None, None, lambda msg: None,
                     )
@@ -1037,7 +1038,7 @@ class TestCmdReleaseRetryCleanup(unittest.TestCase):
     """Tests for the cmd_release_retry entry point in __init__.py.
 
     The __init__.py handler reads retry.toml before calling run_cmd.
-    When read_retry_file raises ValueError, the handler must delete the
+    When read_retry_file raises ReleaseFileError, the handler must delete the
     invalid file and show a hint message.
     """
 

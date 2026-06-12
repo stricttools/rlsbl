@@ -16,6 +16,7 @@ import sys
 from strictcli import CheckResult
 
 from .check_context import WorkspaceCheckContext
+from .errors import ConfigError
 from .targets import TARGETS
 
 # Manifest filenames used by workspace-unregistered and workspace-stale-entries
@@ -444,7 +445,7 @@ def register_checks(app):
         from .config import validate_pipelines_config
         try:
             validate_pipelines_config(config)
-        except ValueError as e:
+        except ConfigError as e:
             errors.append(str(e))
 
         if errors:

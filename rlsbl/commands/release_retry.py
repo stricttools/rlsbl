@@ -18,6 +18,8 @@ import time
 
 import tomlkit
 
+from ..errors import ReleaseFileError
+
 from ..release_file import get_retry_file_path, read_retry_file
 from ..targets import TARGETS, detect_targets
 from ..utils import check_gh_auth, check_gh_installed, run
@@ -165,7 +167,7 @@ def run_cmd(retry_config, flags, project_root):
             # File exists but wasn't read by the caller -- read it now
             try:
                 retry_config = read_retry_file(retry_path)
-            except ValueError as e:
+            except ReleaseFileError as e:
                 # Clean up the invalid file so it doesn't block subsequent
                 # `rlsbl release run` with a dirty working tree.
                 if os.path.exists(retry_path):
@@ -184,7 +186,7 @@ def run_cmd(retry_config, flags, project_root):
                     retry_path, project_dir, target,
                     monorepo_name, monorepo_project_path, log,
                 )
-            except ValueError as e:
+            except ReleaseFileError as e:
                 # Clean up the auto-scaffolded file -- it's untracked and
                 # would block subsequent `rlsbl release run`.
                 if os.path.exists(retry_path):

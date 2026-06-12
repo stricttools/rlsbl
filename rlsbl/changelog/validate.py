@@ -11,6 +11,7 @@ from .resolve import resolve_hash, resolve_hashes
 from .schema import ChangelogEntry, parse_jsonl, validate_schema
 from ..config import get_changelog_validation_config
 from ..git_util import filter_commits_for_project, get_commit_files
+from ..errors import ChangelogError
 from ..utils import commit_files_if_changed
 
 
@@ -519,7 +520,7 @@ def _read_all_versioned_entries(changes_dir: str) -> dict[str, list[ChangelogEnt
     for version, path in list_versioned_files(changes_dir):
         try:
             result[version] = parse_jsonl(path)
-        except (ValueError, OSError):
+        except (ChangelogError, OSError):
             continue
     return result
 

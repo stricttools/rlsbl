@@ -5,6 +5,7 @@ import sys
 
 import tomlkit
 
+from .errors import VersionError
 from .targets import TARGETS, detect_targets
 from .workspace_graph import _parse_pypi_dep_name
 
@@ -125,7 +126,7 @@ def build_rewrite_map(workspace_root, projects, graph):
                 continue
             try:
                 version = target.read_version(entry.path)
-            except (ValueError, FileNotFoundError, KeyError):
+            except (VersionError, FileNotFoundError, KeyError):
                 continue
             if version:
                 rewrite_map[proj["name"]] = f">={version}"

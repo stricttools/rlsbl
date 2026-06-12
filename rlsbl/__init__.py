@@ -10,6 +10,7 @@ import keyword as _keyword
 import strictcli
 
 from .context import create_context
+from .errors import ReleaseFileError
 
 
 # Strictcli derives a Python parameter name from each flag name by stripping
@@ -262,7 +263,7 @@ def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, no_watch, **_kwargs
 
     try:
         release_config = read_release_file(release_path)
-    except ValueError as e:
+    except ReleaseFileError as e:
         print(f"Error in release file: {e}", file=sys.stderr)
         sys.exit(1)
 
@@ -304,7 +305,7 @@ def cmd_release_retry(dry_run, yes, quiet, watch, no_watch, **_kwargs):
     if os.path.exists(retry_path):
         try:
             retry_config = read_retry_file(retry_path)
-        except ValueError as e:
+        except ReleaseFileError as e:
             print(f"Error in retry file: {e}", file=sys.stderr)
             # Clean up the invalid file so it doesn't block subsequent
             # `rlsbl release run` with a dirty working tree.

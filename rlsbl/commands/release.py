@@ -16,6 +16,7 @@ from ..changelog import (
     get_changes_dir,
     validate_unreleased,
 )
+from ..errors import ConfigError
 from ..git_util import validate_subtree_remote_ssh_host
 from ..config import read_deploy_config, read_json_config, should_tag
 from ..pipelines import load_pipelines
@@ -219,7 +220,7 @@ def resolve_release_targets(primary, flags, project_dir=".", *, config):
         for entry in configured:
             try:
                 te = _parse_target_entry(entry, project_dir)
-            except (ValueError, TypeError):
+            except (ConfigError, TypeError):
                 # Unparseable entry -- skip
                 continue
             if te.name in ALL_TARGETS:

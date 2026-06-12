@@ -8,6 +8,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
+from rlsbl.errors import ReleaseFileError
 from rlsbl.release_file import (
     BatchReleaseConfig,
     ReleaseConfig,
@@ -137,32 +138,32 @@ class TestReadBatchReleaseFile:
         assert config.packages["myapp"].targets == {"flutter": {"mode": "ota"}}
 
     def test_missing_packages_section(self, tmp_path):
-        """Missing [packages] section raises ValueError."""
+        """Missing [packages] section raises ReleaseFileError."""
         batch_file = tmp_path / "unreleased.toml"
         batch_file.write_text('bump = "patch"\ndescription = "test release"\n')
-        with pytest.raises(ValueError, match="missing required section"):
+        with pytest.raises(ReleaseFileError, match="missing required section"):
             read_batch_release_file(str(batch_file))
 
     def test_empty_packages(self, tmp_path):
-        """Empty [packages] section raises ValueError."""
+        """Empty [packages] section raises ReleaseFileError."""
         batch_file = tmp_path / "unreleased.toml"
         batch_file.write_text('[packages]\n')
-        with pytest.raises(ValueError, match="is empty"):
+        with pytest.raises(ReleaseFileError, match="is empty"):
             read_batch_release_file(str(batch_file))
 
     def test_missing_bump(self, tmp_path):
-        """Missing bump field in a package raises ValueError."""
+        """Missing bump field in a package raises ReleaseFileError."""
         batch_file = tmp_path / "unreleased.toml"
         batch_file.write_text(
             '[packages.mylib]\n'
             'include = ["pypi"]\n'
             'exclude = []\n'
         )
-        with pytest.raises(ValueError, match=r"\[packages\.mylib\].*bump"):
+        with pytest.raises(ReleaseFileError, match=r"\[packages\.mylib\].*bump"):
             read_batch_release_file(str(batch_file))
 
     def test_invalid_bump(self, tmp_path):
-        """Invalid bump value raises ValueError."""
+        """Invalid bump value raises ReleaseFileError."""
         batch_file = tmp_path / "unreleased.toml"
         batch_file.write_text(
             '[packages.mylib]\n'
@@ -170,33 +171,33 @@ class TestReadBatchReleaseFile:
             'include = ["pypi"]\n'
             'exclude = []\n'
         )
-        with pytest.raises(ValueError, match="invalid bump"):
+        with pytest.raises(ReleaseFileError, match="invalid bump"):
             read_batch_release_file(str(batch_file))
 
     def test_missing_include(self, tmp_path):
-        """Missing include field raises ValueError."""
+        """Missing include field raises ReleaseFileError."""
         batch_file = tmp_path / "unreleased.toml"
         batch_file.write_text(
             '[packages.mylib]\n'
             'bump = "patch"\ndescription = "test release"\n'
             'exclude = []\n'
         )
-        with pytest.raises(ValueError, match="include"):
+        with pytest.raises(ReleaseFileError, match="include"):
             read_batch_release_file(str(batch_file))
 
     def test_missing_exclude(self, tmp_path):
-        """Missing exclude field raises ValueError."""
+        """Missing exclude field raises ReleaseFileError."""
         batch_file = tmp_path / "unreleased.toml"
         batch_file.write_text(
             '[packages.mylib]\n'
             'bump = "patch"\ndescription = "test release"\n'
             'include = ["pypi"]\n'
         )
-        with pytest.raises(ValueError, match="exclude"):
+        with pytest.raises(ReleaseFileError, match="exclude"):
             read_batch_release_file(str(batch_file))
 
     def test_include_exclude_overlap(self, tmp_path):
-        """Overlap between include and exclude raises ValueError."""
+        """Overlap between include and exclude raises ReleaseFileError."""
         batch_file = tmp_path / "unreleased.toml"
         batch_file.write_text(
             '[packages.mylib]\n'
@@ -204,7 +205,7 @@ class TestReadBatchReleaseFile:
             'include = ["pypi", "npm"]\n'
             'exclude = ["pypi"]\n'
         )
-        with pytest.raises(ValueError, match="both include and exclude"):
+        with pytest.raises(ReleaseFileError, match="both include and exclude"):
             read_batch_release_file(str(batch_file))
 
     def test_file_not_found(self, tmp_path):

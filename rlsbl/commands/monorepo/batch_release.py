@@ -15,6 +15,7 @@ from ...release_file import (
     get_batch_release_file_path,
     read_batch_release_file,
 )
+from ...errors import ReleaseFileError
 from ...utils import commit_files
 from ...workspace import find_workspace_root, load_workspace
 from ...workspace_graph import CycleError, WorkspaceGraph
@@ -44,7 +45,7 @@ def _cmd_batch_release(flags, project_root):
 
     try:
         batch_config = read_batch_release_file(batch_path)
-    except ValueError as e:
+    except ReleaseFileError as e:
         print(f"Error in batch release file: {e}", file=sys.stderr)
         sys.exit(1)
 
