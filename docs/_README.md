@@ -7,7 +7,7 @@ title: README.md
 
 # rlsbl
 
-:-: var key="project.description"
+:-: target-count
 
 ## Install
 
