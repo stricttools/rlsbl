@@ -10,8 +10,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-import strictcli
-
 from conftest import git_head, make_commit, make_ctx, make_workspace, run_git
 from rlsbl import app
 from rlsbl.check_context import WorkspaceCheckContext
@@ -290,13 +288,8 @@ class TestDependsOnOrdering:
         ctx.push_stdin = _make_push_stdin(prepush_repo, head_sha, base_sha)
 
         # Run all prepush checks via the check system
-        selected = strictcli._filter_checks(
-            app._check_defs, "prepush", None, False,
-        )
-        order = strictcli._resolve_check_order(app._check_defs, selected)
-        results, exit_code = strictcli._run_checks(app._check_defs, order, ctx, True)
-
-        results_dict = {name: result for name, result in results}
+        results, exit_code = app.run_checks(ctx, tag_expr="prepush", ignore_warnings=True)
+        results_dict = {cr.name: cr.result for cr in results}
 
         # changelog-coverage must have failed
         assert results_dict["prepush-changelog-coverage"].status == "fail"
