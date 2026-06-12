@@ -83,9 +83,10 @@ def _check_npm_lockfile_missing(start_dir="."):
 
 
 def _is_npm_wrapper(npm_dir_path):
-    """Check if the npm package at npm_dir_path is a wrapper (no test script).
+    """Check if the npm package at npm_dir_path is a wrapper.
 
-    Returns True if package.json has no scripts.test field or it's empty.
+    A package is a wrapper if it has no test script OR has zero dependencies
+    (no ``dependencies`` and no ``devDependencies``, or both are empty objects).
     """
     pkg_path = os.path.join(npm_dir_path, "package.json")
     if not os.path.exists(pkg_path):
@@ -93,7 +94,13 @@ def _is_npm_wrapper(npm_dir_path):
     with open(pkg_path, "r", encoding="utf-8") as f:
         pkg = json.load(f)
     test_script = pkg.get("scripts", {}).get("test", "")
-    return not test_script.strip()
+    if not test_script.strip():
+        return True
+    deps = pkg.get("dependencies", {})
+    dev_deps = pkg.get("devDependencies", {})
+    if not deps and not dev_deps:
+        return True
+    return False
 
 
 # Files owned by the user after initial scaffold -- never overwrite or merge

@@ -19,6 +19,12 @@ jobs:
       - uses: {{action "actions/setup-node"}}
         with:
           node-version: ${{ matrix.node-version }}
-      - run: npm ci
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
       - run: npm test --if-present
       - run: npm audit --audit-level=moderate || true

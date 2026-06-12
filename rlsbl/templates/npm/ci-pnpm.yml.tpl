@@ -20,6 +20,12 @@ jobs:
       - uses: {{action "actions/setup-node"}}
         with:
           node-version: ${{ matrix.node-version }}
-      - run: pnpm install --frozen-lockfile
+      - name: Install dependencies
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            pnpm install --frozen-lockfile
+          else
+            pnpm install
+          fi
       - run: pnpm test
       - run: pnpm audit --audit-level=moderate || true

@@ -19,6 +19,12 @@ jobs:
       - uses: {{action "actions/setup-node"}}
         with:
           node-version: ${{ matrix.node-version }}
-      - run: yarn install --frozen-lockfile
+      - name: Install dependencies
+        run: |
+          if [ -f yarn.lock ]; then
+            yarn install --frozen-lockfile
+          else
+            yarn install
+          fi
       - run: yarn test
       - run: yarn audit --audit-level=moderate || true

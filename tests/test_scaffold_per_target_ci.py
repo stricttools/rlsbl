@@ -90,6 +90,7 @@ class TestPerTargetCI:
             "name": "testable-pkg",
             "version": "0.1.0",
             "scripts": {"test": "jest"},
+            "devDependencies": {"jest": "^29"},
         }
         (root / "package.json").write_text(json.dumps(pkg, indent=2) + "\n")
         (root / "package-lock.json").write_text("{}\n")
@@ -144,6 +145,61 @@ class TestPerTargetCI:
         assert "removed (orphan)" in mock_stdout.getvalue()
 
 
+class TestNpmCILockfileConditional:
+    """Tests that CI templates render with lockfile-conditional install steps."""
+
+    def test_npm_ci_template_has_lockfile_conditional(self):
+        """npm ci.yml.tpl renders with conditional lockfile check."""
+        from rlsbl.commands.init_cmd import process_template
+        from rlsbl.targets.npm import NpmTarget
+
+        target = NpmTarget()
+        tpl_dir = target.template_dir()
+        tpl_path = os.path.join(tpl_dir, "ci.yml.tpl")
+
+        with open(tpl_path) as f:
+            raw = f.read()
+
+        content, _ = process_template(raw, {"npm.minRequiredNode": "20"})
+        assert "if [ -f package-lock.json ]" in content
+        assert "npm ci" in content
+        assert "npm install" in content
+
+    def test_pnpm_ci_template_has_lockfile_conditional(self):
+        """pnpm ci template renders with conditional lockfile check."""
+        from rlsbl.commands.init_cmd import process_template
+        from rlsbl.targets.npm import NpmTarget
+
+        target = NpmTarget()
+        tpl_dir = target.template_dir()
+        tpl_path = os.path.join(tpl_dir, "ci-pnpm.yml.tpl")
+
+        with open(tpl_path) as f:
+            raw = f.read()
+
+        content, _ = process_template(raw, {"npm.minRequiredNode": "20"})
+        assert "if [ -f pnpm-lock.yaml ]" in content
+        assert "pnpm install --frozen-lockfile" in content
+        assert "pnpm install" in content
+
+    def test_yarn_ci_template_has_lockfile_conditional(self):
+        """yarn ci template renders with conditional lockfile check."""
+        from rlsbl.commands.init_cmd import process_template
+        from rlsbl.targets.npm import NpmTarget
+
+        target = NpmTarget()
+        tpl_dir = target.template_dir()
+        tpl_path = os.path.join(tpl_dir, "ci-yarn.yml.tpl")
+
+        with open(tpl_path) as f:
+            raw = f.read()
+
+        content, _ = process_template(raw, {"npm.minRequiredNode": "20"})
+        assert "if [ -f yarn.lock ]" in content
+        assert "yarn install --frozen-lockfile" in content
+        assert "yarn install" in content
+
+
 class TestIsNpmWrapper:
     """Unit tests for _is_npm_wrapper."""
 
@@ -160,7 +216,36 @@ class TestIsNpmWrapper:
         assert _is_npm_wrapper(".") is True
 
     def test_is_npm_wrapper_has_test(self, tmp_project):
-        """package.json with a real test script is NOT a wrapper."""
-        pkg = {"name": "test", "scripts": {"test": "jest"}}
+        """package.json with a real test script and deps is NOT a wrapper."""
+        pkg = {"name": "test", "scripts": {"test": "jest"}, "devDependencies": {"jest": "^29"}}
+        (tmp_project / "package.json").write_text(json.dumps(pkg) + "\n")
+        assert _is_npm_wrapper(".") is False
+
+    def test_is_npm_wrapper_zero_deps(self, tmp_project):
+        """package.json with a test script but zero dependencies is a wrapper."""
+        pkg = {"name": "test", "scripts": {"test": "python3 -m pytest tests/"}}
+        (tmp_project / "package.json").write_text(json.dumps(pkg) + "\n")
+        assert _is_npm_wrapper(".") is True
+
+    def test_is_npm_wrapper_empty_deps(self, tmp_project):
+        """package.json with empty dependencies objects is a wrapper."""
+        pkg = {
+            "name": "test",
+            "scripts": {"test": "python3 -m pytest"},
+            "dependencies": {},
+            "devDependencies": {},
+        }
+        (tmp_project / "package.json").write_text(json.dumps(pkg) + "\n")
+        assert _is_npm_wrapper(".") is True
+
+    def test_is_npm_wrapper_has_deps_only(self, tmp_project):
+        """package.json with test script and runtime deps is NOT a wrapper."""
+        pkg = {"name": "test", "scripts": {"test": "jest"}, "dependencies": {"lodash": "^4"}}
+        (tmp_project / "package.json").write_text(json.dumps(pkg) + "\n")
+        assert _is_npm_wrapper(".") is False
+
+    def test_is_npm_wrapper_has_dev_deps_only(self, tmp_project):
+        """package.json with test script and devDependencies is NOT a wrapper."""
+        pkg = {"name": "test", "scripts": {"test": "jest"}, "devDependencies": {"jest": "^29"}}
         (tmp_project / "package.json").write_text(json.dumps(pkg) + "\n")
         assert _is_npm_wrapper(".") is False
