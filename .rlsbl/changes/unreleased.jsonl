@@ -11,3 +11,4 @@
 {"commits":["8b4b54583a6d13054c8d8bd619a95cb64a27c1d3"],"user_facing":true,"description":"**Test context detection uses root-relative matching.** src/test/ is no longer falsely classified as test code. Added testdata/ and integration_test/ patterns.","type":"fix"}
 {"commits":["531bdc217ce358035b5a1c8cf8e33ce45e21c96a"],"user_facing":true,"description":"**BFS and topological sort use correct data structures.** Workspace graph BFS uses deque (O(1) dequeue) and topological sort uses heapq instead of re-sorting.","type":"fix"}
 {"commits":["cc543581f61f9ca225f67865c450754fde1c797c"],"user_facing":true,"description":"**Spec docs corrected.** Fixed incorrect claim that spec target has no ci_templates.","type":"fix"}
+{"commits":["a4543c1b5a9601452a4917d316a7e03d3323aadb"],"user_facing":true,"description":"**Deploy docs corrected.** Fixed config key from deploy_targets to deploy.","type":"fix"}
