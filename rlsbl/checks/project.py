@@ -3,7 +3,7 @@
 Checks: lock, version-consistency, name-consistency, license-consistency,
 description-consistency, private-hook-stale, config-schema, license-file,
 private-publish-workflow, npm-private-mismatch, target-version-readable,
-selfdoc-version-drift.
+selfdoc-version-drift, scaffold-conflicts.
 """
 
 import json
@@ -12,6 +12,68 @@ import os
 from strictcli import CheckResult
 
 from ..errors import ConfigError
+
+
+def find_conflicted_scaffold_files(project_root):
+    """Return relative paths of scaffold-managed files with unresolved
+    git merge conflict markers.
+
+    Scans three file sets (skipping files that don't exist):
+    - every file listed in ``.rlsbl/managed-files.json`` (the
+      scaffold-managed registry; missing or malformed registry is skipped)
+    - all files under ``.github/workflows/``
+    - all files under ``.rlsbl/hooks/``
+
+    A file is conflicted when it contains a line starting with
+    ``'<<<<<<< '`` AND a line starting with ``'>>>>>>> '``. Requiring
+    both avoids false positives on bare ``'======='`` lines (e.g.
+    setext heading underlines).
+
+    Shared by the ``scaffold-conflicts`` check and the pre-mutation
+    guard in ``rlsbl release run``.
+    """
+    root_str = str(project_root)
+    candidates = set()
+
+    registry_path = os.path.join(root_str, ".rlsbl", "managed-files.json")
+    if os.path.exists(registry_path):
+        try:
+            with open(registry_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            for rel in data.get("files", {}):
+                candidates.add(os.path.join(root_str, rel))
+        except (OSError, json.JSONDecodeError):
+            pass  # malformed registry -- skip, don't crash the check
+
+    for scan_dir in (
+        os.path.join(root_str, ".github", "workflows"),
+        os.path.join(root_str, ".rlsbl", "hooks"),
+    ):
+        if os.path.isdir(scan_dir):
+            for entry in os.listdir(scan_dir):
+                candidates.add(os.path.join(scan_dir, entry))
+
+    conflicted = []
+    for filepath in candidates:
+        if not os.path.isfile(filepath):
+            continue
+        has_start = False
+        has_end = False
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                for line in f:
+                    if line.startswith("<<<<<<< "):
+                        has_start = True
+                    elif line.startswith(">>>>>>> "):
+                        has_end = True
+                    if has_start and has_end:
+                        break
+        except (OSError, UnicodeDecodeError):
+            continue
+        if has_start and has_end:
+            conflicted.append(os.path.relpath(filepath, root_str))
+
+    return sorted(conflicted)
 
 
 def register_project_checks(app):
@@ -380,3 +442,16 @@ def register_project_checks(app):
                 f"primary target {first_name} version ({primary_version})",
             )
         return CheckResult("pass", f"selfdoc.json version matches ({selfdoc_version})")
+
+    @app.check("scaffold-conflicts")
+    def check_scaffold_conflicts(ctx):
+        """Scaffold-managed files must not contain unresolved merge conflict markers."""
+        conflicted = find_conflicted_scaffold_files(ctx.project_root)
+        if conflicted:
+            return CheckResult(
+                "fail",
+                f"{len(conflicted)} scaffold-managed file(s) with unresolved "
+                "merge conflict markers",
+                details=conflicted,
+            )
+        return CheckResult("pass", "no unresolved merge conflict markers")

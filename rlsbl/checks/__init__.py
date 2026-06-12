@@ -94,6 +94,7 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "npm-private-mismatch": frozenset({"npm"}),
     "target-version-readable": None,
     "selfdoc-version-drift": None,
+    "scaffold-conflicts": None,
     # --- prepush tag ---
     "prepush-changelog-coverage": None,
     "prepush-gitignore-guard": None,

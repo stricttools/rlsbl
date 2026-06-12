@@ -406,6 +406,32 @@ def _refresh_selfdoc_hashes(files_to_commit, log, project_dir="."):
 _SCHEMA_DUMP_TIMEOUT = 30
 
 
+def _abort_on_scaffold_conflicts(project_dir):
+    """Abort the release if scaffold-managed files contain unresolved merge
+    conflict markers.
+
+    Scaffold's three-way merge (git merge-file) intentionally leaves
+    conflict markers for manual resolution; releasing with them would
+    publish corrupted workflows/hooks. Runs PRE-MUTATION: nothing has
+    been modified yet when this aborts.
+    """
+    from ..checks.project import find_conflicted_scaffold_files
+
+    conflicted = find_conflicted_scaffold_files(project_dir)
+    if conflicted:
+        print(
+            "Error: unresolved merge conflict markers in scaffold-managed file(s):",
+            file=sys.stderr,
+        )
+        for path in conflicted:
+            print(f"  {path}", file=sys.stderr)
+        print(
+            "Resolve the conflicts and commit before releasing.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
 def _run_strictcli_schema_dump(flags, log, project_dir="."):
     """Run --dump-schema for strictcli projects to regenerate .strictcli/schema.json.
 
@@ -768,6 +794,10 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
     # Project directory: ctx.project_root is already resolved to the sub-project
     # in monorepo mode (via _require_sub_project_root).
     project_dir = str(project_root)
+
+    # Scaffold conflict guard: abort before any mutation if scaffold-managed
+    # files still contain unresolved merge conflict markers.
+    _abort_on_scaffold_conflicts(project_dir)
 
     # Get target instance for tag_format/build/publish
     target = TARGETS[registry]

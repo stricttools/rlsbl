@@ -71,6 +71,7 @@ EXPECTED_CHECKS = [
     "npm-private-mismatch",
     "target-version-readable",
     "selfdoc-version-drift",
+    "scaffold-conflicts",
     # Pre-push checks
     "prepush-changelog-coverage",
     "prepush-gitignore-guard",
