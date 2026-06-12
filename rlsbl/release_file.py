@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 
 import tomlkit
 
+from .errors import ReleaseFileError
+
 
 VALID_BUMP_TYPES = ("patch", "minor", "major")
 
@@ -38,11 +40,11 @@ def _validate_release_config(data: dict, prefix: str = "") -> ReleaseConfig:
     configs. The prefix is prepended to all error messages -- empty string for
     single-project, "[packages.<name>] " for batch.
 
-    Raises ValueError for schema/validation failures.
+    Raises ReleaseFileError for schema/validation failures.
     Returns a ReleaseConfig on success.
     """
-    def err(msg: str) -> ValueError:
-        return ValueError(f"{prefix}{msg}")
+    def err(msg: str) -> ReleaseFileError:
+        return ReleaseFileError(f"{prefix}{msg}")
 
     # --- bump ---
     if "bump" not in data:
@@ -140,7 +142,7 @@ def read_release_file(path: str) -> ReleaseConfig:
     """Read and validate a release TOML file.
 
     Raises FileNotFoundError if the file doesn't exist.
-    Raises ValueError for schema/validation failures.
+    Raises ReleaseFileError for schema/validation failures.
     """
     with open(path, "r", encoding="utf-8") as f:
         data = tomlkit.load(f)
@@ -167,25 +169,25 @@ def read_batch_release_file(path: str) -> BatchReleaseConfig:
     as a single ReleaseConfig (bump, include, exclude, optional targets).
 
     Raises FileNotFoundError if the file doesn't exist.
-    Raises ValueError for schema/validation failures.
+    Raises ReleaseFileError for schema/validation failures.
     """
     with open(path, "r", encoding="utf-8") as f:
         data = tomlkit.load(f)
 
     if "packages" not in data:
-        raise ValueError("missing required section: [packages]")
+        raise ReleaseFileError("missing required section: [packages]")
 
     packages_raw = data["packages"]
     if not isinstance(packages_raw, dict):
-        raise ValueError("[packages] must be a table of package configurations")
+        raise ReleaseFileError("[packages] must be a table of package configurations")
 
     if not packages_raw:
-        raise ValueError("[packages] is empty -- at least one package is required")
+        raise ReleaseFileError("[packages] is empty -- at least one package is required")
 
     packages = {}
     for pkg_name, pkg_data in packages_raw.items():
         if not isinstance(pkg_data, dict):
-            raise ValueError(
+            raise ReleaseFileError(
                 f"[packages.{pkg_name}] must be a table"
             )
 
@@ -219,33 +221,33 @@ def read_retry_file(path: str) -> RetryConfig:
     """Read and validate a retry TOML file.
 
     Raises FileNotFoundError if the file doesn't exist.
-    Raises ValueError for schema/validation failures.
+    Raises ReleaseFileError for schema/validation failures.
     """
     with open(path, "r", encoding="utf-8") as f:
         data = tomlkit.load(f)
 
     # --- version ---
     if "version" not in data:
-        raise ValueError("missing required field: version")
+        raise ReleaseFileError("missing required field: version")
     version = data["version"]
     if not isinstance(version, str) or not version.strip():
-        raise ValueError("version must be a non-empty string")
+        raise ReleaseFileError("version must be a non-empty string")
 
     # --- dispatch ---
     if "dispatch" not in data:
-        raise ValueError("missing required field: dispatch")
+        raise ReleaseFileError("missing required field: dispatch")
     dispatch = data["dispatch"]
     if not isinstance(dispatch, list) or not all(isinstance(s, str) for s in dispatch):
-        raise ValueError("dispatch must be a list of strings")
+        raise ReleaseFileError("dispatch must be a list of strings")
     if not dispatch:
-        raise ValueError("dispatch must be non-empty")
+        raise ReleaseFileError("dispatch must be non-empty")
 
     # --- ref ---
     if "ref" not in data:
-        raise ValueError("missing required field: ref")
+        raise ReleaseFileError("missing required field: ref")
     ref = data["ref"]
     if not isinstance(ref, str) or not ref.strip():
-        raise ValueError("ref must be set in retry.toml (e.g. a tag like v1.2.3 or a branch like main)")
+        raise ReleaseFileError("ref must be set in retry.toml (e.g. a tag like v1.2.3 or a branch like main)")
 
     return RetryConfig(
         version=version.strip(),

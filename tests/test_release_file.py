@@ -4,6 +4,7 @@ import os
 
 import pytest
 
+from rlsbl.errors import ReleaseFileError
 from rlsbl.release_file import (
     ReleaseConfig,
     VALID_BUMP_TYPES,
@@ -82,43 +83,43 @@ class TestReadReleaseFileErrors:
     def test_missing_bump(self, tmp_path):
         f = tmp_path / "release.toml"
         f.write_text('include = ["pypi"]\nexclude = []\n')
-        with pytest.raises(ValueError, match="bump"):
+        with pytest.raises(ReleaseFileError, match="bump"):
             read_release_file(str(f))
 
     def test_invalid_bump_value(self, tmp_path):
         f = tmp_path / "release.toml"
         f.write_text('bump = "huge"\ninclude = []\nexclude = []\n')
-        with pytest.raises(ValueError, match="bump"):
+        with pytest.raises(ReleaseFileError, match="bump"):
             read_release_file(str(f))
 
     def test_missing_include(self, tmp_path):
         f = tmp_path / "release.toml"
         f.write_text('bump = "patch"\nexclude = []\n')
-        with pytest.raises(ValueError, match="include"):
+        with pytest.raises(ReleaseFileError, match="include"):
             read_release_file(str(f))
 
     def test_missing_exclude(self, tmp_path):
         f = tmp_path / "release.toml"
         f.write_text('bump = "patch"\ninclude = []\n')
-        with pytest.raises(ValueError, match="exclude"):
+        with pytest.raises(ReleaseFileError, match="exclude"):
             read_release_file(str(f))
 
     def test_include_not_list_of_strings(self, tmp_path):
         f = tmp_path / "release.toml"
         f.write_text('bump = "patch"\ninclude = [1, 2]\nexclude = []\n')
-        with pytest.raises(ValueError, match="include"):
+        with pytest.raises(ReleaseFileError, match="include"):
             read_release_file(str(f))
 
     def test_exclude_not_list_of_strings(self, tmp_path):
         f = tmp_path / "release.toml"
         f.write_text('bump = "patch"\ninclude = []\nexclude = [1]\n')
-        with pytest.raises(ValueError, match="exclude"):
+        with pytest.raises(ReleaseFileError, match="exclude"):
             read_release_file(str(f))
 
     def test_target_in_both_include_and_exclude(self, tmp_path):
         f = tmp_path / "release.toml"
         f.write_text('bump = "patch"\ninclude = ["pypi"]\nexclude = ["pypi"]\n')
-        with pytest.raises(ValueError, match="both include and exclude"):
+        with pytest.raises(ReleaseFileError, match="both include and exclude"):
             read_release_file(str(f))
 
     def test_target_config_for_excluded_target(self, tmp_path):
@@ -131,7 +132,7 @@ class TestReadReleaseFileErrors:
             "[targets.npm]\n"
             'mode = "ota"\n'
         )
-        with pytest.raises(ValueError, match="not in include"):
+        with pytest.raises(ReleaseFileError, match="not in include"):
             read_release_file(str(f))
 
     def test_target_config_for_unlisted_target(self, tmp_path):
@@ -145,7 +146,7 @@ class TestReadReleaseFileErrors:
             "[targets.flutter]\n"
             'mode = "ota"\n'
         )
-        with pytest.raises(ValueError, match="not in include"):
+        with pytest.raises(ReleaseFileError, match="not in include"):
             read_release_file(str(f))
 
     def test_invalid_target_mode(self, tmp_path):
@@ -158,7 +159,7 @@ class TestReadReleaseFileErrors:
             "[targets.flutter]\n"
             'mode = "deploy"\n'
         )
-        with pytest.raises(ValueError, match="invalid mode"):
+        with pytest.raises(ReleaseFileError, match="invalid mode"):
             read_release_file(str(f))
 
     def test_unknown_target_field(self, tmp_path):
@@ -171,19 +172,19 @@ class TestReadReleaseFileErrors:
             "[targets.flutter]\n"
             'flavor = "production"\n'
         )
-        with pytest.raises(ValueError, match="unknown field"):
+        with pytest.raises(ReleaseFileError, match="unknown field"):
             read_release_file(str(f))
 
     def test_description_not_string(self, tmp_path):
         f = tmp_path / "release.toml"
         f.write_text('bump = "patch"\ninclude = []\nexclude = []\ndescription = 42\n')
-        with pytest.raises(ValueError, match="description must be a string"):
+        with pytest.raises(ReleaseFileError, match="description must be a string"):
             read_release_file(str(f))
 
     def test_context_not_string(self, tmp_path):
         f = tmp_path / "release.toml"
         f.write_text('bump = "patch"\ninclude = []\nexclude = []\ndescription = "test release"\ncontext = true\n')
-        with pytest.raises(ValueError, match="context must be a string"):
+        with pytest.raises(ReleaseFileError, match="context must be a string"):
             read_release_file(str(f))
 
 
@@ -191,17 +192,17 @@ class TestReadReleaseFileDescriptionContext:
     """Tests for description and context fields in release files."""
 
     def test_description_required(self, tmp_path):
-        """Omitting description raises ValueError."""
+        """Omitting description raises ReleaseFileError."""
         f = tmp_path / "release.toml"
         f.write_text('bump = "patch"\ninclude = []\nexclude = []\n')
-        with pytest.raises(ValueError, match="description"):
+        with pytest.raises(ReleaseFileError, match="description"):
             read_release_file(str(f))
 
     def test_empty_description_rejected(self, tmp_path):
         """An empty description string is rejected."""
         f = tmp_path / "release.toml"
         f.write_text('bump = "patch"\ninclude = []\nexclude = []\ndescription = ""\n')
-        with pytest.raises(ValueError, match="description"):
+        with pytest.raises(ReleaseFileError, match="description"):
             read_release_file(str(f))
 
     def test_context_defaults_empty(self, tmp_path):
