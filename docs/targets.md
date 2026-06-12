@@ -235,7 +235,7 @@ Each target has an `ecosystem` string used for display and grouping in commands 
 
 - Detection: `version.json` file presence
 - Version: reads/writes `{"version": "X.Y.Z"}` in `version.json`
-- Capabilities: minimal — no `ci_templates`, no `dev_install`, no publish
+- Capabilities: `read_name` and `ci_templates` (a stub CI template for users to add their own validation commands) — no `dev_install`, no publish
 - Use case: spec-only projects that need version tracking without any build or publish step — the tagged GitHub Release is the publication
 
 ### pgdesign
