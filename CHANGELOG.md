@@ -2,6 +2,40 @@
 
 # Changelog
 
+## 0.70.0
+
+Custom exception hierarchy, checks.py modularization, import scanning fixes, deploy local_steps, and 9 truncation removals.
+
+<details>
+<summary>Context</summary>
+
+Codebase investigation surfaced 50 curiosities; 13 were elevated to decisions and executed across 11 phases. The biggest structural changes: 105 bare ValueErrors replaced with 5 typed exception classes, and the 1,978-line checks.py split into a 6-module package. Import scanning got two correctness fixes (guarded imports for deps-unused, root-relative test context detection). The deploy module gained local_steps for pre-SSH commands like cross-compilation. All silent truncation was purged (9 instances). Test suite gained xdist (96s -> 27s), parametrization, and real CI runs.
+
+</details>
+
+### Breaking
+
+- **Custom exception hierarchy replaces ValueError.** rlsbl now raises ConfigError, WorkspaceError, ChangelogError, VersionError, and ReleaseFileError instead of bare ValueError. Code that catches ValueError from rlsbl APIs must update to catch the new types.
+- **Ultranorm variant cap is now a hard error.** check-name with highly-ambiguous names now errors instead of silently warning and continuing with incomplete results.
+
+### Features
+
+- **npm CI templates handle missing lockfiles.** Templates now use npm ci when a lockfile exists and fall back to npm install when absent. Zero-dependency wrapper packages are auto-detected and skip CI generation.
+- **npm wrapper improvements.** bin/cli.js now verifies Python >= 3.11, checks rlsbl is installed (with clear error messages), and supports Windows via python3/python/py fallback.
+- **Deploy: local_steps field.** Deploy targets can now run local commands (cross-compilation, file transfers) before SSH-based remote steps.
+- **target-count selfdoc directive.** New directive dynamically generates the release target count with a link to the targets documentation page.
+
+### Fixes
+
+- **Remove silent data truncation.** Changelog commit messages and batch exclusion reasons are no longer silently truncated at 72/60 characters.
+- **Remove display truncation caps.** Unreleased subjects, pre-push missing commits, OTA native files, orphan hashes, and discover descriptions now show full content instead of capping at arbitrary limits.
+- **Changelog regeneration preserves release metadata.** Descriptions and context from archived release .toml files are now read during CHANGELOG.md regeneration, fixing data loss on subsequent regenerations.
+- **deps-unused no longer flags guarded imports.** Imports inside try/except ImportError blocks now count as used, fixing false positives for optional dependencies.
+- **Test context detection uses root-relative matching.** src/test/ is no longer falsely classified as test code. Added testdata/ and integration_test/ patterns.
+- **BFS and topological sort use correct data structures.** Workspace graph BFS uses deque (O(1) dequeue) and topological sort uses heapq instead of re-sorting.
+- **Spec docs corrected.** Fixed incorrect claim that spec target has no ci_templates.
+- **Deploy docs corrected.** Fixed config key from deploy_targets to deploy.
+
 ## 0.69.2
 
 Deno publish idempotency, orphan sweep script

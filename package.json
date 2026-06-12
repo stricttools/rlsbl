@@ -1,6 +1,6 @@
 {
   "name": "rlsbl",
-  "version": "0.69.2",
+  "version": "0.70.0",
   "description": "Release orchestration and project scaffolding across package ecosystems",
   "license": "MIT",
   "bin": {
