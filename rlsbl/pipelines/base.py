@@ -55,6 +55,12 @@ class BasePipeline:
             build_cmd = entry["build"]
             output_path = os.path.join(dist_dir, name)
 
+            # build_cmd is operator-owned config (custom_assets in the rlsbl
+            # config); shell semantics ($RLSBL_DIST_DIR expansion, redirection)
+            # are an intentional contract, so shell=True is deliberate. Echo
+            # the command before execution for an audit trail. No timeout:
+            # build commands are unbounded operator-defined work.
+            print(f"  Building custom asset '{name}': {build_cmd}")
             result = subprocess.run(
                 build_cmd,
                 shell=True,

@@ -845,6 +845,45 @@ class TestReadDeployConfig:
 
 
 # ---------------------------------------------------------------------------
+# Local step execution (deploy_target)
+# ---------------------------------------------------------------------------
+
+class TestLocalStepExecution:
+    """Local steps run via shell=True (operator-owned contract) with an
+    echoed audit trail of the fully expanded command."""
+
+    def _run_target(self, monkeypatch, local_steps):
+        """Run deploy_target with SSH steps mocked out and real local steps."""
+        monkeypatch.setattr("rlsbl.deploy.ssh_run", lambda **kwargs: ("", "", 0))
+        target = _minimal_target(local_steps=local_steps)
+        return deploy_target(target, "main")
+
+    def test_expanded_command_echoed_before_execution(self, monkeypatch, capsys):
+        monkeypatch.setenv("RLSBL_TEST_STEP_ARG", "expanded-value")
+        result = self._run_target(monkeypatch, [": $RLSBL_TEST_STEP_ARG"])
+        assert result.success
+        out = capsys.readouterr().out
+        assert "[prod] Local step 1/1: : expanded-value" in out
+
+    def test_shell_semantics_preserved(self, monkeypatch, tmp_path):
+        # Operator configs rely on shell features (env-assignment prefixes,
+        # redirection); shell=True is the deliberate contract here.
+        out_file = tmp_path / "marker.txt"
+        step = f"GREETING=shellworks printenv GREETING > {out_file}"
+        result = self._run_target(monkeypatch, [step])
+        assert result.success
+        assert out_file.read_text().strip() == "shellworks"
+
+    def test_failed_local_step_reports_expanded_command(self, monkeypatch, capsys):
+        monkeypatch.setenv("RLSBL_TEST_STEP_ARG", "expanded-value")
+        result = self._run_target(monkeypatch, ["false # $RLSBL_TEST_STEP_ARG"])
+        assert not result.success
+        assert "expanded-value" in result.message
+        out = capsys.readouterr().out
+        assert "[prod] Local step 1/1: false # expanded-value" in out
+
+
+# ---------------------------------------------------------------------------
 # Test utilities
 # ---------------------------------------------------------------------------
 

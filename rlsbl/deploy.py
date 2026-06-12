@@ -295,6 +295,13 @@ def deploy_target(target_config, current_branch):
     if local_steps:
         for i, step in enumerate(local_steps):
             expanded_step = expand_env_vars(step)
+            # The print below echoes the fully expanded command as an audit
+            # trail before execution. expanded_step is operator-owned config
+            # (deploy local_steps); shell semantics (env-assignment prefixes,
+            # quoting, redirection) are an intentional contract, so shell=True
+            # is deliberate. No timeout: local steps are unbounded build
+            # commands. Output streams live to the terminal; on failure the
+            # DeployResult message carries the expanded command.
             print(f"[{name}] Local step {i + 1}/{len(local_steps)}: {expanded_step}")
             try:
                 subprocess.run(

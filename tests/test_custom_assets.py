@@ -155,3 +155,29 @@ class TestBuildCustomAssetsOversized:
         )
         result = p.build_custom_assets(dist)
         assert len(result) == 1
+
+
+class TestBuildCommandEcho:
+    """The build command is echoed to stdout before execution (audit trail).
+
+    Build commands run via shell=True because operator configs rely on shell
+    features ($RLSBL_DIST_DIR expansion, redirection); the echo provides an
+    audit trail of exactly what was run.
+    """
+
+    def test_build_command_echoed_before_execution(self, tmp_path, capsys):
+        dist = str(tmp_path / "dist")
+        cmd = "echo hello > $RLSBL_DIST_DIR/out.txt"
+        p = _pipeline([{"name": "out.txt", "build": cmd}])
+        p.build_custom_assets(dist)
+        out = capsys.readouterr().out
+        assert cmd in out
+
+    def test_build_command_echoed_even_when_build_fails(self, tmp_path, capsys):
+        dist = str(tmp_path / "dist")
+        cmd = "exit 7"
+        p = _pipeline([{"name": "never.txt", "build": cmd}])
+        with pytest.raises(SystemExit):
+            p.build_custom_assets(dist)
+        out = capsys.readouterr().out
+        assert cmd in out
