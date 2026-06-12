@@ -1,3 +1,4 @@
 {"commits":["08e7d248a003fc5da13c10d791781d9a4677c5d6"],"user_facing":true,"description":"**Fix.** `release run` no longer errors when `push_timeout` is unset; it defaults to 120 seconds as documented.","type":"fix"}
 {"commits":["355c9cada1640baa9fe38376802f0ebfa6afc43d"],"user_facing":false}
 {"commits":["b1e4a8babb7e9152cc9c62d97cd7d450d5672035"],"user_facing":true,"description":"**Fix.** `release run` re-run after a partial failure could silently overwrite an already-finalized changelog file; it now aborts with a clear error.","type":"fix"}
+{"commits":["c10e5c229d5a0c8e6ac912535b97ca6fd42ab730"],"user_facing":true,"description":"Custom asset build commands are now echoed to stdout before execution, providing an audit trail of the exact shell command run during release asset builds.","type":"fix"}
