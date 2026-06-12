@@ -1776,15 +1776,6 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         merged_created, merged_skipped, merged_warnings, merged_hashes = apply_plans(merged_plans)
         shared_created, shared_skipped, shared_warnings, shared_hashes = apply_plans(shared_plans)
 
-        # Clean up old ci.yml (replaced by per-target CI files)
-        old_ci = os.path.join(".github", "workflows", "ci.yml")
-        if os.path.exists(old_ci):
-            os.unlink(old_ci)
-            old_ci_base = os.path.join(".rlsbl", "bases", ".github", "workflows", "ci.yml")
-            if os.path.exists(old_ci_base):
-                os.unlink(old_ci_base)
-            print("Removed old ci.yml (replaced by per-target CI files)")
-
         created = ci_created + extra_created + merged_created + shared_created
         skipped = ci_skipped + extra_skipped + merged_skipped + shared_skipped
         warnings = ci_warnings + extra_warnings + merged_warnings + shared_warnings
