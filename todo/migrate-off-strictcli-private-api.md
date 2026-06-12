@@ -44,6 +44,26 @@ No more `app._check_defs` access. No more private function imports.
 
 strictcli Python release containing the public check runner API (`run_checks`, `format_check_results`, `format_check_results_json`, `CheckRunResult`).
 
+## Test files accessing _check_defs directly
+
+12 rlsbl test files access `app._check_defs["check-name"].impl(ctx)` to invoke individual check implementations directly. This pattern is NOT covered by the `run_checks()` migration — `run_checks()` runs the full pipeline (filter, order, execute), while these tests invoke single checks in isolation.
+
+Affected test files (partial list):
+- test_doctor_checks_migration.py (~40 lines)
+- test_prepush_checks.py (~15 lines)
+- test_new_checks.py (~20 lines)
+- test_scaffold_unreplaced_vars.py (~10 lines)
+- test_deps_stale.py (~5 lines)
+- test_selfdoc_version_bump.py (~4 lines)
+- test_workspace_unbuildable.py (~6 lines)
+- test_license_check.py (~5 lines)
+- test_mirror_cmd.py (1 line)
+- test_layers.py (4 lines)
+- test_dep_validation.py (5 lines)
+- test_dev_node.py (2 lines)
+
+These tests would need a public API for running individual checks by name, which is out of scope for the current strictcli public API (runner only, not individual check access). For now, these tests continue using the private `_check_defs` attribute.
+
 ## Effort
 
-Small. Production code is a 4-line replacement. Test migration is moderate -- mock patterns change from patching module-level functions to patching an instance method.
+Moderate. Production code is a 4-line replacement. Test migration is moderate -- mock patterns change from patching module-level functions to patching an instance method.
