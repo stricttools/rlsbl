@@ -5,6 +5,7 @@ import json
 import pytest
 
 from rlsbl.config import read_json_config, should_tag, write_project_config
+from rlsbl.errors import ConfigError
 
 
 class TestShouldTag:
@@ -53,7 +54,7 @@ class TestReadJsonConfig:
     def test_raises_value_error_on_malformed_json(self, tmp_path):
         bad_file = tmp_path / "bad.json"
         bad_file.write_text("{not valid json!!")
-        with pytest.raises(ValueError, match="Malformed JSON"):
+        with pytest.raises(ConfigError, match="Malformed JSON"):
             read_json_config(str(bad_file))
 
 

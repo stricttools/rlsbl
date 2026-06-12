@@ -4,6 +4,8 @@ import json
 import os
 import sys
 
+from .errors import ConfigError
+
 
 def load_env_file(path):
     """Load KEY=VALUE pairs from a file into os.environ.
@@ -49,7 +51,7 @@ def read_json_config(path):
     except FileNotFoundError:
         return {}
     except json.JSONDecodeError as e:
-        raise ValueError(f"Malformed JSON in {path}: {e}") from e
+        raise ConfigError(f"Malformed JSON in {path}: {e}") from e
 
 
 def should_tag(flags, config):
@@ -115,7 +117,7 @@ def get_changelog_validation_config(config):
 def validate_pipelines_config(config):
     """Validate the ``pipelines`` section of a project config.
 
-    Raises ``ValueError`` if:
+    Raises ``ConfigError`` if:
     - ``pipelines`` is present but not a dict
     - An entry is not a dict
     - An entry is missing ``type`` (str) or ``local`` (bool)
@@ -131,35 +133,35 @@ def validate_pipelines_config(config):
         return
 
     if not isinstance(pipelines, dict):
-        raise ValueError(
+        raise ConfigError(
             f"pipelines must be a dict, got {type(pipelines).__name__}"
         )
 
     for name, entry in pipelines.items():
         if not isinstance(entry, dict):
-            raise ValueError(
+            raise ConfigError(
                 f"pipeline '{name}' must be a dict, got {type(entry).__name__}"
             )
 
         # type is required and must be a registered pipeline type
         if "type" not in entry:
-            raise ValueError(f"pipeline '{name}' is missing required key 'type'")
+            raise ConfigError(f"pipeline '{name}' is missing required key 'type'")
         ptype = entry["type"]
         if not isinstance(ptype, str):
-            raise ValueError(
+            raise ConfigError(
                 f"pipeline '{name}'.type must be a string, got {type(ptype).__name__}"
             )
         if ptype not in PIPELINE_TYPES:
-            raise ValueError(
+            raise ConfigError(
                 f"pipeline '{name}'.type '{ptype}' is not a registered pipeline type. "
                 f"Valid types: {', '.join(sorted(PIPELINE_TYPES.keys())) or '(none registered)'}"
             )
 
         # local is required and must be a bool
         if "local" not in entry:
-            raise ValueError(f"pipeline '{name}' is missing required key 'local'")
+            raise ConfigError(f"pipeline '{name}' is missing required key 'local'")
         if not isinstance(entry["local"], bool):
-            raise ValueError(
+            raise ConfigError(
                 f"pipeline '{name}'.local must be a boolean, got {type(entry['local']).__name__}"
             )
 
@@ -167,11 +169,11 @@ def validate_pipelines_config(config):
         if entry.get("assets"):
             max_size = entry.get("max_asset_size_mb")
             if max_size is None:
-                raise ValueError(
+                raise ConfigError(
                     f"pipeline '{name}' has assets=true but max_asset_size_mb is not set"
                 )
             if not isinstance(max_size, int) or max_size <= 0:
-                raise ValueError(
+                raise ConfigError(
                     f"pipeline '{name}'.max_asset_size_mb must be a positive integer, "
                     f"got {max_size!r}"
                 )
@@ -180,33 +182,33 @@ def validate_pipelines_config(config):
         custom_assets = entry.get("custom_assets")
         if custom_assets is not None:
             if not isinstance(custom_assets, list):
-                raise ValueError(
+                raise ConfigError(
                     f"pipeline '{name}'.custom_assets must be a list, "
                     f"got {type(custom_assets).__name__}"
                 )
             # custom_assets requires max_asset_size_mb
             max_size = entry.get("max_asset_size_mb")
             if max_size is None:
-                raise ValueError(
+                raise ConfigError(
                     f"pipeline '{name}' has custom_assets but max_asset_size_mb is not set"
                 )
             if not isinstance(max_size, int) or max_size <= 0:
-                raise ValueError(
+                raise ConfigError(
                     f"pipeline '{name}'.max_asset_size_mb must be a positive integer, "
                     f"got {max_size!r}"
                 )
             for i, asset in enumerate(custom_assets):
                 if not isinstance(asset, dict):
-                    raise ValueError(
+                    raise ConfigError(
                         f"pipeline '{name}'.custom_assets[{i}] must be a dict, "
                         f"got {type(asset).__name__}"
                     )
                 if "name" not in asset or not isinstance(asset["name"], str):
-                    raise ValueError(
+                    raise ConfigError(
                         f"pipeline '{name}'.custom_assets[{i}] is missing required string key 'name'"
                     )
                 if "build" not in asset or not isinstance(asset["build"], str):
-                    raise ValueError(
+                    raise ConfigError(
                         f"pipeline '{name}'.custom_assets[{i}] is missing required string key 'build'"
                     )
 
