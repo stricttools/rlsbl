@@ -152,11 +152,8 @@ def run_cmd(registry, args, flags, project_root):
         for commit in commits:
             short_hash = commit["hash"][:7]
             status = "[COVERED]" if commit["covered"] else "[MISSING]"
-            # Truncate long subjects to keep output aligned
             subject = commit["subject"]
-            if len(subject) > 50:
-                subject = subject[:47] + "..."
-            print(f"  {short_hash}  {subject:<50}  {status}")
+            print(f"  {short_hash}  {subject}  {status}")
 
         print(f"\nCoverage: {covered_count}/{total} commits have changelog entries.")
 
