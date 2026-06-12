@@ -5,6 +5,7 @@ import re
 import xml.etree.ElementTree as ET
 
 from .base import BaseTarget
+from ..errors import VersionError
 from ..utils import run
 
 
@@ -133,7 +134,7 @@ class MavenTarget(BaseTarget):
         """Read version from the detected version source."""
         filepath, fmt = self._find_version_file(dir_path)
         if filepath is None:
-            raise ValueError(f"No version source found in {dir_path}")
+            raise VersionError(f"No version source found in {dir_path}")
 
         with open(filepath, "r", encoding="utf-8") as f:
             content = f.read()
@@ -145,21 +146,21 @@ class MavenTarget(BaseTarget):
             )
             if m:
                 return m.group(1).strip()
-            raise ValueError(f"No version key found in {filepath}")
+            raise VersionError(f"No version key found in {filepath}")
 
         elif fmt == "gradle_kts":
             # version = "X.Y.Z"
             m = re.search(r'version\s*=\s*"([^"]+)"', content)
             if m:
                 return m.group(1)
-            raise ValueError(f"No version found in {filepath}")
+            raise VersionError(f"No version found in {filepath}")
 
         elif fmt == "gradle_groovy":
             # version = 'X.Y.Z' or version "X.Y.Z" or version = "X.Y.Z"
             m = re.search(r"""version\s*=?\s*['"]([^'"]+)['"]""", content)
             if m:
                 return m.group(1)
-            raise ValueError(f"No version found in {filepath}")
+            raise VersionError(f"No version found in {filepath}")
 
         elif fmt == "pom":
             ns = {"m": "http://maven.apache.org/POM/4.0.0"}
@@ -172,9 +173,9 @@ class MavenTarget(BaseTarget):
                 version_elem = root.find("version")
             if version_elem is not None and version_elem.text:
                 return version_elem.text.strip()
-            raise ValueError(f"No <version> found in {filepath}")
+            raise VersionError(f"No <version> found in {filepath}")
 
-        raise ValueError(f"Unknown format: {fmt}")
+        raise VersionError(f"Unknown format: {fmt}")
 
     def write_version(self, dir_path, version, ctx):
         """Write version to the same file it was read from.
@@ -184,7 +185,7 @@ class MavenTarget(BaseTarget):
         """
         filepath, fmt = self._find_version_file(dir_path)
         if filepath is None:
-            raise ValueError(f"No version source found in {dir_path}")
+            raise VersionError(f"No version source found in {dir_path}")
 
         rel_path = os.path.relpath(filepath, dir_path)
 
@@ -241,7 +242,7 @@ class MavenTarget(BaseTarget):
             return [rel_path]
 
         else:
-            raise ValueError(f"Unknown format: {fmt}")
+            raise VersionError(f"Unknown format: {fmt}")
 
         # Atomic write for non-XML formats
         tmp_path = filepath + ".tmp"
@@ -276,7 +277,7 @@ class MavenTarget(BaseTarget):
         # Read version from detected source
         try:
             version = self.read_version(dir_path)
-        except (ValueError, FileNotFoundError):
+        except (VersionError, FileNotFoundError):
             version = "0.0.0"
 
         return {

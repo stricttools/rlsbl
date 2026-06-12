@@ -5,6 +5,7 @@ import re
 import subprocess
 
 from .base import BaseTarget
+from ..errors import VersionError
 from ..utils import run
 
 
@@ -43,7 +44,7 @@ class HexTarget(BaseTarget):
             content = f.read()
         match = re.search(r'version:\s*"([^"]+)"', content)
         if not match:
-            raise ValueError(f"No version found in {mix_path}")
+            raise VersionError(f"No version found in {mix_path}")
         return match.group(1)
 
     def write_version(self, dir_path, version, ctx):

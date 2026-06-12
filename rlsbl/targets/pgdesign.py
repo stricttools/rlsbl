@@ -7,6 +7,7 @@ import sys
 import tomlkit
 
 from .base import BaseTarget
+from ..errors import VersionError
 
 
 class PgdesignTarget(BaseTarget):
@@ -71,7 +72,7 @@ class PgdesignTarget(BaseTarget):
             doc = tomlkit.parse(f.read())
         project = doc.get("project")
         if project is None or "version" not in project:
-            raise ValueError(
+            raise VersionError(
                 f"No [project].version in {path}"
             )
         return str(project["version"])
@@ -118,7 +119,7 @@ class PgdesignTarget(BaseTarget):
         dir_name = os.path.basename(os.path.abspath(dir_path))
         try:
             version = self.read_version(dir_path)
-        except (FileNotFoundError, ValueError):
+        except (FileNotFoundError, VersionError):
             version = "0.0.0"
         return {
             "name": dir_name,

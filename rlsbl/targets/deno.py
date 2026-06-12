@@ -6,6 +6,7 @@ import re
 import subprocess
 
 from .base import BaseTarget
+from ..errors import VersionError
 from ..utils import run
 
 
@@ -63,14 +64,14 @@ class DenoTarget(BaseTarget):
         """Read the version from deno.json or deno.jsonc."""
         config_path = self._config_path(dir_path)
         if not config_path:
-            raise ValueError(f"No deno.json or deno.jsonc found in {dir_path}")
+            raise VersionError(f"No deno.json or deno.jsonc found in {dir_path}")
         with open(config_path, "r", encoding="utf-8") as f:
             content = f.read()
         # Strip comments for jsonc
         cleaned = self._strip_comments(content)
         data = json.loads(cleaned)
         if "version" not in data:
-            raise ValueError(f"No 'version' field in {config_path}")
+            raise VersionError(f"No 'version' field in {config_path}")
         return data["version"]
 
     def write_version(self, dir_path, version, ctx):
@@ -83,7 +84,7 @@ class DenoTarget(BaseTarget):
         """
         config_path = self._config_path(dir_path)
         if not config_path:
-            raise ValueError(f"No deno.json or deno.jsonc found in {dir_path}")
+            raise VersionError(f"No deno.json or deno.jsonc found in {dir_path}")
 
         with open(config_path, "r", encoding="utf-8") as f:
             raw = f.read()

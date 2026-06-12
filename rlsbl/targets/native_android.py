@@ -4,6 +4,7 @@ import os
 import re
 
 from .base import BaseTarget
+from ..errors import VersionError
 
 
 class NativeAndroidTarget(BaseTarget):
@@ -49,7 +50,7 @@ class NativeAndroidTarget(BaseTarget):
             content = f.read()
         m = re.search(r'versionName\s+"([^"]+)"', content)
         if not m:
-            raise ValueError(f"No versionName found in {gradle_path}")
+            raise VersionError(f"No versionName found in {gradle_path}")
         return m.group(1)
 
     def write_version(self, dir_path, version, ctx):

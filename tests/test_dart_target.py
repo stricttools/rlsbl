@@ -5,6 +5,7 @@ import os
 import tempfile
 
 from conftest import make_ctx
+from rlsbl.errors import VersionError
 from rlsbl.targets.dart import DartTarget
 from rlsbl.targets.protocol import ReleaseTarget
 from rlsbl.targets import TARGETS
@@ -117,8 +118,8 @@ class TestDartTargetReadVersion:
             _write(os.path.join(d, "pubspec.yaml"), SAMPLE_PUBSPEC_NO_VERSION)
             try:
                 target.read_version(d)
-                assert False, "Expected ValueError"
-            except ValueError:
+                assert False, "Expected VersionError"
+            except VersionError:
                 pass
 
 

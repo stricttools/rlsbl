@@ -5,6 +5,7 @@ import os
 import re
 
 from .base import BaseTarget
+from ..errors import VersionError
 
 _MIN_VERSION_RE = re.compile(r">=\s*(\d+(?:\.\d+)*)")
 
@@ -84,7 +85,7 @@ class NpmTarget(BaseTarget):
         with open(pkg_path, "r", encoding="utf-8") as f:
             pkg = json.load(f)
         if "version" not in pkg:
-            raise ValueError(f"No 'version' field in {pkg_path}")
+            raise VersionError(f"No 'version' field in {pkg_path}")
         return pkg["version"]
 
     def write_version(self, dir_path, version, ctx):

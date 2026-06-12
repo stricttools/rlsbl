@@ -6,6 +6,7 @@ import re
 import tempfile
 
 from .base import BaseTarget
+from ..errors import VersionError
 
 
 class NativeIosTarget(BaseTarget):
@@ -78,7 +79,7 @@ class NativeIosTarget(BaseTarget):
             if m:
                 return m.group(1)
 
-        raise ValueError(f"No iOS version source found in {dir_path}")
+        raise VersionError(f"No iOS version source found in {dir_path}")
 
     def write_version(self, dir_path, version, ctx):
         """Write version to pbxproj or Tuist, incrementing build number.
@@ -145,7 +146,7 @@ class NativeIosTarget(BaseTarget):
             modified.append(rel_path)
             return modified
 
-        raise ValueError(f"No iOS version source found in {dir_path}")
+        raise VersionError(f"No iOS version source found in {dir_path}")
 
     def version_file(self, dir_path=None):
         # Dynamic: xcodeproj name varies per project.

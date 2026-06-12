@@ -4,6 +4,7 @@ import os
 import tempfile
 
 from conftest import make_ctx
+from rlsbl.errors import VersionError
 from rlsbl.targets.native_android import NativeAndroidTarget
 from rlsbl.targets.maven import MavenTarget
 from rlsbl.targets import TARGETS
@@ -141,8 +142,8 @@ class TestNativeAndroidReadVersion:
             _write(os.path.join(d, "build.gradle.kts"), SAMPLE_PURE_JAVA)
             try:
                 target.read_version(d)
-                assert False, "Expected ValueError"
-            except ValueError:
+                assert False, "Expected VersionError"
+            except VersionError:
                 pass
 
 

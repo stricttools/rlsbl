@@ -25,6 +25,7 @@ from .plain import PlainTarget
 from .protocol import ReleaseTarget
 from .base import BaseTarget
 from ..config import read_json_config
+from ..errors import ConfigError
 
 
 class TargetEntry(NamedTuple):
@@ -62,7 +63,7 @@ def _parse_target_entry(entry, base_dir):
     if isinstance(entry, dict):
         name = entry.get("name")
         if not name:
-            raise ValueError(f"target entry missing 'name': {entry}")
+            raise ConfigError(f"target entry missing 'name': {entry}")
         path = entry.get("path", base_dir)
         resolved = os.path.join(base_dir, path) if not os.path.isabs(path) else path
         return TargetEntry(name=name, path=resolved)
@@ -90,7 +91,7 @@ def detect_targets(dir_path="."):
         for entry in configured:
             try:
                 te = _parse_target_entry(entry, dir_path)
-            except (ValueError, TypeError) as e:
+            except (ConfigError, TypeError) as e:
                 print(f"Warning: {e}, skipping", file=sys.stderr)
                 continue
             if te.name in TARGETS:

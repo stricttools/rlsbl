@@ -4,6 +4,7 @@ import os
 import tempfile
 
 from conftest import make_ctx
+from rlsbl.errors import VersionError
 from rlsbl.targets.native_ios import NativeIosTarget
 from rlsbl.targets.protocol import ReleaseTarget
 from rlsbl.targets import TARGETS
@@ -140,8 +141,8 @@ class TestReadVersion:
         with tempfile.TemporaryDirectory() as d:
             try:
                 target.read_version(d)
-                assert False, "Expected ValueError"
-            except ValueError:
+                assert False, "Expected VersionError"
+            except VersionError:
                 pass
 
     def test_read_version_pbxproj_without_build_num(self):
@@ -198,8 +199,8 @@ class TestWriteVersion:
         with tempfile.TemporaryDirectory() as d:
             try:
                 target.write_version(d, "1.0.0", ctx=make_ctx(d))
-                assert False, "Expected ValueError"
-            except ValueError:
+                assert False, "Expected VersionError"
+            except VersionError:
                 pass
 
 

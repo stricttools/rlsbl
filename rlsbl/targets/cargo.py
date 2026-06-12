@@ -6,6 +6,7 @@ import re
 import tomlkit
 
 from .base import BaseTarget
+from ..errors import VersionError
 from ..utils import run
 
 
@@ -63,7 +64,7 @@ class CargoTarget(BaseTarget):
         with open(cargo_path, "r", encoding="utf-8") as f:
             doc = tomlkit.parse(f.read())
         if "package" not in doc or "version" not in doc["package"]:
-            raise ValueError(f"No [package].version in {cargo_path}")
+            raise VersionError(f"No [package].version in {cargo_path}")
         return str(doc["package"]["version"])
 
     def write_version(self, dir_path, version, ctx):

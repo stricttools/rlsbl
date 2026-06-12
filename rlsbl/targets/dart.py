@@ -5,6 +5,7 @@ import os
 from ruamel.yaml import YAML
 
 from .base import BaseTarget
+from ..errors import VersionError
 
 
 class DartTarget(BaseTarget):
@@ -39,7 +40,7 @@ class DartTarget(BaseTarget):
             data = yaml.load(f)
         version = data.get("version")
         if not version:
-            raise ValueError(f"No 'version' field in {pubspec}")
+            raise VersionError(f"No 'version' field in {pubspec}")
         version = str(version)
         # Strip build number: "1.2.3+4" -> "1.2.3"
         return version.split("+")[0]

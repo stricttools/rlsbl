@@ -10,6 +10,7 @@ import tomllib
 import tomlkit
 
 from .base import BaseTarget
+from ..errors import VersionError
 from ..utils import run
 
 _MIN_VERSION_RE = re.compile(r">=\s*(\d+\.\d+(?:\.\d+)?)")
@@ -65,7 +66,7 @@ class PypiTarget(BaseTarget):
         try:
             return data["project"]["version"]
         except KeyError:
-            raise ValueError(f"No [project].version in {toml_path}")
+            raise VersionError(f"No [project].version in {toml_path}")
 
     def write_version(self, dir_path, version, ctx):
         """Write a new version to pyproject.toml and __version__ in package source.
