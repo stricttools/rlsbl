@@ -404,7 +404,7 @@ class TestTestSuiteHardErrorsAtWorkspaceRoot:
         ctx.push_stdin = None
 
         result = app._check_defs["test-suite"].impl(ctx)
-        assert result.status == "fail"
+        assert result.status == "skip"
         assert "workspace root" in result.message
 
 

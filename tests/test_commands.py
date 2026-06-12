@@ -624,8 +624,8 @@ class TestGitignoreSetUnionMerge:
         # New entry added
         assert ".rlsbl/lock" in result
 
-    def test_gitignore_force_overwrites(self):
-        """With --force, .gitignore should be overwritten entirely."""
+    def test_gitignore_force_preserves_user_entries(self):
+        """With --force, .gitignore still uses additive merge (never removes user entries)."""
         tpl_dir = os.path.join(self.tmp_dir, "_tpls")
         os.makedirs(tpl_dir)
 
@@ -643,10 +643,9 @@ class TestGitignoreSetUnionMerge:
         with open(".gitignore") as f:
             result = f.read()
 
-        # Force should overwrite completely
         assert "dist/" in result
-        assert ".env" not in result
-        assert any(s == "overwritten" for _, s in created)
+        assert ".env" in result
+        assert "node_modules/" in result
 
 
 class TestHashFunctions:
