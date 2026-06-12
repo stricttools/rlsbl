@@ -4,6 +4,7 @@ import os
 
 import pytest
 
+import rlsbl.pipelines as _pipelines_mod
 from rlsbl.pipelines import Pipeline, PIPELINE_TYPES, load_pipelines
 from rlsbl.pipelines.base import BasePipeline, TokenPipeline, CredentialPipeline
 from rlsbl.config import validate_pipelines_config
@@ -284,47 +285,42 @@ class TestLoadPipelines:
 
     def test_valid_config_instantiates_pipelines(self, monkeypatch):
         # Register a test pipeline type
-        original = dict(PIPELINE_TYPES)
-        PIPELINE_TYPES["test_token"] = _TestTokenPipeline
-        try:
-            config = {
-                "pipelines": {
-                    "my_publish": {
-                        "type": "test_token",
-                        "local": True,
-                        "token_var": "MY_TOK",
-                    }
+        monkeypatch.setattr(
+            _pipelines_mod, "PIPELINE_TYPES",
+            {**PIPELINE_TYPES, "test_token": _TestTokenPipeline},
+        )
+        config = {
+            "pipelines": {
+                "my_publish": {
+                    "type": "test_token",
+                    "local": True,
+                    "token_var": "MY_TOK",
                 }
             }
-            result = load_pipelines(config)
-            assert "my_publish" in result
-            p = result["my_publish"]
-            assert p.name == "my_publish"
-            assert p.pipeline_type == "test_token"
-            assert p.local is True
-            assert p.token_var == "MY_TOK"
-        finally:
-            PIPELINE_TYPES.clear()
-            PIPELINE_TYPES.update(original)
+        }
+        result = load_pipelines(config)
+        assert "my_publish" in result
+        p = result["my_publish"]
+        assert p.name == "my_publish"
+        assert p.pipeline_type == "test_token"
+        assert p.local is True
+        assert p.token_var == "MY_TOK"
 
-    def test_multiple_pipelines(self):
-        original = dict(PIPELINE_TYPES)
-        PIPELINE_TYPES["test_token"] = _TestTokenPipeline
-        PIPELINE_TYPES["test_cred"] = _TestCredentialPipeline
-        try:
-            config = {
-                "pipelines": {
-                    "pub1": {"type": "test_token", "local": True},
-                    "pub2": {"type": "test_cred", "local": False},
-                }
+    def test_multiple_pipelines(self, monkeypatch):
+        monkeypatch.setattr(
+            _pipelines_mod, "PIPELINE_TYPES",
+            {**PIPELINE_TYPES, "test_token": _TestTokenPipeline, "test_cred": _TestCredentialPipeline},
+        )
+        config = {
+            "pipelines": {
+                "pub1": {"type": "test_token", "local": True},
+                "pub2": {"type": "test_cred", "local": False},
             }
-            result = load_pipelines(config)
-            assert len(result) == 2
-            assert result["pub1"].local is True
-            assert result["pub2"].local is False
-        finally:
-            PIPELINE_TYPES.clear()
-            PIPELINE_TYPES.update(original)
+        }
+        result = load_pipelines(config)
+        assert len(result) == 2
+        assert result["pub1"].local is True
+        assert result["pub2"].local is False
 
     def test_unknown_type_raises_key_error(self):
         config = {
@@ -375,156 +371,134 @@ class TestValidatePipelinesConfig:
                 {"pipelines": {"p": {"type": "nonexistent", "local": True}}}
             )
 
-    def test_missing_local_fails(self):
-        original = dict(PIPELINE_TYPES)
-        PIPELINE_TYPES["test_token"] = _TestTokenPipeline
-        try:
-            with pytest.raises(ValueError, match="missing required key 'local'"):
-                validate_pipelines_config(
-                    {"pipelines": {"p": {"type": "test_token"}}}
-                )
-        finally:
-            PIPELINE_TYPES.clear()
-            PIPELINE_TYPES.update(original)
-
-    def test_local_not_bool_fails(self):
-        original = dict(PIPELINE_TYPES)
-        PIPELINE_TYPES["test_token"] = _TestTokenPipeline
-        try:
-            with pytest.raises(ValueError, match="local must be a boolean"):
-                validate_pipelines_config(
-                    {"pipelines": {"p": {"type": "test_token", "local": "yes"}}}
-                )
-        finally:
-            PIPELINE_TYPES.clear()
-            PIPELINE_TYPES.update(original)
-
-    def test_valid_config_passes(self):
-        original = dict(PIPELINE_TYPES)
-        PIPELINE_TYPES["test_token"] = _TestTokenPipeline
-        try:
+    def test_missing_local_fails(self, monkeypatch):
+        monkeypatch.setattr(
+            _pipelines_mod, "PIPELINE_TYPES",
+            {**PIPELINE_TYPES, "test_token": _TestTokenPipeline},
+        )
+        with pytest.raises(ValueError, match="missing required key 'local'"):
             validate_pipelines_config(
-                {"pipelines": {"p": {"type": "test_token", "local": True}}}
+                {"pipelines": {"p": {"type": "test_token"}}}
             )
-        finally:
-            PIPELINE_TYPES.clear()
-            PIPELINE_TYPES.update(original)
 
-    def test_assets_true_without_max_size_fails(self):
-        original = dict(PIPELINE_TYPES)
-        PIPELINE_TYPES["test_token"] = _TestTokenPipeline
-        try:
-            with pytest.raises(ValueError, match="max_asset_size_mb is not set"):
-                validate_pipelines_config(
-                    {"pipelines": {"p": {"type": "test_token", "local": True, "assets": True}}}
-                )
-        finally:
-            PIPELINE_TYPES.clear()
-            PIPELINE_TYPES.update(original)
+    def test_local_not_bool_fails(self, monkeypatch):
+        monkeypatch.setattr(
+            _pipelines_mod, "PIPELINE_TYPES",
+            {**PIPELINE_TYPES, "test_token": _TestTokenPipeline},
+        )
+        with pytest.raises(ValueError, match="local must be a boolean"):
+            validate_pipelines_config(
+                {"pipelines": {"p": {"type": "test_token", "local": "yes"}}}
+            )
 
-    def test_assets_true_with_max_size_passes(self):
-        original = dict(PIPELINE_TYPES)
-        PIPELINE_TYPES["test_token"] = _TestTokenPipeline
-        try:
+    def test_valid_config_passes(self, monkeypatch):
+        monkeypatch.setattr(
+            _pipelines_mod, "PIPELINE_TYPES",
+            {**PIPELINE_TYPES, "test_token": _TestTokenPipeline},
+        )
+        validate_pipelines_config(
+            {"pipelines": {"p": {"type": "test_token", "local": True}}}
+        )
+
+    def test_assets_true_without_max_size_fails(self, monkeypatch):
+        monkeypatch.setattr(
+            _pipelines_mod, "PIPELINE_TYPES",
+            {**PIPELINE_TYPES, "test_token": _TestTokenPipeline},
+        )
+        with pytest.raises(ValueError, match="max_asset_size_mb is not set"):
+            validate_pipelines_config(
+                {"pipelines": {"p": {"type": "test_token", "local": True, "assets": True}}}
+            )
+
+    def test_assets_true_with_max_size_passes(self, monkeypatch):
+        monkeypatch.setattr(
+            _pipelines_mod, "PIPELINE_TYPES",
+            {**PIPELINE_TYPES, "test_token": _TestTokenPipeline},
+        )
+        validate_pipelines_config(
+            {"pipelines": {"p": {
+                "type": "test_token", "local": True,
+                "assets": True, "max_asset_size_mb": 50,
+            }}}
+        )
+
+    def test_assets_true_max_size_zero_fails(self, monkeypatch):
+        monkeypatch.setattr(
+            _pipelines_mod, "PIPELINE_TYPES",
+            {**PIPELINE_TYPES, "test_token": _TestTokenPipeline},
+        )
+        with pytest.raises(ValueError, match="positive integer"):
             validate_pipelines_config(
                 {"pipelines": {"p": {
                     "type": "test_token", "local": True,
-                    "assets": True, "max_asset_size_mb": 50,
+                    "assets": True, "max_asset_size_mb": 0,
                 }}}
             )
-        finally:
-            PIPELINE_TYPES.clear()
-            PIPELINE_TYPES.update(original)
 
-    def test_assets_true_max_size_zero_fails(self):
-        original = dict(PIPELINE_TYPES)
-        PIPELINE_TYPES["test_token"] = _TestTokenPipeline
-        try:
-            with pytest.raises(ValueError, match="positive integer"):
-                validate_pipelines_config(
-                    {"pipelines": {"p": {
-                        "type": "test_token", "local": True,
-                        "assets": True, "max_asset_size_mb": 0,
-                    }}}
-                )
-        finally:
-            PIPELINE_TYPES.clear()
-            PIPELINE_TYPES.update(original)
-
-    def test_custom_assets_requires_max_size(self):
-        original = dict(PIPELINE_TYPES)
-        PIPELINE_TYPES["test_token"] = _TestTokenPipeline
-        try:
-            with pytest.raises(ValueError, match="max_asset_size_mb is not set"):
-                validate_pipelines_config(
-                    {"pipelines": {"p": {
-                        "type": "test_token", "local": True,
-                        "custom_assets": [{"name": "x.tar.gz", "build": "make dist"}],
-                    }}}
-                )
-        finally:
-            PIPELINE_TYPES.clear()
-            PIPELINE_TYPES.update(original)
-
-    def test_custom_assets_with_max_size_passes(self):
-        original = dict(PIPELINE_TYPES)
-        PIPELINE_TYPES["test_token"] = _TestTokenPipeline
-        try:
+    def test_custom_assets_requires_max_size(self, monkeypatch):
+        monkeypatch.setattr(
+            _pipelines_mod, "PIPELINE_TYPES",
+            {**PIPELINE_TYPES, "test_token": _TestTokenPipeline},
+        )
+        with pytest.raises(ValueError, match="max_asset_size_mb is not set"):
             validate_pipelines_config(
                 {"pipelines": {"p": {
                     "type": "test_token", "local": True,
                     "custom_assets": [{"name": "x.tar.gz", "build": "make dist"}],
+                }}}
+            )
+
+    def test_custom_assets_with_max_size_passes(self, monkeypatch):
+        monkeypatch.setattr(
+            _pipelines_mod, "PIPELINE_TYPES",
+            {**PIPELINE_TYPES, "test_token": _TestTokenPipeline},
+        )
+        validate_pipelines_config(
+            {"pipelines": {"p": {
+                "type": "test_token", "local": True,
+                "custom_assets": [{"name": "x.tar.gz", "build": "make dist"}],
+                "max_asset_size_mb": 100,
+            }}}
+        )
+
+    def test_custom_assets_missing_name_fails(self, monkeypatch):
+        monkeypatch.setattr(
+            _pipelines_mod, "PIPELINE_TYPES",
+            {**PIPELINE_TYPES, "test_token": _TestTokenPipeline},
+        )
+        with pytest.raises(ValueError, match="missing required string key 'name'"):
+            validate_pipelines_config(
+                {"pipelines": {"p": {
+                    "type": "test_token", "local": True,
+                    "custom_assets": [{"build": "make dist"}],
                     "max_asset_size_mb": 100,
                 }}}
             )
-        finally:
-            PIPELINE_TYPES.clear()
-            PIPELINE_TYPES.update(original)
 
-    def test_custom_assets_missing_name_fails(self):
-        original = dict(PIPELINE_TYPES)
-        PIPELINE_TYPES["test_token"] = _TestTokenPipeline
-        try:
-            with pytest.raises(ValueError, match="missing required string key 'name'"):
-                validate_pipelines_config(
-                    {"pipelines": {"p": {
-                        "type": "test_token", "local": True,
-                        "custom_assets": [{"build": "make dist"}],
-                        "max_asset_size_mb": 100,
-                    }}}
-                )
-        finally:
-            PIPELINE_TYPES.clear()
-            PIPELINE_TYPES.update(original)
+    def test_custom_assets_missing_build_fails(self, monkeypatch):
+        monkeypatch.setattr(
+            _pipelines_mod, "PIPELINE_TYPES",
+            {**PIPELINE_TYPES, "test_token": _TestTokenPipeline},
+        )
+        with pytest.raises(ValueError, match="missing required string key 'build'"):
+            validate_pipelines_config(
+                {"pipelines": {"p": {
+                    "type": "test_token", "local": True,
+                    "custom_assets": [{"name": "x.tar.gz"}],
+                    "max_asset_size_mb": 100,
+                }}}
+            )
 
-    def test_custom_assets_missing_build_fails(self):
-        original = dict(PIPELINE_TYPES)
-        PIPELINE_TYPES["test_token"] = _TestTokenPipeline
-        try:
-            with pytest.raises(ValueError, match="missing required string key 'build'"):
-                validate_pipelines_config(
-                    {"pipelines": {"p": {
-                        "type": "test_token", "local": True,
-                        "custom_assets": [{"name": "x.tar.gz"}],
-                        "max_asset_size_mb": 100,
-                    }}}
-                )
-        finally:
-            PIPELINE_TYPES.clear()
-            PIPELINE_TYPES.update(original)
-
-    def test_custom_assets_not_list_fails(self):
-        original = dict(PIPELINE_TYPES)
-        PIPELINE_TYPES["test_token"] = _TestTokenPipeline
-        try:
-            with pytest.raises(ValueError, match="custom_assets must be a list"):
-                validate_pipelines_config(
-                    {"pipelines": {"p": {
-                        "type": "test_token", "local": True,
-                        "custom_assets": "not-a-list",
-                        "max_asset_size_mb": 100,
-                    }}}
-                )
-        finally:
-            PIPELINE_TYPES.clear()
-            PIPELINE_TYPES.update(original)
+    def test_custom_assets_not_list_fails(self, monkeypatch):
+        monkeypatch.setattr(
+            _pipelines_mod, "PIPELINE_TYPES",
+            {**PIPELINE_TYPES, "test_token": _TestTokenPipeline},
+        )
+        with pytest.raises(ValueError, match="custom_assets must be a list"):
+            validate_pipelines_config(
+                {"pipelines": {"p": {
+                    "type": "test_token", "local": True,
+                    "custom_assets": "not-a-list",
+                    "max_asset_size_mb": 100,
+                }}}
+            )
