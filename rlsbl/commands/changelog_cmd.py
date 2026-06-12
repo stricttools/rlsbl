@@ -12,6 +12,7 @@ from ..changelog.files import (
     get_changes_dir,
     is_read_only,
     read_unreleased,
+    writable_jsonl,
 )
 from ..changelog.generate import generate_changelog
 from ..changelog.resolve import resolve_hash
@@ -350,20 +351,11 @@ def cmd_amend(flags, project_root):
         print(f"Error: {jsonl_path} does not exist.", file=sys.stderr)
         sys.exit(1)
 
-    was_read_only = is_read_only(jsonl_path)
-    if was_read_only:
-        os.chmod(jsonl_path, 0o644)
-
-    existing = parse_jsonl(jsonl_path)
-    _check_duplicate_commits(existing, entry)
-
-    try:
+    with writable_jsonl(jsonl_path):
+        existing = parse_jsonl(jsonl_path)
+        _check_duplicate_commits(existing, entry)
         append_entry_to_version(changes_dir, version, entry)
         print(f"Amended {version}.jsonl with {len(resolved_commits)} commit(s)")
-    finally:
-        # Always re-lock the file
-        if was_read_only:
-            os.chmod(jsonl_path, 0o444)
 
     # Regenerate CHANGELOG.md
     generate_changelog(project_root)

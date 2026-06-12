@@ -188,3 +188,29 @@ class TestCmdAmend:
         assert "Original feature" in content
         assert "Added bugfix" in content
         assert "1.0.0" in content
+
+    def test_file_relocked_after_duplicate_commit_error(self, rlsbl_repo):
+        """File is re-locked when _check_duplicate_commits exits on duplicate."""
+        sha = _make_commit(rlsbl_repo)
+        jsonl_path = _create_released_jsonl(rlsbl_repo, "1.0.0", [
+            {"commits": [sha], "user_facing": True, "description": "Original", "type": "fix"},
+        ])
+        assert is_read_only(str(jsonl_path))
+
+        # Try to amend with the SAME commit and same type/user_facing -- triggers hard error
+        flags = {
+            "version": "1.0.0",
+            "commits": sha,
+            "description": "Duplicate entry",
+            "type": "fix",
+            "no-user-facing": False,
+            "no-resolve": False,
+        }
+        with mock.patch("rlsbl.commands.changelog_cmd.commit_files"):
+            with mock.patch("rlsbl.commands.changelog_cmd._sync_github_release"):
+                with pytest.raises(SystemExit) as exc_info:
+                    cmd_amend(flags, project_root=rlsbl_repo)
+                assert exc_info.value.code == 1
+
+        # File MUST be re-locked after the duplicate error
+        assert is_read_only(str(jsonl_path))
