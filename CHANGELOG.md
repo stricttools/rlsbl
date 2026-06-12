@@ -2,9 +2,15 @@
 
 # Changelog
 
-## 0.68.3
+## 0.68.4
 
-CI template UV_NO_SOURCES fix
+scaffold --force preserves gitignore entries
+
+### Fixes
+
+- **Fix.** `scaffold --force` no longer destroys user-added .gitignore entries. The additive merge (only add, never remove) now applies regardless of `--force`.
+
+## 0.68.3
 
 ### Fixes
 
