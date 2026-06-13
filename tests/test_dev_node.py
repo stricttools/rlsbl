@@ -293,6 +293,8 @@ class TestDevNodeReleaseSkipsChangelog:
                 return ""
             if cmd == "git" and args and args[0] == "fetch":
                 return ""
+            if cmd == "git" and args and args[:2] == ["rev-list", "--count"] and any("origin/" in a for a in args):
+                return "0"
             return real_run(cmd, args=args, timeout=timeout, env=env, cwd=cwd)
 
         with (
@@ -419,6 +421,8 @@ class TestDevNodeReleaseRequiresDescription:
                 return ""
             if cmd == "git" and args and args[0] == "fetch":
                 return ""
+            if cmd == "git" and args and args[:2] == ["rev-list", "--count"] and any("origin/" in a for a in args):
+                return "0"
             return real_run(cmd, args=args, timeout=timeout, env=env, cwd=cwd)
 
         with (
