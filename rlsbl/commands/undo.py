@@ -3,6 +3,7 @@
 import os
 import re
 import sys
+import traceback
 
 from ..changelog.files import get_changes_dir, unfinalize_version
 from ..changelog.generate import generate_changelog
@@ -96,6 +97,7 @@ def run_cmd(registry, args, flags, *, ctx):
         run("gh", ["release", "delete", tag, "--yes"])
         results.append(("Delete GitHub Release", OK, "-"))
     except Exception:
+        traceback.print_exc()
         results.append(("Delete GitHub Release", FAILED, f"gh release delete {tag} --yes"))
 
     # Delete remote tag (marked as release-authorized: undo is part of the
@@ -105,6 +107,7 @@ def run_cmd(registry, args, flags, *, ctx):
         run("git", ["push", "origin", f":{tag}"], timeout=get_push_timeout(ctx.config), env=undo_push_env)
         results.append(("Delete remote tag", OK, "-"))
     except Exception:
+        traceback.print_exc()
         results.append(("Delete remote tag", FAILED, f"git push origin :{tag}"))
 
     # Delete local tag
@@ -112,6 +115,7 @@ def run_cmd(registry, args, flags, *, ctx):
         run("git", ["tag", "-d", tag])
         results.append(("Delete local tag", OK, "-"))
     except Exception:
+        traceback.print_exc()
         results.append(("Delete local tag", FAILED, f"git tag -d {tag}"))
 
     # Revert release commits (should be HEAD, or HEAD + HEAD~1 for two-commit pattern)
@@ -130,6 +134,8 @@ def run_cmd(registry, args, flags, *, ctx):
         bare_version = version_part.lstrip("v")
     else:
         bare_version = tag.lstrip("v")
+
+    project_path = os.path.join(ws_root, monorepo_project_path) if monorepo_name else str(ctx.project_root or ".")
 
     # Release commits can be up to 3 in sequence (newest first):
     #   3. "chore: finalize release file for X.Y.Z" (release file rename)
@@ -170,12 +176,12 @@ def run_cmd(registry, args, flags, *, ctx):
         else:
             results.append(("Revert commit", SKIPPED, f"HEAD ({head_msg}) does not match expected ({expected_msg})"))
     except Exception:
+        traceback.print_exc()
         results.append(("Revert commit", FAILED, "git revert --no-edit HEAD"))
 
     # Restore changelog state if we reverted a changelog finalize commit
     if changelog_finalize_reverted:
         try:
-            project_path = os.path.join(ws_root, monorepo_project_path) if monorepo_name else str(ctx.project_root or ".")
             changes_dir = get_changes_dir(project_path)
             unfinalize_version(changes_dir, bare_version)
             generate_changelog(project_path)
@@ -184,6 +190,7 @@ def run_cmd(registry, args, flags, *, ctx):
             run("git", ["commit", "-m", f"chore: restore changelog after undo of {tag}"])
             results.append(("Restore changelog", OK, "-"))
         except Exception:
+            traceback.print_exc()
             results.append(("Restore changelog", FAILED, "manually restore .rlsbl/changes/ and regenerate CHANGELOG.md"))
 
     # Restore the release file (inverse of release-file finalization). When
@@ -192,7 +199,6 @@ def run_cmd(registry, args, flags, *, ctx):
     # added commits), the finalized read-only vX.Y.Z.toml and the fresh empty
     # unreleased.toml are still on disk and must be repaired directly.
     try:
-        project_path = os.path.join(ws_root, monorepo_project_path) if monorepo_name else str(ctx.project_root or ".")
         releases_dir = os.path.join(project_path, ".rlsbl", "releases")
         release_file_changed = unfinalize_release_file(releases_dir, bare_version)
         if release_file_changed:
@@ -200,6 +206,7 @@ def run_cmd(registry, args, flags, *, ctx):
             run("git", ["commit", "-m", f"chore: restore release file after undo of {tag}"])
             results.append(("Restore release file", OK, "-"))
     except Exception:
+        traceback.print_exc()
         results.append(("Restore release file", FAILED, f"manually restore .rlsbl/releases/unreleased.toml from v{bare_version}.toml"))
 
     # Push the revert commit to remote
@@ -222,6 +229,7 @@ def run_cmd(registry, args, flags, *, ctx):
                 push_if_needed(branch, env=push_env, config=ctx.config)
                 results.append(("Push", OK, "-"))
             except Exception:
+                traceback.print_exc()
                 results.append(("Push", FAILED, "git push"))
 
     # Print summary: table only if something failed, otherwise a simple success message
