@@ -11,3 +11,4 @@
 {"commits":["bb7f93d9c3329327283e8cc921e726900b8fb3de"],"user_facing":false}
 {"commits":["2698acc8ea07e760ac512c1309aec5225ddd9174"],"user_facing":false}
 {"commits":["9bf9a5f6807f0291c7c1b51880be8eed327d82dc"],"user_facing":false}
+{"commits":["857036889aaa8c58b5ef6d06c1159d95a6caa11f","209ade4091ce74b491e5396135b2c7a6863fe50b"],"user_facing":true,"description":"**deps-unused is now scope-aware.** Imports inside try/except ImportError only satisfy optional deps (scope dev/peer); a hard dependency (runtime/explicit) imported only inside a guard is flagged with a dedicated error suggesting to declare it optional or import it unconditionally.","type":"fix"}
