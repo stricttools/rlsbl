@@ -3,7 +3,17 @@
   "env_file": "~/Projects/.env",
   "push_timeout": 120,
   "batch_limits": {
-    "exclusions": []
+    "exclusions": [
+      {
+        "reason": "**Silent exception audit.** Replaced silent exception swallowing across all commands with explicit warnings or hard errors. Safety guardrails now fail loudly instead of silently bypassing checks.",
+        "entries": [
+          {
+            "version": "unreleased",
+            "line": 1
+          }
+        ]
+      }
+    ]
   },
   "targets": [
     "npm",
