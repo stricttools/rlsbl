@@ -123,10 +123,8 @@ class CargoTarget(BaseTarget):
         if authors and len(authors) > 0:
             author = str(authors[0])
         if not author:
-            try:
-                author = run("git", ["config", "user.name"])
-            except Exception:
-                pass
+            from .utils import _get_git_author
+            author = _get_git_author()
 
         version = str(pkg.get("version", "0.0.0"))
 

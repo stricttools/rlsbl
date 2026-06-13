@@ -81,11 +81,8 @@ class SwiftTarget(BaseTarget):
             if match:
                 package_name = match.group(1)
 
-        author = ""
-        try:
-            author = run("git", ["config", "user.name"])
-        except Exception:
-            pass
+        from .utils import _get_git_author
+        author = _get_git_author()
 
         try:
             version = self.read_version(dir_path)

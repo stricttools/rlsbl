@@ -146,11 +146,8 @@ class PypiTarget(BaseTarget):
         version = project.get("version", "0.1.0")
 
         # Extract author -- fall back to git config
-        author = ""
-        try:
-            author = run("git", ["config", "user.name"])
-        except Exception:
-            pass
+        from .utils import _get_git_author
+        author = _get_git_author()
 
         # Extract repo name from project.urls
         repo_name = ""

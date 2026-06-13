@@ -27,3 +27,12 @@ def normalize_go(name):
     """
     segment = name.rsplit("/", 1)[-1] if "/" in name else name
     return segment.lower()
+
+
+def _get_git_author() -> str:
+    """Return the git config user.name, or empty string on failure."""
+    from ..utils import run
+    try:
+        return run("git", ["config", "user.name"])
+    except Exception:
+        return ""

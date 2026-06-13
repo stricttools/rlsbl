@@ -268,11 +268,8 @@ class MavenTarget(BaseTarget):
         name = self._read_project_name(dir_path) or ""
 
         # Author from git config
-        author = ""
-        try:
-            author = run("git", ["config", "user.name"])
-        except Exception:
-            pass
+        from .utils import _get_git_author
+        author = _get_git_author()
 
         # Read version from detected source
         try:

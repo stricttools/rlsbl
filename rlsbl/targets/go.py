@@ -182,11 +182,8 @@ class GoTarget(BaseTarget):
         github_owner = repo_name.split("/")[0] if "/" in repo_name else ""
 
         # Author from git config
-        author = ""
-        try:
-            author = run("git", ["config", "user.name"])
-        except Exception:
-            pass
+        from .utils import _get_git_author
+        author = _get_git_author()
 
         try:
             version = self.read_version(dir_path)

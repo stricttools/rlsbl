@@ -77,11 +77,8 @@ class DockerTarget(BaseTarget):
 
         name = os.path.basename(os.path.abspath(dir_path))
 
-        author = ""
-        try:
-            author = run("git", ["config", "user.name"])
-        except Exception:
-            pass
+        from .utils import _get_git_author
+        author = _get_git_author()
 
         return {
             "image": image,
