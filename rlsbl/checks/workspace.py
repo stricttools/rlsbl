@@ -1,4 +1,4 @@
-"""Workspace checks (tag: workspace) and dependency checks.
+"""Workspace checks (tag: workspace) validating monorepo CI routing, project registration, dev-node boundaries, and inter-project dependency declarations.
 
 Checks: workspace-ci-router, workspace-ci-synced, workspace-targets,
 workspace-unregistered, workspace-stale-entries, dev-node-boundary,
@@ -344,10 +344,17 @@ def register_workspace_checks(app):
         for proj in ctx.projects:
             name = proj["name"]
             project_dir = os.path.join(root, proj["path"])
-            manifest_deps = {d.name for d in ctx.graph.dependencies(name)}
+            # When the same dep is declared with multiple scopes, hard
+            # scopes ("runtime"/"explicit") take precedence over optional
+            # ones ("dev"/"peer"): declared hard anywhere means hard.
+            manifest_deps_with_scope: dict[str, str] = {}
+            for d in ctx.graph.dependencies(name):
+                if manifest_deps_with_scope.get(d.name) in ("runtime", "explicit"):
+                    continue
+                manifest_deps_with_scope[d.name] = d.scope
             errors = check_unused_deps(
-                name, project_dir, manifest_deps, workspace_names, whitelist,
-                _cached_imports=import_cache[name],
+                name, project_dir, manifest_deps_with_scope, workspace_names,
+                whitelist, _cached_imports=import_cache[name],
             )
             all_errors.extend(errors)
 

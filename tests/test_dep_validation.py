@@ -40,7 +40,7 @@ class TestCheckUnusedDeps:
         errors = check_unused_deps(
             project_name="app",
             project_dir=str(project_dir),
-            manifest_deps={"auth"},
+            manifest_deps_with_scope={"auth": "runtime"},
             workspace_names={"app", "auth"},
             whitelist={},
         )
@@ -58,7 +58,7 @@ class TestCheckUnusedDeps:
         errors = check_unused_deps(
             project_name="app",
             project_dir=str(project_dir),
-            manifest_deps={"auth"},
+            manifest_deps_with_scope={"auth": "runtime"},
             workspace_names={"app", "auth"},
             whitelist={},
         )
@@ -75,7 +75,7 @@ class TestCheckUnusedDeps:
         errors = check_unused_deps(
             project_name="app",
             project_dir=str(project_dir),
-            manifest_deps={"auth"},
+            manifest_deps_with_scope={"auth": "runtime"},
             workspace_names={"app", "auth"},
             whitelist=whitelist,
         )
@@ -90,7 +90,7 @@ class TestCheckUnusedDeps:
         errors = check_unused_deps(
             project_name="app",
             project_dir=str(project_dir),
-            manifest_deps=set(),
+            manifest_deps_with_scope={},
             workspace_names={"app", "auth"},
             whitelist={},
         )
@@ -108,7 +108,7 @@ class TestCheckUnusedDeps:
         errors = check_unused_deps(
             project_name="app",
             project_dir=str(project_dir),
-            manifest_deps={"auth"},
+            manifest_deps_with_scope={"auth": "runtime"},
             workspace_names={"app", "auth"},
             whitelist={},
         )
@@ -124,18 +124,17 @@ class TestCheckUnusedDeps:
         errors = check_unused_deps(
             project_name="app",
             project_dir=str(project_dir),
-            manifest_deps={"auth", "models"},
+            manifest_deps_with_scope={"auth": "runtime", "models": "runtime"},
             workspace_names={"app", "auth", "models"},
             whitelist={},
         )
         assert len(errors) == 2
 
     def test_guarded_import_not_false_positive(self, tmp_path):
-        """A declared dep imported only in try/except ImportError is NOT unused.
+        """An OPTIONAL dep imported only in try/except ImportError is NOT unused.
 
-        This is the false-positive fix: guarded imports should count as
-        "used" for the unused-deps check, since the dep is intentionally
-        declared for optional use.
+        Guarded imports count as "used" for optional deps (scope="dev"),
+        since the dep is intentionally declared for optional use.
         """
         project_dir = tmp_path / "app"
         project_dir.mkdir()
@@ -150,9 +149,99 @@ class TestCheckUnusedDeps:
         errors = check_unused_deps(
             project_name="app",
             project_dir=str(project_dir),
-            manifest_deps={"auth"},
+            manifest_deps_with_scope={"auth": "dev"},
             workspace_names={"app", "auth"},
             whitelist={},
+        )
+        assert errors == []
+
+    def test_hard_dep_guarded_only_is_flagged(self, tmp_path):
+        """A HARD dep (scope=runtime) imported only in try/except IS flagged.
+
+        Declaring a hard dependency but only importing it inside
+        try/except ImportError is contradictory -- either declare it
+        optional or import it unconditionally.
+        """
+        project_dir = tmp_path / "app"
+        project_dir.mkdir()
+        (project_dir / "pyproject.toml").write_text(_PYPROJECT)
+        (project_dir / "main.py").write_text(
+            "try:\n"
+            "    import auth\n"
+            "except ImportError:\n"
+            "    auth = None\n"
+        )
+
+        errors = check_unused_deps(
+            project_name="app",
+            project_dir=str(project_dir),
+            manifest_deps_with_scope={"auth": "runtime"},
+            workspace_names={"app", "auth"},
+            whitelist={},
+        )
+        assert len(errors) == 1
+        assert "auth" in errors[0]
+        assert "try/except ImportError" in errors[0]
+
+    def test_hard_dep_imported_normally_and_guarded_not_flagged(self, tmp_path):
+        """A hard dep imported both unconditionally and guarded is not flagged."""
+        project_dir = tmp_path / "app"
+        project_dir.mkdir()
+        (project_dir / "pyproject.toml").write_text(_PYPROJECT)
+        (project_dir / "main.py").write_text("import auth\n")
+        (project_dir / "extras.py").write_text(
+            "try:\n"
+            "    import auth\n"
+            "except ImportError:\n"
+            "    auth = None\n"
+        )
+
+        errors = check_unused_deps(
+            project_name="app",
+            project_dir=str(project_dir),
+            manifest_deps_with_scope={"auth": "runtime"},
+            workspace_names={"app", "auth"},
+            whitelist={},
+        )
+        assert errors == []
+
+    def test_optional_dep_never_imported_still_flagged(self, tmp_path):
+        """An optional dep (scope=dev) with no import at all is still unused."""
+        project_dir = tmp_path / "app"
+        project_dir.mkdir()
+        (project_dir / "pyproject.toml").write_text(_PYPROJECT)
+        (project_dir / "main.py").write_text("import os\n")
+
+        errors = check_unused_deps(
+            project_name="app",
+            project_dir=str(project_dir),
+            manifest_deps_with_scope={"auth": "dev"},
+            workspace_names={"app", "auth"},
+            whitelist={},
+        )
+        assert len(errors) == 1
+        assert "auth" in errors[0]
+        assert "no source file imports it" in errors[0]
+
+    def test_whitelist_suppresses_hard_guarded_error(self, tmp_path):
+        """The whitelist also suppresses the hard-dep-guarded-only error."""
+        project_dir = tmp_path / "app"
+        project_dir.mkdir()
+        (project_dir / "pyproject.toml").write_text(_PYPROJECT)
+        (project_dir / "main.py").write_text(
+            "try:\n"
+            "    import auth\n"
+            "except ImportError:\n"
+            "    auth = None\n"
+        )
+
+        whitelist = {("app", "auth"): "Optional at runtime by design"}
+        errors = check_unused_deps(
+            project_name="app",
+            project_dir=str(project_dir),
+            manifest_deps_with_scope={"auth": "runtime"},
+            workspace_names={"app", "auth"},
+            whitelist=whitelist,
         )
         assert errors == []
 
@@ -571,7 +660,7 @@ class TestNpmWorkspaceDep:
         errors = check_unused_deps(
             project_name="app",
             project_dir=str(project_dir),
-            manifest_deps={"auth"},
+            manifest_deps_with_scope={"auth": "runtime"},
             workspace_names={"app", "auth"},
             whitelist={},
         )
@@ -588,7 +677,7 @@ class TestNpmWorkspaceDep:
         errors = check_unused_deps(
             project_name="app",
             project_dir=str(project_dir),
-            manifest_deps={"auth"},
+            manifest_deps_with_scope={"auth": "runtime"},
             workspace_names={"app", "auth"},
             whitelist={},
         )
@@ -606,7 +695,7 @@ class TestNpmWorkspaceDep:
         errors = check_unused_deps(
             project_name="app",
             project_dir=str(project_dir),
-            manifest_deps={"@myorg/utils"},
+            manifest_deps_with_scope={"@myorg/utils": "runtime"},
             workspace_names={"app", "@myorg/utils"},
             whitelist={},
         )

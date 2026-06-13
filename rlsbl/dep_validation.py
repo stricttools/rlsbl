@@ -124,7 +124,7 @@ def _get_imported_workspace_packages(
 def check_unused_deps(
     project_name: str,
     project_dir: str,
-    manifest_deps: set[str],
+    manifest_deps_with_scope: dict[str, str],
     workspace_names: set[str],
     whitelist: dict[tuple[str, str], str],
     *,
@@ -135,7 +135,8 @@ def check_unused_deps(
     Args:
         project_name: name of the project being checked.
         project_dir: absolute path to the project directory.
-        manifest_deps: set of declared intra-workspace dependency names.
+        manifest_deps_with_scope: mapping of declared intra-workspace
+            dependency name -> scope ("runtime", "dev", "peer", "explicit").
         workspace_names: set of all workspace member package names.
         whitelist: mapping of (package, dep) -> reason for allowed unused deps.
         _cached_imports: optional pre-computed (lib_imports, test_imports,
@@ -145,7 +146,7 @@ def check_unused_deps(
     Returns:
         list of error strings (empty means all good).
     """
-    if not manifest_deps:
+    if not manifest_deps_with_scope:
         return []
 
     if _cached_imports is not None:
@@ -154,14 +155,26 @@ def check_unused_deps(
         lib_imports, test_imports, guarded_imports = _get_imported_workspace_packages(
             project_dir, workspace_names
         )
-    # Guarded imports (try/except ImportError) count as used for unused check
-    all_imports = lib_imports | test_imports | guarded_imports
+    unconditional_imports = lib_imports | test_imports
 
     errors = []
-    for dep in sorted(manifest_deps):
-        if dep not in all_imports:
-            if (project_name, dep) in whitelist:
-                continue
+    for dep, scope in sorted(manifest_deps_with_scope.items()):
+        if dep in unconditional_imports:
+            continue
+        # Guarded imports (try/except ImportError) only satisfy OPTIONAL
+        # deps (scope "dev"/"peer"). A hard dep (scope "runtime"/"explicit")
+        # imported only inside a guard is contradictory and stays flagged.
+        if scope in ("dev", "peer") and dep in guarded_imports:
+            continue
+        if (project_name, dep) in whitelist:
+            continue
+        if dep in guarded_imports:
+            errors.append(
+                f"'{project_name}' declares hard dependency '{dep}' "
+                f"but only imports it inside try/except ImportError "
+                f"(declare it optional or import it unconditionally)"
+            )
+        else:
             errors.append(
                 f"'{project_name}' declares dependency on '{dep}' "
                 f"but no source file imports it"
