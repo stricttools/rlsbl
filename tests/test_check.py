@@ -1,10 +1,11 @@
 """Tests for PyPI, Go, and GitHub availability checks in rlsbl.commands.check."""
 
 import subprocess
-import unittest
 from io import StringIO
 from unittest.mock import patch, MagicMock, call
 from urllib.error import HTTPError, URLError
+
+import pytest
 
 from conftest import FakeResponse
 from rlsbl.commands.check import (
@@ -26,7 +27,7 @@ from rlsbl.commands.check import (
 )
 
 
-class TestCheckPyPI(unittest.TestCase):
+class TestCheckPyPI:
     """Tests for check_pypi_availability and get_pypi_variants."""
 
     @patch("urllib.request.urlopen")
@@ -36,22 +37,22 @@ class TestCheckPyPI(unittest.TestCase):
             "https://pypi.org/simple/nonexistent/", 404, "Not Found", {}, None
         )
         result = check_pypi_availability("nonexistent")
-        self.assertEqual(result["status"], "available")
+        assert result["status"] == "available"
 
     @patch("urllib.request.urlopen")
     def test_pypi_taken_on_200(self, mock_urlopen):
         """A 200 response means the package name is taken."""
         mock_urlopen.return_value = FakeResponse({"info": {"name": "requests"}})
         result = check_pypi_availability("requests")
-        self.assertEqual(result["status"], "taken")
+        assert result["status"] == "taken"
 
     @patch("urllib.request.urlopen")
     def test_pypi_error_on_url_error(self, mock_urlopen):
         """A generic URLError (network failure) returns error status."""
         mock_urlopen.side_effect = URLError("Connection refused")
         result = check_pypi_availability("some-package")
-        self.assertEqual(result["status"], "error")
-        self.assertIn("message", result)
+        assert result["status"] == "error"
+        assert "message" in result
 
     @patch("urllib.request.urlopen")
     def test_pypi_registered_but_empty_is_taken(self, mock_urlopen):
@@ -63,11 +64,11 @@ class TestCheckPyPI(unittest.TestCase):
         # Simple API returns 200 for registered packages even with no releases
         mock_urlopen.return_value = FakeResponse(b"<html></html>")
         result = check_pypi_availability("cost")
-        self.assertEqual(result["status"], "taken")
+        assert result["status"] == "taken"
         # Verify the URL uses the Simple API with normalized name
         called_url = mock_urlopen.call_args[0][0].full_url
-        self.assertIn("/simple/cost/", called_url)
-        self.assertNotIn("/pypi/", called_url)
+        assert "/simple/cost/" in called_url
+        assert "/pypi/" not in called_url
 
     @patch("urllib.request.urlopen")
     def test_pypi_uses_normalized_name_in_url(self, mock_urlopen):
@@ -76,20 +77,20 @@ class TestCheckPyPI(unittest.TestCase):
         check_pypi_availability("My_Package.Name")
         called_url = mock_urlopen.call_args[0][0].full_url
         # PEP 503: lowercase, runs of [-_.] replaced with single hyphen
-        self.assertIn("/simple/my-package-name/", called_url)
+        assert "/simple/my-package-name/" in called_url
 
     def test_pypi_variants(self):
         """get_pypi_variants generates PEP 503 normalized forms."""
         variants = get_pypi_variants("my-package")
         # Should include underscore and no-separator forms
-        self.assertIn("my_package", variants)
-        self.assertIn("mypackage", variants)
+        assert "my_package" in variants
+        assert "mypackage" in variants
         # The normalized hyphen form is the same as input, so it should
         # be excluded (the function discards the original name)
-        self.assertNotIn("my-package", variants)
+        assert "my-package" not in variants
 
 
-class TestCheckGo(unittest.TestCase):
+class TestCheckGo:
     """Tests for check_go_availability."""
 
     @patch("urllib.request.urlopen")
@@ -97,7 +98,7 @@ class TestCheckGo(unittest.TestCase):
         """A 200 response means the Go module exists."""
         mock_urlopen.return_value = FakeResponse(b"<html>pkg page</html>")
         result = check_go_availability("github.com/gorilla/mux")
-        self.assertEqual(result["status"], "exists")
+        assert result["status"] == "exists"
 
     @patch("urllib.request.urlopen")
     def test_go_not_found_on_404(self, mock_urlopen):
@@ -106,19 +107,19 @@ class TestCheckGo(unittest.TestCase):
             "https://pkg.go.dev/github.com/fake/module", 404, "Not Found", {}, None
         )
         result = check_go_availability("github.com/fake/module")
-        self.assertEqual(result["status"], "not_found")
-        self.assertIn("note", result)
+        assert result["status"] == "not_found"
+        assert "note" in result
 
     @patch("urllib.request.urlopen")
     def test_go_error_on_url_error(self, mock_urlopen):
         """A generic URLError (network failure) returns error status."""
         mock_urlopen.side_effect = URLError("DNS resolution failed")
         result = check_go_availability("github.com/some/module")
-        self.assertEqual(result["status"], "error")
-        self.assertIn("message", result)
+        assert result["status"] == "error"
+        assert "message" in result
 
 
-class TestCheckGitHub(unittest.TestCase):
+class TestCheckGitHub:
     """Tests for check_github_availability."""
 
     @patch("rlsbl.commands.check.urllib.request.urlopen")
@@ -126,29 +127,29 @@ class TestCheckGitHub(unittest.TestCase):
         """Zero total_count means the name is unique on GitHub."""
         mock_urlopen.return_value = FakeResponse({"total_count": 0, "items": []})
         result = check_github_availability("some-unique-name")
-        self.assertEqual(result["status"], "available")
-        self.assertEqual(result["count"], 0)
+        assert result["status"] == "available"
+        assert result["count"] == 0
 
     @patch("rlsbl.commands.check.urllib.request.urlopen")
     def test_github_exists_on_nonzero_count(self, mock_urlopen):
         """Non-zero total_count means repos with this name exist."""
         mock_urlopen.return_value = FakeResponse({"total_count": 5, "items": []})
         result = check_github_availability("popular-name")
-        self.assertEqual(result["status"], "exists")
-        self.assertEqual(result["count"], 5)
-        self.assertIn("note", result)
-        self.assertIn("5", result["note"])
+        assert result["status"] == "exists"
+        assert result["count"] == 5
+        assert "note" in result
+        assert "5" in result["note"]
 
     @patch("rlsbl.commands.check.urllib.request.urlopen")
     def test_github_error_on_exception(self, mock_urlopen):
         """A network error returns error status."""
         mock_urlopen.side_effect = URLError("Connection refused")
         result = check_github_availability("some-name")
-        self.assertEqual(result["status"], "error")
-        self.assertIn("message", result)
+        assert result["status"] == "error"
+        assert "message" in result
 
 
-class TestCheckSingleName(unittest.TestCase):
+class TestCheckSingleName:
     """Tests for the _check_single_name structured result function."""
 
     @patch("rlsbl.commands.check.check_github_availability")
@@ -159,11 +160,11 @@ class TestCheckSingleName(unittest.TestCase):
         mock_gh.return_value = {"status": "available", "count": 0}
 
         result = _check_single_name("my-new-pkg", "npm")
-        self.assertEqual(result["name"], "my-new-pkg")
-        self.assertEqual(result["registry"], "npm")
-        self.assertEqual(result["status"], "available")
-        self.assertIsInstance(result["variants"], list)
-        self.assertEqual(result["github_count"], 0)
+        assert result["name"] == "my-new-pkg"
+        assert result["registry"] == "npm"
+        assert result["status"] == "available"
+        assert isinstance(result["variants"], list)
+        assert result["github_count"] == 0
 
     @patch("rlsbl.commands.check.check_github_availability")
     @patch("rlsbl.commands.check.check_npm_availability")
@@ -173,8 +174,8 @@ class TestCheckSingleName(unittest.TestCase):
         mock_gh.return_value = {"status": "exists", "count": 5, "note": "5 repos"}
 
         result = _check_single_name("express", "npm")
-        self.assertEqual(result["status"], "taken")
-        self.assertIsNone(result["github_count"])
+        assert result["status"] == "taken"
+        assert result["github_count"] is None
         mock_gh.assert_not_called()
 
     @patch("rlsbl.commands.check.check_github_availability")
@@ -185,8 +186,8 @@ class TestCheckSingleName(unittest.TestCase):
         mock_gh.return_value = {"status": "available", "count": 0}
 
         result = _check_single_name("some-pkg", "npm")
-        self.assertEqual(result["status"], "error")
-        self.assertEqual(result["error"], "npm CLI not found")
+        assert result["status"] == "error"
+        assert result["error"] == "npm CLI not found"
         mock_gh.assert_not_called()
 
     @patch("rlsbl.commands.check.check_github_availability")
@@ -197,9 +198,9 @@ class TestCheckSingleName(unittest.TestCase):
         mock_gh.return_value = {"status": "available", "count": 0}
 
         result = _check_single_name("my-new-pkg", "pypi")
-        self.assertEqual(result["name"], "my-new-pkg")
-        self.assertEqual(result["registry"], "pypi")
-        self.assertEqual(result["status"], "available")
+        assert result["name"] == "my-new-pkg"
+        assert result["registry"] == "pypi"
+        assert result["status"] == "available"
 
     @patch("rlsbl.commands.check.check_github_availability")
     @patch("rlsbl.commands.check.check_go_availability")
@@ -212,9 +213,9 @@ class TestCheckSingleName(unittest.TestCase):
         mock_gh.return_value = {"status": "available", "count": 0}
 
         result = _check_single_name("github.com/fake/module", "go")
-        self.assertEqual(result["status"], "not_found")
-        self.assertIn("note", result)
-        self.assertEqual(result["registry"], "go")
+        assert result["status"] == "not_found"
+        assert "note" in result
+        assert result["registry"] == "go"
 
     @patch("rlsbl.commands.check.check_github_availability")
     @patch("rlsbl.commands.check.check_go_availability")
@@ -224,8 +225,8 @@ class TestCheckSingleName(unittest.TestCase):
         mock_gh.return_value = {"status": "exists", "count": 3, "note": "3 repos"}
 
         result = _check_single_name("github.com/gorilla/mux", "go")
-        self.assertEqual(result["status"], "exists")
-        self.assertIsNone(result["github_count"])
+        assert result["status"] == "exists"
+        assert result["github_count"] is None
         mock_gh.assert_not_called()
 
     @patch("rlsbl.commands.check.check_github_availability")
@@ -236,10 +237,10 @@ class TestCheckSingleName(unittest.TestCase):
         mock_gh.return_value = {"status": "error", "message": "Connection refused"}
 
         result = _check_single_name("some-pkg", "npm")
-        self.assertIsNone(result["github_count"])
+        assert result["github_count"] is None
 
 
-class TestCheckTargetRequired(unittest.TestCase):
+class TestCheckTargetRequired:
     """Tests verifying that --target is required for the check command."""
 
     def test_missing_target_prints_error(self):
@@ -247,21 +248,21 @@ class TestCheckTargetRequired(unittest.TestCase):
         from rlsbl import main
 
         with patch("sys.argv", ["rlsbl", "check-name", "some-name"]):
-            with self.assertRaises(SystemExit) as ctx:
+            with pytest.raises(SystemExit) as exc_info:
                 main()
-            self.assertEqual(ctx.exception.code, 1)
+            assert exc_info.value.code == 1
 
     def test_missing_target_error_message(self):
         """Error message should mention --target is required."""
         from rlsbl import app
 
         result = app.test(["check-name"])
-        self.assertEqual(result.exit_code, 1)
-        self.assertIn("target", result.stderr)
-        self.assertIn("required", result.stderr)
+        assert result.exit_code == 1
+        assert "target" in result.stderr
+        assert "required" in result.stderr
 
 
-class TestRequestWithBackoff(unittest.TestCase):
+class TestRequestWithBackoff:
     """Tests for the _request_with_backoff retry helper."""
 
     @patch("rlsbl.commands.check.urllib.request.urlopen")
@@ -270,8 +271,8 @@ class TestRequestWithBackoff(unittest.TestCase):
         fake_resp = FakeResponse(b"OK")
         mock_urlopen.return_value = fake_resp
         result = _request_with_backoff("https://example.com/test")
-        self.assertIs(result, fake_resp)
-        self.assertEqual(mock_urlopen.call_count, 1)
+        assert result is fake_resp
+        assert mock_urlopen.call_count == 1
 
     @patch("rlsbl.commands.check.time.sleep")
     @patch("rlsbl.commands.check.urllib.request.urlopen")
@@ -286,8 +287,8 @@ class TestRequestWithBackoff(unittest.TestCase):
         mock_urlopen.side_effect = [error_429, fake_resp]
 
         result = _request_with_backoff("https://example.com/test", max_retries=3)
-        self.assertIs(result, fake_resp)
-        self.assertEqual(mock_urlopen.call_count, 2)
+        assert result is fake_resp
+        assert mock_urlopen.call_count == 2
         mock_sleep.assert_called_once_with(3.0)
 
     @patch("rlsbl.commands.check.time.sleep")
@@ -306,11 +307,11 @@ class TestRequestWithBackoff(unittest.TestCase):
         mock_urlopen.side_effect = [error_429_first, error_429_second, fake_resp]
 
         result = _request_with_backoff("https://example.com/test", max_retries=3)
-        self.assertIs(result, fake_resp)
-        self.assertEqual(mock_urlopen.call_count, 3)
+        assert result is fake_resp
+        assert mock_urlopen.call_count == 3
         # attempt 0: 2^1 = 2, attempt 1: 2^2 = 4
-        self.assertEqual(mock_sleep.call_args_list[0][0][0], 2)
-        self.assertEqual(mock_sleep.call_args_list[1][0][0], 4)
+        assert mock_sleep.call_args_list[0][0][0] == 2
+        assert mock_sleep.call_args_list[1][0][0] == 4
 
     @patch("rlsbl.commands.check.time.sleep")
     @patch("rlsbl.commands.check.urllib.request.urlopen")
@@ -324,11 +325,11 @@ class TestRequestWithBackoff(unittest.TestCase):
         ]
         mock_urlopen.side_effect = errors
 
-        with self.assertRaises(HTTPError) as ctx:
+        with pytest.raises(HTTPError) as exc_info:
             _request_with_backoff("https://example.com/test", max_retries=3)
-        self.assertEqual(ctx.exception.code, 429)
-        self.assertEqual(mock_urlopen.call_count, 3)
-        self.assertEqual(mock_sleep.call_count, 3)
+        assert exc_info.value.code == 429
+        assert mock_urlopen.call_count == 3
+        assert mock_sleep.call_count == 3
 
     @patch("rlsbl.commands.check.time.sleep")
     @patch("rlsbl.commands.check.urllib.request.urlopen")
@@ -339,14 +340,14 @@ class TestRequestWithBackoff(unittest.TestCase):
         )
         mock_urlopen.side_effect = error_500
 
-        with self.assertRaises(HTTPError) as ctx:
+        with pytest.raises(HTTPError) as exc_info:
             _request_with_backoff("https://example.com/test", max_retries=3)
-        self.assertEqual(ctx.exception.code, 500)
-        self.assertEqual(mock_urlopen.call_count, 1)
+        assert exc_info.value.code == 500
+        assert mock_urlopen.call_count == 1
         mock_sleep.assert_not_called()
 
 
-class TestDelayFlag(unittest.TestCase):
+class TestDelayFlag:
     """Tests for the --delay value flag."""
 
     @patch("rlsbl._variadic_args", ["my-pkg"])
@@ -359,7 +360,7 @@ class TestDelayFlag(unittest.TestCase):
         }
         import rlsbl
         result = rlsbl.app.test(["check-name", "--target", "npm", "--delay", "500"])
-        self.assertEqual(result.exit_code, 0)
+        assert result.exit_code == 0
         mock_check.assert_called_once_with("my-pkg", "npm")
 
     @patch("rlsbl._variadic_args", ["a", "b"])
@@ -375,12 +376,12 @@ class TestDelayFlag(unittest.TestCase):
         ]
         import rlsbl
         result = rlsbl.app.test(["check-name", "--target", "npm"])
-        self.assertEqual(result.exit_code, 0)
+        assert result.exit_code == 0
         # Default delay is 200ms = 0.2s between names
         mock_sleep.assert_called_once_with(0.2)
 
 
-class TestMultiNameCheck(unittest.TestCase):
+class TestMultiNameCheck:
     """Tests for multi-name CLI behavior in run_cmd."""
 
     @patch("rlsbl.commands.check._format_single_result")
@@ -412,15 +413,15 @@ class TestMultiNameCheck(unittest.TestCase):
         output = mock_stdout.getvalue()
         lines = output.strip().split("\n")
         # header + 3 rows + blank + summary + batch note = 7 lines
-        self.assertEqual(len(lines), 7)
-        self.assertIn("Name", lines[0])
-        self.assertIn("Status", lines[0])
-        self.assertIn("foo", lines[1])
-        self.assertIn("available", lines[1])
-        self.assertIn("bar", lines[2])
-        self.assertIn("taken", lines[2])
-        self.assertIn("baz", lines[3])
-        self.assertIn("available", lines[3])
+        assert len(lines) == 7
+        assert "Name" in lines[0]
+        assert "Status" in lines[0]
+        assert "foo" in lines[1]
+        assert "available" in lines[1]
+        assert "bar" in lines[2]
+        assert "taken" in lines[2]
+        assert "baz" in lines[3]
+        assert "available" in lines[3]
 
     @patch("rlsbl.commands.check.time.sleep")
     @patch("rlsbl.commands.check._check_single_name")
@@ -437,43 +438,43 @@ class TestMultiNameCheck(unittest.TestCase):
         with patch("sys.stdout", new_callable=StringIO):
             run_cmd("npm", ["a", "b", "c"], {"delay": "500"})
         # 3 names -> 2 delays between them
-        self.assertEqual(mock_sleep.call_count, 2)
+        assert mock_sleep.call_count == 2
         mock_sleep.assert_has_calls([call(0.5), call(0.5)])
 
     def test_empty_args_prints_error_and_exits(self):
         """No names should print an error to stderr and exit 1."""
         with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
-            with self.assertRaises(SystemExit) as ctx:
+            with pytest.raises(SystemExit) as exc_info:
                 run_cmd("npm", [], {})
-            self.assertEqual(ctx.exception.code, 1)
-        self.assertIn("missing package name", mock_stderr.getvalue())
+            assert exc_info.value.code == 1
+        assert "missing package name" in mock_stderr.getvalue()
 
 
-class TestStdlibCollision(unittest.TestCase):
+class TestStdlibCollision:
     """Tests for _check_stdlib_collision."""
 
     def test_queue_collides(self):
         """'queue' is a stdlib module and should be detected."""
         result = _check_stdlib_collision("queue")
-        self.assertEqual(result, "queue")
+        assert result == "queue"
 
     def test_json_collides(self):
         """'json' is a stdlib module and should be detected."""
         result = _check_stdlib_collision("json")
-        self.assertEqual(result, "json")
+        assert result == "json"
 
     def test_unique_name_no_collision(self):
         """A name that is not a stdlib module returns None."""
         result = _check_stdlib_collision("myuniquepkg")
-        self.assertIsNone(result)
+        assert result is None
 
     def test_os_path_no_collision(self):
         """'os-path' normalizes to 'os-path', not 'os' -- should NOT collide."""
         result = _check_stdlib_collision("os-path")
-        self.assertIsNone(result)
+        assert result is None
 
 
-class TestStdlibCollisionIntegration(unittest.TestCase):
+class TestStdlibCollisionIntegration:
     """Integration test: _check_single_name short-circuits for stdlib collisions."""
 
     @patch("rlsbl.commands.check.check_github_availability")
@@ -483,98 +484,98 @@ class TestStdlibCollisionIntegration(unittest.TestCase):
         mock_gh.return_value = {"status": "available", "count": 0}
 
         result = _check_single_name("queue", "pypi")
-        self.assertEqual(result["status"], "taken")
-        self.assertIn("stdlib module", result["note"])
-        self.assertIn("queue", result["note"])
+        assert result["status"] == "taken"
+        assert "stdlib module" in result["note"]
+        assert "queue" in result["note"]
         # PyPI availability check should NOT have been called
         mock_pypi.assert_not_called()
         # GitHub check should also be skipped for taken names
         mock_gh.assert_not_called()
 
 
-class TestUltranormalize(unittest.TestCase):
+class TestUltranormalize:
     """Tests for _ultranormalize."""
 
     def test_cli(self):
         """l->1 and i->1."""
-        self.assertEqual(_ultranormalize("cli"), "c11")
+        assert _ultranormalize("cli") == "c11"
 
     def test_hello(self):
         """l->1 twice, o->0."""
-        self.assertEqual(_ultranormalize("hello"), "he110")
+        assert _ultranormalize("hello") == "he110"
 
     def test_foo_bar_with_dash(self):
         """Strips dash, o->0 twice."""
-        self.assertEqual(_ultranormalize("foo-bar"), "f00bar")
+        assert _ultranormalize("foo-bar") == "f00bar"
 
     def test_no_ambiguous_chars(self):
         """No ambiguous chars, just lowercased."""
-        self.assertEqual(_ultranormalize("MyPackage"), "mypackage")
+        assert _ultranormalize("MyPackage") == "mypackage"
 
     def test_empty_string(self):
         """Empty string returns empty string."""
-        self.assertEqual(_ultranormalize(""), "")
+        assert _ultranormalize("") == ""
 
 
-class TestGenerateUltranormVariants(unittest.TestCase):
+class TestGenerateUltranormVariants:
     """Tests for _generate_ultranorm_variants."""
 
     def test_cli_variants(self):
         """'cli' generates variants with l<->1 and i<->1, excluding itself."""
         variants, capped = _generate_ultranorm_variants("cli")
-        self.assertFalse(capped)
-        self.assertIn("cl1", variants)
-        self.assertIn("c1i", variants)
-        self.assertIn("c11", variants)
-        self.assertNotIn("cli", variants)
+        assert not capped
+        assert "cl1" in variants
+        assert "c1i" in variants
+        assert "c11" in variants
+        assert "cli" not in variants
 
     def test_hello_variants(self):
         """'hello' generates variants with l<->1 and o<->0 substitutions."""
         variants, capped = _generate_ultranorm_variants("hello")
-        self.assertFalse(capped)
+        assert not capped
         # Some expected variants
-        self.assertIn("he1lo", variants)
-        self.assertIn("hel1o", variants)
-        self.assertIn("hell0", variants)
-        self.assertIn("he110", variants)
-        self.assertNotIn("hello", variants)
+        assert "he1lo" in variants
+        assert "hel1o" in variants
+        assert "hell0" in variants
+        assert "he110" in variants
+        assert "hello" not in variants
 
     def test_no_ambiguous_chars(self):
         """'abc' has no ambiguous characters, returns empty list."""
         variants, capped = _generate_ultranorm_variants("abc")
-        self.assertFalse(capped)
-        self.assertEqual(variants, [])
+        assert not capped
+        assert variants == []
 
     def test_cap_at_64(self):
         """Name with >6 ambiguous chars hits cap and reports capped=True."""
         # 7 ambiguous chars -> 2^7 = 128 combinations, minus original = 127
         name = "lllllll"
         variants, capped = _generate_ultranorm_variants(name)
-        self.assertTrue(capped)
-        self.assertLessEqual(len(variants), 64)
+        assert capped
+        assert len(variants) <= 64
 
 
-class TestNpmMonikerNormalize(unittest.TestCase):
+class TestNpmMonikerNormalize:
     """Tests for _normalize_npm_moniker."""
 
     def test_strips_dashes(self):
         """'self-doc' normalizes to 'selfdoc'."""
-        self.assertEqual(_normalize_npm_moniker("self-doc"), "selfdoc")
+        assert _normalize_npm_moniker("self-doc") == "selfdoc"
 
     def test_already_normalized(self):
         """'selfdoc' stays 'selfdoc'."""
-        self.assertEqual(_normalize_npm_moniker("selfdoc"), "selfdoc")
+        assert _normalize_npm_moniker("selfdoc") == "selfdoc"
 
     def test_strips_all_separators(self):
         """Dots, underscores, and dashes are all stripped."""
-        self.assertEqual(_normalize_npm_moniker("my.package_name"), "mypackagename")
+        assert _normalize_npm_moniker("my.package_name") == "mypackagename"
 
     def test_empty_string(self):
         """Empty string returns empty string."""
-        self.assertEqual(_normalize_npm_moniker(""), "")
+        assert _normalize_npm_moniker("") == ""
 
 
-class TestSearchNpmSimilar(unittest.TestCase):
+class TestSearchNpmSimilar:
     """Tests for _search_npm_similar."""
 
     @patch("rlsbl.commands.check.urllib.request.urlopen")
@@ -587,21 +588,21 @@ class TestSearchNpmSimilar(unittest.TestCase):
             ]
         })
         result = _search_npm_similar("selfdoc")
-        self.assertEqual(result, ["self-doc"])
+        assert result == ["self-doc"]
 
     @patch("rlsbl.commands.check.urllib.request.urlopen")
     def test_no_similar_results(self, mock_urlopen):
         """When API returns no results, returns empty list."""
         mock_urlopen.return_value = FakeResponse({"objects": []})
         result = _search_npm_similar("selfdoc")
-        self.assertEqual(result, [])
+        assert result == []
 
     @patch("rlsbl.commands.check.urllib.request.urlopen")
     def test_network_error_returns_empty(self, mock_urlopen):
         """Network errors degrade gracefully to empty list."""
         mock_urlopen.side_effect = URLError("Connection refused")
         result = _search_npm_similar("selfdoc")
-        self.assertEqual(result, [])
+        assert result == []
 
     @patch("rlsbl.commands.check.urllib.request.urlopen")
     def test_no_moniker_match(self, mock_urlopen):
@@ -613,10 +614,10 @@ class TestSearchNpmSimilar(unittest.TestCase):
             ]
         })
         result = _search_npm_similar("selfdoc")
-        self.assertEqual(result, [])
+        assert result == []
 
 
-class TestNpmMonikerIntegration(unittest.TestCase):
+class TestNpmMonikerIntegration:
     """Integration tests: moniker similarity wired into _check_single_name for npm."""
 
     @patch("rlsbl.commands.check.check_github_availability")
@@ -633,9 +634,9 @@ class TestNpmMonikerIntegration(unittest.TestCase):
         mock_gh.return_value = {"status": "available", "count": 0}
 
         result = _check_single_name("selfdoc", "npm")
-        self.assertEqual(result["status"], "taken")
-        self.assertIn("moniker conflict", result["note"])
-        self.assertIn("self-doc", result["note"])
+        assert result["status"] == "taken"
+        assert "moniker conflict" in result["note"]
+        assert "self-doc" in result["note"]
         mock_gh.assert_not_called()
 
     @patch("rlsbl.commands.check.check_github_availability")
@@ -652,8 +653,8 @@ class TestNpmMonikerIntegration(unittest.TestCase):
         mock_gh.return_value = {"status": "available", "count": 0}
 
         result = _check_single_name("uniquepkg", "npm")
-        self.assertEqual(result["status"], "available")
-        self.assertNotIn("note", result)
+        assert result["status"] == "available"
+        assert "note" not in result
 
     @patch("rlsbl.commands.check.check_github_availability")
     @patch("rlsbl.commands.check._search_npm_similar")
@@ -668,12 +669,12 @@ class TestNpmMonikerIntegration(unittest.TestCase):
         mock_gh.return_value = {"status": "exists", "count": 5, "note": "5 repos"}
 
         result = _check_single_name("express", "npm")
-        self.assertEqual(result["status"], "taken")
+        assert result["status"] == "taken"
         mock_similar.assert_not_called()
         mock_gh.assert_not_called()
 
 
-class TestUltranormIntegration(unittest.TestCase):
+class TestUltranormIntegration:
     """Integration tests: ultranormalization variant checking wired into run_cmd."""
 
     @patch("rlsbl.commands.check.time.sleep")
@@ -692,9 +693,9 @@ class TestUltranormIntegration(unittest.TestCase):
         mock_pypi.side_effect = pypi_side_effect
 
         _apply_ultranorm_check(result, "pypi", True, 200)
-        self.assertIn("ultranorm_conflicts", result)
-        self.assertIn("cl1", result["ultranorm_conflicts"])
-        self.assertTrue(result.get("ultranorm_caveat"))
+        assert "ultranorm_conflicts" in result
+        assert "cl1" in result["ultranorm_conflicts"]
+        assert result.get("ultranorm_caveat")
 
     @patch("rlsbl.commands.check.time.sleep")
     @patch("rlsbl.commands.check.check_pypi_availability")
@@ -707,8 +708,8 @@ class TestUltranormIntegration(unittest.TestCase):
         mock_pypi.return_value = {"status": "available"}
 
         _apply_ultranorm_check(result, "pypi", True, 200)
-        self.assertNotIn("ultranorm_conflicts", result)
-        self.assertTrue(result.get("ultranorm_caveat"))
+        assert "ultranorm_conflicts" not in result
+        assert result.get("ultranorm_caveat")
 
     def test_no_flag_skips_ultranorm(self):
         """Without the flag, no ultranorm checking occurs at all."""
@@ -717,8 +718,8 @@ class TestUltranormIntegration(unittest.TestCase):
             "variants": [], "github_count": 0,
         }
         _apply_ultranorm_check(result, "pypi", False, 200)
-        self.assertNotIn("ultranorm_conflicts", result)
-        self.assertNotIn("ultranorm_caveat", result)
+        assert "ultranorm_conflicts" not in result
+        assert "ultranorm_caveat" not in result
 
     def test_flag_with_non_pypi_registry_skips(self):
         """Flag with non-pypi registry does no ultranorm checking."""
@@ -727,11 +728,11 @@ class TestUltranormIntegration(unittest.TestCase):
             "variants": [], "github_count": 0,
         }
         _apply_ultranorm_check(result, "npm", True, 200)
-        self.assertNotIn("ultranorm_conflicts", result)
-        self.assertNotIn("ultranorm_caveat", result)
+        assert "ultranorm_conflicts" not in result
+        assert "ultranorm_caveat" not in result
 
 
-class TestRetryVisibility(unittest.TestCase):
+class TestRetryVisibility:
     """Tests for retry visibility: _request_with_backoff prints to stderr on 429."""
 
     @patch("rlsbl.commands.check.time.sleep")
@@ -748,7 +749,7 @@ class TestRetryVisibility(unittest.TestCase):
 
         with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
             _request_with_backoff("https://example.com/test", max_retries=3)
-        self.assertIn("Rate limited, retrying in", mock_stderr.getvalue())
+        assert "Rate limited, retrying in" in mock_stderr.getvalue()
 
     @patch("rlsbl.commands.check.time.sleep")
     @patch("rlsbl.commands.check.urllib.request.urlopen")
@@ -764,10 +765,10 @@ class TestRetryVisibility(unittest.TestCase):
 
         with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
             _request_with_backoff("https://example.com/test", max_retries=3)
-        self.assertIn("Rate limited, retrying in", mock_stderr.getvalue())
+        assert "Rate limited, retrying in" in mock_stderr.getvalue()
 
 
-class TestReasonField(unittest.TestCase):
+class TestReasonField:
     """Tests for the reason field on check result dicts."""
 
     @patch("rlsbl.commands.check.check_github_availability")
@@ -777,8 +778,8 @@ class TestReasonField(unittest.TestCase):
         mock_gh.return_value = {"status": "available", "count": 0}
 
         result = _check_single_name("queue", "pypi")
-        self.assertEqual(result["status"], "taken")
-        self.assertEqual(result["reason"], "stdlib")
+        assert result["status"] == "taken"
+        assert result["reason"] == "stdlib"
         mock_pypi.assert_not_called()
         mock_gh.assert_not_called()
 
@@ -790,8 +791,8 @@ class TestReasonField(unittest.TestCase):
         mock_gh.return_value = {"status": "available", "count": 0}
 
         result = _check_single_name("requests", "pypi")
-        self.assertEqual(result["status"], "taken")
-        self.assertEqual(result["reason"], "registered")
+        assert result["status"] == "taken"
+        assert result["reason"] == "registered"
         mock_gh.assert_not_called()
 
     @patch("rlsbl.commands.check.check_github_availability")
@@ -802,8 +803,8 @@ class TestReasonField(unittest.TestCase):
         mock_gh.return_value = {"status": "available", "count": 0}
 
         result = _check_single_name("my-unique-pkg-xyz", "pypi")
-        self.assertEqual(result["status"], "available")
-        self.assertIsNone(result["reason"])
+        assert result["status"] == "available"
+        assert result["reason"] is None
 
     @patch("rlsbl.commands.check.check_github_availability")
     @patch("rlsbl.commands.check.check_npm_availability")
@@ -813,8 +814,8 @@ class TestReasonField(unittest.TestCase):
         mock_gh.return_value = {"status": "exists", "count": 5, "note": "5 repos"}
 
         result = _check_single_name("express", "npm")
-        self.assertEqual(result["status"], "taken")
-        self.assertEqual(result["reason"], "registered")
+        assert result["status"] == "taken"
+        assert result["reason"] == "registered"
         mock_gh.assert_not_called()
 
     @patch("rlsbl.commands.check.check_github_availability")
@@ -829,8 +830,8 @@ class TestReasonField(unittest.TestCase):
         mock_gh.return_value = {"status": "available", "count": 0}
 
         result = _check_single_name("selfdoc", "npm")
-        self.assertEqual(result["status"], "taken")
-        self.assertEqual(result["reason"], "moniker")
+        assert result["status"] == "taken"
+        assert result["reason"] == "moniker"
         mock_gh.assert_not_called()
 
     @patch("rlsbl.commands.check.check_github_availability")
@@ -845,8 +846,8 @@ class TestReasonField(unittest.TestCase):
         mock_gh.return_value = {"status": "available", "count": 0}
 
         result = _check_single_name("uniquepkg", "npm")
-        self.assertEqual(result["status"], "available")
-        self.assertIsNone(result["reason"])
+        assert result["status"] == "available"
+        assert result["reason"] is None
 
     @patch("rlsbl.commands.check.check_github_availability")
     @patch("rlsbl.commands.check.check_go_availability")
@@ -856,8 +857,8 @@ class TestReasonField(unittest.TestCase):
         mock_gh.return_value = {"status": "exists", "count": 3, "note": "3 repos"}
 
         result = _check_single_name("github.com/gorilla/mux", "go")
-        self.assertEqual(result["status"], "exists")
-        self.assertEqual(result["reason"], "registered")
+        assert result["status"] == "exists"
+        assert result["reason"] == "registered"
         mock_gh.assert_not_called()
 
     @patch("rlsbl.commands.check.time.sleep")
@@ -875,12 +876,12 @@ class TestReasonField(unittest.TestCase):
         mock_pypi.side_effect = pypi_side_effect
 
         _apply_ultranorm_check(result, "pypi", True, 200)
-        self.assertEqual(result["status"], "taken")
-        self.assertEqual(result["reason"], "ultranorm")
-        self.assertIn("cl1", result["ultranorm_conflicts"])
+        assert result["status"] == "taken"
+        assert result["reason"] == "ultranorm"
+        assert "cl1" in result["ultranorm_conflicts"]
 
 
-class TestReasonExplanations(unittest.TestCase):
+class TestReasonExplanations:
     """Tests for reason-specific explanations in verbose output."""
 
     def test_pypi_stdlib_explanation(self):
@@ -892,7 +893,7 @@ class TestReasonExplanations(unittest.TestCase):
         }
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             _format_single_result(result)
-        self.assertIn("standard library modules", mock_stdout.getvalue())
+        assert "standard library modules" in mock_stdout.getvalue()
 
     def test_npm_moniker_explanation(self):
         """npm moniker reason prints punctuation-stripping explanation."""
@@ -903,7 +904,7 @@ class TestReasonExplanations(unittest.TestCase):
         }
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             _format_single_result(result)
-        self.assertIn("removing dashes, dots, and underscores", mock_stdout.getvalue())
+        assert "removing dashes, dots, and underscores" in mock_stdout.getvalue()
 
     def test_pypi_ultranorm_explanation(self):
         """PyPI ultranorm reason prints visual similarity explanation."""
@@ -914,7 +915,7 @@ class TestReasonExplanations(unittest.TestCase):
         }
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             _format_single_result(result)
-        self.assertIn("visually similar", mock_stdout.getvalue())
+        assert "visually similar" in mock_stdout.getvalue()
 
     def test_pypi_registered_no_explanation(self):
         """PyPI registered reason does NOT print any reason explanation."""
@@ -925,9 +926,9 @@ class TestReasonExplanations(unittest.TestCase):
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             _format_single_result(result)
         output = mock_stdout.getvalue()
-        self.assertNotIn("standard library modules", output)
-        self.assertNotIn("removing dashes, dots, and underscores", output)
-        self.assertNotIn("visually similar", output)
+        assert "standard library modules" not in output
+        assert "removing dashes, dots, and underscores" not in output
+        assert "visually similar" not in output
 
     def test_npm_available_no_explanation(self):
         """npm available result does NOT print any reason explanation."""
@@ -938,12 +939,12 @@ class TestReasonExplanations(unittest.TestCase):
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             _format_single_result(result)
         output = mock_stdout.getvalue()
-        self.assertNotIn("standard library modules", output)
-        self.assertNotIn("removing dashes, dots, and underscores", output)
-        self.assertNotIn("visually similar", output)
+        assert "standard library modules" not in output
+        assert "removing dashes, dots, and underscores" not in output
+        assert "visually similar" not in output
 
 
-class TestShortCircuit(unittest.TestCase):
+class TestShortCircuit:
     """Tests for short-circuit behavior: skip variants and GitHub when taken."""
 
     # -- 1A: Skip variants when taken --
@@ -956,7 +957,7 @@ class TestShortCircuit(unittest.TestCase):
         mock_npm.return_value = {"status": "taken"}
 
         result = _check_single_name("express", "npm")
-        self.assertEqual(result["status"], "taken")
+        assert result["status"] == "taken"
         mock_variants.assert_not_called()
 
     @patch("rlsbl.commands.check.check_github_availability")
@@ -971,7 +972,7 @@ class TestShortCircuit(unittest.TestCase):
         mock_gh.return_value = {"status": "available", "count": 0}
 
         result = _check_single_name("my-unique-pkg", "npm")
-        self.assertEqual(result["status"], "available")
+        assert result["status"] == "available"
         mock_variants.assert_called_once()
 
     @patch("rlsbl.commands.check.check_github_availability")
@@ -982,7 +983,7 @@ class TestShortCircuit(unittest.TestCase):
         mock_pypi.return_value = {"status": "taken"}
 
         result = _check_single_name("requests", "pypi")
-        self.assertEqual(result["status"], "taken")
+        assert result["status"] == "taken"
         mock_variants.assert_not_called()
 
     @patch("rlsbl.commands.check.check_github_availability")
@@ -993,8 +994,8 @@ class TestShortCircuit(unittest.TestCase):
         mock_gh.return_value = {"status": "available", "count": 0}
 
         result = _check_single_name("queue", "pypi")
-        self.assertEqual(result["status"], "taken")
-        self.assertEqual(result["reason"], "stdlib")
+        assert result["status"] == "taken"
+        assert result["reason"] == "stdlib"
         mock_variants.assert_not_called()
         mock_pypi.assert_not_called()
         mock_gh.assert_not_called()
@@ -1009,7 +1010,7 @@ class TestShortCircuit(unittest.TestCase):
         mock_gh.return_value = {"status": "available", "count": 0}
 
         result = _check_single_name("my-unique-pkg", "pypi")
-        self.assertEqual(result["status"], "available")
+        assert result["status"] == "available"
         mock_variants.assert_called_once()
         mock_gh.assert_called_once()
 
@@ -1022,8 +1023,8 @@ class TestShortCircuit(unittest.TestCase):
         mock_npm.return_value = {"status": "taken"}
 
         result = _check_single_name("express", "npm")
-        self.assertEqual(result["status"], "taken")
-        self.assertIsNone(result["github_count"])
+        assert result["status"] == "taken"
+        assert result["github_count"] is None
         mock_gh.assert_not_called()
 
     @patch("rlsbl.commands.check.check_github_availability")
@@ -1038,12 +1039,12 @@ class TestShortCircuit(unittest.TestCase):
         mock_gh.return_value = {"status": "available", "count": 0}
 
         result = _check_single_name("my-unique-pkg", "npm")
-        self.assertEqual(result["status"], "available")
-        self.assertEqual(result["github_count"], 0)
+        assert result["status"] == "available"
+        assert result["github_count"] == 0
         mock_gh.assert_called_once()
 
 
-class TestUltranormEarlyExit(unittest.TestCase):
+class TestUltranormEarlyExit:
     """Tests for early exit in ultranorm variant checking."""
 
     @patch("rlsbl.commands.check.time.sleep")
@@ -1060,10 +1061,10 @@ class TestUltranormEarlyExit(unittest.TestCase):
         }
         _apply_ultranorm_check(result, "pypi", True, 200)
 
-        self.assertEqual(mock_pypi.call_count, 1)
+        assert mock_pypi.call_count == 1
         mock_pypi.assert_called_once_with("var1")
-        self.assertIn("ultranorm_conflicts", result)
-        self.assertEqual(result["ultranorm_conflicts"], ["var1"])
+        assert "ultranorm_conflicts" in result
+        assert result["ultranorm_conflicts"] == ["var1"]
 
     @patch("rlsbl.commands.check.time.sleep")
     @patch("rlsbl.commands.check._generate_ultranorm_variants")
@@ -1079,8 +1080,8 @@ class TestUltranormEarlyExit(unittest.TestCase):
         }
         _apply_ultranorm_check(result, "pypi", True, 200)
 
-        self.assertEqual(mock_pypi.call_count, 3)
-        self.assertNotIn("ultranorm_conflicts", result)
+        assert mock_pypi.call_count == 3
+        assert "ultranorm_conflicts" not in result
 
     @patch("rlsbl.commands.check.time.sleep")
     @patch("rlsbl.commands.check._generate_ultranorm_variants")
@@ -1101,10 +1102,10 @@ class TestUltranormEarlyExit(unittest.TestCase):
         _apply_ultranorm_check(result, "pypi", True, 200)
 
         # var1 available, var2 taken -> break, var3 never checked
-        self.assertEqual(mock_pypi.call_count, 2)
-        self.assertEqual(result["ultranorm_conflicts"], ["var2"])
-        self.assertEqual(result["status"], "taken")
-        self.assertEqual(result["reason"], "ultranorm")
+        assert mock_pypi.call_count == 2
+        assert result["ultranorm_conflicts"] == ["var2"]
+        assert result["status"] == "taken"
+        assert result["reason"] == "ultranorm"
 
     @patch("rlsbl.commands.check._generate_ultranorm_variants")
     @patch("rlsbl.commands.check.check_pypi_availability")
@@ -1118,14 +1119,14 @@ class TestUltranormEarlyExit(unittest.TestCase):
         }
         _apply_ultranorm_check(result, "pypi", True, 200)
 
-        self.assertEqual(result["status"], "error")
-        self.assertIn("capped at 64", result["error"])
-        self.assertIn("Too many ambiguous characters", result["error"])
+        assert result["status"] == "error"
+        assert "capped at 64" in result["error"]
+        assert "Too many ambiguous characters" in result["error"]
         # PyPI should never be queried when capped
         mock_pypi.assert_not_called()
 
 
-class TestPyPICaveats(unittest.TestCase):
+class TestPyPICaveats:
     """Tests for PyPI-specific caveats in _format_single_result output."""
 
     def test_pypi_available_no_flag_shows_prohibited_note_and_tip(self):
@@ -1137,8 +1138,8 @@ class TestPyPICaveats(unittest.TestCase):
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             _format_single_result(result)
         output = mock_stdout.getvalue()
-        self.assertIn("PyPI may reject names on its prohibited names list", output)
-        self.assertIn("--ultranormalized-variants", output)
+        assert "PyPI may reject names on its prohibited names list" in output
+        assert "--ultranormalized-variants" in output
 
     def test_pypi_available_with_flag_shows_ultranorm_caveat_no_duplicate(self):
         """PyPI available with --ultranormalized-variants shows ultranorm caveat, no duplicate."""
@@ -1150,12 +1151,12 @@ class TestPyPICaveats(unittest.TestCase):
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             _format_single_result(result)
         output = mock_stdout.getvalue()
-        self.assertIn("PyPI may also reject names on its prohibited names list", output)
+        assert "PyPI may also reject names on its prohibited names list" in output
         # Should NOT contain the tip to use the flag (it was already used)
-        self.assertNotIn("--ultranormalized-variants", output)
+        assert "--ultranormalized-variants" not in output
         # Should not print the prohibited names note twice
         count = output.count("prohibited names list")
-        self.assertEqual(count, 1)
+        assert count == 1
 
     def test_pypi_taken_no_caveats(self):
         """PyPI taken name does not show prohibited names note or ultranorm tip."""
@@ -1166,8 +1167,8 @@ class TestPyPICaveats(unittest.TestCase):
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             _format_single_result(result)
         output = mock_stdout.getvalue()
-        self.assertNotIn("prohibited names list", output)
-        self.assertNotIn("--ultranormalized-variants", output)
+        assert "prohibited names list" not in output
+        assert "--ultranormalized-variants" not in output
 
     def test_npm_available_no_pypi_caveats(self):
         """npm available name does not show PyPI-specific caveats."""
@@ -1178,11 +1179,11 @@ class TestPyPICaveats(unittest.TestCase):
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             _format_single_result(result)
         output = mock_stdout.getvalue()
-        self.assertNotIn("prohibited names list", output)
-        self.assertNotIn("--ultranormalized-variants", output)
+        assert "prohibited names list" not in output
+        assert "--ultranormalized-variants" not in output
 
 
-class TestStepsSummary(unittest.TestCase):
+class TestStepsSummary:
     """Tests for the steps-run summary line in verbose output."""
 
     def test_pypi_available_summary(self):
@@ -1196,10 +1197,10 @@ class TestStepsSummary(unittest.TestCase):
         output = mock_stdout.getvalue()
         # Find the Checked: line
         checked_line = [l for l in output.split("\n") if l.startswith("Checked:")][0]
-        self.assertIn("PyPI", checked_line)
-        self.assertIn("stdlib", checked_line)
-        self.assertIn("variants", checked_line)
-        self.assertIn("GitHub repos", checked_line)
+        assert "PyPI" in checked_line
+        assert "stdlib" in checked_line
+        assert "variants" in checked_line
+        assert "GitHub repos" in checked_line
 
     def test_pypi_taken_by_stdlib_summary(self):
         """PyPI taken by stdlib includes only PyPI and stdlib."""
@@ -1212,10 +1213,10 @@ class TestStepsSummary(unittest.TestCase):
             _format_single_result(result)
         output = mock_stdout.getvalue()
         checked_line = [l for l in output.split("\n") if l.startswith("Checked:")][0]
-        self.assertIn("PyPI", checked_line)
-        self.assertIn("stdlib", checked_line)
-        self.assertNotIn("variants", checked_line)
-        self.assertNotIn("GitHub repos", checked_line)
+        assert "PyPI" in checked_line
+        assert "stdlib" in checked_line
+        assert "variants" not in checked_line
+        assert "GitHub repos" not in checked_line
 
     def test_npm_available_summary(self):
         """npm available result includes npm, variants, moniker similarity, GitHub repos."""
@@ -1228,11 +1229,11 @@ class TestStepsSummary(unittest.TestCase):
             _format_single_result(result)
         output = mock_stdout.getvalue()
         checked_line = [l for l in output.split("\n") if l.startswith("Checked:")][0]
-        self.assertIn("npm", checked_line)
-        self.assertIn("variants", checked_line)
-        self.assertIn("moniker similarity", checked_line)
-        self.assertIn("GitHub repos", checked_line)
-        self.assertNotIn("stdlib", checked_line)
+        assert "npm" in checked_line
+        assert "variants" in checked_line
+        assert "moniker similarity" in checked_line
+        assert "GitHub repos" in checked_line
+        assert "stdlib" not in checked_line
 
     def test_npm_taken_summary(self):
         """npm taken result includes only npm."""
@@ -1244,7 +1245,7 @@ class TestStepsSummary(unittest.TestCase):
             _format_single_result(result)
         output = mock_stdout.getvalue()
         checked_line = [l for l in output.split("\n") if l.startswith("Checked:")][0]
-        self.assertEqual(checked_line, "Checked: npm")
+        assert checked_line == "Checked: npm"
 
     def test_pypi_with_ultranorm_flag_summary(self):
         """PyPI available with ultranorm flag includes ultranormalization."""
@@ -1257,14 +1258,14 @@ class TestStepsSummary(unittest.TestCase):
             _format_single_result(result)
         output = mock_stdout.getvalue()
         checked_line = [l for l in output.split("\n") if l.startswith("Checked:")][0]
-        self.assertIn("PyPI", checked_line)
-        self.assertIn("stdlib", checked_line)
-        self.assertIn("variants", checked_line)
-        self.assertIn("GitHub repos", checked_line)
-        self.assertIn("ultranormalization", checked_line)
+        assert "PyPI" in checked_line
+        assert "stdlib" in checked_line
+        assert "variants" in checked_line
+        assert "GitHub repos" in checked_line
+        assert "ultranormalization" in checked_line
 
 
-class TestMultiNameSummary(unittest.TestCase):
+class TestMultiNameSummary:
     """Tests for multi-name summary line and batch context note."""
 
     @patch("rlsbl.commands.check.time.sleep")
@@ -1282,9 +1283,9 @@ class TestMultiNameSummary(unittest.TestCase):
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             run_cmd("npm", ["foo", "bar", "baz"], {})
         output = mock_stdout.getvalue()
-        self.assertIn("Summary: 2 available, 1 taken (3 total)", output)
+        assert "Summary: 2 available, 1 taken (3 total)" in output
         # No error count in summary
-        self.assertNotIn("error(s)", output)
+        assert "error(s)" not in output
 
     @patch("rlsbl.commands.check.time.sleep")
     @patch("rlsbl.commands.check._check_single_name")
@@ -1301,7 +1302,7 @@ class TestMultiNameSummary(unittest.TestCase):
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             run_cmd("npm", ["foo", "bar", "baz"], {})
         output = mock_stdout.getvalue()
-        self.assertIn("Summary: 1 available, 1 taken, 1 error(s) (3 total)", output)
+        assert "Summary: 1 available, 1 taken, 1 error(s) (3 total)" in output
 
     @patch("rlsbl.commands.check.time.sleep")
     @patch("rlsbl.commands.check._check_single_name")
@@ -1318,8 +1319,8 @@ class TestMultiNameSummary(unittest.TestCase):
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             run_cmd("npm", ["foo", "bar", "baz"], {})
         output = mock_stdout.getvalue()
-        self.assertIn("Summary: 3 available, 0 taken (3 total)", output)
-        self.assertNotIn("error(s)", output)
+        assert "Summary: 3 available, 0 taken (3 total)" in output
+        assert "error(s)" not in output
 
     @patch("rlsbl.commands.check.time.sleep")
     @patch("rlsbl.commands.check._check_single_name")
@@ -1334,8 +1335,8 @@ class TestMultiNameSummary(unittest.TestCase):
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             run_cmd("npm", ["foo", "bar"], {})
         output = mock_stdout.getvalue()
-        self.assertIn("Checked with 200ms delay between names.", output)
-        self.assertIn("Increase --delay if rate limited.", output)
+        assert "Checked with 200ms delay between names." in output
+        assert "Increase --delay if rate limited." in output
 
     @patch("rlsbl.commands.check.time.sleep")
     @patch("rlsbl.commands.check._check_single_name")
@@ -1350,9 +1351,5 @@ class TestMultiNameSummary(unittest.TestCase):
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             run_cmd("npm", ["foo", "bar"], {"delay": "500"})
         output = mock_stdout.getvalue()
-        self.assertIn("Checked with 500ms delay between names.", output)
-        self.assertNotIn("Increase --delay if rate limited.", output)
-
-
-if __name__ == "__main__":
-    unittest.main()
+        assert "Checked with 500ms delay between names." in output
+        assert "Increase --delay if rate limited." not in output
