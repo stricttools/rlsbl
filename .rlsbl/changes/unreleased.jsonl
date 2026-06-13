@@ -7,3 +7,4 @@
 {"commits":["6294776b6f63347a46046bc71b0d1e60a4cc9eb7"],"user_facing":true,"description":"**Undo pre-check.** `rlsbl release undo` now checks that the GitHub Release exists before attempting to delete it.","type":"fix"}
 {"commits":["5d633ac040a2d67307692f83f3359cf854ec4874"],"user_facing":true,"description":"**Dev-node batch release guard.** `rlsbl monorepo release` now hard-errors if a dev_node project is included in a batch release, instead of silently skipping it.","type":"breaking"}
 {"commits":["682c684f9730efe854482035c57d0a055f044304","e17e6d30c52abd0e39c590d448a9e24a1b9aa0be"],"user_facing":false}
+{"commits":["d00502aee9cc49ed30061dd9ab38ad5a71f70792","6e23f844f9a3360949d923e8750bfdc0cbab2599"],"user_facing":false}
