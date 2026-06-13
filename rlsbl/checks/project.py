@@ -115,7 +115,9 @@ def register_project_checks(app):
             try:
                 v = target.read_version(path)
                 versions[name] = v
-            except Exception:
+            except Exception as e:
+                import sys
+                print(f"Warning: could not read version from {name}: {e}", file=sys.stderr)
                 versions[name] = None
 
         # Include selfdoc.json in version consistency checks. selfdoc.json
@@ -128,7 +130,9 @@ def register_project_checks(app):
                     with open(selfdoc_path, "r", encoding="utf-8") as f:
                         selfdoc_data = json.load(f)
                     versions["selfdoc"] = selfdoc_data.get("version", "0.0.0")
-                except (OSError, json.JSONDecodeError):
+                except (OSError, json.JSONDecodeError) as e:
+                    import sys
+                    print(f"Warning: could not read selfdoc.json: {e}", file=sys.stderr)
                     versions["selfdoc"] = None
 
         unique = set(v for v in versions.values() if v is not None)
@@ -166,7 +170,9 @@ def register_project_checks(app):
             try:
                 n = target.read_name(path, ctx=ctx)
                 names[name] = n
-            except Exception:
+            except Exception as e:
+                import sys
+                print(f"Warning: could not read name from {name}: {e}", file=sys.stderr)
                 names[name] = None
 
         have_name = {k: v for k, v in names.items() if v is not None}
@@ -203,8 +209,9 @@ def register_project_checks(app):
                 meta = target.read_metadata(path)
                 if "license" in meta:
                     licenses[name] = meta["license"]
-            except Exception:
-                pass
+            except Exception as e:
+                import sys
+                print(f"Warning: could not read metadata from {name}: {e}", file=sys.stderr)
 
         if len(licenses) == 0:
             return CheckResult("pass", "no targets declare a license")
@@ -235,8 +242,9 @@ def register_project_checks(app):
                 meta = target.read_metadata(path)
                 if "description" in meta:
                     descriptions[name] = meta["description"]
-            except Exception:
-                pass
+            except Exception as e:
+                import sys
+                print(f"Warning: could not read metadata from {name}: {e}", file=sys.stderr)
 
         if len(descriptions) == 0:
             return CheckResult("pass", "no targets declare a description")
