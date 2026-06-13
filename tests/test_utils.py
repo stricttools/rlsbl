@@ -5,7 +5,7 @@ import os
 
 import pytest
 
-from rlsbl.errors import VersionError
+from rlsbl.errors import ConfigError, VersionError
 from rlsbl.utils import bump_version, extract_changelog_entry, get_hook_timeout, get_push_timeout
 
 
@@ -145,22 +145,22 @@ class TestGetPushTimeout:
 
     def test_invalid_env_var_raises_error(self, monkeypatch):
         monkeypatch.setenv("RLSBL_PUSH_TIMEOUT", "not-a-number")
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ConfigError) as exc_info:
             get_push_timeout({})
         assert "Invalid RLSBL_PUSH_TIMEOUT" in str(exc_info.value)
 
     def test_zero_env_var_raises_error(self, monkeypatch):
         monkeypatch.setenv("RLSBL_PUSH_TIMEOUT", "0")
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ConfigError) as exc_info:
             get_push_timeout({})
         assert "Invalid RLSBL_PUSH_TIMEOUT" in str(exc_info.value)
 
     def test_invalid_config_value_raises_error(self):
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ConfigError) as exc_info:
             get_push_timeout({"push_timeout": "slow"})
         assert "Invalid push_timeout" in str(exc_info.value)
 
     def test_negative_config_value_raises_error(self):
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ConfigError) as exc_info:
             get_push_timeout({"push_timeout": -10})
         assert "Invalid push_timeout" in str(exc_info.value)

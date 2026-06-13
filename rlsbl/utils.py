@@ -8,7 +8,7 @@ import subprocess
 import sys
 import urllib.request
 
-from .errors import VersionError
+from .errors import ConfigError, VersionError
 
 
 def run(cmd, args=None, timeout=120, env=None, cwd=None):
@@ -87,14 +87,14 @@ def get_push_timeout(config):
                 raise ValueError
             return val
         except ValueError:
-            raise ValueError(
+            raise ConfigError(
                 f'Invalid RLSBL_PUSH_TIMEOUT="{raw}". Must be a positive integer.'
             )
 
     config_val = config.get("push_timeout")
     if config_val is not None:
         if not isinstance(config_val, int) or config_val <= 0:
-            raise ValueError(
+            raise ConfigError(
                 f'Invalid push_timeout in .rlsbl/config.json: {config_val!r}. '
                 f'Must be a positive integer.'
             )
