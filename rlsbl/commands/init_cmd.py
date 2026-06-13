@@ -1049,8 +1049,9 @@ def _trigger_monorepo_sync(no_commit=False):
                 cwd=ws_root,
                 check=False,
             )
-        except Exception:
-            pass
+        except Exception as e:
+            from ..utils import warn_exception
+            warn_exception("monorepo sync after scaffold failed", e)
 
 
 def run_cmd(registry, args, flags, ctx):

@@ -29,8 +29,7 @@ def run_cmd(registry, args, flags):
             # Display the PR list directly to terminal (stdout not captured)
             subprocess.run(["gh", "pr", "list", "--state", "open"])
 
-    except Exception:
-        # Never crash -- this is informational only
-        pass
+    except Exception as e:
+        print(f"Warning: could not list PRs: {e}", file=sys.stderr)
 
     sys.exit(0)

@@ -234,7 +234,9 @@ def _build_project_template_vars(project_dir, root):
         target = TARGETS[entry.name]
         try:
             tvars = target.template_vars(entry.path, ctx)
-        except Exception:
+        except Exception as e:
+            from ...utils import warn_exception
+            warn_exception(f"template_vars failed for target {entry.name}", e)
             continue
         # Un-namespaced (first target wins for collisions)
         for key, value in tvars.items():

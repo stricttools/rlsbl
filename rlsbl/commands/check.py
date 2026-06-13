@@ -151,7 +151,9 @@ def _search_npm_similar(name):
             if _normalize_npm_moniker(pkg_name) == candidate_moniker and pkg_name != name:
                 conflicts.append(pkg_name)
         return conflicts
-    except Exception:
+    except Exception as e:
+        import sys
+        print(f"Warning: npm similar-name search failed: {e}", file=sys.stderr)
         return []
 
 

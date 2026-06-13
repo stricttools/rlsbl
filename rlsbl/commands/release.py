@@ -1380,8 +1380,9 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                         pkg_path = target_vpath(npm_path, "package.json")
                         if pkg_path not in files_to_commit:
                             files_to_commit.append(pkg_path)
-            except Exception:
-                pass
+            except Exception as e:
+                from ..utils import warn_exception
+                warn_exception("npm ecosystem tagging failed", e)
             pypi_path = target_paths.get("pypi", project_dir)
             try:
                 if TARGETS["pypi"].check_project_exists(pypi_path):
@@ -1389,8 +1390,9 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                         pyproject_path = target_vpath(pypi_path, "pyproject.toml")
                         if pyproject_path not in files_to_commit:
                             files_to_commit.append(pyproject_path)
-            except Exception:
-                pass
+            except Exception as e:
+                from ..utils import warn_exception
+                warn_exception("pypi ecosystem tagging failed", e)
 
         # Sync lockfiles after version bumps so they reflect the new version
         _sync_lockfiles(target_paths, files_to_commit, log)
@@ -1404,8 +1406,9 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                     f.write(rlsbl_ver + "\n")
                 if rlsbl_version_marker not in files_to_commit:
                     files_to_commit.append(rlsbl_version_marker)
-            except Exception:
-                pass
+            except Exception as e:
+                from ..utils import warn_exception
+                warn_exception("writing .rlsbl/version marker failed", e)
 
         # Re-run selfdoc check to refresh hashes after version bump
         _refresh_selfdoc_hashes(files_to_commit, log, project_dir=project_dir)
