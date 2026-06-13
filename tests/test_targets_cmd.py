@@ -127,7 +127,7 @@ class TestMultiTargetRelease:
     @patch("rlsbl.commands.release._run_selfdoc_check", return_value=True)
     @patch("rlsbl.commands.release._run_selfdoc_gen", return_value=True)
     def test_secondary_targets_called_when_detected(
-        self, _selfdoc_gen, _selfdoc_check, _changes_dir, _extract, _finalize, _gen_ver_file, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, _commit_files, mock_run, _push
+        self, _selfdoc_gen, _selfdoc_check, _changes_dir, _extract, _finalize, _gen_ver_file, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, _commit_files, mock_run, _push, monkeypatch
     ):
         """When a secondary target (spec) is detected, its build is called."""
         # Create version.json so spec target is detected
@@ -155,21 +155,16 @@ class TestMultiTargetRelease:
 
         # Mock the spec target's build to track calls
         from rlsbl.targets import TARGETS
-        original_build = TARGETS["spec"].build
         build_mock = MagicMock()
-        TARGETS["spec"].build = build_mock
+        monkeypatch.setattr(TARGETS["spec"], "build", build_mock)
 
-        try:
-            from rlsbl.commands.release import run_cmd
+        from rlsbl.commands.release import run_cmd
 
-            with patch("sys.stdout", StringIO()):
-                run_cmd(_rc(include=["npm", "spec"]), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
+        with patch("sys.stdout", StringIO()):
+            run_cmd(_rc(include=["npm", "spec"]), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
 
-            # Verify spec target build was called
-            build_mock.assert_called_once_with(".", "1.0.1")
-        finally:
-            # Restore original methods
-            TARGETS["spec"].build = original_build
+        # Verify spec target build was called
+        build_mock.assert_called_once_with(".", "1.0.1")
 
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
@@ -187,7 +182,7 @@ class TestMultiTargetRelease:
     @patch("rlsbl.commands.release._run_selfdoc_check", return_value=True)
     @patch("rlsbl.commands.release._run_selfdoc_gen", return_value=True)
     def test_secondary_target_failure_is_non_fatal(
-        self, _selfdoc_gen, _selfdoc_check, _changes_dir, _extract, _finalize, _gen_ver_file, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, _commit_files, mock_run, _push
+        self, _selfdoc_gen, _selfdoc_check, _changes_dir, _extract, _finalize, _gen_ver_file, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, _commit_files, mock_run, _push, monkeypatch
     ):
         """If a secondary target's build raises, release still completes."""
         # Create version.json so spec target is detected
@@ -203,19 +198,15 @@ class TestMultiTargetRelease:
         mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", "", "/tmp/fake-repo", "", "pre123", "", "", "", "", "abc123"]
 
         from rlsbl.targets import TARGETS
-        original_build = TARGETS["spec"].build
-        TARGETS["spec"].build = MagicMock(side_effect=RuntimeError("build failed"))
+        monkeypatch.setattr(TARGETS["spec"], "build", MagicMock(side_effect=RuntimeError("build failed")))
 
-        try:
-            from rlsbl.commands.release import run_cmd
+        from rlsbl.commands.release import run_cmd
 
-            # Should not raise -- secondary failures are non-fatal
-            buf = StringIO()
-            with patch("sys.stdout", StringIO()), patch("sys.stderr", buf):
-                run_cmd(_rc(include=["npm", "spec"]), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
+        # Should not raise -- secondary failures are non-fatal
+        buf = StringIO()
+        with patch("sys.stdout", StringIO()), patch("sys.stderr", buf):
+            run_cmd(_rc(include=["npm", "spec"]), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
 
-            # Verify warnings were emitted
-            stderr_output = buf.getvalue()
-            assert "spec target build failed" in stderr_output
-        finally:
-            TARGETS["spec"].build = original_build
+        # Verify warnings were emitted
+        stderr_output = buf.getvalue()
+        assert "spec target build failed" in stderr_output
