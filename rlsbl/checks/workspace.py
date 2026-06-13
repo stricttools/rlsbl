@@ -522,7 +522,10 @@ def register_workspace_checks(app):
         if config is None:
             return CheckResult("skip", "layers not configured")
 
-        violations = check_layer_violations(ctx.projects, config, ctx.graph)
+        # Dev node projects sit outside the layer system entirely
+        projects = [p for p in ctx.projects if not p.get("dev_node")]
+
+        violations = check_layer_violations(projects, config, ctx.graph)
         if violations:
             return CheckResult(
                 "fail",

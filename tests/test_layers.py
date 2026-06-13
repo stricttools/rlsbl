@@ -609,3 +609,114 @@ class TestLayersViolationsCheck:
         result = captured["layers-violations"](ctx)
         assert result.status == "fail"
         assert "1 layer violation" in result.message
+
+    def test_check_pass_dev_node_unassigned(self, tmp_path):
+        """A dev_node project not assigned to any layer is auto-exempted."""
+        from pathlib import Path
+
+        from rlsbl.check_context import WorkspaceCheckContext
+
+        ws_dir = tmp_path / ".rlsbl-monorepo"
+        ws_dir.mkdir()
+        (ws_dir / "workspace.toml").write_text(
+            '[[projects]]\npath = "schema"\nname = "schema"\n\n'
+            '[[projects]]\npath = "app"\nname = "app"\n\n'
+            '[[projects]]\npath = "loadtest"\nname = "loadtest"\ndev_node = true\n\n'
+            "[layers]\n"
+            'order = ["foundation", "app"]\n\n'
+            "[layers.assignments]\n"
+            'foundation = ["schema"]\n'
+            'app = ["app"]\n'
+        )
+        (tmp_path / "schema").mkdir()
+        (tmp_path / "app").mkdir()
+        (tmp_path / "loadtest").mkdir()
+
+        # loadtest is NOT in any layer assignment -- dev_node exempts it
+        projects = [
+            {"name": "schema", "path": "schema"},
+            {"name": "app", "path": "app", "depends_on": ["schema"]},
+            {"name": "loadtest", "path": "loadtest", "dev_node": True},
+        ]
+        graph = WorkspaceGraph(str(tmp_path), projects)
+
+        ctx = WorkspaceCheckContext(
+            project_root=Path(tmp_path),
+            workspace_root=Path(tmp_path),
+            config={},
+            projects=projects,
+            graph=graph,
+        )
+
+        captured = {}
+
+        class MockApp:
+            _checks_enabled = True
+
+            def check(self, name):
+                def decorator(fn):
+                    captured[name] = fn
+                    return fn
+                return decorator
+
+        from rlsbl.checks import register_checks
+        register_checks(MockApp())
+
+        result = captured["layers-violations"](ctx)
+        assert result.status == "pass"
+
+    def test_check_fail_non_dev_node_unassigned(self, tmp_path):
+        """A non-dev-node project not assigned to any layer still fails."""
+        from pathlib import Path
+
+        from rlsbl.check_context import WorkspaceCheckContext
+
+        ws_dir = tmp_path / ".rlsbl-monorepo"
+        ws_dir.mkdir()
+        (ws_dir / "workspace.toml").write_text(
+            '[[projects]]\npath = "schema"\nname = "schema"\n\n'
+            '[[projects]]\npath = "app"\nname = "app"\n\n'
+            '[[projects]]\npath = "stray"\nname = "stray"\n\n'
+            "[layers]\n"
+            'order = ["foundation", "app"]\n\n'
+            "[layers.assignments]\n"
+            'foundation = ["schema"]\n'
+            'app = ["app"]\n'
+        )
+        (tmp_path / "schema").mkdir()
+        (tmp_path / "app").mkdir()
+        (tmp_path / "stray").mkdir()
+
+        # stray is NOT a dev_node and NOT assigned -- must fail
+        projects = [
+            {"name": "schema", "path": "schema"},
+            {"name": "app", "path": "app", "depends_on": ["schema"]},
+            {"name": "stray", "path": "stray"},
+        ]
+        graph = WorkspaceGraph(str(tmp_path), projects)
+
+        ctx = WorkspaceCheckContext(
+            project_root=Path(tmp_path),
+            workspace_root=Path(tmp_path),
+            config={},
+            projects=projects,
+            graph=graph,
+        )
+
+        captured = {}
+
+        class MockApp:
+            _checks_enabled = True
+
+            def check(self, name):
+                def decorator(fn):
+                    captured[name] = fn
+                    return fn
+                return decorator
+
+        from rlsbl.checks import register_checks
+        register_checks(MockApp())
+
+        result = captured["layers-violations"](ctx)
+        assert result.status == "fail"
+        assert any("stray" in d for d in (result.details or []))
