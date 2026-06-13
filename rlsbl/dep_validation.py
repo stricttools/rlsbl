@@ -1069,7 +1069,8 @@ def find_dead_workspace_packages(
         projects: list of workspace project dicts (must have "name",
             and optionally "library" and "dev_node" keys).
         import_cache: mapping of project name to (lib_imports, test_imports,
-            guarded_imports) as produced by _build_dep_import_cache in checks.py.
+            guarded_imports) as produced by _build_dep_import_cache in
+            rlsbl/checks/_common.py.
 
     Returns:
         list of DeadWorkspacePackage for packages with no workspace importers.

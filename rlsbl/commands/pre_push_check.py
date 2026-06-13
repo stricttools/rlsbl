@@ -1,7 +1,7 @@
 """Pre-push check helpers used by the strictcli check system.
 
 The ``rlsbl pre-push-check`` command was removed.  These functions are
-kept because ``rlsbl/checks.py`` imports them for the prepush check
+kept because ``rlsbl/checks/prepush.py`` imports them for the prepush check
 implementations.
 """
 

@@ -95,7 +95,7 @@ The npm file-level graph builder (`_build_npm_import_graph()`) implements a subs
 
 ## Caching
 
-Workspace-level import results are cached on the check context object (`ctx._dep_import_cache`) to avoid scanning the same source trees multiple times. Since four separate checks all need the same import data, caching reduces the total number of source tree walks from four per project to one. The `_build_dep_import_cache()` function in `checks.py`:
+Workspace-level import results are cached on the check context object (`ctx._dep_import_cache`) to avoid scanning the same source trees multiple times. Since four separate checks all need the same import data, caching reduces the total number of source tree walks from four per project to one. The `_build_dep_import_cache()` function in `rlsbl/checks/_common.py`:
 
 1. Iterates all workspace projects once
 2. Computes `(lib_imports, test_imports)` per project using `_get_imported_workspace_packages()`

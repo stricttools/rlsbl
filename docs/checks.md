@@ -170,4 +170,4 @@ Checks are declared in `rlsbl/data/checks.toml` with metadata that controls exec
 | `needs_network` | bool | Whether the check requires network access (e.g., GitHub API calls) |
 | `depends_on` | array of strings | Other checks that must pass first (skipped if dependency fails) |
 
-Checks are implemented via the `@app.check()` decorator in `rlsbl/checks.py`, which registers the function with strictcli's check system. The decorator name must match the key in `checks.toml`.
+Checks are implemented via the `@app.check()` decorator in the `rlsbl/checks/` package (one module per tag, e.g. `project.py`, `release.py`, `workspace.py`), which registers the function with strictcli's check system. The decorator name must match the key in `checks.toml`.
