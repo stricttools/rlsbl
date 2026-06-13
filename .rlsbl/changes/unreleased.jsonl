@@ -18,3 +18,4 @@
 {"commits":["8af691a2a4629f8d3825d8e47cac097a9ab9f56c"],"user_facing":true,"description":"**Fix.** `rlsbl deploy --dry-run` now displays `local_steps` before remote steps, mirroring execution order.","type":"fix"}
 {"commits":["c81060c2f364ab6b272d15842f934bea761602aa"],"user_facing":true,"description":"**Docs.** Fixed stale references to the old monolithic `checks.py` after the split into the `checks/` package.","type":"fix"}
 {"commits":["56c85c1a805d510c2282960e498ca346fb0888ec"],"user_facing":false}
+{"commits":["dd7454bbc7d321354c029e0096578ec1b1f68dc9","eaf24706c4d3f290fb3ab9ef9ef71ca3f82c6dad"],"user_facing":false}
