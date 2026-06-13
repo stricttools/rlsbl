@@ -1,3 +1,4 @@
 {"commits":["13c0b21f202c8ff90872f6865a9acb9ecb28bc93","7f85dabd924af4766f7cefe7648ed8c12ad97759","104f3d35c8c00588079fee4dfef961021d799c16"],"user_facing":false}
 {"commits":["917357fbe994c821ed9be481ea5bc19b667afac1"],"user_facing":true,"description":"**Fix.** `release undo` error handlers now log tracebacks instead of silently swallowing exceptions.","type":"fix"}
 {"commits":["0e6816f45e1af1cadcc1a8dbe8a4a40ca29d3933"],"user_facing":true,"description":"**Fix.** Per-version `.md` files are now regenerated from the archived release `.toml` after finalization, ensuring metadata is sourced from the canonical file.","type":"fix"}
+{"commits":["8e8edaaee397d8f3c69f15d3ce0676118b073f06"],"user_facing":false}
