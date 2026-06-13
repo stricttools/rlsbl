@@ -94,11 +94,16 @@ def run_cmd(registry, args, flags, *, ctx):
 
     # Delete GitHub Release
     try:
-        run("gh", ["release", "delete", tag, "--yes"])
-        results.append(("Delete GitHub Release", OK, "-"))
+        run("gh", ["release", "view", tag])
     except Exception:
-        traceback.print_exc()
-        results.append(("Delete GitHub Release", FAILED, f"gh release delete {tag} --yes"))
+        results.append(("Delete GitHub Release", SKIPPED, "no GitHub Release found"))
+    else:
+        try:
+            run("gh", ["release", "delete", tag, "--yes"])
+            results.append(("Delete GitHub Release", OK, "-"))
+        except Exception:
+            traceback.print_exc()
+            results.append(("Delete GitHub Release", FAILED, f"gh release delete {tag} --yes"))
 
     # Delete remote tag (marked as release-authorized: undo is part of the
     # release flow, so the pre-push hook shouldn't warn about a manual push).
