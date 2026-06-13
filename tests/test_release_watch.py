@@ -239,7 +239,8 @@ class TestWatchInvokedAfterRelease:
         # mock_run calls: fetch, rev-list, tag-l (current tag exists),
         # tag-l (new tag), pre-hook status, post-hook status,
         # status --porcelain (baseline), status --porcelain (re-check),
-        # rev-parse HEAD (pre-release sha), tag, push tag,
+        # rev-parse HEAD (pre-release sha), status --porcelain (backfilled
+        # .md detection), tag, push tag,
         # rev-parse HEAD (pushed sha), gh release create
         mock_run.side_effect = [
             "",       # fetch
@@ -252,6 +253,7 @@ class TestWatchInvokedAfterRelease:
             "/tmp/fake-repo",  # git rev-parse --show-toplevel (for vpath)
             "",       # re-check dirty snapshot
             "pre123", # rev-parse HEAD (pre-release)
+            "",       # status --porcelain (backfilled .md detection)
             "",       # git tag
             "",       # git push origin tag
             fake_sha, # rev-parse HEAD (pushed sha)
@@ -332,6 +334,7 @@ class TestWatchInvokedAfterRelease:
             "/tmp/fake-repo",  # git rev-parse --show-toplevel (for vpath)
             "",       # re-check dirty status
             "pre123", # rev-parse HEAD (pre-release)
+            "",       # status --porcelain (backfilled .md detection)
             "",       # git tag
             "",       # git push origin tag
             fake_sha, # rev-parse HEAD (pushed sha)

@@ -150,8 +150,15 @@ def generate_version_file(
 
     if write_to_disk:
         md_path = os.path.join(changes_dir, f"{version}.md")
-        with open(md_path, "w", encoding="utf-8") as f:
-            f.write(md)
+        # Skip the write when content is unchanged, so regeneration doesn't
+        # needlessly dirty already-committed per-version files.
+        existing = None
+        if os.path.exists(md_path):
+            with open(md_path, "r", encoding="utf-8") as f:
+                existing = f.read()
+        if existing != md:
+            with open(md_path, "w", encoding="utf-8") as f:
+                f.write(md)
 
     return md
 

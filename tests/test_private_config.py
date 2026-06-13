@@ -195,6 +195,7 @@ class TestPrivatePublishGuardrail:
             "/tmp/fake-repo",   # git rev-parse --show-toplevel (for vpath)
             "",                 # git status --porcelain (re-check guard)
             "abc123",           # git rev-parse HEAD (pre_release_sha)
+            "",                 # git status --porcelain (backfilled .md detection)
             "",                 # git tag v1.0.1
             "",                 # git push origin v1.0.1
             "def456",           # git rev-parse HEAD (pushed_sha)
@@ -252,6 +253,7 @@ class TestPrivatePublishGuardrail:
             "/tmp/fake-repo",   # git rev-parse --show-toplevel (for vpath)
             "",                 # git status --porcelain (re-check guard)
             "abc123",           # git rev-parse HEAD (pre_release_sha)
+            "",                 # git status --porcelain (backfilled .md detection)
             "",                 # git tag v1.0.1
             "",                 # git push origin v1.0.1
             "def456",           # git rev-parse HEAD (pushed_sha)

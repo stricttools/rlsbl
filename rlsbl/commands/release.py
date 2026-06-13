@@ -1065,6 +1065,8 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
             lock_dir=lock_dir,
             pre_existing_dirty=pre_existing_dirty,
             hook_generated=hook_generated,
+            description=release_config.description,
+            context=release_config.context,
             ctx=ctx,
         )
     finally:
@@ -1252,6 +1254,8 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                           lock_dir=".rlsbl",
                           pre_existing_dirty=None,
                           hook_generated=None,
+                          description="",
+                          context="",
                           ctx):
     """Inner release logic that runs under the advisory lock (mutating phase).
 
@@ -1481,7 +1485,14 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
             changes_dir = get_changes_dir(project_dir)
             tag_glob = target.monorepo_tag_glob(monorepo_name, path=monorepo_project_path) if monorepo_name else None
             finalize_version(changes_dir, new_version, tag_glob=tag_glob)
-            generate_version_file(changes_dir, new_version)
+            # Pass release metadata so the new version's .md matches what a
+            # future backfill from the archived v{version}.toml would produce
+            # (the archived toml is stripped on read, so strip here too).
+            generate_version_file(
+                changes_dir, new_version,
+                description=(description or "").strip(),
+                context=(context or "").strip(),
+            )
             log(f"Finalized JSONL changelog for {new_version}")
             # Commit the finalized JSONL file and the new empty unreleased.jsonl
             jsonl_finalized = _rel_to_git_root(os.path.join(changes_dir, f"{new_version}.jsonl"), _git_root)
@@ -1492,6 +1503,16 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
             finalize_files = [jsonl_finalized, jsonl_unreleased, changelog_file]
             if os.path.exists(jsonl_md):
                 finalize_files.append(jsonl_md)
+            # generate_changelog() (run before the mutating phase) backfills
+            # description/context from archived release files into OLDER
+            # per-version .md files. Include any it actually modified so the
+            # release leaves a clean working tree. Only files git reports as
+            # changed are added (passing unchanged files to safegit may error).
+            md_status = run("git", ["status", "--porcelain", "--", changes_dir])
+            if md_status:
+                for md_path in sorted(parse_porcelain_paths(md_status)):
+                    if md_path.endswith(".md") and md_path not in finalize_files:
+                        finalize_files.append(md_path)
             commit_files(f"chore: finalize changelog for {new_version}", finalize_files, cwd=_git_root)
             log(f"Committed finalized changelog files")
         else:

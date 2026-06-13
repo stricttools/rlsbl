@@ -146,11 +146,12 @@ class TestMultiTargetRelease:
         # 9. git status --porcelain (re-check guard) -> ""
         # 10. git rev-parse HEAD (pre_release_sha capture) -> "pre123"
         # commit_files is mocked separately (no git add/commit calls here)
-        # 11. git tag -> ""
-        # 12. git push origin tag -> ""
-        # 13. git rev-parse HEAD (pushed_sha) -> ""
-        # 14. gh release create -> "abc123"
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", "", "/tmp/fake-repo", "", "pre123", "", "", "", "abc123"]
+        # 11. git status --porcelain (backfilled .md detection) -> ""
+        # 12. git tag -> ""
+        # 13. git push origin tag -> ""
+        # 14. git rev-parse HEAD (pushed_sha) -> ""
+        # 15. gh release create -> "abc123"
+        mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", "", "/tmp/fake-repo", "", "pre123", "", "", "", "", "abc123"]
 
         # Mock the spec target's build to track calls
         from rlsbl.targets import TARGETS
@@ -196,9 +197,10 @@ class TestMultiTargetRelease:
         # Same mock sequence as test_secondary_targets_called_when_detected:
         # 1. git fetch  2. git rev-list  3-4. tag -l x2
         # 5-6. pre/post-hook snapshots  7. baseline  8. rev-parse --show-toplevel
-        # 9. re-check guard  10. pre_release_sha  11. git tag  12. git push origin tag
-        # 13. pushed_sha  14. gh release create
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", "", "/tmp/fake-repo", "", "pre123", "", "", "", "abc123"]
+        # 9. re-check guard  10. pre_release_sha  11. backfilled .md detection
+        # 12. git tag  13. git push origin tag
+        # 14. pushed_sha  15. gh release create
+        mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", "", "/tmp/fake-repo", "", "pre123", "", "", "", "", "abc123"]
 
         from rlsbl.targets import TARGETS
         original_build = TARGETS["spec"].build
