@@ -15,3 +15,4 @@
 {"commits":["dc858f653e21309d24f9a1f7517eea7c9d2a5861"],"user_facing":false}
 {"commits":["0e9f2a8681b3f95703d7c263d38aaf82887fdf6e"],"user_facing":true,"description":"**Fix.** `get_push_timeout` now raises `ConfigError` instead of `ValueError` for invalid `RLSBL_PUSH_TIMEOUT` or `push_timeout` config values.","type":"fix"}
 {"commits":["145e9c105dbe1bc1084be523635d67baedc6a907"],"user_facing":true,"description":"**Fix.** The `layers-violations` check now auto-exempts dev_node projects; they no longer need manual layer assignments.","type":"fix"}
+{"commits":["8af691a2a4629f8d3825d8e47cac097a9ab9f56c"],"user_facing":true,"description":"**Fix.** `rlsbl deploy --dry-run` now displays `local_steps` before remote steps, mirroring execution order.","type":"fix"}
