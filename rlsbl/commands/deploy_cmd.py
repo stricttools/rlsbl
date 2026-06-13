@@ -88,6 +88,7 @@ def _print_dry_run(target_config, branch):
     user = target_config.get("user", "root")
     directory = target_config.get("directory")
     health = target_config.get("health")
+    local_steps = target_config.get("local_steps")
 
     print(f"Deploy target: {name}")
     print(f"  Host:      {user}@{host}")
@@ -95,7 +96,11 @@ def _print_dry_run(target_config, branch):
     print(f"  Only on:   {', '.join(only_on)}")
     if directory:
         print(f"  Directory: {directory}")
-    print(f"  Steps:")
+    if local_steps:
+        print(f"  Local steps:")
+        for i, step in enumerate(local_steps, 1):
+            print(f"    {i}. {step}")
+    print(f"  Remote steps:")
     for i, step in enumerate(steps, 1):
         print(f"    {i}. {step}")
     if health:

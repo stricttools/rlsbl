@@ -165,6 +165,37 @@ class TestDeployDryRun:
         assert "/opt/app" in captured.out
         assert "http" in captured.out
         assert "dry run" in captured.out.lower()
+        # No local_steps configured -> no "Local steps:" header
+        assert "Local steps:" not in captured.out
+
+    def test_deploy_dry_run_local_steps(self, mock_git_repo, monkeypatch, capsys):
+        """--dry-run with local_steps -> local steps listed before remote steps."""
+        target = _minimal_target(
+            local_steps=["npm run build", "rsync -av dist/ remote:/srv/app"],
+        )
+
+        deploy_calls = []
+
+        def mock_deploy_target(target_config, current_branch):
+            deploy_calls.append(target_config["name"])
+            return DeployResult("prod", True, "Deploy completed")
+
+        monkeypatch.setattr("rlsbl.commands.deploy_cmd.deploy_target", mock_deploy_target)
+
+        with pytest.raises(SystemExit) as exc_info:
+            run_cmd(None, [], {"dry-run": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"deploy": [target]}))
+
+        assert exc_info.value.code == 0
+        assert len(deploy_calls) == 0
+
+        captured = capsys.readouterr()
+        assert "Local steps:" in captured.out
+        assert "npm run build" in captured.out
+        assert "rsync -av dist/ remote:/srv/app" in captured.out
+        assert "Remote steps:" in captured.out
+        assert "systemctl restart app" in captured.out
+        # Local steps must appear before remote steps (mirrors execution order)
+        assert captured.out.index("Local steps:") < captured.out.index("Remote steps:")
 
 
 class TestDeployBranchRestriction:
