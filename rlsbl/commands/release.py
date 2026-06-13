@@ -540,8 +540,9 @@ def _sync_lockfiles(target_paths, files_to_commit, log):
                         # exit 0 means the file IS ignored
                         log(f"Lockfile updated but gitignored, skipping: {lockfile}")
                         continue
-                except Exception:
-                    pass  # check-ignore failure -- proceed cautiously
+                except Exception as e:
+                    from ..utils import warn_exception
+                    warn_exception("git check-ignore failed for lockfile", e)
                 if norm_path not in files_to_commit:
                     files_to_commit.append(norm_path)
                     log(f"Lockfile updated: {lockfile}")
@@ -552,7 +553,9 @@ def _update_last_build_release(project_dir, version):
     config_path = os.path.join(project_dir, ".rlsbl", "config.json")
     try:
         config = read_json_config(config_path)
-    except Exception:
+    except Exception as e:
+        from ..utils import warn_exception
+        warn_exception(f"could not read {config_path}, starting fresh", e)
         config = {}
     config["last_build_release"] = version
     tmp_path = config_path + ".tmp"
@@ -1023,7 +1026,9 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
                 projects = load_workspace(monorepo_root)
                 proj_dict = next((p for p in projects if p["name"] == monorepo_name), None)
                 subtree_remote = proj_dict.get("subtree_remote") if proj_dict else None
-            except Exception:
+            except Exception as e:
+                from ..utils import warn_exception
+                warn_exception("could not load workspace for subtree info", e)
                 subtree_remote = None
             if subtree_remote:
                 plain_tag = target.tag_format(new_version)
@@ -1124,9 +1129,9 @@ def _print_stale_dep_advisory(monorepo_name, new_version, monorepo_root=None):
             print("! Stale dependency constraints:", file=sys.stderr)
             for line in stale_lines:
                 print(line, file=sys.stderr)
-    except Exception:
-        # Advisory is non-blocking; swallow errors silently
-        pass
+    except Exception as e:
+        from ..utils import warn_exception
+        warn_exception("stale dependency advisory check failed", e)
 
 
 def upload_release_assets(tag, new_version, log, flags, *, ctx):
@@ -1647,7 +1652,9 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                         proj_dict = p
                         break
                 subtree_remote = proj_dict.get("subtree_remote") if proj_dict else None
-            except Exception:
+            except Exception as e:
+                from ..utils import warn_exception
+                warn_exception("could not load workspace for subtree publishing", e)
                 subtree_remote = None
 
             if subtree_remote:
