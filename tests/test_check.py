@@ -453,25 +453,22 @@ class TestMultiNameCheck:
 class TestStdlibCollision:
     """Tests for _check_stdlib_collision."""
 
-    def test_queue_collides(self):
-        """'queue' is a stdlib module and should be detected."""
-        result = _check_stdlib_collision("queue")
-        assert result == "queue"
-
-    def test_json_collides(self):
-        """'json' is a stdlib module and should be detected."""
-        result = _check_stdlib_collision("json")
-        assert result == "json"
-
-    def test_unique_name_no_collision(self):
-        """A name that is not a stdlib module returns None."""
-        result = _check_stdlib_collision("myuniquepkg")
-        assert result is None
-
-    def test_os_path_no_collision(self):
-        """'os-path' normalizes to 'os-path', not 'os' -- should NOT collide."""
-        result = _check_stdlib_collision("os-path")
-        assert result is None
+    @pytest.mark.parametrize(
+        ("name", "expected"),
+        [
+            # 'queue' is a stdlib module and should be detected
+            ("queue", "queue"),
+            # 'json' is a stdlib module and should be detected
+            ("json", "json"),
+            # A name that is not a stdlib module returns None
+            ("myuniquepkg", None),
+            # 'os-path' normalizes to 'os-path', not 'os' -- should NOT collide
+            ("os-path", None),
+        ],
+    )
+    def test_stdlib_collision(self, name, expected):
+        """Stdlib module names are detected; non-stdlib names return None."""
+        assert _check_stdlib_collision(name) == expected
 
 
 class TestStdlibCollisionIntegration:
@@ -496,25 +493,24 @@ class TestStdlibCollisionIntegration:
 class TestUltranormalize:
     """Tests for _ultranormalize."""
 
-    def test_cli(self):
-        """l->1 and i->1."""
-        assert _ultranormalize("cli") == "c11"
-
-    def test_hello(self):
-        """l->1 twice, o->0."""
-        assert _ultranormalize("hello") == "he110"
-
-    def test_foo_bar_with_dash(self):
-        """Strips dash, o->0 twice."""
-        assert _ultranormalize("foo-bar") == "f00bar"
-
-    def test_no_ambiguous_chars(self):
-        """No ambiguous chars, just lowercased."""
-        assert _ultranormalize("MyPackage") == "mypackage"
-
-    def test_empty_string(self):
-        """Empty string returns empty string."""
-        assert _ultranormalize("") == ""
+    @pytest.mark.parametrize(
+        ("name", "expected"),
+        [
+            # l->1 and i->1
+            ("cli", "c11"),
+            # l->1 twice, o->0
+            ("hello", "he110"),
+            # Strips dash, o->0 twice
+            ("foo-bar", "f00bar"),
+            # No ambiguous chars, just lowercased
+            ("MyPackage", "mypackage"),
+            # Empty string returns empty string
+            ("", ""),
+        ],
+    )
+    def test_ultranormalize(self, name, expected):
+        """Ambiguous characters are normalized; separators stripped; lowercased."""
+        assert _ultranormalize(name) == expected
 
 
 class TestGenerateUltranormVariants:
@@ -558,21 +554,22 @@ class TestGenerateUltranormVariants:
 class TestNpmMonikerNormalize:
     """Tests for _normalize_npm_moniker."""
 
-    def test_strips_dashes(self):
-        """'self-doc' normalizes to 'selfdoc'."""
-        assert _normalize_npm_moniker("self-doc") == "selfdoc"
-
-    def test_already_normalized(self):
-        """'selfdoc' stays 'selfdoc'."""
-        assert _normalize_npm_moniker("selfdoc") == "selfdoc"
-
-    def test_strips_all_separators(self):
-        """Dots, underscores, and dashes are all stripped."""
-        assert _normalize_npm_moniker("my.package_name") == "mypackagename"
-
-    def test_empty_string(self):
-        """Empty string returns empty string."""
-        assert _normalize_npm_moniker("") == ""
+    @pytest.mark.parametrize(
+        ("name", "expected"),
+        [
+            # 'self-doc' normalizes to 'selfdoc'
+            ("self-doc", "selfdoc"),
+            # 'selfdoc' stays 'selfdoc'
+            ("selfdoc", "selfdoc"),
+            # Dots, underscores, and dashes are all stripped
+            ("my.package_name", "mypackagename"),
+            # Empty string returns empty string
+            ("", ""),
+        ],
+    )
+    def test_normalize_npm_moniker(self, name, expected):
+        """Separators (dashes, dots, underscores) are stripped."""
+        assert _normalize_npm_moniker(name) == expected
 
 
 class TestSearchNpmSimilar:
