@@ -3,3 +3,4 @@
 {"commits":["0e6816f45e1af1cadcc1a8dbe8a4a40ca29d3933"],"user_facing":true,"description":"**Fix.** Per-version `.md` files are now regenerated from the archived release `.toml` after finalization, ensuring metadata is sourced from the canonical file.","type":"fix"}
 {"commits":["8e8edaaee397d8f3c69f15d3ce0676118b073f06"],"user_facing":false}
 {"commits":["fe92e1163470f5f0855dfee285649c9781264856"],"user_facing":false}
+{"commits":["7cbe68fd0976cd12de60dc984dc657a8a8f0b394"],"user_facing":false}
