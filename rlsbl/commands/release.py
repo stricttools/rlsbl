@@ -16,6 +16,7 @@ from ..changelog import (
     get_changes_dir,
     validate_unreleased,
 )
+from ..changelog.generate import _read_release_metadata
 from ..errors import ConfigError
 from ..git_util import validate_subtree_remote_ssh_host
 from ..config import read_deploy_config, read_json_config, should_tag
@@ -1550,6 +1551,26 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
             ]
             commit_files(f"chore: finalize release file for {new_version}", release_finalize_files, cwd=_git_root)
             log(f"Finalized release file for {new_version}")
+
+            # Now that v{version}.toml is archived, regenerate the per-version
+            # .md so its content is derived from _read_release_metadata() rather
+            # than the direct params passed earlier. This keeps the .md
+            # consistent with what future generate_changelog() calls produce.
+            if changes_dir_exists(project_dir):
+                changes_dir_regen = get_changes_dir(project_dir)
+                ver_desc, ver_ctx = _read_release_metadata(project_dir, new_version)
+                generate_version_file(
+                    changes_dir_regen, new_version,
+                    description=ver_desc, context=ver_ctx,
+                )
+                md_regen_path = os.path.join(changes_dir_regen, f"{new_version}.md")
+                md_regen_rel = _rel_to_git_root(md_regen_path, _git_root)
+                if has_staged_or_modified([md_regen_rel], cwd=_git_root):
+                    commit_files(
+                        f"chore: regenerate {new_version}.md from archived release metadata",
+                        [md_regen_rel],
+                        cwd=_git_root,
+                    )
 
         # Create local git tag
         run("git", ["tag", tag])
