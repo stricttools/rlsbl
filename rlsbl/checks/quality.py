@@ -31,8 +31,8 @@ def register_quality_checks(app):
         if ws_root:
             try:
                 projects = load_workspace(ws_root)
-            except Exception:
-                return CheckResult("pass", "not in a monorepo workspace")
+            except Exception as e:
+                return CheckResult("error", f"failed to load workspace: {e}")
 
             library_projects = [p for p in projects if p.get("library")]
             if not library_projects:

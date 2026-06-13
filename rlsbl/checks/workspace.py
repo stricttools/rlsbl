@@ -485,7 +485,9 @@ def register_workspace_checks(app):
                     continue
                 try:
                     version = target.read_version(entry.path)
-                except Exception:
+                except Exception as e:
+                    import sys
+                    print(f"Warning: could not read version for {proj['name']} ({entry.name}): {e}", file=sys.stderr)
                     continue
                 if version:
                     project_versions[proj["name"]] = version

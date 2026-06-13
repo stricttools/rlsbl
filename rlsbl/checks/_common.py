@@ -23,7 +23,9 @@ def _resolve_version_and_tag(ctx):
     target = TARGETS[first_name]
     try:
         version = target.read_version(first_path)
-    except Exception:
+    except Exception as e:
+        import sys
+        print(f"Warning: could not read version from {first_name}: {e}", file=sys.stderr)
         version = None
     tag = target.tag_format(version) if version else None
     return version, tag
