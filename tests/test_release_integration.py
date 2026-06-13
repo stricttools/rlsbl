@@ -285,3 +285,56 @@ class TestReleaseVpathRelativePaths:
                 f"Full list: {version_bump_files}\n"
                 "vpath() should produce paths relative to the git root."
             )
+
+
+class TestReleaseGhReleaseCreateFailure:
+    """Verify that gh release create failure is non-fatal for post-push steps."""
+
+    def test_gh_release_create_failure_continues_and_exits_1(self, mock_git_repo, capsys):
+        _setup_releasable_npm_project(mock_git_repo)
+
+        call_log = []
+
+        def failing_gh_run(cmd, args=None, timeout=120, env=None, cwd=None):
+            call_log.append((cmd, args))
+            if cmd == "gh" and args and args[0] == "release" and args[1] == "create":
+                raise subprocess.CalledProcessError(1, "gh release create")
+            if cmd == "gh":
+                return ""
+            if cmd == "git" and args and args[0] == "push":
+                return ""
+            if cmd == "git" and args and args[0] == "fetch":
+                return ""
+            if cmd == "git" and args and args[:2] == ["rev-list", "--count"] and any("origin/" in a for a in args):
+                return "0"
+            return real_run(cmd, args=args, timeout=timeout, env=env, cwd=cwd)
+
+        with pytest.raises(SystemExit) as exc_info:
+            with (
+                patch("rlsbl.commands.release.check_gh_installed", return_value=True),
+                patch("rlsbl.commands.release.check_gh_auth", return_value=True),
+                patch("rlsbl.commands.release.push_if_needed"),
+                patch("rlsbl.commands.release.run", side_effect=failing_gh_run),
+                patch("rlsbl.commands.release.upload_release_assets") as mock_upload,
+            ):
+                run_cmd(
+                    _rc(),
+                    {"yes": True, "quiet": False},
+                    ctx=_make_ctx(mock_git_repo),
+                )
+
+        # Should exit with code 1
+        assert exc_info.value.code == 1
+
+        # Error message should appear in stderr
+        captured = capsys.readouterr()
+        assert "GitHub Release creation failed" in captured.err
+        assert "rlsbl release edit" in captured.err
+        assert "rlsbl release undo" in captured.err
+
+        # Asset upload should NOT have been called (depends on release existing)
+        mock_upload.assert_not_called()
+
+        # Verify the release still completed its other steps (tag was created, etc.)
+        tag_output = _git_output(mock_git_repo, "tag", "-l", "v1.0.1")
+        assert "v1.0.1" in tag_output, "Tag should still exist even though GH Release failed"

@@ -1635,15 +1635,26 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
     # Notes file cleanup is deferred until after subtree publishing (which reuses it)
     notes_file = f".rlsbl-notes-{int(time.time() * 1000)}.tmp"
     writing_file = notes_file + ".writing"
+    release_created = True
     try:
         with open(writing_file, "w", encoding="utf-8") as f:
             f.write(changelog_entry or "")
         os.rename(writing_file, notes_file)
-        run("gh", ["release", "create", tag, "--title", tag, "--notes-file", notes_file])
-        log(f"Created GitHub Release: {tag}")
+        try:
+            run("gh", ["release", "create", tag, "--title", tag, "--notes-file", notes_file])
+            log(f"Created GitHub Release: {tag}")
+        except Exception:
+            release_created = False
+            print(
+                f"Error: GitHub Release creation failed for {tag}. "
+                f"The tag and commit are on the remote.\n"
+                f"  To create the release: rlsbl release edit {new_version}\n"
+                f"  To roll back: rlsbl release undo",
+                file=sys.stderr,
+            )
 
         # Subtree publishing for monorepo projects with subtree_remote configured
-        if monorepo_name and monorepo_project_path:
+        if release_created and monorepo_name and monorepo_project_path:
             try:
                 projects = load_workspace(monorepo_root)
                 proj_dict = None
@@ -1688,7 +1699,8 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
                 os.unlink(tmp)
 
     # Upload release assets for pipelines with assets/custom_assets config
-    upload_release_assets(tag, new_version, log, flags, ctx=ctx)
+    if release_created:
+        upload_release_assets(tag, new_version, log, flags, ctx=ctx)
 
     # Load pipelines for the publish step (validation already ran in run_cmd)
     release_pipelines = load_pipelines(ctx.config)
@@ -1786,3 +1798,6 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
             log(f"Watch CI: rlsbl watch {pushed_sha}")
 
     log(f"\nRelease {new_version} complete!")
+
+    if not release_created:
+        sys.exit(1)
