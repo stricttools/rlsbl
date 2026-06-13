@@ -11,12 +11,12 @@ Verifies:
 
 import json
 import os
-from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
+import rlsbl.lock
 from rlsbl.context import ProjectContext
 from rlsbl.release_file import ReleaseConfig
 
@@ -44,6 +44,7 @@ class TestPrivateConfigRequired:
     @pytest.fixture(autouse=True)
     def _setup(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(rlsbl.lock, "_lock_fd", None)
         self.tmp_dir = str(tmp_path)
         # Minimal npm project
         with open("package.json", "w") as f:
@@ -100,7 +101,7 @@ class TestPrivateConfigRequired:
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_release_proceeds_when_private_true_no_local_pipeline(
         self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch,
-        _commit_files, mock_run, _push,
+        _commit_files, mock_run, _push, capsys,
     ):
         """Release does not abort when private=true and no local pipeline config."""
         _write_config(self.tmp_dir, {"private": True, "pipelines": {}})
@@ -109,9 +110,8 @@ class TestPrivateConfigRequired:
 
         from rlsbl.commands.release import run_cmd
 
-        with patch("sys.stdout", new_callable=StringIO):
-            # Should not raise SystemExit
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": True, "pipelines": {}}))
+        # Should not raise SystemExit
+        run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": True, "pipelines": {}}))
 
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
@@ -124,7 +124,7 @@ class TestPrivateConfigRequired:
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_release_proceeds_when_private_false(
         self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch,
-        _commit_files, mock_run, _push,
+        _commit_files, mock_run, _push, capsys,
     ):
         """Release does not abort when private=false (normal public repo)."""
         _write_config(self.tmp_dir, {"private": False, "pipelines": {}})
@@ -133,9 +133,8 @@ class TestPrivateConfigRequired:
 
         from rlsbl.commands.release import run_cmd
 
-        with patch("sys.stdout", new_callable=StringIO):
-            # Should not raise SystemExit
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
+        # Should not raise SystemExit
+        run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
 
 
 class TestPrivatePublishGuardrail:
@@ -144,6 +143,7 @@ class TestPrivatePublishGuardrail:
     @pytest.fixture(autouse=True)
     def _setup(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(rlsbl.lock, "_lock_fd", None)
         self.tmp_dir = str(tmp_path)
         # Minimal npm project
         with open("package.json", "w") as f:
@@ -176,6 +176,7 @@ class TestPrivatePublishGuardrail:
         self, _changes_dir, _extract, _finalize, _gen_ver_file,
         _validate, _gen_cl, _deploy, _tag, _gh_inst, _gh_auth,
         _clean, _branch, _commit_files, mock_run, _push, _lock, _unlock,
+        capsys,
     ):
         """When private=true, pipeline.publish() is not called."""
         _write_config(self.tmp_dir, {"private": True, "pipelines": {"npm": {"type": "npm", "local": False}}})
@@ -202,11 +203,10 @@ class TestPrivatePublishGuardrail:
             "",                 # gh release create ...
         ]
 
-        with patch("sys.stdout", new_callable=StringIO):
-            with patch("rlsbl.pipelines.npm.NpmPipeline.publish") as mock_publish:
-                run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": True, "pipelines": {"npm": {"type": "npm", "local": False}}}))
-                # publish() must NOT be called for private repos
-                mock_publish.assert_not_called()
+        with patch("rlsbl.pipelines.npm.NpmPipeline.publish") as mock_publish:
+            run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": True, "pipelines": {"npm": {"type": "npm", "local": False}}}))
+            # publish() must NOT be called for private repos
+            mock_publish.assert_not_called()
 
     @patch("rlsbl.commands.release.release_lock")
     @patch("rlsbl.commands.release.acquire_lock")
@@ -231,6 +231,7 @@ class TestPrivatePublishGuardrail:
         _changes_dir, _extract, _finalize, _gen_ver_file,
         _validate, _gen_cl, _deploy, _tag, _gh_inst, _gh_auth,
         _clean, _branch, _commit_files, mock_run, _push, _lock, _unlock,
+        capsys,
     ):
         """When private=true with assets: true, asset upload still runs."""
         _write_config(self.tmp_dir, {
@@ -260,8 +261,7 @@ class TestPrivatePublishGuardrail:
             "",                 # gh release create ...
         ]
 
-        with patch("sys.stdout", new_callable=StringIO):
-            run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": True, "pipelines": {"npm": {"type": "npm", "local": False, "assets": True, "max_asset_size_mb": 50}}}))
+        run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": True, "pipelines": {"npm": {"type": "npm", "local": False, "assets": True, "max_asset_size_mb": 50}}}))
 
         # upload_release_assets must be called even for private repos
         mock_upload_assets.assert_called_once()
