@@ -477,11 +477,11 @@ class TestBatchFinalization:
 class TestBatchReleaseDevNode:
 
     def test_dev_node_project_included_in_batch(self, mock_git_repo, capsys):
-        """Dev node projects are released (version bumped) in batch mode.
+        """Dev node projects in batch TOML trigger a hard error.
 
-        The batch release flow does not skip dev node projects -- they get
-        version bumps like any other project. The dev node flag only applies to
-        changelog enforcement (no JSONL coverage required).
+        Dev nodes must be released individually via `rlsbl release run` in
+        their project directory. If a dev_node appears in the batch TOML,
+        it was manually added -- that's an error.
         """
         _make_npm_project(mock_git_repo, "internal", version="0.1.0")
         _make_npm_project(mock_git_repo, "public", version="0.1.0")
@@ -506,13 +506,47 @@ class TestBatchReleaseDevNode:
             'exclude = []\n',
         )
 
+        with pytest.raises(SystemExit) as exc_info:
+            _cmd_batch_release(
+                {"dry-run": False, "yes": True, "quiet": False},
+                project_root=mock_git_repo,
+            )
+
+        assert exc_info.value.code == 1
+        captured = capsys.readouterr()
+        assert "internal" in captured.err
+        assert "dev_node projects cannot be in batch release" in captured.err
+
+    def test_batch_without_dev_nodes_succeeds(self, mock_git_repo, capsys):
+        """Batch release with only non-dev-node projects succeeds."""
+        _make_npm_project(mock_git_repo, "alpha", version="0.1.0")
+        _make_npm_project(mock_git_repo, "beta", version="0.1.0")
+
+        projects = [
+            {"path": "alpha", "name": "alpha"},
+            {"path": "beta", "name": "beta"},
+        ]
+        _init_workspace(mock_git_repo, projects)
+
+        batch_path = get_batch_release_file_path(str(mock_git_repo))
+        _write_toml(
+            batch_path,
+            '[packages.alpha]\n'
+            'bump = "patch"\ndescription = "test release"\n'
+            'include = ["npm"]\n'
+            'exclude = []\n'
+            '\n'
+            '[packages.beta]\n'
+            'bump = "minor"\ndescription = "test release"\n'
+            'include = ["npm"]\n'
+            'exclude = []\n',
+        )
+
         released = []
-        configs = {}
 
         def mock_run_cmd(release_config, flags, **kwargs):
             name = os.path.basename(str(kwargs["ctx"].project_root))
             released.append(name)
-            configs[name] = release_config
 
         with patch("rlsbl.commands.monorepo.batch_release._finalize_batch_file"):
             with patch("rlsbl.commands.release.run_cmd", mock_run_cmd):
@@ -521,11 +555,6 @@ class TestBatchReleaseDevNode:
                     project_root=mock_git_repo,
                 )
 
-        # Both projects are released (exempt is NOT skipped)
-        assert "internal" in released
-        assert "public" in released
+        assert "alpha" in released
+        assert "beta" in released
         assert len(released) == 2
-
-        # The exempt project gets its configured bump type
-        assert configs["internal"].bump == "patch"
-        assert configs["public"].bump == "minor"

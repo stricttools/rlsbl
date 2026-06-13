@@ -63,6 +63,22 @@ def _cmd_batch_release(flags, project_root):
         )
         sys.exit(1)
 
+    # Reject dev_node projects -- they must be released individually
+    dev_nodes_in_batch = sorted(
+        name
+        for name in batch_config.packages
+        if project_by_name[name].get("dev_node", False)
+    )
+    if dev_nodes_in_batch:
+        print(
+            "Error: dev_node projects cannot be in batch release: "
+            f"{', '.join(dev_nodes_in_batch)}. "
+            "Use `rlsbl release run` in each project directory for "
+            "individual dev_node releases.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     # Determine topological order for the listed packages
     graph = WorkspaceGraph(workspace_root, projects)
     try:
