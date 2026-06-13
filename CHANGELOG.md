@@ -2,6 +2,15 @@
 
 # Changelog
 
+## 0.71.1
+
+Release undo traceback logging, per-version .md canonical regeneration, test isolation fixes, and CI JUnit XML reporting.
+
+### Fixes
+
+- **Fix.** `release undo` error handlers now log tracebacks instead of silently swallowing exceptions.
+- **Fix.** Per-version `.md` files are now regenerated from the archived release `.toml` after finalization, ensuring metadata is sourced from the canonical file.
+
 ## 0.71.0
 
 Scaffold-conflict check consolidation, scope-aware deps-unused, release finalization fixes, and dev_node layer exemption.
