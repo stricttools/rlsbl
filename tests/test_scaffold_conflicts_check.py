@@ -4,6 +4,10 @@ markers in scaffold-managed files must hard-error.
 The scaffold three-way merge (git merge-file) intentionally leaves conflict
 markers for manual resolution; this check verifies they were actually
 resolved before a push or release ships corrupted files.
+
+The check scans the managed-files.json registry, .github/workflows/, and
+everything under .rlsbl/ recursively, and reports each conflicted file
+with the line number of its first '<<<<<<< ' marker.
 """
 
 import json
@@ -54,12 +58,13 @@ class TestScaffoldConflictsCheck:
 
     def test_managed_file_with_both_markers_fails(self, tmp_project):
         """A managed file containing both conflict markers fails the check,
-        and the failing file is named in the details."""
+        and the failing file is named in the details with the line number
+        of the first '<<<<<<< ' marker."""
         _write_managed_files_json(tmp_project, [".goreleaser.yml"])
         (tmp_project / ".goreleaser.yml").write_text(CONFLICTED_CONTENT)
         result = _run_check(tmp_project)
         assert result.status == "fail"
-        assert any(".goreleaser.yml" in d for d in result.details)
+        assert ".goreleaser.yml:2" in result.details
 
     def test_separator_only_line_passes(self, tmp_project):
         """A bare '=======' line without <<<<<<< / >>>>>>> is not a conflict."""
@@ -133,18 +138,80 @@ class TestScaffoldConflictsCheck:
         assert any("pre-release.sh" in d for d in result.details)
 
 
+class TestRlsblDirRecursiveScan:
+    """The check scans ALL of .rlsbl/ recursively, not just hooks and the
+    registry. Migrated from the removed scaffold-conflict-markers check
+    (tests/test_new_checks.py), adapted to scaffold-conflicts."""
+
+    def test_clean_files_pass(self, tmp_project):
+        """Files without conflict markers pass."""
+        rlsbl_dir = tmp_project / ".rlsbl"
+        rlsbl_dir.mkdir()
+        (rlsbl_dir / "config.json").write_text('{"private": false}\n')
+        wf_dir = tmp_project / ".github" / "workflows"
+        wf_dir.mkdir(parents=True)
+        (wf_dir / "ci.yml").write_text("name: CI\non: push\n")
+        result = _run_check(tmp_project)
+        assert result.status == "pass"
+
+    def test_conflict_in_nested_rlsbl_dir_fails(self, tmp_project):
+        """A conflicted file anywhere under .rlsbl/ is caught, even in a
+        nested directory not covered by the registry or hooks scan."""
+        bases_dir = tmp_project / ".rlsbl" / "bases" / ".github" / "workflows"
+        bases_dir.mkdir(parents=True)
+        (bases_dir / "publish.yml").write_text(CONFLICTED_CONTENT)
+        result = _run_check(tmp_project)
+        assert result.status == "fail"
+        assert ".rlsbl/bases/.github/workflows/publish.yml:2" in result.details
+
+    def test_conflict_in_workflow_fails_with_line_number(self, tmp_project):
+        """Conflict markers in .github/workflows/ are detected and the
+        detail line carries the first '<<<<<<< ' line number."""
+        wf_dir = tmp_project / ".github" / "workflows"
+        wf_dir.mkdir(parents=True)
+        (wf_dir / "ci.yml").write_text(
+            "name: CI\n"
+            "<<<<<<< HEAD\n"
+            "on: push\n"
+            "=======\n"
+            "on: pull_request\n"
+            ">>>>>>> other\n"
+        )
+        result = _run_check(tmp_project)
+        assert result.status == "fail"
+        assert ".github/workflows/ci.yml:2" in result.details
+
+    def test_no_scaffold_files_passes(self, tmp_project):
+        """Project with no .rlsbl or workflow files passes."""
+        result = _run_check(tmp_project)
+        assert result.status == "pass"
+
+    def test_markdown_setext_underline_in_rlsbl_passes(self, tmp_project):
+        """A bare '=======' setext heading underline in a markdown file
+        under .rlsbl/ does NOT fire. The removed scaffold-conflict-markers
+        check false-positived on this; requiring paired markers fixes it."""
+        changes_dir = tmp_project / ".rlsbl" / "changes"
+        changes_dir.mkdir(parents=True)
+        (changes_dir / "0.1.0.md").write_text(SEPARATOR_ONLY_CONTENT)
+        result = _run_check(tmp_project)
+        assert result.status == "pass"
+
+
 class TestFindConflictedScaffoldFiles:
     """Tests for the shared helper used by both the check and release run."""
 
-    def test_returns_relative_paths_sorted(self, tmp_project):
+    def test_returns_path_line_tuples_sorted(self, tmp_project):
+        """Returns (relpath, first_conflict_line) tuples sorted by path.
+        The line number is the first '<<<<<<< ' marker (line 2 in
+        CONFLICTED_CONTENT)."""
         wf_dir = tmp_project / ".github" / "workflows"
         wf_dir.mkdir(parents=True)
         (wf_dir / "publish.yml").write_text(CONFLICTED_CONTENT)
         (wf_dir / "ci.yml").write_text(CONFLICTED_CONTENT)
         result = find_conflicted_scaffold_files(tmp_project)
         assert result == [
-            ".github/workflows/ci.yml",
-            ".github/workflows/publish.yml",
+            (".github/workflows/ci.yml", 2),
+            (".github/workflows/publish.yml", 2),
         ]
 
     def test_file_listed_twice_reported_once(self, tmp_project):
@@ -156,7 +223,7 @@ class TestFindConflictedScaffoldFiles:
         wf_dir.mkdir(parents=True)
         (wf_dir / "publish.yml").write_text(CONFLICTED_CONTENT)
         result = find_conflicted_scaffold_files(tmp_project)
-        assert result == [".github/workflows/publish.yml"]
+        assert result == [(".github/workflows/publish.yml", 2)]
 
     def test_clean_project_returns_empty(self, tmp_project):
         assert find_conflicted_scaffold_files(tmp_project) == []
@@ -174,7 +241,7 @@ class TestReleaseAbortsOnScaffoldConflicts:
         assert excinfo.value.code == 1
         captured = capsys.readouterr()
         assert "conflict" in captured.err
-        assert ".github/workflows/publish.yml" in captured.err
+        assert ".github/workflows/publish.yml:2" in captured.err
 
     def test_no_op_when_clean(self, tmp_project, capsys):
         wf_dir = tmp_project / ".github" / "workflows"

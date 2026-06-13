@@ -1,8 +1,11 @@
-"""Tests for Phase 12 checks: private-publish-workflow, scaffold-conflict-markers,
-npm-private-mismatch, target-version-readable, selfdoc-version-drift."""
+"""Tests for Phase 12 checks: private-publish-workflow, npm-private-mismatch,
+target-version-readable, selfdoc-version-drift.
+
+The scaffold-conflict-markers tests that used to live here moved to
+tests/test_scaffold_conflicts_check.py when the check was consolidated
+into scaffold-conflicts."""
 
 import json
-import os
 
 from conftest import make_ctx
 
@@ -82,67 +85,6 @@ class TestPrivatePublishWorkflow:
         result = app._check_defs["private-publish-workflow"].impl(ctx)
         assert result.status == "pass"
         assert "no publish workflows" in result.message
-
-
-# ------------------------------------------------------------------
-# scaffold-conflict-markers
-# ------------------------------------------------------------------
-
-
-class TestScaffoldConflictMarkers:
-    """Tests for the scaffold-conflict-markers check."""
-
-    def test_clean_files_pass(self, tmp_project):
-        """Files without conflict markers pass."""
-        rlsbl_dir = tmp_project / ".rlsbl"
-        rlsbl_dir.mkdir()
-        (rlsbl_dir / "config.json").write_text('{"private": false}\n')
-        wf_dir = tmp_project / ".github" / "workflows"
-        wf_dir.mkdir(parents=True)
-        (wf_dir / "ci.yml").write_text("name: CI\non: push\n")
-        ctx = make_ctx(tmp_project)
-        result = app._check_defs["scaffold-conflict-markers"].impl(ctx)
-        assert result.status == "pass"
-
-    def test_conflict_in_rlsbl_dir_fails(self, tmp_project):
-        """Conflict markers in .rlsbl/ files are detected."""
-        hooks_dir = tmp_project / ".rlsbl" / "hooks"
-        hooks_dir.mkdir(parents=True)
-        (hooks_dir / "pre-release.sh").write_text(
-            '#!/bin/bash\n'
-            '<<<<<<< HEAD\n'
-            'echo "old"\n'
-            '=======\n'
-            'echo "new"\n'
-            '>>>>>>> feature\n'
-        )
-        ctx = make_ctx(tmp_project)
-        result = app._check_defs["scaffold-conflict-markers"].impl(ctx)
-        assert result.status == "fail"
-        assert "conflict marker" in result.message
-
-    def test_conflict_in_workflow_fails(self, tmp_project):
-        """Conflict markers in .github/workflows/ are detected."""
-        wf_dir = tmp_project / ".github" / "workflows"
-        wf_dir.mkdir(parents=True)
-        (wf_dir / "ci.yml").write_text(
-            "name: CI\n"
-            "<<<<<<< HEAD\n"
-            "on: push\n"
-            "=======\n"
-            "on: pull_request\n"
-            ">>>>>>> other\n"
-        )
-        ctx = make_ctx(tmp_project)
-        result = app._check_defs["scaffold-conflict-markers"].impl(ctx)
-        assert result.status == "fail"
-        assert any("ci.yml" in d for d in result.details)
-
-    def test_no_scaffold_files_passes(self, tmp_project):
-        """Project with no .rlsbl or workflow files passes."""
-        ctx = make_ctx(tmp_project)
-        result = app._check_defs["scaffold-conflict-markers"].impl(ctx)
-        assert result.status == "pass"
 
 
 # ------------------------------------------------------------------
