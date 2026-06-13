@@ -3,3 +3,4 @@
 {"commits":["58e082bf0bbe09e37877e2e4587165434997a68a"],"user_facing":false}
 {"commits":["ae9a80fc6d09cdae37047754f11df2e4773e6e20"],"user_facing":true,"description":"**Fix CheckResult status.** Use 'fail' instead of 'error' to comply with strictcli constraints.","type":"fix"}
 {"commits":["503cd4a8f897a4f2b73cacd718b8c58363886af1"],"user_facing":false}
+{"commits":["0bbcc6fa2003cff7cfdaa6907201fca4fa2bfdbf"],"user_facing":true,"description":"**Graceful release failure handling.** `rlsbl release run` now handles `gh release create` failures gracefully instead of crashing.","type":"fix"}
