@@ -423,8 +423,8 @@ def _abort_on_scaffold_conflicts(project_dir):
             "Error: unresolved merge conflict markers in scaffold-managed file(s):",
             file=sys.stderr,
         )
-        for path in conflicted:
-            print(f"  {path}", file=sys.stderr)
+        for path, line in conflicted:
+            print(f"  {path}:{line}", file=sys.stderr)
         print(
             "Resolve the conflicts and commit before releasing.",
             file=sys.stderr,
