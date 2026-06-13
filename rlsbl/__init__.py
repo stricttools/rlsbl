@@ -5,31 +5,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-import keyword as _keyword
-
 import strictcli
 
 from .context import create_context
 from .errors import ReleaseFileError
-
-
-# Strictcli derives a Python parameter name from each flag name by stripping
-# leading dashes and replacing internal dashes with underscores. That breaks
-# for flags whose derived name collides with a Python reserved word
-# (e.g. `--global` -> `global`, which cannot be used as a function parameter).
-# Patch `_flag_param_name` to append a trailing underscore in that case, the
-# conventional PEP 8 workaround. Handlers can then declare `global_` etc.
-_orig_flag_param_name = strictcli._flag_param_name
-
-
-def _flag_param_name_with_kw_safety(flag_name):
-    name = _orig_flag_param_name(flag_name)
-    if _keyword.iskeyword(name):
-        return name + "_"
-    return name
-
-
-strictcli._flag_param_name = _flag_param_name_with_kw_safety
 
 
 def _detect_version():
