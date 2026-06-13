@@ -895,6 +895,43 @@ class TestFindDeadModules:
         dead = find_dead_modules(str(tmp_path))
         assert "mylib/sub/detail.py" not in dead
 
+    def test_scripts_dir_not_flagged_as_dead(self, tmp_path):
+        """Files in scripts/ are standalone executables, not dead modules."""
+        (tmp_path / "pyproject.toml").write_text('[project]\nname = "mylib"\n')
+        pkg = tmp_path / "mylib"
+        pkg.mkdir()
+        (pkg / "__init__.py").write_text("from .core import x\n")
+        (pkg / "core.py").write_text("x = 1\n")
+        scripts = tmp_path / "scripts"
+        scripts.mkdir()
+        (scripts / "migrate.py").write_text("import mylib.core\n")
+
+        dead = find_dead_modules(str(tmp_path))
+        # scripts/migrate.py is a standalone executable, not a module
+        assert "scripts/migrate.py" not in dead
+
+    def test_module_only_imported_by_script_still_dead(self, tmp_path):
+        """A module imported only by a script is still flagged as dead.
+
+        Scripts are scanned as import sources (their imports are collected)
+        but the modules they import must also be imported by non-script code
+        to be considered alive. Scripts are not part of the importable module
+        graph.
+        """
+        (tmp_path / "pyproject.toml").write_text('[project]\nname = "mylib"\n')
+        pkg = tmp_path / "mylib"
+        pkg.mkdir()
+        (pkg / "__init__.py").write_text("")
+        (pkg / "core.py").write_text("x = 1\n")
+        (pkg / "orphan.py").write_text("y = 2\n")
+        scripts = tmp_path / "scripts"
+        scripts.mkdir()
+        # The script imports orphan, but that should NOT save it
+        (scripts / "run.py").write_text("import mylib.orphan\n")
+
+        dead = find_dead_modules(str(tmp_path))
+        assert "mylib/orphan.py" in dead
+
 
 class TestFindDeadGoPackages:
     """find_dead_go_packages detects unreferenced Go internal packages."""
@@ -1213,6 +1250,26 @@ class TestFindDeadNpmModules:
         assert "lib/core.js" not in dead
         assert "bin/cli.js" not in dead
         assert "bin/helpers.js" not in dead
+
+    def test_js_inside_python_package_not_flagged(self, tmp_path):
+        """JS files inside a Python package (with __init__.py) are not npm modules."""
+        self._pkg_json(tmp_path, {
+            "name": "test", "version": "1.0.0",
+            "main": "./src/index.js",
+        })
+        src = tmp_path / "src"
+        src.mkdir()
+        (src / "index.js").write_text("module.exports = {};\n")
+        # JS files inside a Python package dir (data resources, not npm modules)
+        pydir = tmp_path / "mylib" / "js"
+        pydir.mkdir(parents=True)
+        (pydir / "__init__.py").write_text("")
+        (pydir / "template.js").write_text("function render() {}\n")
+
+        dead = find_dead_npm_modules(str(tmp_path))
+        # template.js should NOT be flagged -- it's a Python data resource
+        rel_paths = [d for d in dead]
+        assert "mylib/js/template.js" not in rel_paths
 
 
 class TestWalkSourceFilesExcludeDirs:

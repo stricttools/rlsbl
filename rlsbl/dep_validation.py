@@ -24,6 +24,10 @@ from .lint.go_ast import scan_imports as _go_scan_imports
 from .lint.utils import walk_source_files
 from .workspace import WORKSPACE_DIR
 
+# Root-level directories containing standalone executables (not importable modules).
+# Files here are excluded from the dead-module candidate set.
+_ROOT_NON_MODULE_DIRS = frozenset({"scripts"})
+
 
 def load_dep_overrides(root: str) -> dict[tuple[str, str], str]:
     """Load dep-overrides.toml from the monorepo config directory.
@@ -442,10 +446,16 @@ def find_dead_modules(
     if not production_files:
         return []
 
-    # Build module name -> filepath mapping
+    # Build module name -> filepath mapping.
+    # Skip files in _ROOT_NON_MODULE_DIRS (e.g. scripts/) -- they are
+    # standalone executables, not importable modules.
     module_to_file: dict[str, str] = {}
     init_files: list[str] = []
     for filepath in production_files:
+        rel = os.path.relpath(filepath, project_dir)
+        first_component = rel.split(os.sep)[0]
+        if first_component in _ROOT_NON_MODULE_DIRS:
+            continue
         if os.path.basename(filepath) == "__init__.py":
             init_files.append(filepath)
             continue
@@ -456,9 +466,14 @@ def find_dead_modules(
     if not module_to_file:
         return []
 
-    # Collect all imports across all production files
+    # Collect all imports across production files (excluding scripts).
+    # Scripts are standalone executables whose imports should not save
+    # modules from being flagged as dead.
     all_imports: set[str] = set()
     for filepath in production_files:
+        rel = os.path.relpath(filepath, project_dir)
+        if rel.split(os.sep)[0] in _ROOT_NON_MODULE_DIRS:
+            continue
         all_imports.update(_collect_python_imports(filepath, project_dir))
 
     # Collect all __init__.py exports (names referenced via relative import
@@ -769,6 +784,17 @@ def _build_npm_import_graph(
     return graph
 
 
+def _is_inside_python_package(filepath: str) -> bool:
+    """Check if a file is inside a directory containing __init__.py.
+
+    Walks up from the file's directory looking for __init__.py, which
+    indicates the directory is a Python package. JS/TS files in such
+    directories are data resources consumed by Python, not npm modules.
+    """
+    dirpath = os.path.dirname(os.path.abspath(filepath))
+    return os.path.isfile(os.path.join(dirpath, "__init__.py"))
+
+
 def find_dead_npm_modules(
     project_dir: str,
     exclude_dirs: list[str] | None = None,
@@ -798,12 +824,15 @@ def find_dead_npm_modules(
 
     import_graph = _build_npm_import_graph(project_dir, exclude_dirs=exclude_dirs)
 
-    # Collect all production source files
+    # Collect all production source files, excluding JS/TS files that
+    # live inside Python packages (directories containing __init__.py).
+    # Those are data resources consumed by Python, not npm modules.
     all_files = walk_source_files(project_dir, _NPM_SOURCE_EXTENSIONS, [], exclude_dirs=exclude_dirs)
     production_files = {
         os.path.abspath(f)
         for f in all_files
         if not _is_non_production_path(f, project_dir)
+        and not _is_inside_python_package(f)
     }
 
     if not production_files:
