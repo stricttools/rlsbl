@@ -1,5 +1,5 @@
 {
-  "version": "0.71.1",
+  "version": "0.72.0",
   "version_source": "pyproject.toml",
   "base_url": "https://rlsbl.smmh.dev",
   "source": [
@@ -12,7 +12,7 @@
   "output": "docs/_build/",
   "versions": [
     {
-      "version": "0.71.1",
+      "version": "0.72.0",
       "indexed": true
     }
   ],
