@@ -13,14 +13,8 @@ from rlsbl.checks._common import _resolve_version_and_tag
 class TestQualityCheckLibraryLint:
     """load_workspace failure should not silently pass."""
 
-    def test_workspace_load_failure_does_not_pass(self, tmp_project):
-        """When load_workspace raises, check does not silently pass.
-
-        The implementation tries to return CheckResult("error", ...) but
-        strictcli's CheckResult only accepts "pass", "fail", "warn", "skip",
-        so a ValueError is raised. This confirms the check does NOT
-        silently succeed -- the error propagates.
-        """
+    def test_workspace_load_failure_returns_fail(self, tmp_project):
+        """When load_workspace raises, check returns fail, not pass."""
         cfg_dir = tmp_project / ".rlsbl"
         cfg_dir.mkdir(exist_ok=True)
         (cfg_dir / "config.json").write_text(json.dumps({}))
@@ -29,18 +23,10 @@ class TestQualityCheckLibraryLint:
 
         with patch("rlsbl.workspace.find_workspace_root", return_value=str(tmp_project)), \
              patch("rlsbl.workspace.load_workspace", side_effect=RuntimeError("corrupt workspace")):
-            # CheckResult("error", ...) raises ValueError because "error"
-            # is not a valid status. The important thing: it does NOT
-            # silently return a "pass".
-            try:
-                result = app._check_defs["library-lint"].impl(ctx)
-                # If we get here, the check completed -- verify it didn't pass
-                assert result.status != "pass", (
-                    "load_workspace failure must not produce a passing result"
-                )
-            except ValueError as exc:
-                # Expected: CheckResult rejects "error" as a status
-                assert "error" in str(exc).lower()
+            result = app._check_defs["library-lint"].impl(ctx)
+
+        assert result.status == "fail"
+        assert "corrupt workspace" in result.message
 
 
 class TestVersionConsistencyCorruptedTarget:
@@ -62,7 +48,7 @@ class TestVersionConsistencyCorruptedTarget:
 
         # The check should complete without crashing. With one target whose
         # version is None, it should warn about no versions being reported.
-        assert result.status in ("warn", "pass", "fail", "error")
+        assert result.status in ("warn", "pass", "fail", "skip")
 
     def test_unreadable_version_sets_none(self, tmp_project, capsys):
         """When read_version raises, the target's version entry is None
@@ -102,7 +88,7 @@ class TestNameConsistencyCorruptedTarget:
             result = app._check_defs["name-consistency"].impl(ctx)
 
         # Should not crash; with all names being None it should warn.
-        assert result.status in ("warn", "pass", "fail", "error")
+        assert result.status in ("warn", "pass", "fail", "skip")
 
     def test_unreadable_name_prints_warning(self, tmp_project, capsys):
         """When read_name raises, a warning is printed to stderr."""

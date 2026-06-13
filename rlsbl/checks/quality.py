@@ -32,7 +32,7 @@ def register_quality_checks(app):
             try:
                 projects = load_workspace(ws_root)
             except Exception as e:
-                return CheckResult("error", f"failed to load workspace: {e}")
+                return CheckResult("fail", f"failed to load workspace: {e}")
 
             library_projects = [p for p in projects if p.get("library")]
             if not library_projects:
