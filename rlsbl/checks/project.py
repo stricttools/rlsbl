@@ -1,4 +1,4 @@
-"""Project checks (tag: project).
+"""Project checks (tag: project) validating version, name, license, and description consistency, config schema, and scaffold conflicts.
 
 Checks: lock, version-consistency, name-consistency, license-consistency,
 description-consistency, private-hook-stale, config-schema, license-file,

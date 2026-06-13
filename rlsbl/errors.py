@@ -1,4 +1,4 @@
-"""Custom exception hierarchy for rlsbl."""
+"""Custom exception hierarchy for rlsbl, providing typed error classes for config, workspace, changelog, version, and release file failures."""
 
 
 class RlsblError(Exception):

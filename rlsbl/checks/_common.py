@@ -1,4 +1,4 @@
-"""Shared helpers for check modules."""
+"""Shared helpers for rlsbl check modules: version and tag resolution, changelog context loading, and sibling project directory exclusion."""
 
 import os
 

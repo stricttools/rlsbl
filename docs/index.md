@@ -1,5 +1,5 @@
 ---
-description: "Documentation index for rlsbl, a release orchestration CLI handling version bumps, JSONL changelogs, CI scaffolding, and GitHub Releases across 18 ecosystems."
+description: "Documentation index for rlsbl, a release orchestration CLI handling version bumps, JSONL changelogs, CI scaffolding, and GitHub Releases for 18 ecosystems."
 ---
 
 # rlsbl

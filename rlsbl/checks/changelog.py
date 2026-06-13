@@ -1,4 +1,4 @@
-"""Changelog checks (tag: changelog).
+"""Changelog checks (tag: changelog) validating JSONL entry schema, commit hash resolution, coverage, orphans, and batch size limits.
 
 Checks: changelog-entry, changelog-hashes, changelog-range,
 changelog-coverage, changelog-orphans, changelog-schema,

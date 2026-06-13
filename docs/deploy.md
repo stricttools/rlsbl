@@ -148,7 +148,7 @@ The `only_on` field restricts which git branches can deploy to each target, prev
 
 ## Example config with local steps
 
-Cross-compile a Go binary locally, transfer it to the remote host via rsync, then restart the service remotely:
+This configuration cross-compiles a Go binary on the local machine, transfers the build artifact to the remote host via rsync, and then restarts the service remotely over SSH. The `local_steps` run on your machine before any remote connection is made, so the remote host never needs a build toolchain installed — it only receives the finished binary:
 
 ```json
 {

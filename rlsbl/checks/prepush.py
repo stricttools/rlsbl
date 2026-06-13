@@ -1,4 +1,4 @@
-"""Pre-push checks (tag: prepush).
+"""Pre-push checks (tag: prepush) enforcing changelog coverage for pushed commits, gitignore guards, and manual release push warnings.
 
 Checks: prepush-changelog-coverage, prepush-gitignore-guard,
 prepush-manual-warning.

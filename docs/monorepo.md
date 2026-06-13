@@ -1,5 +1,5 @@
 ---
-description: "Complete guide to rlsbl monorepo workspaces — workspace.toml format, project types, dependency graphs, batch releases, impact analysis, snapshots, mirrors, and workspace checks."
+description: "Guide to rlsbl monorepo workspaces — workspace.toml format, dependency graphs, batch releases, impact analysis, snapshots, mirrors, and checks."
 ---
 
 # Monorepo guide

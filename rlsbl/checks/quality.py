@@ -1,4 +1,4 @@
-"""Quality checks (tag: quality).
+"""Quality checks (tag: quality) covering library lint, dead module detection, circular dependencies, unreplaced scaffold variables, and the test suite.
 
 Checks: library-lint, dead-modules, circular-deps,
 scaffold-unreplaced-vars, test-suite.

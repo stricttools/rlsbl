@@ -1,4 +1,4 @@
-"""Release checks (tag: release).
+"""Release checks (tag: release) verifying that local and remote git tags exist, the GitHub Release was created, and the branch is in sync.
 
 Checks: local-tag, remote-tag, github-release, branch-sync.
 """

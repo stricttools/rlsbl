@@ -173,7 +173,7 @@ Dev nodes are projects at the edge of the dependency graph — test infrastructu
 
 ## Scrubbing sensitive content
 
-When sensitive content is discovered in git history (credentials, confidential project names, etc.), `rlsbl release scrub` wraps safegit's history rewriting with automatic release metadata cleanup.
+When sensitive content is discovered in git history (credentials, confidential project names, etc.), `rlsbl release scrub` wraps safegit's history rewriting with automatic release metadata cleanup. Rewriting history changes every commit SHA from the rewrite point forward, which would normally break the JSONL changelog's hash references, the validation cache, and existing GitHub Releases — so the command repairs all of that release metadata in one pass.
 
 Usage:
 ```
