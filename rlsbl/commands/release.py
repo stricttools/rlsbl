@@ -764,9 +764,10 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
     else:
         try:
             behind_count = int(run("git", ["rev-list", "--count", f"HEAD..origin/{branch}"]))
-        except Exception:
-            # Remote branch may not exist yet — not an error
-            behind_count = 0
+        except Exception as e:
+            print(f"Error: could not check if local branch is behind origin: {e}", file=sys.stderr)
+            print("Cannot verify remote-ahead status. Aborting for safety.", file=sys.stderr)
+            sys.exit(1)
         if behind_count > 0:
             print(
                 f"Error: local branch is {behind_count} commit(s) behind origin/{branch}. Pull before releasing.",

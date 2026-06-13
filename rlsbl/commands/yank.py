@@ -83,9 +83,10 @@ def run_cmd(args, flags, project_root):
                 file=sys.stderr,
             )
             sys.exit(1)
-    except Exception:
-        # If we cannot determine the latest release, proceed anyway
-        pass
+    except Exception as e:
+        print(f"Error: could not determine latest release: {e}", file=sys.stderr)
+        print("Cannot verify whether this is the latest release. Aborting for safety.", file=sys.stderr)
+        sys.exit(1)
 
     # Confirmation prompt (skipped with --yes or --dry-run)
     if not dry_run and not flags.get("yes"):
