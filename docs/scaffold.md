@@ -151,18 +151,18 @@ Each sub-project gets its own `.rlsbl/` directory with config, hooks, and change
 
 ## Related checks
 
-Two quality checks detect scaffold problems that would otherwise surface only at CI time or cause silent misbehavior. Both run as part of `rlsbl check --all` and `rlsbl check --tag quality`, so they are evaluated automatically during the release pipeline and can also be invoked independently for quick verification after a scaffold run.
+Two checks detect scaffold problems that would otherwise surface only at CI time or cause silent misbehavior. Both run as part of `rlsbl check --all`, so they are evaluated automatically during the release pipeline and can also be invoked independently for quick verification after a scaffold run.
 
 | Check | Severity | What it detects |
 | --- | --- | --- |
 | `scaffold-unreplaced-vars` | error | Leftover `{{...}}` placeholders in workflow files that were not resolved during scaffold |
-| `scaffold-conflict-markers` | error | Unresolved `<<<<<<<` / `=======` / `>>>>>>>` conflict markers from a three-way merge |
+| `scaffold-conflicts` | error | Unresolved `<<<<<<< ` / `>>>>>>> ` conflict marker pairs from a three-way merge, in the managed-files registry, `.github/workflows/`, or anywhere under `.rlsbl/` |
 
 Run them with:
 
 ```bash
 rlsbl check --name scaffold-unreplaced-vars
-rlsbl check --name scaffold-conflict-markers
+rlsbl check --name scaffold-conflicts
 ```
 
-Both are included in `rlsbl check --all` and `rlsbl check --tag quality`.
+`scaffold-unreplaced-vars` runs under `rlsbl check --tag quality`. `scaffold-conflicts` runs under the `project`, `prepush`, and `release` tags, and also runs as a pre-mutation guard at the start of `rlsbl release run`.

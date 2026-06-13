@@ -38,14 +38,14 @@ Severity is declared per-check in metadata. A check with `severity = "error"` re
 
 | Tag | Purpose | Check count |
 | --- | --- | --- |
-| `project` | Project-level metadata, config schema, version consistency | 12 |
-| `release` | Git tag and GitHub Release validation | 4 |
+| `project` | Project-level metadata, config schema, version consistency | 13 |
+| `release` | Git tag and GitHub Release validation | 5 |
 | `changelog` | JSONL changelog validation and structure | 9 |
-| `workspace` | Monorepo workspace integrity and dependency rules | 9 |
-| `quality` | Code quality, dependency analysis, scaffold hygiene | 8 |
-| `prepush` | Pre-push enforcement: changelog coverage, gitignore guard, manual-push warning, tests | 5 |
+| `workspace` | Monorepo workspace integrity and dependency rules | 10 |
+| `quality` | Code quality, dependency analysis, scaffold hygiene | 7 |
+| `prepush` | Pre-push enforcement: changelog coverage, gitignore guard, manual-push warning, tests | 6 |
 
-Note: `test-suite` is tagged both `prepush` and `quality`, so it appears in both tag counts. Four checks (`layers-violations`, `deps-unused`, `deps-undeclared`, `deps-stale`) have no tag and only run with `--all` or `--name`.
+Note: `test-suite` is tagged both `prepush` and `quality`, and `scaffold-conflicts` is tagged `project`, `prepush`, and `release`, so they appear in multiple tag counts. Four checks (`layers-violations`, `deps-unused`, `deps-undeclared`, `deps-stale`) have no tag and only run with `--all` or `--name`.
 
 ## Project checks
 
@@ -63,6 +63,7 @@ Note: `test-suite` is tagged both `prepush` and `quality`, so it appears in both
 | `npm-private-mismatch` | error | `package.json` private field matches `.rlsbl/config.json` private flag (npm targets only) |
 | `target-version-readable` | error | Version can be read from all declared target files |
 | `selfdoc-version-drift` | error | selfdoc-generated version references match the actual project version |
+| `scaffold-conflicts` | error | Unresolved git merge conflict markers in scaffold files (managed-files registry, `.github/workflows/`, all of `.rlsbl/`); also tagged `prepush` and `release` |
 
 ## Release checks
 
@@ -114,7 +115,6 @@ Dependencies: `changelog-range` and `changelog-coverage` depend on `changelog-ha
 | `deps-runtime-test-only` | warn | Runtime dependencies that are only imported in test files |
 | `deps-dev-in-lib` | error | Dev dependencies used in library source (should be runtime deps) |
 | `scaffold-unreplaced-vars` | error | Leftover `{{...}}` template placeholders in workflow files |
-| `scaffold-conflict-markers` | error | Unresolved merge conflict markers in scaffolded files |
 
 ## Prepush checks
 

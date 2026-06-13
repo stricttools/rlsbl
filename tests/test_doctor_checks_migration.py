@@ -61,7 +61,6 @@ EXPECTED_CHECKS = [
     "deps-dev-in-lib",
     "dead-modules",
     "scaffold-unreplaced-vars",
-    "scaffold-conflict-markers",
     "dead-workspace-packages",
     "subtree-remote-reachable",
     "workspace-unbuildable",

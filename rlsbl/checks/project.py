@@ -15,19 +15,20 @@ from ..errors import ConfigError
 
 
 def find_conflicted_scaffold_files(project_root):
-    """Return relative paths of scaffold-managed files with unresolved
-    git merge conflict markers.
+    """Return ``(relpath, first_conflict_line)`` tuples for scaffold files
+    with unresolved git merge conflict markers, sorted by path.
 
     Scans three file sets (skipping files that don't exist):
     - every file listed in ``.rlsbl/managed-files.json`` (the
       scaffold-managed registry; missing or malformed registry is skipped)
     - all files under ``.github/workflows/``
-    - all files under ``.rlsbl/hooks/``
+    - all files under ``.rlsbl/`` (recursively)
 
     A file is conflicted when it contains a line starting with
     ``'<<<<<<< '`` AND a line starting with ``'>>>>>>> '``. Requiring
     both avoids false positives on bare ``'======='`` lines (e.g.
-    setext heading underlines).
+    setext heading underlines). ``first_conflict_line`` is the 1-based
+    line number of the first ``'<<<<<<< '`` marker in the file.
 
     Shared by the ``scaffold-conflicts`` check and the pre-mutation
     guard in ``rlsbl release run``.
@@ -45,33 +46,37 @@ def find_conflicted_scaffold_files(project_root):
         except (OSError, json.JSONDecodeError):
             pass  # malformed registry -- skip, don't crash the check
 
-    for scan_dir in (
-        os.path.join(root_str, ".github", "workflows"),
-        os.path.join(root_str, ".rlsbl", "hooks"),
-    ):
-        if os.path.isdir(scan_dir):
-            for entry in os.listdir(scan_dir):
-                candidates.add(os.path.join(scan_dir, entry))
+    workflows_dir = os.path.join(root_str, ".github", "workflows")
+    if os.path.isdir(workflows_dir):
+        for entry in os.listdir(workflows_dir):
+            candidates.add(os.path.join(workflows_dir, entry))
+
+    rlsbl_dir = os.path.join(root_str, ".rlsbl")
+    for dirpath, _dirnames, filenames in os.walk(rlsbl_dir):
+        for filename in filenames:
+            candidates.add(os.path.join(dirpath, filename))
 
     conflicted = []
     for filepath in candidates:
         if not os.path.isfile(filepath):
             continue
-        has_start = False
+        first_start_line = None
         has_end = False
         try:
             with open(filepath, "r", encoding="utf-8") as f:
-                for line in f:
-                    if line.startswith("<<<<<<< "):
-                        has_start = True
+                for lineno, line in enumerate(f, 1):
+                    if first_start_line is None and line.startswith("<<<<<<< "):
+                        first_start_line = lineno
                     elif line.startswith(">>>>>>> "):
                         has_end = True
-                    if has_start and has_end:
+                    if first_start_line is not None and has_end:
                         break
         except (OSError, UnicodeDecodeError):
             continue
-        if has_start and has_end:
-            conflicted.append(os.path.relpath(filepath, root_str))
+        if first_start_line is not None and has_end:
+            conflicted.append(
+                (os.path.relpath(filepath, root_str), first_start_line)
+            )
 
     return sorted(conflicted)
 
@@ -450,8 +455,8 @@ def register_project_checks(app):
         if conflicted:
             return CheckResult(
                 "fail",
-                f"{len(conflicted)} scaffold-managed file(s) with unresolved "
+                f"{len(conflicted)} scaffold file(s) with unresolved "
                 "merge conflict markers",
-                details=conflicted,
+                details=[f"{path}:{line}" for path, line in conflicted],
             )
         return CheckResult("pass", "no unresolved merge conflict markers")

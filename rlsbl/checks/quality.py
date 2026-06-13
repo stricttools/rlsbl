@@ -1,7 +1,7 @@
 """Quality checks (tag: quality).
 
 Checks: library-lint, dead-modules, circular-deps,
-scaffold-unreplaced-vars, scaffold-conflict-markers, test-suite.
+scaffold-unreplaced-vars, test-suite.
 """
 
 import os
@@ -249,45 +249,6 @@ def register_quality_checks(app):
                 details=errors,
             )
         return CheckResult("pass", "no unreplaced template variables")
-
-    @app.check("scaffold-conflict-markers")
-    def check_scaffold_conflict_markers(ctx):
-        """Scaffold and workflow files must not contain git merge conflict markers."""
-        import glob
-
-        root_str = str(ctx.project_root)
-
-        scan_patterns = [
-            os.path.join(root_str, ".rlsbl", "**", "*"),
-            os.path.join(root_str, ".github", "workflows", "*.yml"),
-        ]
-
-        conflict_markers = ("<<<<<<< ", "=======", ">>>>>>> ")
-        errors = []
-
-        for pattern in scan_patterns:
-            for filepath in glob.glob(pattern, recursive=True):
-                if not os.path.isfile(filepath):
-                    continue
-                rel_path = os.path.relpath(filepath, root_str)
-                try:
-                    with open(filepath, "r", encoding="utf-8") as f:
-                        for lineno, line in enumerate(f, 1):
-                            for marker in conflict_markers:
-                                if line.startswith(marker):
-                                    errors.append(
-                                        f"{rel_path}:{lineno}: conflict marker '{marker.strip()}'"
-                                    )
-                except (OSError, UnicodeDecodeError):
-                    continue
-
-        if errors:
-            return CheckResult(
-                "fail",
-                f"{len(errors)} conflict marker(s) found",
-                details=errors,
-            )
-        return CheckResult("pass", "no conflict markers")
 
     @app.check("test-suite")
     def check_test_suite(ctx):
