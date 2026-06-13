@@ -10,3 +10,4 @@
 {"commits":["e8129dbec9bfab6d250e2daacc7e1ec3e849ed3f"],"user_facing":true,"description":"**Fix.** Releases no longer leave a dirty working tree: backfilled older per-version changelog `.md` files are now included in the finalization commit, and the new version's `.md` now contains the release description and context.","type":"fix"}
 {"commits":["bb7f93d9c3329327283e8cc921e726900b8fb3de"],"user_facing":false}
 {"commits":["2698acc8ea07e760ac512c1309aec5225ddd9174"],"user_facing":false}
+{"commits":["9bf9a5f6807f0291c7c1b51880be8eed327d82dc"],"user_facing":false}
