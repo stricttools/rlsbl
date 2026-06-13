@@ -18,6 +18,13 @@ def run(cmd, args=None, timeout=120, env=None, cwd=None):
     return result.stdout.strip()
 
 
+def warn_exception(context: str, exc: Exception) -> None:
+    """Print a warning with optional traceback for non-fatal errors."""
+    import traceback
+    print(f"Warning: {context}: {exc}", file=sys.stderr)
+    traceback.print_exc()
+
+
 def require_tool(name, purpose=None, fatal=True):
     """Check that a CLI tool is available on PATH.
 
