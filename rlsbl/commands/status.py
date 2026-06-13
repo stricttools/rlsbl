@@ -50,19 +50,22 @@ def _collect_status(registry, target_path=".", *, tag_glob=None, ctx, project=No
     # Git branch
     try:
         branch = get_current_branch()
-    except Exception:
+    except Exception as e:
+        print(f"Warning: could not determine branch: {e}", file=sys.stderr)
         branch = None
 
     # Last tag
     try:
         tag = run("git", ["describe", "--tags", "--abbrev=0"])
-    except Exception:
+    except Exception as e:
+        print(f"Warning: could not determine last tag: {e}", file=sys.stderr)
         tag = None
 
     # Clean tree
     try:
         clean = is_clean_tree()
-    except Exception:
+    except Exception as e:
+        print(f"Warning: could not check working tree status: {e}", file=sys.stderr)
         clean = None
 
     # Changelog (generated from JSONL)
@@ -143,8 +146,8 @@ def _collect_status(registry, target_path=".", *, tag_glob=None, ctx, project=No
                     jsonl_coverage = f"{covered}/{total} commits covered"
             else:
                 jsonl_coverage = f"{len(entries)} entries"
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Warning: could not compute JSONL coverage: {e}", file=sys.stderr)
 
     # CI workflows
     ci = os.path.exists(os.path.join(root_str, ".github", "workflows", "ci.yml"))
@@ -193,8 +196,8 @@ def run_cmd(registry, args, flags, ctx):
             ws_projects = load_workspace(ws_root)
             monorepo_count = len(ws_projects)
             monorepo_project = resolve_project(ws_root, root_str)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Warning: could not detect monorepo context: {e}", file=sys.stderr)
 
     if monorepo_project:
         target = TARGETS[registry]
