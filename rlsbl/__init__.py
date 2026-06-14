@@ -209,7 +209,7 @@ release_group = app.group("release", help="Release orchestration commands. Provi
         ]),
     ],
 )
-@strictcli.flag(name="allow-dirty", type=bool, help="Allow releasing with a dirty working tree")
+@strictcli.flag(name="allow-dirty", type=bool, help="Skip the clean working tree check and allow releasing with uncommitted changes")
 def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, no_watch, **_kwargs):
     root = _require_sub_project_root()
 
@@ -314,7 +314,7 @@ def cmd_release_retry(dry_run, yes, quiet, watch, no_watch, **_kwargs):
 
 @app.command(name="status", help="Display the current project version, branch, last release tag, unreleased commit count, and changelog coverage. Outputs plain text by default or structured JSON with the --json flag.")
 @strictcli.flag(name="target", type=str, help="Target a specific registry (auto-detected if omitted)", default="")
-@strictcli.flag(name="json", type=bool, help="Output status as JSON")
+@strictcli.flag(name="json", type=bool, help="Output version, branch, tag, and coverage as machine-readable JSON")
 def cmd_status(target, json, **_kwargs):
     root = _require_sub_project_root()
     from .workspace import find_workspace_root
@@ -332,11 +332,11 @@ def cmd_status(target, json, **_kwargs):
 
 @app.command(name="scaffold", help="Generate or update CI/CD workflows, git hooks, changelog, and license files. Safe to run repeatedly -- merges template changes with your customizations. Use --force to overwrite all files.")
 @strictcli.flag(name="target", type=str, help="Target a specific registry (auto-detected if omitted)", default="")
-@strictcli.flag(name="force", type=bool, help="Overwrite all files (ignore user customizations)")
-@strictcli.flag(name="private", type=bool, help="Scaffold for private repos (skip publish)")
-@strictcli.flag(name="no-commit", type=bool, help="Skip auto-commit of scaffolded files")
-@strictcli.flag(name="skip-shared", type=bool, help="Skip shared template processing")
-@strictcli.flag(name="no-tag", type=bool, help="Disable ecosystem tagging for this invocation")
+@strictcli.flag(name="force", type=bool, help="Overwrite all scaffold-managed files, discarding any user customizations")
+@strictcli.flag(name="private", type=bool, help="Generate workflows without publish steps, suitable for private repositories")
+@strictcli.flag(name="no-commit", type=bool, help="Write scaffolded files to disk without auto-committing them")
+@strictcli.flag(name="skip-shared", type=bool, help="Skip processing of shared workflow templates across targets")
+@strictcli.flag(name="no-tag", type=bool, help="Do not add or update the rlsbl GitHub topic tag on this invocation")
 def cmd_scaffold(target, force, private, no_commit, skip_shared, no_tag, dry_run, **_kwargs):
     # Scaffold is special: if a project root exists, resolve it for use as
     # scaffold_root; if not, stay in cwd (for new projects).
@@ -418,8 +418,8 @@ def cmd_scaffold(target, force, private, no_commit, skip_shared, no_tag, dry_run
 # ---------------------------------------------------------------------------
 
 @app.command(name="check-name", help="Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.")
-@strictcli.flag(name="target", type=str, help="Target registry (npm, pypi, or go)", repeatable=True, unique=True)
-@strictcli.flag(name="delay", type=str, help="Delay between checks in ms", default="200")
+@strictcli.flag(name="target", type=str, help="Registry to query for name availability (npm, pypi, or go); repeatable", repeatable=True, unique=True)
+@strictcli.flag(name="delay", type=str, help="Milliseconds to wait between consecutive registry API queries (default: 200)", default="200")
 def cmd_check_name(target, delay, **_kwargs):
     # --target is required for check-name; with repeatable=True, target is a list
     targets = target if target else []
@@ -453,7 +453,7 @@ def cmd_check_name(target, delay, **_kwargs):
 # ---------------------------------------------------------------------------
 
 @release_group.command(name="edit", help="Sync the GitHub Release notes for a given version with the corresponding CHANGELOG.md entry. Defaults to the current version if none is specified. Use --dry-run to preview changes without updating GitHub.")
-@strictcli.arg(name="version", help="Version to update (defaults to current)", required=False)
+@strictcli.arg(name="version", help="Version whose GitHub Release notes to sync (defaults to current version)", required=False)
 def cmd_release_edit(dry_run, version=None, **_kwargs):
     root = _require_sub_project_root()
     args = [version] if version else []
@@ -467,7 +467,7 @@ def cmd_release_edit(dry_run, version=None, **_kwargs):
 # ---------------------------------------------------------------------------
 
 @release_group.command(name="undo", help="Revert the most recent release by deleting the GitHub Release, removing the git tag from local and remote, and reverting the version bump commit. Requires a manual git push afterward to finalize.")
-@strictcli.flag(name="target", type=str, help="Target a specific registry", default="")
+@strictcli.flag(name="target", type=str, help="Target a specific registry for version detection (auto-detected if omitted)", default="")
 def cmd_release_undo(target, yes, **_kwargs):
     root = _require_project_root()
     from .workspace import find_workspace_root
@@ -483,10 +483,10 @@ def cmd_release_undo(target, yes, **_kwargs):
 # ---------------------------------------------------------------------------
 
 @release_group.command(name="yank", help="Mark a past release as deprecated (soft yank) or delete it (hard yank). Soft yank marks the GitHub Release as pre-release and prepends a deprecation notice. Hard yank deletes the release entirely while preserving the git tag.")
-@strictcli.flag(name="reason", type=str, help="Why the version is being yanked", default="")
-@strictcli.flag(name="use", type=str, help="Replacement version to recommend", default="")
+@strictcli.flag(name="reason", type=str, help="Human-readable explanation of why this version is being yanked", default="")
+@strictcli.flag(name="use", type=str, help="Suggest this version as a replacement in the deprecation notice", default="")
 @strictcli.flag(name="hard", type=bool, help="Delete the release instead of marking as pre-release")
-@strictcli.arg(name="version", help="Version to yank (e.g. 0.9.1 or v0.9.1)")
+@strictcli.arg(name="version", help="Semver string of the release to yank, with or without v prefix (e.g. 0.9.1)")
 def cmd_release_yank(reason, use, hard, dry_run, yes, version, **_kwargs):
     root = _require_sub_project_root()
     args = [version]
@@ -510,16 +510,16 @@ def cmd_release_yank(reason, use, hard, dry_run, yes, version, **_kwargs):
     help="Scrub sensitive content from git history and update release metadata to match the rewritten commits. Wraps safegit scrub (match or file mode), remaps commit hashes in all JSONL changelog files, regenerates CHANGELOG.md, force-pushes the rewritten history, and recreates GitHub Releases on the new tags. A scrub-result.json file records the SHA mapping for recovery if any post-rewrite step fails.",
     mutex=[
         strictcli.MutexGroup(flags=[
-            strictcli.Flag(name="pattern", type=str, help="Regex pattern to match (for scrub match)"),
-            strictcli.Flag(name="file", type=str, help="File path to scrub (for scrub file)"),
+            strictcli.Flag(name="pattern", type=str, help="Regex pattern to match against file contents (mutually exclusive with --file)"),
+            strictcli.Flag(name="file", type=str, help="Path to the file to remove from git history (mutually exclusive with --pattern)"),
         ]),
         strictcli.MutexGroup(flags=[
-            strictcli.Flag(name="replace", type=str, help="Replacement text for matched content"),
+            strictcli.Flag(name="replace", type=str, help="Literal text to substitute for each match (mutually exclusive with --mangle)"),
             strictcli.Flag(name="mangle", type=bool, negatable=False, help="Replace matched content with random ASCII of same length"),
         ]),
         strictcli.MutexGroup(flags=[
-            strictcli.Flag(name="from-commit", type=str, help="Start rewriting from this commit (inclusive)"),
-            strictcli.Flag(name="entire-history", type=bool, negatable=False, help="Rewrite entire repository history"),
+            strictcli.Flag(name="from-commit", type=str, help="SHA of the earliest commit to rewrite (all descendants are also rewritten)"),
+            strictcli.Flag(name="entire-history", type=bool, negatable=False, help="Rewrite every commit in the repository from the initial commit onward"),
         ]),
     ],
 )
@@ -549,7 +549,7 @@ def cmd_release_scrub(pattern, file, replace, mangle, from_commit, entire_histor
 # ---------------------------------------------------------------------------
 
 @app.command(name="discover", help="Search GitHub for repositories tagged with the rlsbl topic and list them. Use --mine to filter results to only your own repositories. Requires the gh CLI to be authenticated.")
-@strictcli.flag(name="mine", type=bool, help="Show only your own repositories")
+@strictcli.flag(name="mine", type=bool, help="Filter results to only show repositories owned by the authenticated GitHub user")
 def cmd_discover(mine, **_kwargs):
     flags = {"mine": mine}
     from .commands.discover import run_cmd
@@ -561,9 +561,9 @@ def cmd_discover(mine, **_kwargs):
 # ---------------------------------------------------------------------------
 
 @app.command(name="watch", help="Poll GitHub Actions CI workflow runs for a specific commit SHA and report pass or fail status. Defaults to HEAD if no SHA is provided. Useful after rlsbl release to monitor the publish pipeline.")
-@strictcli.flag(name="target", type=str, help="Target a specific registry", default="")
-@strictcli.flag(name="run-id", type=str, help="CI workflow run ID to watch", repeatable=True, unique=True)
-@strictcli.arg(name="sha", help="Commit SHA to watch (defaults to HEAD)", required=False)
+@strictcli.flag(name="target", type=str, help="Registry whose CI workflow to watch (auto-detected if omitted)", default="")
+@strictcli.flag(name="run-id", type=str, help="GitHub Actions workflow run ID to poll directly instead of searching by SHA", repeatable=True, unique=True)
+@strictcli.arg(name="sha", help="Git commit SHA whose CI workflows to monitor (defaults to HEAD if omitted)", required=False)
 def cmd_watch(target, run_id, sha=None, **_kwargs):
     if sha and run_id:
         print("Error: cannot use both SHA and --run-id", file=sys.stderr)
@@ -602,7 +602,7 @@ def cmd_prs(**_kwargs):
 # ---------------------------------------------------------------------------
 
 @app.command(name="unreleased", help="List commits between the latest release tag and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain text or JSON to help prepare the next release.")
-@strictcli.flag(name="json", type=bool, help="Output as JSON")
+@strictcli.flag(name="json", type=bool, help="Output the unreleased commit list and coverage status as machine-readable JSON")
 def cmd_unreleased(json, **_kwargs):
     root = _require_sub_project_root()
     flags = {"json": json}
@@ -626,10 +626,10 @@ def cmd_targets(**_kwargs):
 # ---------------------------------------------------------------------------
 
 @app.command(name="record-gif", help="Record an animated GIF demo of rlsbl commands using the vhs terminal recorder. Configurable width, height, font size, and duration for consistent, reproducible demo recordings.")
-@strictcli.flag(name="width", type=str, help="GIF width in pixels", default="1200")
-@strictcli.flag(name="height", type=str, help="GIF height in pixels", default="600")
-@strictcli.flag(name="font-size", type=str, help="Font size in pixels", default="24")
-@strictcli.flag(name="duration", type=str, help="Duration in seconds", default="10")
+@strictcli.flag(name="width", type=str, help="Width of the recorded GIF in pixels (default: 1200)", default="1200")
+@strictcli.flag(name="height", type=str, help="Height of the recorded GIF in pixels (default: 600)", default="600")
+@strictcli.flag(name="font-size", type=str, help="Terminal font size in pixels for the recording (default: 24)", default="24")
+@strictcli.flag(name="duration", type=str, help="Total recording duration in seconds before auto-stop (default: 10)", default="10")
 def cmd_record_gif(width, height, font_size, duration, **_kwargs):
     root = _require_sub_project_root()
     ctx = create_context(root)
@@ -643,7 +643,7 @@ def cmd_record_gif(width, height, font_size, duration, **_kwargs):
 # ---------------------------------------------------------------------------
 
 @app.command(name="migrate", help="Run pending configuration migrations to update .rlsbl config files to the latest schema. Use --dry-run to preview changes without applying, or --status to see which migrations are pending.")
-@strictcli.flag(name="status", type=bool, help="Show migration status")
+@strictcli.flag(name="status", type=bool, help="Display which migrations are pending and which have already been applied")
 def cmd_migrate(dry_run, status, **_kwargs):
     flags = {"dry-run": dry_run, "status": status}
     from .commands.migrate import run_cmd
@@ -656,9 +656,9 @@ def cmd_migrate(dry_run, status, **_kwargs):
 # ---------------------------------------------------------------------------
 
 @app.command(name="deploy", help="Run the configured deployment pipeline for the project. Supports named deploy targets, dry-run preview of what would be deployed, and a --force flag to override branch restrictions.")
-@strictcli.flag(name="target", type=str, help="Target a specific registry", default="")
-@strictcli.flag(name="force", type=bool, help="Override branch restrictions")
-@strictcli.arg(name="target_name", help="Deploy target name", required=False)
+@strictcli.flag(name="target", type=str, help="Registry whose deploy pipeline to run (auto-detected if omitted)", default="")
+@strictcli.flag(name="force", type=bool, help="Bypass branch restrictions that normally limit which branches can deploy")
+@strictcli.arg(name="target_name", help="Named deploy target from the project's deploy configuration to execute", required=False)
 def cmd_deploy(target, dry_run, force, target_name=None, **_kwargs):
     root = _require_sub_project_root()
     ctx = create_context(root)
@@ -673,7 +673,7 @@ def cmd_deploy(target, dry_run, force, target_name=None, **_kwargs):
 # ---------------------------------------------------------------------------
 
 @app.command(name="commit", help="Commit one or more files with an Autogenerated trailer, marking the commit as machine-generated so it is automatically exempted from changelog coverage checks.")
-@strictcli.flag(name="message", short="m", type=str, help="Commit message")
+@strictcli.flag(name="message", short="m", type=str, help="Commit message for the autogenerated-file commit (added with Autogenerated trailer)")
 def cmd_commit(message, **_kwargs):
     # Files come from _variadic_args (extracted before strictcli parsing)
     files = _variadic_args
@@ -692,11 +692,11 @@ chlog = app.group("changelog", help="Structured changelog management using JSONL
 
 
 @chlog.command(name="add", help="Append a structured changelog entry to the project's unreleased.jsonl file. Each entry includes a human-readable description, an entry type (feature, fix, or breaking), and optional commit hashes linking it to specific changes. The file is auto-committed unless --no-commit is passed. Use --no-user-facing to mark internal changes that should not appear in the published changelog.")
-@strictcli.flag(name="commits", type=str, help="Comma-separated commit hashes", default="")
-@strictcli.flag(name="description", type=str, help="Entry description", default="")
-@strictcli.flag(name="type", type=str, help="Entry type (feature, fix, breaking)", default="")
-@strictcli.flag(name="no-user-facing", type=bool, help="Mark as non-user-facing")
-@strictcli.flag(name="no-commit", type=bool, help="Skip auto-commit of unreleased.jsonl")
+@strictcli.flag(name="commits", type=str, help="Comma-separated list of commit hashes to associate with this changelog entry", default="")
+@strictcli.flag(name="description", type=str, help="Human-readable description of the change, shown in the generated CHANGELOG.md", default="")
+@strictcli.flag(name="type", type=str, help="Classification of the change: feature, fix, or breaking (required if user-facing)", default="")
+@strictcli.flag(name="no-user-facing", type=bool, help="Mark this entry as internal (excluded from generated CHANGELOG.md output)")
+@strictcli.flag(name="no-commit", type=bool, help="Append to unreleased.jsonl without auto-committing the change")
 @strictcli.flag(name="allow-batch", type=bool, help="Auto-create an exclusion if this entry exceeds the commit batch limit")
 def cmd_chlog_add(commits, description, type, no_user_facing, no_commit, allow_batch, **_kwargs):
     root = _require_sub_project_root()
@@ -714,7 +714,7 @@ def cmd_chlog_add(commits, description, type, no_user_facing, no_commit, allow_b
 
 
 @chlog.command(name="generate", help="Compile all validated JSONL changelog entries into a formatted CHANGELOG.md file. Groups entries by type (features, fixes, breaking changes) under the appropriate version heading, preserving existing changelog content for previous releases. Use --dry-run to preview the generated Markdown output without writing to disk, which is useful for reviewing before committing.")
-@strictcli.flag(name="no-commit", type=bool, help="Skip auto-commit of generated files")
+@strictcli.flag(name="no-commit", type=bool, help="Write generated CHANGELOG.md and per-version .md files without auto-committing")
 def cmd_chlog_generate(dry_run, no_commit, **_kwargs):
     root = _require_sub_project_root()
     flags = {"dry-run": dry_run, "no-commit": no_commit}
@@ -723,12 +723,12 @@ def cmd_chlog_generate(dry_run, no_commit, **_kwargs):
 
 
 @chlog.command(name="amend", help="Append a changelog entry to a released version's JSONL file. Temporarily unlocks the read-only file, appends the entry, re-locks it, regenerates CHANGELOG.md, and syncs GitHub Release notes. Use --no-resolve to skip hash validation for old or amended commits.")
-@strictcli.flag(name="version", type=str, help="Released version to amend (e.g., 0.39.0)")
-@strictcli.flag(name="commits", type=str, help="Comma-separated commit hashes")
-@strictcli.flag(name="description", type=str, help="Entry description", default="")
-@strictcli.flag(name="type", type=str, help="Entry type (feature, fix, breaking)", default="")
-@strictcli.flag(name="no-user-facing", type=bool, help="Mark as non-user-facing")
-@strictcli.flag(name="no-resolve", type=bool, help="Skip hash validation")
+@strictcli.flag(name="version", type=str, help="Semver of the already-released version whose JSONL to amend (e.g. 0.39.0)")
+@strictcli.flag(name="commits", type=str, help="Comma-separated commit hashes to associate with the amended changelog entry")
+@strictcli.flag(name="description", type=str, help="Human-readable description for the amended entry in CHANGELOG.md", default="")
+@strictcli.flag(name="type", type=str, help="Classification for the amended entry: feature, fix, or breaking (required if user-facing)", default="")
+@strictcli.flag(name="no-user-facing", type=bool, help="Mark the amended entry as internal (excluded from CHANGELOG.md output)")
+@strictcli.flag(name="no-resolve", type=bool, help="Skip git rev-parse hash validation for old or rewritten commits")
 def cmd_chlog_amend(version, commits, description, type, no_user_facing, no_resolve, **_kwargs):
     root = _require_sub_project_root()
     flags = {
@@ -746,10 +746,10 @@ def cmd_chlog_amend(version, commits, description, type, no_user_facing, no_reso
 @chlog.command(name="edit", help="Modify an existing changelog entry in unreleased or released JSONL files. Finds the entry by commit hash, applies field changes (type, description, user-facing status), and rewrites the file atomically. For released files, temporarily unlocks the read-only file, regenerates CHANGELOG.md, and syncs GitHub Release notes.")
 @strictcli.flag(name="commits", type=str, help="Comma-separated commit hashes identifying the target entry")
 @strictcli.flag(name="type", type=str, help="New type value (feature, fix, breaking); also disambiguates multi-entry commits", default="")
-@strictcli.flag(name="description", type=str, help="New description text", default="")
-@strictcli.flag(name="no-user-facing", type=bool, help="Set user_facing=false, clear description and type")
+@strictcli.flag(name="description", type=str, help="Replacement description text for the matched changelog entry", default="")
+@strictcli.flag(name="no-user-facing", type=bool, help="Set user_facing=false on the matched entry, clearing its description and type")
 @strictcli.flag(name="user-facing", type=bool, help="Set user_facing=true (requires --description and --type if entry doesn't already have them)")
-@strictcli.flag(name="no-commit", type=bool, help="Skip auto-commit")
+@strictcli.flag(name="no-commit", type=bool, help="Write the edited JSONL file without auto-committing the change")
 def cmd_chlog_edit(commits, type, description, no_user_facing, user_facing, no_commit, **_kwargs):
     root = _require_sub_project_root()
     flags = {
@@ -772,7 +772,7 @@ mono = app.group("monorepo", help="Manage monorepo workspaces with multiple inde
 
 
 @mono.command(name="init", help="Create a new monorepo workspace by generating the .rlsbl-monorepo directory and an empty workspace.toml configuration file at the current directory. This must be run at the repository root before adding individual projects with the add subcommand. Each workspace tracks multiple independently-versioned projects that share a single git repository.")
-@strictcli.flag(name="no-commit", type=bool, help="Skip auto-commit of workspace.toml")
+@strictcli.flag(name="no-commit", type=bool, help="Create the workspace.toml file without auto-committing it to git")
 def cmd_mono_init(no_commit, **_kwargs):
     root = _require_project_root()
     from .commands.monorepo import _cmd_init
@@ -780,15 +780,15 @@ def cmd_mono_init(no_commit, **_kwargs):
 
 
 @mono.command(name="add", help="Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Optionally set a display name, target registry for publishing, glob patterns for change detection, a subtree remote URL for split publishing, inter-project dependencies, and a library flag to mark shared code packages.")
-@strictcli.flag(name="name", type=str, help="Project name (defaults to directory name)", default="")
-@strictcli.flag(name="target", type=str, help="Target registry", default="")
-@strictcli.flag(name="watch", type=str, help="Comma-separated glob patterns to watch", default="")
-@strictcli.flag(name="subtree-remote", type=str, help="Subtree remote URL", default="")
-@strictcli.flag(name="depends-on", type=str, help="Comma-separated dependency project names", default="")
-@strictcli.flag(name="library", type=str, help="Mark as library (true/false)", default="")
-@strictcli.flag(name="dev-node", type=str, help="Mark as dev node (true/false)", default="")
+@strictcli.flag(name="name", type=str, help="Display name for the project in workspace.toml (defaults to directory name)", default="")
+@strictcli.flag(name="target", type=str, help="Registry this project publishes to (e.g. npm, pypi, go, cargo)", default="")
+@strictcli.flag(name="watch", type=str, help="Comma-separated glob patterns for change detection in CI workflows", default="")
+@strictcli.flag(name="subtree-remote", type=str, help="Git remote URL for split-publishing this project as a standalone repo", default="")
+@strictcli.flag(name="depends-on", type=str, help="Comma-separated names of workspace projects this project depends on", default="")
+@strictcli.flag(name="library", type=str, help="Mark as a shared library consumed by other workspace projects (true/false)", default="")
+@strictcli.flag(name="dev-node", type=str, help="Mark as a dev-only leaf node that skips changelog enforcement (true/false)", default="")
 @strictcli.flag(name="no-commit", type=bool, help="Skip auto-commit of workspace.toml and suppress commits from auto-triggered scaffold/sync")
-@strictcli.arg(name="path", help="Path to the project directory")
+@strictcli.arg(name="path", help="Relative path from the repo root to the project directory to register")
 def cmd_mono_add(name, target, watch, subtree_remote, depends_on, library, dev_node, no_commit, path, **_kwargs):
     root = _require_project_root()
     flags = {}
@@ -813,7 +813,7 @@ def cmd_mono_add(name, target, watch, subtree_remote, depends_on, library, dev_n
 
 
 @mono.command(name="remove", help="Unregister a project from the monorepo workspace.toml by its path. This removes the project entry from the workspace configuration file but does not delete any files, directories, or git history on disk. The project's code remains intact and can be re-added later with the add subcommand if needed.")
-@strictcli.arg(name="path", help="Path to the project to remove")
+@strictcli.arg(name="path", help="Relative path from the repo root of the project to unregister from workspace.toml")
 def cmd_mono_remove(path, **_kwargs):
     root = _require_project_root()
     from .commands.monorepo import _cmd_remove
@@ -828,7 +828,7 @@ def cmd_mono_list(**_kwargs):
 
 
 @mono.command(name="sync", help="Copy and merge CI workflow files from each project's individual scaffold into the shared .github/workflows directory at the repository root. This ensures that every project in the workspace has its publish and test pipelines properly configured as GitHub Actions workflows, even when projects use different target registries or have custom workflow steps.")
-@strictcli.flag(name="no-commit", type=bool, help="Skip auto-commit of synced workflow files")
+@strictcli.flag(name="no-commit", type=bool, help="Write merged workflow files to .github/workflows/ without auto-committing")
 def cmd_mono_sync(no_commit, **_kwargs):
     root = _require_project_root()
     from .commands.monorepo import _cmd_sync
@@ -843,10 +843,10 @@ def cmd_mono_status(**_kwargs):
 
 
 @mono.command(name="check-names", help="Check package name availability on a target registry for all projects in the monorepo workspace. Queries the registry API for each project name and reports whether it is available or already taken. Supports optional prefix and suffix arguments to test naming conventions like scoped packages, with a configurable delay between registry queries to avoid rate limiting.")
-@strictcli.flag(name="target", type=str, help="Target registry (npm, pypi, or go)")
-@strictcli.flag(name="prefix", type=str, help="Prefix to prepend to project names", default="")
-@strictcli.flag(name="suffix", type=str, help="Suffix to append to project names", default="")
-@strictcli.flag(name="delay", type=str, help="Delay between checks in ms", default="200")
+@strictcli.flag(name="target", type=str, help="Registry to query for name availability across all workspace projects (npm, pypi, or go)")
+@strictcli.flag(name="prefix", type=str, help="String to prepend to each project name before checking availability", default="")
+@strictcli.flag(name="suffix", type=str, help="String to append to each project name before checking availability", default="")
+@strictcli.flag(name="delay", type=str, help="Milliseconds to wait between consecutive registry API queries (default: 200)", default="200")
 def cmd_mono_check_names(target, prefix, suffix, delay, **_kwargs):
     root = _require_project_root()
     flags = {"target": target, "prefix": prefix, "suffix": suffix, "delay": delay}
@@ -877,7 +877,7 @@ def cmd_mono_snapshot(check, **_kwargs):
 
 
 @mono.command(name="mirror", help="Initialize a subtree mirror repository for a monorepo project by performing a full git subtree split of the project's history, pushing the extracted tree to the configured subtree_remote URL, cloning the resulting standalone mirror repository, running rlsbl scaffold to generate CI workflows for independent publishing, and pushing the scaffolded mirror to its remote.")
-@strictcli.arg(name="project", help="Name of the workspace project to mirror")
+@strictcli.arg(name="project", help="Name of the workspace project to split and push as a standalone mirror repo")
 def cmd_mono_mirror(project, **_kwargs):
     root = _require_project_root()
     from .commands.monorepo import _cmd_mirror
@@ -885,11 +885,11 @@ def cmd_mono_mirror(project, **_kwargs):
 
 
 @mono.command(name="graph", help="Export the monorepo dependency graph in JSON, DOT (Graphviz), or indented text tree format. Supports filtering by a root package (transitive deps) or reverse package (transitive rdeps), with optional depth limiting. Use --output to write to a file instead of stdout.")
-@strictcli.flag(name="format", type=str, help="Output format: json, dot, or text (default: json)", default="json")
-@strictcli.flag(name="output", type=str, help="Write output to file instead of stdout", default="")
-@strictcli.flag(name="root", type=str, help="Show only transitive deps from this package", default="")
-@strictcli.flag(name="reverse", type=str, help="Show only transitive rdeps of this package", default="")
-@strictcli.flag(name="depth", type=int, help="Limit traversal depth")
+@strictcli.flag(name="format", type=str, help="Serialization format for the dependency graph: json, dot (Graphviz), or text", default="json")
+@strictcli.flag(name="output", type=str, help="File path to write the graph output to instead of printing to stdout", default="")
+@strictcli.flag(name="root", type=str, help="Filter to show only transitive dependencies reachable from this package", default="")
+@strictcli.flag(name="reverse", type=str, help="Filter to show only transitive reverse dependencies of this package", default="")
+@strictcli.flag(name="depth", type=int, help="Maximum number of dependency hops to traverse from the root or reverse node")
 def cmd_mono_graph(format, output, root, reverse, depth=None, **_kwargs):
     flags = {"format": format}
     if output:
@@ -906,8 +906,8 @@ def cmd_mono_graph(format, output, root, reverse, depth=None, **_kwargs):
 
 
 @mono.command(name="impact", help="Analyze the impact of changes to a package, file, or git diff range on the monorepo dependency graph. Shows direct and transitive dependents, test scope, and release candidates. Supports package names, file paths, and --since for git-based change detection.")
-@strictcli.flag(name="format", type=str, help="Output format: json or text (default: text)", default="text")
-@strictcli.flag(name="depth", type=int, help="Limit traversal depth")
+@strictcli.flag(name="format", type=str, help="Output serialization format for the impact report: json or text (default: text)", default="text")
+@strictcli.flag(name="depth", type=int, help="Maximum number of dependency hops to traverse when computing transitive impact")
 @strictcli.flag(name="since", type=str, help="Git ref to diff against HEAD (e.g. HEAD~3, v1.0.0)", default="")
 def cmd_mono_impact(format, depth=None, since="", **_kwargs):
     args = _variadic_args
@@ -922,7 +922,7 @@ def cmd_mono_impact(format, depth=None, since="", **_kwargs):
 
 
 @mono.command(name="release", help="Execute a batch release of multiple monorepo packages in topological order. Reads package configurations from .rlsbl-monorepo/releases/unreleased.toml. Each package is released sequentially using the single-package release flow, with leaves (no dependencies) released first. Supports --dry-run, --yes, --allow-dirty flags.")
-@strictcli.flag(name="allow-dirty", type=bool, help="Allow releasing with a dirty working tree")
+@strictcli.flag(name="allow-dirty", type=bool, help="Skip the clean working tree check and allow releasing with uncommitted changes")
 def cmd_mono_release(dry_run, yes, quiet, allow_dirty, **_kwargs):
     flags = {
         "dry-run": dry_run,
