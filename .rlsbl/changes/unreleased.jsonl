@@ -3,3 +3,4 @@
 {"commits":["cd172af0eb5b249181e0ab2d4e3bc9f551f3e7cb"],"user_facing":true,"description":"**Fix.** The `private` config key is now required -- missing or corrupted config files produce a hard error instead of silently continuing.","type":"fix"}
 {"commits":["e5aabc3a857329c3e65a8a289c71a0baa40b5a9d"],"user_facing":true,"description":"**Fix.** Retry `gh release create` with race-condition detection when the release already exists.","type":"fix"}
 {"commits":["54f6707f55851baf92399a70730aa0a0b51d4deb","29b7f3b7406d8673c57861f7ded147684aa20b90"],"user_facing":true,"description":"**New.** CI now reports test coverage via pytest-cov.","type":"feature"}
+{"commits":["966540fb5fb99a47b169affc93bb09e48fe31a2f","de23c6beca2896ed1dab820d5a6804ca355e24a3"],"user_facing":false}
