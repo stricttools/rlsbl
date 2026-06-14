@@ -3,9 +3,9 @@
 import json
 import os
 import re
-import subprocess
 
 from .base import BaseTarget
+from .utils import _get_git_author
 from ..errors import VersionError
 from ..utils import run
 
@@ -136,11 +136,7 @@ class DenoTarget(BaseTarget):
         cleaned = self._strip_comments(content)
         data = json.loads(cleaned)
 
-        # Author from git config
-        try:
-            author = run("git", ["config", "user.name"])
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            author = ""
+        author = _get_git_author()
 
         return {
             "name": data.get("name", ""),

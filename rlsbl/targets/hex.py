@@ -2,9 +2,9 @@
 
 import os
 import re
-import subprocess
 
 from .base import BaseTarget
+from .utils import _get_git_author
 from ..errors import VersionError
 from ..utils import run
 
@@ -87,11 +87,7 @@ class HexTarget(BaseTarget):
         app_match = re.search(r'app:\s*:(\w+)', content)
         app_name = app_match.group(1) if app_match else ""
 
-        # Author from git config
-        try:
-            author = run("git", ["config", "user.name"])
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            author = ""
+        author = _get_git_author()
 
         return {
             "name": app_name,
