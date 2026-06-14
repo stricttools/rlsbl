@@ -1,5 +1,5 @@
 ---
-description: "Complete reference for the rlsbl release flow — prerequisites, pipeline order, hooks, flags, dev node releases, and related commands."
+description: "Complete reference for the rlsbl release flow — prerequisites, pipeline order, hooks, flags, dev node behavior, and related commands."
 ---
 
 # Release workflow
