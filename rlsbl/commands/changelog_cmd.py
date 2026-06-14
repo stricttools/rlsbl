@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 
 from ..changelog.files import (
     append_entry,
@@ -11,12 +12,13 @@ from ..changelog.files import (
     changes_dir_exists,
     get_changes_dir,
     is_read_only,
+    list_versioned_files,
     read_unreleased,
     writable_jsonl,
 )
 from ..changelog.generate import generate_changelog
 from ..changelog.resolve import resolve_hash
-from ..changelog.schema import ChangelogEntry, parse_jsonl, validate_schema
+from ..changelog.schema import ChangelogEntry, parse_jsonl, serialize_entry, validate_schema
 from ..changelog.validate import _get_batch_limits_config
 from ..config import read_project_config
 from ..git_util import filter_commits_for_project
@@ -366,6 +368,199 @@ def cmd_amend(flags, project_root):
     if user_facing and description:
         commit_msg = f"changelog: amend {version}: {description}"
     commit_files(commit_msg, changed_files, allow_failure=True)
+
+
+def cmd_edit(flags, project_root):
+    """Edit an existing changelog entry in unreleased or released JSONL files.
+
+    Finds the entry by commit hash, applies field changes, and rewrites
+    the file atomically. For released files, temporarily unlocks the
+    read-only file, regenerates CHANGELOG.md, and syncs GitHub Release notes.
+
+    Required flags:
+    - --commits: comma-separated commit hashes identifying the target entry
+
+    At least one edit flag required:
+    - --type: new type value (feature, fix, breaking)
+    - --description: new description text
+    - --no-user-facing: set user_facing=false, clear description and type
+    - --user-facing: set user_facing=true
+    """
+    _resolve_workspace_project(project_root)
+
+    # Validate at least one edit flag is provided
+    has_type = bool(flags.get("type"))
+    has_description = bool(flags.get("description"))
+    has_no_user_facing = flags.get("no-user-facing", False)
+    has_user_facing = flags.get("user-facing", False)
+    if not (has_type or has_description or has_no_user_facing or has_user_facing):
+        print(
+            "Error: at least one edit flag is required "
+            "(--type, --description, --no-user-facing, --user-facing).",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    # Parse and resolve commits
+    commits_raw = flags.get("commits", "")
+    if not commits_raw:
+        print("Error: --commits is required.", file=sys.stderr)
+        sys.exit(1)
+
+    commits = [h.strip() for h in commits_raw.split(",") if h.strip()]
+    if not commits:
+        print("Error: --commits must contain at least one hash.", file=sys.stderr)
+        sys.exit(1)
+
+    resolved_search = []
+    for h in commits:
+        full = resolve_hash(h)
+        if full is None:
+            print(f"Error: commit hash does not resolve: {h}", file=sys.stderr)
+            sys.exit(1)
+        resolved_search.append(full)
+    search_set = set(resolved_search)
+
+    # Search for matching entries across all JSONL files
+    changes_dir = get_changes_dir(project_root)
+    matches = []  # list of (file_path, line_index, entry, version_or_none)
+
+    # Search unreleased.jsonl first
+    unreleased_path = os.path.join(changes_dir, "unreleased.jsonl")
+    if os.path.isfile(unreleased_path):
+        entries = parse_jsonl(unreleased_path)
+        for idx, entry in enumerate(entries):
+            if search_set.intersection(entry.commits):
+                matches.append((unreleased_path, idx, entry, None))
+
+    # Then search versioned files (newest first)
+    for version, jsonl_path in list_versioned_files(changes_dir):
+        entries = parse_jsonl(jsonl_path)
+        for idx, entry in enumerate(entries):
+            if search_set.intersection(entry.commits):
+                matches.append((jsonl_path, idx, entry, version))
+
+    if not matches:
+        short_hashes = ", ".join(h[:12] for h in resolved_search)
+        print(
+            f"Error: No changelog entry found for commit(s): {short_hashes}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    # Disambiguate if multiple matches
+    if len(matches) > 1:
+        type_filter = flags.get("type") or None
+        if type_filter:
+            filtered = [m for m in matches if m[2].type == type_filter]
+            if len(filtered) == 0:
+                print(
+                    f"Error: No entry with type '{type_filter}' found for these commits.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            elif len(filtered) > 1:
+                print("Error: Multiple entries match even after type filter:", file=sys.stderr)
+                for fp, _idx, ent, ver in filtered:
+                    loc = f"v{ver}" if ver else "unreleased"
+                    desc = ent.description or "(no description)"
+                    print(f"  [{loc}] type={ent.type}: {desc}", file=sys.stderr)
+                sys.exit(1)
+            matches = filtered
+        else:
+            print("Error: Multiple entries match -- use --type to disambiguate:", file=sys.stderr)
+            for fp, _idx, ent, ver in matches:
+                loc = f"v{ver}" if ver else "unreleased"
+                desc = ent.description or "(no description)"
+                print(f"  [{loc}] type={ent.type}: {desc}", file=sys.stderr)
+            sys.exit(1)
+
+    file_path, line_index, entry, version = matches[0]
+    is_released = version is not None
+
+    # Apply edits
+    if has_no_user_facing:
+        entry.user_facing = False
+        entry.description = None
+        entry.type = None
+    elif has_user_facing:
+        entry.user_facing = True
+        # If the entry doesn't already have description/type, require them
+        if not entry.description and not has_description:
+            print(
+                "Error: --description is required when setting --user-facing "
+                "on an entry without an existing description.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        if not entry.type and not has_type:
+            print(
+                "Error: --type is required when setting --user-facing "
+                "on an entry without an existing type.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+    if has_type and not has_no_user_facing:
+        entry.type = flags["type"]
+    if has_description and not has_no_user_facing:
+        entry.description = flags["description"]
+
+    # Validate the edited entry
+    errors = validate_schema(entry)
+    if errors:
+        for err in errors:
+            print(f"Error: schema validation: {err}", file=sys.stderr)
+        sys.exit(1)
+
+    # Rewrite the file atomically
+    def _rewrite_file(target_path):
+        all_entries = parse_jsonl(target_path)
+        all_entries[line_index] = entry
+        lines = [serialize_entry(e) + "\n" for e in all_entries]
+        content = "".join(lines)
+        parent = os.path.dirname(target_path)
+        fd, tmp_path = tempfile.mkstemp(dir=parent, suffix=".tmp")
+        try:
+            os.write(fd, content.encode("utf-8"))
+            os.close(fd)
+            os.replace(tmp_path, target_path)
+        except BaseException:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+            raise
+
+    if is_released:
+        with writable_jsonl(file_path):
+            _rewrite_file(file_path)
+
+        # Regenerate CHANGELOG.md
+        generate_changelog(project_root)
+        print(f"Edited entry in {version}.jsonl")
+        print("Regenerated CHANGELOG.md")
+
+        # Sync GitHub Release notes (best-effort)
+        _sync_github_release(version)
+
+        # Auto-commit
+        if not flags.get("no-commit"):
+            changed_files = [file_path]
+            md_path = os.path.join(changes_dir, f"{version}.md")
+            if os.path.isfile(md_path):
+                changed_files.append(md_path)
+            changelog_path = os.path.join(project_root, "CHANGELOG.md")
+            if os.path.isfile(changelog_path):
+                changed_files.append(changelog_path)
+            desc = entry.description or "entry"
+            commit_files(f"changelog: edit {version}: {desc}", changed_files, allow_failure=True)
+    else:
+        _rewrite_file(file_path)
+        print("Edited entry in unreleased.jsonl")
+
+        # Auto-commit
+        if not flags.get("no-commit"):
+            desc = entry.description or "entry"
+            commit_files(f"changelog: edit unreleased: {desc}", [file_path], allow_failure=True)
 
 
 def _sync_github_release(version: str) -> None:
