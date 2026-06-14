@@ -5,3 +5,4 @@
 {"commits":["54f6707f55851baf92399a70730aa0a0b51d4deb","29b7f3b7406d8673c57861f7ded147684aa20b90"],"user_facing":true,"description":"**New.** CI now reports test coverage via pytest-cov.","type":"feature"}
 {"commits":["966540fb5fb99a47b169affc93bb09e48fe31a2f","de23c6beca2896ed1dab820d5a6804ca355e24a3"],"user_facing":false}
 {"commits":["cbbe6e35ef36bc33efabf749c963f2e528504f76"],"user_facing":false}
+{"commits":["9a95094c7ad014d83ee84de0e4f3540dd982234c","53d7e32de5ce4dd9fbc9932096c6a83f32a9bc4a"],"user_facing":false}
