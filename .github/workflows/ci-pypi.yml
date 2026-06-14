@@ -22,7 +22,7 @@ jobs:
       - uses: astral-sh/setup-uv@v7
       - run: uv python install ${{ matrix.python-version }}
       - run: uv sync --group dev
-      - run: uv run pytest -n auto -x --junitxml=test-results.xml --cov=rlsbl --cov-report=xml
+      - run: uv run pytest -n auto -x --junitxml=test-results.xml --cov=rlsbl --cov-report=xml --cov-fail-under=85
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
