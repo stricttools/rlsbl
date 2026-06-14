@@ -331,7 +331,12 @@ def register_project_checks(app):
     @app.check("private-publish-workflow")
     def check_private_publish_workflow(ctx):
         """Private repos must not have publish workflows."""
-        if not ctx.config.get("private"):
+        if "private" not in ctx.config:
+            return CheckResult(
+                "fail",
+                'missing required "private" key in .rlsbl/config.json — set "private": true or "private": false',
+            )
+        if not ctx.config["private"]:
             return CheckResult("pass", "not a private repo")
 
         import glob
@@ -377,7 +382,12 @@ def register_project_checks(app):
             return CheckResult("skip", "cannot read package.json")
 
         npm_private = pkg.get("private", False)
-        config_private = ctx.config.get("private")
+        if "private" not in ctx.config:
+            return CheckResult(
+                "fail",
+                'missing required "private" key in .rlsbl/config.json — set "private": true or "private": false',
+            )
+        config_private = ctx.config["private"]
 
         if npm_private is True and config_private is False:
             return CheckResult(

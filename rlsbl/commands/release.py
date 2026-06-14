@@ -554,9 +554,9 @@ def _update_last_build_release(project_dir, version):
     try:
         config = read_json_config(config_path)
     except Exception as e:
-        from ..utils import warn_exception
-        warn_exception(f"could not read {config_path}, starting fresh", e)
-        config = {}
+        raise RuntimeError(
+            f"{config_path} is corrupted or unreadable — fix it before releasing: {e}"
+        ) from e
     config["last_build_release"] = version
     tmp_path = config_path + ".tmp"
     with open(tmp_path, "w", encoding="utf-8") as f:
@@ -1711,7 +1711,7 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
     release_pipelines = load_pipelines(ctx.config)
 
     # Publish step: skip for private repos (they don't publish to registries)
-    is_private = ctx.config.get("private", False)
+    is_private = ctx.config["private"]
     if not is_private:
         # Pipeline dispatch: run publish for each pipeline (runs once per release, not per-target)
         for pl_name, pl in release_pipelines.items():
