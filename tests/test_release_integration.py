@@ -297,8 +297,8 @@ class TestReleaseGhReleaseCreateFailure:
 
         def failing_gh_run(cmd, args=None, timeout=120, env=None, cwd=None):
             call_log.append((cmd, args))
-            if cmd == "gh" and args and args[0] == "release" and args[1] == "create":
-                raise subprocess.CalledProcessError(1, "gh release create")
+            if cmd == "gh" and args and args[0] == "release" and args[1] in ("create", "view"):
+                raise subprocess.CalledProcessError(1, f"gh release {args[1]}")
             if cmd == "gh":
                 return ""
             if cmd == "git" and args and args[0] == "push":
@@ -329,7 +329,7 @@ class TestReleaseGhReleaseCreateFailure:
         # Error message should appear in stderr
         captured = capsys.readouterr()
         assert "GitHub Release creation failed" in captured.err
-        assert "rlsbl release edit" in captured.err
+        assert "gh release create" in captured.err
         assert "rlsbl release undo" in captured.err
 
         # Asset upload should NOT have been called (depends on release existing)
