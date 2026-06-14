@@ -109,14 +109,15 @@ Libraries are packages consumed by other workspace projects as runtime or dev de
 
 ### Dev nodes (`dev_node = true`)
 
-Dev nodes are projects at the edge of the dependency graph that nothing user-facing depends on — test infrastructure, conformance suites, dev tooling, and internal utilities consumed only during development. They skip the entire changelog system and use a streamlined release flow with a mandatory description that becomes the GitHub Release body. They have a streamlined release flow:
+Dev nodes are projects at the edge of the dependency graph that nothing user-facing depends on — test infrastructure, conformance suites, dev tooling, and internal utilities consumed only during development. Dev nodes cannot be released:
 
 - **No changelog system**: no `.rlsbl/changes/`, no `unreleased.jsonl`, no `CHANGELOG.md`
+- **No releases**: `rlsbl release run` and `rlsbl release edit` error with "dev_node projects cannot be released"
 - `rlsbl changelog add` errors with "dev node projects don't use changelogs"
 - Scaffold skips changelog infrastructure
 - Pre-push check ignores dev node commits
-- Release flow: version bump, commit, tag, push, GitHub Release (skipping changelog validation/generation)
-- Release description in `unreleased.toml` is **mandatory** for dev nodes (it becomes the GitHub Release body)
+- Batch release (`rlsbl monorepo release`) excludes dev nodes
+- Remove `dev_node = true` from workspace.toml to make a project releasable
 - The `dev-node-boundary` check prevents non-dev-node projects from declaring runtime dependencies on dev nodes
 
 ## Dependency graph
@@ -202,7 +203,7 @@ Supports `--depth N` to limit BFS traversal depth (default: unlimited, traverses
 
 ### release-init scaffolding
 
-`rlsbl monorepo release-init` auto-detects release targets for each workspace project and generates a TOML file with pre-populated per-package sections. Packages with no unreleased commits are commented out, and dev nodes are excluded entirely since they bypass the changelog system:
+`rlsbl monorepo release-init` auto-detects release targets for each workspace project and generates a TOML file with pre-populated per-package sections. Packages with no unreleased commits are commented out, and dev nodes are excluded entirely since they cannot be released:
 
 ```toml
 [packages.mylib]
