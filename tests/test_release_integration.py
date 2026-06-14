@@ -338,3 +338,72 @@ class TestReleaseGhReleaseCreateFailure:
         # Verify the release still completed its other steps (tag was created, etc.)
         tag_output = _git_output(mock_git_repo, "tag", "-l", "v1.0.1")
         assert "v1.0.1" in tag_output, "Tag should still exist even though GH Release failed"
+
+    def test_recovery_hint_uses_committed_md_file(self, mock_git_repo, capsys):
+        """Recovery hint references the committed .rlsbl/changes/{version}.md, not
+        a temp notes file, and does not suggest rlsbl release edit (which requires
+        the release to already exist)."""
+        _setup_releasable_npm_project(mock_git_repo)
+
+        gh_calls = []
+
+        def failing_gh_run(cmd, args=None, timeout=120, env=None, cwd=None):
+            if cmd == "gh" and args and args[0] == "release":
+                gh_calls.append(args)
+                if args[1] in ("create", "view"):
+                    raise subprocess.CalledProcessError(1, f"gh release {args[1]}")
+                return ""
+            if cmd == "gh":
+                return ""
+            if cmd == "git" and args and args[0] == "push":
+                return ""
+            if cmd == "git" and args and args[0] == "fetch":
+                return ""
+            if cmd == "git" and args and args[:2] == ["rev-list", "--count"] and any("origin/" in a for a in args):
+                return "0"
+            return real_run(cmd, args=args, timeout=timeout, env=env, cwd=cwd)
+
+        with pytest.raises(SystemExit):
+            with (
+                patch("rlsbl.commands.release.check_gh_installed", return_value=True),
+                patch("rlsbl.commands.release.check_gh_auth", return_value=True),
+                patch("rlsbl.commands.release.push_if_needed"),
+                patch("rlsbl.commands.release.run", side_effect=failing_gh_run),
+                patch("rlsbl.commands.release.upload_release_assets"),
+            ):
+                run_cmd(
+                    _rc(),
+                    {"yes": True, "quiet": False},
+                    ctx=_make_ctx(mock_git_repo),
+                )
+
+        captured = capsys.readouterr()
+
+        # Recovery hint must contain the full gh release create command with
+        # the committed per-version .md file path (not the temp notes file)
+        assert ".rlsbl/changes/1.0.1.md" in captured.err, (
+            f"Recovery hint should reference .rlsbl/changes/1.0.1.md, got:\n{captured.err}"
+        )
+        assert "gh release create v1.0.1 --title v1.0.1 --notes-file .rlsbl/changes/1.0.1.md" in captured.err, (
+            f"Recovery hint should contain full gh release create command, got:\n{captured.err}"
+        )
+
+        # Must NOT suggest rlsbl release edit (it checks release exists first)
+        assert "rlsbl release edit" not in captured.err, (
+            f"Recovery hint must not suggest 'rlsbl release edit', got:\n{captured.err}"
+        )
+
+        # Must NOT suggest rlsbl release retry (it dispatches CI, not create releases)
+        assert "rlsbl release retry" not in captured.err, (
+            f"Recovery hint must not suggest 'rlsbl release retry', got:\n{captured.err}"
+        )
+
+        # Verify retry behavior: should have attempted create twice, view twice
+        create_calls = [c for c in gh_calls if c[1] == "create"]
+        view_calls = [c for c in gh_calls if c[1] == "view"]
+        assert len(create_calls) == 2, (
+            f"Expected 2 gh release create attempts, got {len(create_calls)}: {create_calls}"
+        )
+        assert len(view_calls) == 2, (
+            f"Expected 2 gh release view checks, got {len(view_calls)}: {view_calls}"
+        )
