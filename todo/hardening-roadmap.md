@@ -16,7 +16,6 @@ Three bug classes account for 38 of 72 historical fixes. Each recurs because fix
 
 ## Pipeline robustness gaps
 
-- **Tag push after commit push (release.py ~1507-1547):** tag push is OUTSIDE the try-catch that handles rollback. If commit pushes but tag push fails, commit is public, no tag, no rollback runs. Fix: wrap both pushes in one try block.
 - **GitHub Release creation failure (~1561):** tag is orphaned if gh release create fails. Fix: delete tag on failure or make creation idempotent.
 - **Post-release hook side effects (~1662-1674):** hook can create commits that release undo doesn't know about. Fix: document that hooks must be idempotent, or snapshot tree before hook.
 - **Monorepo batch partial failure (batch_release.py ~92-123):** packages 1-(N-1) are fully released if package N fails; no coordinated undo. Fix: record released packages, provide batch-level undo or resume.
@@ -57,8 +56,6 @@ Three bug classes account for 38 of 72 historical fixes. Each recurs because fix
 
 ## Suggested execution order
 
-1. Retire the superseded scaffold-conflict-markers check (separate todo exists)
-2. Clean up Wave A rough edges (separate todo exists)
 3. release.py split (prerequisite for pipeline fixes)
 4. Pipeline robustness fixes (tag-push/GH-release rollback, batch recovery)
 5. ExemptionRegistry + changelog subsystem bugs
