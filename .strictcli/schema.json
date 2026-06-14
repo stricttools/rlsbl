@@ -1,7 +1,5 @@
-{
-  "defaults": {
-    "app": {
-      "env_prefix": null,
+/home/m/Projects/rlsbl/.strictcli/schema.json
+ix": null,
       "config": false,
       "global_flags": [],
       "commands": {},
@@ -38,7 +36,7 @@
   },
   "project_id": "rlsbl",
   "name": "rlsbl",
-  "version": "0.72.0",
+  "version": "0.73.0",
   "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 32 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
   "global_flags": [
     {
@@ -67,52 +65,52 @@
   "commands": {
     "check": {
       "name": "check",
-      "help": "Run project checks",
+      "help": "Run project checks registered via the check framework and report results",
       "flags": [
         {
           "name": "all",
           "type": "bool",
-          "help": "Run all checks",
+          "help": "Run every registered check regardless of tag or name filters",
           "default": false,
           "negatable": true
         },
         {
           "name": "tag",
           "type": "str",
-          "help": "Tag DSL expression to filter checks",
+          "help": "Tag DSL expression to select checks (e.g. 'changelog & !quality')",
           "default": ""
         },
         {
           "name": "name",
           "type": "str",
-          "help": "Glob pattern to filter by check name",
+          "help": "Glob pattern to filter checks by name (e.g. 'hash-*', '*coverage*')",
           "default": ""
         },
         {
           "name": "list",
           "type": "bool",
-          "help": "List all checks and their tags",
+          "help": "List all registered checks with their tags and exit without running",
           "default": false,
           "negatable": true
         },
         {
           "name": "json",
           "type": "bool",
-          "help": "Output results as JSON",
+          "help": "Output check results as machine-readable JSON instead of human text",
           "default": false,
           "negatable": true
         },
         {
           "name": "ignore-warnings",
           "type": "bool",
-          "help": "Warn severity does not cause nonzero exit",
+          "help": "Treat warn-severity results as passing so they do not cause nonzero exit",
           "default": false,
           "negatable": true
         },
         {
           "name": "verbose",
           "type": "bool",
-          "help": "Show details for passing checks too",
+          "help": "Show full details for passing checks in addition to failures and warnings",
           "default": false,
           "negatable": true
         }
@@ -131,7 +129,7 @@
         {
           "name": "json",
           "type": "bool",
-          "help": "Output status as JSON",
+          "help": "Output version, branch, tag, and coverage as machine-readable JSON",
           "default": false,
           "negatable": true
         }
@@ -150,35 +148,35 @@
         {
           "name": "force",
           "type": "bool",
-          "help": "Overwrite all files (ignore user customizations)",
+          "help": "Overwrite all scaffold-managed files, discarding any user customizations",
           "default": false,
           "negatable": true
         },
         {
           "name": "private",
           "type": "bool",
-          "help": "Scaffold for private repos (skip publish)",
+          "help": "Generate workflows without publish steps, suitable for private repositories",
           "default": false,
           "negatable": true
         },
         {
           "name": "no-commit",
           "type": "bool",
-          "help": "Skip auto-commit of scaffolded files",
+          "help": "Write scaffolded files to disk without auto-committing them",
           "default": false,
           "negatable": true
         },
         {
           "name": "skip-shared",
           "type": "bool",
-          "help": "Skip shared template processing",
+          "help": "Skip processing of shared workflow templates across targets",
           "default": false,
           "negatable": true
         },
         {
           "name": "no-tag",
           "type": "bool",
-          "help": "Disable ecosystem tagging for this invocation",
+          "help": "Do not add or update the rlsbl GitHub topic tag on this invocation",
           "default": false,
           "negatable": true
         }
@@ -191,7 +189,7 @@
         {
           "name": "target",
           "type": "str",
-          "help": "Target registry (npm, pypi, or go)",
+          "help": "Registry to query for name availability (npm, pypi, or go); repeatable",
           "default": [],
           "repeatable": true,
           "unique": true
@@ -199,7 +197,7 @@
         {
           "name": "delay",
           "type": "str",
-          "help": "Delay between checks in ms",
+          "help": "Milliseconds to wait between consecutive registry API queries (default: 200)",
           "default": "200"
         }
       ]
@@ -211,7 +209,7 @@
         {
           "name": "mine",
           "type": "bool",
-          "help": "Show only your own repositories",
+          "help": "Filter results to only show repositories owned by the authenticated GitHub user",
           "default": false,
           "negatable": true
         }
@@ -224,13 +222,13 @@
         {
           "name": "target",
           "type": "str",
-          "help": "Target a specific registry",
+          "help": "Registry whose CI workflow to watch (auto-detected if omitted)",
           "default": ""
         },
         {
           "name": "run-id",
           "type": "str",
-          "help": "CI workflow run ID to watch",
+          "help": "GitHub Actions workflow run ID to poll directly instead of searching by SHA",
           "default": [],
           "repeatable": true,
           "unique": true
@@ -239,7 +237,7 @@
       "args": [
         {
           "name": "sha",
-          "help": "Commit SHA to watch (defaults to HEAD)",
+          "help": "Git commit SHA whose CI workflows to monitor (defaults to HEAD if omitted)",
           "required": false
         }
       ]
@@ -259,7 +257,7 @@
         {
           "name": "json",
           "type": "bool",
-          "help": "Output as JSON",
+          "help": "Output the unreleased commit list and coverage status as machine-readable JSON",
           "default": false,
           "negatable": true
         }
@@ -276,25 +274,25 @@
         {
           "name": "width",
           "type": "str",
-          "help": "GIF width in pixels",
+          "help": "Width of the recorded GIF in pixels (default: 1200)",
           "default": "1200"
         },
         {
           "name": "height",
           "type": "str",
-          "help": "GIF height in pixels",
+          "help": "Height of the recorded GIF in pixels (default: 600)",
           "default": "600"
         },
         {
           "name": "font-size",
           "type": "str",
-          "help": "Font size in pixels",
+          "help": "Terminal font size in pixels for the recording (default: 24)",
           "default": "24"
         },
         {
           "name": "duration",
           "type": "str",
-          "help": "Duration in seconds",
+          "help": "Total recording duration in seconds before auto-stop (default: 10)",
           "default": "10"
         }
       ]
@@ -306,7 +304,7 @@
         {
           "name": "status",
           "type": "bool",
-          "help": "Show migration status",
+          "help": "Display which migrations are pending and which have already been applied",
           "default": false,
           "negatable": true
         }
@@ -319,13 +317,13 @@
         {
           "name": "target",
           "type": "str",
-          "help": "Target a specific registry",
+          "help": "Registry whose deploy pipeline to run (auto-detected if omitted)",
           "default": ""
         },
         {
           "name": "force",
           "type": "bool",
-          "help": "Override branch restrictions",
+          "help": "Bypass branch restrictions that normally limit which branches can deploy",
           "default": false,
           "negatable": true
         }
@@ -333,7 +331,7 @@
       "args": [
         {
           "name": "target_name",
-          "help": "Deploy target name",
+          "help": "Named deploy target from the project's deploy configuration to execute",
           "required": false
         }
       ]
@@ -345,7 +343,7 @@
         {
           "name": "message",
           "type": "str",
-          "help": "Commit message",
+          "help": "Commit message for the autogenerated-file commit (added with Autogenerated trailer)",
           "short": "m"
         }
       ]
@@ -363,7 +361,7 @@
             {
               "name": "allow-dirty",
               "type": "bool",
-              "help": "Allow releasing with a dirty working tree",
+              "help": "Skip the clean working tree check and allow releasing with uncommitted changes",
               "default": false,
               "negatable": true
             },
@@ -413,7 +411,7 @@
           "args": [
             {
               "name": "version",
-              "help": "Version to update (defaults to current)",
+              "help": "Version whose GitHub Release notes to sync (defaults to current version)",
               "required": false
             }
           ]
@@ -425,7 +423,7 @@
             {
               "name": "target",
               "type": "str",
-              "help": "Target a specific registry",
+              "help": "Target a specific registry for version detection (auto-detected if omitted)",
               "default": ""
             }
           ]
@@ -437,13 +435,13 @@
             {
               "name": "reason",
               "type": "str",
-              "help": "Why the version is being yanked",
+              "help": "Human-readable explanation of why this version is being yanked",
               "default": ""
             },
             {
               "name": "use",
               "type": "str",
-              "help": "Replacement version to recommend",
+              "help": "Suggest this version as a replacement in the deprecation notice",
               "default": ""
             },
             {
@@ -457,7 +455,7 @@
           "args": [
             {
               "name": "version",
-              "help": "Version to yank (e.g. 0.9.1 or v0.9.1)"
+              "help": "Semver string of the release to yank, with or without v prefix (e.g. 0.9.1)"
             }
           ]
         },
@@ -474,17 +472,17 @@
             {
               "name": "pattern",
               "type": "str",
-              "help": "Regex pattern to match (for scrub match)"
+              "help": "Regex pattern to match against file contents (mutually exclusive with --file)"
             },
             {
               "name": "file",
               "type": "str",
-              "help": "File path to scrub (for scrub file)"
+              "help": "Path to the file to remove from git history (mutually exclusive with --pattern)"
             },
             {
               "name": "replace",
               "type": "str",
-              "help": "Replacement text for matched content"
+              "help": "Literal text to substitute for each match (mutually exclusive with --mangle)"
             },
             {
               "name": "mangle",
@@ -496,12 +494,12 @@
             {
               "name": "from-commit",
               "type": "str",
-              "help": "Start rewriting from this commit (inclusive)"
+              "help": "SHA of the earliest commit to rewrite (all descendants are also rewritten)"
             },
             {
               "name": "entire-history",
               "type": "bool",
-              "help": "Rewrite entire repository history",
+              "help": "Rewrite every commit in the repository from the initial commit onward",
               "default": false,
               "negatable": false
             }
@@ -520,32 +518,32 @@
             {
               "name": "commits",
               "type": "str",
-              "help": "Comma-separated commit hashes",
+              "help": "Comma-separated list of commit hashes to associate with this changelog entry",
               "default": ""
             },
             {
               "name": "description",
               "type": "str",
-              "help": "Entry description",
+              "help": "Human-readable description of the change, shown in the generated CHANGELOG.md",
               "default": ""
             },
             {
               "name": "type",
               "type": "str",
-              "help": "Entry type (feature, fix, breaking)",
+              "help": "Classification of the change: feature, fix, or breaking (required if user-facing)",
               "default": ""
             },
             {
               "name": "no-user-facing",
               "type": "bool",
-              "help": "Mark as non-user-facing",
+              "help": "Mark this entry as internal (excluded from generated CHANGELOG.md output)",
               "default": false,
               "negatable": true
             },
             {
               "name": "no-commit",
               "type": "bool",
-              "help": "Skip auto-commit of unreleased.jsonl",
+              "help": "Append to unreleased.jsonl without auto-committing the change",
               "default": false,
               "negatable": true
             },
@@ -565,7 +563,7 @@
             {
               "name": "no-commit",
               "type": "bool",
-              "help": "Skip auto-commit of generated files",
+              "help": "Write generated CHANGELOG.md and per-version .md files without auto-committing",
               "default": false,
               "negatable": true
             }
@@ -578,36 +576,36 @@
             {
               "name": "version",
               "type": "str",
-              "help": "Released version to amend (e.g., 0.39.0)"
+              "help": "Semver of the already-released version whose JSONL to amend (e.g. 0.39.0)"
             },
             {
               "name": "commits",
               "type": "str",
-              "help": "Comma-separated commit hashes"
+              "help": "Comma-separated commit hashes to associate with the amended changelog entry"
             },
             {
               "name": "description",
               "type": "str",
-              "help": "Entry description",
+              "help": "Human-readable description for the amended entry in CHANGELOG.md",
               "default": ""
             },
             {
               "name": "type",
               "type": "str",
-              "help": "Entry type (feature, fix, breaking)",
+              "help": "Classification for the amended entry: feature, fix, or breaking (required if user-facing)",
               "default": ""
             },
             {
               "name": "no-user-facing",
               "type": "bool",
-              "help": "Mark as non-user-facing",
+              "help": "Mark the amended entry as internal (excluded from CHANGELOG.md output)",
               "default": false,
               "negatable": true
             },
             {
               "name": "no-resolve",
               "type": "bool",
-              "help": "Skip hash validation",
+              "help": "Skip git rev-parse hash validation for old or rewritten commits",
               "default": false,
               "negatable": true
             }
@@ -631,13 +629,13 @@
             {
               "name": "description",
               "type": "str",
-              "help": "New description text",
+              "help": "Replacement description text for the matched changelog entry",
               "default": ""
             },
             {
               "name": "no-user-facing",
               "type": "bool",
-              "help": "Set user_facing=false, clear description and type",
+              "help": "Set user_facing=false on the matched entry, clearing its description and type",
               "default": false,
               "negatable": true
             },
@@ -651,7 +649,7 @@
             {
               "name": "no-commit",
               "type": "bool",
-              "help": "Skip auto-commit",
+              "help": "Write the edited JSONL file without auto-committing the change",
               "default": false,
               "negatable": true
             }
@@ -670,7 +668,7 @@
             {
               "name": "no-commit",
               "type": "bool",
-              "help": "Skip auto-commit of workspace.toml",
+              "help": "Create the workspace.toml file without auto-committing it to git",
               "default": false,
               "negatable": true
             }
@@ -683,43 +681,43 @@
             {
               "name": "name",
               "type": "str",
-              "help": "Project name (defaults to directory name)",
+              "help": "Display name for the project in workspace.toml (defaults to directory name)",
               "default": ""
             },
             {
               "name": "target",
               "type": "str",
-              "help": "Target registry",
+              "help": "Registry this project publishes to (e.g. npm, pypi, go, cargo)",
               "default": ""
             },
             {
               "name": "watch",
               "type": "str",
-              "help": "Comma-separated glob patterns to watch",
+              "help": "Comma-separated glob patterns for change detection in CI workflows",
               "default": ""
             },
             {
               "name": "subtree-remote",
               "type": "str",
-              "help": "Subtree remote URL",
+              "help": "Git remote URL for split-publishing this project as a standalone repo",
               "default": ""
             },
             {
               "name": "depends-on",
               "type": "str",
-              "help": "Comma-separated dependency project names",
+              "help": "Comma-separated names of workspace projects this project depends on",
               "default": ""
             },
             {
               "name": "library",
               "type": "str",
-              "help": "Mark as library (true/false)",
+              "help": "Mark as a shared library consumed by other workspace projects (true/false)",
               "default": ""
             },
             {
               "name": "dev-node",
               "type": "str",
-              "help": "Mark as dev node (true/false)",
+              "help": "Mark as a dev-only leaf node that skips changelog enforcement (true/false)",
               "default": ""
             },
             {
@@ -733,7 +731,7 @@
           "args": [
             {
               "name": "path",
-              "help": "Path to the project directory"
+              "help": "Relative path from the repo root to the project directory to register"
             }
           ]
         },
@@ -743,7 +741,7 @@
           "args": [
             {
               "name": "path",
-              "help": "Path to the project to remove"
+              "help": "Relative path from the repo root of the project to unregister from workspace.toml"
             }
           ]
         },
@@ -758,7 +756,7 @@
             {
               "name": "no-commit",
               "type": "bool",
-              "help": "Skip auto-commit of synced workflow files",
+              "help": "Write merged workflow files to .github/workflows/ without auto-committing",
               "default": false,
               "negatable": true
             }
@@ -775,24 +773,24 @@
             {
               "name": "target",
               "type": "str",
-              "help": "Target registry (npm, pypi, or go)"
+              "help": "Registry to query for name availability across all workspace projects (npm, pypi, or go)"
             },
             {
               "name": "prefix",
               "type": "str",
-              "help": "Prefix to prepend to project names",
+              "help": "String to prepend to each project name before checking availability",
               "default": ""
             },
             {
               "name": "suffix",
               "type": "str",
-              "help": "Suffix to append to project names",
+              "help": "String to append to each project name before checking availability",
               "default": ""
             },
             {
               "name": "delay",
               "type": "str",
-              "help": "Delay between checks in ms",
+              "help": "Milliseconds to wait between consecutive registry API queries (default: 200)",
               "default": "200"
             }
           ]
@@ -824,7 +822,7 @@
           "args": [
             {
               "name": "project",
-              "help": "Name of the workspace project to mirror"
+              "help": "Name of the workspace project to split and push as a standalone mirror repo"
             }
           ]
         },
@@ -835,31 +833,31 @@
             {
               "name": "format",
               "type": "str",
-              "help": "Output format: json, dot, or text (default: json)",
+              "help": "Serialization format for the dependency graph: json, dot (Graphviz), or text",
               "default": "json"
             },
             {
               "name": "output",
               "type": "str",
-              "help": "Write output to file instead of stdout",
+              "help": "File path to write the graph output to instead of printing to stdout",
               "default": ""
             },
             {
               "name": "root",
               "type": "str",
-              "help": "Show only transitive deps from this package",
+              "help": "Filter to show only transitive dependencies reachable from this package",
               "default": ""
             },
             {
               "name": "reverse",
               "type": "str",
-              "help": "Show only transitive rdeps of this package",
+              "help": "Filter to show only transitive reverse dependencies of this package",
               "default": ""
             },
             {
               "name": "depth",
               "type": "int",
-              "help": "Limit traversal depth"
+              "help": "Maximum number of dependency hops to traverse from the root or reverse node"
             }
           ]
         },
@@ -870,13 +868,13 @@
             {
               "name": "format",
               "type": "str",
-              "help": "Output format: json or text (default: text)",
+              "help": "Output serialization format for the impact report: json or text (default: text)",
               "default": "text"
             },
             {
               "name": "depth",
               "type": "int",
-              "help": "Limit traversal depth"
+              "help": "Maximum number of dependency hops to traverse when computing transitive impact"
             },
             {
               "name": "since",
@@ -893,7 +891,7 @@
             {
               "name": "allow-dirty",
               "type": "bool",
-              "help": "Allow releasing with a dirty working tree",
+              "help": "Skip the clean working tree check and allow releasing with uncommitted changes",
               "default": false,
               "negatable": true
             }
