@@ -795,6 +795,15 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
         is_library = bool(project.get("library"))
         is_dev_node = bool(project.get("dev_node"))
         log(f"Monorepo project: {monorepo_name} ({monorepo_project_path})")
+        if is_dev_node:
+            print(
+                "Error: dev_node projects cannot be released. Dev nodes are "
+                "infrastructure projects that do not produce releases. Remove "
+                "dev_node = true from workspace.toml if this project should be "
+                "releasable.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
     # Project directory: ctx.project_root is already resolved to the sub-project
     # in monorepo mode (via _require_sub_project_root).
@@ -854,71 +863,49 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
         print(f'Error: tag "{tag}" already exists.', file=sys.stderr)
         sys.exit(1)
 
-    # Dev node projects don't participate in the changelog system
-    if monorepo_name and is_dev_node:
-        log("Dev node project: skipping changelog infrastructure")
-        # Enforce mandatory description for dev_node releases
-        if not release_config.description:
-            print(
-                "Error: dev node releases require a description in unreleased.toml.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        changes_dir = None
-        changelog_content = None
-        # Build GitHub Release body from description + context
-        body_parts = [release_config.description]
-        if release_config.context:
-            body_parts.append("")
-            body_parts.append(
-                "<details>\n<summary>Context</summary>\n\n"
-                f"{release_config.context}\n\n</details>"
-            )
-        changelog_entry = "\n".join(body_parts)
-    else:
-        if not changes_dir_exists(project_dir):
-            print(
-                "Error: JSONL changelog not set up. Run 'rlsbl scaffold' to create .rlsbl/changes/",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-
-        changes_dir = get_changes_dir(project_dir)
-        tag_glob = target.monorepo_tag_glob(monorepo_name, path=monorepo_project_path) if monorepo_name else None
-        # In monorepo mode, pass the project dict so coverage/range checks
-        # only consider commits touching this package's files.
-        monorepo_project = project if monorepo_name else None
-        validation = validate_unreleased(changes_dir, tag_glob=tag_glob, project=monorepo_project, config=config)
-        if not validation["passed"]:
-            print("Error: JSONL changelog validation failed:", file=sys.stderr)
-            for check_name, (passed, details) in validation["checks"].items():
-                if not passed:
-                    for detail in details:
-                        print(f"  {check_name}: {detail}", file=sys.stderr)
-            sys.exit(1)
-        # Compute the changelog content in memory only. We defer writing CHANGELOG.md
-        # (and per-version .md files) to disk until after pre-release checks pass,
-        # so that an aborted release leaves the working tree exactly as it was.
-        # The actual write to disk happens just after acquire_lock() below.
-        changelog_content = generate_changelog(
-            project_dir, write_to_disk=False, version_override=new_version,
-            description=release_config.description, context=release_config.context,
+    if not changes_dir_exists(project_dir):
+        print(
+            "Error: JSONL changelog not set up. Run 'rlsbl scaffold' to create .rlsbl/changes/",
+            file=sys.stderr,
         )
-        log("Generated CHANGELOG.md from JSONL entries (in-memory preview)")
+        sys.exit(1)
 
-        if isinstance(changelog_content, str):
-            changelog_entry = extract_changelog_entry_from_text(changelog_content, new_version)
-        else:
-            # Mocked in tests (returns MagicMock). Fall back to the on-disk file,
-            # which test fixtures pre-populate with a known entry.
-            changelog_path = os.path.join(project_dir, "CHANGELOG.md")
-            if not os.path.exists(changelog_path):
-                print(
-                    "Error: CHANGELOG.md not found after generation.",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-            changelog_entry = extract_changelog_entry(changelog_path, new_version)
+    changes_dir = get_changes_dir(project_dir)
+    tag_glob = target.monorepo_tag_glob(monorepo_name, path=monorepo_project_path) if monorepo_name else None
+    # In monorepo mode, pass the project dict so coverage/range checks
+    # only consider commits touching this package's files.
+    monorepo_project = project if monorepo_name else None
+    validation = validate_unreleased(changes_dir, tag_glob=tag_glob, project=monorepo_project, config=config)
+    if not validation["passed"]:
+        print("Error: JSONL changelog validation failed:", file=sys.stderr)
+        for check_name, (passed, details) in validation["checks"].items():
+            if not passed:
+                for detail in details:
+                    print(f"  {check_name}: {detail}", file=sys.stderr)
+        sys.exit(1)
+    # Compute the changelog content in memory only. We defer writing CHANGELOG.md
+    # (and per-version .md files) to disk until after pre-release checks pass,
+    # so that an aborted release leaves the working tree exactly as it was.
+    # The actual write to disk happens just after acquire_lock() below.
+    changelog_content = generate_changelog(
+        project_dir, write_to_disk=False, version_override=new_version,
+        description=release_config.description, context=release_config.context,
+    )
+    log("Generated CHANGELOG.md from JSONL entries (in-memory preview)")
+
+    if isinstance(changelog_content, str):
+        changelog_entry = extract_changelog_entry_from_text(changelog_content, new_version)
+    else:
+        # Mocked in tests (returns MagicMock). Fall back to the on-disk file,
+        # which test fixtures pre-populate with a known entry.
+        changelog_path = os.path.join(project_dir, "CHANGELOG.md")
+        if not os.path.exists(changelog_path):
+            print(
+                "Error: CHANGELOG.md not found after generation.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        changelog_entry = extract_changelog_entry(changelog_path, new_version)
 
     # Snapshot dirty files BEFORE any hooks run, so we can detect which files
     # hooks create or modify (the diff between pre-hook and post-hook snapshots).
@@ -1640,15 +1627,33 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
         with open(writing_file, "w", encoding="utf-8") as f:
             f.write(changelog_entry or "")
         os.rename(writing_file, notes_file)
-        try:
-            run("gh", ["release", "create", tag, "--title", tag, "--notes-file", notes_file])
-            log(f"Created GitHub Release: {tag}")
-        except Exception:
+        # Retry gh release create with race-condition detection.
+        # GitHub API can return an error even when the release was actually created,
+        # so after each failure we check whether the release exists before retrying.
+        gh_release_succeeded = False
+        for attempt in range(2):
+            try:
+                run("gh", ["release", "create", tag, "--title", tag, "--notes-file", notes_file])
+                gh_release_succeeded = True
+                log(f"Created GitHub Release: {tag}")
+                break
+            except Exception:
+                # Check if the release was created despite the error (race condition)
+                try:
+                    run("gh", ["release", "view", tag])
+                    gh_release_succeeded = True
+                    log(f"GitHub Release created (confirmed via view): {tag}")
+                    break
+                except Exception:
+                    pass  # Release truly doesn't exist; retry or fail
+
+        if not gh_release_succeeded:
             release_created = False
+            notes_path = f".rlsbl/changes/{new_version}.md"
             print(
                 f"Error: GitHub Release creation failed for {tag}. "
                 f"The tag and commit are on the remote.\n"
-                f"  To create the release: rlsbl release edit {new_version}\n"
+                f"  To create the release: gh release create {tag} --title {tag} --notes-file {notes_path}\n"
                 f"  To roll back: rlsbl release undo",
                 file=sys.stderr,
             )

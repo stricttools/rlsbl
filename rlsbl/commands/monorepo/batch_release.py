@@ -73,8 +73,8 @@ def _cmd_batch_release(flags, project_root):
         print(
             "Error: dev_node projects cannot be in batch release: "
             f"{', '.join(dev_nodes_in_batch)}. "
-            "Use `rlsbl release run` in each project directory for "
-            "individual dev_node releases.",
+            "Remove dev_node = true from workspace.toml if these projects "
+            "should be releasable.",
             file=sys.stderr,
         )
         sys.exit(1)
