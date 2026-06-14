@@ -181,6 +181,19 @@ The command:
 
 Use `--no-resolve` to skip hash validation for old or amended commits that may no longer exist in the local history.
 
+## Modifying existing entries
+
+`rlsbl changelog edit` modifies an existing entry in any JSONL file (unreleased or released) by looking it up via commit hash. Instead of appending a new entry like `add` or `amend`, it performs a partial field update on the matched entry and rewrites the file atomically. This is the correct tool when an entry already exists but has the wrong type, description, or user-facing status.
+
+The following table distinguishes the four commands that interact with changelog entries and GitHub Release notes:
+
+| Command | What it does | Target file | Use case |
+| --- | --- | --- | --- |
+| `changelog add` | Append new entry | `unreleased.jsonl` | Document new work |
+| `changelog amend` | Append new entry | Released `.jsonl` (read-only, temporarily unlocked) | Add missing coverage to a past release |
+| `changelog edit` | Modify existing entry in-place | Any `.jsonl` (auto-detected by commit hash) | Fix wrong type, description, or user-facing status |
+| `release edit` | Sync GitHub Release notes from CHANGELOG.md | GitHub Release | Update release notes after CHANGELOG.md changes |
+
 ## Changelog discipline
 
 Changelogs are for users, not developers. Apply this test: "Would a user who upgrades read this and think 'that affects me'?" If the answer is no, the entry should be marked `--no-user-facing`. The table below classifies common change types to guide consistent categorization across releases:
