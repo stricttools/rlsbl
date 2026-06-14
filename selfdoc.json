@@ -1,6 +1,5 @@
 {
   "version": "0.73.0",
-  "version_source": "pyproject.toml",
   "base_url": "https://rlsbl.smmh.dev",
   "source": [
     {
