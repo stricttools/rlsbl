@@ -8,6 +8,7 @@ import pytest
 from rlsbl.errors import ConfigError
 from rlsbl.dep_validation import (
     DeadWorkspacePackage,
+    _is_inside_python_package,
     check_dev_in_lib,
     check_runtime_test_only,
     check_undeclared_deps,
@@ -1270,6 +1271,32 @@ class TestFindDeadNpmModules:
         # template.js should NOT be flagged -- it's a Python data resource
         rel_paths = [d for d in dead]
         assert "mylib/js/template.js" not in rel_paths
+
+
+class TestIsInsidePythonPackage:
+    """_is_inside_python_package walks parent directories up to project_dir."""
+
+    def test_grandparent_has_init_py(self, tmp_path):
+        """A file whose grandparent has __init__.py is inside a Python package."""
+        project = tmp_path / "project"
+        pkg = project / "pkg"
+        sub = pkg / "sub"
+        sub.mkdir(parents=True)
+        (pkg / "__init__.py").write_text("")
+        js_file = sub / "file.js"
+        js_file.write_text("// js\n")
+
+        assert _is_inside_python_package(str(js_file), str(project)) is True
+
+    def test_no_init_py_up_to_root(self, tmp_path):
+        """A file with no __init__.py in any parent up to project_dir is not inside a package."""
+        project = tmp_path / "project"
+        stuff = project / "stuff"
+        stuff.mkdir(parents=True)
+        js_file = stuff / "file.js"
+        js_file.write_text("// js\n")
+
+        assert _is_inside_python_package(str(js_file), str(project)) is False
 
 
 class TestWalkSourceFilesExcludeDirs:

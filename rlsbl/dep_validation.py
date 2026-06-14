@@ -11,6 +11,7 @@ import re
 import tomllib
 from collections import deque
 from dataclasses import dataclass
+from pathlib import Path
 
 from .errors import ConfigError
 from .import_scanners import (
@@ -784,15 +785,23 @@ def _build_npm_import_graph(
     return graph
 
 
-def _is_inside_python_package(filepath: str) -> bool:
+def _is_inside_python_package(filepath: str, project_dir: str) -> bool:
     """Check if a file is inside a directory containing __init__.py.
 
-    Walks up from the file's directory looking for __init__.py, which
-    indicates the directory is a Python package. JS/TS files in such
-    directories are data resources consumed by Python, not npm modules.
+    Walks up from the file's directory looking for __init__.py, stopping
+    at project_dir. If any directory from the file's parent up to (but
+    not above) project_dir contains __init__.py, the file is considered
+    a Python data resource, not an npm module.
     """
-    dirpath = os.path.dirname(os.path.abspath(filepath))
-    return os.path.isfile(os.path.join(dirpath, "__init__.py"))
+    dirpath = Path(os.path.abspath(filepath)).parent
+    boundary = Path(os.path.abspath(project_dir))
+    while dirpath >= boundary:
+        if (dirpath / "__init__.py").is_file():
+            return True
+        if dirpath == boundary:
+            break
+        dirpath = dirpath.parent
+    return False
 
 
 def find_dead_npm_modules(
@@ -832,7 +841,7 @@ def find_dead_npm_modules(
         os.path.abspath(f)
         for f in all_files
         if not _is_non_production_path(f, project_dir)
-        and not _is_inside_python_package(f)
+        and not _is_inside_python_package(f, project_dir)
     }
 
     if not production_files:
