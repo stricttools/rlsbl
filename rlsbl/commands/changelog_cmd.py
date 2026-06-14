@@ -93,6 +93,51 @@ def _check_duplicate_commits(existing_entries, new_entry):
                     )
 
 
+def _build_entry(flags, resolved_commits):
+    """Build and validate a ChangelogEntry from CLI flags and resolved commits.
+
+    Reads user_facing, description, type, and release_type from flags.
+    Validates that user-facing entries have description and type.
+    Returns a validated ChangelogEntry.
+    """
+    no_user_facing = flags.get("no-user-facing", False)
+    user_facing = not no_user_facing
+    description = flags.get("description") or None
+    entry_type = flags.get("type") or None
+
+    if user_facing:
+        if not description:
+            print(
+                "Error: --description is required for user-facing entries. "
+                "Use --no-user-facing to skip.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        if not entry_type:
+            print(
+                "Error: --type is required for user-facing entries. "
+                "Use --no-user-facing to skip.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+    entry = ChangelogEntry(
+        commits=resolved_commits,
+        user_facing=user_facing,
+        description=description,
+        type=entry_type,
+        release_type=flags.get("release-type") or None,
+    )
+
+    errors = validate_schema(entry)
+    if errors:
+        for err in errors:
+            print(f"Error: schema validation: {err}", file=sys.stderr)
+        sys.exit(1)
+
+    return entry
+
+
 def cmd_add(flags, project_root):
     """Add a changelog entry to unreleased.jsonl.
 
@@ -123,39 +168,9 @@ def cmd_add(flags, project_root):
 
     _check_project_scope(resolved_commits, ws_project)
 
-    no_user_facing = flags.get("no-user-facing", False)
-    user_facing = not no_user_facing
-    description = flags.get("description") or None
-    entry_type = flags.get("type") or None
-
-    if user_facing:
-        if not description:
-            print(
-                "Error: --description is required for user-facing entries. "
-                "Use --no-user-facing to skip.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        if not entry_type:
-            print(
-                "Error: --type is required for user-facing entries. "
-                "Use --no-user-facing to skip.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-
-    entry = ChangelogEntry(
-        commits=resolved_commits,
-        user_facing=user_facing,
-        description=description,
-        type=entry_type,
-    )
-
-    errors = validate_schema(entry)
-    if errors:
-        for err in errors:
-            print(f"Error: schema validation: {err}", file=sys.stderr)
-        sys.exit(1)
+    entry = _build_entry(flags, resolved_commits)
+    user_facing = entry.user_facing
+    description = entry.description
 
     # Check batch size limit before writing
     config = read_project_config(project_root)
@@ -314,39 +329,9 @@ def cmd_amend(flags, project_root):
     if not no_resolve:
         _check_project_scope(resolved_commits, ws_project)
 
-    no_user_facing = flags.get("no-user-facing", False)
-    user_facing = not no_user_facing
-    description = flags.get("description") or None
-    entry_type = flags.get("type") or None
-
-    if user_facing:
-        if not description:
-            print(
-                "Error: --description is required for user-facing entries. "
-                "Use --no-user-facing to skip.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        if not entry_type:
-            print(
-                "Error: --type is required for user-facing entries. "
-                "Use --no-user-facing to skip.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-
-    entry = ChangelogEntry(
-        commits=resolved_commits,
-        user_facing=user_facing,
-        description=description,
-        type=entry_type,
-    )
-
-    errors = validate_schema(entry)
-    if errors:
-        for err in errors:
-            print(f"Error: schema validation: {err}", file=sys.stderr)
-        sys.exit(1)
+    entry = _build_entry(flags, resolved_commits)
+    user_facing = entry.user_facing
+    description = entry.description
 
     changes_dir = get_changes_dir(project_root)
     jsonl_path = os.path.join(changes_dir, f"{version}.jsonl")
