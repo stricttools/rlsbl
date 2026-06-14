@@ -160,16 +160,18 @@ The `release` command group provides 6 subcommands covering the full release lif
 | `rlsbl release undo` | Revert last release: delete GitHub Release, delete tag, revert commit. Requires manual `git push` after. |
 | `rlsbl release yank <version>` | Mark a past release as deprecated (`--hard` deletes entirely). Refuses to yank the latest release. |
 
-## Dev node releases
+## Dev node projects
 
-Monorepo projects marked `dev_node = true` in `workspace.toml` have a simplified release flow that skips the entire changelog system. Since dev nodes are leaf projects with no user-facing dependents, they do not need structured change tracking or generated CHANGELOG.md files:
+Dev nodes are projects at the edge of the dependency graph that nothing user-facing depends on — test infrastructure, conformance suites, dev tooling, and internal utilities consumed only during development. Dev nodes cannot be released:
 
-- Changelog validation is skipped entirely (no `.rlsbl/changes/` directory, no `unreleased.jsonl`)
-- CHANGELOG.md generation is skipped
-- The `description` field in `unreleased.toml` is **mandatory** (it becomes the GitHub Release body)
-- The release flow is: version bump, commit, tag, push, GitHub Release (with description + context as body)
-
-Dev nodes are projects at the edge of the dependency graph — test infrastructure, conformance suites, dev tooling. Nothing user-facing depends on them. The `dev-node-boundary` check (`rlsbl check --tag workspace`) enforces this constraint.
+- **No changelog system**: no `.rlsbl/changes/`, no `unreleased.jsonl`, no `CHANGELOG.md`
+- **No releases**: `rlsbl release run` and `rlsbl release edit` error with "dev_node projects cannot be released"
+- `rlsbl changelog add` errors with "dev node projects don't use changelogs"
+- Scaffold skips changelog infrastructure
+- Pre-push check ignores dev node commits
+- Batch release (`rlsbl monorepo release`) excludes dev nodes
+- Remove `dev_node = true` from workspace.toml to make a project releasable
+- The `dev-node-boundary` check prevents non-dev-node projects from declaring runtime dependencies on dev nodes
 
 ## Scrubbing sensitive content
 
