@@ -244,10 +244,10 @@ class TestDevNodeChangelogAdd:
         assert exc_info.value.code == 1
 
 
-class TestDevNodeReleaseSkipsChangelog:
+class TestDevNodeReleaseBlocked:
     """Dev node projects must be rejected by the release guard."""
 
-    def test_dev_node_release_skips_changelog(self, dev_node_monorepo, capsys):
+    def test_dev_node_release_blocked(self, dev_node_monorepo, capsys):
         """Release run on a dev_node project hard-errors before any work."""
         root = dev_node_monorepo.root
         dev_node_dir = dev_node_monorepo.dev_node_dir
@@ -287,10 +287,10 @@ class TestDevNodeReleaseSkipsChangelog:
         assert "dev_node projects cannot be released" in captured.err
 
 
-class TestDevNodeReleaseRequiresDescription:
+class TestDevNodeReleaseBlockedRegardlessOfConfig:
     """Dev node releases are blocked by the hard error guard regardless of config."""
 
-    def test_dev_node_release_errors_without_description(self, dev_node_monorepo, capsys):
+    def test_dev_node_release_blocked_regardless_of_config_no_description(self, dev_node_monorepo, capsys):
         """Release run on a dev_node project hard-errors before description check."""
         root = dev_node_monorepo.root
         dev_node_dir = dev_node_monorepo.dev_node_dir
