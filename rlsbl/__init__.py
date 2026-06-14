@@ -743,6 +743,27 @@ def cmd_chlog_amend(version, commits, description, type, no_user_facing, no_reso
     cmd_amend(flags, project_root=root)
 
 
+@chlog.command(name="edit", help="Modify an existing changelog entry in unreleased or released JSONL files. Finds the entry by commit hash, applies field changes (type, description, user-facing status), and rewrites the file atomically. For released files, temporarily unlocks the read-only file, regenerates CHANGELOG.md, and syncs GitHub Release notes.")
+@strictcli.flag(name="commits", type=str, help="Comma-separated commit hashes identifying the target entry")
+@strictcli.flag(name="type", type=str, help="New type value (feature, fix, breaking); also disambiguates multi-entry commits", default="")
+@strictcli.flag(name="description", type=str, help="New description text", default="")
+@strictcli.flag(name="no-user-facing", type=bool, help="Set user_facing=false, clear description and type")
+@strictcli.flag(name="user-facing", type=bool, help="Set user_facing=true (requires --description and --type if entry doesn't already have them)")
+@strictcli.flag(name="no-commit", type=bool, help="Skip auto-commit")
+def cmd_chlog_edit(commits, type, description, no_user_facing, user_facing, no_commit, **_kwargs):
+    root = _require_sub_project_root()
+    flags = {
+        "commits": commits,
+        "type": type,
+        "description": description,
+        "no-user-facing": no_user_facing,
+        "user-facing": user_facing,
+        "no-commit": no_commit,
+    }
+    from .commands.changelog_cmd import cmd_edit
+    cmd_edit(flags, project_root=root)
+
+
 # ---------------------------------------------------------------------------
 # monorepo group
 # ---------------------------------------------------------------------------
