@@ -13,7 +13,6 @@ from rlsbl.commands.release import run_cmd as release_run_cmd
 from rlsbl.commands.edit_release import run_cmd as edit_run_cmd
 from rlsbl.context import ProjectContext
 from rlsbl.release_file import ReleaseConfig
-from rlsbl.utils import run as real_run
 from rlsbl.workspace import WORKSPACE_DIR
 
 
@@ -246,27 +245,17 @@ class TestDevNodeChangelogAdd:
 
 
 class TestDevNodeReleaseSkipsChangelog:
-    """Dev node projects should release without .rlsbl/changes/ directory."""
+    """Dev node projects must be rejected by the release guard."""
 
     def test_dev_node_release_skips_changelog(self, dev_node_monorepo, capsys):
-        """Release run on a dev_node project works without .rlsbl/changes/ dir."""
-        import shutil
-
+        """Release run on a dev_node project hard-errors before any work."""
         root = dev_node_monorepo.root
         dev_node_dir = dev_node_monorepo.dev_node_dir
-
-        # Remove the changes directory entirely -- dev nodes don't need it
-        changes_dir = dev_node_dir / ".rlsbl" / "changes"
-        if changes_dir.exists():
-            shutil.rmtree(str(changes_dir))
-        # Commit the removal so the tree is clean
-        run_git(root, "add", "-u", "internal-pkg/.rlsbl/changes")
-        run_git(root, "commit", "-q", "-m", "remove dev node changelog dir")
 
         # Make a commit so there's something to release
         make_commit(root, "internal-pkg/feature.js", "dev node work")
 
-        # Create a release file
+        # Create a release file and commit it so the tree is clean
         releases_dir = dev_node_dir / ".rlsbl" / "releases"
         releases_dir.mkdir(parents=True, exist_ok=True)
         (releases_dir / "unreleased.toml").write_text(
@@ -286,52 +275,25 @@ class TestDevNodeReleaseSkipsChangelog:
         rc = ReleaseConfig(bump="patch", include=["npm"], exclude=[],
                            description="Internal update")
 
-        def fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
-            if cmd == "gh":
-                return ""
-            if cmd == "git" and args and args[0] == "push":
-                return ""
-            if cmd == "git" and args and args[0] == "fetch":
-                return ""
-            if cmd == "git" and args and args[:2] == ["rev-list", "--count"] and any("origin/" in a for a in args):
-                return "0"
-            return real_run(cmd, args=args, timeout=timeout, env=env, cwd=cwd)
-
         with (
             patch("rlsbl.commands.release.check_gh_installed", return_value=True),
             patch("rlsbl.commands.release.check_gh_auth", return_value=True),
-            patch("rlsbl.commands.release.push_if_needed"),
-            patch("rlsbl.commands.release.run", side_effect=fake_run),
         ):
-            release_run_cmd(rc, {"yes": True, "quiet": True}, ctx=ctx)
+            with pytest.raises(SystemExit) as exc_info:
+                release_run_cmd(rc, {"yes": True, "quiet": True}, ctx=ctx)
+            assert exc_info.value.code == 1
 
-        # The release should succeed: package.json bumped to 0.1.1
-        pkg = json.loads((dev_node_dir / "package.json").read_text())
-        assert pkg["version"] == "0.1.1"
-
-        # No CHANGELOG.md should be created for dev node
-        assert not (dev_node_dir / "CHANGELOG.md").exists()
-
-        # No .rlsbl/changes/ directory should be created
-        assert not (dev_node_dir / ".rlsbl" / "changes").exists()
+        captured = capsys.readouterr()
+        assert "dev_node projects cannot be released" in captured.err
 
 
 class TestDevNodeReleaseRequiresDescription:
-    """Dev node releases must have a non-empty description."""
+    """Dev node releases are blocked by the hard error guard regardless of config."""
 
     def test_dev_node_release_errors_without_description(self, dev_node_monorepo, capsys):
-        """Release run on a dev_node project errors when description is empty."""
-        import shutil
-
+        """Release run on a dev_node project hard-errors before description check."""
         root = dev_node_monorepo.root
         dev_node_dir = dev_node_monorepo.dev_node_dir
-
-        # Remove the changes directory
-        changes_dir = dev_node_dir / ".rlsbl" / "changes"
-        if changes_dir.exists():
-            shutil.rmtree(str(changes_dir))
-        run_git(root, "add", "-u", "internal-pkg/.rlsbl/changes")
-        run_git(root, "commit", "-q", "-m", "remove dev node changelog dir")
 
         make_commit(root, "internal-pkg/feature.js", "dev node work")
 
@@ -362,20 +324,12 @@ class TestDevNodeReleaseRequiresDescription:
             assert exc_info.value.code == 1
 
         captured = capsys.readouterr()
-        assert "description" in captured.err
+        assert "dev_node projects cannot be released" in captured.err
 
     def test_dev_node_release_body_includes_context(self, dev_node_monorepo, capsys):
-        """Dev node release GitHub body includes description and context."""
-        import shutil
-
+        """Release run on a dev_node project hard-errors even with description and context."""
         root = dev_node_monorepo.root
         dev_node_dir = dev_node_monorepo.dev_node_dir
-
-        changes_dir = dev_node_dir / ".rlsbl" / "changes"
-        if changes_dir.exists():
-            shutil.rmtree(str(changes_dir))
-        run_git(root, "add", "-u", "internal-pkg/.rlsbl/changes")
-        run_git(root, "commit", "-q", "-m", "remove dev node changelog dir")
 
         make_commit(root, "internal-pkg/feature.js", "dev node work")
 
@@ -402,64 +356,32 @@ class TestDevNodeReleaseRequiresDescription:
             context="Needed for dashboard v3",
         )
 
-        # Capture what gets written as the notes file
-        notes_written = []
-
-        def fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
-            if cmd == "gh":
-                # Capture the notes file content when gh release create is called
-                if args and "release" in args and "create" in args:
-                    for i, a in enumerate(args):
-                        if a == "--notes-file" and i + 1 < len(args):
-                            try:
-                                with open(args[i + 1]) as f:
-                                    notes_written.append(f.read())
-                            except FileNotFoundError:
-                                pass
-                return ""
-            if cmd == "git" and args and args[0] == "push":
-                return ""
-            if cmd == "git" and args and args[0] == "fetch":
-                return ""
-            if cmd == "git" and args and args[:2] == ["rev-list", "--count"] and any("origin/" in a for a in args):
-                return "0"
-            return real_run(cmd, args=args, timeout=timeout, env=env, cwd=cwd)
-
         with (
             patch("rlsbl.commands.release.check_gh_installed", return_value=True),
             patch("rlsbl.commands.release.check_gh_auth", return_value=True),
-            patch("rlsbl.commands.release.push_if_needed"),
-            patch("rlsbl.commands.release.run", side_effect=fake_run),
         ):
-            release_run_cmd(rc, {"yes": True, "quiet": True}, ctx=ctx)
+            with pytest.raises(SystemExit) as exc_info:
+                release_run_cmd(rc, {"yes": True, "quiet": True}, ctx=ctx)
+            assert exc_info.value.code == 1
 
-        assert len(notes_written) >= 1
-        body = notes_written[0]
-        assert "Updated internal deps" in body
-        assert "Needed for dashboard v3" in body
-        assert "<details>" in body
+        captured = capsys.readouterr()
+        assert "dev_node projects cannot be released" in captured.err
 
 
 class TestReleaseEditDevNode:
-    """release edit should read description from versioned vX.Y.Z.toml for dev nodes."""
+    """release edit must reject dev_node projects with a hard error."""
 
-    def test_release_edit_reads_from_versioned_toml(self, dev_node_monorepo):
-        """After a dev_node release, release edit reads from the versioned toml."""
-        root = dev_node_monorepo.root
+    def test_release_edit_rejects_dev_node(self, dev_node_monorepo, capsys):
+        """release edit on a dev_node project hard-errors before any work."""
         dev_node_dir = dev_node_monorepo.dev_node_dir
 
-        # Simulate a completed release by creating a versioned release file
-        releases_dir = dev_node_dir / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True, exist_ok=True)
-        (releases_dir / "v0.1.0.toml").write_text(
-            'bump = "minor"\ninclude = ["npm"]\nexclude = []\n'
-        )
+        with (
+            patch("rlsbl.commands.edit_release.check_gh_installed", return_value=True),
+            patch("rlsbl.commands.edit_release.check_gh_auth", return_value=True),
+        ):
+            with pytest.raises(SystemExit) as exc_info:
+                edit_run_cmd([], {"dry-run": False}, project_root=Path(str(dev_node_dir)))
+            assert exc_info.value.code == 1
 
-        # Tag the current commit as the release
-        run_git(root, "tag", "mypkg-internal@v0.1.0-edit-test")
-
-        from rlsbl.commands.edit_release import _read_release_description
-
-        desc = _read_release_description(str(dev_node_dir), "0.1.0")
-        assert "0.1.0" in desc
-        assert "minor" in desc
+        captured = capsys.readouterr()
+        assert "dev_node projects cannot be released and have no release to edit" in captured.err
