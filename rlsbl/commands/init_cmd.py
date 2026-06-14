@@ -664,9 +664,9 @@ def _print_dry_run_report(plans_groups, registry=None, registries=None, existing
     _print_file_status_table(created, skipped)
 
     if warnings:
-        print("Warnings:")
+        print("Warnings:", file=sys.stderr)
         for w in warnings:
-            print(f"  {w}")
+            print(f"  {w}", file=sys.stderr)
 
     # Show orphans that would be removed
     if existing_hashes:
@@ -841,9 +841,9 @@ def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnin
     _print_file_status_table(created, skipped)
 
     if warnings:
-        print("Warnings:")
+        print("Warnings:", file=sys.stderr)
         for w in warnings:
-            print(f"  {w}")
+            print(f"  {w}", file=sys.stderr)
 
     # Tip when ci.yml or publish.yml had a merge conflict: recommend the
     # user-owned custom workflow file so they don't fight three-way merge.
@@ -939,7 +939,7 @@ def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnin
                 capture_output=True, text=True, check=True,
             )
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        print(f"Warning: could not untrack gitignored files: {e}")
+        print(f"Warning: could not untrack gitignored files: {e}", file=sys.stderr)
 
     if commit_files("rlsbl scaffold", files_to_commit, allow_failure=True):
         print("Committed scaffold changes.")
