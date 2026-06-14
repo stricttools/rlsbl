@@ -38,7 +38,7 @@
   },
   "project_id": "rlsbl",
   "name": "rlsbl",
-  "version": "0.71.1",
+  "version": "0.72.0",
   "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 32 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
   "global_flags": [
     {
@@ -608,6 +608,50 @@
               "name": "no-resolve",
               "type": "bool",
               "help": "Skip hash validation",
+              "default": false,
+              "negatable": true
+            }
+          ]
+        },
+        "edit": {
+          "name": "edit",
+          "help": "Modify an existing changelog entry in unreleased or released JSONL files. Finds the entry by commit hash, applies field changes (type, description, user-facing status), and rewrites the file atomically. For released files, temporarily unlocks the read-only file, regenerates CHANGELOG.md, and syncs GitHub Release notes.",
+          "flags": [
+            {
+              "name": "commits",
+              "type": "str",
+              "help": "Comma-separated commit hashes identifying the target entry"
+            },
+            {
+              "name": "type",
+              "type": "str",
+              "help": "New type value (feature, fix, breaking); also disambiguates multi-entry commits",
+              "default": ""
+            },
+            {
+              "name": "description",
+              "type": "str",
+              "help": "New description text",
+              "default": ""
+            },
+            {
+              "name": "no-user-facing",
+              "type": "bool",
+              "help": "Set user_facing=false, clear description and type",
+              "default": false,
+              "negatable": true
+            },
+            {
+              "name": "user-facing",
+              "type": "bool",
+              "help": "Set user_facing=true (requires --description and --type if entry doesn't already have them)",
+              "default": false,
+              "negatable": true
+            },
+            {
+              "name": "no-commit",
+              "type": "bool",
+              "help": "Skip auto-commit",
               "default": false,
               "negatable": true
             }

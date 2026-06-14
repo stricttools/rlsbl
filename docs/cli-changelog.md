@@ -50,3 +50,18 @@ Append a changelog entry to a released version's JSONL file. Temporarily unlocks
 | `--type` |  | str |  |  | Entry type (feature, fix, breaking) |
 | `--no-user-facing` |  | bool |  |  | Mark as non-user-facing |
 | `--no-resolve` |  | bool |  |  | Skip hash validation |
+
+## changelog edit
+
+Modify an existing changelog entry in unreleased or released JSONL files. Finds the entry by commit hash, applies field changes (type, description, user-facing status), and rewrites the file atomically. For released files, temporarily unlocks the read-only file, regenerates CHANGELOG.md, and syncs GitHub Release notes.
+
+### Flags
+
+| Name | Short | Type | Default | Env | Description |
+| --- | --- | --- | --- | --- | --- |
+| `--commits` |  | str |  |  | Comma-separated commit hashes identifying the target entry |
+| `--type` |  | str |  |  | New type value (feature, fix, breaking); also disambiguates multi-entry commits |
+| `--description` |  | str |  |  | New description text |
+| `--no-user-facing` |  | bool |  |  | Set user_facing=false, clear description and type |
+| `--user-facing` |  | bool |  |  | Set user_facing=true (requires --description and --type if entry doesn't already have them) |
+| `--no-commit` |  | bool |  |  | Skip auto-commit |
