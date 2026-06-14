@@ -1,8 +1,0 @@
-# Version bump type: patch, minor, or major
-bump = "minor"
-# Short description of this release (required)
-description = "Changelog edit command, dev_node release prohibition, config hardening, and coverage reporting"
-# Optional context explaining why these changes were made
-context = ""
-include = ["npm", "pypi"]
-exclude = []
