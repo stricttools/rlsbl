@@ -9,16 +9,16 @@ nav_order: 2
 
 # rlsbl check
 
-Run project checks
+Run project checks registered via the check framework and report results
 
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--all` |  | bool |  |  | Run all checks |
-| `--tag` |  | str |  |  | Tag DSL expression to filter checks |
-| `--name` |  | str |  |  | Glob pattern to filter by check name |
-| `--list` |  | bool |  |  | List all checks and their tags |
-| `--json` |  | bool |  |  | Output results as JSON |
-| `--ignore-warnings` |  | bool |  |  | Warn severity does not cause nonzero exit |
-| `--verbose` |  | bool |  |  | Show details for passing checks too |
+| `--all` |  | bool |  |  | Run every registered check regardless of tag or name filters |
+| `--tag` |  | str |  |  | Tag DSL expression to select checks (e.g. 'changelog & !quality') |
+| `--name` |  | str |  |  | Glob pattern to filter checks by name (e.g. 'hash-*', '*coverage*') |
+| `--list` |  | bool |  |  | List all registered checks with their tags and exit without running |
+| `--json` |  | bool |  |  | Output check results as machine-readable JSON instead of human text |
+| `--ignore-warnings` |  | bool |  |  | Treat warn-severity results as passing so they do not cause nonzero exit |
+| `--verbose` |  | bool |  |  | Show full details for passing checks in addition to failures and warnings |

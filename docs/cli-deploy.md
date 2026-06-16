@@ -15,11 +15,11 @@ Run the configured deployment pipeline for the project. Supports named deploy ta
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--target` |  | str |  |  | Target a specific registry |
-| `--force` |  | bool |  |  | Override branch restrictions |
+| `--target` |  | str |  |  | Registry whose deploy pipeline to run (auto-detected if omitted) |
+| `--force` |  | bool |  |  | Bypass branch restrictions that normally limit which branches can deploy |
 
 ## Arguments
 
 | Name | Required | Description |
 | --- | --- | --- |
-| `target_name` | no | Deploy target name |
+| `target_name` | no | Named deploy target from the project's deploy configuration to execute |

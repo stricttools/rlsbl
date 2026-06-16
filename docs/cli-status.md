@@ -16,4 +16,4 @@ Display the current project version, branch, last release tag, unreleased commit
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--target` |  | str |  |  | Target a specific registry (auto-detected if omitted) |
-| `--json` |  | bool |  |  | Output status as JSON |
+| `--json` |  | bool |  |  | Output version, branch, tag, and coverage as machine-readable JSON |

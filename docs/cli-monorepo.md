@@ -19,7 +19,7 @@ Create a new monorepo workspace by generating the .rlsbl-monorepo directory and 
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--no-commit` |  | bool |  |  | Skip auto-commit of workspace.toml |
+| `--no-commit` |  | bool |  |  | Create the workspace.toml file without auto-committing it to git |
 
 ## monorepo add
 
@@ -29,20 +29,20 @@ Register a project directory in the monorepo workspace.toml configuration. The p
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--name` |  | str |  |  | Project name (defaults to directory name) |
-| `--target` |  | str |  |  | Target registry |
-| `--watch` |  | str |  |  | Comma-separated glob patterns to watch |
-| `--subtree-remote` |  | str |  |  | Subtree remote URL |
-| `--depends-on` |  | str |  |  | Comma-separated dependency project names |
-| `--library` |  | str |  |  | Mark as library (true/false) |
-| `--dev-node` |  | str |  |  | Mark as dev node (true/false) |
+| `--name` |  | str |  |  | Display name for the project in workspace.toml (defaults to directory name) |
+| `--target` |  | str |  |  | Registry this project publishes to (e.g. npm, pypi, go, cargo) |
+| `--watch` |  | str |  |  | Comma-separated glob patterns for change detection in CI workflows |
+| `--subtree-remote` |  | str |  |  | Git remote URL for split-publishing this project as a standalone repo |
+| `--depends-on` |  | str |  |  | Comma-separated names of workspace projects this project depends on |
+| `--library` |  | str |  |  | Mark as a shared library consumed by other workspace projects (true/false) |
+| `--dev-node` |  | str |  |  | Mark as a dev-only leaf node that skips changelog enforcement (true/false) |
 | `--no-commit` |  | bool |  |  | Skip auto-commit of workspace.toml and suppress commits from auto-triggered scaffold/sync |
 
 ### Arguments
 
 | Name | Required | Description |
 | --- | --- | --- |
-| `path` | yes | Path to the project directory |
+| `path` | yes | Relative path from the repo root to the project directory to register |
 
 ## monorepo remove
 
@@ -52,7 +52,7 @@ Unregister a project from the monorepo workspace.toml by its path. This removes 
 
 | Name | Required | Description |
 | --- | --- | --- |
-| `path` | yes | Path to the project to remove |
+| `path` | yes | Relative path from the repo root of the project to unregister from workspace.toml |
 
 ## monorepo list
 
@@ -66,7 +66,7 @@ Copy and merge CI workflow files from each project's individual scaffold into th
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--no-commit` |  | bool |  |  | Skip auto-commit of synced workflow files |
+| `--no-commit` |  | bool |  |  | Write merged workflow files to .github/workflows/ without auto-committing |
 
 ## monorepo status
 
@@ -80,10 +80,10 @@ Check package name availability on a target registry for all projects in the mon
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--target` |  | str |  |  | Target registry (npm, pypi, or go) |
-| `--prefix` |  | str |  |  | Prefix to prepend to project names |
-| `--suffix` |  | str |  |  | Suffix to append to project names |
-| `--delay` |  | str | 200 |  | Delay between checks in ms |
+| `--target` |  | str |  |  | Registry to query for name availability across all workspace projects (npm, pypi, or go) |
+| `--prefix` |  | str |  |  | String to prepend to each project name before checking availability |
+| `--suffix` |  | str |  |  | String to append to each project name before checking availability |
+| `--delay` |  | str | 200 |  | Milliseconds to wait between consecutive registry API queries (default: 200) |
 
 ## monorepo release-order
 
@@ -111,7 +111,7 @@ Initialize a subtree mirror repository for a monorepo project by performing a fu
 
 | Name | Required | Description |
 | --- | --- | --- |
-| `project` | yes | Name of the workspace project to mirror |
+| `project` | yes | Name of the workspace project to split and push as a standalone mirror repo |
 
 ## monorepo graph
 
@@ -121,11 +121,11 @@ Export the monorepo dependency graph in JSON, DOT (Graphviz), or indented text t
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--format` |  | str | json |  | Output format: json, dot, or text (default: json) |
-| `--output` |  | str |  |  | Write output to file instead of stdout |
-| `--root` |  | str |  |  | Show only transitive deps from this package |
-| `--reverse` |  | str |  |  | Show only transitive rdeps of this package |
-| `--depth` |  | int |  |  | Limit traversal depth |
+| `--format` |  | str | json |  | Serialization format for the dependency graph: json, dot (Graphviz), or text |
+| `--output` |  | str |  |  | File path to write the graph output to instead of printing to stdout |
+| `--root` |  | str |  |  | Filter to show only transitive dependencies reachable from this package |
+| `--reverse` |  | str |  |  | Filter to show only transitive reverse dependencies of this package |
+| `--depth` |  | int |  |  | Maximum number of dependency hops to traverse from the root or reverse node |
 
 ## monorepo impact
 
@@ -135,8 +135,8 @@ Analyze the impact of changes to a package, file, or git diff range on the monor
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--format` |  | str | text |  | Output format: json or text (default: text) |
-| `--depth` |  | int |  |  | Limit traversal depth |
+| `--format` |  | str | text |  | Output serialization format for the impact report: json or text (default: text) |
+| `--depth` |  | int |  |  | Maximum number of dependency hops to traverse when computing transitive impact |
 | `--since` |  | str |  |  | Git ref to diff against HEAD (e.g. HEAD~3, v1.0.0) |
 
 ## monorepo release
@@ -147,7 +147,7 @@ Execute a batch release of multiple monorepo packages in topological order. Read
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--allow-dirty` |  | bool |  |  | Allow releasing with a dirty working tree |
+| `--allow-dirty` |  | bool |  |  | Skip the clean working tree check and allow releasing with uncommitted changes |
 
 ## monorepo release-init
 

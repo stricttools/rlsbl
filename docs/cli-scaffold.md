@@ -16,8 +16,8 @@ Generate or update CI/CD workflows, git hooks, changelog, and license files. Saf
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--target` |  | str |  |  | Target a specific registry (auto-detected if omitted) |
-| `--force` |  | bool |  |  | Overwrite all files (ignore user customizations) |
-| `--private` |  | bool |  |  | Scaffold for private repos (skip publish) |
-| `--no-commit` |  | bool |  |  | Skip auto-commit of scaffolded files |
-| `--skip-shared` |  | bool |  |  | Skip shared template processing |
-| `--no-tag` |  | bool |  |  | Disable ecosystem tagging for this invocation |
+| `--force` |  | bool |  |  | Overwrite all scaffold-managed files, discarding any user customizations |
+| `--private` |  | bool |  |  | Generate workflows without publish steps, suitable for private repositories |
+| `--no-commit` |  | bool |  |  | Write scaffolded files to disk without auto-committing them |
+| `--skip-shared` |  | bool |  |  | Skip processing of shared workflow templates across targets |
+| `--no-tag` |  | bool |  |  | Do not add or update the rlsbl GitHub topic tag on this invocation |

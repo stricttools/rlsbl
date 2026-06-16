@@ -19,7 +19,7 @@ Bump version, validate the JSONL changelog, run tests and lint, commit, tag, pus
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--allow-dirty` |  | bool |  |  | Allow releasing with a dirty working tree |
+| `--allow-dirty` |  | bool |  |  | Skip the clean working tree check and allow releasing with uncommitted changes |
 | `--watch` |  | bool |  |  | After release, automatically watch CI runs to completion |
 | `--no-watch` |  | bool |  |  | After release, print the watch command hint without watching |
 
@@ -46,7 +46,7 @@ Sync the GitHub Release notes for a given version with the corresponding CHANGEL
 
 | Name | Required | Description |
 | --- | --- | --- |
-| `version` | no | Version to update (defaults to current) |
+| `version` | no | Version whose GitHub Release notes to sync (defaults to current version) |
 
 ## release undo
 
@@ -56,7 +56,7 @@ Revert the most recent release by deleting the GitHub Release, removing the git 
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--target` |  | str |  |  | Target a specific registry |
+| `--target` |  | str |  |  | Target a specific registry for version detection (auto-detected if omitted) |
 
 ## release yank
 
@@ -66,15 +66,15 @@ Mark a past release as deprecated (soft yank) or delete it (hard yank). Soft yan
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--reason` |  | str |  |  | Why the version is being yanked |
-| `--use` |  | str |  |  | Replacement version to recommend |
+| `--reason` |  | str |  |  | Human-readable explanation of why this version is being yanked |
+| `--use` |  | str |  |  | Suggest this version as a replacement in the deprecation notice |
 | `--hard` |  | bool |  |  | Delete the release instead of marking as pre-release |
 
 ### Arguments
 
 | Name | Required | Description |
 | --- | --- | --- |
-| `version` | yes | Version to yank (e.g. 0.9.1 or v0.9.1) |
+| `version` | yes | Semver string of the release to yank, with or without v prefix (e.g. 0.9.1) |
 
 ## release scrub
 
@@ -85,9 +85,9 @@ Scrub sensitive content from git history and update release metadata to match th
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--reason` |  | str |  |  | Reason for scrubbing (required, used in commit message) |
-| `--pattern` |  | str |  |  | Regex pattern to match (for scrub match) |
-| `--file` |  | str |  |  | File path to scrub (for scrub file) |
-| `--replace` |  | str |  |  | Replacement text for matched content |
+| `--pattern` |  | str |  |  | Regex pattern to match against file contents (mutually exclusive with --file) |
+| `--file` |  | str |  |  | Path to the file to remove from git history (mutually exclusive with --pattern) |
+| `--replace` |  | str |  |  | Literal text to substitute for each match (mutually exclusive with --mangle) |
 | `--mangle` |  | bool |  |  | Replace matched content with random ASCII of same length |
-| `--from-commit` |  | str |  |  | Start rewriting from this commit (inclusive) |
-| `--entire-history` |  | bool |  |  | Rewrite entire repository history |
+| `--from-commit` |  | str |  |  | SHA of the earliest commit to rewrite (all descendants are also rewritten) |
+| `--entire-history` |  | bool |  |  | Rewrite every commit in the repository from the initial commit onward |
