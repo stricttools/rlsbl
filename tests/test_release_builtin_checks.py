@@ -603,6 +603,7 @@ class TestSelfdocGen:
 class TestTwoHookModel:
     """Tests for pre-checks and pre-release hook ordering."""
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -623,6 +624,7 @@ class TestTwoHookModel:
         _commit_files,
         mock_run,
         _push,
+        _remote_exists,
         tmp_project,
     ):
         """pre-checks.sh runs before built-in tests."""
@@ -655,6 +657,7 @@ class TestTwoHookModel:
             mock_tests.assert_called_once()
             mock_lint.assert_called_once()
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -675,6 +678,7 @@ class TestTwoHookModel:
         _commit_files,
         mock_run,
         _push,
+        _remote_exists,
         tmp_project,
     ):
         """pre-release.sh runs after built-in tests and lint."""
@@ -706,6 +710,7 @@ class TestTwoHookModel:
                 "pre-release.sh should have run after built-in checks"
             )
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -726,6 +731,7 @@ class TestTwoHookModel:
         _commit_files,
         mock_run,
         _push,
+        _remote_exists,
         tmp_project,
     ):
         """A failing pre-checks.sh aborts the release before running tests."""
@@ -759,6 +765,7 @@ class TestTwoHookModel:
 class TestFullFlowOrder:
     """Tests verifying the execution order of all pre-release components."""
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -779,6 +786,7 @@ class TestFullFlowOrder:
         _commit_files,
         mock_run,
         _push,
+        _remote_exists,
         tmp_project,
     ):
         """Verify order: pre-checks hook -> tests -> lint -> pre-release hook.

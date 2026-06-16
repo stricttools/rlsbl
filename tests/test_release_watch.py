@@ -98,6 +98,7 @@ class TestWatchMutexEnforcement:
 class TestNoWatchPrintsHint:
     """--no-watch preserves the existing behavior of printing the watch hint."""
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -121,6 +122,7 @@ class TestNoWatchPrintsHint:
         _commit_files,
         mock_run,
         _push,
+        _remote_exists,
         tmp_project,
         capsys,
     ):
@@ -148,6 +150,7 @@ class TestNoWatchPrintsHint:
 class TestWatchInvokesWatchCmd:
     """--watch calls the watch command's run_cmd with the pushed SHA."""
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -171,6 +174,7 @@ class TestWatchInvokesWatchCmd:
         _commit_files,
         mock_run,
         _push,
+        _remote_exists,
         tmp_project,
         capsys,
     ):
@@ -192,6 +196,7 @@ class TestWatchInvokesWatchCmd:
 class TestWatchInvokedAfterRelease:
     """When --watch is set and release completes, watch.run_cmd is called."""
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -229,6 +234,7 @@ class TestWatchInvokedAfterRelease:
         _commit_files,
         mock_run,
         _push,
+        _remote_exists,
         tmp_project,
         capsys,
     ):
@@ -280,6 +286,7 @@ class TestWatchInvokedAfterRelease:
 )
             mock_watch.assert_called_once_with(None, [fake_sha], {})
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -317,6 +324,7 @@ class TestWatchInvokedAfterRelease:
         _commit_files,
         mock_run,
         _push,
+        _remote_exists,
         tmp_project,
         capsys,
     ):

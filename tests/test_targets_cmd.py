@@ -111,6 +111,7 @@ class TestMultiTargetRelease:
         with open(os.path.join(".rlsbl", "config.json"), "w") as f:
             json.dump({"private": False}, f)
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -127,7 +128,7 @@ class TestMultiTargetRelease:
     @patch("rlsbl.commands.release._run_selfdoc_check", return_value=True)
     @patch("rlsbl.commands.release._run_selfdoc_gen", return_value=True)
     def test_secondary_targets_called_when_detected(
-        self, _selfdoc_gen, _selfdoc_check, _changes_dir, _extract, _finalize, _gen_ver_file, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, _commit_files, mock_run, _push, monkeypatch
+        self, _selfdoc_gen, _selfdoc_check, _changes_dir, _extract, _finalize, _gen_ver_file, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, _commit_files, mock_run, _push, _remote_exists, monkeypatch
     ):
         """When a secondary target (spec) is detected, its build is called."""
         # Create version.json so spec target is detected
@@ -166,6 +167,7 @@ class TestMultiTargetRelease:
         # Verify spec target build was called
         build_mock.assert_called_once_with(".", "1.0.1")
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -182,7 +184,7 @@ class TestMultiTargetRelease:
     @patch("rlsbl.commands.release._run_selfdoc_check", return_value=True)
     @patch("rlsbl.commands.release._run_selfdoc_gen", return_value=True)
     def test_secondary_target_failure_is_non_fatal(
-        self, _selfdoc_gen, _selfdoc_check, _changes_dir, _extract, _finalize, _gen_ver_file, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, _commit_files, mock_run, _push, monkeypatch
+        self, _selfdoc_gen, _selfdoc_check, _changes_dir, _extract, _finalize, _gen_ver_file, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, _commit_files, mock_run, _push, _remote_exists, monkeypatch
     ):
         """If a secondary target's build raises, release still completes."""
         # Create version.json so spec target is detected

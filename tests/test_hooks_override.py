@@ -169,6 +169,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
     """Tests that the release flow skips built-in tests/lint when the
     pre-release hook has been customized."""
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -193,6 +194,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         _commit_files,
         mock_run,
         _push,
+        _remote_exists,
         tmp_project,
         capsys,
     ):
@@ -226,6 +228,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         assert "Skipping built-in tests (pre-release hook handles testing)" in captured.out
         assert "Skipping built-in lint (pre-release hook handles linting)" in captured.out
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -250,6 +253,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         _commit_files,
         mock_run,
         _push,
+        _remote_exists,
         tmp_project,
         capsys,
     ):
@@ -280,6 +284,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         assert "Skipping built-in tests" not in captured.out
         assert "Skipping built-in lint" not in captured.out
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -304,6 +309,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         _commit_files,
         mock_run,
         _push,
+        _remote_exists,
         tmp_project,
         capsys,
     ):
@@ -329,6 +335,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         mock_tests.assert_called_once()
         mock_lint.assert_called_once()
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -353,6 +360,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         _commit_files,
         mock_run,
         _push,
+        _remote_exists,
         tmp_project,
     ):
         """Even when tests/lint are skipped, the pre-release hook itself

@@ -53,6 +53,7 @@ class TestReleaseValidatedCache:
         with open(os.path.join(".rlsbl", "config.json"), "w") as f:
             json.dump({"private": False}, f)
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.release_lock")
     @patch("rlsbl.commands.release.acquire_lock")
     @patch("rlsbl.commands.release.push_if_needed")
@@ -74,7 +75,7 @@ class TestReleaseValidatedCache:
                                                     _deploy, _tag, _gh_inst,
                                                     _gh_auth, _clean, _branch,
                                                     _commit_files, mock_run, _push,
-                                                    _lock, _unlock):
+                                                    _lock, _unlock, _remote_exists):
         """The .validated file modified by validation must not trigger the dirty-tree abort."""
         from rlsbl.commands.release import run_cmd
 
@@ -113,6 +114,7 @@ class TestReleaseValidatedCache:
             ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}),
 )
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.release_lock")
     @patch("rlsbl.commands.release.acquire_lock")
     @patch("rlsbl.commands.release.push_if_needed")
@@ -130,7 +132,7 @@ class TestReleaseValidatedCache:
                                                           _deploy, _tag, _gh_inst,
                                                           _gh_auth, _clean, _branch,
                                                           _commit_files, mock_run, _push,
-                                                          _lock, _unlock):
+                                                          _lock, _unlock, _remote_exists):
         """An unexpected file (not .validated, not package.json) still aborts the release."""
         from rlsbl.commands.release import run_cmd
 

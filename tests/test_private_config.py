@@ -90,6 +90,7 @@ class TestPrivateConfigRequired:
         captured = capsys.readouterr()
         assert "private repo cannot publish" in captured.err
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -101,7 +102,7 @@ class TestPrivateConfigRequired:
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_release_proceeds_when_private_true_no_local_pipeline(
         self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch,
-        _commit_files, mock_run, _push, capsys,
+        _commit_files, mock_run, _push, _remote_exists, capsys,
     ):
         """Release does not abort when private=true and no local pipeline config."""
         _write_config(self.tmp_dir, {"private": True, "pipelines": {}})
@@ -113,6 +114,7 @@ class TestPrivateConfigRequired:
         # Should not raise SystemExit
         run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": True, "pipelines": {}}))
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -124,7 +126,7 @@ class TestPrivateConfigRequired:
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_release_proceeds_when_private_false(
         self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch,
-        _commit_files, mock_run, _push, capsys,
+        _commit_files, mock_run, _push, _remote_exists, capsys,
     ):
         """Release does not abort when private=false (normal public repo)."""
         _write_config(self.tmp_dir, {"private": False, "pipelines": {}})
@@ -155,6 +157,7 @@ class TestPrivatePublishGuardrail:
         with open(os.path.join(".rlsbl", "changes", "unreleased.jsonl"), "w") as f:
             f.write('{"commits":["abc1234"],"user_facing":true,"description":"Bugfix","type":"fix"}\n')
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.release_lock")
     @patch("rlsbl.commands.release.acquire_lock")
     @patch("rlsbl.commands.release.push_if_needed")
@@ -176,7 +179,7 @@ class TestPrivatePublishGuardrail:
         self, _changes_dir, _extract, _finalize, _gen_ver_file,
         _validate, _gen_cl, _deploy, _tag, _gh_inst, _gh_auth,
         _clean, _branch, _commit_files, mock_run, _push, _lock, _unlock,
-        capsys,
+        _remote_exists, capsys,
     ):
         """When private=true, pipeline.publish() is not called."""
         _write_config(self.tmp_dir, {"private": True, "pipelines": {"npm": {"type": "npm", "local": False}}})
@@ -208,6 +211,7 @@ class TestPrivatePublishGuardrail:
             # publish() must NOT be called for private repos
             mock_publish.assert_not_called()
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.release_lock")
     @patch("rlsbl.commands.release.acquire_lock")
     @patch("rlsbl.commands.release.push_if_needed")
@@ -231,7 +235,7 @@ class TestPrivatePublishGuardrail:
         _changes_dir, _extract, _finalize, _gen_ver_file,
         _validate, _gen_cl, _deploy, _tag, _gh_inst, _gh_auth,
         _clean, _branch, _commit_files, mock_run, _push, _lock, _unlock,
-        capsys,
+        _remote_exists, capsys,
     ):
         """When private=true with assets: true, asset upload still runs."""
         _write_config(self.tmp_dir, {

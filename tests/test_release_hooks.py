@@ -57,6 +57,7 @@ def _setup_project(tmp_path, hook_name, hook_body):
 class TestPreReleaseHookOutput:
     """Tests for pre-release hook streaming and error handling."""
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -77,6 +78,7 @@ class TestPreReleaseHookOutput:
         _commit_files,
         mock_run,
         _push,
+        _remote_exists,
         tmp_project,
     ):
         """A successful hook is called via subprocess.run without capture_output."""
@@ -102,6 +104,7 @@ class TestPreReleaseHookOutput:
             # Should have check=True
             assert call_args.kwargs.get("check") is True
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -122,6 +125,7 @@ class TestPreReleaseHookOutput:
         _commit_files,
         mock_run,
         _push,
+        _remote_exists,
         tmp_project,
         capsys,
     ):
@@ -160,6 +164,7 @@ class TestPreReleaseHookOutput:
         # No .rlsbl/hooks/pre-release.sh created
 
         with (
+            patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
             patch("rlsbl.commands.release.push_if_needed"),
             patch("rlsbl.commands.release.run") as mock_run,
             patch("rlsbl.commands.release.commit_files", return_value=True),
@@ -239,6 +244,7 @@ class TestPostReleaseHookOutput:
             return subprocess.CompletedProcess(args=cmd, returncode=0)
 
         with (
+            patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
             patch("rlsbl.commands.release.subprocess") as mock_sp,
         ):
@@ -320,6 +326,7 @@ class TestWatchSHABeforePostHook:
             return subprocess.CompletedProcess(args=cmd, returncode=0)
 
         with (
+            patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
             patch("rlsbl.commands.release.subprocess") as mock_sp,
         ):
@@ -354,6 +361,7 @@ class TestHookTimeout:
         captured = capsys.readouterr()
         assert "invalid RLSBL_HOOK_TIMEOUT" in captured.err
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -374,6 +382,7 @@ class TestHookTimeout:
         _commit_files,
         mock_run,
         _push,
+        _remote_exists,
         tmp_project,
         monkeypatch,
         capsys,
@@ -401,6 +410,7 @@ class TestHookTimeout:
 class TestHookCwdStandalone:
     """Tests that hook subprocess.run calls receive cwd=None in standalone mode."""
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -421,6 +431,7 @@ class TestHookCwdStandalone:
         _commit_files,
         mock_run,
         _push,
+        _remote_exists,
         tmp_project,
     ):
         """In standalone mode, pre-checks hook subprocess.run gets cwd=project_dir."""
@@ -441,6 +452,7 @@ class TestHookCwdStandalone:
             pre_checks_call = mock_sp.run.call_args_list[0]
             assert pre_checks_call.kwargs.get("cwd") == "."
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -461,6 +473,7 @@ class TestHookCwdStandalone:
         _commit_files,
         mock_run,
         _push,
+        _remote_exists,
         tmp_project,
     ):
         """In standalone mode, pre-release hook subprocess.run gets cwd=project_dir."""
@@ -526,6 +539,7 @@ class TestHookCwdStandalone:
             return ""
 
         with (
+            patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
             patch("rlsbl.commands.release.subprocess") as mock_sp,
         ):
@@ -549,6 +563,7 @@ class TestHookCwdStandalone:
 class TestHookCwdMonorepo:
     """Tests that hook subprocess.run calls receive cwd=project_dir in monorepo mode."""
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -573,6 +588,7 @@ class TestHookCwdMonorepo:
         _commit_files,
         mock_run,
         _push,
+        _remote_exists,
         monorepo_fixture,
         monkeypatch,
     ):
@@ -614,6 +630,7 @@ class TestHookCwdMonorepo:
             assert os.path.isabs(script_path)
             assert script_path.endswith(".rlsbl/hooks/pre-checks.sh")
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -638,6 +655,7 @@ class TestHookCwdMonorepo:
         _commit_files,
         mock_run,
         _push,
+        _remote_exists,
         monorepo_fixture,
         monkeypatch,
     ):
@@ -735,6 +753,7 @@ class TestHookCwdMonorepo:
             return ""
 
         with (
+            patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
             patch("rlsbl.commands.release.subprocess") as mock_sp,
         ):

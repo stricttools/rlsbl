@@ -68,6 +68,7 @@ def _setup_multi_target_project(tmp_path, targets):
 class TestRunCmdWithReleaseConfig:
     """run_cmd(ReleaseConfig, flags, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}})) works correctly in dry-run mode."""
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -91,6 +92,7 @@ class TestRunCmdWithReleaseConfig:
         _commit_files,
         mock_run,
         _push,
+        _remote_exists,
         tmp_project,
         capsys,
     ):
@@ -112,6 +114,7 @@ class TestRunCmdWithReleaseConfig:
         assert "patch" in captured.out
         assert "Dry run" in captured.out
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -135,6 +138,7 @@ class TestRunCmdWithReleaseConfig:
         _commit_files,
         mock_run,
         _push,
+        _remote_exists,
         tmp_project,
         capsys,
     ):
@@ -153,6 +157,7 @@ class TestRunCmdWithReleaseConfig:
         assert "1.1.0" in captured.out
         assert "minor" in captured.out
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -176,6 +181,7 @@ class TestRunCmdWithReleaseConfig:
         _commit_files,
         mock_run,
         _push,
+        _remote_exists,
         tmp_project,
         capsys,
     ):
@@ -232,6 +238,7 @@ class TestTargetExhaustivenessValidation:
         assert "detected targets not in release file" in captured.err
         assert "pypi" in captured.err
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -255,6 +262,7 @@ class TestTargetExhaustivenessValidation:
         _commit_files,
         mock_run,
         _push,
+        _remote_exists,
         tmp_project,
         capsys,
     ):
@@ -290,6 +298,7 @@ class TestTargetExhaustivenessValidation:
         assert "unknown target" in captured.err
         assert "nonexistent_target" in captured.err
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -313,6 +322,7 @@ class TestTargetExhaustivenessValidation:
         _commit_files,
         mock_run,
         _push,
+        _remote_exists,
         tmp_project,
         capsys,
     ):
@@ -417,6 +427,7 @@ class TestCmdReleaseInvalidFile:
 class TestReleaseConfigSignature:
     """run_cmd(ReleaseConfig, flags, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}})) is the only supported calling convention."""
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -440,6 +451,7 @@ class TestReleaseConfigSignature:
         _commit_files,
         mock_run,
         _push,
+        _remote_exists,
         tmp_project,
         capsys,
     ):
@@ -574,6 +586,7 @@ class TestMonorepoDirectoryScoping:
     dict rather than None.
     """
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -594,6 +607,7 @@ class TestMonorepoDirectoryScoping:
         _commit_files,
         mock_run,
         _push,
+        _remote_exists,
         monorepo_fixture,
         monkeypatch,
     ):

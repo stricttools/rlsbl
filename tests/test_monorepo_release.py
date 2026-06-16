@@ -86,6 +86,7 @@ class TestMonorepoRelease:
 
         return proj_dir
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
     @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
@@ -94,7 +95,7 @@ class TestMonorepoRelease:
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_dry_run_shows_monorepo_tag(
-        self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run,
+        self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run, _remote_exists,
         mock_git_repo, monkeypatch, capsys,
     ):
         """Dry-run in a monorepo project shows prefixed tag."""
@@ -115,6 +116,7 @@ class TestMonorepoRelease:
         assert "tooling@v1.0.0" in output
         assert "Tag:" in output
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
     @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
@@ -123,7 +125,7 @@ class TestMonorepoRelease:
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_dry_run_shows_monorepo_commit_message(
-        self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run,
+        self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run, _remote_exists,
         mock_git_repo, monkeypatch, capsys,
     ):
         """Commit message uses 'name: release v...' format in monorepo mode."""
@@ -140,6 +142,7 @@ class TestMonorepoRelease:
         assert "tooling: release v1.0.0" in output
         assert "Commit:" in output
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
     @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
@@ -148,7 +151,7 @@ class TestMonorepoRelease:
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_dry_run_bump_shows_monorepo_tag(
-        self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run,
+        self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run, _remote_exists,
         mock_git_repo, monkeypatch, capsys,
     ):
         """When bumping an existing version in monorepo, tag is name@vX.Y.Z."""
@@ -171,6 +174,7 @@ class TestMonorepoRelease:
         assert "tooling@v1.0.1" in output
         assert "tooling: release v1.0.1" in output
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
     @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
@@ -179,7 +183,7 @@ class TestMonorepoRelease:
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_dry_run_shows_project_info(
-        self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run,
+        self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run, _remote_exists,
         mock_git_repo, monkeypatch, capsys,
     ):
         """Dry-run output includes project name and path."""
@@ -232,6 +236,7 @@ class TestMonorepoRelease:
 )
         assert exc_info.value.code == 1
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
     @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
@@ -240,7 +245,7 @@ class TestMonorepoRelease:
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_standalone_release_unchanged(
-        self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run,
+        self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run, _remote_exists,
         mock_git_repo, capsys,
     ):
         """Non-monorepo release still uses plain tag format."""
@@ -278,6 +283,7 @@ class TestMonorepoRelease:
         # No monorepo project info
         assert "Project:" not in output
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
     @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
@@ -286,7 +292,7 @@ class TestMonorepoRelease:
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_monorepo_reads_version_from_project_subdir(
-        self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run,
+        self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run, _remote_exists,
         mock_git_repo, monkeypatch, capsys,
     ):
         """Version is read from the project subdirectory, not the repo root."""
@@ -314,6 +320,7 @@ class TestMonorepoRelease:
         # Should read 1.0.0 from libs/core/package.json, not 9.9.9 from root
         assert "Current version: 1.0.0" in output
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
     @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
@@ -322,7 +329,7 @@ class TestMonorepoRelease:
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_monorepo_reads_changelog_from_project_subdir(
-        self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run,
+        self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run, _remote_exists,
         mock_git_repo, monkeypatch, capsys,
     ):
         """Changelog is read from the project subdirectory."""
@@ -392,6 +399,7 @@ class TestSubtreePublish:
         )
         return proj_dir
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
     @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
@@ -400,7 +408,7 @@ class TestSubtreePublish:
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_release_calls_subtree_push(
-        self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run,
+        self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run, _remote_exists,
         mock_git_repo, monkeypatch, capsys,
     ):
         """Dry-run with subtree_remote shows subtree info in output."""
@@ -421,6 +429,7 @@ class TestSubtreePublish:
         assert "git@github.com:user/tooling.git" in output
         assert "v1.0.0" in output
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
     @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
@@ -429,7 +438,7 @@ class TestSubtreePublish:
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_release_skips_subtree_without_config(
-        self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run,
+        self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run, _remote_exists,
         mock_git_repo, monkeypatch, capsys,
     ):
         """Dry-run without subtree_remote does not show subtree info."""
@@ -446,6 +455,7 @@ class TestSubtreePublish:
         output = mock_out.getvalue()
         assert "Subtree:" not in output
 
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.run")
@@ -457,7 +467,7 @@ class TestSubtreePublish:
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_subtree_push_failure_nonfatal(
         self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run,
-        _commit_files, _push,
+        _commit_files, _push, _remote_exists,
         mock_git_repo, monkeypatch, capsys,
     ):
         """Subtree push failure does not abort the release."""

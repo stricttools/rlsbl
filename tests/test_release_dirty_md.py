@@ -192,6 +192,7 @@ class TestReleaseLeavesCleanPerVersionMd:
             patch("rlsbl.commands.release.check_gh_installed", return_value=True),
             patch("rlsbl.commands.release.check_gh_auth", return_value=True),
             patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
         ):
             run_cmd(rc, {"yes": True, "quiet": True}, ctx=_make_ctx(repo))
