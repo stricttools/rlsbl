@@ -1,5 +1,7 @@
-/home/m/Projects/rlsbl/.strictcli/schema.json
-ix": null,
+{
+  "defaults": {
+    "app": {
+      "env_prefix": null,
       "config": false,
       "global_flags": [],
       "commands": {},
