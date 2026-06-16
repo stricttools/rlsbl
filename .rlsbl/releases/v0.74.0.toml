@@ -1,0 +1,8 @@
+# Version bump type: patch, minor, or major
+bump = "minor"
+# Short description of this release (required)
+description = "Blog post integration for releases, richer hook environment variables, and assembly support in post-release hooks."
+# Optional context explaining why these changes were made
+context = "Adds blog = true support in release TOML to auto-generate blog posts via selfdoc during releases. Enriches hook env vars with bump type, previous version, and description. Adds conditional selfdoc assembly push to the post-release hook template for unified documentation deployment."
+include = ["npm", "pypi"]
+exclude = []
