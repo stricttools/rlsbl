@@ -358,6 +358,106 @@ def _run_selfdoc_check(flags, project_dir=None):
     return True
 
 
+def _run_selfdoc_post_generate(flags, *, project_dir=None, release_config=None,
+                                new_version=None, current_version=None,
+                                bump_type=None, changelog_entry=None, tag=None):
+    """Generate a blog post via selfdoc during release.
+
+    Called when release_config.blog is True and selfdoc.json exists.
+    Writes the changelog entry to a temp file and invokes
+    ``selfdoc post generate --from-release`` with all release metadata.
+
+    The generated post file and updated manifest are picked up by the
+    hook-generated-files mechanism (dirty snapshot diff) and included
+    in the release commit.
+    """
+    import re
+    import tempfile
+
+    check_dir = project_dir if project_dir else "."
+
+    if not release_config or not release_config.blog:
+        return True
+
+    selfdoc_config = os.path.join(check_dir, "selfdoc.json")
+    if not os.path.exists(selfdoc_config):
+        return True
+
+    if flags.get("dry-run"):
+        print(f"Would run: selfdoc post generate --from-release --version {new_version}")
+        return True
+
+    if not require_tool("selfdoc", fatal=False):
+        print(
+            "Note: blog = true but selfdoc is not installed. Skipping blog post generation."
+        )
+        return True
+
+    print("Generating blog post via selfdoc...")
+
+    # Write changelog entry to a temp file
+    tmp_changelog = None
+    try:
+        tmp_changelog = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".md", prefix="rlsbl-changelog-",
+            delete=False, encoding="utf-8",
+        )
+        tmp_changelog.write(changelog_entry or "")
+        tmp_changelog.close()
+
+        # Assemble CLI args
+        cmd = ["selfdoc", "post", "generate", "--from-release"]
+        cmd.extend(["--version", new_version or ""])
+        if current_version:
+            cmd.extend(["--prev-version", current_version])
+        if bump_type:
+            cmd.extend(["--bump-type", bump_type])
+        if release_config.description:
+            cmd.extend(["--description", release_config.description])
+        if release_config.context:
+            cmd.extend(["--context", release_config.context])
+        cmd.extend(["--changelog-file", tmp_changelog.name])
+
+        # Body file (optional)
+        blog_body_path = os.path.join(check_dir, ".rlsbl", "releases", "unreleased.md")
+        if os.path.exists(blog_body_path):
+            cmd.extend(["--body-file", blog_body_path])
+
+        # Project name from selfdoc config or directory name
+        try:
+            import json as _json
+            with open(selfdoc_config, "r", encoding="utf-8") as f:
+                sd_config = _json.load(f)
+            project_name = sd_config.get("project_name") or sd_config.get("name") or os.path.basename(os.path.abspath(check_dir))
+        except Exception:
+            project_name = os.path.basename(os.path.abspath(check_dir))
+        cmd.extend(["--project-name", project_name])
+
+        # Release URL (GitHub release URL pattern)
+        try:
+            remote = run("git", ["remote", "get-url", "origin"])
+            match = re.search(r"github\.com[/:]([^/]+/[^/.]+)", remote)
+            if match:
+                repo_path = match.group(1).removesuffix(".git")
+                release_url = f"https://github.com/{repo_path}/releases/tag/{tag or ''}"
+                cmd.extend(["--release-url", release_url])
+        except Exception:
+            pass  # Best-effort; release URL is optional
+
+        subprocess.run(cmd, cwd=project_dir, check=True)
+    except subprocess.CalledProcessError as e:
+        print(
+            f"Error: selfdoc post generate failed (exit code {e.returncode}).",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    finally:
+        if tmp_changelog and os.path.exists(tmp_changelog.name):
+            os.unlink(tmp_changelog.name)
+
+    return True
+
+
 def _refresh_selfdoc_hashes(files_to_commit, log, project_dir="."):
     """Re-run selfdoc check after version bump to refresh content hashes.
 
@@ -956,6 +1056,18 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
 
     # Built-in selfdoc check (before tests so doc issues surface early)
     _run_selfdoc_check(flags, project_dir=project_dir)
+
+    # Generate blog post via selfdoc if blog is enabled
+    _run_selfdoc_post_generate(
+        flags,
+        project_dir=project_dir,
+        release_config=release_config,
+        new_version=new_version,
+        current_version=current_version,
+        bump_type=bump_type,
+        changelog_entry=changelog_entry,
+        tag=tag,
+    )
 
     # Check if the pre-release hook has been customized. When it has,
     # skip built-in tests and lint -- the hook is expected to handle them.
