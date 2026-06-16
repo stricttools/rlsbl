@@ -10,3 +10,4 @@
 {"commits":["634efbfb964d71ae10bf5953ee1f0a2a3371e496"],"user_facing":true,"description":"**Assembly support in post-release hooks.** Post-release hook template now conditionally runs `selfdoc assembly push` when assembly config is present.","type":"feature"}
 {"commits":["029d5f722ac23c559a8d27e990438f57c96bf4a8","1d15434cfd07e2604a0c278e55fa905a37e20855","2c564deb31f6b132a94d6c052aafdd96850d3e39","4e8222faa84063ba8c0f03ed3acbd16d2bc3565b","5af90a8095ccf8d84392c2dd6084bea7a60db8fa"],"user_facing":false}
 {"commits":["6294229666e5451ccec775d8ef2effcf2f0ab2da","68c8c175763a108bc0b60400a631112b5477dfa8","697f60b9da8f83b40db9fc180ca5878be9870576","70de8dbdd074d6ba390f57a62f98f242fa883ef7","9288d90f293b25ae438311a76a76aa6cdc9bf389"],"user_facing":false}
+{"commits":["9b5b0b55ad68063e17c329c1c4da29991fda5b9f","cbbe90a4a697376902eff38b1234d85786ec42f5","f4b356a6513378ba2f650cda70032262496f175c"],"user_facing":false}
