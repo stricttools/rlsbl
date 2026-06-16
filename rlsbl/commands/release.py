@@ -42,6 +42,7 @@ from ..utils import (
     has_staged_or_modified,
     is_clean_tree,
     push_if_needed,
+    remote_branch_exists,
     require_tool,
     run,
 )
@@ -865,18 +866,24 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
         # Network failure or no remote — warn but don't block the release
         print("Warning: could not fetch from origin. Skipping remote-ahead check.", file=sys.stderr)
     else:
-        try:
-            behind_count = int(run("git", ["rev-list", "--count", f"HEAD..origin/{branch}"]))
-        except Exception as e:
-            print(f"Error: could not check if local branch is behind origin: {e}", file=sys.stderr)
-            print("Cannot verify remote-ahead status. Aborting for safety.", file=sys.stderr)
-            sys.exit(1)
-        if behind_count > 0:
+        if not remote_branch_exists(branch):
             print(
-                f"Error: local branch is {behind_count} commit(s) behind origin/{branch}. Pull before releasing.",
+                f"Remote branch origin/{branch} does not exist yet. Skipping remote-ahead check.",
                 file=sys.stderr,
             )
-            sys.exit(1)
+        else:
+            try:
+                behind_count = int(run("git", ["rev-list", "--count", f"HEAD..origin/{branch}"]))
+            except Exception as e:
+                print(f"Error: could not check if local branch is behind origin: {e}", file=sys.stderr)
+                print("Cannot verify remote-ahead status. Aborting for safety.", file=sys.stderr)
+                sys.exit(1)
+            if behind_count > 0:
+                print(
+                    f"Error: local branch is {behind_count} commit(s) behind origin/{branch}. Pull before releasing.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
 
     # Monorepo context detection
     monorepo_name = None
