@@ -5,7 +5,11 @@ import stat
 
 import pytest
 
-from rlsbl.commands.release import _cleanup_release_artifacts
+from rlsbl.commands.release import (
+    _cleanup_release_artifacts,
+    archive_blog_body,
+    validate_blog_body,
+)
 from rlsbl.release_file import unfinalize_release_file
 
 
@@ -13,65 +17,58 @@ class TestBlogBodyValidation:
     """Tests for blog body file validation during release."""
 
     def test_blog_true_body_exists_nonempty(self, tmp_path):
-        """blog=true with a non-empty body file: no error."""
+        """blog=true with a non-empty body file: returns path, no warning."""
         releases_dir = tmp_path / ".rlsbl" / "releases"
         releases_dir.mkdir(parents=True)
         body = releases_dir / "unreleased.md"
         body.write_text("# Blog post\n\nSome content here.\n")
 
-        # Simulate the validation logic inline
-        blog_body_path = str(body)
-        assert os.path.exists(blog_body_path)
-        with open(blog_body_path, "r", encoding="utf-8") as f:
-            content = f.read()
-        assert content.strip()  # non-empty, no error
+        body_path, warning = validate_blog_body(str(tmp_path), blog_enabled=True)
+        assert body_path == str(body)
+        assert warning is None
 
-    def test_blog_true_body_missing_warns(self, tmp_path, capsys):
-        """blog=true with missing body file: warning printed, no error."""
+    def test_blog_true_body_missing_warns(self, tmp_path):
+        """blog=true with missing body file: warning returned, no error."""
         releases_dir = tmp_path / ".rlsbl" / "releases"
         releases_dir.mkdir(parents=True)
 
-        blog_body_path = os.path.join(str(tmp_path), ".rlsbl", "releases", "unreleased.md")
-        assert not os.path.exists(blog_body_path)
-        # The release flow prints a log message (not stderr) when the file is missing.
-        # This is informational, not an error.
+        body_path, warning = validate_blog_body(str(tmp_path), blog_enabled=True)
+        assert body_path is None
+        assert warning is not None
+        assert "changelog-only" in warning
 
     def test_blog_true_body_empty_errors(self, tmp_path):
-        """blog=true with an empty body file: should trigger sys.exit(1)."""
+        """blog=true with an empty body file: raises SystemExit."""
         releases_dir = tmp_path / ".rlsbl" / "releases"
         releases_dir.mkdir(parents=True)
         body = releases_dir / "unreleased.md"
         body.write_text("")
 
-        blog_body_path = str(body)
-        assert os.path.exists(blog_body_path)
-        with open(blog_body_path, "r", encoding="utf-8") as f:
-            content = f.read()
-        assert not content.strip()  # empty -> would trigger sys.exit(1)
+        with pytest.raises(SystemExit) as exc_info:
+            validate_blog_body(str(tmp_path), blog_enabled=True)
+        assert exc_info.value.code == 1
 
     def test_blog_true_body_whitespace_only_errors(self, tmp_path):
-        """blog=true with a whitespace-only body file: treated as empty."""
+        """blog=true with a whitespace-only body file: treated as empty, raises SystemExit."""
         releases_dir = tmp_path / ".rlsbl" / "releases"
         releases_dir.mkdir(parents=True)
         body = releases_dir / "unreleased.md"
         body.write_text("   \n\n  \n")
 
-        blog_body_path = str(body)
-        with open(blog_body_path, "r", encoding="utf-8") as f:
-            content = f.read()
-        assert not content.strip()  # whitespace-only -> would trigger sys.exit(1)
+        with pytest.raises(SystemExit) as exc_info:
+            validate_blog_body(str(tmp_path), blog_enabled=True)
+        assert exc_info.value.code == 1
 
     def test_blog_false_skips_body_check(self, tmp_path):
-        """blog=false: no body check at all, even if file exists."""
+        """blog=false: returns (None, None) even if body file exists and is empty."""
         releases_dir = tmp_path / ".rlsbl" / "releases"
         releases_dir.mkdir(parents=True)
-        # Even an empty body file should not matter when blog=false
         body = releases_dir / "unreleased.md"
         body.write_text("")
 
-        blog = False
-        # When blog is False, the validation block is never entered
-        assert not blog  # confirms the guard condition skips
+        body_path, warning = validate_blog_body(str(tmp_path), blog_enabled=False)
+        assert body_path is None
+        assert warning is None
 
 
 class TestBlogBodyArchival:
@@ -84,81 +81,47 @@ class TestBlogBodyArchival:
         body = releases_dir / "unreleased.md"
         body.write_text("# My blog post\n\nDetails about the release.\n")
 
-        version = "1.2.3"
-        blog_body_src = os.path.join(str(releases_dir), "unreleased.md")
-        blog_body_dst = os.path.join(str(releases_dir), f"v{version}.md")
+        result = archive_blog_body(str(tmp_path), "1.2.3")
 
-        assert os.path.exists(blog_body_src)
-        os.rename(blog_body_src, blog_body_dst)
-        os.chmod(blog_body_dst, 0o444)
-
-        assert not os.path.exists(blog_body_src), "unreleased.md should be renamed away"
-        assert os.path.exists(blog_body_dst), "v1.2.3.md should exist"
-        mode = stat.S_IMODE(os.stat(blog_body_dst).st_mode)
+        expected_dst = str(releases_dir / "v1.2.3.md")
+        assert result == expected_dst
+        assert not (releases_dir / "unreleased.md").exists(), "unreleased.md should be renamed away"
+        assert (releases_dir / "v1.2.3.md").exists(), "v1.2.3.md should exist"
+        mode = stat.S_IMODE(os.stat(expected_dst).st_mode)
         assert mode == 0o444, f"archived body file should be read-only, got {oct(mode)}"
-        with open(blog_body_dst, "r", encoding="utf-8") as f:
+        with open(expected_dst, "r", encoding="utf-8") as f:
             assert "My blog post" in f.read()
 
     def test_finalize_no_body_file(self, tmp_path):
-        """No unreleased.md: no error, only toml archived."""
+        """No unreleased.md: returns None, no error."""
         releases_dir = tmp_path / ".rlsbl" / "releases"
         releases_dir.mkdir(parents=True)
 
-        version = "1.2.3"
-        blog_body_src = os.path.join(str(releases_dir), "unreleased.md")
-        blog_body_dst = os.path.join(str(releases_dir), f"v{version}.md")
+        result = archive_blog_body(str(tmp_path), "1.2.3")
 
-        assert not os.path.exists(blog_body_src)
-        # The finalization code checks os.path.exists(blog_body_src) and skips if missing
-        if os.path.exists(blog_body_src):
-            os.rename(blog_body_src, blog_body_dst)
-        assert not os.path.exists(blog_body_dst), "no body file should be created"
+        assert result is None
+        assert not (releases_dir / "v1.2.3.md").exists(), "no body file should be created"
 
     def test_finalize_body_file_included_in_commit(self, tmp_path):
-        """Archived .md should be in the commit files list when it exists."""
+        """Archived path is returned (non-None) when body file exists."""
         releases_dir = tmp_path / ".rlsbl" / "releases"
         releases_dir.mkdir(parents=True)
         body = releases_dir / "unreleased.md"
         body.write_text("Blog content.\n")
 
-        version = "2.0.0"
-        blog_body_src = os.path.join(str(releases_dir), "unreleased.md")
-        blog_body_dst = os.path.join(str(releases_dir), f"v{version}.md")
+        result = archive_blog_body(str(tmp_path), "2.0.0")
 
-        os.rename(blog_body_src, blog_body_dst)
-        os.chmod(blog_body_dst, 0o444)
-
-        # Simulate building the release_finalize_files list
-        release_finalize_files = [
-            "versioned_release_placeholder",
-            "release_file_path_placeholder",
-        ]
-        if os.path.exists(blog_body_dst):
-            release_finalize_files.append(blog_body_dst)
-
-        assert blog_body_dst in release_finalize_files, (
-            "archived blog body should be included in the commit files list"
-        )
-        assert len(release_finalize_files) == 3
+        assert result is not None, "archived blog body path should be returned for commit"
+        assert os.path.exists(result)
 
     def test_finalize_body_file_not_in_commit_when_missing(self, tmp_path):
-        """When no body file, commit list should only have toml files."""
+        """When no body file, returns None (nothing to add to commit)."""
         releases_dir = tmp_path / ".rlsbl" / "releases"
         releases_dir.mkdir(parents=True)
 
-        version = "2.0.0"
-        blog_body_dst = os.path.join(str(releases_dir), f"v{version}.md")
+        result = archive_blog_body(str(tmp_path), "2.0.0")
 
-        release_finalize_files = [
-            "versioned_release_placeholder",
-            "release_file_path_placeholder",
-        ]
-        if os.path.exists(blog_body_dst):
-            release_finalize_files.append(blog_body_dst)
-
-        assert len(release_finalize_files) == 2, (
-            "no blog body in commit files when the file does not exist"
-        )
+        assert result is None, "no blog body path when the file does not exist"
 
 
 class TestBlogBodyCleanup:
