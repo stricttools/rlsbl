@@ -130,6 +130,15 @@ def get_hook_timeout():
         return None
 
 
+def remote_branch_exists(branch):
+    """Check whether origin/{branch} exists as a valid ref."""
+    try:
+        run("git", ["rev-parse", "--verify", f"origin/{branch}"])
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
 def push_if_needed(branch, env=None, *, config):
     """Push the branch to origin if local is ahead of remote.
 
@@ -142,13 +151,10 @@ def push_if_needed(branch, env=None, *, config):
     """
     timeout = get_push_timeout(config)
     local = run("git", ["rev-parse", branch])
-    try:
-        remote = run("git", ["rev-parse", f"origin/{branch}"])
-    except subprocess.CalledProcessError:
-        # Remote branch doesn't exist yet; push it
+    if not remote_branch_exists(branch):
         run("git", ["push", "-u", "origin", branch], timeout=timeout, env=env)
         return
-
+    remote = run("git", ["rev-parse", f"origin/{branch}"])
     if local != remote:
         run("git", ["push", "origin", branch], timeout=timeout, env=env)
 
