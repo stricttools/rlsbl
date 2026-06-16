@@ -921,6 +921,9 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
         try:
             env = os.environ.copy()
             env["RLSBL_VERSION"] = new_version
+            env["RLSBL_BUMP_TYPE"] = bump_type or ""
+            env["RLSBL_PREV_VERSION"] = current_version or ""
+            env["RLSBL_DESCRIPTION"] = release_config.description if release_config else ""
             subprocess.run(["bash", pre_checks_script], env=env, check=True, timeout=hook_timeout, cwd=project_dir)
         except subprocess.CalledProcessError as e:
             print(f"Error: pre-checks hook exited with code {e.returncode}.", file=sys.stderr)
@@ -964,6 +967,9 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
         try:
             env = os.environ.copy()
             env["RLSBL_VERSION"] = new_version
+            env["RLSBL_BUMP_TYPE"] = bump_type or ""
+            env["RLSBL_PREV_VERSION"] = current_version or ""
+            env["RLSBL_DESCRIPTION"] = release_config.description if release_config else ""
             subprocess.run(["bash", pre_release_script], env=env, check=True, timeout=hook_timeout, cwd=project_dir)
         except subprocess.CalledProcessError as e:
             print(f"Error: pre-release hook exited with code {e.returncode}.", file=sys.stderr)
@@ -1767,6 +1773,9 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
         try:
             env = os.environ.copy()
             env["RLSBL_VERSION"] = new_version
+            env["RLSBL_BUMP_TYPE"] = bump_type or ""
+            env["RLSBL_PREV_VERSION"] = current_version or ""
+            env["RLSBL_DESCRIPTION"] = description or ""
             subprocess.run(["bash", post_release_script], env=env, check=True, timeout=hook_timeout, cwd=project_dir)
         except subprocess.CalledProcessError as e:
             print(f"Warning: post-release hook exited with code {e.returncode}.", file=sys.stderr)
