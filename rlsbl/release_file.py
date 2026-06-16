@@ -27,6 +27,7 @@ class ReleaseConfig:
     targets: dict[str, dict] = field(default_factory=dict)  # per-target config
     description: str = ""  # short description of this release
     context: str = ""  # optional context explaining why these changes were made
+    blog: bool = False
 
 
 def get_release_file_path(project_dir: str = ".") -> str:
@@ -129,6 +130,11 @@ def _validate_release_config(data: dict, prefix: str = "") -> ReleaseConfig:
     if not isinstance(context, str):
         raise err("context must be a string")
 
+    # --- blog (optional) ---
+    blog = data.get("blog", False)
+    if not isinstance(blog, bool):
+        raise err("blog must be a boolean")
+
     return ReleaseConfig(
         bump=bump,
         include=list(include),
@@ -136,6 +142,7 @@ def _validate_release_config(data: dict, prefix: str = "") -> ReleaseConfig:
         targets=targets,
         description=description.strip(),
         context=context.strip(),
+        blog=blog,
     )
 
 

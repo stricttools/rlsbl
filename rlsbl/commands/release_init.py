@@ -46,6 +46,8 @@ def run_cmd(project_root):
     doc.add("description", "")
     doc.add(tomlkit.comment("Optional context explaining why these changes were made"))
     doc.add("context", "")
+    doc.add(tomlkit.comment("Set to true to generate a blog post for this release"))
+    doc.add(tomlkit.comment("blog = false"))
     doc.add("include", target_names)
     doc.add("exclude", [])
 
