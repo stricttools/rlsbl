@@ -19,6 +19,9 @@ VALID_BUMP_TYPES = ("patch", "minor", "major")
 VALID_TARGET_MODES = ("ota", "build")
 
 
+# Project identification: "slug" is the machine identifier (URL-safe, lowercase,
+# hyphens) used in config keys and paths; "name" is the human-readable display
+# name used in UI and documentation.
 @dataclass
 class ReleaseConfig:
     bump: str  # "patch", "minor", "major"
