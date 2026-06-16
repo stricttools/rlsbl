@@ -985,19 +985,9 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
         sys.exit(1)
 
     # Validate blog body file if blog is enabled
-    if release_config.blog:
-        blog_body_path = os.path.join(project_dir, ".rlsbl", "releases", "unreleased.md")
-        if os.path.exists(blog_body_path):
-            with open(blog_body_path, "r", encoding="utf-8") as f:
-                body_content = f.read()
-            if not body_content.strip():
-                print(
-                    "Error: blog body file at .rlsbl/releases/unreleased.md exists but is empty.",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-        else:
-            log("blog = true but no body file at .rlsbl/releases/unreleased.md (post will be changelog-only)")
+    _blog_body_path, blog_warning = validate_blog_body(project_dir, release_config.blog)
+    if blog_warning:
+        log(blog_warning)
 
     # Compute the changelog content in memory only. We defer writing CHANGELOG.md
     # (and per-version .md files) to disk until after pre-release checks pass,
@@ -1350,6 +1340,44 @@ def upload_release_assets(tag, new_version, log, flags, *, ctx):
             shutil.rmtree(dist_dir)
 
 
+def validate_blog_body(project_dir, blog_enabled):
+    """Validate the blog body file for a release.
+
+    Returns (body_path, warning_message) where body_path is the path if it exists
+    and warning_message is set if the file is missing.
+    Raises SystemExit if blog_enabled and file is empty.
+    """
+    if not blog_enabled:
+        return None, None
+    blog_body_path = os.path.join(project_dir, ".rlsbl", "releases", "unreleased.md")
+    if os.path.exists(blog_body_path):
+        with open(blog_body_path, "r", encoding="utf-8") as f:
+            body_content = f.read()
+        if not body_content.strip():
+            print(
+                "Error: blog body file at .rlsbl/releases/unreleased.md exists but is empty.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        return blog_body_path, None
+    return None, "blog = true but no body file at .rlsbl/releases/unreleased.md (post will be changelog-only)"
+
+
+def archive_blog_body(project_dir, version):
+    """Archive unreleased.md to v{version}.md during release finalization.
+
+    Returns the archived path if the file existed, None otherwise.
+    """
+    releases_dir = os.path.join(project_dir, ".rlsbl", "releases")
+    blog_body_src = os.path.join(releases_dir, "unreleased.md")
+    blog_body_dst = os.path.join(releases_dir, f"v{version}.md")
+    if os.path.exists(blog_body_src):
+        os.rename(blog_body_src, blog_body_dst)
+        os.chmod(blog_body_dst, 0o444)
+        return blog_body_dst
+    return None
+
+
 def _cleanup_release_artifacts(project_dir: str, version: str) -> None:
     """Best-effort removal of generated files that become orphaned after rollback.
 
@@ -1677,16 +1705,12 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
             with open(release_file_path, "w", encoding="utf-8") as f:
                 pass  # empty file
             # Archive blog body file if it exists (unreleased.md -> v{version}.md)
-            blog_body_src = os.path.join(releases_dir, "unreleased.md")
-            blog_body_dst = os.path.join(releases_dir, f"v{new_version}.md")
-            if os.path.exists(blog_body_src):
-                os.rename(blog_body_src, blog_body_dst)
-                os.chmod(blog_body_dst, 0o444)
+            blog_body_dst = archive_blog_body(project_dir, new_version)
             release_finalize_files = [
                 _rel_to_git_root(versioned_release, _git_root),
                 _rel_to_git_root(release_file_path, _git_root),
             ]
-            if os.path.exists(blog_body_dst):
+            if blog_body_dst:
                 release_finalize_files.append(_rel_to_git_root(blog_body_dst, _git_root))
             commit_files(f"chore: finalize release file for {new_version}", release_finalize_files, cwd=_git_root)
             log(f"Finalized release file for {new_version}")
