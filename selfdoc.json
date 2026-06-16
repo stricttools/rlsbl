@@ -42,5 +42,14 @@
     "table-targets": "docs/directives/target_table.py",
     "check-count": "docs/directives/check_count.py",
     "target-count": "docs/directives/target_count.py"
+  },
+  "topology": {
+    "slug": "rlsbl",
+    "docs_base": "https://docs.smmh.dev",
+    "posts_base": "https://blog.smmh.dev",
+    "assembly": "smm-h/selfdoc-cache"
+  },
+  "assembly": {
+    "repo": "smm-h/selfdoc-cache"
   }
 }
