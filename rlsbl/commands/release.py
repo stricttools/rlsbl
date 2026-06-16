@@ -883,6 +883,22 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
                 for detail in details:
                     print(f"  {check_name}: {detail}", file=sys.stderr)
         sys.exit(1)
+
+    # Validate blog body file if blog is enabled
+    if release_config.blog:
+        blog_body_path = os.path.join(project_dir, ".rlsbl", "releases", "unreleased.md")
+        if os.path.exists(blog_body_path):
+            with open(blog_body_path, "r", encoding="utf-8") as f:
+                body_content = f.read()
+            if not body_content.strip():
+                print(
+                    "Error: blog body file at .rlsbl/releases/unreleased.md exists but is empty.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+        else:
+            log("blog = true but no body file at .rlsbl/releases/unreleased.md (post will be changelog-only)")
+
     # Compute the changelog content in memory only. We defer writing CHANGELOG.md
     # (and per-version .md files) to disk until after pre-release checks pass,
     # so that an aborted release leaves the working tree exactly as it was.
@@ -1235,6 +1251,7 @@ def _cleanup_release_artifacts(project_dir: str, version: str) -> None:
             os.path.join(project_dir, ".rlsbl", "changes", f"{version}.jsonl"),
             os.path.join(project_dir, ".rlsbl", "changes", f"{version}.md"),
             os.path.join(project_dir, ".rlsbl", "releases", f"v{version}.toml"),
+            os.path.join(project_dir, ".rlsbl", "releases", f"v{version}.md"),
         ]
         for path in candidates:
             if os.path.exists(path):
@@ -1547,10 +1564,18 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
             # Create a fresh empty unreleased.toml
             with open(release_file_path, "w", encoding="utf-8") as f:
                 pass  # empty file
+            # Archive blog body file if it exists (unreleased.md -> v{version}.md)
+            blog_body_src = os.path.join(releases_dir, "unreleased.md")
+            blog_body_dst = os.path.join(releases_dir, f"v{new_version}.md")
+            if os.path.exists(blog_body_src):
+                os.rename(blog_body_src, blog_body_dst)
+                os.chmod(blog_body_dst, 0o444)
             release_finalize_files = [
                 _rel_to_git_root(versioned_release, _git_root),
                 _rel_to_git_root(release_file_path, _git_root),
             ]
+            if os.path.exists(blog_body_dst):
+                release_finalize_files.append(_rel_to_git_root(blog_body_dst, _git_root))
             commit_files(f"chore: finalize release file for {new_version}", release_finalize_files, cwd=_git_root)
             log(f"Finalized release file for {new_version}")
 

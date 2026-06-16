@@ -201,7 +201,23 @@ def unfinalize_release_file(releases_dir: str, version: str) -> list[str]:
 
     os.chmod(versioned, 0o644)
     os.rename(versioned, unreleased)
-    return [unreleased, versioned]
+    changed = [unreleased, versioned]
+
+    # Also reverse blog body file archival if present
+    versioned_md = os.path.join(releases_dir, f"v{version}.md")
+    unreleased_md = os.path.join(releases_dir, "unreleased.md")
+    if os.path.isfile(versioned_md):
+        if os.path.isfile(unreleased_md):
+            print(
+                f"warning: {unreleased_md} already exists; leaving {versioned_md} in place.",
+                file=sys.stderr,
+            )
+        else:
+            os.chmod(versioned_md, 0o644)
+            os.rename(versioned_md, unreleased_md)
+            changed.extend([unreleased_md, versioned_md])
+
+    return changed
 
 
 @dataclass
