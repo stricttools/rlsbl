@@ -3,7 +3,6 @@
 Public API:
     lint_library(project_path) -> list[LintResult]
     scan_imports(project_path) -> set[tuple[str, str, int, bool]]
-    LintResult  (namedtuple: file, line, rule, severity, message)
 """
 
 import os
@@ -15,7 +14,7 @@ from .config import (
 )
 from .result import LintResult
 
-__all__ = ["lint_library", "scan_imports", "LintResult"]
+__all__ = ["lint_library", "scan_imports"]
 
 # Default exclusion patterns for library lint, per language.
 # These exclude test and example files from lint by default so that
