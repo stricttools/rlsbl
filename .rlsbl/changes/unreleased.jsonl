@@ -1,0 +1,1 @@
+{"commits":["bfd1c4ca4e186a4df4114e82dea87677f5ed5c4e","40b96e97d998d2e17dd45bb0e1d4bf822d08783c"],"user_facing":true,"description":"**Breaking.** Added `GitError` and `PostReleaseError` exception types. Last 2 `sys.exit` calls in `execute.py` converted to `PostReleaseError`.","type":"breaking"}
