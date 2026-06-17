@@ -17,7 +17,7 @@ except ImportError:
 
 from itertools import product  # noqa: E402
 
-from rlsbl.targets.utils import normalize_pypi  # noqa: E402
+from rlsbl.targets.utils import normalize_npm, normalize_pypi  # noqa: E402
 
 
 def _request_with_backoff(url, timeout=5, max_retries=3):
@@ -119,14 +119,6 @@ def _generate_ultranorm_variants(name):
     return variants, capped
 
 
-def _normalize_npm_moniker(name):
-    """Normalize an npm package name using npm's moniker collision algorithm.
-
-    Strips all '-', '.', '_' characters and lowercases the result.
-    Two packages whose monikers match are considered conflicting by npm.
-    """
-    return re.sub(r"[-._]", "", name).lower()
-
 
 def _search_npm_similar(name):
     """Search the npm registry for packages with conflicting monikers.
@@ -138,7 +130,7 @@ def _search_npm_similar(name):
     On any failure (network, JSON parse), returns an empty list for
     graceful degradation.
     """
-    candidate_moniker = _normalize_npm_moniker(name)
+    candidate_moniker = normalize_npm(name)
     url = f"https://registry.npmjs.org/-/v1/search?text={name}&size=20"
     try:
         with _request_with_backoff(url) as resp:
@@ -148,7 +140,7 @@ def _search_npm_similar(name):
             pkg_name = obj.get("package", {}).get("name")
             if pkg_name is None:
                 continue
-            if _normalize_npm_moniker(pkg_name) == candidate_moniker and pkg_name != name:
+            if normalize_npm(pkg_name) == candidate_moniker and pkg_name != name:
                 conflicts.append(pkg_name)
         return conflicts
     except Exception as e:
@@ -521,7 +513,7 @@ def _format_single_result(result):
     github_count = result.get("github_count")
     if github_count is not None:
         if github_count == 0:
-            print(f"\n  (i) No GitHub repos named \"{name}\")")
+            print(f"\n  (i) No GitHub repos named \"{name}\"")
         else:
             print(f"\n  (i) {github_count} GitHub repo(s) named \"{name}\" (informational, not a registry)")
 

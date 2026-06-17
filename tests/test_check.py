@@ -15,7 +15,6 @@ from rlsbl.commands.check import (
     _format_single_result,
     _format_table_row,
     _generate_ultranorm_variants,
-    _normalize_npm_moniker,
     _request_with_backoff,
     _search_npm_similar,
     _ultranormalize,
@@ -25,6 +24,7 @@ from rlsbl.commands.check import (
     get_pypi_variants,
     run_cmd,
 )
+from rlsbl.targets.utils import normalize_npm
 
 
 class TestCheckPyPI:
@@ -552,7 +552,7 @@ class TestGenerateUltranormVariants:
 
 
 class TestNpmMonikerNormalize:
-    """Tests for _normalize_npm_moniker."""
+    """Tests for normalize_npm."""
 
     @pytest.mark.parametrize(
         ("name", "expected"),
@@ -567,9 +567,9 @@ class TestNpmMonikerNormalize:
             ("", ""),
         ],
     )
-    def test_normalize_npm_moniker(self, name, expected):
+    def test_normalize_npm(self, name, expected):
         """Separators (dashes, dots, underscores) are stripped."""
-        assert _normalize_npm_moniker(name) == expected
+        assert normalize_npm(name) == expected
 
 
 class TestSearchNpmSimilar:
