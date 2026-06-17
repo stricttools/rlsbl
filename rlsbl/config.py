@@ -253,6 +253,23 @@ def clean_stale_exclusions(config_path):
     return removed
 
 
+def update_last_build_release(project_dir, version):
+    """Store last_build_release version in .rlsbl/config.json for OTA validation."""
+    config_path = os.path.join(project_dir, ".rlsbl", "config.json")
+    try:
+        config = read_json_config(config_path)
+    except Exception as e:
+        raise RuntimeError(
+            f"{config_path} is corrupted or unreadable — fix it before releasing: {e}"
+        ) from e
+    config["last_build_release"] = version
+    tmp_path = config_path + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=2)
+        f.write("\n")
+    os.replace(tmp_path, config_path)
+
+
 def write_project_config(key, value, project_root):
     """Write or update a key in .rlsbl/config.json (creates dir if needed).
 
