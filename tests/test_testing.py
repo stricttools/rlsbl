@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from rlsbl.testing import run_project_tests
+from rlsbl.testing import run_project_tests, sync_workspace
 
 
 # ---------------------------------------------------------------------------
@@ -239,3 +239,144 @@ class TestDryRun:
 
             assert result is True
             mock_run.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# workspace_root parameter (monorepo support)
+# ---------------------------------------------------------------------------
+
+class TestWorkspaceRoot:
+    """Tests for workspace_root parameter: uv sync runs at workspace root."""
+
+    def test_pypi_workspace_syncs_at_workspace_root(self, tmp_project):
+        """When workspace_root is set, uv sync runs at workspace_root, pytest at project_dir."""
+        workspace = str(tmp_project / "workspace")
+        project = str(tmp_project / "workspace" / "pkg-a")
+
+        with (
+            patch("rlsbl.testing.require_tool") as mock_tool,
+            patch("rlsbl.testing.subprocess.run") as mock_run,
+        ):
+            mock_tool.return_value = "/usr/bin/uv"
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+
+            result = run_project_tests(
+                "pypi", project_dir=project, workspace_root=workspace
+            )
+
+            assert result is True
+            assert mock_run.call_count == 2
+            # uv sync runs at workspace root
+            sync_call = mock_run.call_args_list[0]
+            assert sync_call[0][0] == ["uv", "sync", "--all-packages", "--quiet"]
+            assert sync_call.kwargs.get("cwd") == workspace
+            # uv run pytest runs at project dir
+            pytest_call = mock_run.call_args_list[1]
+            assert pytest_call[0][0] == ["uv", "run", "pytest"]
+            assert pytest_call.kwargs.get("cwd") == project
+
+    def test_pypi_workspace_skip_sync(self, tmp_project):
+        """When skip_sync is True, uv sync is skipped but pytest still runs."""
+        project = str(tmp_project / "pkg-a")
+
+        with (
+            patch("rlsbl.testing.require_tool") as mock_tool,
+            patch("rlsbl.testing.subprocess.run") as mock_run,
+        ):
+            mock_tool.return_value = "/usr/bin/uv"
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+
+            result = run_project_tests(
+                "pypi", project_dir=project, skip_sync=True
+            )
+
+            assert result is True
+            # Only pytest should run, not uv sync
+            assert mock_run.call_count == 1
+            assert mock_run.call_args[0][0] == ["uv", "run", "pytest"]
+            assert mock_run.call_args.kwargs.get("cwd") == project
+
+    def test_pypi_without_workspace_root_syncs_at_project_dir(self, tmp_project):
+        """Without workspace_root, uv sync runs at project_dir (existing behavior)."""
+        project = str(tmp_project)
+
+        with (
+            patch("rlsbl.testing.require_tool") as mock_tool,
+            patch("rlsbl.testing.subprocess.run") as mock_run,
+        ):
+            mock_tool.return_value = "/usr/bin/uv"
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+
+            result = run_project_tests("pypi", project_dir=project)
+
+            assert result is True
+            assert mock_run.call_count == 2
+            # Both calls use project_dir
+            assert mock_run.call_args_list[0].kwargs.get("cwd") == project
+            assert mock_run.call_args_list[1].kwargs.get("cwd") == project
+
+
+# ---------------------------------------------------------------------------
+# sync_workspace
+# ---------------------------------------------------------------------------
+
+class TestSyncWorkspace:
+    """Tests for the sync_workspace helper."""
+
+    def test_sync_workspace_runs_uv_sync_at_root(self, tmp_project):
+        """sync_workspace runs uv sync --all-packages --quiet at the given root."""
+        root = str(tmp_project)
+
+        with (
+            patch("rlsbl.testing.require_tool") as mock_tool,
+            patch("rlsbl.testing.subprocess.run") as mock_run,
+        ):
+            mock_tool.return_value = "/usr/bin/uv"
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+
+            result = sync_workspace(root)
+
+            assert result is True
+            mock_run.assert_called_once()
+            assert mock_run.call_args[0][0] == ["uv", "sync", "--all-packages", "--quiet"]
+            assert mock_run.call_args.kwargs.get("cwd") == root
+
+    def test_sync_workspace_verbose(self, tmp_project):
+        """sync_workspace with verbose=True omits --quiet."""
+        root = str(tmp_project)
+
+        with (
+            patch("rlsbl.testing.require_tool") as mock_tool,
+            patch("rlsbl.testing.subprocess.run") as mock_run,
+        ):
+            mock_tool.return_value = "/usr/bin/uv"
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+
+            result = sync_workspace(root, verbose=True)
+
+            assert result is True
+            assert mock_run.call_args[0][0] == ["uv", "sync", "--all-packages"]
+
+    def test_sync_workspace_failure(self, tmp_project):
+        """sync_workspace returns False when uv sync fails."""
+        root = str(tmp_project)
+
+        with (
+            patch("rlsbl.testing.require_tool") as mock_tool,
+            patch("rlsbl.testing.subprocess.run") as mock_run,
+        ):
+            mock_tool.return_value = "/usr/bin/uv"
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=1)
+
+            result = sync_workspace(root)
+
+            assert result is False
+
+    def test_sync_workspace_no_uv(self, tmp_project):
+        """sync_workspace returns True when uv is not available."""
+        with patch("rlsbl.testing.require_tool") as mock_tool:
+            mock_tool.return_value = None
+
+            result = sync_workspace(str(tmp_project))
+
+            assert result is True

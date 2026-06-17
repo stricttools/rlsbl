@@ -492,11 +492,19 @@ class TestWorkspaceTestSuiteRunsAffectedProjects:
         )
         ctx.push_stdin = push_stdin
 
-        with patch("rlsbl.testing.run_project_tests", return_value=True) as mock_tests:
+        with (
+            patch("rlsbl.testing.run_project_tests", return_value=True) as mock_tests,
+            patch("rlsbl.testing.sync_workspace", return_value=True) as mock_sync,
+        ):
             result = app._check_defs["test-suite-workspace"].impl(ctx)
 
         assert result.status == "pass"
-        mock_tests.assert_called_once_with("pypi", project_dir=str(pkg))
+        # Upfront uv sync runs at workspace root
+        mock_sync.assert_called_once_with(str(repo))
+        # Per-project test runs with skip_sync=True
+        mock_tests.assert_called_once_with(
+            "pypi", project_dir=str(pkg), skip_sync=True,
+        )
 
 
 class TestWorkspaceTestSuiteSkipsDevNodes:

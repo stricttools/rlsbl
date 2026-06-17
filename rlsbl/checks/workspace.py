@@ -555,7 +555,7 @@ def register_workspace_checks(app):
         from ..commands.pre_push_check import _parse_stdin_refs
         from ..git_util import affected_projects as _affected, get_push_changed_files
         from ..targets import detect_targets
-        from ..testing import run_project_tests
+        from ..testing import run_project_tests, sync_workspace
 
         stdin_lines = ctx.push_stdin.strip().splitlines()
         refs = _parse_stdin_refs(stdin_lines)
@@ -578,6 +578,9 @@ def register_workspace_checks(app):
         failed_projects = []
         passed_count = 0
 
+        # Pre-detect targets so we know if any pypi projects need syncing
+        project_targets = []
+        has_pypi = False
         for proj in affected:
             project_dir = os.path.join(str(ctx.workspace_root), proj["path"])
             target_entries = detect_targets(project_dir)
@@ -588,11 +591,25 @@ def register_workspace_checks(app):
                     target_name = name
                     break
 
+            project_targets.append((proj, project_dir, target_name))
+            if target_name == "pypi":
+                has_pypi = True
+
+        # Run uv sync once at workspace root for all pypi sub-projects
+        if has_pypi:
+            if not sync_workspace(str(ctx.workspace_root)):
+                return CheckResult("fail", "uv sync --all-packages failed at workspace root")
+
+        for proj, project_dir, target_name in project_targets:
             if target_name is None:
                 # No testable target -- skip this project
                 continue
 
-            passed = run_project_tests(target_name, project_dir=project_dir)
+            passed = run_project_tests(
+                target_name,
+                project_dir=project_dir,
+                skip_sync=True,
+            )
             if passed:
                 passed_count += 1
             else:

@@ -12,10 +12,30 @@ import sys
 from .utils import require_tool
 
 
+def sync_workspace(workspace_root: str, *, verbose: bool = False) -> bool:
+    """Run uv sync --all-packages at the workspace root.
+
+    Returns True on success, False on failure.
+    """
+    if not require_tool("uv", fatal=False):
+        return True
+
+    sync_cmd = ["uv", "sync", "--all-packages"]
+    if not verbose:
+        sync_cmd.append("--quiet")
+    result = subprocess.run(sync_cmd, cwd=workspace_root)
+    if result.returncode != 0:
+        print("Error: uv sync failed.", file=sys.stderr)
+        return False
+    return True
+
+
 def run_project_tests(
     target_name: str,
     *,
     project_dir: str | None = None,
+    workspace_root: str | None = None,
+    skip_sync: bool = False,
     config: dict | None = None,
     dry_run: bool = False,
 ) -> bool:
@@ -24,6 +44,9 @@ def run_project_tests(
     Args:
         target_name: registry/target identifier (e.g., "pypi", "go", "npm").
         project_dir: working directory for subprocess calls. None means cwd.
+        workspace_root: uv workspace root for monorepos. When set, uv sync
+            runs here instead of at project_dir.
+        skip_sync: if True, skip the uv sync step (caller already synced).
         config: project config dict. Used to read uv_sync_verbose for pypi.
         dry_run: if True, skip all subprocess execution and return True.
 
@@ -36,7 +59,12 @@ def run_project_tests(
     print("Running tests...")
 
     if target_name == "pypi":
-        return _run_pypi_tests(project_dir=project_dir, config=config or {})
+        return _run_pypi_tests(
+            project_dir=project_dir,
+            workspace_root=workspace_root,
+            skip_sync=skip_sync,
+            config=config or {},
+        )
     elif target_name == "go":
         return _run_go_tests(project_dir=project_dir)
     elif target_name == "npm":
@@ -46,17 +74,25 @@ def run_project_tests(
         return True
 
 
-def _run_pypi_tests(*, project_dir: str | None, config: dict) -> bool:
+def _run_pypi_tests(
+    *,
+    project_dir: str | None,
+    workspace_root: str | None = None,
+    skip_sync: bool = False,
+    config: dict,
+) -> bool:
     """Run Python tests via uv or bare pytest."""
     uv_verbose = config.get("uv_sync_verbose", False)
     if require_tool("uv", fatal=False):
-        sync_cmd = ["uv", "sync", "--all-packages"]
-        if not uv_verbose:
-            sync_cmd.append("--quiet")
-        result = subprocess.run(sync_cmd, cwd=project_dir)
-        if result.returncode != 0:
-            print("Error: uv sync failed.", file=sys.stderr)
-            return False
+        if not skip_sync:
+            sync_cmd = ["uv", "sync", "--all-packages"]
+            if not uv_verbose:
+                sync_cmd.append("--quiet")
+            sync_cwd = workspace_root if workspace_root else project_dir
+            result = subprocess.run(sync_cmd, cwd=sync_cwd)
+            if result.returncode != 0:
+                print("Error: uv sync failed.", file=sys.stderr)
+                return False
         result = subprocess.run(["uv", "run", "pytest"], cwd=project_dir)
     elif require_tool("pytest", fatal=False):
         result = subprocess.run(["pytest"], cwd=project_dir)
