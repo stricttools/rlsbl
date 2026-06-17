@@ -6,3 +6,4 @@
 {"commits":["366a116f7df212668881004a192426d33e50d9f7"],"user_facing":true,"description":"**Bug fix.** Standardized `dep_validation.py` path normalization on `realpath`, consistent with the rest of the codebase. Fixes potential mismatches with symlinked project directories.","type":"fix"}
 {"commits":["26b17cc0a89f91fcf260711cd7701d65c271dfd0"],"user_facing":false}
 {"commits":["0d585f757284d356dc7edac400a4490861beb782"],"user_facing":false}
+{"commits":["6d9cff48aa44be13297284eb24ddd4ea98a5fc7c"],"user_facing":false}
