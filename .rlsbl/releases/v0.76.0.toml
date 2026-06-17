@@ -1,0 +1,10 @@
+# Version bump type: patch, minor, or major
+bump = "minor"
+# Short description of this release (required)
+description = "Split release.py into a package, ExemptionRegistry, path normalization, orphan messaging"
+# Optional context explaining why these changes were made
+context = "The 1985-line release.py monolith was split into 6 modules with clean boundaries. 27 sys.exit calls converted to a proper exception hierarchy. The 24-parameter _run_release_mutating signature replaced with a ReleaseState dataclass. Changelog exemptions centralized into an ExemptionRegistry. Path normalization standardized on realpath. Orphan check messaging improved with entry context."
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["npm", "pypi"]
+exclude = []
