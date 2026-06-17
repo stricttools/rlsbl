@@ -5,3 +5,4 @@
 {"commits":["f269ed1eca752768e146c5bc7c7f1df7bae0160a"],"user_facing":true,"description":"**Bug fix.** `check-name` npm moniker search failure is now a hard error instead of silently reporting the name as available.","type":"fix"}
 {"commits":["628092a9c8713067dbd17df326bbdd89c1ffb077"],"user_facing":true,"description":"**Breaking.** Removed `_normalize_npm_moniker` internal function (replaced by `normalize_npm` from `targets/utils`). Removed the `--ultranormalized-variants` flag (ultranorm is now always-on for PyPI).","type":"breaking"}
 {"commits":["9d49c5afdcaa404e20b3cae903421b4f6753bb3f","edb69562489d9aef99044d7e4c8de0b78bbf3075"],"user_facing":false}
+{"commits":["97eeb26d3b27d53c0ae824a9dfea6055b8996a75","2e81df7ff1c9ed5b97de768a2a0ddb2e6e2e62cd"],"user_facing":false}
