@@ -1,1 +1,2 @@
 {"commits":["efa46d833e623dc1f2e2f33387de974ded17df9a"],"user_facing":true,"description":"**Bug fix.** Workspace test runner now runs `uv sync --all-packages` at the workspace root instead of per sub-project, fixing monorepo test suites with cross-project dependencies.","type":"fix"}
+{"commits":["1304f62a4a80c8f650e6a787ba058cf7ce494bd5","b431956964a5e26c413257d6711009d2673753f8","93027a247b763541eecd81afd1aa50b5bf748dc6","16a2e6c642c3d390faf4116b462e85e483fe1183"],"user_facing":false}
