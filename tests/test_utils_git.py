@@ -4,7 +4,9 @@ import subprocess
 
 import pytest
 
-from rlsbl.utils import commit_files_if_changed, has_staged_or_modified
+from unittest.mock import patch
+
+from rlsbl.utils import commit_files_if_changed, has_staged_or_modified, remote_branch_exists
 
 
 class TestHasStagedOrModified:
@@ -89,3 +91,22 @@ class TestCommitFilesIfChanged:
         assert result is False
         captured = capsys.readouterr()
         assert "Nothing to do here." in captured.out
+
+
+class TestRemoteBranchExists:
+    """Tests for remote_branch_exists -- mocked, no real git repo needed."""
+
+    @patch("rlsbl.utils.run")
+    def test_remote_branch_exists_returns_true(self, mock_run):
+        """When the ref resolves, returns True."""
+        mock_run.return_value = "abc123def456"
+        assert remote_branch_exists("main") is True
+        mock_run.assert_called_once_with(
+            "git", ["rev-parse", "--verify", "origin/main"]
+        )
+
+    @patch("rlsbl.utils.run")
+    def test_remote_branch_exists_returns_false(self, mock_run):
+        """When rev-parse fails, returns False."""
+        mock_run.side_effect = subprocess.CalledProcessError(128, "git")
+        assert remote_branch_exists("main") is False
