@@ -166,47 +166,32 @@ class TestPushTimeout:
     Source behavior: push_if_needed() calls run("git", ["push", ...],
     timeout=timeout). The run() function uses subprocess.run with
     check=True and the given timeout. If the push times out,
-    subprocess.TimeoutExpired propagates up uncaught.
-
-    Verdict: the edge case is NOT explicitly handled -- TimeoutExpired
-    propagates as-is with no wrapping, context message, or recovery
-    guidance. The caller (release flow) must handle it.
+    subprocess.TimeoutExpired is caught and wrapped in GitError with
+    an actionable message.
     """
 
     @patch("rlsbl.utils.run")
-    def test_timeout_propagates_on_new_branch(self, mock_run):
-        """TimeoutExpired from push propagates when branch has no remote."""
-        # First call: rev-parse for local SHA succeeds
-        # Second call: rev-parse --verify origin/branch fails (no remote)
-        # Third call: push -u origin branch times out
-        mock_run.side_effect = [
-            "abc123",  # git rev-parse <branch>
-            subprocess.CalledProcessError(128, "git"),  # rev-parse --verify origin/branch
-        ]
-
+    def test_timeout_raises_git_error_on_new_branch(self, mock_run):
+        """TimeoutExpired from push is wrapped in GitError when branch has no remote."""
         # remote_branch_exists returns False, so push_if_needed calls push -u
         with patch("rlsbl.utils.remote_branch_exists", return_value=False):
             mock_run.side_effect = [
                 "abc123",  # git rev-parse <branch>
                 subprocess.TimeoutExpired(cmd=["git", "push", "-u", "origin", "main"], timeout=120),
             ]
-            with pytest.raises(subprocess.TimeoutExpired):
+            with pytest.raises(GitError, match="Push timed out after 120s"):
                 push_if_needed("main", config={"push_timeout": 120})
 
     @patch("rlsbl.utils.run")
-    def test_timeout_propagates_on_existing_branch(self, mock_run):
-        """TimeoutExpired from push propagates when local is ahead of remote."""
-        mock_run.side_effect = [
-            "abc123",  # git rev-parse <branch> (local)
-        ]
-
+    def test_timeout_raises_git_error_on_existing_branch(self, mock_run):
+        """TimeoutExpired from push is wrapped in GitError when local is ahead of remote."""
         with patch("rlsbl.utils.remote_branch_exists", return_value=True):
             mock_run.side_effect = [
                 "abc123",  # git rev-parse <branch> (local)
                 "def456",  # git rev-parse origin/<branch> (remote, different)
                 subprocess.TimeoutExpired(cmd=["git", "push", "origin", "main"], timeout=120),
             ]
-            with pytest.raises(subprocess.TimeoutExpired):
+            with pytest.raises(GitError, match="Push timed out after 120s"):
                 push_if_needed("main", config={"push_timeout": 120})
 
     @patch("rlsbl.utils.run")

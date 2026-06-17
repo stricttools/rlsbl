@@ -190,11 +190,17 @@ def push_if_needed(branch, env=None, *, config):
     timeout = get_push_timeout(config)
     local = run("git", ["rev-parse", branch])
     if not remote_branch_exists(branch):
-        run("git", ["push", "-u", "origin", branch], timeout=timeout, env=env)
+        try:
+            run("git", ["push", "-u", "origin", branch], timeout=timeout, env=env)
+        except subprocess.TimeoutExpired as e:
+            raise GitError(f"Push timed out after {timeout}s — remote state may be inconsistent. Check with: git push --dry-run") from e
         return
     remote = run("git", ["rev-parse", f"origin/{branch}"])
     if local != remote:
-        run("git", ["push", "origin", branch], timeout=timeout, env=env)
+        try:
+            run("git", ["push", "origin", branch], timeout=timeout, env=env)
+        except subprocess.TimeoutExpired as e:
+            raise GitError(f"Push timed out after {timeout}s — remote state may be inconsistent. Check with: git push --dry-run") from e
 
 
 def extract_changelog_entry_from_text(content, version):
