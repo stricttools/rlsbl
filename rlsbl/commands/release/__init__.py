@@ -16,9 +16,9 @@ from ...changelog import (
     validate_unreleased,
 )
 from ...changelog.generate import _read_release_metadata
-from ...errors import ConfigError
+from ...errors import ConfigError, PostReleaseError
 from ...git_util import validate_subtree_remote_ssh_host
-from ...config import read_deploy_config, read_json_config, should_tag
+from ...config import read_deploy_config, read_json_config, should_tag, update_last_build_release
 from ...pipelines import load_pipelines
 from ...deploy import deploy_target
 from ...lock import acquire_lock, release_lock
@@ -77,23 +77,6 @@ from .execute import (
 VALID_BUMP_TYPES = ("patch", "minor", "major")
 
 
-def _update_last_build_release(project_dir, version):
-    """Store last_build_release version in .rlsbl/config.json for OTA validation."""
-    config_path = os.path.join(project_dir, ".rlsbl", "config.json")
-    try:
-        config = read_json_config(config_path)
-    except Exception as e:
-        raise RuntimeError(
-            f"{config_path} is corrupted or unreadable — fix it before releasing: {e}"
-        ) from e
-    config["last_build_release"] = version
-    tmp_path = config_path + ".tmp"
-    with open(tmp_path, "w", encoding="utf-8") as f:
-        json.dump(config, f, indent=2)
-        f.write("\n")
-    os.replace(tmp_path, config_path)
-
-
 def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
             ctx):
     """Release command handler.
@@ -105,6 +88,8 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
     """
     try:
         _run_cmd_inner(release_config, flags, ctx=ctx)
+    except PostReleaseError:
+        sys.exit(1)
     except (ReleaseValidationError, HookError, ConfigError) as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
@@ -315,6 +300,6 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     if flutter_targets:
         mode = release_config.targets.get(flutter_targets[0], {}).get("mode")
         if mode == "build":
-            _update_last_build_release(project_dir, new_version)
+            update_last_build_release(project_dir, new_version)
 
 

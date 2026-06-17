@@ -813,8 +813,9 @@ def _run_release_mutating(state: ReleaseState):
     if release_created:
         try:
             upload_release_assets(tag, new_version, log, flags, ctx=ctx)
-        except (ReleaseValidationError, HookError):
-            sys.exit(1)
+        except (ReleaseValidationError, HookError) as e:
+            from ...errors import PostReleaseError
+            raise PostReleaseError(str(e)) from e
 
     # Load pipelines for the publish step (validation already ran in run_cmd)
     release_pipelines = load_pipelines(ctx.config)
@@ -917,4 +918,5 @@ def _run_release_mutating(state: ReleaseState):
     log(f"\nRelease {new_version} complete!")
 
     if not release_created:
-        sys.exit(1)
+        from ...errors import PostReleaseError
+        raise PostReleaseError(f"GitHub Release creation failed for {tag}")
