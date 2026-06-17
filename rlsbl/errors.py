@@ -23,3 +23,11 @@ class VersionError(RlsblError):
 
 class ReleaseFileError(RlsblError):
     """Invalid unreleased.toml, retry.toml, or batch release file."""
+
+
+class GitError(RlsblError):
+    """Git infrastructure failure (detached HEAD, shallow clone, push timeout)."""
+
+
+class PostReleaseError(RlsblError):
+    """Post-mutation failure where the error is already printed and no rollback is possible."""
