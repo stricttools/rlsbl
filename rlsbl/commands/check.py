@@ -488,8 +488,10 @@ def _check_single_name(name, registry):
 def _format_single_result(result):
     """Print the verbose output for a single name check result.
 
-    Reproduces the original detailed output format with variant warnings and
-    GitHub info.
+    Returns an exit code: 0 = available, 1 = taken/collision, 2 = error.
+
+    When status is "error", prints the error message and returns 2 immediately,
+    skipping variant/GitHub output (same behavior as the old sys.exit(1) calls).
     """
     name = result["name"]
     registry = result["registry"]
@@ -509,7 +511,7 @@ def _format_single_result(result):
         print(f'Checking npm for "{name}"...')
         if status == "error":
             print(f"Error checking npm: {result['error']}", file=sys.stderr)
-            sys.exit(1)
+            return 2
         if status == "available":
             print(f'"{name}" is available on npm.')
         else:
@@ -521,7 +523,7 @@ def _format_single_result(result):
         print(f'Checking PyPI for "{name}"...')
         if status == "error":
             print(f"Error checking PyPI: {result['error']}", file=sys.stderr)
-            sys.exit(1)
+            return 2
         if status == "available":
             print(f'"{name}" is available on PyPI.')
         else:
@@ -535,7 +537,7 @@ def _format_single_result(result):
         print(f'Checking pkg.go.dev for "{name}"...')
         if status == "error":
             print(f"Error checking pkg.go.dev: {result['error']}", file=sys.stderr)
-            sys.exit(1)
+            return 2
         if status == "not_found":
             print(f'"{name}" not found on pkg.go.dev.')
         else:
@@ -593,6 +595,11 @@ def _format_single_result(result):
     if result.get("ultranorm_checked"):
         steps.append("ultranormalization")
     print(f"\nChecked: {', '.join(steps)}")
+
+    # Return exit code based on status
+    if status in ("taken", "exists"):
+        return 1
+    return 0
 
 
 def _format_table_row(result):
@@ -677,13 +684,19 @@ def run_cmd(registry, args, flags):
     if len(names) == 1:
         result = _check_single_name(names[0], registry)
         _apply_ultranorm_check(result, registry, delay_ms)
-        _format_single_result(result)
+        exit_code = _format_single_result(result)
+        sys.exit(exit_code)
     else:
         rows = []
+        max_exit = 0
         for i, name in enumerate(names):
             result = _check_single_name(name, registry)
             _apply_ultranorm_check(result, registry, delay_ms)
             rows.append(_format_table_row(result))
+            if result["status"] == "error":
+                max_exit = max(max_exit, 2)
+            elif result["status"] in ("taken", "exists"):
+                max_exit = max(max_exit, 1)
             if i < len(names) - 1:
                 time.sleep(delay_ms / 1000)
 
@@ -710,3 +723,5 @@ def run_cmd(registry, args, flags):
         if delay_ms == 200:
             msg += " Increase --delay if rate limited."
         print(msg)
+
+        sys.exit(max_exit)

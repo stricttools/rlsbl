@@ -396,7 +396,10 @@ class TestMultiNameCheck:
             "name": "foo", "registry": "npm", "status": "available",
             "variants": [], "github_count": 0,
         }
-        run_cmd("npm", ["foo"], {})
+        mock_format.return_value = 0
+        with pytest.raises(SystemExit) as exc_info:
+            run_cmd("npm", ["foo"], {})
+        assert exc_info.value.code == 0
         mock_check.assert_called_once_with("foo", "npm")
         mock_format.assert_called_once_with(mock_check.return_value)
 
@@ -413,7 +416,9 @@ class TestMultiNameCheck:
              "variants": [], "github_count": 0},
         ]
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            run_cmd("npm", ["foo", "bar", "baz"], {})
+            with pytest.raises(SystemExit) as exc_info:
+                run_cmd("npm", ["foo", "bar", "baz"], {})
+            assert exc_info.value.code == 1  # one name is taken
         output = mock_stdout.getvalue()
         lines = output.strip().split("\n")
         # header + 3 rows + blank + summary + batch note = 7 lines
@@ -440,7 +445,8 @@ class TestMultiNameCheck:
              "variants": [], "github_count": 0},
         ]
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd("npm", ["a", "b", "c"], {"delay": "500"})
+            with pytest.raises(SystemExit):
+                run_cmd("npm", ["a", "b", "c"], {"delay": "500"})
         # 3 names -> 2 delays between them
         assert mock_sleep.call_count == 2
         mock_sleep.assert_has_calls([call(0.5), call(0.5)])
@@ -1291,7 +1297,9 @@ class TestMultiNameSummary:
              "variants": [], "github_count": 0},
         ]
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            run_cmd("npm", ["foo", "bar", "baz"], {})
+            with pytest.raises(SystemExit) as exc_info:
+                run_cmd("npm", ["foo", "bar", "baz"], {})
+            assert exc_info.value.code == 1
         output = mock_stdout.getvalue()
         assert "Summary: 2 available, 1 taken (3 total)" in output
         # No error count in summary
@@ -1310,7 +1318,9 @@ class TestMultiNameSummary:
              "variants": [], "github_count": None},
         ]
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            run_cmd("npm", ["foo", "bar", "baz"], {})
+            with pytest.raises(SystemExit) as exc_info:
+                run_cmd("npm", ["foo", "bar", "baz"], {})
+            assert exc_info.value.code == 2  # error is highest severity
         output = mock_stdout.getvalue()
         assert "Summary: 1 available, 1 taken, 1 error(s) (3 total)" in output
 
@@ -1327,7 +1337,9 @@ class TestMultiNameSummary:
              "variants": [], "github_count": 0},
         ]
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            run_cmd("npm", ["foo", "bar", "baz"], {})
+            with pytest.raises(SystemExit) as exc_info:
+                run_cmd("npm", ["foo", "bar", "baz"], {})
+            assert exc_info.value.code == 0
         output = mock_stdout.getvalue()
         assert "Summary: 3 available, 0 taken (3 total)" in output
         assert "error(s)" not in output
@@ -1343,7 +1355,9 @@ class TestMultiNameSummary:
              "variants": [], "github_count": 0},
         ]
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            run_cmd("npm", ["foo", "bar"], {})
+            with pytest.raises(SystemExit) as exc_info:
+                run_cmd("npm", ["foo", "bar"], {})
+            assert exc_info.value.code == 0
         output = mock_stdout.getvalue()
         assert "Checked with 200ms delay between names." in output
         assert "Increase --delay if rate limited." in output
@@ -1359,7 +1373,9 @@ class TestMultiNameSummary:
              "variants": [], "github_count": 0},
         ]
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            run_cmd("npm", ["foo", "bar"], {"delay": "500"})
+            with pytest.raises(SystemExit) as exc_info:
+                run_cmd("npm", ["foo", "bar"], {"delay": "500"})
+            assert exc_info.value.code == 0
         output = mock_stdout.getvalue()
         assert "Checked with 500ms delay between names." in output
         assert "Increase --delay if rate limited." not in output
@@ -1612,3 +1628,211 @@ class TestNormalizationCollisionIntegration:
         # The note should reference the local collision variant, not the search result
         assert "tool-stream" in result["note"]
         assert "moniker collision" in result["note"]
+
+
+class TestExitCodes:
+    """Tests for exit code semantics: 0=available, 1=taken, 2=error."""
+
+    # -- Single-name exit codes via _format_single_result --
+
+    def test_exit_0_for_available(self):
+        """Available name returns exit code 0."""
+        result = {
+            "name": "my-new-pkg", "registry": "npm", "status": "available",
+            "variants": [], "github_count": 0, "reason": None,
+        }
+        with patch("sys.stdout", new_callable=StringIO):
+            exit_code = _format_single_result(result)
+        assert exit_code == 0
+
+    def test_exit_0_for_not_found_go(self):
+        """Go not_found status returns exit code 0."""
+        result = {
+            "name": "github.com/fake/module", "registry": "go",
+            "status": "not_found", "variants": None, "github_count": 0,
+            "reason": None, "note": "Go modules use repository paths.",
+        }
+        with patch("sys.stdout", new_callable=StringIO):
+            exit_code = _format_single_result(result)
+        assert exit_code == 0
+
+    def test_exit_1_for_taken(self):
+        """Taken name returns exit code 1."""
+        result = {
+            "name": "express", "registry": "npm", "status": "taken",
+            "variants": None, "github_count": None, "reason": "registered",
+        }
+        with patch("sys.stdout", new_callable=StringIO):
+            exit_code = _format_single_result(result)
+        assert exit_code == 1
+
+    def test_exit_1_for_exists_go(self):
+        """Go exists status returns exit code 1."""
+        result = {
+            "name": "github.com/gorilla/mux", "registry": "go",
+            "status": "exists", "variants": None, "github_count": None,
+            "reason": "registered",
+        }
+        with patch("sys.stdout", new_callable=StringIO):
+            exit_code = _format_single_result(result)
+        assert exit_code == 1
+
+    def test_exit_1_for_normalized_collision(self):
+        """Normalized collision (taken via moniker) returns exit code 1."""
+        result = {
+            "name": "selfdoc", "registry": "npm", "status": "taken",
+            "variants": [], "github_count": None, "reason": "moniker",
+            "note": "moniker conflict with 'self-doc'",
+        }
+        with patch("sys.stdout", new_callable=StringIO):
+            exit_code = _format_single_result(result)
+        assert exit_code == 1
+
+    def test_exit_1_for_ultranorm_collision(self):
+        """Ultranorm collision returns exit code 1."""
+        result = {
+            "name": "cli", "registry": "pypi", "status": "taken",
+            "variants": [], "github_count": None, "reason": "ultranorm",
+            "ultranorm_conflicts": ["cl1"],
+        }
+        with patch("sys.stdout", new_callable=StringIO):
+            exit_code = _format_single_result(result)
+        assert exit_code == 1
+
+    def test_exit_2_for_npm_error(self):
+        """npm error returns exit code 2."""
+        result = {
+            "name": "some-pkg", "registry": "npm", "status": "error",
+            "variants": None, "github_count": None, "reason": None,
+            "error": "npm CLI not found",
+        }
+        with patch("sys.stdout", new_callable=StringIO):
+            with patch("sys.stderr", new_callable=StringIO):
+                exit_code = _format_single_result(result)
+        assert exit_code == 2
+
+    def test_exit_2_for_pypi_error(self):
+        """PyPI error returns exit code 2."""
+        result = {
+            "name": "some-pkg", "registry": "pypi", "status": "error",
+            "variants": None, "github_count": None, "reason": None,
+            "error": "Connection refused",
+        }
+        with patch("sys.stdout", new_callable=StringIO):
+            with patch("sys.stderr", new_callable=StringIO):
+                exit_code = _format_single_result(result)
+        assert exit_code == 2
+
+    def test_exit_2_for_go_error(self):
+        """Go error returns exit code 2."""
+        result = {
+            "name": "github.com/some/module", "registry": "go",
+            "status": "error", "variants": None, "github_count": None,
+            "reason": None, "error": "DNS resolution failed",
+        }
+        with patch("sys.stdout", new_callable=StringIO):
+            with patch("sys.stderr", new_callable=StringIO):
+                exit_code = _format_single_result(result)
+        assert exit_code == 2
+
+    # -- Single-name exit codes via run_cmd --
+
+    @patch("rlsbl.commands.check._check_single_name")
+    def test_run_cmd_single_available_exits_0(self, mock_check):
+        """run_cmd with single available name exits 0."""
+        mock_check.return_value = {
+            "name": "my-new-pkg", "registry": "npm", "status": "available",
+            "variants": [], "github_count": 0, "reason": None,
+        }
+        with patch("sys.stdout", new_callable=StringIO):
+            with pytest.raises(SystemExit) as exc_info:
+                run_cmd("npm", ["my-new-pkg"], {})
+            assert exc_info.value.code == 0
+
+    @patch("rlsbl.commands.check._check_single_name")
+    def test_run_cmd_single_taken_exits_1(self, mock_check):
+        """run_cmd with single taken name exits 1."""
+        mock_check.return_value = {
+            "name": "express", "registry": "npm", "status": "taken",
+            "variants": None, "github_count": None, "reason": "registered",
+        }
+        with patch("sys.stdout", new_callable=StringIO):
+            with pytest.raises(SystemExit) as exc_info:
+                run_cmd("npm", ["express"], {})
+            assert exc_info.value.code == 1
+
+    @patch("rlsbl.commands.check._check_single_name")
+    def test_run_cmd_single_error_exits_2(self, mock_check):
+        """run_cmd with single error result exits 2."""
+        mock_check.return_value = {
+            "name": "some-pkg", "registry": "npm", "status": "error",
+            "variants": None, "github_count": None, "reason": None,
+            "error": "npm CLI not found",
+        }
+        with patch("sys.stdout", new_callable=StringIO):
+            with patch("sys.stderr", new_callable=StringIO):
+                with pytest.raises(SystemExit) as exc_info:
+                    run_cmd("npm", ["some-pkg"], {})
+                assert exc_info.value.code == 2
+
+    # -- Multi-name exit codes via run_cmd --
+
+    @patch("rlsbl.commands.check.time.sleep")
+    @patch("rlsbl.commands.check._check_single_name")
+    def test_multi_name_all_available_exits_0(self, mock_check, mock_sleep):
+        """All names available -> exit 0."""
+        mock_check.side_effect = [
+            {"name": "a", "registry": "npm", "status": "available",
+             "variants": [], "github_count": 0},
+            {"name": "b", "registry": "npm", "status": "available",
+             "variants": [], "github_count": 0},
+        ]
+        with patch("sys.stdout", new_callable=StringIO):
+            with pytest.raises(SystemExit) as exc_info:
+                run_cmd("npm", ["a", "b"], {})
+            assert exc_info.value.code == 0
+
+    @patch("rlsbl.commands.check.time.sleep")
+    @patch("rlsbl.commands.check._check_single_name")
+    def test_multi_name_one_taken_exits_1(self, mock_check, mock_sleep):
+        """One taken, one available -> exit 1."""
+        mock_check.side_effect = [
+            {"name": "a", "registry": "npm", "status": "available",
+             "variants": [], "github_count": 0},
+            {"name": "b", "registry": "npm", "status": "taken",
+             "variants": [], "github_count": None},
+        ]
+        with patch("sys.stdout", new_callable=StringIO):
+            with pytest.raises(SystemExit) as exc_info:
+                run_cmd("npm", ["a", "b"], {})
+            assert exc_info.value.code == 1
+
+    @patch("rlsbl.commands.check.time.sleep")
+    @patch("rlsbl.commands.check._check_single_name")
+    def test_multi_name_one_error_exits_2(self, mock_check, mock_sleep):
+        """One error, one taken -> exit 2 (highest severity wins)."""
+        mock_check.side_effect = [
+            {"name": "a", "registry": "npm", "status": "error",
+             "variants": None, "github_count": None, "error": "timeout"},
+            {"name": "b", "registry": "npm", "status": "taken",
+             "variants": [], "github_count": None},
+        ]
+        with patch("sys.stdout", new_callable=StringIO):
+            with pytest.raises(SystemExit) as exc_info:
+                run_cmd("npm", ["a", "b"], {})
+            assert exc_info.value.code == 2
+
+    @patch("rlsbl.commands.check.time.sleep")
+    @patch("rlsbl.commands.check._check_single_name")
+    def test_multi_name_go_exists_exits_1(self, mock_check, mock_sleep):
+        """Go 'exists' status counts as taken -> exit 1."""
+        mock_check.side_effect = [
+            {"name": "github.com/fake/a", "registry": "go",
+             "status": "not_found", "variants": None, "github_count": 0},
+            {"name": "github.com/gorilla/mux", "registry": "go",
+             "status": "exists", "variants": None, "github_count": None},
+        ]
+        with patch("sys.stdout", new_callable=StringIO):
+            with pytest.raises(SystemExit) as exc_info:
+                run_cmd("go", ["github.com/fake/a", "github.com/gorilla/mux"], {})
+            assert exc_info.value.code == 1
