@@ -1563,6 +1563,18 @@ class TestClassifyVariantCollisions:
         assert hard == []
         assert soft == ["f-oo"]
 
+    def test_pypi_ultranorm_comparison_used(self):
+        """PyPI: _classify_variant_collisions uses _ultranormalize for comparison."""
+        # 'llmloop' and 'llm-loop' ultranormalize identically (separator removal)
+        hard, soft = _classify_variant_collisions("llmloop", ["llm-loop"], "pypi")
+        assert hard == ["llm-loop"]
+        assert soft == []
+
+        # 'cli' and 'c1i' ultranormalize identically (visual-ambiguity normalization)
+        hard, soft = _classify_variant_collisions("cli", ["c1i"], "pypi")
+        assert hard == ["c1i"]
+        assert soft == []
+
 
 class TestNormalizationCollisionIntegration:
     """Integration tests: normalization collisions upgrade status to 'taken'."""
