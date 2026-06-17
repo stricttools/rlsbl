@@ -8,7 +8,7 @@ import subprocess
 import sys
 import urllib.request
 
-from .errors import ConfigError, VersionError
+from .errors import ConfigError, GitError, VersionError
 
 
 def run(cmd, args=None, timeout=120, env=None, cwd=None):
@@ -74,8 +74,16 @@ def is_clean_tree():
 
 
 def get_current_branch():
-    """Returns the current git branch name."""
-    return run("git", ["rev-parse", "--abbrev-ref", "HEAD"])
+    """Returns the current git branch name.
+
+    Raises GitError when HEAD is detached (git returns the literal string
+    "HEAD"), since callers like push_if_needed would silently misbehave
+    by operating on ``origin/HEAD``.
+    """
+    result = run("git", ["rev-parse", "--abbrev-ref", "HEAD"])
+    if result == "HEAD":
+        raise GitError("HEAD is detached — release operations require a named branch")
+    return result
 
 
 def get_push_timeout(config):

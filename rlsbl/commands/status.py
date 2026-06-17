@@ -13,6 +13,7 @@ from ..changelog.validate import (
 )
 from ..git_util import filter_commits_for_project
 from ..targets import TARGETS, detect_targets
+from ..errors import GitError
 from ..utils import (
     extract_changelog_entry,
     get_current_branch,
@@ -49,6 +50,8 @@ def _collect_status(registry, target_path=".", *, tag_glob=None, ctx, project=No
     # Git branch
     try:
         branch = get_current_branch()
+    except GitError:
+        branch = "(detached HEAD)"
     except Exception as e:
         print(f"Warning: could not determine branch: {e}", file=sys.stderr)
         branch = None

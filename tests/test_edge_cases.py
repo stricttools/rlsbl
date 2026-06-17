@@ -13,6 +13,7 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 import rlsbl.lock
+from rlsbl.errors import GitError
 from rlsbl.lock import release_lock
 from rlsbl.utils import get_current_branch, push_if_needed
 from rlsbl.changelog.validate import _get_last_version_tag
@@ -21,19 +22,12 @@ from rlsbl.changelog.validate import _get_last_version_tag
 class TestDetachedHead:
     """9.1: get_current_branch() when HEAD is detached.
 
-    Source behavior: get_current_branch() calls
-    ``git rev-parse --abbrev-ref HEAD``, which returns the literal string
-    "HEAD" when in detached-HEAD state. The function does NOT raise an
-    error -- it returns "HEAD" as the branch name. This is potentially
-    dangerous because callers (e.g. push_if_needed) would attempt to push
-    a branch named "HEAD", which is nonsensical.
-
-    Verdict: the edge case is NOT explicitly handled in the source code.
-    The function silently returns "HEAD" instead of raising a clear error.
+    get_current_branch() raises GitError when HEAD is detached, preventing
+    callers (e.g. push_if_needed) from silently operating on ``origin/HEAD``.
     """
 
-    def test_detached_head_returns_head_string(self, mock_git_repo):
-        """On detached HEAD, get_current_branch() returns the string 'HEAD'."""
+    def test_detached_head_raises_git_error(self, mock_git_repo):
+        """On detached HEAD, get_current_branch() raises GitError."""
         subprocess.run(
             ["git", "checkout", "--detach"],
             cwd=str(mock_git_repo),
@@ -41,17 +35,16 @@ class TestDetachedHead:
             capture_output=True,
         )
 
+        with pytest.raises(GitError, match="HEAD is detached"):
+            get_current_branch()
+
+    def test_normal_branch_returns_name(self, mock_git_repo):
+        """On a normal branch, get_current_branch() returns the branch name."""
         result = get_current_branch()
-        # git rev-parse --abbrev-ref HEAD returns "HEAD" when detached
-        assert result == "HEAD"
+        assert result == "main"
 
-    def test_detached_head_is_not_a_valid_branch_name(self, mock_git_repo):
-        """Demonstrate that the return value 'HEAD' is not a real branch.
-
-        get_current_branch() returns 'HEAD' (the literal string) which is
-        NOT a real branch ref. If a caller passes this to git push, it would
-        try to push a branch named 'HEAD' which is nonsensical.
-        """
+    def test_status_works_on_detached_head(self, mock_git_repo):
+        """The status command handles detached HEAD gracefully without crashing."""
         subprocess.run(
             ["git", "checkout", "--detach"],
             cwd=str(mock_git_repo),
@@ -59,18 +52,23 @@ class TestDetachedHead:
             capture_output=True,
         )
 
-        branch = get_current_branch()
-        assert branch == "HEAD"
+        from rlsbl.commands.status import _collect_status
+        from rlsbl.context import create_context
 
-        # Verify that "HEAD" is not an actual branch ref via rev-parse
-        result = subprocess.run(
-            ["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch}"],
-            cwd=str(mock_git_repo),
+        # Set up minimal rlsbl project structure for status to work
+        import os
+        rlsbl_dir = mock_git_repo / ".rlsbl"
+        rlsbl_dir.mkdir(exist_ok=True)
+
+        # Create a minimal pyproject.toml so detect_targets finds something
+        pyproject = mock_git_repo / "pyproject.toml"
+        pyproject.write_text(
+            '[project]\nname = "test-pkg"\nversion = "0.1.0"\n'
         )
-        # Non-zero exit means refs/heads/HEAD does not exist
-        assert result.returncode != 0, (
-            "refs/heads/HEAD should not exist -- 'HEAD' is not a real branch"
-        )
+
+        ctx = create_context(mock_git_repo)
+        data = _collect_status("pypi", ".", ctx=ctx)
+        assert data["branch"] == "(detached HEAD)"
 
 
 class TestShallowClone:
