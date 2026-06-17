@@ -4,3 +4,4 @@
 {"commits":["1dbc4ffab483f04f284ab7b31875df4a7b9f70ac"],"user_facing":true,"description":"**Bug fix.** Standardized path normalization on `realpath` across root discovery, containment checks, and lint exclusion. Fixes potential mismatches when project directories are accessed through symlinks.","type":"fix"}
 {"commits":["cf1fc12d4f2254f5ba28d8c75e84336e13d1146d"],"user_facing":false}
 {"commits":["11b3ce52feba28585ab7c379402139ebcbd38287"],"user_facing":false}
+{"commits":["5086e9f907f324b0d2afdbece900ec6b68a1bf67"],"user_facing":false}
