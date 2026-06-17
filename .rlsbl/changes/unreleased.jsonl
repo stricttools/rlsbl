@@ -1,1 +1,2 @@
 {"commits":["c1533808043ec9232ff194b25266a7613ba65173"],"user_facing":true,"description":"**Bug fix.** Stale commit-level batch exclusions are now cleaned from `config.json` during release finalization, matching the existing cleanup for entry-level exclusions.","type":"fix"}
+{"commits":["f8adca6f628a1345f8f95648df394b2348b84f68"],"user_facing":false}
