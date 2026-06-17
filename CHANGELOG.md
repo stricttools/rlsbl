@@ -2,6 +2,21 @@
 
 # Changelog
 
+## 0.74.1
+
+Fix first release on empty remote
+
+<details>
+<summary>Context</summary>
+
+When a project had a configured remote but no commits had been pushed yet, the remote-ahead check would abort because origin/{branch} did not exist. The check now detects this and skips gracefully.
+
+</details>
+
+### Fixes
+
+- **Bug fix.** Release no longer aborts on first push to an empty remote. When `origin/{branch}` does not exist after a successful fetch, the remote-ahead check is skipped with an informational message instead of hard-aborting.
+
 ## 0.74.0
 
 Blog post integration for releases, richer hook environment variables, and assembly support in post-release hooks.
