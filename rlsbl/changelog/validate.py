@@ -249,14 +249,27 @@ def _is_cache_valid(changes_dir: str) -> bool:
 def check_hashes_resolve(entries: list[ChangelogEntry]) -> tuple[bool, list[str]]:
     """Check that every hash in every entry resolves via git rev-parse."""
     details: list[str] = []
+
+    # Collect all hashes for batch resolution
     all_hashes: list[str] = []
     for entry in entries:
         all_hashes.extend(entry.commits)
-
     resolved = resolve_hashes(all_hashes)
-    for h, full in resolved.items():
-        if full is None:
-            details.append(f"hash does not resolve: {h}")
+
+    # Report per-entry with context
+    for i, entry in enumerate(entries):
+        if not entry.commits:
+            continue
+        bad_hashes = [h for h in entry.commits if resolved.get(h) is None]
+        if not bad_hashes:
+            continue
+        total = len(entry.commits)
+        n_valid = total - len(bad_hashes)
+        for h in bad_hashes:
+            details.append(
+                f"entry {i + 1} in unreleased.jsonl: hash {h} does not resolve "
+                f"({n_valid} of {total} commits still valid)"
+            )
 
     return (len(details) == 0, details)
 
@@ -332,16 +345,50 @@ def check_coverage(entries: list[ChangelogEntry], tag_glob: str | None = None, p
     return (uncovered == 0, details)
 
 
-def check_no_orphans(entries: list[ChangelogEntry]) -> tuple[bool, list[str]]:
-    """Flag entries where ALL hashes are unresolvable (stale/rebased entries)."""
+def check_no_orphans(
+    entries: list[ChangelogEntry],
+    tag_glob: str | None = None,
+    project: dict | None = None,
+) -> tuple[bool, list[str]]:
+    """Flag entries where all commits are stale (unresolvable or out of range).
+
+    An entry is fully orphaned when ALL its hashes are unresolvable.
+    An entry is effectively orphaned when every hash is either
+    unresolvable or outside the unreleased range — no commit is both
+    valid and in range.
+    """
     details: list[str] = []
+    unreleased_commits = set(_git_log_hashes(_unreleased_range(tag_glob)))
+
+    if project is not None:
+        unreleased_commits = filter_commits_for_project(unreleased_commits, project)
+
     for i, entry in enumerate(entries):
         if not entry.commits:
             continue
         resolved = resolve_hashes(entry.commits)
-        if all(v is None for v in resolved.values()):
-            hashes_str = ", ".join(entry.commits)
-            details.append(f"entry {i + 1}: all hashes unresolvable ({hashes_str})")
+        n_unresolvable = sum(1 for v in resolved.values() if v is None)
+        resolvable_shas = {v for v in resolved.values() if v is not None}
+        n_out_of_range = sum(1 for sha in resolvable_shas if sha not in unreleased_commits)
+        n_in_range = len(resolvable_shas) - n_out_of_range
+
+        if n_unresolvable == len(entry.commits):
+            # Fully orphaned: all hashes unresolvable
+            details.append(
+                f"entry {i + 1} in unreleased.jsonl: all commits are stale "
+                f"({n_unresolvable} unresolvable) — consider removing this entry"
+            )
+        elif n_in_range == 0 and (n_unresolvable > 0 or n_out_of_range > 0):
+            # Effectively orphaned: mix of unresolvable and out-of-range
+            parts = []
+            if n_unresolvable > 0:
+                parts.append(f"{n_unresolvable} unresolvable")
+            if n_out_of_range > 0:
+                parts.append(f"{n_out_of_range} out of range")
+            details.append(
+                f"entry {i + 1} in unreleased.jsonl: all commits are stale "
+                f"({', '.join(parts)}) — consider removing this entry"
+            )
 
     return (len(details) == 0, details)
 
@@ -537,7 +584,7 @@ def validate_unreleased(changes_dir: str, tag_glob: str | None = None, project: 
         "hashes_resolve": check_hashes_resolve(entries),
         "in_range": check_in_range(entries, tag_glob, project=project),
         "coverage": check_coverage(entries, tag_glob, project=project),
-        "no_orphans": check_no_orphans(entries),
+        "no_orphans": check_no_orphans(entries, tag_glob, project=project),
         "schema": check_schema(entries),
         "batch_size_commits": check_batch_size_commits(entries, batch_config, version="unreleased"),
         "batch_size_entries": check_batch_size_entries(entries_by_version, batch_config),

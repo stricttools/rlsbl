@@ -157,7 +157,8 @@ class TestCheckNoOrphans:
         entries = [ChangelogEntry(commits=[fake], user_facing=False)]
         passed, details = check_no_orphans(entries)
         assert passed is False
-        assert "all hashes unresolvable" in details[0]
+        assert "all commits are stale" in details[0]
+        assert "unresolvable" in details[0]
 
     def test_passes_with_partial_resolve(self, git_repo):
         """If at least one hash resolves, entry is not orphaned."""
@@ -171,6 +172,102 @@ class TestCheckNoOrphans:
         entries = [ChangelogEntry(commits=[], user_facing=False)]
         passed, details = check_no_orphans(entries)
         assert passed is True
+
+
+class TestHashResolveEntryContext:
+    """Tests for improved check_hashes_resolve with entry context."""
+
+    def test_partial_bad_hash_includes_entry_context(self, git_repo):
+        """Entry with 1 bad hash out of 3: message includes entry index and validity count."""
+        sha1 = _make_commit(git_repo, "a.txt")
+        sha2 = _make_commit(git_repo, "b.txt")
+        fake = "0" * 40
+        entries = [ChangelogEntry(commits=[sha1, fake, sha2], user_facing=False)]
+        passed, details = check_hashes_resolve(entries)
+        assert passed is False
+        assert len(details) == 1
+        assert "entry 1 in unreleased.jsonl" in details[0]
+        assert fake in details[0]
+        assert "does not resolve" in details[0]
+        assert "2 of 3 commits still valid" in details[0]
+
+    def test_all_bad_hashes_reported_as_fully_invalid(self, git_repo):
+        """Entry with all bad hashes: each reported with 0 valid."""
+        fake1 = "0" * 40
+        fake2 = "1" * 40
+        entries = [ChangelogEntry(commits=[fake1, fake2], user_facing=False)]
+        passed, details = check_hashes_resolve(entries)
+        assert passed is False
+        assert len(details) == 2
+        for d in details:
+            assert "entry 1 in unreleased.jsonl" in d
+            assert "0 of 2 commits still valid" in d
+
+    def test_multiple_entries_correct_indices(self, git_repo):
+        """Bad hashes in different entries get correct entry indices."""
+        sha = _make_commit(git_repo)
+        fake = "0" * 40
+        entries = [
+            ChangelogEntry(commits=[sha], user_facing=False),  # entry 1: all valid
+            ChangelogEntry(commits=[fake], user_facing=False),  # entry 2: bad
+        ]
+        passed, details = check_hashes_resolve(entries)
+        assert passed is False
+        assert len(details) == 1
+        assert "entry 2 in unreleased.jsonl" in details[0]
+
+
+class TestOrphanPartialStaleness:
+    """Tests for improved check_no_orphans with partial staleness detection."""
+
+    def test_all_hashes_out_of_range_detected(self, git_repo):
+        """Entry with all hashes out of range: reported as effectively orphaned."""
+        # The initial commit (at v0.0.0 tag) is not in unreleased range
+        initial = _git_head(git_repo)
+        _make_commit(git_repo)  # advance HEAD so there's a non-empty range
+        entries = [ChangelogEntry(commits=[initial], user_facing=False)]
+        passed, details = check_no_orphans(entries)
+        assert passed is False
+        assert len(details) == 1
+        assert "entry 1 in unreleased.jsonl" in details[0]
+        assert "all commits are stale" in details[0]
+        assert "out of range" in details[0]
+
+    def test_mix_unresolvable_and_out_of_range(self, git_repo):
+        """Entry with mix of unresolvable and out-of-range: consolidated message."""
+        initial = _git_head(git_repo)
+        _make_commit(git_repo)  # advance HEAD past the tag
+        fake = "0" * 40
+        entries = [ChangelogEntry(commits=[initial, fake], user_facing=False)]
+        passed, details = check_no_orphans(entries)
+        assert passed is False
+        assert len(details) == 1
+        assert "all commits are stale" in details[0]
+        assert "1 unresolvable" in details[0]
+        assert "1 out of range" in details[0]
+        assert "consider removing this entry" in details[0]
+
+    def test_partial_valid_in_range_not_flagged(self, git_repo):
+        """Entry with some bad hashes but at least one in-range: NOT flagged."""
+        sha = _make_commit(git_repo)  # in range
+        fake = "0" * 40
+        entries = [ChangelogEntry(commits=[sha, fake], user_facing=False)]
+        passed, details = check_no_orphans(entries)
+        assert passed is True
+        assert details == []
+
+    def test_fully_orphaned_message_format(self, git_repo):
+        """Fully orphaned entry (all unresolvable) has updated message format."""
+        fake1 = "0" * 40
+        fake2 = "1" * 40
+        entries = [ChangelogEntry(commits=[fake1, fake2], user_facing=False)]
+        passed, details = check_no_orphans(entries)
+        assert passed is False
+        assert len(details) == 1
+        assert "entry 1 in unreleased.jsonl" in details[0]
+        assert "all commits are stale" in details[0]
+        assert "2 unresolvable" in details[0]
+        assert "consider removing this entry" in details[0]
 
 
 class TestCheckSchema:
