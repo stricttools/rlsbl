@@ -2,6 +2,21 @@
 
 # Changelog
 
+## 0.75.1
+
+Fix workspace test runner uv sync
+
+<details>
+<summary>Context</summary>
+
+The workspace test runner was running uv sync per sub-project instead of once at the workspace root, breaking monorepos with cross-project dependencies.
+
+</details>
+
+### Fixes
+
+- **Bug fix.** Workspace test runner now runs `uv sync --all-packages` at the workspace root instead of per sub-project, fixing monorepo test suites with cross-project dependencies.
+
 ## 0.75.0
 
 Normalization collision detection, ultranorm by default, claim-name command, exit codes
