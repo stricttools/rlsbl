@@ -3,17 +3,7 @@
   "env_file": "~/Projects/.env",
   "push_timeout": 120,
   "batch_limits": {
-    "exclusions": [
-      {
-        "reason": "**Breaking.** Split `release.py` (1985 lines) into a 6-module `release/` package: `__init__.py` (orchestrator), `execute.py`, `validate.py`, `hooks.py`, `publish.py`, `rollback.py`. Replaced the 24-parameter `_run_release_mutating` signature with a `ReleaseState` dataclass. Converted 27 `sys.exit` calls to `ReleaseValidationError`/`HookError` exceptions.",
-        "entries": [
-          {
-            "version": "unreleased",
-            "line": 1
-          }
-        ]
-      }
-    ]
+    "exclusions": []
   },
   "targets": [
     "npm",
