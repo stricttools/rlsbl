@@ -453,8 +453,15 @@ def cmd_check_name(target, delay, **_kwargs):
 # ---------------------------------------------------------------------------
 
 @app.command(name="claim-name", help="Claim a name on a package registry by publishing a minimal placeholder package. Runs check-name first, then publishes if available.")
-@strictcli.flag(name="target", type=str, help="Target registry: npm or pypi", required=True)
+@strictcli.flag(name="target", type=str, help="Target registry: npm or pypi", default="")
 def cmd_claim_name(target, yes, **_kwargs):
+    if not target:
+        print(
+            "Error: --target is required. "
+            "Usage: rlsbl claim-name <name> --target <npm|pypi>",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     valid_targets = {"npm", "pypi"}
     if target not in valid_targets:
         print(
