@@ -8,6 +8,8 @@ import subprocess
 import sys
 import tempfile
 
+from .validate import HookError, ReleaseValidationError
+
 # Names like run, require_tool, load_pipelines, warn_exception are imported
 # from the parent package at call time (via `from . import X`) so that
 # test patches on `rlsbl.commands.release.X` are picked up correctly.
@@ -99,11 +101,9 @@ def _run_selfdoc_post_generate(flags, *, project_dir=None, release_config=None,
 
         subprocess.run(cmd, cwd=project_dir, check=True)
     except subprocess.CalledProcessError as e:
-        print(
-            f"Error: selfdoc post generate failed (exit code {e.returncode}).",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        raise HookError(
+            f"selfdoc post generate failed (exit code {e.returncode})."
+        ) from e
     finally:
         if tmp_changelog and os.path.exists(tmp_changelog.name):
             os.unlink(tmp_changelog.name)
@@ -233,15 +233,13 @@ def upload_release_assets(tag, new_version, log, flags, *, ctx):
                 if file_size > max_size_bytes:
                     file_name = os.path.basename(artifact_path)
                     actual_mb = file_size / (1024 * 1024)
-                    print(
-                        f"Error: artifact '{file_name}' is {actual_mb:.1f}MB, "
-                        f"exceeds max_asset_size_mb ({max_size_mb}MB) for pipeline '{name}'.",
-                        file=sys.stderr,
-                    )
                     # Clean up dist before aborting
                     if os.path.isdir(dist_dir):
                         shutil.rmtree(dist_dir)
-                    sys.exit(1)
+                    raise ReleaseValidationError(
+                        f"artifact '{file_name}' is {actual_mb:.1f}MB, "
+                        f"exceeds max_asset_size_mb ({max_size_mb}MB) for pipeline '{name}'."
+                    )
 
         # Upload
         try:

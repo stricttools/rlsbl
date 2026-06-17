@@ -697,16 +697,19 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
         sys.exit(1)
 
     # Generate blog post via selfdoc if blog is enabled
-    _run_selfdoc_post_generate(
-        flags,
-        project_dir=project_dir,
-        release_config=release_config,
-        new_version=new_version,
-        current_version=current_version,
-        bump_type=bump_type,
-        changelog_entry=changelog_entry,
-        tag=tag,
-    )
+    try:
+        _run_selfdoc_post_generate(
+            flags,
+            project_dir=project_dir,
+            release_config=release_config,
+            new_version=new_version,
+            current_version=current_version,
+            bump_type=bump_type,
+            changelog_entry=changelog_entry,
+            tag=tag,
+        )
+    except (ReleaseValidationError, HookError):
+        sys.exit(1)
 
     # Check if the pre-release hook has been customized. When it has,
     # skip built-in tests and lint -- the hook is expected to handle them.
@@ -1337,7 +1340,10 @@ def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current
 
     # Upload release assets for pipelines with assets/custom_assets config
     if release_created:
-        upload_release_assets(tag, new_version, log, flags, ctx=ctx)
+        try:
+            upload_release_assets(tag, new_version, log, flags, ctx=ctx)
+        except (ReleaseValidationError, HookError):
+            sys.exit(1)
 
     # Load pipelines for the publish step (validation already ran in run_cmd)
     release_pipelines = load_pipelines(ctx.config)

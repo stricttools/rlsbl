@@ -9,6 +9,7 @@ from unittest.mock import patch
 import pytest
 
 from rlsbl.commands.release import _run_selfdoc_post_generate
+from rlsbl.commands.release.validate import HookError
 from rlsbl.release_file import ReleaseConfig
 
 
@@ -249,7 +250,7 @@ class TestTempFileCleanup:
             patch("subprocess.run", side_effect=failing_subprocess_run),
             patch("rlsbl.commands.release.run", return_value="git@github.com:owner/repo.git"),
             patch("tempfile.NamedTemporaryFile", side_effect=tracking_temp),
-            pytest.raises(SystemExit),
+            pytest.raises(HookError),
         ):
             _run_selfdoc_post_generate(
                 {},
@@ -297,8 +298,8 @@ class TestDryRun:
 class TestSubprocessFailure:
     """Test that selfdoc failure aborts the release."""
 
-    def test_selfdoc_failure_exits(self, tmp_path):
-        """When selfdoc post generate fails, sys.exit(1) is called."""
+    def test_selfdoc_failure_raises_hook_error(self, tmp_path):
+        """When selfdoc post generate fails, HookError is raised."""
         selfdoc_json = tmp_path / "selfdoc.json"
         selfdoc_json.write_text(json.dumps({"project_name": "myproject"}))
 
@@ -311,7 +312,7 @@ class TestSubprocessFailure:
             patch("rlsbl.commands.release.require_tool", return_value=True),
             patch("subprocess.run", side_effect=failing_subprocess_run),
             patch("rlsbl.commands.release.run", return_value="git@github.com:owner/repo.git"),
-            pytest.raises(SystemExit) as exc_info,
+            pytest.raises(HookError, match="selfdoc post generate failed"),
         ):
             _run_selfdoc_post_generate(
                 {},
@@ -323,5 +324,3 @@ class TestSubprocessFailure:
                 changelog_entry="test",
                 tag="v1.0.0",
             )
-
-        assert exc_info.value.code == 1

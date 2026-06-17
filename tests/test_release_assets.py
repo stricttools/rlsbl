@@ -16,6 +16,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from rlsbl.commands.release import upload_release_assets
+from rlsbl.commands.release.validate import ReleaseValidationError
 from rlsbl.context import ProjectContext
 
 
@@ -175,8 +176,8 @@ class TestAssetSizeExceeded:
         monkeypatch.chdir(tmp_path)
         self.tmp_dir = str(tmp_path)
 
-    def test_oversized_artifact_aborts(self, capsys):
-        """An artifact exceeding the size limit causes sys.exit(1)."""
+    def test_oversized_artifact_aborts(self):
+        """An artifact exceeding the size limit raises ReleaseValidationError."""
         _write_config(self.tmp_dir, {
             "targets": ["pypi"],
             "pipelines": {"pypi": {"type": "pypi", "local": False, "assets": True, "max_asset_size_mb": 1}},
@@ -202,14 +203,8 @@ class TestAssetSizeExceeded:
         })
         with patch("rlsbl.commands.release.load_pipelines", return_value={"pypi": mock_pipeline}):
             with patch("rlsbl.commands.release.run"):
-                with pytest.raises(SystemExit) as exc_info:
+                with pytest.raises(ReleaseValidationError, match="exceeds max_asset_size_mb"):
                     upload_release_assets("v1.0.0", "1.0.0", lambda m: None, {}, ctx=ctx)
-                assert exc_info.value.code == 1
-
-        captured = capsys.readouterr()
-        assert "exceeds max_asset_size_mb" in captured.err
-        assert "huge.tar.gz" in captured.err
-        assert "1MB" in captured.err
 
 
 class TestDryRun:
