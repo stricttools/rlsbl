@@ -1836,3 +1836,153 @@ class TestExitCodes:
             with pytest.raises(SystemExit) as exc_info:
                 run_cmd("go", ["github.com/fake/a", "github.com/gorilla/mux"], {})
             assert exc_info.value.code == 1
+
+
+class TestCheckNameEndToEnd:
+    """End-to-end integration tests that only mock the HTTP/subprocess layer.
+
+    All internal functions (_check_single_name, _check_variants,
+    _classify_variant_collisions, _search_npm_similar, get_pypi_variants,
+    get_npm_variants, _apply_ultranorm_check) run for real.  Only network
+    I/O (urllib.request.urlopen, subprocess.run) and time.sleep are mocked.
+    """
+
+    @staticmethod
+    def _make_pypi_urlopen(taken_names):
+        """Return a urlopen side_effect that simulates the PyPI Simple API.
+
+        ``taken_names`` is a set of *normalized* package names that should
+        return 200.  Everything else returns 404.  GitHub and npm search
+        URLs return innocuous defaults so the test focuses on PyPI.
+        """
+        def side_effect(req, **kwargs):
+            url = req.full_url if hasattr(req, "full_url") else str(req)
+            # PyPI Simple API
+            if "pypi.org/simple/" in url:
+                # Extract name from https://pypi.org/simple/<name>/
+                name = url.split("/simple/")[1].rstrip("/")
+                if name in taken_names:
+                    return FakeResponse(b"ok", status=200)
+                raise HTTPError(url, 404, "Not Found", {}, None)
+            # GitHub search API -- return zero repos
+            if "api.github.com" in url:
+                return FakeResponse({"total_count": 0})
+            # npm search API -- return empty results
+            if "registry.npmjs.org" in url:
+                return FakeResponse({"objects": []})
+            raise AssertionError(f"Unexpected URL: {url}")
+        return side_effect
+
+    @staticmethod
+    def _make_npm_subprocess(taken_names):
+        """Return a subprocess.run side_effect for npm view.
+
+        ``taken_names`` is a set of package names that should appear taken.
+        Everything else raises CalledProcessError with E404 stderr.
+        """
+        def side_effect(cmd, **kwargs):
+            if cmd[:2] == ["npm", "view"]:
+                name = cmd[2]
+                if name in taken_names:
+                    result = MagicMock()
+                    result.returncode = 0
+                    result.stdout = name
+                    result.stderr = ""
+                    return result
+                raise subprocess.CalledProcessError(
+                    1, cmd, output="", stderr="E404 - Not found"
+                )
+            raise AssertionError(f"Unexpected subprocess: {cmd}")
+        return side_effect
+
+    # ------------------------------------------------------------------
+    # 1. PyPI normalization collision: "llmloop" vs "llm-loop"
+    # ------------------------------------------------------------------
+
+    @patch("rlsbl.commands.check.time.sleep")
+    @patch("urllib.request.urlopen")
+    def test_pypi_llmloop_detects_llm_loop_collision(self, mock_urlopen, mock_sleep):
+        """llmloop is available but llm-loop is taken -- hard normalized collision."""
+        # "llm-loop" normalizes to "llm-loop" via PEP 503.
+        # get_pypi_variants("llmloop") generates insertion variants including
+        # "llm-loop", which is taken.  _classify_variant_collisions classifies
+        # it as a hard collision because _ultranormalize("llmloop") ==
+        # _ultranormalize("llm-loop").
+        mock_urlopen.side_effect = self._make_pypi_urlopen({"llm-loop"})
+
+        result = _check_single_name("llmloop", "pypi")
+        assert result["status"] == "taken"
+        assert result["reason"] == "normalized"
+        # The note mentions whichever hard collision was found first.
+        # Multiple variants normalize to "llm-loop" (e.g., "llm.loop",
+        # "llm_loop", "llm-loop"), and thread ordering is non-deterministic.
+        note = result.get("note", "")
+        assert "normalization collision" in note
+
+    # ------------------------------------------------------------------
+    # 2. npm moniker collision: "toolstream" vs "tool-stream"
+    # ------------------------------------------------------------------
+
+    @patch("rlsbl.commands.check.time.sleep")
+    @patch("subprocess.run")
+    @patch("urllib.request.urlopen")
+    def test_npm_toolstream_detects_tool_stream_collision(
+        self, mock_urlopen, mock_subprocess, mock_sleep
+    ):
+        """toolstream is available but tool-stream is taken -- npm moniker collision."""
+        # npm: subprocess.run for npm view, urlopen for npm search + GitHub
+        mock_subprocess.side_effect = self._make_npm_subprocess({"tool-stream"})
+        # npm search and GitHub both return empty results
+        def urlopen_side_effect(req, **kwargs):
+            url = req.full_url if hasattr(req, "full_url") else str(req)
+            if "registry.npmjs.org" in url:
+                return FakeResponse({"objects": []})
+            if "api.github.com" in url:
+                return FakeResponse({"total_count": 0})
+            raise AssertionError(f"Unexpected URL: {url}")
+        mock_urlopen.side_effect = urlopen_side_effect
+
+        result = _check_single_name("toolstream", "npm")
+        assert result["status"] == "taken"
+        assert result["reason"] == "moniker"
+        assert "tool-stream" in result.get("note", "")
+
+    # ------------------------------------------------------------------
+    # 3. PyPI fully available -- no collisions anywhere
+    # ------------------------------------------------------------------
+
+    @patch("rlsbl.commands.check.time.sleep")
+    @patch("urllib.request.urlopen")
+    def test_pypi_available_no_collisions(self, mock_urlopen, mock_sleep):
+        """Name with no collisions at all reports available."""
+        # Nothing is taken -- every PyPI query returns 404
+        mock_urlopen.side_effect = self._make_pypi_urlopen(set())
+
+        result = _check_single_name("xyzzypkg", "pypi")
+        # Also run ultranorm (as run_cmd would)
+        _apply_ultranorm_check(result, "pypi", 0)
+        assert result["status"] == "available"
+        assert result["reason"] is None
+        assert result.get("ultranorm_checked") is True
+
+    # ------------------------------------------------------------------
+    # 4. PyPI ultranormalization visual ambiguity: "cli" vs "c1i"
+    # ------------------------------------------------------------------
+
+    @patch("rlsbl.commands.check.time.sleep")
+    @patch("urllib.request.urlopen")
+    def test_pypi_ultranorm_visual_ambiguity(self, mock_urlopen, mock_sleep):
+        """cli is available but c1i is taken -- ultranorm visual collision."""
+        # "cli" itself is available.  _generate_ultranorm_variants("cli")
+        # produces ["cl1", "c1i", "c11"].  We mark "c1i" as taken on PyPI.
+        # The ultranorm check iterates variants in order: cl1 (404), c1i (200)
+        # -> conflict found, stops early.
+        mock_urlopen.side_effect = self._make_pypi_urlopen({"c1i"})
+
+        result = _check_single_name("cli", "pypi")
+        assert result["status"] == "available"  # before ultranorm
+
+        _apply_ultranorm_check(result, "pypi", 0)
+        assert result["status"] == "taken"
+        assert result["reason"] == "ultranorm"
+        assert "c1i" in result.get("ultranorm_conflicts", [])
