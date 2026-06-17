@@ -1,1 +1,2 @@
 {"commits":["0839973160e83ee604215b5253bf5105c53c0166"],"user_facing":true,"description":"**Bug fix.** Release no longer aborts on first push to an empty remote. When `origin/{branch}` does not exist after a successful fetch, the remote-ahead check is skipped with an informational message instead of hard-aborting.","type":"fix"}
+{"commits":["bd3d9bc51860f16ff30c58cfb3b6a53df53e68c5","6a23ce70cfaf11339b8a3aaa7ff58a129c0ea43a"],"user_facing":false}
