@@ -55,7 +55,7 @@ def find_project_root(start=None):
     Returns the directory path containing the marker, or None if not found.
     Prefers the nearest ancestor with either marker.
     """
-    current = os.path.abspath(start or ".")
+    current = os.path.realpath(start or ".")
     while True:
         if os.path.isdir(os.path.join(current, ".rlsbl")):
             return current

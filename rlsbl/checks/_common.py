@@ -76,13 +76,13 @@ def _sibling_exclude_dirs(root, project_path, all_projects):
     into sibling projects when the current project is at a parent
     path (e.g. ``path = "."``).
     """
-    project_abs = os.path.normpath(os.path.join(root, project_path))
+    project_abs = os.path.realpath(os.path.join(root, project_path))
     exclude = []
     for other in all_projects:
         other_path = other["path"]
         if other_path == project_path:
             continue
-        other_abs = os.path.normpath(os.path.join(root, other_path))
+        other_abs = os.path.realpath(os.path.join(root, other_path))
         # Only exclude if the other project is strictly inside this
         # project's directory tree.
         if other_abs.startswith(project_abs + os.sep):

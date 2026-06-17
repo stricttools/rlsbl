@@ -275,3 +275,101 @@ class TestRequireSubProjectRoot:
         result = _require_sub_project_root()
 
         assert result == tmp_path
+
+
+class TestSymlinkPathNormalization:
+    """Verify that path normalization resolves symlinks consistently.
+
+    find_project_root and find_workspace_root both use os.path.realpath,
+    so paths discovered through symlinks must agree with the real directory.
+    """
+
+    def test_find_project_root_resolves_symlink(self, tmp_path):
+        """find_project_root called from a symlinked path returns the real path."""
+        real_dir = tmp_path / "real_project"
+        real_dir.mkdir()
+        (real_dir / ".rlsbl").mkdir()
+
+        link = tmp_path / "link_to_project"
+        link.symlink_to(real_dir, target_is_directory=True)
+
+        result = find_project_root(start=str(link))
+        assert result == os.path.realpath(str(real_dir))
+
+    def test_find_project_root_from_symlinked_subdirectory(self, tmp_path):
+        """find_project_root from a subdirectory inside a symlinked tree resolves correctly."""
+        real_dir = tmp_path / "real_project"
+        real_dir.mkdir()
+        (real_dir / ".rlsbl").mkdir()
+        (real_dir / "src").mkdir()
+
+        link = tmp_path / "link_to_project"
+        link.symlink_to(real_dir, target_is_directory=True)
+
+        result = find_project_root(start=str(link / "src"))
+        assert result == os.path.realpath(str(real_dir))
+
+    def test_find_workspace_root_resolves_symlink(self, tmp_path):
+        """find_workspace_root called from a symlinked path returns the real path."""
+        from rlsbl.workspace import find_workspace_root, WORKSPACE_DIR, WORKSPACE_FILE
+
+        real_dir = tmp_path / "real_monorepo"
+        real_dir.mkdir()
+        ws_dir = real_dir / WORKSPACE_DIR
+        ws_dir.mkdir()
+        (ws_dir / WORKSPACE_FILE).write_text('[[projects]]\npath = "pkg"\nname = "pkg"\n')
+
+        link = tmp_path / "link_to_monorepo"
+        link.symlink_to(real_dir, target_is_directory=True)
+
+        result = find_workspace_root(str(link))
+        assert result == os.path.realpath(str(real_dir))
+
+    def test_project_and_workspace_roots_agree_through_symlink(self, tmp_path):
+        """Both root discovery functions agree when called through the same symlink."""
+        from rlsbl.workspace import find_workspace_root, WORKSPACE_DIR, WORKSPACE_FILE
+
+        real_dir = tmp_path / "real_project"
+        real_dir.mkdir()
+        (real_dir / ".rlsbl").mkdir()
+        ws_dir = real_dir / WORKSPACE_DIR
+        ws_dir.mkdir()
+        (ws_dir / WORKSPACE_FILE).write_text('[[projects]]\npath = "."\nname = "root"\n')
+
+        link = tmp_path / "link_to_project"
+        link.symlink_to(real_dir, target_is_directory=True)
+
+        project_root = find_project_root(start=str(link))
+        workspace_root = find_workspace_root(str(link))
+
+        expected = os.path.realpath(str(real_dir))
+        assert project_root == expected
+        assert workspace_root == expected
+        assert project_root == workspace_root
+
+    def test_containment_check_works_through_symlink(self, tmp_path):
+        """startswith-based containment works when paths are resolved through symlinks."""
+        from rlsbl.checks._common import _sibling_exclude_dirs
+
+        real_dir = tmp_path / "real_root"
+        real_dir.mkdir()
+        (real_dir / "pkg-a").mkdir()
+        (real_dir / "pkg-b").mkdir()
+
+        link = tmp_path / "link_to_root"
+        link.symlink_to(real_dir, target_is_directory=True)
+
+        # _sibling_exclude_dirs uses os.path.realpath, so even if root is
+        # provided as a symlink path, containment checks still work.
+        all_projects = [
+            {"path": ".", "name": "root"},
+            {"path": "pkg-a", "name": "pkg-a"},
+            {"path": "pkg-b", "name": "pkg-b"},
+        ]
+        excluded = _sibling_exclude_dirs(str(link), ".", all_projects)
+
+        # Both pkg-a and pkg-b should be excluded (they are inside ".")
+        real_root = os.path.realpath(str(real_dir))
+        assert os.path.realpath(os.path.join(str(real_dir), "pkg-a")) in excluded
+        assert os.path.realpath(os.path.join(str(real_dir), "pkg-b")) in excluded
+        assert len(excluded) == 2

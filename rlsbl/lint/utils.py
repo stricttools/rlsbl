@@ -30,7 +30,7 @@ def walk_source_files(
     normalized_exclude_dirs: frozenset[str] = frozenset()
     if exclude_dirs:
         normalized_exclude_dirs = frozenset(
-            os.path.normpath(os.path.join(project_path, d))
+            os.path.realpath(os.path.join(project_path, d))
             for d in exclude_dirs
         )
 
@@ -45,7 +45,7 @@ def walk_source_files(
         if normalized_exclude_dirs:
             dirs[:] = [
                 d for d in dirs
-                if os.path.normpath(os.path.join(dirpath, d))
+                if os.path.realpath(os.path.join(dirpath, d))
                 not in normalized_exclude_dirs
             ]
 
