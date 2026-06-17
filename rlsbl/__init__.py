@@ -449,6 +449,33 @@ def cmd_check_name(target, delay, **_kwargs):
 
 
 # ---------------------------------------------------------------------------
+# claim-name
+# ---------------------------------------------------------------------------
+
+@app.command(name="claim-name", help="Claim a name on a package registry by publishing a minimal placeholder package. Runs check-name first, then publishes if available.")
+@strictcli.flag(name="target", type=str, help="Target registry: npm or pypi", required=True)
+def cmd_claim_name(target, yes, **_kwargs):
+    valid_targets = {"npm", "pypi"}
+    if target not in valid_targets:
+        print(
+            f"Error: unknown target: {target!r}. Valid: npm, pypi",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    names = _variadic_args
+    if len(names) != 1:
+        print(
+            "Error: expected exactly one package name. "
+            "Usage: rlsbl claim-name <name> --target <npm|pypi>",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    flags = {"yes": yes}
+    from .commands.claim_name import run_cmd
+    run_cmd(target, names, flags)
+
+
+# ---------------------------------------------------------------------------
 # release edit (was: edit-release)
 # ---------------------------------------------------------------------------
 
@@ -1048,6 +1075,31 @@ def _extract_variadic_args():
         new_argv = [sys.argv[0], "check-name"]
         i = 1  # index into argv (after 'check-name')
         value_flags = {"target", "delay"}
+        while i < len(argv):
+            tok = argv[i]
+            if tok.startswith("--"):
+                key = tok[2:]
+                if "=" in key:
+                    new_argv.append(tok)
+                elif key in value_flags and i + 1 < len(argv):
+                    new_argv.append(tok)
+                    new_argv.append(argv[i + 1])
+                    i += 1
+                else:
+                    new_argv.append(tok)
+            elif tok.startswith("-"):
+                new_argv.append(tok)
+            else:
+                positionals.append(tok)
+            i += 1
+        sys.argv = new_argv
+        return positionals
+
+    if cmd == "claim-name":
+        positionals = []
+        new_argv = [sys.argv[0], "claim-name"]
+        i = 1  # index into argv (after 'claim-name')
+        value_flags = {"target"}
         while i < len(argv):
             tok = argv[i]
             if tok.startswith("--"):
