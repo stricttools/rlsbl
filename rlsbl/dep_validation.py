@@ -431,7 +431,7 @@ def find_dead_modules(
     Returns:
         list of relative paths of dead modules (e.g. ["mylib/unused.py"]).
     """
-    project_dir = os.path.abspath(project_dir)
+    project_dir = os.path.realpath(project_dir)
 
     # Check this is a Python project
     if not os.path.isfile(os.path.join(project_dir, "pyproject.toml")):
@@ -555,7 +555,7 @@ def find_dead_go_packages(
         list of relative paths of dead internal packages
         (e.g. ["internal/unused"]).
     """
-    project_dir = os.path.abspath(project_dir)
+    project_dir = os.path.realpath(project_dir)
 
     module_path = _read_go_module_path(project_dir)
     if module_path is None:
@@ -740,10 +740,10 @@ def _resolve_npm_entry_points(project_dir: str) -> set[str]:
     # Resolve each path to an absolute file
     entry_points: set[str] = set()
     for raw in raw_paths:
-        abs_path = os.path.normpath(os.path.join(project_dir, raw))
+        abs_path = os.path.realpath(os.path.join(project_dir, raw))
         resolved = _resolve_npm_file(abs_path)
         if resolved is not None:
-            entry_points.add(os.path.abspath(resolved))
+            entry_points.add(os.path.realpath(resolved))
 
     return entry_points
 
@@ -771,16 +771,16 @@ def _build_npm_import_graph(
         if not specifier.startswith("./") and not specifier.startswith("../"):
             continue
 
-        abs_filepath = os.path.abspath(filepath)
+        abs_filepath = os.path.realpath(filepath)
         if abs_filepath not in graph:
             graph[abs_filepath] = set()
 
         # Resolve the import relative to the importing file's directory
         import_dir = os.path.dirname(abs_filepath)
-        abs_target = os.path.normpath(os.path.join(import_dir, specifier))
+        abs_target = os.path.realpath(os.path.join(import_dir, specifier))
         resolved = _resolve_npm_file(abs_target)
         if resolved is not None:
-            graph[abs_filepath].add(os.path.abspath(resolved))
+            graph[abs_filepath].add(os.path.realpath(resolved))
 
     return graph
 
@@ -793,8 +793,8 @@ def _is_inside_python_package(filepath: str, project_dir: str) -> bool:
     not above) project_dir contains __init__.py, the file is considered
     a Python data resource, not an npm module.
     """
-    dirpath = Path(os.path.abspath(filepath)).parent
-    boundary = Path(os.path.abspath(project_dir))
+    dirpath = Path(os.path.realpath(filepath)).parent
+    boundary = Path(os.path.realpath(project_dir))
     while dirpath >= boundary:
         if (dirpath / "__init__.py").is_file():
             return True
@@ -821,7 +821,7 @@ def find_dead_npm_modules(
     Returns:
         sorted list of relative paths of dead source files.
     """
-    project_dir = os.path.abspath(project_dir)
+    project_dir = os.path.realpath(project_dir)
 
     if not os.path.isfile(os.path.join(project_dir, "package.json")):
         return []
@@ -838,7 +838,7 @@ def find_dead_npm_modules(
     # Those are data resources consumed by Python, not npm modules.
     all_files = walk_source_files(project_dir, _NPM_SOURCE_EXTENSIONS, [], exclude_dirs=exclude_dirs)
     production_files = {
-        os.path.abspath(f)
+        os.path.realpath(f)
         for f in all_files
         if not _is_non_production_path(f, project_dir)
         and not _is_inside_python_package(f, project_dir)
@@ -914,21 +914,21 @@ def _resolve_dart_entry_points(project_dir: str) -> set[str]:
 
     Returns a set of absolute file paths.
     """
-    project_dir = os.path.abspath(project_dir)
+    project_dir = os.path.realpath(project_dir)
     entry_points: set[str] = set()
 
     pkg_name = _read_dart_package_name(project_dir)
     if pkg_name:
         barrel = os.path.join(project_dir, "lib", f"{pkg_name}.dart")
         if os.path.isfile(barrel):
-            entry_points.add(os.path.abspath(barrel))
+            entry_points.add(os.path.realpath(barrel))
 
     bin_dir = os.path.join(project_dir, "bin")
     if os.path.isdir(bin_dir):
         for name in os.listdir(bin_dir):
             if name.endswith(".dart"):
                 entry_points.add(
-                    os.path.abspath(os.path.join(bin_dir, name))
+                    os.path.realpath(os.path.join(bin_dir, name))
                 )
 
     return entry_points
@@ -964,16 +964,16 @@ def _resolve_dart_import(
             # External package -- not part of intra-package graph
             return None
         # Self-package: resolve to lib/<rest>
-        resolved = os.path.normpath(os.path.join(project_dir, "lib", rest))
+        resolved = os.path.realpath(os.path.join(project_dir, "lib", rest))
         if os.path.isfile(resolved):
-            return os.path.abspath(resolved)
+            return os.path.realpath(resolved)
         return None
 
     # Relative import: resolve relative to the importing file's directory
     import_dir = os.path.dirname(importing_file)
-    resolved = os.path.normpath(os.path.join(import_dir, specifier))
+    resolved = os.path.realpath(os.path.join(import_dir, specifier))
     if os.path.isfile(resolved):
-        return os.path.abspath(resolved)
+        return os.path.realpath(resolved)
     return None
 
 
@@ -989,7 +989,7 @@ def _build_dart_import_graph(
     Returns a dict mapping each source file's absolute path to a set
     of absolute paths it imports/exports (only resolved intra-package refs).
     """
-    project_dir = os.path.abspath(project_dir)
+    project_dir = os.path.realpath(project_dir)
     package_name = _read_dart_package_name(project_dir)
 
     dart_files = walk_source_files(
@@ -998,7 +998,7 @@ def _build_dart_import_graph(
 
     graph: dict[str, set[str]] = {}
     for filepath in dart_files:
-        abs_filepath = os.path.abspath(filepath)
+        abs_filepath = os.path.realpath(filepath)
         try:
             with open(filepath, "r", encoding="utf-8") as f:
                 content = f.read()
@@ -1042,7 +1042,7 @@ def find_dead_dart_modules(
     Returns:
         sorted list of relative paths of dead source files.
     """
-    project_dir = os.path.abspath(project_dir)
+    project_dir = os.path.realpath(project_dir)
 
     if not os.path.isfile(os.path.join(project_dir, "pubspec.yaml")):
         return []
@@ -1060,7 +1060,7 @@ def find_dead_dart_modules(
         project_dir, (".dart",), [], exclude_dirs=exclude_dirs,
     )
     production_files = {
-        os.path.abspath(f)
+        os.path.realpath(f)
         for f in all_files
         if not _is_non_production_path(f, project_dir)
     }
@@ -1265,7 +1265,7 @@ def _build_python_import_graph(
     relative paths it imports (only intra-project imports that resolve to
     actual files).
     """
-    project_dir = os.path.abspath(project_dir)
+    project_dir = os.path.realpath(project_dir)
 
     if not os.path.isfile(os.path.join(project_dir, "pyproject.toml")):
         return {}
@@ -1344,7 +1344,7 @@ def find_circular_npm_deps(
     Returns:
         list of cycles, each a sorted list of relative file paths.
     """
-    project_dir = os.path.abspath(project_dir)
+    project_dir = os.path.realpath(project_dir)
 
     if not os.path.isfile(os.path.join(project_dir, "package.json")):
         return []
@@ -1376,7 +1376,7 @@ def find_circular_dart_deps(
     Returns:
         list of cycles, each a sorted list of relative file paths.
     """
-    project_dir = os.path.abspath(project_dir)
+    project_dir = os.path.realpath(project_dir)
 
     pubspec = os.path.join(project_dir, "pubspec.yaml")
     if not os.path.isfile(pubspec):
@@ -1410,7 +1410,7 @@ def find_circular_dart_deps(
             import_path = match.group(1)
             # Resolve relative to the importing file's directory
             import_dir = os.path.dirname(filepath)
-            abs_target = os.path.normpath(os.path.join(import_dir, import_path))
+            abs_target = os.path.realpath(os.path.join(import_dir, import_path))
             if os.path.isfile(abs_target):
                 target_rel = os.path.relpath(abs_target, project_dir)
                 if target_rel != rel_path:

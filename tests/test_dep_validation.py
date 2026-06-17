@@ -933,6 +933,35 @@ class TestFindDeadModules:
         dead = find_dead_modules(str(tmp_path))
         assert "mylib/orphan.py" in dead
 
+    def test_symlinked_project_dir(self, tmp_path):
+        """Dead module detection works when invoked through a symlinked directory.
+
+        The project is set up in a real directory, then a symlink is created
+        pointing to it. Running find_dead_modules through the symlink should
+        produce the same results as running it directly.
+        """
+        real_dir = tmp_path / "real_project"
+        real_dir.mkdir()
+        (real_dir / "pyproject.toml").write_text('[project]\nname = "mylib"\n')
+        pkg = real_dir / "mylib"
+        pkg.mkdir()
+        (pkg / "__init__.py").write_text("from .core import x\n")
+        (pkg / "core.py").write_text("x = 1\n")
+        (pkg / "unused.py").write_text("y = 2\n")
+
+        # Verify results via the real path
+        dead_real = find_dead_modules(str(real_dir))
+        assert "mylib/unused.py" in dead_real
+        assert "mylib/core.py" not in dead_real
+
+        # Create a symlink to the project directory
+        link_dir = tmp_path / "linked_project"
+        link_dir.symlink_to(real_dir)
+
+        # Same results via the symlink
+        dead_link = find_dead_modules(str(link_dir))
+        assert dead_link == dead_real
+
 
 class TestFindDeadGoPackages:
     """find_dead_go_packages detects unreferenced Go internal packages."""
