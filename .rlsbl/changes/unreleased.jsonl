@@ -5,3 +5,4 @@
 {"commits":["3f020c401fc82e4f2d2ce4fd190207933ba78ad5"],"user_facing":true,"description":"**New feature.** `check-name` variant checks now respect the `--delay` flag for rate-limiting, using sequential checking instead of concurrent threads when a delay is set.","type":"feature"}
 {"commits":["366a116f7df212668881004a192426d33e50d9f7"],"user_facing":true,"description":"**Bug fix.** Standardized `dep_validation.py` path normalization on `realpath`, consistent with the rest of the codebase. Fixes potential mismatches with symlinked project directories.","type":"fix"}
 {"commits":["26b17cc0a89f91fcf260711cd7701d65c271dfd0"],"user_facing":false}
+{"commits":["0d585f757284d356dc7edac400a4490861beb782"],"user_facing":false}
