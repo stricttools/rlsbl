@@ -1,6 +1,5 @@
 """Release command: bumps version, validates changelog, runs hooks, regenerates selfdoc, syncs lockfiles, tags, pushes, and creates a GitHub Release."""
 
-import hashlib
 import json
 import os
 import shutil
@@ -46,6 +45,15 @@ from ...utils import (
     require_tool,
     run,
 )
+from .rollback import _cleanup_release_artifacts
+from .publish import _run_selfdoc_post_generate, _print_stale_dep_advisory, upload_release_assets
+from .validate import (
+    parse_porcelain_paths, _run_builtin_tests, _run_builtin_lint,
+    _run_selfdoc_gen, _run_selfdoc_check, _abort_on_scaffold_conflicts,
+    _run_strictcli_schema_dump, validate_blog_body,
+    ReleaseValidationError, HookError, _SCHEMA_DUMP_TIMEOUT,
+)
+from .hooks import _compute_content_hash, _get_pre_release_template_hashes, _is_hook_effectively_empty
 
 VALID_BUMP_TYPES = ("patch", "minor", "major")
 
@@ -88,73 +96,6 @@ def _bump_selfdoc_version(project_dir, new_version):
     return ["selfdoc.json"]
 
 
-def _compute_content_hash(content):
-    """SHA-256 of content with trailing whitespace stripped."""
-    return hashlib.sha256(content.rstrip().encode("utf-8")).hexdigest()
-
-
-# Lazily computed on first access via _get_pre_release_template_hashes().
-_PRE_RELEASE_TEMPLATE_HASHES = None
-
-
-def _get_pre_release_template_hashes():
-    """Return a frozenset of content hashes for known scaffold template versions of pre-release.sh.
-
-    Currently there is only one version (the template has never changed),
-    but using a set follows the same pattern as hook_hashes.py, making it
-    easy to add historical versions later.
-    """
-    global _PRE_RELEASE_TEMPLATE_HASHES
-    if _PRE_RELEASE_TEMPLATE_HASHES is not None:
-        return _PRE_RELEASE_TEMPLATE_HASHES
-
-    template_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-        "templates", "shared", "hooks", "pre-release.sh.tpl",
-    )
-    with open(template_path, "r", encoding="utf-8") as f:
-        template_content = f.read()
-
-    # V1: original scaffold template (before the comment was updated to
-    # describe the override behavior).
-    _V1 = (
-        "#!/usr/bin/env bash\n"
-        "set -euo pipefail\n"
-        "# Project-specific pre-release checks.\n"
-        "# Built-in checks (tests, lint) run automatically before this hook.\n"
-        "# Add custom validation here, e.g.:\n"
-        "#   - Check for uncommitted documentation\n"
-        "#   - Verify external service connectivity\n"
-        "#   - Run integration tests not covered by the test suite\n"
-    )
-
-    _PRE_RELEASE_TEMPLATE_HASHES = frozenset({
-        _compute_content_hash(template_content),
-        _compute_content_hash(_V1),
-    })
-    return _PRE_RELEASE_TEMPLATE_HASHES
-
-
-def _is_hook_effectively_empty(hook_path):
-    """Check if a pre-release hook file is effectively empty (matches scaffold template).
-
-    Returns True (hook is boilerplate / not customized) when:
-    - The hook file does not exist
-    - The hook file's content hash matches a known scaffold template version
-
-    Returns False (hook has been customized) when:
-    - The hook exists and its content does not match any known template version
-    """
-    if not os.path.exists(hook_path):
-        return True
-
-    with open(hook_path, "r", encoding="utf-8") as f:
-        hook_content = f.read()
-
-    hook_hash = _compute_content_hash(hook_content)
-    return hook_hash in _get_pre_release_template_hashes()
-
-
 def _rel_to_git_root(path, git_root):
     """Normalize path; make relative to git root if absolute."""
     n = os.path.normpath(path)
@@ -165,26 +106,6 @@ def _rel_to_git_root(path, git_root):
 
 class ReleaseAbortError(Exception):
     """Raised when the release must abort (e.g., unexpected dirty files)."""
-
-
-def parse_porcelain_paths(porcelain_output):
-    """Parse file paths from `git status --porcelain` output.
-
-    Handles the case where run() strips stdout, potentially removing a
-    leading space from the first line. Uses lstrip().split(None, 1) to
-    robustly extract the status code and path regardless.
-
-    Returns a set of file paths found in the output.
-    """
-    dirty_files = set()
-    for line in porcelain_output.splitlines():
-        parts = line.lstrip().split(None, 1)
-        if len(parts) < 2:
-            continue
-        # Handle rename notation: "R old -> new"
-        file_path = parts[1].split(" -> ")[-1]
-        dirty_files.add(file_path)
-    return dirty_files
 
 
 def resolve_target_paths(project_dir="."):
@@ -237,228 +158,6 @@ def resolve_release_targets(primary, flags, project_dir=".", *, config):
     return baseline
 
 
-def _run_builtin_tests(registry, flags, *, project_dir=None, ctx):
-    """Run built-in tests for the detected project type.
-
-    Delegates to run_project_tests() for the actual test execution.
-    Handles the release-specific concern of aborting (sys.exit) on failure.
-    Returns True if tests pass, calls sys.exit(1) on failure.
-    """
-    success = run_project_tests(
-        registry,
-        project_dir=project_dir,
-        config=ctx.config,
-        dry_run=flags.get("dry-run", False),
-    )
-    if not success:
-        print("Error: tests failed.", file=sys.stderr)
-        sys.exit(1)
-    return True
-
-
-def _run_builtin_lint(flags, is_library=False, project_dir=None):
-    """Run built-in library lint.
-
-    Counts errors and warnings from lint results. Exits on errors.
-    Only runs on library projects (monorepo projects with library = true).
-    When project_dir is set (monorepo mode), lint runs against that directory.
-    """
-    if flags.get("dry-run"):
-        return True
-
-    if not is_library:
-        print("Skipping lint (not a library project)")
-        return True
-
-    print("Running lint...")
-
-    from ...lint import lint_library
-
-    results = lint_library(project_dir if project_dir else ".")
-
-    errors = [r for r in results if r.severity == "error"]
-    warnings = [r for r in results if r.severity == "warning"]
-
-    if errors:
-        for r in errors:
-            print(f"  {r.file}:{r.line}: {r.rule}: {r.message}", file=sys.stderr)
-        print(f"Error: library lint found {len(errors)} error(s).", file=sys.stderr)
-        sys.exit(1)
-
-    if warnings:
-        for r in warnings:
-            print(f"  {r.file}:{r.line}: {r.rule}: {r.message}", file=sys.stderr)
-        print(f"Library lint: {len(warnings)} warning(s).")
-    else:
-        print("Library lint: clean.")
-
-    return True
-
-
-def _run_selfdoc_gen(flags, project_dir=None):
-    """Run selfdoc gen if selfdoc.json exists in the project directory.
-
-    Regenerates documentation pages from source before the selfdoc check step,
-    ensuring the check validates fresh content rather than stale pages.
-    """
-    check_dir = project_dir if project_dir else "."
-    selfdoc_config = os.path.join(check_dir, "selfdoc.json")
-    if not os.path.exists(selfdoc_config):
-        return True
-
-    if flags.get("dry-run"):
-        print("Would run: selfdoc gen --no-commit")
-        return True
-
-    if not require_tool("selfdoc", fatal=False):
-        print(
-            "Note: selfdoc.json found but selfdoc is not installed. Skipping docs generation."
-        )
-        return True
-
-    print("Running selfdoc gen...")
-    try:
-        subprocess.run(["selfdoc", "gen", "--no-commit"], cwd=project_dir, check=True)
-    except subprocess.CalledProcessError as e:
-        print(
-            f"Error: selfdoc gen failed (exit code {e.returncode}).",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-    return True
-
-
-def _run_selfdoc_check(flags, project_dir=None):
-    """Run selfdoc check if selfdoc.json exists in the project directory.
-
-    Checks documentation consistency before releasing. Non-fatal if selfdoc
-    is not installed; fatal if it is installed and the check fails.
-    When project_dir is set (monorepo mode), checks are resolved relative to it.
-    """
-    if flags.get("dry-run"):
-        return True
-
-    check_dir = project_dir if project_dir else "."
-    selfdoc_config = os.path.join(check_dir, "selfdoc.json")
-    if not os.path.exists(selfdoc_config):
-        return True
-
-    if not require_tool("selfdoc", fatal=False):
-        print("Note: selfdoc.json found but selfdoc is not installed. Skipping docs check.")
-        return True
-
-    print("Running selfdoc check...")
-    try:
-        subprocess.run(["selfdoc", "check"], cwd=project_dir, check=True)
-    except subprocess.CalledProcessError as e:
-        print(
-            f"Error: selfdoc check failed (exit code {e.returncode}).",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-    return True
-
-
-def _run_selfdoc_post_generate(flags, *, project_dir=None, release_config=None,
-                                new_version=None, current_version=None,
-                                bump_type=None, changelog_entry=None, tag=None):
-    """Generate a blog post via selfdoc during release.
-
-    Called when release_config.blog is True and selfdoc.json exists.
-    Writes the changelog entry to a temp file and invokes
-    ``selfdoc post generate --from-release`` with all release metadata.
-
-    The generated post file and updated manifest are picked up by the
-    hook-generated-files mechanism (dirty snapshot diff) and included
-    in the release commit.
-    """
-    import re
-    import tempfile
-
-    check_dir = project_dir if project_dir else "."
-
-    if not release_config or not release_config.blog:
-        return True
-
-    selfdoc_config = os.path.join(check_dir, "selfdoc.json")
-    if not os.path.exists(selfdoc_config):
-        return True
-
-    if flags.get("dry-run"):
-        print(f"Would run: selfdoc post generate --from-release --version {new_version}")
-        return True
-
-    if not require_tool("selfdoc", fatal=False):
-        print(
-            "Note: blog = true but selfdoc is not installed. Skipping blog post generation."
-        )
-        return True
-
-    print("Generating blog post via selfdoc...")
-
-    # Write changelog entry to a temp file
-    tmp_changelog = None
-    try:
-        tmp_changelog = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".md", prefix="rlsbl-changelog-",
-            delete=False, encoding="utf-8",
-        )
-        tmp_changelog.write(changelog_entry or "")
-        tmp_changelog.close()
-
-        # Assemble CLI args
-        cmd = ["selfdoc", "post", "generate", "--from-release"]
-        cmd.extend(["--version", new_version or ""])
-        if current_version:
-            cmd.extend(["--prev-version", current_version])
-        if bump_type:
-            cmd.extend(["--bump-type", bump_type])
-        if release_config.description:
-            cmd.extend(["--description", release_config.description])
-        if release_config.context:
-            cmd.extend(["--context", release_config.context])
-        cmd.extend(["--changelog-file", tmp_changelog.name])
-
-        # Body file (optional)
-        blog_body_path = os.path.join(check_dir, ".rlsbl", "releases", "unreleased.md")
-        if os.path.exists(blog_body_path):
-            cmd.extend(["--body-file", blog_body_path])
-
-        # Project name from selfdoc config or directory name
-        try:
-            import json as _json
-            with open(selfdoc_config, "r", encoding="utf-8") as f:
-                sd_config = _json.load(f)
-            project_name = sd_config.get("project_name") or sd_config.get("name") or os.path.basename(os.path.abspath(check_dir))
-        except Exception:
-            project_name = os.path.basename(os.path.abspath(check_dir))
-        cmd.extend(["--project-name", project_name])
-
-        # Release URL (GitHub release URL pattern)
-        try:
-            remote = run("git", ["remote", "get-url", "origin"])
-            match = re.search(r"github\.com[/:]([^/]+/[^/.]+)", remote)
-            if match:
-                repo_path = match.group(1).removesuffix(".git")
-                release_url = f"https://github.com/{repo_path}/releases/tag/{tag or ''}"
-                cmd.extend(["--release-url", release_url])
-        except Exception:
-            pass  # Best-effort; release URL is optional
-
-        subprocess.run(cmd, cwd=project_dir, check=True)
-    except subprocess.CalledProcessError as e:
-        print(
-            f"Error: selfdoc post generate failed (exit code {e.returncode}).",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-    finally:
-        if tmp_changelog and os.path.exists(tmp_changelog.name):
-            os.unlink(tmp_changelog.name)
-
-    return True
-
-
 def _refresh_selfdoc_hashes(files_to_commit, log, project_dir="."):
     """Re-run selfdoc check after version bump to refresh content hashes.
 
@@ -503,75 +202,6 @@ def _refresh_selfdoc_hashes(files_to_commit, log, project_dir="."):
                 log("Selfdoc hashes updated after version bump")
     except Exception as e:
         log(f"Warning: could not check selfdoc hash status: {e}")
-
-
-_SCHEMA_DUMP_TIMEOUT = 30
-
-
-def _abort_on_scaffold_conflicts(project_dir):
-    """Abort the release if scaffold-managed files contain unresolved merge
-    conflict markers.
-
-    Scaffold's three-way merge (git merge-file) intentionally leaves
-    conflict markers for manual resolution; releasing with them would
-    publish corrupted workflows/hooks. Runs PRE-MUTATION: nothing has
-    been modified yet when this aborts.
-    """
-    from ...checks.project import find_conflicted_scaffold_files
-
-    conflicted = find_conflicted_scaffold_files(project_dir)
-    if conflicted:
-        print(
-            "Error: unresolved merge conflict markers in scaffold-managed file(s):",
-            file=sys.stderr,
-        )
-        for path, line in conflicted:
-            print(f"  {path}:{line}", file=sys.stderr)
-        print(
-            "Resolve the conflicts and commit before releasing.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-
-def _run_strictcli_schema_dump(flags, log, project_dir="."):
-    """Run --dump-schema for strictcli projects to regenerate .strictcli/schema.json.
-
-    Detects strictcli usage via pyproject.toml, runs the entry point with
-    --dump-schema, and logs the result. The generated file is picked up by
-    the hook-generated file mechanism (pre/post hook dirty snapshots).
-
-    Non-fatal: a failing dump command prints a warning but does not abort.
-    """
-    if flags.get("dry-run"):
-        check_dir = project_dir
-        result = detect_strictcli(check_dir)
-        if result:
-            entry_point, _ = result
-            log(f"Would run: uv run {entry_point} --dump-schema")
-        return
-
-    check_dir = project_dir
-    result = detect_strictcli(check_dir)
-    if not result:
-        return
-
-    entry_point, lang = result
-    log(f"Dumping strictcli schema ({entry_point})...")
-
-    try:
-        subprocess.run(
-            ["uv", "run", entry_point, "--dump-schema"],
-            cwd=project_dir,
-            timeout=_SCHEMA_DUMP_TIMEOUT,
-        )
-    except subprocess.TimeoutExpired:
-        print(
-            f"Warning: strictcli schema dump timed out after {_SCHEMA_DUMP_TIMEOUT}s.",
-            file=sys.stderr,
-        )
-    except (subprocess.CalledProcessError, OSError) as e:
-        print(f"Warning: strictcli schema dump failed: {e}", file=sys.stderr)
 
 
 # Lockfile -> (tool name, sync command args)
@@ -918,7 +548,10 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
 
     # Scaffold conflict guard: abort before any mutation if scaffold-managed
     # files still contain unresolved merge conflict markers.
-    _abort_on_scaffold_conflicts(project_dir)
+    try:
+        _abort_on_scaffold_conflicts(project_dir)
+    except (ReleaseValidationError, HookError):
+        sys.exit(1)
 
     # Get target instance for tag_format/build/publish
     target = TARGETS[registry]
@@ -992,7 +625,10 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
         sys.exit(1)
 
     # Validate blog body file if blog is enabled
-    _blog_body_path, blog_warning = validate_blog_body(project_dir, release_config.blog)
+    try:
+        _blog_body_path, blog_warning = validate_blog_body(project_dir, release_config.blog)
+    except (ReleaseValidationError, HookError):
+        sys.exit(1)
     if blog_warning:
         log(blog_warning)
 
@@ -1049,10 +685,16 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
     _run_strictcli_schema_dump(flags, log, project_dir=project_dir)
 
     # Regenerate selfdoc pages so the subsequent check validates fresh content
-    _run_selfdoc_gen(flags, project_dir=project_dir)
+    try:
+        _run_selfdoc_gen(flags, project_dir=project_dir)
+    except (ReleaseValidationError, HookError):
+        sys.exit(1)
 
     # Built-in selfdoc check (before tests so doc issues surface early)
-    _run_selfdoc_check(flags, project_dir=project_dir)
+    try:
+        _run_selfdoc_check(flags, project_dir=project_dir)
+    except (ReleaseValidationError, HookError):
+        sys.exit(1)
 
     # Generate blog post via selfdoc if blog is enabled
     _run_selfdoc_post_generate(
@@ -1072,16 +714,19 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
     hook_is_customized = not _is_hook_effectively_empty(pre_release_script)
 
     # Built-in test runner (skipped when pre-release hook is customized)
-    if hook_is_customized:
-        log("Skipping built-in tests (pre-release hook handles testing)")
-    else:
-        _run_builtin_tests(registry, flags, project_dir=project_dir, ctx=ctx)
+    try:
+        if hook_is_customized:
+            log("Skipping built-in tests (pre-release hook handles testing)")
+        else:
+            _run_builtin_tests(registry, flags, project_dir=project_dir, ctx=ctx)
 
-    # Built-in lint runner (skipped when pre-release hook is customized)
-    if hook_is_customized:
-        log("Skipping built-in lint (pre-release hook handles linting)")
-    else:
-        _run_builtin_lint(flags, is_library=is_library, project_dir=project_dir)
+        # Built-in lint runner (skipped when pre-release hook is customized)
+        if hook_is_customized:
+            log("Skipping built-in lint (pre-release hook handles linting)")
+        else:
+            _run_builtin_lint(flags, is_library=is_library, project_dir=project_dir)
+    except (ReleaseValidationError, HookError):
+        sys.exit(1)
 
     # Run pre-release hook if present
     pre_release_script = os.path.join(project_dir, ".rlsbl", "hooks", "pre-release.sh")
@@ -1207,169 +852,6 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
             _update_last_build_release(project_dir, new_version)
 
 
-def _print_stale_dep_advisory(monorepo_name, new_version, monorepo_root=None):
-    """Print advisory about downstream packages with stale constraints.
-
-    After releasing a package, checks if any workspace package that depends
-    on the just-released package has a constraint that no longer satisfies
-    the new version. Prints to stderr as a non-blocking advisory.
-    """
-    try:
-        from ..monorepo import _evaluate_constraint
-        from ...workspace_graph import WorkspaceGraph
-
-        ws_root = monorepo_root or "."
-        projects = load_workspace(ws_root)
-        graph = WorkspaceGraph(ws_root, projects)
-
-        # Find direct dependents of the released package
-        dependents = graph.dependents(monorepo_name)
-        if not dependents:
-            return
-
-        stale_lines = []
-        for dep_name in dependents:
-            deps = graph.dependencies(dep_name)
-            for dep in deps:
-                if dep.name != monorepo_name:
-                    continue
-                if dep.dep_type != "versioned":
-                    continue
-                status = _evaluate_constraint(dep.constraint, new_version)
-                if status == "outdated":
-                    stale_lines.append(
-                        f"  {dep_name} depends on {monorepo_name} "
-                        f"{dep.constraint} but {monorepo_name} is now {new_version}\n"
-                        f"    Suggested: update to >={new_version}"
-                    )
-
-        if stale_lines:
-            print("! Stale dependency constraints:", file=sys.stderr)
-            for line in stale_lines:
-                print(line, file=sys.stderr)
-    except Exception as e:
-        from ...utils import warn_exception
-        warn_exception("stale dependency advisory check failed", e)
-
-
-def upload_release_assets(tag, new_version, log, flags, *, ctx):
-    """Build and upload release assets for pipelines with ``assets: true`` or ``custom_assets``.
-
-    For each pipeline that has assets enabled:
-    1. Create a dist directory under ``.rlsbl/dist/<pipeline_name>/``
-    2. Call ``pipeline.build_assets()`` and/or ``pipeline.build_custom_assets()``
-    3. Check each artifact against ``max_asset_size_mb``
-    4. Upload via ``gh release upload``
-    5. Clean up the dist directory
-
-    Skips silently if no pipelines have assets enabled.
-
-    ctx: ProjectContext carrying project_root, monorepo_root, and config.
-    """
-    project_dir = str(ctx.project_root)
-    config = ctx.config
-
-    pipelines_cfg = config.get("pipelines", {})
-    if not isinstance(pipelines_cfg, dict):
-        return
-
-    # Find pipelines with assets or custom_assets
-    pipelines_with_assets = {}
-    for name, entry in pipelines_cfg.items():
-        if not isinstance(entry, dict):
-            continue
-        if entry.get("assets") or entry.get("custom_assets"):
-            pipelines_with_assets[name] = entry
-
-    if not pipelines_with_assets:
-        return
-
-    dry_run = flags.get("dry-run", False)
-
-    # Load pipeline instances for asset building
-    all_pipelines = load_pipelines(config)
-
-    for name, entry in pipelines_with_assets.items():
-        pipeline = all_pipelines.get(name)
-        if pipeline is None:
-            continue
-
-        max_size_mb = entry.get("max_asset_size_mb")
-        dist_dir = os.path.join(project_dir, ".rlsbl", "dist", name)
-
-        if dry_run:
-            log(f"Would build and upload assets for pipeline '{name}' to release {tag}")
-            continue
-
-        # Build standard assets
-        artifacts = []
-        if entry.get("assets"):
-            artifacts.extend(pipeline.build_assets(project_dir, new_version, dist_dir, ctx))
-
-        # Build custom assets
-        if entry.get("custom_assets"):
-            artifacts.extend(pipeline.build_custom_assets(dist_dir))
-
-        if not artifacts:
-            log(f"No artifacts produced for pipeline '{name}', skipping upload.")
-            continue
-
-        # Size check
-        if max_size_mb is not None:
-            max_size_bytes = max_size_mb * 1024 * 1024
-            for artifact_path in artifacts:
-                try:
-                    file_size = os.path.getsize(artifact_path)
-                except OSError:
-                    continue
-                if file_size > max_size_bytes:
-                    file_name = os.path.basename(artifact_path)
-                    actual_mb = file_size / (1024 * 1024)
-                    print(
-                        f"Error: artifact '{file_name}' is {actual_mb:.1f}MB, "
-                        f"exceeds max_asset_size_mb ({max_size_mb}MB) for pipeline '{name}'.",
-                        file=sys.stderr,
-                    )
-                    # Clean up dist before aborting
-                    if os.path.isdir(dist_dir):
-                        shutil.rmtree(dist_dir)
-                    sys.exit(1)
-
-        # Upload
-        try:
-            run("gh", ["release", "upload", tag] + artifacts + ["--clobber"])
-            log(f"Uploaded {len(artifacts)} asset(s) for pipeline '{name}'")
-        except Exception as e:
-            print(f"Warning: asset upload failed for pipeline '{name}': {e}", file=sys.stderr)
-
-        # Clean up dist directory
-        if os.path.isdir(dist_dir):
-            shutil.rmtree(dist_dir)
-
-
-def validate_blog_body(project_dir, blog_enabled):
-    """Validate the blog body file for a release.
-
-    Returns (body_path, warning_message) where body_path is the path if it exists
-    and warning_message is set if the file is missing.
-    Raises SystemExit if blog_enabled and file is empty.
-    """
-    if not blog_enabled:
-        return None, None
-    blog_body_path = os.path.join(project_dir, ".rlsbl", "releases", "unreleased.md")
-    if os.path.exists(blog_body_path):
-        with open(blog_body_path, "r", encoding="utf-8") as f:
-            body_content = f.read()
-        if not body_content.strip():
-            print(
-                "Error: blog body file at .rlsbl/releases/unreleased.md exists but is empty.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        return blog_body_path, None
-    return None, "blog = true but no body file at .rlsbl/releases/unreleased.md (post will be changelog-only)"
-
-
 def archive_blog_body(project_dir, version):
     """Archive unreleased.md to v{version}.md during release finalization.
 
@@ -1383,30 +865,6 @@ def archive_blog_body(project_dir, version):
         os.chmod(blog_body_dst, 0o444)
         return blog_body_dst
     return None
-
-
-def _cleanup_release_artifacts(project_dir: str, version: str) -> None:
-    """Best-effort removal of generated files that become orphaned after rollback.
-
-    After `git reset --hard` reverts the release commits, files created during
-    finalization (renamed JSONL, per-version markdown, renamed release TOML) are
-    left as untracked because they never existed in the pre-release history.
-    Removing them prevents a dirty working tree that blocks the next attempt.
-    """
-    try:
-        candidates = [
-            os.path.join(project_dir, ".rlsbl", "changes", f"{version}.jsonl"),
-            os.path.join(project_dir, ".rlsbl", "changes", f"{version}.md"),
-            os.path.join(project_dir, ".rlsbl", "releases", f"v{version}.toml"),
-            os.path.join(project_dir, ".rlsbl", "releases", f"v{version}.md"),
-        ]
-        for path in candidates:
-            if os.path.exists(path):
-                # Released JSONL files are chmod 444; make writable before unlinking
-                os.chmod(path, 0o644)
-                os.unlink(path)
-    except Exception:
-        pass  # Best-effort: never mask the original error
 
 
 def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current_version,

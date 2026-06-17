@@ -9,7 +9,7 @@ import pytest
 
 from pathlib import Path
 
-from rlsbl.commands.release import _run_builtin_lint, _run_builtin_tests, _run_selfdoc_check, _run_selfdoc_gen
+from rlsbl.commands.release import _run_builtin_lint, _run_builtin_tests, _run_selfdoc_check, _run_selfdoc_gen, HookError, ReleaseValidationError
 from rlsbl.context import ProjectContext
 from rlsbl.lint.result import LintResult
 from rlsbl.release_file import ReleaseConfig
@@ -169,10 +169,8 @@ class TestBuiltinTestRunner:
                 args=[], returncode=1
             )
 
-            with pytest.raises(SystemExit) as exc_info:
+            with pytest.raises(HookError, match="Tests failed"):
                 _run_builtin_tests("npm", {}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={}))
-
-            assert exc_info.value.code == 1
 
     def test_dry_run_skips_tests(self, tmp_project):
         """--dry-run flag prevents any test command from running."""
@@ -355,10 +353,8 @@ class TestBuiltinLintRunner:
         ]
 
         with patch("rlsbl.lint.lint_library", return_value=errors):
-            with pytest.raises(SystemExit) as exc_info:
+            with pytest.raises(HookError, match="Lint errors found"):
                 _run_builtin_lint({}, is_library=True)
-
-            assert exc_info.value.code == 1
 
     def test_lint_warnings_are_non_blocking(self, tmp_project):
         """When lint_library returns only warnings, lint passes without exit."""
@@ -466,9 +462,8 @@ class TestSelfdocCheck:
                 side_effect=subprocess.CalledProcessError(1, ["selfdoc", "check"]),
             ),
         ):
-            with pytest.raises(SystemExit) as exc_info:
+            with pytest.raises(HookError, match="selfdoc check failed"):
                 _run_selfdoc_check({})
-            assert exc_info.value.code == 1
 
     def test_selfdoc_check_uses_project_dir(self, tmp_project):
         """When project_dir is set, selfdoc.json is checked there and cwd is passed."""
@@ -559,10 +554,8 @@ class TestSelfdocGen:
                 side_effect=subprocess.CalledProcessError(1, ["selfdoc", "gen", "--no-commit"]),
             ),
         ):
-            with pytest.raises(SystemExit) as exc_info:
+            with pytest.raises(HookError, match="selfdoc gen failed"):
                 _run_selfdoc_gen({})
-
-            assert exc_info.value.code == 1
 
     def test_selfdoc_gen_uses_project_dir(self, tmp_project):
         """When project_dir is set, selfdoc.json is checked there and cwd is passed."""

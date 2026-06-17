@@ -18,7 +18,7 @@ from conftest import make_ctx
 
 from rlsbl import app
 from rlsbl.checks.project import find_conflicted_scaffold_files
-from rlsbl.commands.release import _abort_on_scaffold_conflicts
+from rlsbl.commands.release import _abort_on_scaffold_conflicts, ReleaseValidationError
 
 
 CONFLICTED_CONTENT = (
@@ -236,9 +236,8 @@ class TestReleaseAbortsOnScaffoldConflicts:
         wf_dir = tmp_project / ".github" / "workflows"
         wf_dir.mkdir(parents=True)
         (wf_dir / "publish.yml").write_text(CONFLICTED_CONTENT)
-        with pytest.raises(SystemExit) as excinfo:
+        with pytest.raises(ReleaseValidationError, match="Unresolved scaffold conflict markers"):
             _abort_on_scaffold_conflicts(str(tmp_project))
-        assert excinfo.value.code == 1
         captured = capsys.readouterr()
         assert "conflict" in captured.err
         assert ".github/workflows/publish.yml:2" in captured.err

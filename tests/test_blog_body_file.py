@@ -9,6 +9,7 @@ from rlsbl.commands.release import (
     _cleanup_release_artifacts,
     archive_blog_body,
     validate_blog_body,
+    ReleaseValidationError,
 )
 from rlsbl.release_file import unfinalize_release_file
 
@@ -38,26 +39,24 @@ class TestBlogBodyValidation:
         assert "changelog-only" in warning
 
     def test_blog_true_body_empty_errors(self, tmp_path):
-        """blog=true with an empty body file: raises SystemExit."""
+        """blog=true with an empty body file: raises ReleaseValidationError."""
         releases_dir = tmp_path / ".rlsbl" / "releases"
         releases_dir.mkdir(parents=True)
         body = releases_dir / "unreleased.md"
         body.write_text("")
 
-        with pytest.raises(SystemExit) as exc_info:
+        with pytest.raises(ReleaseValidationError, match="Blog body validation failed"):
             validate_blog_body(str(tmp_path), blog_enabled=True)
-        assert exc_info.value.code == 1
 
     def test_blog_true_body_whitespace_only_errors(self, tmp_path):
-        """blog=true with a whitespace-only body file: treated as empty, raises SystemExit."""
+        """blog=true with a whitespace-only body file: treated as empty, raises ReleaseValidationError."""
         releases_dir = tmp_path / ".rlsbl" / "releases"
         releases_dir.mkdir(parents=True)
         body = releases_dir / "unreleased.md"
         body.write_text("   \n\n  \n")
 
-        with pytest.raises(SystemExit) as exc_info:
+        with pytest.raises(ReleaseValidationError, match="Blog body validation failed"):
             validate_blog_body(str(tmp_path), blog_enabled=True)
-        assert exc_info.value.code == 1
 
     def test_blog_false_skips_body_check(self, tmp_path):
         """blog=false: returns (None, None) even if body file exists and is empty."""
