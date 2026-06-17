@@ -2,6 +2,21 @@
 
 # Changelog
 
+## 0.77.1
+
+Fix stale commit-level batch exclusion cleanup
+
+<details>
+<summary>Context</summary>
+
+clean_stale_exclusions now removes commit-level batch exclusions when all referenced commits have been finalized, matching the existing entry-level cleanup behavior.
+
+</details>
+
+### Fixes
+
+- **Bug fix.** Stale commit-level batch exclusions are now cleaned from `config.json` during release finalization, matching the existing cleanup for entry-level exclusions.
+
 ## 0.77.0
 
 GitError/PostReleaseError exceptions, detached HEAD/shallow clone/push timeout handling, variant delay, dep_validation realpath
