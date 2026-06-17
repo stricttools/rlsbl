@@ -157,7 +157,7 @@
     "description": "92c829699be90c4ea09e05c6e0ff3830b755bdd05be47a9427e51074cedcb831"
   },
   "en/cli-index.md": {
-    "content": "3b357475037402f495a69a426f3b018833b1e281661fded8c8d67f7275d15ea4",
+    "content": "43a7f7da96fac27d6ba28cd3325693f1cac2b973966b8ffc98882d07b5794224",
     "description": "0f01533cb10562a220aa70ea5e33e2500c0c1e4aa8e16b2f80c532449a68b7ea"
   },
   "en/cli-migrate.md": {
@@ -217,7 +217,7 @@
     "description": "f934ebcc70f1b9dc3c86b2020fcfac4db46bd2cd252d78e4d5989f59cc429886"
   },
   "en/configuration.md": {
-    "content": "306f801e862c42eedff682e2c1fa6726e3f868597f46f7765b3707303eeccc12",
+    "content": "245a751263f04531c6566b04b202ec8eee164dffac2112070a88619cbeb1fd69",
     "description": "2b299140b2d961d153c7d61904667008c1a2e33081bb58950272063a9eb3c519",
     "source_docstring": "05560ab55a1390ba5b634be62fee1d394181c2b12d1519dd0e522f25ff68e000"
   },
@@ -553,7 +553,7 @@
     "description": "7e4f7b1452f4dc1eacb72af1bee63dd0cbb9a504dcf50cccbff952354eae2e16"
   },
   "en/rlsbl-config.md": {
-    "content": "4a9c313e779dc637f7cf8e8556f810fef914eb34cf4e394b4333fd69d4b611ec",
+    "content": "57cb93b75cad4e3e51e315e3f7a8b9081b03cfecaec93f8709f8f8647eb3b36e",
     "description": "09bb58e98cc226d9c0a15ae7af665bf640be1023b91758076240843500b1607e",
     "source_docstring": "05560ab55a1390ba5b634be62fee1d394181c2b12d1519dd0e522f25ff68e000"
   },
