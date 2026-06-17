@@ -213,12 +213,45 @@ def validate_pipelines_config(config):
                     )
 
 
-def clean_stale_exclusions(config_path):
-    """Remove batch_limits exclusions that reference version="unreleased".
+def _read_unreleased_commits(config_path):
+    """Read commit hashes from unreleased.jsonl adjacent to config_path.
 
-    After release finalization renames unreleased.jsonl to X.Y.Z.jsonl,
-    exclusions with version="unreleased" become dead references. This
-    function cleans them up.
+    Returns a set of commit hash strings found in the "commits" arrays
+    of all entries in unreleased.jsonl.  Returns an empty set if the
+    file does not exist or is empty.
+    """
+    rlsbl_dir = os.path.dirname(config_path)
+    unreleased_path = os.path.join(rlsbl_dir, "changes", "unreleased.jsonl")
+    if not os.path.isfile(unreleased_path):
+        return set()
+    commits = set()
+    with open(unreleased_path, "r", encoding="utf-8") as f:
+        for line in f:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            try:
+                obj = json.loads(stripped)
+            except json.JSONDecodeError:
+                continue
+            for c in obj.get("commits", []):
+                if isinstance(c, str):
+                    commits.add(c)
+    return commits
+
+
+def clean_stale_exclusions(config_path):
+    """Remove stale batch_limits exclusions after release finalization.
+
+    Two kinds of exclusions become stale:
+
+    1. Entry-level (have ``"entries"`` with ``version="unreleased"``):
+       after finalization renames unreleased.jsonl to X.Y.Z.jsonl, these
+       are dead references.
+
+    2. Commit-level (have ``"commits"`` but no ``"entries"``): stale when
+       ALL referenced commits are no longer in unreleased.jsonl (they
+       were moved to a versioned file during finalization).
 
     Returns the number of exclusions removed. Returns 0 and does not
     write to disk if nothing changed.
@@ -231,14 +264,29 @@ def clean_stale_exclusions(config_path):
     if not isinstance(exclusions, list) or not exclusions:
         return 0
 
-    def _has_unreleased_entry(exclusion):
+    unreleased_commits = _read_unreleased_commits(config_path)
+
+    def _is_stale(exclusion):
+        if not isinstance(exclusion, dict):
+            return False
+        # Entry-level: stale if any entry references version="unreleased"
         entries = exclusion.get("entries", [])
-        return any(
+        if entries and any(
             isinstance(e, dict) and e.get("version") == "unreleased"
             for e in entries
-        )
+        ):
+            return True
+        # Commit-level: stale if ALL commits are absent from unreleased.jsonl
+        commits = exclusion.get("commits", [])
+        if commits and all(
+            c not in unreleased_commits
+            for c in commits
+            if isinstance(c, str)
+        ):
+            return True
+        return False
 
-    cleaned = [ex for ex in exclusions if not _has_unreleased_entry(ex)]
+    cleaned = [ex for ex in exclusions if not _is_stale(ex)]
     removed = len(exclusions) - len(cleaned)
     if removed == 0:
         return 0
