@@ -1,7 +1,9 @@
-"""Hook helpers: content hashing, template hash lookup, hook emptiness check."""
+"""Hook helpers: content hashing, template hash lookup, hook emptiness check, hook runner."""
 
 import hashlib
 import os
+
+from .validate import HookError
 
 # Lazily computed on first access via _get_pre_release_template_hashes().
 _PRE_RELEASE_TEMPLATE_HASHES = None
@@ -68,3 +70,37 @@ def _is_hook_effectively_empty(hook_path):
 
     hook_hash = _compute_content_hash(hook_content)
     return hook_hash in _get_pre_release_template_hashes()
+
+
+def run_release_hook(hook_name, hook_path, project_dir, env, timeout):
+    """Run a release hook script (pre-checks or pre-release).
+
+    hook_name: human-readable name for error messages (e.g. "pre-checks").
+    hook_path: absolute path to the shell script.
+    project_dir: working directory for the hook.
+    env: environment dict to pass to the subprocess.
+    timeout: seconds before the hook is killed.
+
+    Raises HookError on non-zero exit or timeout.
+    """
+    # Late-bind subprocess through the package namespace so tests can patch
+    # rlsbl.commands.release.subprocess and the mock is visible here.
+    from . import subprocess as _subprocess
+
+    if not os.path.exists(hook_path):
+        return
+
+    hook_path = os.path.abspath(hook_path)
+    try:
+        _subprocess.run(
+            ["bash", hook_path], env=env, check=True,
+            timeout=timeout, cwd=project_dir,
+        )
+    except _subprocess.CalledProcessError as e:
+        raise HookError(
+            f"{hook_name} hook exited with code {e.returncode}."
+        ) from e
+    except _subprocess.TimeoutExpired as e:
+        raise HookError(
+            f"{hook_name} hook timed out after {timeout}s."
+        ) from e

@@ -6,6 +6,7 @@ import subprocess
 from unittest.mock import MagicMock, patch
 
 from rlsbl.commands.release import _refresh_selfdoc_hashes, _run_selfdoc_gen, run_cmd
+from rlsbl.commands.release import _run_cmd_inner
 
 
 class TestSelfdocBeforeTestsAndLint:
@@ -18,7 +19,7 @@ class TestSelfdocBeforeTestsAndLint:
         _run_selfdoc_check appears before _run_builtin_tests and
         _run_builtin_lint in the release function.
         """
-        source = inspect.getsource(run_cmd)
+        source = inspect.getsource(_run_cmd_inner)
         selfdoc_pos = source.index("_run_selfdoc_check(")
         tests_pos = source.index("_run_builtin_tests(")
         lint_pos = source.index("_run_builtin_lint(")
@@ -32,7 +33,7 @@ class TestSelfdocBeforeTestsAndLint:
 
     def test_selfdoc_still_before_pre_release_hook(self):
         """Selfdoc check must also run before the pre-release hook."""
-        source = inspect.getsource(run_cmd)
+        source = inspect.getsource(_run_cmd_inner)
         selfdoc_pos = source.index("_run_selfdoc_check(")
         pre_release_pos = source.index("pre_release_script")
 
@@ -42,7 +43,7 @@ class TestSelfdocBeforeTestsAndLint:
 
     def test_ordering_selfdoc_tests_lint(self):
         """The full ordering must be: selfdoc, tests, lint."""
-        source = inspect.getsource(run_cmd)
+        source = inspect.getsource(_run_cmd_inner)
 
         selfdoc_pos = source.index("_run_selfdoc_check(")
         tests_pos = source.index("_run_builtin_tests(")
@@ -55,7 +56,7 @@ class TestSelfdocBeforeTestsAndLint:
 
     def test_selfdoc_after_pre_checks_hook(self):
         """Selfdoc check must run after the pre-checks hook."""
-        source = inspect.getsource(run_cmd)
+        source = inspect.getsource(_run_cmd_inner)
         pre_checks_pos = source.index("pre_checks_script")
         selfdoc_pos = source.index("_run_selfdoc_check(")
 
@@ -65,7 +66,7 @@ class TestSelfdocBeforeTestsAndLint:
 
     def test_selfdoc_gen_before_selfdoc_check(self):
         """Selfdoc gen must run before selfdoc check."""
-        source = inspect.getsource(run_cmd)
+        source = inspect.getsource(_run_cmd_inner)
         gen_pos = source.index("_run_selfdoc_gen(")
         check_pos = source.index("_run_selfdoc_check(")
 
@@ -75,7 +76,7 @@ class TestSelfdocBeforeTestsAndLint:
 
     def test_selfdoc_gen_after_strictcli_schema_dump(self):
         """Selfdoc gen must run after strictcli schema dump."""
-        source = inspect.getsource(run_cmd)
+        source = inspect.getsource(_run_cmd_inner)
         schema_pos = source.index("_run_strictcli_schema_dump(")
         gen_pos = source.index("_run_selfdoc_gen(")
 
@@ -85,7 +86,7 @@ class TestSelfdocBeforeTestsAndLint:
 
     def test_selfdoc_gen_before_tests(self):
         """Selfdoc gen must run before tests."""
-        source = inspect.getsource(run_cmd)
+        source = inspect.getsource(_run_cmd_inner)
         gen_pos = source.index("_run_selfdoc_gen(")
         tests_pos = source.index("_run_builtin_tests(")
 

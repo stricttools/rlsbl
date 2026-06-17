@@ -8,7 +8,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from rlsbl.commands.release import run_cmd, _run_strictcli_schema_dump
+from rlsbl.commands.release import run_cmd, _run_cmd_inner, _run_strictcli_schema_dump
 from rlsbl.release_file import ReleaseConfig
 
 
@@ -138,7 +138,7 @@ class TestStrictcliSchemaOrdering:
 
     def test_schema_dump_after_pre_checks_hook(self):
         """Schema dump must run after the pre-checks hook."""
-        source = inspect.getsource(run_cmd)
+        source = inspect.getsource(_run_cmd_inner)
         pre_checks_pos = source.index("pre_checks_script")
         schema_pos = source.index("_run_strictcli_schema_dump(")
 
@@ -148,7 +148,7 @@ class TestStrictcliSchemaOrdering:
 
     def test_schema_dump_before_selfdoc_check(self):
         """Schema dump must run before the selfdoc check."""
-        source = inspect.getsource(run_cmd)
+        source = inspect.getsource(_run_cmd_inner)
         schema_pos = source.index("_run_strictcli_schema_dump(")
         selfdoc_pos = source.index("_run_selfdoc_check(")
 
@@ -158,7 +158,7 @@ class TestStrictcliSchemaOrdering:
 
     def test_schema_dump_before_tests(self):
         """Schema dump must run before tests."""
-        source = inspect.getsource(run_cmd)
+        source = inspect.getsource(_run_cmd_inner)
         schema_pos = source.index("_run_strictcli_schema_dump(")
         tests_pos = source.index("_run_builtin_tests(")
 
