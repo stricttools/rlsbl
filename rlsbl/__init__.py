@@ -453,7 +453,7 @@ def cmd_check_name(target, delay, **_kwargs):
 # ---------------------------------------------------------------------------
 
 @app.command(name="claim-name", help="Claim a name on a package registry by publishing a minimal placeholder package. Runs check-name first, then publishes if available.")
-@strictcli.flag(name="target", type=str, help="Target registry: npm or pypi", default="")
+@strictcli.flag(name="target", type=str, help="Target package registry to publish the placeholder to (npm or pypi)", default="")
 def cmd_claim_name(target, yes, **_kwargs):
     if not target:
         print(

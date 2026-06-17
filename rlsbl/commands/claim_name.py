@@ -1,3 +1,5 @@
+"""Claim a package name on npm or PyPI by publishing a minimal placeholder package."""
+
 import json
 import os
 import shutil
@@ -7,7 +9,15 @@ import tempfile
 
 
 def run_cmd(target, args, flags):
-    """Claim a name on a package registry by publishing a minimal placeholder."""
+    """Claim a package name on a registry by publishing a minimal placeholder.
+
+    Checks availability first via check-name, then publishes a version 0.0.0
+    placeholder package to reserve the name. Supports npm (via npm publish)
+    and PyPI (via uv build + uv publish). Requires NPM_TOKEN for npm or
+    PYPI_TOKEN / UV_PUBLISH_TOKEN for PyPI to be set in the environment.
+    When --yes is passed, proceeds even if the name appears taken or the
+    availability check returns an ambiguous status.
+    """
 
     if len(args) != 1:
         print("Expected exactly one package name.", file=sys.stderr)
