@@ -355,6 +355,33 @@ def _check_variants(name, check_fn, get_variants_fn):
     return similar
 
 
+def _classify_variant_collisions(name, taken_variants, registry):
+    """Classify taken variants as hard normalization collisions or soft similar names.
+
+    Hard collisions are names the registry would reject because they normalize
+    identically to the candidate.  Soft similar names merely look alike but
+    are distinct after normalization.
+
+    Returns (hard_collisions, soft_similar).
+    """
+    hard = []
+    soft = []
+    for variant in taken_variants:
+        if registry == "pypi":
+            if _ultranormalize(name) == _ultranormalize(variant):
+                hard.append(variant)
+            else:
+                soft.append(variant)
+        elif registry == "npm":
+            if normalize_npm(name) == normalize_npm(variant):
+                hard.append(variant)
+            else:
+                soft.append(variant)
+        else:
+            soft.append(variant)
+    return hard, soft
+
+
 def _check_stdlib_collision(name):
     """Check if a name collides with a Python standard library module.
 
@@ -378,8 +405,8 @@ def _check_single_name(name, registry):
         - variants: list of similar names that are taken (npm/pypi only)
         - github_count: number of GitHub repos with this name (or None on error)
         - reason: why the name is taken/unavailable, or None if available/error.
-          Values: "registered", "stdlib", "moniker", "ultranorm" (set by
-          _apply_ultranorm_check), or None.
+          Values: "registered", "stdlib", "moniker", "normalized", "ultranorm"
+          (set by _apply_ultranorm_check), or None.
         - error: error message if status is "error" (absent otherwise)
         - note: informational note (go only, absent otherwise)
     """
@@ -394,10 +421,16 @@ def _check_single_name(name, registry):
         elif check_result["status"] == "taken":
             result["reason"] = "registered"
         elif check_result["status"] == "available":
-            result["variants"] = _check_variants(name, check_npm_availability, get_npm_variants)
+            taken_variants = _check_variants(name, check_npm_availability, get_npm_variants)
+            hard, soft = _classify_variant_collisions(name, taken_variants, "npm")
+            if hard:
+                result["status"] = "taken"
+                result["reason"] = "moniker"
+                result["note"] = f"moniker collision with '{hard[0]}' (npm strips punctuation)"
+            result["variants"] = soft
             conflicts = _search_npm_similar(name)
             result["moniker_checked"] = True
-            if conflicts:
+            if conflicts and result["status"] != "taken":
                 result["status"] = "taken"
                 result["reason"] = "moniker"
                 result["note"] = f"moniker conflict with '{conflicts[0]}' (npm strips punctuation)"
@@ -416,7 +449,16 @@ def _check_single_name(name, registry):
             elif check_result["status"] == "taken":
                 result["reason"] = "registered"
             elif check_result["status"] == "available":
-                result["variants"] = _check_variants(name, check_pypi_availability, get_pypi_variants)
+                # Two collision mechanisms for PyPI:
+                # Path A: separator-based (variants + classification here)
+                # Path B: visual-ambiguity (_apply_ultranorm_check, called later by run_cmd)
+                taken_variants = _check_variants(name, check_pypi_availability, get_pypi_variants)
+                hard, soft = _classify_variant_collisions(name, taken_variants, "pypi")
+                if hard:
+                    result["status"] = "taken"
+                    result["reason"] = "normalized"
+                    result["note"] = f"normalization collision with '{hard[0]}' (registry rejects identical normalized names)"
+                result["variants"] = soft  # only soft similar names shown as informational
 
     elif registry == "go":
         check_result = check_go_availability(name)
@@ -454,6 +496,7 @@ def _format_single_result(result):
     _REASON_EXPLANATIONS = {
         "stdlib": "  PyPI blocks names that match Python standard library modules.",
         "moniker": "  npm considers names identical after removing dashes, dots, and underscores.",
+        "normalized": "  The registry rejects names that normalize identically after stripping separators.",
         "ultranorm": "  PyPI blocks names that are visually similar (l/1/i and o/0 substitutions).",
     }
 
@@ -507,8 +550,7 @@ def _format_single_result(result):
             print(f"  {s}")
         if available:
             print(
-                "\nYour name is available but has similar existing packages. "
-                "Consider if this could cause confusion."
+                "\nYour name is available but has similar existing packages."
             )
 
     # Ultranormalization warnings and PyPI caveats

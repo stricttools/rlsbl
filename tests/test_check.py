@@ -13,6 +13,7 @@ from rlsbl.commands.check import (
     _check_single_name,
     _check_stdlib_collision,
     _check_variants,
+    _classify_variant_collisions,
     _format_single_result,
     _format_table_row,
     _generate_ultranorm_variants,
@@ -1490,3 +1491,115 @@ class TestCheckVariantsDirectCoverage:
 
         assert "taken" in result
         assert "bad" not in result
+
+
+class TestClassifyVariantCollisions:
+    """Tests for _classify_variant_collisions."""
+
+    def test_pypi_hard_collision_ultranorm(self):
+        """PyPI: 'llmloop' and 'llm-loop' ultranormalize identically -> hard collision."""
+        hard, soft = _classify_variant_collisions("llmloop", ["llm-loop"], "pypi")
+        assert hard == ["llm-loop"]
+        assert soft == []
+
+    def test_pypi_soft_similar(self):
+        """PyPI: 'mylib' and 'my-lib-2' do NOT ultranormalize identically -> soft."""
+        hard, soft = _classify_variant_collisions("mylib", ["my-lib-2"], "pypi")
+        assert hard == []
+        assert soft == ["my-lib-2"]
+
+    def test_npm_hard_collision_moniker(self):
+        """npm: 'toolstream' and 'tool-stream' normalize identically -> hard collision."""
+        hard, soft = _classify_variant_collisions("toolstream", ["tool-stream"], "npm")
+        assert hard == ["tool-stream"]
+        assert soft == []
+
+    def test_npm_soft_similar(self):
+        """npm: variant that doesn't normalize identically -> soft."""
+        # 'mylib' normalizes to 'mylib', 'mylib2' normalizes to 'mylib2' -- different
+        hard, soft = _classify_variant_collisions("mylib", ["mylib2"], "npm")
+        assert hard == []
+        assert soft == ["mylib2"]
+
+    def test_mixed_hard_and_soft(self):
+        """PyPI: list with both hard and soft variants is split correctly."""
+        # 'llmloop' ultranorm -> 'llmloop' (after stripping separators)
+        # 'llm-loop' ultranorm -> 'llmloop' -- same, hard
+        # 'llm-loop-extra' ultranorm -> 'llmloopextra' -- different, soft
+        hard, soft = _classify_variant_collisions(
+            "llmloop", ["llm-loop", "llm-loop-extra"], "pypi"
+        )
+        assert hard == ["llm-loop"]
+        assert soft == ["llm-loop-extra"]
+
+    def test_unknown_registry_all_soft(self):
+        """Unknown registry: all variants are classified as soft."""
+        hard, soft = _classify_variant_collisions("foo", ["f-oo"], "go")
+        assert hard == []
+        assert soft == ["f-oo"]
+
+
+class TestNormalizationCollisionIntegration:
+    """Integration tests: normalization collisions upgrade status to 'taken'."""
+
+    @patch("rlsbl.commands.check.check_github_availability")
+    @patch("rlsbl.commands.check._check_variants")
+    @patch("rlsbl.commands.check.check_pypi_availability")
+    def test_pypi_normalized_collision_upgrades_to_taken(
+        self, mock_pypi, mock_variants, mock_gh
+    ):
+        """PyPI: available name with a normalization-colliding variant becomes taken."""
+        mock_pypi.return_value = {"status": "available"}
+        mock_variants.return_value = ["llm-loop"]
+        mock_gh.return_value = {"status": "available", "count": 0}
+
+        result = _check_single_name("llmloop", "pypi")
+        assert result["status"] == "taken"
+        assert result["reason"] == "normalized"
+        assert "llm-loop" in result["note"]
+        # Hard collisions are removed from variants; only soft remain
+        assert result["variants"] == []
+        # GitHub should be skipped since status is now 'taken'
+        mock_gh.assert_not_called()
+
+    @patch("rlsbl.commands.check.check_github_availability")
+    @patch("rlsbl.commands.check._search_npm_similar")
+    @patch("rlsbl.commands.check._check_variants")
+    @patch("rlsbl.commands.check.check_npm_availability")
+    def test_npm_local_variant_collision_upgrades_to_taken(
+        self, mock_npm, mock_variants, mock_similar, mock_gh
+    ):
+        """npm: available name with a normalization-colliding variant becomes taken."""
+        mock_npm.return_value = {"status": "available"}
+        mock_variants.return_value = ["tool-stream"]
+        mock_similar.return_value = []
+        mock_gh.return_value = {"status": "available", "count": 0}
+
+        result = _check_single_name("toolstream", "npm")
+        assert result["status"] == "taken"
+        assert result["reason"] == "moniker"
+        assert "tool-stream" in result["note"]
+        # Hard collisions are removed from variants; only soft remain
+        assert result["variants"] == []
+        # GitHub should be skipped since status is now 'taken'
+        mock_gh.assert_not_called()
+
+    @patch("rlsbl.commands.check.check_github_availability")
+    @patch("rlsbl.commands.check._search_npm_similar")
+    @patch("rlsbl.commands.check._check_variants")
+    @patch("rlsbl.commands.check.check_npm_availability")
+    def test_npm_local_collision_takes_priority_over_search(
+        self, mock_npm, mock_variants, mock_similar, mock_gh
+    ):
+        """npm: local variant collision takes priority over _search_npm_similar results."""
+        mock_npm.return_value = {"status": "available"}
+        mock_variants.return_value = ["tool-stream"]
+        mock_similar.return_value = ["tool.stream"]
+        mock_gh.return_value = {"status": "available", "count": 0}
+
+        result = _check_single_name("toolstream", "npm")
+        assert result["status"] == "taken"
+        assert result["reason"] == "moniker"
+        # The note should reference the local collision variant, not the search result
+        assert "tool-stream" in result["note"]
+        assert "moniker collision" in result["note"]
