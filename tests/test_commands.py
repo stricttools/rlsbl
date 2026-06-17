@@ -805,7 +805,7 @@ class TestRelease:
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
-    @patch("rlsbl.commands.release.remote_branch_exists", return_value=False, create=True)
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=False)
     def test_release_empty_remote_continues(self, _remote_exists, _validate,
                                             _gen_cl, _gh_inst, _gh_auth,
                                             _clean, _branch, _commit_files,
@@ -827,7 +827,7 @@ class TestRelease:
 
         assert "Remote branch origin/main does not exist yet" in mock_stderr.getvalue()
 
-    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True, create=True)
+    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
     @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
