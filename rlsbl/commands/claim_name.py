@@ -1,0 +1,131 @@
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+
+
+def run_cmd(target, args, flags):
+    """Claim a name on a package registry by publishing a minimal placeholder."""
+
+    if len(args) != 1:
+        print("Expected exactly one package name.", file=sys.stderr)
+        sys.exit(1)
+
+    name = args[0]
+
+    if target not in ("npm", "pypi"):
+        print(f"Unsupported target: {target!r}. Must be 'npm' or 'pypi'.", file=sys.stderr)
+        sys.exit(1)
+
+    from rlsbl.commands.check import _check_single_name
+
+    result = _check_single_name(name, target)
+    status = result["status"]
+
+    if status == "available":
+        pass
+    elif status == "taken":
+        reason = result.get("reason", "unknown reason")
+        print(f"Name '{name}' appears taken on {target}: {reason}.", file=sys.stderr)
+        if flags["yes"]:
+            print("--yes passed, attempting publish anyway...")
+        else:
+            sys.exit(1)
+    elif status == "error":
+        error = result.get("error", "unknown error")
+        print(f"Error checking '{name}' on {target}: {error}", file=sys.stderr)
+        sys.exit(2)
+    else:
+        print(f"Ambiguous status '{status}' for '{name}' on {target}.", file=sys.stderr)
+        if flags["yes"]:
+            print("--yes passed, attempting publish anyway...")
+        else:
+            sys.exit(1)
+
+    if target == "npm":
+        if "NPM_TOKEN" not in os.environ:
+            print("NPM_TOKEN environment variable is not set.", file=sys.stderr)
+            sys.exit(1)
+    elif target == "pypi":
+        if "PYPI_TOKEN" not in os.environ and "UV_PUBLISH_TOKEN" not in os.environ:
+            print("Neither PYPI_TOKEN nor UV_PUBLISH_TOKEN environment variable is set.", file=sys.stderr)
+            sys.exit(1)
+
+    tmpdir = tempfile.mkdtemp()
+    try:
+        if target == "npm":
+            _claim_npm(name, tmpdir)
+        elif target == "pypi":
+            _claim_pypi(name, tmpdir)
+    except subprocess.CalledProcessError as e:
+        print(e.stderr, file=sys.stderr)
+        sys.exit(1)
+    finally:
+        shutil.rmtree(tmpdir)
+
+
+def _claim_npm(name, tmpdir):
+    package_json = {
+        "name": name,
+        "version": "0.0.0",
+        "description": "Name reservation",
+    }
+    with open(os.path.join(tmpdir, "package.json"), "w") as f:
+        json.dump(package_json, f, indent=2)
+        f.write("\n")
+
+    subprocess.run(
+        ["npm", "publish", "--access", "public"],
+        cwd=tmpdir,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=60,
+    )
+    print(f"Successfully claimed '{name}' on npm: https://www.npmjs.com/package/{name}")
+
+
+def _claim_pypi(name, tmpdir):
+    name_underscored = name.replace("-", "_")
+    pkg_dir = os.path.join(tmpdir, name_underscored)
+    os.makedirs(pkg_dir)
+
+    with open(os.path.join(pkg_dir, "__init__.py"), "w") as f:
+        pass
+
+    pyproject_toml = f"""\
+[project]
+name = "{name}"
+version = "0.0.0"
+description = "Name reservation"
+requires-python = ">=3.11"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+"""
+    with open(os.path.join(tmpdir, "pyproject.toml"), "w") as f:
+        f.write(pyproject_toml)
+
+    subprocess.run(
+        ["uv", "build"],
+        cwd=tmpdir,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=60,
+    )
+
+    token = os.environ.get("UV_PUBLISH_TOKEN") or os.environ["PYPI_TOKEN"]
+
+    subprocess.run(
+        ["uv", "publish", "--token", token],
+        cwd=tmpdir,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=60,
+    )
+    print(f"Successfully claimed '{name}' on PyPI: https://pypi.org/project/{name}/")
