@@ -12,6 +12,7 @@ from rlsbl.commands.check import (
     _apply_ultranorm_check,
     _check_single_name,
     _check_stdlib_collision,
+    _check_variants,
     _format_single_result,
     _format_table_row,
     _generate_ultranorm_variants,
@@ -20,7 +21,9 @@ from rlsbl.commands.check import (
     _ultranormalize,
     check_github_availability,
     check_go_availability,
+    check_npm_availability,
     check_pypi_availability,
+    get_npm_variants,
     get_pypi_variants,
     run_cmd,
 )
@@ -1350,3 +1353,140 @@ class TestMultiNameSummary:
         output = mock_stdout.getvalue()
         assert "Checked with 500ms delay between names." in output
         assert "Increase --delay if rate limited." not in output
+
+
+class TestPyPIVariantsInsertions:
+    """Tests for separator-insertion variants in get_pypi_variants."""
+
+    def test_pypi_variants_separator_free_generates_insertions(self):
+        """get_pypi_variants for a separator-free name generates insertion variants."""
+        variants = get_pypi_variants("llmloop")
+        # Should include insertion variants like llm-loop, ll-mloop, etc.
+        assert "llm-loop" in variants
+        assert "ll-mloop" in variants
+        assert "l-lmloop" in variants
+        # The original name should NOT be in the set
+        assert "llmloop" not in variants
+        # Should have more than just the stripped form (which equals original)
+        assert len(variants) > 0
+
+    def test_pypi_variants_with_separators_no_insertions(self):
+        """get_pypi_variants for a name with separators does NOT generate insertion variants."""
+        variants = get_pypi_variants("my-pkg")
+        # Should have swap variants (underscore, no-separator)
+        assert "my_pkg" in variants
+        assert "mypkg" in variants
+        # Should NOT have insertion variants like m-ypkg, my-p-kg, etc.
+        # Insertion variants are only for separator-free names
+        insertion_candidates = [v for v in variants if v.count("-") > 1 or v.count("_") > 1]
+        assert len(insertion_candidates) == 0
+
+    def test_pypi_variants_insertion_cap(self):
+        """For a very long separator-free name, insertion count is capped at 30."""
+        # A 50-char name would generate 49 * 3 = 147 insertion variants without cap
+        long_name = "a" * 50
+        variants = get_pypi_variants(long_name)
+        # Count only insertion variants (those with a separator in them)
+        insertion_variants = [v for v in variants if "-" in v or "_" in v or "." in v]
+        assert len(insertion_variants) <= 30
+
+
+class TestNpmVariants:
+    """Tests for get_npm_variants."""
+
+    def test_npm_variants_with_separators(self):
+        """Separator-swap variants are generated for names with separators."""
+        variants = get_npm_variants("my-pkg")
+        # Should include underscore and dot swaps, and stripped form
+        assert "my_pkg" in variants
+        assert "my.pkg" in variants
+        assert "mypkg" in variants
+
+    def test_npm_variants_separator_free_generates_insertions(self):
+        """Insertion variants are generated for separator-free names."""
+        variants = get_npm_variants("llmloop")
+        assert "llm-loop" in variants
+        assert "llm_loop" in variants
+        assert "llm.loop" in variants
+        assert "l-lmloop" in variants
+
+    def test_npm_variants_excludes_original(self):
+        """The original name is excluded from variants."""
+        variants = get_npm_variants("mypackage")
+        assert "mypackage" not in variants
+
+        variants2 = get_npm_variants("my-pkg")
+        assert "my-pkg" not in variants2
+
+
+class TestCheckVariantsDirectCoverage:
+    """Direct tests for _check_variants without going through _check_single_name."""
+
+    def test_sequential_path(self):
+        """When _HAS_THREADS is False, sequential execution works."""
+        call_log = []
+
+        def fake_check(name):
+            call_log.append(name)
+            if name == "b-variant":
+                return {"status": "taken"}
+            return {"status": "available"}
+
+        def fake_variants(name):
+            return ["a-variant", "b-variant", "c-variant"]
+
+        with patch("rlsbl.commands.check._HAS_THREADS", False):
+            result = _check_variants("orig", fake_check, fake_variants)
+
+        assert result == ["b-variant"]
+        assert call_log == ["a-variant", "b-variant", "c-variant"]
+
+    def test_threaded_path(self):
+        """Threaded execution returns correct results."""
+        def fake_check(name):
+            if name in ("taken1", "taken2"):
+                return {"status": "taken"}
+            return {"status": "available"}
+
+        def fake_variants(name):
+            return ["taken1", "avail1", "taken2"]
+
+        with patch("rlsbl.commands.check._HAS_THREADS", True):
+            result = _check_variants("orig", fake_check, fake_variants)
+
+        assert sorted(result) == ["taken1", "taken2"]
+
+    def test_excludes_input_name(self):
+        """The input name is filtered from variants even if get_variants returns it."""
+        def fake_check(name):
+            return {"status": "taken"}
+
+        def fake_variants(name):
+            return ["orig", "other"]
+
+        with patch("rlsbl.commands.check._HAS_THREADS", False):
+            result = _check_variants("orig", fake_check, fake_variants)
+
+        assert "orig" not in result
+        assert "other" in result
+
+    def test_exception_in_future_skipped(self):
+        """An exception in one variant check does not crash the whole operation."""
+        call_count = [0]
+
+        def fake_check(name):
+            call_count[0] += 1
+            if name == "bad":
+                raise RuntimeError("simulated failure")
+            if name == "taken":
+                return {"status": "taken"}
+            return {"status": "available"}
+
+        def fake_variants(name):
+            return ["bad", "taken", "avail"]
+
+        with patch("rlsbl.commands.check._HAS_THREADS", True):
+            result = _check_variants("orig", fake_check, fake_variants)
+
+        assert "taken" in result
+        assert "bad" not in result

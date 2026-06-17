@@ -226,6 +226,9 @@ def check_pypi_availability(name):
         return {"status": "error", "message": str(e) or "Network error"}
 
 
+_PYPI_INSERTION_CAP = 30
+
+
 def get_pypi_variants(name):
     """Generate common PyPI name variants for similarity checking."""
     normalized = normalize_pypi(name)
@@ -234,7 +237,27 @@ def get_pypi_variants(name):
     variants.add(normalized)
     variants.add(re.sub(r"[-_.]+", "_", lower))
     variants.add(re.sub(r"[-_.]+", "-", lower))
-    variants.add(re.sub(r"[-_.]+", "", lower))
+
+    stripped = re.sub(r"[-_.]+", "", lower)
+    variants.add(stripped)
+
+    # Separator-free names: insert separators at every interior position
+    # to detect existing packages that normalize identically (e.g. "llmloop"
+    # vs "llm-loop" on PyPI).  Mirrors get_npm_variants insertion logic.
+    if stripped == lower:
+        separators = "-_."
+        insertion_count = 0
+        for i in range(1, len(lower)):
+            for sep in separators:
+                variants.add(lower[:i] + sep + lower[i:])
+                insertion_count += 1
+            if insertion_count >= _PYPI_INSERTION_CAP:
+                print(
+                    f"PyPI insertion variants capped at {_PYPI_INSERTION_CAP} "
+                    f"for '{name}' (name too long for exhaustive check)",
+                    file=sys.stderr,
+                )
+                break
 
     # Remove the original name itself
     variants.discard(name)
@@ -300,7 +323,7 @@ def _check_variants(name, check_fn, get_variants_fn):
 
     if _HAS_THREADS and variants:
         try:
-            with ThreadPoolExecutor(max_workers=len(variants)) as executor:
+            with ThreadPoolExecutor(max_workers=min(len(variants), 10)) as executor:
                 future_to_variant = {
                     executor.submit(check_fn, v): v
                     for v in variants
@@ -314,7 +337,10 @@ def _check_variants(name, check_fn, get_variants_fn):
                     except Exception:
                         pass  # Skip variants that error
         except Exception:
-            # Fall back to sequential on any thread pool error
+            # Thread pool itself errored (not individual futures).  Partial
+            # results from the pool are untrustworthy, so start fresh with
+            # a sequential fallback rather than mixing partial threaded
+            # results with sequential ones.
             similar = []
             for variant in variants:
                 var_result = check_fn(variant)
