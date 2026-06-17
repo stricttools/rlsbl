@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.claim_name
-description: "API reference for the rlsbl.commands.claim_name module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Claim a package name on npm or PyPI by publishing a minimal placeholder package."
 generated: true
 nav_group: "API Reference"
 nav_order: 21
