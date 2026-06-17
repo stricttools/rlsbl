@@ -599,11 +599,11 @@ class TestSearchNpmSimilar:
         assert result == []
 
     @patch("rlsbl.commands.check.urllib.request.urlopen")
-    def test_network_error_returns_empty(self, mock_urlopen):
-        """Network errors degrade gracefully to empty list."""
+    def test_network_error_raises(self, mock_urlopen):
+        """Network errors propagate as exceptions (no silent degradation)."""
         mock_urlopen.side_effect = URLError("Connection refused")
-        result = _search_npm_similar("selfdoc")
-        assert result == []
+        with pytest.raises(URLError):
+            _search_npm_similar("selfdoc")
 
     @patch("rlsbl.commands.check.urllib.request.urlopen")
     def test_no_moniker_match(self, mock_urlopen):
@@ -673,6 +673,43 @@ class TestNpmMonikerIntegration:
         assert result["status"] == "taken"
         mock_similar.assert_not_called()
         mock_gh.assert_not_called()
+
+    @patch("rlsbl.commands.check.check_github_availability")
+    @patch("rlsbl.commands.check._search_npm_similar")
+    @patch("rlsbl.commands.check._check_variants")
+    @patch("rlsbl.commands.check.check_npm_availability")
+    def test_npm_search_failure_when_already_taken_continues(
+        self, mock_npm, mock_variants, mock_similar, mock_gh
+    ):
+        """Search failure when local collision already detected keeps status 'taken'."""
+        mock_npm.return_value = {"status": "available"}
+        # Local variant collision makes it "taken" via _classify_variant_collisions
+        mock_variants.return_value = ["tool-stream"]
+        mock_similar.side_effect = URLError("Connection refused")
+        mock_gh.return_value = {"status": "available", "count": 0}
+
+        result = _check_single_name("toolstream", "npm")
+        assert result["status"] == "taken"
+        assert result["reason"] == "moniker"
+        assert "error" not in result
+
+    @patch("rlsbl.commands.check.check_github_availability")
+    @patch("rlsbl.commands.check._search_npm_similar")
+    @patch("rlsbl.commands.check._check_variants")
+    @patch("rlsbl.commands.check.check_npm_availability")
+    def test_npm_search_failure_when_available_becomes_error(
+        self, mock_npm, mock_variants, mock_similar, mock_gh
+    ):
+        """Search failure when name is still 'available' becomes hard error."""
+        mock_npm.return_value = {"status": "available"}
+        mock_variants.return_value = []  # No local collisions
+        mock_similar.side_effect = URLError("Connection refused")
+        mock_gh.return_value = {"status": "available", "count": 0}
+
+        result = _check_single_name("uniquepkg", "npm")
+        assert result["status"] == "error"
+        assert "npm moniker check failed" in result["error"]
+        assert "Connection refused" in result["error"]
 
 
 class TestUltranormIntegration:

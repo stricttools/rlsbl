@@ -127,26 +127,21 @@ def _search_npm_similar(name):
     compares each result's normalized moniker against the candidate's.
     Returns a list of original package names that conflict.
 
-    On any failure (network, JSON parse), returns an empty list for
-    graceful degradation.
+    Raises on failure (network, timeout). The caller is responsible for
+    handling the exception appropriately.
     """
     candidate_moniker = normalize_npm(name)
     url = f"https://registry.npmjs.org/-/v1/search?text={name}&size=20"
-    try:
-        with _request_with_backoff(url) as resp:
-            data = json.loads(resp.read())
-        conflicts = []
-        for obj in data.get("objects", []):
-            pkg_name = obj.get("package", {}).get("name")
-            if pkg_name is None:
-                continue
-            if normalize_npm(pkg_name) == candidate_moniker and pkg_name != name:
-                conflicts.append(pkg_name)
-        return conflicts
-    except Exception as e:
-        import sys
-        print(f"Warning: npm similar-name search failed: {e}", file=sys.stderr)
-        return []
+    with _request_with_backoff(url) as resp:
+        data = json.loads(resp.read())
+    conflicts = []
+    for obj in data.get("objects", []):
+        pkg_name = obj.get("package", {}).get("name")
+        if pkg_name is None:
+            continue
+        if normalize_npm(pkg_name) == candidate_moniker and pkg_name != name:
+            conflicts.append(pkg_name)
+    return conflicts
 
 
 def check_npm_availability(name):
@@ -428,7 +423,16 @@ def _check_single_name(name, registry):
                 result["reason"] = "moniker"
                 result["note"] = f"moniker collision with '{hard[0]}' (npm strips punctuation)"
             result["variants"] = soft
-            conflicts = _search_npm_similar(name)
+            try:
+                conflicts = _search_npm_similar(name)
+            except Exception as e:
+                if result["status"] == "taken":
+                    print(f"Note: npm search also failed ({e}), but collision already detected.", file=sys.stderr)
+                    conflicts = []
+                else:
+                    result["status"] = "error"
+                    result["error"] = f"npm moniker check failed: {e}"
+                    conflicts = []
             result["moniker_checked"] = True
             if conflicts and result["status"] != "taken":
                 result["status"] = "taken"
