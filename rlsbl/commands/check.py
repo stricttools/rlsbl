@@ -308,15 +308,28 @@ def check_github_availability(name):
         return {"status": "error", "message": str(e) or "Network error"}
 
 
-def _check_variants(name, check_fn, get_variants_fn):
+def _check_variants(name, check_fn, get_variants_fn, delay_ms=0):
     """Check name variants for similarity using the given availability checker.
+
+    When ``delay_ms > 0``, bypasses the thread pool and checks variants
+    sequentially with ``time.sleep(delay_ms / 1000)`` between checks (no
+    delay before the first check).  This avoids triggering registry rate
+    limits when many variants are generated.
 
     Returns a list of variant names that are taken/exist.
     """
     variants = [v for v in get_variants_fn(name) if v != name]
     similar = []
 
-    if _HAS_THREADS and variants:
+    if delay_ms > 0:
+        # Rate-limited sequential path
+        for i, variant in enumerate(variants):
+            if i > 0:
+                time.sleep(delay_ms / 1000)
+            var_result = check_fn(variant)
+            if var_result["status"] == "taken":
+                similar.append(variant)
+    elif _HAS_THREADS and variants:
         try:
             with ThreadPoolExecutor(max_workers=min(len(variants), 10)) as executor:
                 future_to_variant = {
@@ -390,8 +403,11 @@ def _check_stdlib_collision(name):
     return None
 
 
-def _check_single_name(name, registry):
+def _check_single_name(name, registry, delay_ms=0):
     """Check a single name on a given registry, returning a structured result.
+
+    When ``delay_ms > 0``, variant checks use sequential execution with a
+    delay between requests instead of concurrent threads.
 
     Returns a dict with keys:
         - name: the package name checked
@@ -416,7 +432,7 @@ def _check_single_name(name, registry):
         elif check_result["status"] == "taken":
             result["reason"] = "registered"
         elif check_result["status"] == "available":
-            taken_variants = _check_variants(name, check_npm_availability, get_npm_variants)
+            taken_variants = _check_variants(name, check_npm_availability, get_npm_variants, delay_ms=delay_ms)
             hard, soft = _classify_variant_collisions(name, taken_variants, "npm")
             if hard:
                 result["status"] = "taken"
@@ -456,7 +472,7 @@ def _check_single_name(name, registry):
                 # Two collision mechanisms for PyPI:
                 # Path A: separator-based (variants + classification here)
                 # Path B: visual-ambiguity (_apply_ultranorm_check, called later by run_cmd)
-                taken_variants = _check_variants(name, check_pypi_availability, get_pypi_variants)
+                taken_variants = _check_variants(name, check_pypi_availability, get_pypi_variants, delay_ms=delay_ms)
                 hard, soft = _classify_variant_collisions(name, taken_variants, "pypi")
                 if hard:
                     result["status"] = "taken"
@@ -682,7 +698,7 @@ def run_cmd(registry, args, flags):
     delay_ms = int(flags.get("delay", "200"))
 
     if len(names) == 1:
-        result = _check_single_name(names[0], registry)
+        result = _check_single_name(names[0], registry, delay_ms=delay_ms)
         _apply_ultranorm_check(result, registry, delay_ms)
         exit_code = _format_single_result(result)
         sys.exit(exit_code)
@@ -690,7 +706,7 @@ def run_cmd(registry, args, flags):
         rows = []
         max_exit = 0
         for i, name in enumerate(names):
-            result = _check_single_name(name, registry)
+            result = _check_single_name(name, registry, delay_ms=delay_ms)
             _apply_ultranorm_check(result, registry, delay_ms)
             rows.append(_format_table_row(result))
             if result["status"] == "error":

@@ -365,7 +365,7 @@ class TestDelayFlag:
         import rlsbl
         result = rlsbl.app.test(["check-name", "--target", "npm", "--delay", "500"])
         assert result.exit_code == 0
-        mock_check.assert_called_once_with("my-pkg", "npm")
+        mock_check.assert_called_once_with("my-pkg", "npm", delay_ms=500)
 
     @patch("rlsbl._variadic_args", ["a", "b"])
     @patch("rlsbl.commands.check.time.sleep")
@@ -400,7 +400,7 @@ class TestMultiNameCheck:
         with pytest.raises(SystemExit) as exc_info:
             run_cmd("npm", ["foo"], {})
         assert exc_info.value.code == 0
-        mock_check.assert_called_once_with("foo", "npm")
+        mock_check.assert_called_once_with("foo", "npm", delay_ms=200)
         mock_format.assert_called_once_with(mock_check.return_value)
 
     @patch("rlsbl.commands.check.time.sleep")
