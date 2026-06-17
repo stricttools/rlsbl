@@ -560,21 +560,10 @@ def _format_single_result(result):
             f"\nWarning: '{name}' ultranormalizes to the same value as: "
             f"{', '.join(ultranorm_conflicts)}"
         )
-    if result.get("ultranorm_caveat"):
-        # Flag was used: print the existing caveat (includes prohibited names note)
+    if registry == "pypi" and status == "available":
         print(
             "\nNote: PyPI may also reject names on its prohibited names list "
             "(not publicly available)."
-        )
-    elif registry == "pypi" and status == "available":
-        # Flag was NOT used: print prohibited names note + suggest the flag
-        print(
-            "\nNote: PyPI may reject names on its prohibited names list "
-            "(not publicly available)."
-        )
-        print(
-            "Tip: use --ultranormalized-variants to check for visual similarity "
-            "conflicts (l/1/i, o/0)."
         )
 
     # GitHub informational
@@ -597,7 +586,7 @@ def _format_single_result(result):
         steps.append("moniker similarity")
     if result.get("github_count") is not None:
         steps.append("GitHub repos")
-    if result.get("ultranorm_caveat"):
+    if result.get("ultranorm_checked"):
         steps.append("ultranormalization")
     print(f"\nChecked: {', '.join(steps)}")
 
@@ -623,22 +612,21 @@ def _format_table_row(result):
     return {"name": name, "status": display_status}
 
 
-def _apply_ultranorm_check(result, registry, ultranorm_flag, delay_ms):
+def _apply_ultranorm_check(result, registry, delay_ms):
     """Apply ultranormalization variant checking to a result dict (in-place).
 
-    Only runs for PyPI when the --ultranormalized-variants flag is set and
-    the name was initially available. Checks each generated variant against
-    PyPI Simple API, applying a delay between requests. Sets
-    ``ultranorm_conflicts`` (list of taken variant names) and
-    ``ultranorm_caveat`` (always True when the flag is used) on the result.
+    Always runs for PyPI when the name was initially available. Checks each
+    generated variant against PyPI Simple API, applying a delay between
+    requests. Sets ``ultranorm_conflicts`` (list of taken variant names)
+    on the result.
     """
-    if not ultranorm_flag or registry != "pypi":
+    if registry != "pypi":
         return
-
-    result["ultranorm_caveat"] = True
 
     if result["status"] != "available":
         return
+
+    result["ultranorm_checked"] = True
 
     variants, capped = _generate_ultranorm_variants(result["name"])
 
@@ -682,17 +670,15 @@ def run_cmd(registry, args, flags):
 
     delay_ms = int(flags.get("delay", "200"))
 
-    ultranorm_flag = flags.get("ultranormalized-variants")
-
     if len(names) == 1:
         result = _check_single_name(names[0], registry)
-        _apply_ultranorm_check(result, registry, ultranorm_flag, delay_ms)
+        _apply_ultranorm_check(result, registry, delay_ms)
         _format_single_result(result)
     else:
         rows = []
         for i, name in enumerate(names):
             result = _check_single_name(name, registry)
-            _apply_ultranorm_check(result, registry, ultranorm_flag, delay_ms)
+            _apply_ultranorm_check(result, registry, delay_ms)
             rows.append(_format_table_row(result))
             if i < len(names) - 1:
                 time.sleep(delay_ms / 1000)

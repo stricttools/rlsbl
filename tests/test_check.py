@@ -676,12 +676,12 @@ class TestNpmMonikerIntegration:
 
 
 class TestUltranormIntegration:
-    """Integration tests: ultranormalization variant checking wired into run_cmd."""
+    """Integration tests: ultranormalization variant checking always runs for PyPI."""
 
     @patch("rlsbl.commands.check.time.sleep")
     @patch("rlsbl.commands.check.check_pypi_availability")
-    def test_flag_with_variant_exists_adds_conflicts(self, mock_pypi, mock_sleep):
-        """Available name with flag + existing variant adds ultranorm_conflicts."""
+    def test_variant_exists_adds_conflicts(self, mock_pypi, mock_sleep):
+        """Available name with existing variant adds ultranorm_conflicts."""
         # "cli" generates variants: "cl1", "c1i", "c11"
         result = {
             "name": "cli", "registry": "pypi", "status": "available",
@@ -693,44 +693,31 @@ class TestUltranormIntegration:
             return {"status": "available"}
         mock_pypi.side_effect = pypi_side_effect
 
-        _apply_ultranorm_check(result, "pypi", True, 200)
+        _apply_ultranorm_check(result, "pypi", 200)
         assert "ultranorm_conflicts" in result
         assert "cl1" in result["ultranorm_conflicts"]
-        assert result.get("ultranorm_caveat")
 
     @patch("rlsbl.commands.check.time.sleep")
     @patch("rlsbl.commands.check.check_pypi_availability")
-    def test_flag_no_variant_exists_no_conflicts_but_caveat(self, mock_pypi, mock_sleep):
-        """Available name with flag + no existing variants has caveat but no conflicts."""
+    def test_no_variant_exists_no_conflicts(self, mock_pypi, mock_sleep):
+        """Available name with no existing variants has no conflicts."""
         result = {
             "name": "cli", "registry": "pypi", "status": "available",
             "variants": [], "github_count": 0,
         }
         mock_pypi.return_value = {"status": "available"}
 
-        _apply_ultranorm_check(result, "pypi", True, 200)
+        _apply_ultranorm_check(result, "pypi", 200)
         assert "ultranorm_conflicts" not in result
-        assert result.get("ultranorm_caveat")
 
-    def test_no_flag_skips_ultranorm(self):
-        """Without the flag, no ultranorm checking occurs at all."""
-        result = {
-            "name": "cli", "registry": "pypi", "status": "available",
-            "variants": [], "github_count": 0,
-        }
-        _apply_ultranorm_check(result, "pypi", False, 200)
-        assert "ultranorm_conflicts" not in result
-        assert "ultranorm_caveat" not in result
-
-    def test_flag_with_non_pypi_registry_skips(self):
-        """Flag with non-pypi registry does no ultranorm checking."""
+    def test_non_pypi_registry_skips(self):
+        """Non-pypi registry does no ultranorm checking."""
         result = {
             "name": "cli", "registry": "npm", "status": "available",
             "variants": [], "github_count": 0,
         }
-        _apply_ultranorm_check(result, "npm", True, 200)
+        _apply_ultranorm_check(result, "npm", 200)
         assert "ultranorm_conflicts" not in result
-        assert "ultranorm_caveat" not in result
 
 
 class TestRetryVisibility:
@@ -876,7 +863,7 @@ class TestReasonField:
             return {"status": "available"}
         mock_pypi.side_effect = pypi_side_effect
 
-        _apply_ultranorm_check(result, "pypi", True, 200)
+        _apply_ultranorm_check(result, "pypi", 200)
         assert result["status"] == "taken"
         assert result["reason"] == "ultranorm"
         assert "cl1" in result["ultranorm_conflicts"]
@@ -1060,7 +1047,7 @@ class TestUltranormEarlyExit:
             "name": "test-pkg", "registry": "pypi", "status": "available",
             "variants": [], "github_count": 0,
         }
-        _apply_ultranorm_check(result, "pypi", True, 200)
+        _apply_ultranorm_check(result, "pypi", 200)
 
         assert mock_pypi.call_count == 1
         mock_pypi.assert_called_once_with("var1")
@@ -1079,7 +1066,7 @@ class TestUltranormEarlyExit:
             "name": "test-pkg", "registry": "pypi", "status": "available",
             "variants": [], "github_count": 0,
         }
-        _apply_ultranorm_check(result, "pypi", True, 200)
+        _apply_ultranorm_check(result, "pypi", 200)
 
         assert mock_pypi.call_count == 3
         assert "ultranorm_conflicts" not in result
@@ -1100,7 +1087,7 @@ class TestUltranormEarlyExit:
             "name": "test-pkg", "registry": "pypi", "status": "available",
             "variants": [], "github_count": 0,
         }
-        _apply_ultranorm_check(result, "pypi", True, 200)
+        _apply_ultranorm_check(result, "pypi", 200)
 
         # var1 available, var2 taken -> break, var3 never checked
         assert mock_pypi.call_count == 2
@@ -1118,7 +1105,7 @@ class TestUltranormEarlyExit:
             "name": "lllllll", "registry": "pypi", "status": "available",
             "variants": [], "github_count": 0,
         }
-        _apply_ultranorm_check(result, "pypi", True, 200)
+        _apply_ultranorm_check(result, "pypi", 200)
 
         assert result["status"] == "error"
         assert "capped at 64" in result["error"]
@@ -1130,37 +1117,24 @@ class TestUltranormEarlyExit:
 class TestPyPICaveats:
     """Tests for PyPI-specific caveats in _format_single_result output."""
 
-    def test_pypi_available_no_flag_shows_prohibited_note_and_tip(self):
-        """PyPI available without --ultranormalized-variants shows prohibited names note and tip."""
+    def test_pypi_available_shows_prohibited_note(self):
+        """PyPI available name shows prohibited names note."""
         result = {
             "name": "my-new-pkg", "registry": "pypi", "status": "available",
             "variants": [], "github_count": 0, "reason": None,
-        }
-        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            _format_single_result(result)
-        output = mock_stdout.getvalue()
-        assert "PyPI may reject names on its prohibited names list" in output
-        assert "--ultranormalized-variants" in output
-
-    def test_pypi_available_with_flag_shows_ultranorm_caveat_no_duplicate(self):
-        """PyPI available with --ultranormalized-variants shows ultranorm caveat, no duplicate."""
-        result = {
-            "name": "my-new-pkg", "registry": "pypi", "status": "available",
-            "variants": [], "github_count": 0, "reason": None,
-            "ultranorm_caveat": True,
         }
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             _format_single_result(result)
         output = mock_stdout.getvalue()
         assert "PyPI may also reject names on its prohibited names list" in output
-        # Should NOT contain the tip to use the flag (it was already used)
+        # No tip about a nonexistent flag
         assert "--ultranormalized-variants" not in output
-        # Should not print the prohibited names note twice
+        # Prohibited names note appears exactly once
         count = output.count("prohibited names list")
         assert count == 1
 
     def test_pypi_taken_no_caveats(self):
-        """PyPI taken name does not show prohibited names note or ultranorm tip."""
+        """PyPI taken name does not show prohibited names note."""
         result = {
             "name": "requests", "registry": "pypi", "status": "taken",
             "variants": [], "github_count": None, "reason": "registered",
@@ -1169,7 +1143,6 @@ class TestPyPICaveats:
             _format_single_result(result)
         output = mock_stdout.getvalue()
         assert "prohibited names list" not in output
-        assert "--ultranormalized-variants" not in output
 
     def test_npm_available_no_pypi_caveats(self):
         """npm available name does not show PyPI-specific caveats."""
@@ -1181,7 +1154,6 @@ class TestPyPICaveats:
             _format_single_result(result)
         output = mock_stdout.getvalue()
         assert "prohibited names list" not in output
-        assert "--ultranormalized-variants" not in output
 
 
 class TestStepsSummary:
@@ -1248,12 +1220,12 @@ class TestStepsSummary:
         checked_line = [l for l in output.split("\n") if l.startswith("Checked:")][0]
         assert checked_line == "Checked: npm"
 
-    def test_pypi_with_ultranorm_flag_summary(self):
-        """PyPI available with ultranorm flag includes ultranormalization."""
+    def test_pypi_always_includes_ultranormalization_summary(self):
+        """PyPI available always includes ultranormalization in steps summary."""
         result = {
             "name": "my-new-pkg", "registry": "pypi", "status": "available",
             "variants": [], "github_count": 0, "reason": None,
-            "ultranorm_caveat": True,
+            "ultranorm_checked": True,
         }
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             _format_single_result(result)
