@@ -2,6 +2,30 @@
 
 # Changelog
 
+## 0.76.0
+
+Split release.py into a package, ExemptionRegistry, path normalization, orphan messaging
+
+<details>
+<summary>Context</summary>
+
+The 1985-line release.py monolith was split into 6 modules with clean boundaries. 27 sys.exit calls converted to a proper exception hierarchy. The 24-parameter _run_release_mutating signature replaced with a ReleaseState dataclass. Changelog exemptions centralized into an ExemptionRegistry. Path normalization standardized on realpath. Orphan check messaging improved with entry context.
+
+</details>
+
+### Breaking
+
+- **Breaking.** Split `release.py` (1985 lines) into a 6-module `release/` package: `__init__.py` (orchestrator), `execute.py`, `validate.py`, `hooks.py`, `publish.py`, `rollback.py`. Replaced the 24-parameter `_run_release_mutating` signature with a `ReleaseState` dataclass. Converted 27 `sys.exit` calls to `ReleaseValidationError`/`HookError` exceptions.
+
+### Features
+
+- **New feature.** Centralized changelog exemption logic into `ExemptionRegistry` with ordered predicates and per-rule unit tests. Fixed batch exclusion hash matching (abbreviated hashes now resolve to full SHAs).
+
+### Fixes
+
+- **Bug fix.** Changelog orphan check now reports entry context (file, line, how many commits are valid) instead of bare hash errors. Detects partially stale entries where all commits are either unresolvable or out of range.
+- **Bug fix.** Standardized path normalization on `realpath` across root discovery, containment checks, and lint exclusion. Fixes potential mismatches when project directories are accessed through symlinks.
+
 ## 0.75.1
 
 Fix workspace test runner uv sync

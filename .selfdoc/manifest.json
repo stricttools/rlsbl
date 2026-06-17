@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.75.0",
+  "version": "0.75.1",
   "description": null,
   "language": "python",
   "base_url": "https://rlsbl.smmh.dev",
@@ -193,6 +193,11 @@
       "type": "doc"
     },
     {
+      "path": "rlsbl-changelog-exemptions.md",
+      "title": "rlsbl.changelog.exemptions",
+      "type": "doc"
+    },
+    {
       "path": "rlsbl-changelog-files.md",
       "title": "rlsbl.changelog.files",
       "type": "doc"
@@ -370,6 +375,31 @@
     {
       "path": "rlsbl-commands-record_gif.md",
       "title": "rlsbl.commands.record_gif",
+      "type": "doc"
+    },
+    {
+      "path": "rlsbl-commands-release-execute.md",
+      "title": "rlsbl.commands.release.execute",
+      "type": "doc"
+    },
+    {
+      "path": "rlsbl-commands-release-hooks.md",
+      "title": "rlsbl.commands.release.hooks",
+      "type": "doc"
+    },
+    {
+      "path": "rlsbl-commands-release-publish.md",
+      "title": "rlsbl.commands.release.publish",
+      "type": "doc"
+    },
+    {
+      "path": "rlsbl-commands-release-rollback.md",
+      "title": "rlsbl.commands.release.rollback",
+      "type": "doc"
+    },
+    {
+      "path": "rlsbl-commands-release-validate.md",
+      "title": "rlsbl.commands.release.validate",
       "type": "doc"
     },
     {
@@ -799,5 +829,5 @@
     }
   ],
   "posts": [],
-  "last_gen": "2026-06-17T13:29:32.902580+00:00"
+  "last_gen": "2026-06-17T15:57:08.622737+00:00"
 }
