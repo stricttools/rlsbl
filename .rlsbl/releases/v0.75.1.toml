@@ -1,0 +1,10 @@
+# Version bump type: patch, minor, or major
+bump = "patch"
+# Short description of this release (required)
+description = "Fix workspace test runner uv sync"
+# Optional context explaining why these changes were made
+context = "The workspace test runner was running uv sync per sub-project instead of once at the workspace root, breaking monorepos with cross-project dependencies."
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["npm", "pypi"]
+exclude = []
