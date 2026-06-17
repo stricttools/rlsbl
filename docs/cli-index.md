@@ -12,7 +12,7 @@ order: 91
 
 Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 32 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).
 
-Version: 0.74.0
+Version: 0.74.1
 
 ## Commands
 
@@ -20,6 +20,7 @@ Version: 0.74.0
 - [status](cli-status.html) -- Display the current project version, branch, last release tag, unreleased commit count, and changelog coverage. Outputs plain text by default or structured JSON with the --json flag.
 - [scaffold](cli-scaffold.html) -- Generate or update CI/CD workflows, git hooks, changelog, and license files. Safe to run repeatedly -- merges template changes with your customizations. Use --force to overwrite all files.
 - [check-name](cli-check-name.html) -- Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.
+- [claim-name](cli-claim-name.html) -- Claim a name on a package registry by publishing a minimal placeholder package. Runs check-name first, then publishes if available.
 - [discover](cli-discover.html) -- Search GitHub for repositories tagged with the rlsbl topic and list them. Use --mine to filter results to only your own repositories. Requires the gh CLI to be authenticated.
 - [watch](cli-watch.html) -- Poll GitHub Actions CI workflow runs for a specific commit SHA and report pass or fail status. Defaults to HEAD if no SHA is provided. Useful after rlsbl release to monitor the publish pipeline.
 - [pre-push-check](cli-pre-push-check.html) -- Verify that CHANGELOG.md contains an entry matching the current project version. Designed to run as a git pre-push hook to prevent pushing releases without documented changes.

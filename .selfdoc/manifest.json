@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.74.0",
+  "version": "0.74.1",
   "description": null,
   "language": "python",
   "base_url": "https://rlsbl.smmh.dev",
@@ -35,6 +35,11 @@
     {
       "path": "cli-check.md",
       "title": "rlsbl check",
+      "type": "doc"
+    },
+    {
+      "path": "cli-claim-name.md",
+      "title": "rlsbl claim-name",
       "type": "doc"
     },
     {
@@ -265,6 +270,11 @@
     {
       "path": "rlsbl-commands-check.md",
       "title": "rlsbl.commands.check",
+      "type": "doc"
+    },
+    {
+      "path": "rlsbl-commands-claim_name.md",
+      "title": "rlsbl.commands.claim_name",
       "type": "doc"
     },
     {
@@ -789,5 +799,5 @@
     }
   ],
   "posts": [],
-  "last_gen": "2026-06-17T04:16:05.279347+00:00"
+  "last_gen": "2026-06-17T06:55:45.978795+00:00"
 }

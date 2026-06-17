@@ -30,6 +30,7 @@ order: 90
 - [rlsbl.commands](rlsbl-commands.html)
 - [rlsbl.commands.changelog_cmd](rlsbl-commands-changelog_cmd.html)
 - [rlsbl.commands.check](rlsbl-commands-check.html)
+- [rlsbl.commands.claim_name](rlsbl-commands-claim_name.html)
 - [rlsbl.commands.commit_cmd](rlsbl-commands-commit_cmd.html)
 - [rlsbl.commands.deploy_cmd](rlsbl-commands-deploy_cmd.html)
 - [rlsbl.commands.dev](rlsbl-commands-dev.html)
