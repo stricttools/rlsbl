@@ -9,23 +9,23 @@ import pytest
 from rlsbl.commands.monorepo import _cmd_init, _cmd_add
 from rlsbl.commands.unreleased import (
     _get_commits_since,
-    _get_last_tag,
     run_cmd,
 )
+from rlsbl.utils import get_last_version_tag
 
 
 class TestGetLastTag:
-    """Tests for _get_last_tag."""
+    """Tests for get_last_version_tag (consolidated from _get_last_tag)."""
 
     def test_returns_tag_when_exists(self, mock_git_repo):
         subprocess.run(
             ["git", "tag", "v1.0.0"],
             cwd=str(mock_git_repo), check=True,
         )
-        assert _get_last_tag() == "v1.0.0"
+        assert get_last_version_tag() == "v1.0.0"
 
     def test_returns_none_when_no_tags(self, mock_git_repo):
-        assert _get_last_tag() is None
+        assert get_last_version_tag() is None
 
     def test_returns_latest_tag(self, mock_git_repo):
         subprocess.run(["git", "tag", "v1.0.0"], cwd=str(mock_git_repo), check=True)
@@ -37,7 +37,7 @@ class TestGetLastTag:
             cwd=str(mock_git_repo), check=True,
         )
         subprocess.run(["git", "tag", "v1.1.0"], cwd=str(mock_git_repo), check=True)
-        assert _get_last_tag() == "v1.1.0"
+        assert get_last_version_tag() == "v1.1.0"
 
 
 class TestGetCommitsSince:
@@ -134,25 +134,24 @@ def _commit_file(repo, name, content="x\n", message="change"):
 
 
 class TestGetLastTagWithGlob:
-    """Tests for _get_last_tag with tag_glob parameter."""
+    """Tests for get_last_version_tag with tag_glob parameter."""
 
     def test_tag_glob_filters_tags(self, mock_git_repo):
         """With tag_glob, only matching tags are returned."""
         subprocess.run(["git", "tag", "alpha@v1.0.0"], cwd=str(mock_git_repo), check=True)
         subprocess.run(["git", "tag", "beta@v2.0.0"], cwd=str(mock_git_repo), check=True)
-        assert _get_last_tag(tag_glob="alpha@v*") == "alpha@v1.0.0"
-        assert _get_last_tag(tag_glob="beta@v*") == "beta@v2.0.0"
+        assert get_last_version_tag(tag_glob="alpha@v*") == "alpha@v1.0.0"
+        assert get_last_version_tag(tag_glob="beta@v*") == "beta@v2.0.0"
 
     def test_tag_glob_no_match(self, mock_git_repo):
         """When no tags match the glob, returns None."""
         subprocess.run(["git", "tag", "v1.0.0"], cwd=str(mock_git_repo), check=True)
-        assert _get_last_tag(tag_glob="nonexistent@v*") is None
+        assert get_last_version_tag(tag_glob="nonexistent@v*") is None
 
-    def test_no_tag_glob_returns_any(self, mock_git_repo):
-        """Without tag_glob, returns the most recent tag regardless of format."""
+    def test_no_tag_glob_returns_v_star(self, mock_git_repo):
+        """Without tag_glob, defaults to 'v*' and returns matching version tags."""
         subprocess.run(["git", "tag", "v1.0.0"], cwd=str(mock_git_repo), check=True)
-        assert _get_last_tag() == "v1.0.0"
-        assert _get_last_tag(tag_glob=None) == "v1.0.0"
+        assert get_last_version_tag() == "v1.0.0"
 
 
 class TestUnreleasedMonorepo:

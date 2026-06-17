@@ -2,7 +2,7 @@
 
 Covers:
 - Detached HEAD behavior for get_current_branch()
-- Shallow clone behavior for _get_last_version_tag()
+- Shallow clone behavior for get_last_version_tag()
 - Push timeout propagation for push_if_needed()
 - Signal handling (KeyboardInterrupt) during release, verifying lock cleanup
 """
@@ -15,8 +15,7 @@ import pytest
 import rlsbl.lock
 from rlsbl.errors import GitError
 from rlsbl.lock import release_lock
-from rlsbl.utils import get_current_branch, push_if_needed
-from rlsbl.changelog.validate import _get_last_version_tag
+from rlsbl.utils import get_current_branch, get_last_version_tag, push_if_needed
 
 
 class TestDetachedHead:
@@ -72,25 +71,19 @@ class TestDetachedHead:
 
 
 class TestShallowClone:
-    """9.2: _get_last_version_tag() in a shallow clone.
+    """9.2: get_last_version_tag() in a shallow clone.
 
     CI environments often use ``git clone --depth 1``, which strips history
     and makes ``git describe --tags`` fail because the tag's commit is not
     reachable from the shallow history.
 
-    Source behavior: _get_last_version_tag() catches subprocess errors and
-    returns None when git describe fails. This means shallow clones silently
-    behave as if no version tags exist, which causes _unreleased_range() to
-    return "HEAD" (all commits) instead of the correct range.
-
-    Verdict: the edge case IS handled (returns None gracefully) but the
-    consequence is silent incorrect behavior -- the unreleased range
-    expands to all commits rather than producing a clear error about
-    shallow clone limitations.
+    The consolidated get_last_version_tag() detects shallow clones and
+    raises GitError with a clear message, rather than silently returning
+    None (which would cause _unreleased_range() to expand to all commits).
     """
 
-    def test_shallow_clone_tag_not_found(self, tmp_path):
-        """In a shallow clone, _get_last_version_tag() returns None."""
+    def test_shallow_clone_raises_git_error(self, tmp_path):
+        """In a shallow clone, get_last_version_tag() raises GitError."""
         # Create a source repo with a tag
         source = tmp_path / "source"
         source.mkdir()
@@ -118,31 +111,28 @@ class TestShallowClone:
             capture_output=True,
         )
 
-        # Verify the clone is actually shallow (no tags fetched)
-        tag_result = subprocess.run(
-            ["git", "tag", "-l"],
+        # Verify the clone is actually shallow
+        shallow_result = subprocess.run(
+            ["git", "rev-parse", "--is-shallow-repository"],
             cwd=str(clone),
             capture_output=True,
             text=True,
         )
-        assert tag_result.stdout.strip() == "", (
-            "shallow clone should have no tags"
+        assert shallow_result.stdout.strip() == "true", (
+            "clone should be shallow"
         )
 
-        # Run _get_last_version_tag inside the shallow clone
         import os
         old_cwd = os.getcwd()
         try:
             os.chdir(str(clone))
-            result = _get_last_version_tag()
+            with pytest.raises(GitError, match="Shallow clone detected"):
+                get_last_version_tag()
         finally:
             os.chdir(old_cwd)
 
-        # The tag is not reachable in the shallow clone, so returns None
-        assert result is None
-
     def test_full_clone_tag_found(self, tmp_path):
-        """Contrast: in a full clone, _get_last_version_tag() finds the tag."""
+        """In a full clone, get_last_version_tag() finds the tag."""
         repo = tmp_path / "repo"
         repo.mkdir()
         subprocess.run(["git", "init", "-q", "-b", "main"], cwd=str(repo), check=True)
@@ -158,11 +148,16 @@ class TestShallowClone:
         old_cwd = os.getcwd()
         try:
             os.chdir(str(repo))
-            result = _get_last_version_tag()
+            result = get_last_version_tag()
         finally:
             os.chdir(old_cwd)
 
         assert result == "v1.0.0"
+
+    def test_no_tags_not_shallow_returns_none(self, mock_git_repo):
+        """Genuine first release: no tags, not shallow, returns None."""
+        result = get_last_version_tag()
+        assert result is None
 
 
 class TestPushTimeout:

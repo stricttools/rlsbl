@@ -7,26 +7,8 @@ import sys
 from ..changelog import changes_dir_exists, get_changes_dir, read_unreleased, resolve_hashes
 from ..git_util import filter_commits_for_project
 from ..targets import TARGETS, detect_targets
+from ..utils import get_last_version_tag
 from ..workspace import find_workspace_root, load_workspace, resolve_project
-
-
-def _get_last_tag(tag_glob=None):
-    """Get the most recent tag. Returns None if no tags exist.
-
-    When tag_glob is set (monorepo mode), only tags matching the glob
-    are considered, so each project resolves its own last release tag.
-    """
-    try:
-        cmd = ["git", "describe", "--tags", "--abbrev=0"]
-        if tag_glob:
-            cmd.extend(["--match", tag_glob])
-        result = subprocess.run(
-            cmd,
-            capture_output=True, text=True, check=True, timeout=10,
-        )
-        return result.stdout.strip()
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
-        return None
 
 
 def _get_commits_since(tag):
@@ -93,7 +75,7 @@ def run_cmd(registry, args, flags, project_root):
     except Exception:
         pass
 
-    tag = _get_last_tag(tag_glob=tag_glob)
+    tag = get_last_version_tag(tag_glob) if tag_glob else get_last_version_tag()
     commits = _get_commits_since(tag)
 
     # In monorepo mode, filter to commits touching this project's files

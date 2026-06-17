@@ -19,7 +19,7 @@ from .schema import ChangelogEntry, parse_jsonl, validate_schema
 from ..config import get_changelog_validation_config
 from ..git_util import filter_commits_for_project
 from ..errors import ChangelogError
-from ..utils import commit_files_if_changed
+from ..utils import commit_files_if_changed, get_last_version_tag
 
 
 # Defaults applied when batch_limits keys are absent or malformed.
@@ -87,27 +87,12 @@ def _git_log_hashes(range_spec: str) -> list[str]:
 
 
 def _get_last_version_tag(tag_glob: str | None = None) -> str | None:
-    """Get the most recent version tag (e.g., v0.25.2).
+    """Backward-compatible wrapper around get_last_version_tag from utils.
 
-    When tag_glob is set (monorepo mode), uses it directly as the
-    ``--match`` pattern (e.g. ``mylib@v*`` or ``go/v*``).
-
-    Returns the tag string or None if no version tags exist.
+    Accepts None for tag_glob (defaulting to "v*") to preserve the old call
+    signature used by _unreleased_range and external callers like status.py.
     """
-    match_pattern = tag_glob if tag_glob else "v*"
-    try:
-        result = subprocess.run(
-            ["git", "describe", "--tags", "--abbrev=0", "--match", match_pattern],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        if result.returncode != 0:
-            return None
-        tag = result.stdout.strip()
-        return tag if tag else None
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
-        return None
+    return get_last_version_tag(tag_glob if tag_glob else "v*")
 
 
 def _unreleased_range(tag_glob: str | None = None) -> str:
