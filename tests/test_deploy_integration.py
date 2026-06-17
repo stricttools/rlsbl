@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
+from rlsbl.commands.release.execute import ReleaseState
 from rlsbl.context import ProjectContext
 from rlsbl.deploy import DeployResult
 
@@ -87,9 +88,9 @@ class TestReleaseWithDeployTargets:
         monkeypatch.setattr("rlsbl.commands.release.extract_changelog_entry", lambda *a, **kw: "- Fixed a bug")
         monkeypatch.setattr("rlsbl.commands.release.get_changes_dir", lambda *a, **kw: ".rlsbl/changes")
 
-        _run_release_mutating(
+        _run_release_mutating(ReleaseState(
             registry="npm",
-            reg=type("FakeReg", (), {
+            target=type("FakeTarget", (), {
                 "version_file": lambda self, dir_path=None: None,
                 "write_version": lambda self, p, v, ctx=None: [],
                 "build": lambda self, p, v: None,
@@ -104,12 +105,8 @@ class TestReleaseWithDeployTargets:
             tag="v1.0.1",
             branch="main",
             changelog_entry="- Fixed a bug",
-            target=type("FakeTarget", (), {
-                "tag_format": lambda self, v: f"v{v}",
-                "build": lambda self, p, v: None,
-            })(),
             ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False, "pipelines": {}, "deploy": deploy_targets}),
-        )
+        ))
 
         assert len(deploy_calls) == 1
         assert deploy_calls[0] == ("prod", "main")
@@ -181,9 +178,9 @@ class TestReleaseDeployFailureContinues:
         monkeypatch.setattr("rlsbl.commands.release.get_changes_dir", lambda *a, **kw: ".rlsbl/changes")
 
         # Should NOT raise -- deploy failure is non-fatal
-        _run_release_mutating(
+        _run_release_mutating(ReleaseState(
             registry="npm",
-            reg=type("FakeReg", (), {
+            target=type("FakeTarget", (), {
                 "version_file": lambda self, dir_path=None: None,
                 "write_version": lambda self, p, v, ctx=None: [],
                 "build": lambda self, p, v: None,
@@ -198,12 +195,8 @@ class TestReleaseDeployFailureContinues:
             tag="v1.0.1",
             branch="main",
             changelog_entry="- Fixed a bug",
-            target=type("FakeTarget", (), {
-                "tag_format": lambda self, v: f"v{v}",
-                "build": lambda self, p, v: None,
-            })(),
             ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False, "pipelines": {}, "deploy": deploy_targets}),
-        )
+        ))
 
         captured = capsys.readouterr()
         assert "FAILED" in captured.err
@@ -250,9 +243,9 @@ class TestReleaseNoDeployConfig:
         monkeypatch.setattr("rlsbl.commands.release.extract_changelog_entry", lambda *a, **kw: "- Fixed a bug")
         monkeypatch.setattr("rlsbl.commands.release.get_changes_dir", lambda *a, **kw: ".rlsbl/changes")
 
-        _run_release_mutating(
+        _run_release_mutating(ReleaseState(
             registry="npm",
-            reg=type("FakeReg", (), {
+            target=type("FakeTarget", (), {
                 "version_file": lambda self, dir_path=None: None,
                 "write_version": lambda self, p, v, ctx=None: [],
                 "build": lambda self, p, v: None,
@@ -267,12 +260,8 @@ class TestReleaseNoDeployConfig:
             tag="v1.0.1",
             branch="main",
             changelog_entry="- Fixed a bug",
-            target=type("FakeTarget", (), {
-                "tag_format": lambda self, v: f"v{v}",
-                "build": lambda self, p, v: None,
-            })(),
             ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False, "pipelines": {}}),
-        )
+        ))
 
         # deploy_target should never have been called
         assert len(deploy_calls) == 0
@@ -320,9 +309,9 @@ class TestReleaseDeployConfigErrors:
         monkeypatch.setattr("rlsbl.commands.release.extract_changelog_entry", lambda *a, **kw: "- Fixed a bug")
         monkeypatch.setattr("rlsbl.commands.release.get_changes_dir", lambda *a, **kw: ".rlsbl/changes")
 
-        _run_release_mutating(
+        _run_release_mutating(ReleaseState(
             registry="npm",
-            reg=type("FakeReg", (), {
+            target=type("FakeTarget", (), {
                 "version_file": lambda self, dir_path=None: None,
                 "write_version": lambda self, p, v, ctx=None: [],
                 "build": lambda self, p, v: None,
@@ -337,12 +326,8 @@ class TestReleaseDeployConfigErrors:
             tag="v1.0.1",
             branch="main",
             changelog_entry="- Fixed a bug",
-            target=type("FakeTarget", (), {
-                "tag_format": lambda self, v: f"v{v}",
-                "build": lambda self, p, v: None,
-            })(),
             ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False, "pipelines": {}, "deploy": deploy_targets}),
-        )
+        ))
 
         # deploy_target should never have been called (config has errors)
         assert len(deploy_calls) == 0
@@ -393,9 +378,9 @@ class TestReleaseStopsAtFirstDeployFailure:
         monkeypatch.setattr("rlsbl.commands.release.extract_changelog_entry", lambda *a, **kw: "- Fixed a bug")
         monkeypatch.setattr("rlsbl.commands.release.get_changes_dir", lambda *a, **kw: ".rlsbl/changes")
 
-        _run_release_mutating(
+        _run_release_mutating(ReleaseState(
             registry="npm",
-            reg=type("FakeReg", (), {
+            target=type("FakeTarget", (), {
                 "version_file": lambda self, dir_path=None: None,
                 "write_version": lambda self, p, v, ctx=None: [],
                 "build": lambda self, p, v: None,
@@ -410,12 +395,8 @@ class TestReleaseStopsAtFirstDeployFailure:
             tag="v1.0.1",
             branch="main",
             changelog_entry="- Fixed a bug",
-            target=type("FakeTarget", (), {
-                "tag_format": lambda self, v: f"v{v}",
-                "build": lambda self, p, v: None,
-            })(),
             ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False, "pipelines": {}, "deploy": deploy_targets}),
-        )
+        ))
 
         # Only staging was attempted; prod was NOT attempted
         assert deploy_calls == ["staging"]

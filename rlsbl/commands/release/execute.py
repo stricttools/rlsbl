@@ -1,5 +1,6 @@
 """Release execution: version bump, commit, tag, push, GitHub Release, and post-release steps."""
 
+import dataclasses
 import json
 import os
 import sys
@@ -250,22 +251,76 @@ def archive_blog_body(project_dir, version):
     return None
 
 
-def _run_release_mutating(registry, reg, flags, quiet, log, new_version, current_version,
-                          bump_type, tag, branch, changelog_entry, target, *,
-                          secondary_targets=None, monorepo_name=None,
-                          monorepo_project_path=None,
-                          commit_msg=None,
-                          primary_path=None, target_paths=None,
-                          lock_dir=".rlsbl",
-                          pre_existing_dirty=None,
-                          hook_generated=None,
-                          description="",
-                          context="",
-                          ctx):
-    """Inner release logic that runs under the advisory lock (mutating phase).
+@dataclasses.dataclass
+class ReleaseState:
+    """All state needed by _run_release_mutating, grouped logically."""
 
-    ctx: ProjectContext carrying project_root, monorepo_root, and config.
-    """
+    # Identity
+    registry: str
+    target: object  # TARGETS[registry] instance -- replaces both 'reg' and 'target' params
+    new_version: str
+    current_version: str
+    bump_type: str | None
+    tag: str
+    branch: str
+
+    # Paths
+    primary_path: str | None = None
+    target_paths: dict | None = None
+    lock_dir: str = ".rlsbl"
+
+    # Monorepo
+    monorepo_name: str | None = None
+    monorepo_project_path: str | None = None
+
+    # Metadata
+    changelog_entry: str | None = None
+    commit_msg: str | None = None
+    description: str = ""
+    context: str = ""
+
+    # State
+    pre_existing_dirty: set | None = None
+    hook_generated: set | None = None
+    secondary_targets: dict | None = None
+
+    # Control
+    flags: dict = dataclasses.field(default_factory=dict)
+    quiet: bool = False
+    log: object = None  # callable
+    ctx: object = None  # ProjectContext
+
+
+def _run_release_mutating(state: ReleaseState):
+    """Inner release logic that runs under the advisory lock (mutating phase)."""
+    # Unpack frequently-used state into locals for readability and to preserve
+    # the existing closure/reference patterns (commit_msg, primary_path, and
+    # target_paths are conditionally reassigned below).
+    registry = state.registry
+    target = state.target
+    reg = state.target  # 'reg' and 'target' were always the same object
+    flags = state.flags
+    quiet = state.quiet
+    log = state.log
+    new_version = state.new_version
+    current_version = state.current_version
+    bump_type = state.bump_type
+    tag = state.tag
+    branch = state.branch
+    changelog_entry = state.changelog_entry
+    secondary_targets = state.secondary_targets
+    monorepo_name = state.monorepo_name
+    monorepo_project_path = state.monorepo_project_path
+    commit_msg = state.commit_msg
+    primary_path = state.primary_path
+    target_paths = state.target_paths
+    lock_dir = state.lock_dir
+    pre_existing_dirty = state.pre_existing_dirty
+    hook_generated = state.hook_generated
+    description = state.description
+    context = state.context
+    ctx = state.ctx
+
     # Late-bound imports from the package namespace for mock.patch compatibility.
     # All rlsbl-internal names are resolved through __init__.py so that
     # mock.patch("rlsbl.commands.release.X") is picked up at call time.

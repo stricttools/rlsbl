@@ -63,6 +63,7 @@ from .execute import (
     _bump_selfdoc_version,
     _rel_to_git_root,
     ReleaseAbortError,
+    ReleaseState,
     resolve_target_paths,
     resolve_release_targets,
     _refresh_selfdoc_hashes,
@@ -277,22 +278,31 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         )
 
     try:
-        _run_release_mutating(
-            registry, TARGETS[registry], flags, quiet, log, new_version,
-            current_version, bump_type, tag, branch, changelog_entry, target,
-            secondary_targets=secondary_targets,
-            monorepo_name=monorepo_name,
-            monorepo_project_path=monorepo_project_path,
-            commit_msg=commit_msg,
+        _run_release_mutating(ReleaseState(
+            registry=registry,
+            target=TARGETS[registry],
+            new_version=new_version,
+            current_version=current_version,
+            bump_type=bump_type,
+            tag=tag,
+            branch=branch,
             primary_path=primary_path,
             target_paths=target_paths,
             lock_dir=lock_dir,
-            pre_existing_dirty=pre_existing_dirty,
-            hook_generated=hook_generated,
+            monorepo_name=monorepo_name,
+            monorepo_project_path=monorepo_project_path,
+            changelog_entry=changelog_entry,
+            commit_msg=commit_msg,
             description=release_config.description,
             context=release_config.context,
+            pre_existing_dirty=pre_existing_dirty,
+            hook_generated=hook_generated,
+            secondary_targets=secondary_targets,
+            flags=flags,
+            quiet=quiet,
+            log=log,
             ctx=ctx,
-        )
+        ))
     except ReleaseAbortError:
         sys.exit(1)
     except (KeyboardInterrupt, SystemExit):
