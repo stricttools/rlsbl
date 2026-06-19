@@ -107,7 +107,7 @@ class TestCheckTargetsConsistencyWithCode:
         workspace_checks = {
             "workspace-ci-router", "workspace-ci-synced",
             "workspace-targets", "workspace-unregistered",
-            "workspace-stale-entries", "dev-node-boundary",
+            "workspace-stale-entries", "dev-only-boundary",
             "layers-violations", "deps-stale",
         }
         for name in workspace_checks:

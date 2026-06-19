@@ -1759,8 +1759,8 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         shared_mappings = reg.shared_template_mappings(ctx)
         shared_mappings = _append_deploy_workflow_if_configured(shared_mappings, ctx.config)
 
-        # Dev node projects skip changelog infrastructure
-        if _is_dev_node_project(project_root):
+        # Non-releasable projects skip changelog infrastructure
+        if _is_non_releasable_project(project_root):
             shared_mappings = [
                 m for m in shared_mappings
                 if m["target"] not in ("CHANGELOG.md", ".rlsbl/changes/unreleased.jsonl")

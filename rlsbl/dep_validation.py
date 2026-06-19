@@ -23,7 +23,7 @@ from .import_scanners import (
 )
 from .lint.go_ast import scan_imports as _go_scan_imports
 from .lint.utils import walk_source_files
-from .workspace import WORKSPACE_DIR
+from .workspace import WORKSPACE_DIR, project_is_dev_only as _is_dev_only
 
 # Root-level directories containing standalone executables (not importable modules).
 # Files here are excluded from the dead-module candidate set.
@@ -1149,7 +1149,7 @@ def find_dead_workspace_packages(
         name = proj["name"]
 
         # Skip dev-only projects -- excluded from most checks
-        if proj.dev_only:
+        if _is_dev_only(proj):
             continue
 
         # Skip non-library projects (apps, CLIs) -- they are entry points

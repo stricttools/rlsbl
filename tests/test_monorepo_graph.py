@@ -416,7 +416,7 @@ class TestRawFacts:
 
         for name in ("core", "utils"):
             pkg = data["packages"][name]
-            assert "dev_node" in pkg
+            assert "dev_only" in pkg
             assert "library" in pkg
             assert "has_runtime_dependents" in pkg
             assert "is_leaf" in pkg
@@ -513,8 +513,8 @@ class TestRawFacts:
         captured = capsys.readouterr()
         data = json.loads(captured.out)
 
-        assert data["packages"]["devtool"]["dev_node"] is True
-        assert data["packages"]["main"]["dev_node"] is False
+        assert data["packages"]["devtool"]["dev_only"] is True
+        assert data["packages"]["main"]["dev_only"] is False
 
     def test_library_flag(self, mock_git_repo, capsys):
         """library flag from project config is reflected in output."""

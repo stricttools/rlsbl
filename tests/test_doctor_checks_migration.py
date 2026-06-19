@@ -49,7 +49,7 @@ EXPECTED_CHECKS = [
     "workspace-targets",
     "workspace-unregistered",
     "workspace-stale-entries",
-    "dev-node-boundary",
+    "dev-only-boundary",
     # Layer checks
     "layers-violations",
     # Dependency validation checks
@@ -392,7 +392,7 @@ class TestCheckTagFiltering:
         assert "workspace-targets" in result.stdout
         assert "workspace-unregistered" in result.stdout
         assert "workspace-stale-entries" in result.stdout
-        assert "dev-node-boundary" in result.stdout
+        assert "dev-only-boundary" in result.stdout
 
 
 # ---------------------------------------------------------------------------
@@ -418,7 +418,7 @@ class TestNewCheckDependencies:
         for name in [
             "workspace-ci-router", "workspace-ci-synced",
             "workspace-targets", "workspace-unregistered",
-            "workspace-stale-entries", "dev-node-boundary",
+            "workspace-stale-entries", "dev-only-boundary",
         ]:
             assert app._check_defs[name].depends_on == []
 

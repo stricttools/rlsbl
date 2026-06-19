@@ -515,7 +515,7 @@ class TestBatchReleaseDevNode:
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
         assert "internal" in captured.err
-        assert "dev_node projects cannot be in batch release" in captured.err
+        assert "non-releasable projects cannot be in batch release" in captured.err
 
     def test_batch_without_dev_nodes_succeeds(self, mock_git_repo, capsys):
         """Batch release with only non-dev-node projects succeeds."""

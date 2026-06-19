@@ -124,7 +124,7 @@ class TestBoundaryGuardrail:
             {"path": "proj-b", "name": "proj-b", "dev_node": True},
         ])
         checks = _register_and_get_checks()
-        result = checks["dev-node-boundary"](ctx)
+        result = checks["dev-only-boundary"](ctx)
 
         assert result.status == "fail"
         assert "proj-a" in result.details[0]
@@ -137,7 +137,7 @@ class TestBoundaryGuardrail:
             {"path": "proj-b", "name": "proj-b", "dev_node": True},
         ])
         checks = _register_and_get_checks()
-        result = checks["dev-node-boundary"](ctx)
+        result = checks["dev-only-boundary"](ctx)
 
         assert result.status == "pass"
 
@@ -148,7 +148,7 @@ class TestBoundaryGuardrail:
             {"path": "proj-b", "name": "proj-b", "dev_node": True},
         ])
         checks = _register_and_get_checks()
-        result = checks["dev-node-boundary"](ctx)
+        result = checks["dev-only-boundary"](ctx)
 
         assert result.status == "pass"
 
@@ -163,7 +163,7 @@ class TestBoundaryGuardrail:
             {"path": "proj-c", "name": "proj-c", "dev_node": True},
         ])
         checks = _register_and_get_checks()
-        result = checks["dev-node-boundary"](ctx)
+        result = checks["dev-only-boundary"](ctx)
 
         assert result.status == "fail"
         # Should mention proj-a (the non-dev-node project that transitively

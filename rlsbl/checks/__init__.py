@@ -71,7 +71,7 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "workspace-targets": "workspace",
     "workspace-unregistered": "workspace",
     "workspace-stale-entries": "workspace",
-    "dev-node-boundary": "workspace",
+    "dev-only-boundary": "workspace",
     "layers-violations": "workspace",
     "deps-stale": "workspace",
     "dead-workspace-packages": "workspace",

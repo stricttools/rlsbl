@@ -4,10 +4,10 @@ Bug 1: when running `rlsbl scaffold --target plain` in a monorepo sub-project,
 `detect_registries()` returns empty (PlainTarget.detect() always returns
 False), so cmd_scaffold falls through to `find_project_root()` which walks
 up and finds the monorepo root. The scaffold_root is then the monorepo root
-instead of cwd, causing `_is_dev_node_project()` to fail (it can't resolve
-the project from the wrong root). This means changelog infrastructure
-(unreleased.jsonl, CHANGELOG.md) gets created for dev_node projects that
-should not have it.
+instead of cwd, causing `_is_non_releasable_project()` to fail (it can't
+resolve the project from the wrong root). This means changelog infrastructure
+(unreleased.jsonl, CHANGELOG.md) gets created for non-releasable projects
+that should not have it.
 
 Fix 1: when --target is explicitly passed, always use Path.cwd() as
 scaffold_root.
@@ -28,7 +28,7 @@ from unittest.mock import patch
 
 import pytest
 
-from rlsbl.commands.init_cmd import run_cmd, _is_dev_node_project
+from rlsbl.commands.init_cmd import run_cmd, _is_non_releasable_project
 from rlsbl.context import ProjectContext, create_context
 from conftest import make_workspace
 
@@ -51,25 +51,25 @@ class TestScaffoldPlainDevNode:
 
         return proj_dir
 
-    def test_is_dev_node_with_correct_root(self, mock_git_repo, monkeypatch):
-        """_is_dev_node_project returns True when project_root points to the
-        sub-project directory (the fixed behavior)."""
+    def test_is_non_releasable_with_correct_root(self, mock_git_repo, monkeypatch):
+        """_is_non_releasable_project returns True when project_root points to
+        the sub-project directory (the fixed behavior)."""
         proj_dir = self._setup_monorepo_with_dev_node(mock_git_repo)
         monkeypatch.chdir(proj_dir)
 
-        # With project_root = sub-project dir (correct), dev_node is detected
-        assert _is_dev_node_project(proj_dir) is True
+        # With project_root = sub-project dir (correct), non-releasable is detected
+        assert _is_non_releasable_project(proj_dir) is True
 
-    def test_is_dev_node_with_wrong_root(self, mock_git_repo, monkeypatch):
-        """_is_dev_node_project returns False when project_root points to the
-        monorepo root (the buggy behavior)."""
+    def test_is_non_releasable_with_wrong_root(self, mock_git_repo, monkeypatch):
+        """_is_non_releasable_project returns False when project_root points to
+        the monorepo root (the buggy behavior)."""
         proj_dir = self._setup_monorepo_with_dev_node(mock_git_repo)
         monkeypatch.chdir(proj_dir)
 
-        # With project_root = monorepo root (wrong), dev_node is NOT detected
-        # because resolve_project(ws_root, monorepo_root) can't match the
-        # sub-project
-        assert _is_dev_node_project(mock_git_repo) is False
+        # With project_root = monorepo root (wrong), non-releasable is NOT
+        # detected because resolve_project(ws_root, monorepo_root) can't
+        # match the sub-project
+        assert _is_non_releasable_project(mock_git_repo) is False
 
     def test_scaffold_plain_dev_node_no_changelog(self, mock_git_repo, monkeypatch):
         """Scaffolding a plain dev_node project must NOT create changelog files."""

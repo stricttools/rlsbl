@@ -8,6 +8,8 @@ import os
 
 from strictcli import CheckResult
 
+from ..workspace import project_is_releasable
+
 
 def register_prepush_checks(app):
     """Register prepush-tag checks on *app*."""
@@ -51,7 +53,7 @@ def register_prepush_checks(app):
 
             failures = []
             for proj in affected:
-                if not proj.is_releasable:
+                if not project_is_releasable(proj):
                     continue
                 proj_dir = os.path.join(ws_root, proj["path"])
                 if not changes_dir_exists(proj_dir):

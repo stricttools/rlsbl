@@ -132,7 +132,7 @@ class TestDevNodeProjectChecks:
         # Run changelog-user-facing check
         result = registered_checks["changelog-user-facing"](ctx)
         assert result.status == "skip"
-        assert "dev node" in result.message
+        assert "non-releasable" in result.message
 
     def test_dev_node_project_skips_coverage_check(self, dev_node_monorepo):
         """Changelog-coverage check returns skip for dev node projects."""
@@ -173,7 +173,7 @@ class TestDevNodeProjectChecks:
 
         result = registered_checks["changelog-coverage"](ctx)
         assert result.status == "skip"
-        assert "dev node" in result.message
+        assert "non-releasable" in result.message
 
     def test_regular_project_not_skipped(self, dev_node_monorepo):
         """Changelog checks are NOT skipped for regular (non-dev-node) projects."""
@@ -213,11 +213,11 @@ class TestDevNodeProjectChecks:
 
         # Coverage check should NOT skip for regular project
         result = registered_checks["changelog-coverage"](ctx)
-        assert result.status != "skip" or "dev node" not in result.message
+        assert result.status != "skip" or "non-releasable" not in result.message
 
         # User-facing check should NOT skip for regular project
         result = registered_checks["changelog-user-facing"](ctx)
-        assert result.status != "skip" or "dev node" not in result.message
+        assert result.status != "skip" or "non-releasable" not in result.message
 
 
 class TestDevNodeChangelogAdd:
@@ -284,7 +284,7 @@ class TestDevNodeReleaseBlocked:
             assert exc_info.value.code == 1
 
         captured = capsys.readouterr()
-        assert "dev_node projects cannot be released" in captured.err
+        assert "non-releasable projects cannot be released" in captured.err
 
 
 class TestDevNodeReleaseBlockedRegardlessOfConfig:
@@ -324,7 +324,7 @@ class TestDevNodeReleaseBlockedRegardlessOfConfig:
             assert exc_info.value.code == 1
 
         captured = capsys.readouterr()
-        assert "dev_node projects cannot be released" in captured.err
+        assert "non-releasable projects cannot be released" in captured.err
 
     def test_dev_node_release_body_includes_context(self, dev_node_monorepo, capsys):
         """Release run on a dev_node project hard-errors even with description and context."""
@@ -365,7 +365,7 @@ class TestDevNodeReleaseBlockedRegardlessOfConfig:
             assert exc_info.value.code == 1
 
         captured = capsys.readouterr()
-        assert "dev_node projects cannot be released" in captured.err
+        assert "non-releasable projects cannot be released" in captured.err
 
 
 class TestReleaseEditDevNode:
@@ -384,4 +384,4 @@ class TestReleaseEditDevNode:
             assert exc_info.value.code == 1
 
         captured = capsys.readouterr()
-        assert "dev_node projects cannot be released and have no release to edit" in captured.err
+        assert "non-releasable projects cannot be released and have no release to edit" in captured.err

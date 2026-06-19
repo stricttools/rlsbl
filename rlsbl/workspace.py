@@ -157,6 +157,23 @@ class WorkspaceProject:
         return self._data
 
 
+def project_is_dev_only(proj) -> bool:
+    """Check if a project is dev_only (works with WorkspaceProject or dict)."""
+    if isinstance(proj, WorkspaceProject):
+        return proj.dev_only
+    return bool(proj.get("dev_only", False) or proj.get("dev_node", False))
+
+
+def project_is_releasable(proj) -> bool:
+    """Check if a project is releasable (works with WorkspaceProject or dict)."""
+    if isinstance(proj, WorkspaceProject):
+        return proj.is_releasable
+    # For raw dicts: mirror the WorkspaceProject logic
+    if proj.get("dev_node", False):
+        return False
+    return proj.get("releasable") is not False
+
+
 def find_workspace_root(start_path="."):
     """Walk up from start_path looking for a .rlsbl-monorepo/workspace.toml.
 

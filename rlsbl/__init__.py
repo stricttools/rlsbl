@@ -347,7 +347,7 @@ def cmd_scaffold(target, force, private, no_commit, skip_shared, no_tag, dry_run
     # When --target is explicitly passed (e.g., --target plain), always use
     # cwd -- the user is declaring what to scaffold and where. Without this,
     # plain-target projects (whose detect() always returns False) would walk
-    # up to the monorepo root, causing _is_dev_node_project() to fail.
+    # up to the monorepo root, causing _is_non_releasable_project() to fail.
     from .utils import find_project_root
     cwd_has_project = bool(detect_registries())
     # Already-scaffolded projects (e.g. plain targets whose detect() returns

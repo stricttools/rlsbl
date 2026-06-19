@@ -5,7 +5,7 @@ import os
 from datetime import datetime, timezone
 
 from .targets import detect_targets, TARGETS
-from .workspace import WORKSPACE_DIR, WorkspaceProject, members_of
+from .workspace import WORKSPACE_DIR, WorkspaceProject, members_of, project_is_dev_only, project_is_releasable
 
 
 SNAPSHOT_FILE = "snapshot.json"
@@ -54,8 +54,8 @@ def generate_snapshot(root, projects, graph, releasables=None):
             "deps": deps,
             "rdeps": rdeps,
             "library": proj.get("library", False),
-            "dev_only": proj.dev_only,
-            "releasable_flag": proj.is_releasable,
+            "dev_only": project_is_dev_only(proj),
+            "releasable_flag": project_is_releasable(proj),
             "test_only": proj.get("test_only", False),
         }
 
@@ -64,7 +64,7 @@ def generate_snapshot(root, projects, graph, releasables=None):
             rel_val = proj.get("releasable")
             if rel_val is None:
                 # Implicit mode: project is its own releasable (unless non-releasable)
-                pkg_entry["releasable"] = name if proj.is_releasable else None
+                pkg_entry["releasable"] = name if project_is_releasable(proj) else None
             elif rel_val is False:
                 pkg_entry["releasable"] = None
             else:

@@ -14,6 +14,7 @@ import subprocess
 from strictcli import CheckResult
 
 from ..check_context import WorkspaceCheckContext
+from ..workspace import project_is_dev_only, project_is_releasable
 from ._common import (
     RLSBL_CONFIG,
     _build_dep_import_cache,
@@ -196,7 +197,7 @@ def register_workspace_checks(app):
         # Find all dev-only projects
         dev_only_names = [
             name for name, proj in projects_by_name.items()
-            if proj.dev_only
+            if project_is_dev_only(proj)
         ]
 
         if not dev_only_names:
@@ -217,7 +218,7 @@ def register_workspace_checks(app):
                 dep_proj = projects_by_name.get(dep_name)
                 if dep_proj is None:
                     continue
-                if not dep_proj.dev_only:
+                if not project_is_dev_only(dep_proj):
                     violations.append(
                         f"non-dev-only project '{dep_name}' has a runtime dependency "
                         f"on dev-only project '{dev_name}'. "
@@ -532,7 +533,7 @@ def register_workspace_checks(app):
             return CheckResult("skip", "layers not configured")
 
         # Dev-only projects sit outside the layer system entirely
-        projects = [p for p in ctx.projects if not p.dev_only]
+        projects = [p for p in ctx.projects if not project_is_dev_only(p)]
 
         violations = check_layer_violations(projects, config, ctx.graph)
         if violations:
@@ -569,7 +570,7 @@ def register_workspace_checks(app):
         affected = _affected(changed_files, ctx.projects)
 
         # Filter out dev-only projects
-        affected = [p for p in affected if not p.dev_only]
+        affected = [p for p in affected if not project_is_dev_only(p)]
 
         if not affected:
             return CheckResult("pass", "no affected projects need testing")
