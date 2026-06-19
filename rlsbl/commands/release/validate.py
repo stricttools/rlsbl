@@ -285,9 +285,30 @@ def resolve_monorepo_context(monorepo_root, project_root, log):
     return monorepo_name, monorepo_project_path, is_library, is_dev_node, releasable_name
 
 
+def _format_releasable_tag(releasable_tag_format, releasable_name, version):
+    """Format a tag using the releasable's tag_format template.
+
+    Supports ``{name}`` and ``{version}`` placeholders.  E.g.::
+
+        "{name}@v{version}" -> "www@v2.0.0"
+        "v{version}"        -> "v2.0.0"
+    """
+    return releasable_tag_format.format(name=releasable_name, version=version)
+
+
+def _releasable_tag_glob(releasable_tag_format, releasable_name):
+    """Derive a glob pattern from a releasable's tag_format.
+
+    Replaces ``{version}`` with ``*`` and fills in ``{name}`` with the
+    literal releasable name so ``git tag -l`` can match all versions.
+    """
+    return releasable_tag_format.replace("{version}", "*").format(name=releasable_name)
+
+
 def compute_release_version(target, primary_path, bump_arg, monorepo_name,
                             monorepo_project_path, log, *,
-                            workspace_root=None, releasable_name=None):
+                            workspace_root=None, releasable_name=None,
+                            releasable_tag_fmt=None):
     """Compute current and new version, bump type, and tag.
 
     In explicit releasable mode (when ``workspace_root`` and ``releasable_name``
@@ -295,6 +316,10 @@ def compute_release_version(target, primary_path, bump_arg, monorepo_name,
     at ``.rlsbl-monorepo/releasables/<name>/version`` instead of from the
     target's manifest file. This is the canonical version source for
     multi-package releasables.
+
+    When ``releasable_tag_fmt`` is provided (explicit mode), tags are
+    constructed from the releasable's tag format instead of the target's
+    monorepo tag format.
 
     In implicit mode (the default, when either parameter is None), the version
     is read from the target's manifest as before.
@@ -311,12 +336,18 @@ def compute_release_version(target, primary_path, bump_arg, monorepo_name,
         current_version = target.read_version(primary_path)
     log(f"Current version: {current_version}")
 
-    if monorepo_name:
-        current_tag = target.monorepo_tag_format(
-            monorepo_name, current_version, path=monorepo_project_path
-        )
-    else:
-        current_tag = target.tag_format(current_version)
+    # Build tag using releasable tag format (explicit mode) or target format
+    def _make_tag(version):
+        if releasable_tag_fmt is not None and releasable_name is not None:
+            return _format_releasable_tag(releasable_tag_fmt, releasable_name, version)
+        elif monorepo_name:
+            return target.monorepo_tag_format(
+                monorepo_name, version, path=monorepo_project_path
+            )
+        else:
+            return target.tag_format(version)
+
+    current_tag = _make_tag(current_version)
     current_tag_exists = len(run("git", ["tag", "-l", current_tag])) > 0
 
     if not current_tag_exists:
@@ -334,12 +365,7 @@ def compute_release_version(target, primary_path, bump_arg, monorepo_name,
                 f'invalid bump type "{bump_type}". Use: {", ".join(VALID_BUMP_TYPES)}'
             )
         new_version = bump_version(current_version, bump_type)
-        if monorepo_name:
-            tag = target.monorepo_tag_format(
-                monorepo_name, new_version, path=monorepo_project_path
-            )
-        else:
-            tag = target.tag_format(new_version)
+        tag = _make_tag(new_version)
         log(f"New version: {new_version} ({bump_type})")
 
     # Check tag doesn't already exist
@@ -351,25 +377,44 @@ def compute_release_version(target, primary_path, bump_arg, monorepo_name,
 
 
 def validate_changelog_state(project_dir, target, monorepo_name,
-                             monorepo_project_path, config, monorepo_project=None):
+                             monorepo_project_path, config, monorepo_project=None,
+                             releasable_name=None, releasable_tag_fmt=None,
+                             workspace_root=None):
     """Validate JSONL changelog is set up and passes validation.
+
+    In explicit releasable mode (when ``releasable_name`` is provided along
+    with ``workspace_root``), the changes dir is resolved at the releasable
+    level and the tag glob uses the releasable's tag format.
 
     Returns the changes_dir path.
     Raises ReleaseValidationError on failure.
     """
     from . import changes_dir_exists, get_changes_dir, validate_unreleased
 
-    if not changes_dir_exists(project_dir):
-        raise ReleaseValidationError(
-            "JSONL changelog not set up. Run 'rlsbl scaffold' to create .rlsbl/changes/"
-        )
+    # Resolve changes dir: releasable level or per-project
+    if releasable_name and workspace_root:
+        from ...workspace import get_releasable_changes_dir
+        changes_dir = get_releasable_changes_dir(str(workspace_root), releasable_name)
+        if not os.path.isdir(changes_dir):
+            raise ReleaseValidationError(
+                f"JSONL changelog not set up for releasable '{releasable_name}'. "
+                f"Expected: {changes_dir}"
+            )
+    else:
+        if not changes_dir_exists(project_dir):
+            raise ReleaseValidationError(
+                "JSONL changelog not set up. Run 'rlsbl scaffold' to create .rlsbl/changes/"
+            )
+        changes_dir = get_changes_dir(project_dir)
 
-    changes_dir = get_changes_dir(project_dir)
-    tag_glob = (
-        target.monorepo_tag_glob(monorepo_name, path=monorepo_project_path)
-        if monorepo_name
-        else None
-    )
+    # Resolve tag glob
+    if releasable_name and releasable_tag_fmt:
+        tag_glob = _releasable_tag_glob(releasable_tag_fmt, releasable_name)
+    elif monorepo_name:
+        tag_glob = target.monorepo_tag_glob(monorepo_name, path=monorepo_project_path)
+    else:
+        tag_glob = None
+
     validation = validate_unreleased(
         changes_dir, tag_glob=tag_glob, project=monorepo_project, config=config
     )

@@ -251,6 +251,74 @@ def archive_blog_body(project_dir, version):
     return None
 
 
+def _sync_member_package_versions(
+    member_package_paths, monorepo_root, new_version,
+    files_to_commit, git_root, log, ctx,
+    exclude_path=None,
+):
+    """Sync version to published member packages in explicit releasable mode.
+
+    For each member package that has publishing pipelines (non-private,
+    has a detected target), writes the version to the manifest.
+    Private-only packages are left untouched.
+
+    Args:
+        member_package_paths: list of workspace-relative paths for member packages.
+        monorepo_root: absolute path to the monorepo root.
+        new_version: version string to write.
+        files_to_commit: list to append modified file paths to.
+        git_root: absolute path to the git root.
+        log: logging callable.
+        ctx: ProjectContext.
+        exclude_path: optional workspace-relative path to skip (already handled).
+    """
+    from . import TARGETS, detect_targets
+
+    for pkg_path in member_package_paths:
+        if exclude_path and pkg_path == exclude_path:
+            continue
+
+        abs_pkg = os.path.join(str(monorepo_root), pkg_path)
+        if not os.path.isdir(abs_pkg):
+            continue
+
+        # Check if package has publishing pipelines
+        pkg_config_path = os.path.join(abs_pkg, ".rlsbl", "config.json")
+        if not os.path.exists(pkg_config_path):
+            continue
+
+        try:
+            import json
+            with open(pkg_config_path, "r") as f:
+                pkg_config = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            continue
+
+        # Skip private packages
+        if pkg_config.get("private", True):
+            continue
+
+        # Detect targets and write version
+        entries = detect_targets(abs_pkg)
+        if not entries:
+            continue
+
+        for entry in entries:
+            tgt = TARGETS.get(entry.name)
+            if not tgt:
+                continue
+            try:
+                modified = tgt.write_version(entry.path, new_version, ctx=ctx)
+                for rel in modified:
+                    fpath = _rel_to_git_root(os.path.join(entry.path, rel), git_root)
+                    if fpath not in files_to_commit:
+                        files_to_commit.append(fpath)
+                if modified:
+                    log(f"Synced version to member {pkg_path}: {', '.join(modified)}")
+            except Exception as e:
+                log(f"Warning: failed to sync version to {pkg_path}/{entry.name}: {e}")
+
+
 @dataclasses.dataclass
 class ReleaseState:
     """All state needed by _run_release_mutating, grouped logically."""
@@ -272,6 +340,11 @@ class ReleaseState:
     # Monorepo
     monorepo_name: str | None = None
     monorepo_project_path: str | None = None
+
+    # Releasable (explicit mode) -- None in implicit mode
+    releasable_name: str | None = None
+    member_package_paths: list[str] | None = None
+    releasable_tag_format: str | None = None
 
     # Metadata
     changelog_entry: str | None = None
@@ -311,6 +384,9 @@ def _run_release_mutating(state: ReleaseState):
     secondary_targets = state.secondary_targets
     monorepo_name = state.monorepo_name
     monorepo_project_path = state.monorepo_project_path
+    releasable_name = state.releasable_name
+    member_package_paths = state.member_package_paths
+    releasable_tag_format_str = state.releasable_tag_format
     commit_msg = state.commit_msg
     primary_path = state.primary_path
     target_paths = state.target_paths
@@ -437,6 +513,15 @@ def _run_release_mutating(state: ReleaseState):
         # Build files_to_commit from the paths actually modified by write_version().
         files_to_commit = []
         if new_version != current_version:
+            # In explicit releasable mode, write the releasable version file first
+            if releasable_name and monorepo_root:
+                from ...workspace import write_releasable_version, get_releasable_version_path
+                write_releasable_version(str(monorepo_root), releasable_name, new_version)
+                ver_path = get_releasable_version_path(str(monorepo_root), releasable_name)
+                ver_rel = _rel_to_git_root(ver_path, _git_root)
+                files_to_commit.append(ver_rel)
+                log(f"Updated releasable version: {releasable_name} -> {new_version}")
+
             modified = reg.write_version(primary_path, new_version, ctx=ctx)
             for rel in modified:
                 files_to_commit.append(target_vpath(primary_path, rel))
@@ -454,6 +539,15 @@ def _run_release_mutating(state: ReleaseState):
                         files_to_commit.append(target_vpath(t_path, rel))
                     if other_modified:
                         log(f"Synced version to {', '.join(target_vpath(t_path, r) for r in other_modified)}")
+
+            # In explicit mode, sync version to published member packages
+            if releasable_name and member_package_paths and monorepo_root:
+                _sync_member_package_versions(
+                    member_package_paths, monorepo_root, new_version,
+                    files_to_commit, _git_root, log, ctx,
+                    # Skip the current project's path -- already handled above
+                    exclude_path=monorepo_project_path,
+                )
 
             # Bump selfdoc.json version inline (no DocsTarget dependency).
             bumped_files = set(files_to_commit)
@@ -580,9 +674,18 @@ def _run_release_mutating(state: ReleaseState):
         # CHANGELOG.md already has the correct "## X.Y.Z" heading because the
         # earlier generate_changelog() call (above acquire_lock) was passed
         # version_override=new_version, so no regeneration is needed here.
+        #
+        # In explicit releasable mode, the changes dir lives at the releasable
+        # level, and the tag glob uses the releasable's tag format.
         if changes_dir_exists(project_dir):
             changes_dir = get_changes_dir(project_dir)
-            tag_glob = target.monorepo_tag_glob(monorepo_name, path=monorepo_project_path) if monorepo_name else None
+            if releasable_name and releasable_tag_format_str:
+                from .validate import _releasable_tag_glob
+                tag_glob = _releasable_tag_glob(releasable_tag_format_str, releasable_name)
+            elif monorepo_name:
+                tag_glob = target.monorepo_tag_glob(monorepo_name, path=monorepo_project_path)
+            else:
+                tag_glob = None
             finalize_version(changes_dir, new_version, tag_glob=tag_glob)
             # Pass release metadata so the new version's .md matches what a
             # future backfill from the archived v{version}.toml would produce

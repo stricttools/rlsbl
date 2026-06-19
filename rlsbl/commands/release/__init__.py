@@ -57,6 +57,7 @@ from .validate import (
     validate_branch_and_remote, resolve_monorepo_context,
     compute_release_version, validate_changelog_state,
     print_dry_run_summary,
+    _format_releasable_tag, _releasable_tag_glob,
 )
 from .hooks import _compute_content_hash, _get_pre_release_template_hashes, _is_hook_effectively_empty, run_release_hook
 from .execute import (
@@ -132,6 +133,20 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         monorepo_root, project_root, log,
     )
 
+    # In explicit mode, resolve the full releasable object and member info
+    releasable_tag_fmt = None
+    member_package_paths = None
+    if releasable_name and monorepo_root:
+        from ...workspace import load_releasables, load_workspace, members_of
+        ws_projects = load_workspace(monorepo_root)
+        releasables = load_releasables(monorepo_root, ws_projects)
+        releasable_obj = next((r for r in releasables if r.name == releasable_name), None)
+        if releasable_obj:
+            releasable_tag_fmt = releasable_obj.tag_format
+            member_projs = members_of(releasable_name, ws_projects)
+            member_package_paths = [p["path"] for p in member_projs]
+            log(f"Releasable: {releasable_name} ({len(member_package_paths)} member(s))")
+
     project_dir = str(project_root)
 
     # Scaffold conflict guard
@@ -147,6 +162,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         monorepo_name, monorepo_project_path, log,
         workspace_root=monorepo_root if releasable_name else None,
         releasable_name=releasable_name,
+        releasable_tag_fmt=releasable_tag_fmt,
     )
 
     # --- Validate changelog ---
@@ -158,6 +174,9 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     changes_dir = validate_changelog_state(
         project_dir, target, monorepo_name, monorepo_project_path,
         config, monorepo_project=monorepo_project,
+        releasable_name=releasable_name,
+        releasable_tag_fmt=releasable_tag_fmt,
+        workspace_root=monorepo_root,
     )
 
     # Validate blog body file if blog is enabled
@@ -238,7 +257,14 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     post_hook_dirty = parse_porcelain_paths(post_hook_output) if post_hook_output else set()
     hook_generated = post_hook_dirty - pre_hook_dirty
 
-    commit_msg = f"{monorepo_name}: release v{new_version}" if monorepo_name else tag
+    # In explicit mode, commit message uses releasable name;
+    # in implicit monorepo mode, uses the package name; standalone uses the tag.
+    if releasable_name:
+        commit_msg = f"{releasable_name}: release v{new_version}"
+    elif monorepo_name:
+        commit_msg = f"{monorepo_name}: release v{new_version}"
+    else:
+        commit_msg = tag
 
     # --- Dry run: print summary and return ---
     if flags.get("dry-run", False):
@@ -278,6 +304,9 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             lock_dir=lock_dir,
             monorepo_name=monorepo_name,
             monorepo_project_path=monorepo_project_path,
+            releasable_name=releasable_name,
+            member_package_paths=member_package_paths,
+            releasable_tag_format=releasable_tag_fmt,
             changelog_entry=changelog_entry,
             commit_msg=commit_msg,
             description=release_config.description,

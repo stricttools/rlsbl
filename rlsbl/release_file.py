@@ -222,9 +222,16 @@ def unfinalize_release_file(releases_dir: str, version: str) -> list[str]:
 
 @dataclass
 class BatchReleaseConfig:
-    """Configuration from a batch release TOML file (monorepo)."""
+    """Configuration from a batch release TOML file (monorepo).
 
-    packages: dict[str, ReleaseConfig]  # package name -> config
+    ``packages`` maps either package names (implicit mode / backward compat)
+    or releasable names (explicit mode) to their release configs.
+    ``section_type`` indicates which top-level key was used: ``"packages"``
+    or ``"releasables"``.
+    """
+
+    packages: dict[str, ReleaseConfig]  # name -> config
+    section_type: str = "packages"  # "packages" or "releasables"
 
 
 def get_batch_release_file_path(workspace_root: str = ".") -> str:
@@ -235,8 +242,12 @@ def get_batch_release_file_path(workspace_root: str = ".") -> str:
 def read_batch_release_file(path: str) -> BatchReleaseConfig:
     """Read and validate a batch release TOML file.
 
-    Expects [packages.<name>] sections, each with the same fields
-    as a single ReleaseConfig (bump, include, exclude, optional targets).
+    Accepts either ``[packages.<name>]`` sections (implicit mode, backward
+    compat) or ``[releasables.<name>]`` sections (explicit mode). Having both
+    is a hard error.
+
+    Each section has the same fields as a single ReleaseConfig (bump, include,
+    exclude, optional targets, description, context).
 
     Raises FileNotFoundError if the file doesn't exist.
     Raises ReleaseFileError for schema/validation failures.
@@ -244,28 +255,49 @@ def read_batch_release_file(path: str) -> BatchReleaseConfig:
     with open(path, "r", encoding="utf-8") as f:
         data = tomlkit.load(f)
 
-    if "packages" not in data:
-        raise ReleaseFileError("missing required section: [packages]")
+    has_packages = "packages" in data
+    has_releasables = "releasables" in data
 
-    packages_raw = data["packages"]
-    if not isinstance(packages_raw, dict):
-        raise ReleaseFileError("[packages] must be a table of package configurations")
-
-    if not packages_raw:
-        raise ReleaseFileError("[packages] is empty -- at least one package is required")
-
-    packages = {}
-    for pkg_name, pkg_data in packages_raw.items():
-        if not isinstance(pkg_data, dict):
-            raise ReleaseFileError(
-                f"[packages.{pkg_name}] must be a table"
-            )
-
-        packages[pkg_name] = _validate_release_config(
-            pkg_data, prefix=f"[packages.{pkg_name}] "
+    if has_packages and has_releasables:
+        raise ReleaseFileError(
+            "batch release file has both [packages] and [releasables] sections. "
+            "Use [releasables] in explicit mode or [packages] in implicit mode, "
+            "not both."
         )
 
-    return BatchReleaseConfig(packages=packages)
+    if not has_packages and not has_releasables:
+        raise ReleaseFileError(
+            "missing required section: [packages] or [releasables]"
+        )
+
+    if has_releasables:
+        section_key = "releasables"
+        section_type = "releasables"
+    else:
+        section_key = "packages"
+        section_type = "packages"
+
+    raw = data[section_key]
+    if not isinstance(raw, dict):
+        raise ReleaseFileError(f"[{section_key}] must be a table of configurations")
+
+    if not raw:
+        raise ReleaseFileError(
+            f"[{section_key}] is empty -- at least one entry is required"
+        )
+
+    entries = {}
+    for name, entry_data in raw.items():
+        if not isinstance(entry_data, dict):
+            raise ReleaseFileError(
+                f"[{section_key}.{name}] must be a table"
+            )
+
+        entries[name] = _validate_release_config(
+            entry_data, prefix=f"[{section_key}.{name}] "
+        )
+
+    return BatchReleaseConfig(packages=entries, section_type=section_type)
 
 
 # ---------------------------------------------------------------------------
