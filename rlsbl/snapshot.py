@@ -5,7 +5,7 @@ import os
 from datetime import datetime, timezone
 
 from .targets import detect_targets, TARGETS
-from .workspace import WORKSPACE_DIR, members_of
+from .workspace import WORKSPACE_DIR, WorkspaceProject, members_of
 
 
 SNAPSHOT_FILE = "snapshot.json"
@@ -98,7 +98,10 @@ def generate_snapshot(root, projects, graph, releasables=None):
         for rel in releasables:
             member_projs = members_of(rel.name, projects)
             releasables_section[rel.name] = {
-                "members": sorted(p.name for p in member_projs),
+                "members": sorted(
+                    p.name if isinstance(p, WorkspaceProject) else p["name"]
+                    for p in member_projs
+                ),
                 "version": None,
                 "tag_format": rel.tag_format,
             }

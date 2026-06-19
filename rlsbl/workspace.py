@@ -298,21 +298,40 @@ def members_of(releasable_name, projects):
 
     Args:
         releasable_name: the releasable name to look up.
-        projects: list of WorkspaceProject instances.
+        projects: list of WorkspaceProject or dict instances.
 
     Returns:
-        List of WorkspaceProject instances that are members of the releasable.
+        List of projects that are members of the releasable.
     """
     result = []
     for proj in projects:
-        val = proj.releasable
+        val = _get_releasable_value(proj)
+        name = proj.name if isinstance(proj, WorkspaceProject) else proj["name"]
         if isinstance(val, str) and val == releasable_name:
             # Explicit membership
             result.append(proj)
-        elif val is None and proj.name == releasable_name:
+        elif val is None and name == releasable_name:
             # Implicit mode: project is its own releasable
             result.append(proj)
     return result
+
+
+def _get_releasable_value(proj):
+    """Extract the releasable value from a project (WorkspaceProject or dict).
+
+    Returns str, False, or None. Does not validate -- just reads the raw value.
+    """
+    if isinstance(proj, WorkspaceProject):
+        return proj.releasable
+    # Raw dict
+    val = proj.get("releasable")
+    if val is None:
+        return None
+    if isinstance(val, str):
+        return val
+    if isinstance(val, bool) and val is False:
+        return False
+    return val
 
 
 def save_workspace(root, projects, releasables=None):
