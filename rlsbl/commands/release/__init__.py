@@ -59,7 +59,14 @@ from .validate import (
     print_dry_run_summary,
     _format_releasable_tag, _releasable_tag_glob,
 )
-from .hooks import _compute_content_hash, _get_pre_release_template_hashes, _is_hook_effectively_empty, run_release_hook
+from .hooks import (
+    _compute_content_hash, _get_pre_release_template_hashes,
+    _is_hook_effectively_empty, run_release_hook,
+    get_releasable_hook_path, get_package_hook_path,
+    build_hook_env, run_releasable_hooks,
+    run_releasable_tests, run_releasable_lint,
+    is_releasable_hook_customized,
+)
 from .execute import (
     _bump_selfdoc_version,
     _rel_to_git_root,
@@ -211,17 +218,48 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     pre_hook_dirty = parse_porcelain_paths(pre_hook_output) if pre_hook_output else set()
 
     # Build hook environment
-    hook_env = os.environ.copy()
-    hook_env["RLSBL_VERSION"] = new_version
-    hook_env["RLSBL_BUMP_TYPE"] = bump_type or ""
-    hook_env["RLSBL_PREV_VERSION"] = current_version or ""
-    hook_env["RLSBL_DESCRIPTION"] = release_config.description if release_config else ""
+    hook_env = build_hook_env(
+        os.environ.copy(),
+        new_version,
+        bump_type=bump_type or "",
+        prev_version=current_version or "",
+        description=release_config.description if release_config else "",
+    )
     hook_timeout = get_hook_timeout()
 
-    pre_checks_script = os.path.join(project_dir, ".rlsbl", "hooks", "pre-checks.sh")
-    if os.path.exists(pre_checks_script):
-        log("Running pre-checks hook...")
-        run_release_hook("pre-checks", pre_checks_script, project_dir, hook_env, hook_timeout)
+    # In explicit releasable mode with members, use the multi-level hook system:
+    #   1. Releasable pre-checks
+    #   2. Per-package pre-checks (alphabetical)
+    #   3. Built-in tests (each member) / lint (library members)
+    #   4. Per-package pre-release (alphabetical)
+    #   5. Releasable pre-release
+    #
+    # In implicit mode or standalone, use the single-level hook system.
+    _use_releasable_hooks = releasable_name and monorepo_root and member_package_paths
+
+    if _use_releasable_hooks:
+        # Build (name, dir) tuples for member packages
+        _member_tuples = []
+        from ...workspace import load_workspace, members_of
+        _ws_projects = load_workspace(str(monorepo_root))
+        _member_projs = members_of(releasable_name, _ws_projects)
+        for mp in _member_projs:
+            mp_name = mp.name if hasattr(mp, 'name') else mp["name"]
+            mp_path = mp.path if hasattr(mp, 'path') else mp["path"]
+            mp_dir = os.path.join(str(monorepo_root), mp_path)
+            _member_tuples.append((mp_name, mp_dir))
+
+        # 1+2. Pre-checks: releasable first, then per-package
+        run_releasable_hooks(
+            "pre-checks", monorepo_root, releasable_name,
+            _member_tuples, hook_env, hook_timeout, log,
+            project_dir=project_dir,
+        )
+    else:
+        pre_checks_script = os.path.join(project_dir, ".rlsbl", "hooks", "pre-checks.sh")
+        if os.path.exists(pre_checks_script):
+            log("Running pre-checks hook...")
+            run_release_hook("pre-checks", pre_checks_script, project_dir, hook_env, hook_timeout)
 
     _run_strictcli_schema_dump(flags, log, project_dir=project_dir)
     _run_selfdoc_gen(flags, project_dir=project_dir)
@@ -238,25 +276,47 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         tag=tag,
     )
 
-    # Built-in tests and lint (skipped when pre-release hook is customized)
-    pre_release_script = os.path.join(project_dir, ".rlsbl", "hooks", "pre-release.sh")
-    hook_is_customized = not _is_hook_effectively_empty(pre_release_script)
+    if _use_releasable_hooks:
+        # Check if releasable-level pre-release hook is customized
+        hook_is_customized = is_releasable_hook_customized(str(monorepo_root), releasable_name)
 
-    if hook_is_customized:
-        log("Skipping built-in tests (pre-release hook handles testing)")
+        # 3. Built-in tests and lint (skipped when releasable pre-release hook is customized)
+        if hook_is_customized:
+            log("Skipping built-in tests (releasable pre-release hook handles testing)")
+        else:
+            run_releasable_tests(_member_tuples, registry, flags, ctx=ctx, log=log)
+
+        if hook_is_customized:
+            log("Skipping built-in lint (releasable pre-release hook handles linting)")
+        else:
+            run_releasable_lint(_member_tuples, flags, ws_projects=_ws_projects, log=log)
+
+        # 4+5. Pre-release: per-package first, then releasable
+        run_releasable_hooks(
+            "pre-release", monorepo_root, releasable_name,
+            _member_tuples, hook_env, hook_timeout, log,
+            project_dir=project_dir,
+        )
     else:
-        _run_builtin_tests(registry, flags, project_dir=project_dir, ctx=ctx)
+        # Built-in tests and lint (skipped when pre-release hook is customized)
+        pre_release_script = os.path.join(project_dir, ".rlsbl", "hooks", "pre-release.sh")
+        hook_is_customized = not _is_hook_effectively_empty(pre_release_script)
 
-    if hook_is_customized:
-        log("Skipping built-in lint (pre-release hook handles linting)")
-    else:
-        _run_builtin_lint(flags, is_library=is_library, project_dir=project_dir)
+        if hook_is_customized:
+            log("Skipping built-in tests (pre-release hook handles testing)")
+        else:
+            _run_builtin_tests(registry, flags, project_dir=project_dir, ctx=ctx)
 
-    # Run pre-release hook
-    pre_release_script = os.path.join(project_dir, ".rlsbl", "hooks", "pre-release.sh")
-    if os.path.exists(pre_release_script):
-        log("Running pre-release hook...")
-        run_release_hook("pre-release", pre_release_script, project_dir, hook_env, hook_timeout)
+        if hook_is_customized:
+            log("Skipping built-in lint (pre-release hook handles linting)")
+        else:
+            _run_builtin_lint(flags, is_library=is_library, project_dir=project_dir)
+
+        # Run pre-release hook
+        pre_release_script = os.path.join(project_dir, ".rlsbl", "hooks", "pre-release.sh")
+        if os.path.exists(pre_release_script):
+            log("Running pre-release hook...")
+            run_release_hook("pre-release", pre_release_script, project_dir, hook_env, hook_timeout)
 
     # Snapshot dirty files after all hooks
     post_hook_output = run("git", ["status", "--porcelain"])
