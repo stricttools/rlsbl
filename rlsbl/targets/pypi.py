@@ -202,6 +202,16 @@ class PypiTarget(BaseTarget):
             if m:
                 result["minRequiredPython"] = m.group(1)
 
+        # Detect path-based uv sources (monorepo siblings installed via path).
+        # When present, CI needs UV_NO_SOURCES=1 to skip local-only sources.
+        sources = data.get("tool", {}).get("uv", {}).get("sources", {})
+        has_path_sources = any(
+            isinstance(v, dict) and "path" in v
+            for v in sources.values()
+        )
+        if has_path_sources:
+            result["uvNoSources"] = "true"
+
         return result
 
     def template_mappings(self, ctx):

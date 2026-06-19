@@ -7,9 +7,11 @@ on:
     branches: [main]
   workflow_dispatch:
 
+{{#if uvNoSources}}
 env:
   UV_NO_SOURCES: "1"
 
+{{/if}}
 jobs:
   test:
     runs-on: ubuntu-latest
