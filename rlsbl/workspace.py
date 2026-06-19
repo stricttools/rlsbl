@@ -1,6 +1,7 @@
 """Workspace data layer for monorepo support handling discovery, loading, saving, and resolution of workspaces from workspace.toml config."""
 
 import os
+import tempfile
 import tomllib
 from dataclasses import dataclass, field
 
@@ -11,8 +12,123 @@ from .errors import WorkspaceError
 
 WORKSPACE_DIR = ".rlsbl-monorepo"
 WORKSPACE_FILE = "workspace.toml"
+RELEASABLES_DIR = "releasables"
 
 DEFAULT_TAG_FORMAT = "{name}@v{version}"
+
+
+# ---------------------------------------------------------------------------
+# Per-releasable directory structure and version management
+# ---------------------------------------------------------------------------
+
+
+def get_releasable_dir(workspace_root, releasable_name):
+    """Return the directory path for a releasable's state files.
+
+    Path: ``<workspace_root>/.rlsbl-monorepo/releasables/<name>/``
+
+    Args:
+        workspace_root: path to the monorepo root.
+        releasable_name: name of the releasable.
+
+    Returns:
+        Absolute path string to the releasable directory.
+    """
+    return os.path.join(workspace_root, WORKSPACE_DIR, RELEASABLES_DIR, releasable_name)
+
+
+def get_releasable_version_path(workspace_root, releasable_name):
+    """Return the path to a releasable's version file.
+
+    Path: ``<workspace_root>/.rlsbl-monorepo/releasables/<name>/version``
+
+    Args:
+        workspace_root: path to the monorepo root.
+        releasable_name: name of the releasable.
+
+    Returns:
+        Absolute path string to the version file.
+    """
+    return os.path.join(get_releasable_dir(workspace_root, releasable_name), "version")
+
+
+def read_releasable_version(workspace_root, releasable_name):
+    """Read the version string from a releasable's version file.
+
+    Args:
+        workspace_root: path to the monorepo root.
+        releasable_name: name of the releasable.
+
+    Returns:
+        The version string (stripped of whitespace).
+
+    Raises:
+        WorkspaceError: if the version file does not exist or is empty.
+    """
+    path = get_releasable_version_path(workspace_root, releasable_name)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            version = f.read().strip()
+    except FileNotFoundError:
+        raise WorkspaceError(
+            f"version file missing for releasable '{releasable_name}': {path}"
+        )
+    if not version:
+        raise WorkspaceError(
+            f"version file is empty for releasable '{releasable_name}': {path}"
+        )
+    return version
+
+
+def write_releasable_version(workspace_root, releasable_name, version):
+    """Write a version string to a releasable's version file atomically.
+
+    Creates the releasable directory if it does not exist. Writes to a
+    temporary file in the same directory and then atomically replaces
+    the target file via ``os.replace()``.
+
+    Args:
+        workspace_root: path to the monorepo root.
+        releasable_name: name of the releasable.
+        version: the version string to write.
+    """
+    path = get_releasable_version_path(workspace_root, releasable_name)
+    target_dir = os.path.dirname(path)
+    os.makedirs(target_dir, exist_ok=True)
+
+    fd, tmp_path = tempfile.mkstemp(dir=target_dir, prefix=".version.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(version + "\n")
+        os.replace(tmp_path, path)
+    except BaseException:
+        # Clean up the temp file on any failure
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
+def is_explicit_mode(workspace_root):
+    """Check whether the workspace uses explicit releasable definitions.
+
+    Returns True when ``[[releasables]]`` is present in workspace.toml,
+    False otherwise (implicit mode where each project is its own releasable).
+
+    Args:
+        workspace_root: path to the monorepo root.
+
+    Returns:
+        bool
+    """
+    path = os.path.join(workspace_root, WORKSPACE_DIR, WORKSPACE_FILE)
+    try:
+        with open(path, "rb") as f:
+            data = tomllib.load(f)
+    except FileNotFoundError:
+        return False
+    return data.get("releasables") is not None
 
 
 @dataclass
