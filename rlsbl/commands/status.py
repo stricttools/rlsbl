@@ -189,16 +189,33 @@ def run_cmd(registry, args, flags, ctx):
     # Detect monorepo context early so coverage uses scoped tags
     monorepo_project = None
     monorepo_count = None
+    releasable_info = None  # (releasable_name, tag_format, version) in explicit mode
     try:
         ws_root = find_workspace_root(root_str)
         if ws_root is not None:
             ws_projects = load_workspace(ws_root)
             monorepo_count = len(ws_projects)
             monorepo_project = resolve_project(ws_root, root_str)
+            # Detect explicit releasable mode
+            if monorepo_project:
+                from ..workspace import is_explicit_mode, load_releasables, resolve_releasable_for_project, read_releasable_version
+                if is_explicit_mode(ws_root):
+                    releasables = load_releasables(ws_root, ws_projects)
+                    rel = resolve_releasable_for_project(monorepo_project, releasables)
+                    if rel:
+                        try:
+                            rel_ver = read_releasable_version(ws_root, rel.name)
+                        except Exception:
+                            rel_ver = None
+                        releasable_info = (rel.name, rel.tag_format, rel_ver)
     except Exception as e:
         print(f"Warning: could not detect monorepo context: {e}", file=sys.stderr)
 
-    if monorepo_project:
+    if releasable_info:
+        # In explicit mode, use releasable's tag glob
+        from ..commands.release.validate import _releasable_tag_glob
+        tag_glob = _releasable_tag_glob(releasable_info[1], releasable_info[0])
+    elif monorepo_project:
         target = TARGETS[registry]
         tag_glob = target.monorepo_tag_glob(monorepo_project["name"], path=monorepo_project["path"])
     else:
@@ -274,7 +291,15 @@ def run_cmd(registry, args, flags, ctx):
 
     # Monorepo awareness (detection already done above)
     if monorepo_count is not None:
-        if monorepo_project is not None:
+        if releasable_info:
+            rel_name, rel_tag_fmt, rel_ver = releasable_info
+            print(f"Releasable: {rel_name}")
+            if rel_ver:
+                from ..commands.release.validate import _format_releasable_tag
+                rel_tag = _format_releasable_tag(rel_tag_fmt, rel_name, rel_ver)
+                print(f"Rel. version: {rel_ver}")
+                print(f"Rel. tag:  {rel_tag}")
+        elif monorepo_project is not None:
             target = TARGETS[registry]
             mono_tag = target.monorepo_tag_format(
                 monorepo_project["name"], data["version"],

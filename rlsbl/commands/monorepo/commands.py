@@ -235,6 +235,17 @@ def _cmd_status(flags, project_root):
     # Build dependency graph
     graph = WorkspaceGraph(root, projects)
 
+    # Detect explicit releasable mode for column display
+    from ...workspace import is_explicit_mode
+    explicit = is_explicit_mode(root)
+    releasable_map = {}  # project name -> releasable name
+    if explicit:
+        from ...workspace import load_releasables, resolve_releasable_for_project
+        releasables = load_releasables(root, projects)
+        for proj in projects:
+            rel = resolve_releasable_for_project(proj, releasables)
+            releasable_map[proj["name"]] = rel.name if rel else ""
+
     rows = []
     for proj in projects:
         name = proj["name"]
@@ -323,7 +334,10 @@ def _cmd_status(flags, project_root):
         remote = proj.get("subtree_remote", "")
         remote_str = remote if remote else "-"
 
-        rows.append((name, path, target_display, version, latest_tag, unreleased_str, library_str, dev_only_str, deps_str, rdeps_str, watch_str, remote_str))
+        # Releasable membership (explicit mode only)
+        releasable_str = releasable_map.get(name, "") if explicit else ""
+
+        rows.append((name, path, target_display, version, latest_tag, unreleased_str, library_str, dev_only_str, deps_str, rdeps_str, watch_str, remote_str, releasable_str))
 
     # Determine which dynamic columns to show
     any_library = any(row[6] != "" for row in rows)
@@ -332,9 +346,12 @@ def _cmd_status(flags, project_root):
     any_rdeps = any(row[9] != "0" for row in rows)
     any_watch = any(row[10] != "-" for row in rows)
     any_remote = any(row[11] != "-" for row in rows)
+    any_releasable = any(row[12] != "" for row in rows)
 
     # Calculate column widths
     base_headers = ("Project", "Path", "Target", "Version", "Tag", "Unreleased")
+    if any_releasable:
+        base_headers = base_headers + ("Releasable",)
     if any_library:
         base_headers = base_headers + ("Library",)
     if any_dev_only:
@@ -353,6 +370,8 @@ def _cmd_status(flags, project_root):
     display_rows = []
     for row in rows:
         cells = list(row[:6])  # base columns: name, path, target, version, tag, unreleased
+        if any_releasable:
+            cells.append(row[12])
         if any_library:
             cells.append(row[6])
         if any_dev_only:

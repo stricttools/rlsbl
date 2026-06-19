@@ -65,13 +65,23 @@ def run_cmd(registry, args, flags, project_root):
         if ws_root is not None:
             monorepo_project = resolve_project(ws_root, root_str)
             if monorepo_project:
-                targets = detect_targets(root_str)
-                if targets:
-                    target = TARGETS[targets[0].name]
-                    tag_glob = target.monorepo_tag_glob(
-                        monorepo_project["name"],
-                        path=monorepo_project["path"],
-                    )
+                # Check for explicit releasable mode
+                from ..workspace import is_explicit_mode, load_releasables, resolve_releasable_for_project
+                if is_explicit_mode(ws_root):
+                    ws_projects = load_workspace(ws_root)
+                    releasables = load_releasables(ws_root, ws_projects)
+                    rel = resolve_releasable_for_project(monorepo_project, releasables)
+                    if rel:
+                        from ..commands.release.validate import _releasable_tag_glob
+                        tag_glob = _releasable_tag_glob(rel.tag_format, rel.name)
+                if tag_glob is None:
+                    targets = detect_targets(root_str)
+                    if targets:
+                        target = TARGETS[targets[0].name]
+                        tag_glob = target.monorepo_tag_glob(
+                            monorepo_project["name"],
+                            path=monorepo_project["path"],
+                        )
     except Exception:
         pass
 
