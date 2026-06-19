@@ -1,8 +1,16 @@
 """Batch release command for monorepo workspaces.
 
-Reads .rlsbl-monorepo/releases/unreleased.toml, validates all listed packages,
-determines topological release order, and releases each package sequentially
+Reads .rlsbl-monorepo/releases/unreleased.toml, validates all listed items,
+determines topological release order, and releases each sequentially
 by delegating to the existing single-package release flow.
+
+In explicit mode (``[releasables.*]`` sections), iterates releasables in
+dependency order (a releasable's position = max topological position of
+its member packages). For each releasable, picks one representative member
+package and releases through it.
+
+In implicit mode (``[packages.*]`` sections), iterates packages directly
+in topological order (original behavior).
 """
 
 import os
@@ -17,12 +25,40 @@ from ...release_file import (
 )
 from ...errors import ReleaseFileError
 from ...utils import commit_files
-from ...workspace import find_workspace_root, load_workspace
+from ...workspace import find_workspace_root, load_workspace, is_explicit_mode
 from ...workspace_graph import CycleError, WorkspaceGraph
 
 
+def _releasable_release_order(batch_names, releasables, projects, graph):
+    """Compute release order for releasables based on member topological positions.
+
+    A releasable's position is the maximum topological position of its member
+    packages. This ensures that a releasable whose members depend on members
+    of another releasable is released after the dependency.
+
+    Returns an ordered list of releasable names from the batch.
+    """
+    from ...workspace import members_of
+
+    full_order = graph.topological_order()
+    position = {name: i for i, name in enumerate(full_order)}
+
+    releasable_positions = {}
+    for rel in releasables:
+        if rel.name not in batch_names:
+            continue
+        members = members_of(rel.name, projects)
+        if members:
+            max_pos = max(position.get(m["name"], 0) for m in members)
+        else:
+            max_pos = 0
+        releasable_positions[rel.name] = max_pos
+
+    return sorted(batch_names, key=lambda n: releasable_positions.get(n, 0))
+
+
 def _cmd_batch_release(flags, project_root):
-    """Execute a batch release of multiple monorepo packages."""
+    """Execute a batch release of multiple monorepo packages or releasables."""
     start = str(project_root)
     workspace_root = find_workspace_root(start)
     if workspace_root is None:
@@ -38,7 +74,7 @@ def _cmd_batch_release(flags, project_root):
             "Error: No batch release file found at "
             f"{os.path.relpath(batch_path)}.\n"
             "Create .rlsbl-monorepo/releases/unreleased.toml with "
-            "[packages.<name>] sections.",
+            "[packages.<name>] or [releasables.<name>] sections.",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -49,8 +85,115 @@ def _cmd_batch_release(flags, project_root):
         print(f"Error in batch release file: {e}", file=sys.stderr)
         sys.exit(1)
 
-    # Load workspace and build graph
     projects = load_workspace(workspace_root)
+    explicit = is_explicit_mode(workspace_root)
+
+    if batch_config.section_type == "releasables":
+        if not explicit:
+            print(
+                "Error: batch release file uses [releasables] sections but the "
+                "workspace is in implicit mode (no [[releasables]] in workspace.toml).",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        _batch_release_releasables(
+            flags, workspace_root, batch_path, batch_config, projects,
+        )
+    else:
+        _batch_release_packages(
+            flags, workspace_root, batch_path, batch_config, projects,
+        )
+
+
+def _batch_release_releasables(flags, workspace_root, batch_path, batch_config, projects):
+    """Execute batch release in releasable mode."""
+    from ...workspace import load_releasables, members_of
+
+    releasables = load_releasables(workspace_root, projects)
+    releasable_by_name = {r.name: r for r in releasables}
+
+    # Validate all releasable names exist
+    missing = set(batch_config.packages.keys()) - set(releasable_by_name.keys())
+    if missing:
+        print(
+            f"Error: releasables not found in workspace: {', '.join(sorted(missing))}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    # Build graph and compute release order
+    graph = WorkspaceGraph(workspace_root, projects)
+    try:
+        graph.topological_order()
+    except CycleError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    batch_names = set(batch_config.packages.keys())
+    release_order = _releasable_release_order(
+        batch_names, releasables, projects, graph,
+    )
+
+    dry_run = flags.get("dry-run", False)
+    yes = flags.get("yes", False)
+    quiet = flags.get("quiet", False)
+
+    def log(msg):
+        if not quiet:
+            print(msg)
+
+    log(f"Batch release: {len(release_order)} releasable(s)")
+    log(f"Release order: {', '.join(release_order)}")
+    log("")
+
+    released = []
+    for rel_name in release_order:
+        release_config = batch_config.packages[rel_name]
+        member_projs = members_of(rel_name, projects)
+        if not member_projs:
+            print(f"Error: releasable '{rel_name}' has no member projects.", file=sys.stderr)
+            sys.exit(1)
+
+        # Pick the first member as the representative for the release flow
+        representative = member_projs[0]
+        project_dir = os.path.join(workspace_root, representative["path"])
+
+        log(f"--- Releasing releasable {rel_name} ({release_config.bump}) ---")
+
+        try:
+            from pathlib import Path
+
+            from ...context import create_context
+            from ..release import run_cmd
+
+            release_flags = {
+                "dry-run": dry_run,
+                "yes": yes,
+                "quiet": quiet,
+                "allow-dirty": flags.get("allow-dirty", False),
+            }
+            pkg_ctx = create_context(Path(project_dir), workspace_root=Path(workspace_root))
+            run_cmd(release_config, release_flags, ctx=pkg_ctx)
+            released.append(rel_name)
+        except SystemExit as e:
+            if e.code != 0:
+                print(
+                    f"\nError: release of releasable {rel_name} failed. "
+                    f"Successfully released: {', '.join(released) if released else '(none)'}",
+                    file=sys.stderr,
+                )
+                raise
+
+        log("")
+
+    if not dry_run and released:
+        _finalize_batch_file(batch_path, log)
+
+    log(f"Batch release complete: {', '.join(released)}")
+
+
+def _batch_release_packages(flags, workspace_root, batch_path, batch_config, projects):
+    """Execute batch release in package mode (implicit, original behavior)."""
     project_names = {p["name"] for p in projects}
     project_by_name = {p["name"]: p for p in projects}
 
