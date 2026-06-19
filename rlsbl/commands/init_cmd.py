@@ -41,10 +41,10 @@ def _find_git_dir():
         return None
 
 
-def _is_dev_node_project(project_root):
-    """Check if the current project is a dev_node in its monorepo workspace.
+def _is_non_releasable_project(project_root):
+    """Check if the current project is non-releasable in its monorepo workspace.
 
-    Returns False if not in a monorepo or if the project is not a dev_node.
+    Returns False if not in a monorepo or if the project is releasable.
     """
     if project_root is None:
         return False
@@ -55,7 +55,7 @@ def _is_dev_node_project(project_root):
     project = resolve_project(ws_root, str(project_root))
     if project is None:
         return False
-    return bool(project.get("dev_node"))
+    return not project.is_releasable
 
 
 def _check_npm_lockfile_missing(start_dir="."):
@@ -1128,8 +1128,8 @@ def run_cmd(registry, args, flags, ctx):
             shared_mappings = reg.shared_template_mappings(ctx)
             shared_mappings = _append_deploy_workflow_if_configured(shared_mappings, ctx.config)
 
-            # Dev node projects skip changelog infrastructure
-            if _is_dev_node_project(project_root):
+            # Non-releasable projects skip changelog infrastructure
+            if _is_non_releasable_project(project_root):
                 shared_mappings = [
                     m for m in shared_mappings
                     if m["target"] not in ("CHANGELOG.md", ".rlsbl/changes/unreleased.jsonl")

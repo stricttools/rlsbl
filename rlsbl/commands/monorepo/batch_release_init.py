@@ -179,8 +179,8 @@ def _cmd_batch_release_init(project_root, packages=None):
     commented_sections = []
 
     for proj in projects:
-        if proj.get("dev_node", False):
-            print(f"Skipping dev_node project: {proj['name']}", file=sys.stderr)
+        if not proj.is_releasable:
+            print(f"Skipping non-releasable project: {proj['name']}", file=sys.stderr)
             continue
 
         # Apply --packages filter

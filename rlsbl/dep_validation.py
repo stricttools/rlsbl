@@ -1148,8 +1148,8 @@ def find_dead_workspace_packages(
     for proj in projects:
         name = proj["name"]
 
-        # Skip dev_node projects -- excluded from most checks
-        if proj.get("dev_node"):
+        # Skip dev-only projects -- excluded from most checks
+        if proj.dev_only:
             continue
 
         # Skip non-library projects (apps, CLIs) -- they are entry points

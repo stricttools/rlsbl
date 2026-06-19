@@ -39,7 +39,7 @@ def _collect_graph_data(root, projects, graph):
         rdep_names = graph.dependents(name)
 
         # Raw facts from project config
-        dev_node = bool(proj.get("dev_node", False))
+        dev_only = bool(proj.dev_only)
         library = bool(proj.get("library", False))
 
         # Check if any reverse-dependent has runtime or explicit scope
@@ -54,7 +54,7 @@ def _collect_graph_data(root, projects, graph):
             "rdeps": rdep_names,
             "targets": target_names,
             "version": version,
-            "dev_node": dev_node,
+            "dev_only": dev_only,
             "library": library,
             "has_runtime_dependents": has_runtime_dependents,
             "is_leaf": is_leaf,
@@ -124,7 +124,7 @@ def _render_dot(packages, edges):
 
     # Node styling based on raw facts
     for name, pkg in sorted(packages.items()):
-        if pkg.get("dev_node"):
+        if pkg.get("dev_only"):
             lines.append(f'    "{name}" [style=filled, fillcolor=lightgray];')
         elif pkg.get("is_leaf"):
             lines.append(f'    "{name}" [style=filled, fillcolor=lightgreen];')
@@ -151,7 +151,7 @@ def _render_text(packages, edges):
 def _text_label(name, pkg):
     """Build a text label with fact annotations like [dev], [lib], [leaf]."""
     labels = []
-    if pkg.get("dev_node"):
+    if pkg.get("dev_only"):
         labels.append("[dev]")
     if pkg.get("library"):
         labels.append("[lib]")

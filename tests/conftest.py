@@ -82,6 +82,8 @@ def make_workspace(root, projects):
             lines.append("library = true")
         if proj.get("dev_node"):
             lines.append("dev_node = true")
+        if proj.get("dev_only"):
+            lines.append("dev_only = true")
         lines.append("")
     (ws_dir / WORKSPACE_FILE).write_text("\n".join(lines))
 

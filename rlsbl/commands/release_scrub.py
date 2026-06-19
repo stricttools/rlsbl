@@ -199,7 +199,7 @@ def run_cmd(flags, *, ctx):
         if "CHANGELOG_GENERATED" not in completed:
             if ctx.workspace_root:
                 for proj in workspace_projects:
-                    if proj.dev_node:
+                    if not proj.is_releasable:
                         continue
                     proj_path = os.path.join(str(ctx.workspace_root), proj.path)
                     generate_changelog(proj_path)
@@ -235,7 +235,7 @@ def run_cmd(flags, *, ctx):
             # Add CHANGELOG.md files
             if ctx.workspace_root:
                 for proj in workspace_projects:
-                    if proj.dev_node:
+                    if not proj.is_releasable:
                         continue
                     proj_path = os.path.join(str(ctx.workspace_root), proj.path)
                     cl = os.path.join(proj_path, "CHANGELOG.md")

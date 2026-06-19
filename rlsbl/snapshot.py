@@ -54,7 +54,8 @@ def generate_snapshot(root, projects, graph, releasables=None):
             "deps": deps,
             "rdeps": rdeps,
             "library": proj.get("library", False),
-            "dev_node": proj.get("dev_node", False),
+            "dev_only": proj.dev_only,
+            "releasable_flag": proj.is_releasable,
             "test_only": proj.get("test_only", False),
         }
 
@@ -62,8 +63,8 @@ def generate_snapshot(root, projects, graph, releasables=None):
         if releasables is not None:
             rel_val = proj.get("releasable")
             if rel_val is None:
-                # Implicit mode: project is its own releasable (unless dev_node)
-                pkg_entry["releasable"] = name if not proj.get("dev_node", False) else None
+                # Implicit mode: project is its own releasable (unless non-releasable)
+                pkg_entry["releasable"] = name if proj.is_releasable else None
             elif rel_val is False:
                 pkg_entry["releasable"] = None
             else:
