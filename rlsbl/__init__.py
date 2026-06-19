@@ -1006,6 +1006,86 @@ def cmd_mono_release_init(packages, **_kwargs):
     _cmd_batch_release_init(project_root=root, packages=packages or None)
 
 
+@mono.command(name="extract", help="Extract a package from the monorepo into a new standalone repository. Clones the monorepo, runs git filter-repo to keep only the package's history, migrates changelog entries, creates .rlsbl/ config in the new repo, and removes the project from workspace.toml.")
+@strictcli.arg(name="package_name", help="Name of the package in workspace.toml to extract")
+@strictcli.arg(name="target_path", help="Filesystem path where the new standalone repository will be created")
+def cmd_mono_extract(dry_run, package_name, target_path, **_kwargs):
+    root = _require_project_root()
+    from .workspace import find_workspace_root
+    ws_root = find_workspace_root(str(root))
+    if ws_root is None:
+        print("Error: No workspace found. Run 'rlsbl monorepo init' first.", file=sys.stderr)
+        sys.exit(1)
+    from .commands.monorepo import cmd_extract
+    try:
+        result = cmd_extract(ws_root, package_name, target_path, dry_run=dry_run)
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    if dry_run:
+        print(f"Would extract '{result['package_name']}' (path: {result['package_path']}) to {result['target_path']}")
+    else:
+        print(f"Extracted '{result['package_name']}' to {result['target_path']}")
+        print(f"  Changelog: {result['entries_migrated']} entries in {result['files_written']} files")
+
+
+@mono.command(name="absorb", help="Absorb an external repository as a package in the monorepo. Runs git subtree add to import the source repo's history under the package name, adds the project to workspace.toml, and migrates changelog entries from the source repo's .rlsbl/changes/ directory.")
+@strictcli.flag(name="releasable", type=str, help="Releasable group to assign the absorbed package to", default="")
+@strictcli.arg(name="source_path", help="Filesystem path to the external git repository to absorb")
+@strictcli.arg(name="package_name", help="Name for the package in the monorepo workspace")
+def cmd_mono_absorb(dry_run, releasable, source_path, package_name, **_kwargs):
+    root = _require_project_root()
+    from .workspace import find_workspace_root
+    ws_root = find_workspace_root(str(root))
+    if ws_root is None:
+        print("Error: No workspace found. Run 'rlsbl monorepo init' first.", file=sys.stderr)
+        sys.exit(1)
+    from .commands.monorepo import cmd_absorb
+    try:
+        result = cmd_absorb(
+            ws_root, source_path, package_name,
+            releasable_name=releasable or None,
+            dry_run=dry_run,
+        )
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    if dry_run:
+        print(f"Would absorb '{result['package_name']}' from {result['source_path']} (branch: {result['source_branch']})")
+    else:
+        print(f"Absorbed '{result['package_name']}' from {result['source_path']} (branch: {result['source_branch']})")
+        print(f"  Changelog: {result['entries_migrated']} entries in {result['files_written']} files")
+
+
+@mono.command(name="extract-releasable", help="Extract all member packages of a releasable into a new repository. If the releasable has one member, creates a single-project repo. If it has multiple members, creates a new monorepo with workspace.toml. Migrates changelog entries for each member and removes all extracted projects from the source workspace.")
+@strictcli.arg(name="releasable_name", help="Name of the releasable group in workspace.toml to extract")
+@strictcli.arg(name="target_path", help="Filesystem path where the new repository will be created")
+def cmd_mono_extract_releasable(dry_run, releasable_name, target_path, **_kwargs):
+    root = _require_project_root()
+    from .workspace import find_workspace_root
+    ws_root = find_workspace_root(str(root))
+    if ws_root is None:
+        print("Error: No workspace found. Run 'rlsbl monorepo init' first.", file=sys.stderr)
+        sys.exit(1)
+    from .commands.monorepo import cmd_extract_releasable
+    try:
+        result = cmd_extract_releasable(ws_root, releasable_name, target_path, dry_run=dry_run)
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    if dry_run:
+        members = ", ".join(result["member_packages"])
+        kind = "monorepo" if result["is_monorepo"] else "single-project repo"
+        print(f"Would extract releasable '{result['releasable_name']}' ({kind}) to {result['target_path']}")
+        print(f"  Members: {members}")
+    else:
+        members = ", ".join(result["member_packages"])
+        kind = "monorepo" if result["is_monorepo"] else "single-project repo"
+        print(f"Extracted releasable '{result['releasable_name']}' ({kind}) to {result['target_path']}")
+        print(f"  Members: {members}")
+        print(f"  Changelog: {result['entries_migrated']} entries in {result['files_written']} files")
+
+
 # ---------------------------------------------------------------------------
 # dev group
 # ---------------------------------------------------------------------------
