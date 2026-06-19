@@ -21,7 +21,7 @@ class Releasable:
 
     In explicit mode, releasables are defined via ``[[releasables]]`` in
     workspace.toml.  In implicit mode (no ``[[releasables]]`` section),
-    each non-dev_node project is its own single-member releasable.
+    each releasable project is its own single-member releasable.
     """
 
     name: str
@@ -269,7 +269,7 @@ def load_releasables(root, projects=None):
 def _load_explicit_releasables(raw_releasables, projects):
     """Parse [[releasables]] section and validate project membership.
 
-    Every non-dev_node project must have a ``releasable`` field that is either
+    Every releasable project must have a ``releasable`` field that is either
     a string referencing a defined releasable name, or ``false``.
     """
     if not isinstance(raw_releasables, list):

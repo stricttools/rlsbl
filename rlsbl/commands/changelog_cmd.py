@@ -29,7 +29,7 @@ from ..workspace import find_workspace_root, resolve_project
 def _resolve_workspace_project(project_root):
     """Resolve the WorkspaceProject for project_root, or None in standalone mode.
 
-    Also checks and exits if the project is a dev_node.
+    Also checks and exits if the project is non-releasable.
     """
     if project_root is None:
         return None
