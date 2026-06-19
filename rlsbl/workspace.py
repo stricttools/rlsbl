@@ -15,6 +15,7 @@ WORKSPACE_FILE = "workspace.toml"
 RELEASABLES_DIR = "releasables"
 
 DEFAULT_TAG_FORMAT = "{name}@v{version}"
+STANDALONE_TAG_FORMAT = "v{version}"
 
 
 # ---------------------------------------------------------------------------
@@ -628,3 +629,95 @@ def resolve_project(root, cwd="."):
                 best_len = len(proj_abs)
 
     return best_match
+
+
+# ---------------------------------------------------------------------------
+# Standalone (single-project) releasable
+# ---------------------------------------------------------------------------
+
+STANDALONE_RELEASABLE_FILE = "releasable.toml"
+
+
+def _derive_standalone_name(project_root):
+    """Derive a project name for the standalone releasable.
+
+    Tries target read_name (first detected target), then falls back to
+    the directory basename.
+
+    Args:
+        project_root: path to the project root (str or Path).
+
+    Returns:
+        A non-empty name string.
+    """
+    project_root = str(project_root)
+    try:
+        from .targets import detect_targets, TARGETS
+        entries = detect_targets(project_root)
+        if entries:
+            target_obj = TARGETS.get(entries[0].name)
+            if target_obj is not None:
+                name = target_obj.read_name(entries[0].path, None)
+                if name:
+                    return name
+    except Exception:
+        pass
+    return os.path.basename(os.path.realpath(project_root)) or "project"
+
+
+def load_standalone_releasable(project_root):
+    """Load an explicit releasable definition from .rlsbl/releasable.toml.
+
+    If the file exists, reads ``name`` and ``tag_format`` from it.
+    If absent, returns None (caller should use create_standalone_releasable).
+
+    Args:
+        project_root: path to the project root (str or Path).
+
+    Returns:
+        A Releasable instance, or None if the file does not exist.
+
+    Raises:
+        WorkspaceError on invalid file contents.
+    """
+    path = os.path.join(str(project_root), ".rlsbl", STANDALONE_RELEASABLE_FILE)
+    if not os.path.isfile(path):
+        return None
+    with open(path, "rb") as f:
+        data = tomllib.load(f)
+    name = data.get("name")
+    if not name or not isinstance(name, str):
+        raise WorkspaceError(
+            f".rlsbl/{STANDALONE_RELEASABLE_FILE}: missing or invalid 'name' "
+            f"(must be a non-empty string)"
+        )
+    tag_format = data.get("tag_format", STANDALONE_TAG_FORMAT)
+    if not isinstance(tag_format, str):
+        raise WorkspaceError(
+            f".rlsbl/{STANDALONE_RELEASABLE_FILE}: tag_format must be a string"
+        )
+    return Releasable(name=name, tag_format=tag_format)
+
+
+def create_standalone_releasable(project_root):
+    """Return a Releasable representing a single-project repo.
+
+    If ``.rlsbl/releasable.toml`` exists, uses its explicit configuration.
+    Otherwise, derives the name from the project's target metadata (e.g.,
+    ``pyproject.toml [project].name``) or the directory basename, and uses
+    the standalone tag format (``v{version}``).
+
+    This function does NOT create any files on disk -- the releasable is
+    purely an internal abstraction.
+
+    Args:
+        project_root: path to the project root (str or Path).
+
+    Returns:
+        A Releasable instance.
+    """
+    explicit = load_standalone_releasable(project_root)
+    if explicit is not None:
+        return explicit
+    name = _derive_standalone_name(project_root)
+    return Releasable(name=name, tag_format=STANDALONE_TAG_FORMAT)

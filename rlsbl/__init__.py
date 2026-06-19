@@ -183,8 +183,11 @@ def _check_context_factory():
         )
         wctx.push_stdin = push_stdin
         return wctx
+    from .workspace import create_standalone_releasable
+
     ctx = create_context(Path.cwd())
     ctx.push_stdin = push_stdin
+    ctx.releasable = create_standalone_releasable(ctx.project_root)
     return ctx
 
 

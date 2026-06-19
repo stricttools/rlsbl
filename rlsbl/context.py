@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .workspace import WorkspaceProject
+    from .workspace import Releasable, WorkspaceProject
 
 
 @dataclass
@@ -20,6 +20,7 @@ class ProjectContext:
     config: dict
     project: WorkspaceProject | None = field(default=None)
     push_stdin: str | None = field(default=None)
+    releasable: "Releasable | None" = field(default=None)
 
 
 def create_context(
