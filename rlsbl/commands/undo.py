@@ -47,6 +47,7 @@ def run_cmd(registry, args, flags, *, ctx):
     # Monorepo detection
     monorepo_name = None
     monorepo_project_path = None
+    releasable_name = None
     start_path = str(ctx.project_root)
     ws_root = find_workspace_root(start_path)
     if ws_root:
@@ -57,8 +58,21 @@ def run_cmd(registry, args, flags, *, ctx):
         monorepo_name = project["name"]
         monorepo_project_path = project["path"]
 
-    # Find the latest tag (scoped to project in monorepo mode)
-    if monorepo_name:
+        # Detect explicit releasable mode
+        from ..workspace import is_explicit_mode, load_releasables, load_workspace as _load_ws, resolve_releasable_for_project
+        if is_explicit_mode(ws_root):
+            ws_projects = _load_ws(ws_root)
+            releasables = load_releasables(ws_root, ws_projects)
+            rel = resolve_releasable_for_project(project, releasables)
+            if rel:
+                releasable_name = rel.name
+
+    # Find the latest tag (scoped to releasable or project in monorepo mode)
+    if releasable_name and ws_root:
+        from ..commands.release.validate import _releasable_tag_glob
+        rel = next(r for r in releasables if r.name == releasable_name)
+        match_pattern = _releasable_tag_glob(rel.tag_format, releasable_name)
+    elif monorepo_name:
         abs_project_dir = os.path.join(ws_root, monorepo_project_path)
         target_entries = detect_targets(abs_project_dir)
         if target_entries:
@@ -124,9 +138,14 @@ def run_cmd(registry, args, flags, *, ctx):
         results.append(("Delete local tag", FAILED, f"git tag -d {tag}"))
 
     # Revert release commits (should be HEAD, or HEAD + HEAD~1 for two-commit pattern)
-    # In monorepo mode, commit message is "<project>: release v<version>"
+    # In explicit releasable mode, commit message is "<releasable>: release v<version>"
+    # In implicit monorepo mode, commit message is "<project>: release v<version>"
     # In standalone mode, commit message is the tag string (e.g., "v1.2.3")
-    if monorepo_name:
+    if releasable_name:
+        _version_match = re.search(r"v(\d+\.\d+\.\d+)$", tag)
+        version_part = f"v{_version_match.group(1)}" if _version_match else tag
+        expected_msg = f"{releasable_name}: release {version_part}"
+    elif monorepo_name:
         # Extract version from tag: handles both name@v1.2.3 and path/v1.2.3
         _version_match = re.search(r"v(\d+\.\d+\.\d+)$", tag)
         version_part = f"v{_version_match.group(1)}" if _version_match else tag

@@ -39,6 +39,8 @@ def run_cmd(args, flags, project_root):
     # Detect monorepo context and build tag accordingly
     monorepo_name = None
     monorepo_project_path = None
+    releasable_name = None
+    releasable_tag_fmt = None
     start_path = str(project_root)
     monorepo_root = find_workspace_root(start_path)
     if monorepo_root:
@@ -47,13 +49,26 @@ def run_cmd(args, flags, project_root):
             monorepo_name = project["name"]
             monorepo_project_path = project["path"]
 
+            # Detect explicit releasable mode
+            from ..workspace import is_explicit_mode, load_releasables, load_workspace as _load_ws, resolve_releasable_for_project
+            if is_explicit_mode(monorepo_root):
+                ws_projects = _load_ws(monorepo_root)
+                releasables = load_releasables(monorepo_root, ws_projects)
+                rel = resolve_releasable_for_project(project, releasables)
+                if rel:
+                    releasable_name = rel.name
+                    releasable_tag_fmt = rel.tag_format
+
     # Project directory: project_root is already resolved to the sub-project
     # in monorepo mode (via _require_sub_project_root).
     project_dir = start_path
     entries = detect_targets(project_dir)
     if entries:
         target = TARGETS[entries[0].name]
-        if monorepo_name:
+        if releasable_name and releasable_tag_fmt:
+            from .release.validate import _format_releasable_tag
+            tag = _format_releasable_tag(releasable_tag_fmt, releasable_name, version)
+        elif monorepo_name:
             tag = target.monorepo_tag_format(monorepo_name, version, path=monorepo_project_path)
         else:
             tag = target.tag_format(version)

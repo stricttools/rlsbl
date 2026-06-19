@@ -36,6 +36,8 @@ def run_cmd(args, flags, project_root):
     monorepo_name = None
     monorepo_project_path = None
     is_non_releasable = False
+    releasable_name = None
+    releasable_tag_fmt = None
     start_path = str(project_root)
     monorepo_root = find_workspace_root(start_path)
     if monorepo_root:
@@ -44,6 +46,16 @@ def run_cmd(args, flags, project_root):
             monorepo_name = project["name"]
             monorepo_project_path = project["path"]
             is_non_releasable = not project.is_releasable
+
+            # Detect explicit releasable mode
+            from ..workspace import is_explicit_mode, load_releasables, load_workspace as _load_ws, resolve_releasable_for_project
+            if is_explicit_mode(monorepo_root):
+                ws_projects = _load_ws(monorepo_root)
+                releasables = load_releasables(monorepo_root, ws_projects)
+                rel = resolve_releasable_for_project(project, releasables)
+                if rel:
+                    releasable_name = rel.name
+                    releasable_tag_fmt = rel.tag_format
 
     if is_non_releasable:
         print(
@@ -75,8 +87,11 @@ def run_cmd(args, flags, project_root):
     # Normalize: strip leading "v" for changelog lookup
     version = raw_version.lstrip("v")
 
-    # Build the tag: monorepo format or standalone
-    if monorepo_name:
+    # Build the tag: releasable format, monorepo format, or standalone
+    if releasable_name and releasable_tag_fmt:
+        from .release.validate import _format_releasable_tag
+        tag = _format_releasable_tag(releasable_tag_fmt, releasable_name, version)
+    elif monorepo_name:
         tag = target.monorepo_tag_format(monorepo_name, version, path=monorepo_project_path)
     else:
         tag = target.tag_format(version)
