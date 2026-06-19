@@ -2,6 +2,14 @@
 
 # Changelog
 
+## 0.79.1
+
+Raise CI coverage threshold to 90% with 4873 tests at 91.78% coverage
+
+### Features
+
+- **CI coverage threshold raised to 90%.** Test suite expanded to 4873 tests with 91.78% coverage.
+
 ## 0.79.0
 
 Fix publish workflow releasable tags, UV_NO_SOURCES for monorepos, namespace package scanning
