@@ -38,7 +38,7 @@
   },
   "project_id": "rlsbl",
   "name": "rlsbl",
-  "version": "0.77.1",
+  "version": "0.78.0",
   "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 32 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
   "global_flags": [
     {
@@ -323,6 +323,10 @@
           "negatable": true
         }
       ]
+    },
+    "migrate-publish-config": {
+      "name": "migrate-publish-config",
+      "help": "Extract publishing fields (targets, private, pipelines, push_timeout, tag) from .rlsbl/config.json into a separate .rlsbl/publish.json file. This is the preferred config layout for new projects. Fails if publish.json already has content."
     },
     "deploy": {
       "name": "deploy",
@@ -926,6 +930,56 @@
               "type": "str",
               "help": "Comma-separated package names to include (default: all)",
               "default": ""
+            }
+          ]
+        },
+        "extract": {
+          "name": "extract",
+          "help": "Extract a package from the monorepo into a new standalone repository. Clones the monorepo, runs git filter-repo to keep only the package's history, migrates changelog entries, creates .rlsbl/ config in the new repo, and removes the project from workspace.toml.",
+          "args": [
+            {
+              "name": "target_path",
+              "help": "Filesystem path where the new standalone repository will be created"
+            },
+            {
+              "name": "package_name",
+              "help": "Name of the package in workspace.toml to extract"
+            }
+          ]
+        },
+        "absorb": {
+          "name": "absorb",
+          "help": "Absorb an external repository as a package in the monorepo. Runs git subtree add to import the source repo's history under the package name, adds the project to workspace.toml, and migrates changelog entries from the source repo's .rlsbl/changes/ directory.",
+          "flags": [
+            {
+              "name": "releasable",
+              "type": "str",
+              "help": "Releasable group to assign the absorbed package to",
+              "default": ""
+            }
+          ],
+          "args": [
+            {
+              "name": "package_name",
+              "help": "Name for the package in the monorepo workspace"
+            },
+            {
+              "name": "source_path",
+              "help": "Filesystem path to the external git repository to absorb"
+            }
+          ]
+        },
+        "extract-releasable": {
+          "name": "extract-releasable",
+          "help": "Extract all member packages of a releasable into a new repository. If the releasable has one member, creates a single-project repo. If it has multiple members, creates a new monorepo with workspace.toml. Migrates changelog entries for each member and removes all extracted projects from the source workspace.",
+          "args": [
+            {
+              "name": "target_path",
+              "help": "Filesystem path where the new repository will be created"
+            },
+            {
+              "name": "releasable_name",
+              "help": "Name of the releasable group in workspace.toml to extract"
             }
           ]
         }

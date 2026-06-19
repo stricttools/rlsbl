@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.77.1",
+  "version": "0.78.0",
   "description": null,
   "language": "python",
   "base_url": "https://rlsbl.smmh.dev",
@@ -65,6 +65,11 @@
     {
       "path": "cli-index.md",
       "title": "rlsbl CLI Reference",
+      "type": "doc"
+    },
+    {
+      "path": "cli-migrate-publish-config.md",
+      "title": "rlsbl migrate-publish-config",
       "type": "doc"
     },
     {
@@ -844,5 +849,5 @@
     }
   ],
   "posts": [],
-  "last_gen": "2026-06-19T11:28:54.920690+00:00"
+  "last_gen": "2026-06-19T16:15:44.119082+00:00"
 }

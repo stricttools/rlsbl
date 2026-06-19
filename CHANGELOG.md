@@ -2,6 +2,38 @@
 
 # Changelog
 
+## 0.79.0
+
+Fix publish workflow releasable tags, UV_NO_SOURCES for monorepos, namespace package scanning
+
+<details>
+<summary>Context</summary>
+
+Three gaps discovered during first real-world use of the releasable model:
+(1) publish workflow ignored releasable tags, (2) UV_NO_SOURCES broke
+monorepo CI for workspace-source projects, (3) deps-unused produced false
+positives for namespace packages. Also adds template engine conditionals,
+extract/absorb CLI commands, migrate-publish-config command, and removes
+implicit releasable mode (monorepos must define [[releasables]]).
+
+</details>
+
+### Breaking
+
+- **Remove implicit releasable mode.** Monorepo workspaces must define `[[releasables]]` in workspace.toml. Hard error if missing.
+
+### Features
+
+- **Template engine conditionals.** `{{#if varName}}...{{/if}}` blocks for conditional template content.
+- **New command: `rlsbl migrate-publish-config`.** Splits publishing fields from `.rlsbl/config.json` into `.rlsbl/publish.json`.
+- **New commands: `rlsbl monorepo extract`, `absorb`, `extract-releasable`.** First-class operations for moving packages in and out of monorepos.
+
+### Fixes
+
+- **Fix: publish workflow releasable tags.** Monorepo publish router uses releasable tag prefixes instead of per-project tags in explicit mode.
+- **Fix: UV_NO_SOURCES omitted for monorepo members.** CI template conditionally includes `UV_NO_SOURCES` only for projects with path-based sources. Monorepo sync strips it as a safety net.
+- **Fix: namespace package import scanning.** `deps-unused` correctly detects workspace imports through namespace packages (e.g., `from orxt.protocols import X`). Auto-discovers namespace-to-project mapping from source layout.
+
 ## 0.78.0
 
 Releasable model: groups of packages sharing a version, changelog, and release lifecycle
