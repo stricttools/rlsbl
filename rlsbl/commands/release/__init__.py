@@ -185,9 +185,15 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         log(blog_warning)
 
     # Compute changelog content in memory (deferred write after pre-release checks pass)
+    # In explicit releasable mode, changes_dir points to the releasable-level
+    # directory, not the per-project default.
+    changelog_gen_kwargs = {}
+    if releasable_name and changes_dir:
+        changelog_gen_kwargs["changes_dir_override"] = changes_dir
     changelog_content = generate_changelog(
         project_dir, write_to_disk=False, version_override=new_version,
         description=release_config.description, context=release_config.context,
+        **changelog_gen_kwargs,
     )
     log("Generated CHANGELOG.md from JSONL entries (in-memory preview)")
 
@@ -288,6 +294,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         generate_changelog(
             project_dir, version_override=new_version,
             description=release_config.description, context=release_config.context,
+            **changelog_gen_kwargs,
         )
 
     try:
@@ -302,6 +309,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             primary_path=primary_path,
             target_paths=target_paths,
             lock_dir=lock_dir,
+            changes_dir=changes_dir,
             monorepo_name=monorepo_name,
             monorepo_project_path=monorepo_project_path,
             releasable_name=releasable_name,

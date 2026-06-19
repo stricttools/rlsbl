@@ -336,6 +336,7 @@ class ReleaseState:
     primary_path: str | None = None
     target_paths: dict | None = None
     lock_dir: str = ".rlsbl"
+    changes_dir: str | None = None  # resolved changes dir (releasable or per-project)
 
     # Monorepo
     monorepo_name: str | None = None
@@ -638,8 +639,10 @@ def _run_release_mutating(state: ReleaseState):
             # The .validated cache is written by changelog validation earlier in the
             # release flow.  It may be tracked (dirty) or gitignored (invisible to
             # git status).  Either way it is not a concurrent-change signal.
+            # Use the resolved changes_dir (covers both releasable and per-project).
+            _validated_changes_dir = state.changes_dir or get_changes_dir(project_dir)
             validated_raw = os.path.normpath(
-                os.path.join(get_changes_dir(project_dir), ".validated")
+                os.path.join(_validated_changes_dir, ".validated")
             )
             validated_file = os.path.relpath(validated_raw, _git_root) if os.path.isabs(validated_raw) else validated_raw
             expected_files.add(validated_file)
@@ -676,9 +679,12 @@ def _run_release_mutating(state: ReleaseState):
         # version_override=new_version, so no regeneration is needed here.
         #
         # In explicit releasable mode, the changes dir lives at the releasable
-        # level, and the tag glob uses the releasable's tag format.
-        if changes_dir_exists(project_dir):
+        # level, and the tag glob uses the releasable's tag format. The
+        # resolved changes_dir is passed via state.changes_dir.
+        changes_dir = state.changes_dir
+        if changes_dir is None and changes_dir_exists(project_dir):
             changes_dir = get_changes_dir(project_dir)
+        if changes_dir and os.path.isdir(changes_dir):
             if releasable_name and releasable_tag_format_str:
                 from .validate import _releasable_tag_glob
                 tag_glob = _releasable_tag_glob(releasable_tag_format_str, releasable_name)
@@ -761,8 +767,8 @@ def _run_release_mutating(state: ReleaseState):
             # .md so its content is derived from _read_release_metadata() rather
             # than the direct params passed earlier. This keeps the .md
             # consistent with what future generate_changelog() calls produce.
-            if changes_dir_exists(project_dir):
-                changes_dir_regen = get_changes_dir(project_dir)
+            changes_dir_regen = state.changes_dir or (get_changes_dir(project_dir) if changes_dir_exists(project_dir) else None)
+            if changes_dir_regen and os.path.isdir(changes_dir_regen):
                 ver_desc, ver_ctx = _read_release_metadata(project_dir, new_version)
                 generate_version_file(
                     changes_dir_regen, new_version,
