@@ -136,7 +136,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     branch = validate_branch_and_remote(flags)
 
     # --- Resolve context ---
-    monorepo_name, monorepo_project_path, is_library, is_dev_node, releasable_name = resolve_monorepo_context(
+    monorepo_name, monorepo_project_path, is_library, is_non_releasable, releasable_name = resolve_monorepo_context(
         monorepo_root, project_root, log,
     )
 

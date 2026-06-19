@@ -580,7 +580,7 @@ releasable = "core"
         pkg_dir.mkdir()
 
         from rlsbl.commands.release.validate import resolve_monorepo_context
-        name, path, is_lib, is_dev, rel_name = resolve_monorepo_context(
+        name, path, is_lib, is_non_releasable, rel_name = resolve_monorepo_context(
             str(tmp_path), pkg_dir, lambda msg: None
         )
         assert name == "pkg"
@@ -597,7 +597,7 @@ name = "pkg"
         pkg_dir.mkdir()
 
         from rlsbl.commands.release.validate import resolve_monorepo_context
-        name, path, is_lib, is_dev, rel_name = resolve_monorepo_context(
+        name, path, is_lib, is_non_releasable, rel_name = resolve_monorepo_context(
             str(tmp_path), pkg_dir, lambda msg: None
         )
         assert name == "pkg"
@@ -606,7 +606,7 @@ name = "pkg"
     def test_not_monorepo_returns_none(self, tmp_path):
         """When not in a monorepo, releasable_name is None."""
         from rlsbl.commands.release.validate import resolve_monorepo_context
-        name, path, is_lib, is_dev, rel_name = resolve_monorepo_context(
+        name, path, is_lib, is_non_releasable, rel_name = resolve_monorepo_context(
             None, tmp_path, lambda msg: None
         )
         assert name is None

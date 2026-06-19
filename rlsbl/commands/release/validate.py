@@ -242,7 +242,7 @@ def validate_branch_and_remote(flags):
 def resolve_monorepo_context(monorepo_root, project_root, log):
     """Resolve monorepo project context if inside a monorepo.
 
-    Returns (monorepo_name, monorepo_project_path, is_library, is_dev_node, releasable_name).
+    Returns (monorepo_name, monorepo_project_path, is_library, is_non_releasable, releasable_name).
     All values are None/False/None when not in a monorepo.
     ``releasable_name`` is a string when the project explicitly belongs to a
     named releasable (``releasable = "name"``), or None in implicit mode.
@@ -264,9 +264,9 @@ def resolve_monorepo_context(monorepo_root, project_root, log):
     monorepo_name = project["name"]
     monorepo_project_path = project["path"]
     is_library = bool(project.get("library"))
-    is_dev_node = not project.is_releasable
+    is_non_releasable = not project.is_releasable
     log(f"Monorepo project: {monorepo_name} ({monorepo_project_path})")
-    if is_dev_node:
+    if is_non_releasable:
         raise ReleaseValidationError(
             "non-releasable projects cannot be released. Set "
             "releasable = \"<name>\" in workspace.toml if this project "
@@ -282,7 +282,7 @@ def resolve_monorepo_context(monorepo_root, project_root, log):
         if isinstance(rel_val, str):
             releasable_name = rel_val
 
-    return monorepo_name, monorepo_project_path, is_library, is_dev_node, releasable_name
+    return monorepo_name, monorepo_project_path, is_library, is_non_releasable, releasable_name
 
 
 def _format_releasable_tag(releasable_tag_format, releasable_name, version):

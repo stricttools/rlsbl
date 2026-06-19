@@ -188,11 +188,11 @@ class TestReleaseGateUsesReleasable:
         project_dir = root / "dev-rel"
 
         # resolve_monorepo_context should NOT raise for dev_only + releasable
-        name, path, is_lib, is_dev, _rel_name = resolve_monorepo_context(
+        name, path, is_lib, is_non_releasable, _rel_name = resolve_monorepo_context(
             str(root), project_dir, lambda msg: None
         )
         assert name == "dev-rel"
-        assert is_dev is False  # is_releasable is True, so is_dev_node return is False
+        assert is_non_releasable is False  # is_releasable is True, so is_non_releasable is False
 
     def test_dev_only_non_releasable_project_blocked(self, split_monorepo):
         """A dev_only=true project with releasable=false should be blocked."""
@@ -227,11 +227,11 @@ class TestReleaseGateUsesReleasable:
         root = split_monorepo.root
         project_dir = root / "regular"
 
-        name, path, is_lib, is_dev, _rel_name = resolve_monorepo_context(
+        name, path, is_lib, is_non_releasable, _rel_name = resolve_monorepo_context(
             str(root), project_dir, lambda msg: None
         )
         assert name == "regular"
-        assert is_dev is False
+        assert is_non_releasable is False
 
 
 # ---------------------------------------------------------------------------
