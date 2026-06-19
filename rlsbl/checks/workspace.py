@@ -1,7 +1,7 @@
-"""Workspace checks (tag: workspace) validating monorepo CI routing, project registration, dev-node boundaries, and inter-project dependency declarations.
+"""Workspace checks (tag: workspace) validating monorepo CI routing, project registration, dev-only boundaries, and inter-project dependency declarations.
 
 Checks: workspace-ci-router, workspace-ci-synced, workspace-targets,
-workspace-unregistered, workspace-stale-entries, dev-node-boundary,
+workspace-unregistered, workspace-stale-entries, dev-only-boundary,
 dead-workspace-packages, subtree-remote-reachable, workspace-unbuildable,
 layers-violations, deps-unused, deps-undeclared, deps-runtime-test-only,
 deps-dev-in-lib, deps-stale, test-suite-workspace.
@@ -184,26 +184,26 @@ def register_workspace_checks(app):
             )
         return CheckResult("pass", "no stale entries")
 
-    @app.check("dev-node-boundary")
-    def check_dev_node_boundary(ctx):
-        """Non-dev-node projects must not have runtime deps on dev node projects."""
+    @app.check("dev-only-boundary")
+    def check_dev_only_boundary(ctx):
+        """Non-dev-only projects must not have runtime deps on dev-only projects."""
         if not isinstance(ctx, WorkspaceCheckContext):
             return CheckResult("skip", "not a monorepo workspace")
 
         # Build lookup: project name -> project dict
         projects_by_name = {p["name"]: p for p in ctx.projects}
 
-        # Find all dev node projects
-        dev_node_names = [
+        # Find all dev-only projects
+        dev_only_names = [
             name for name, proj in projects_by_name.items()
-            if proj.get("dev_node")
+            if proj.dev_only
         ]
 
-        if not dev_node_names:
-            return CheckResult("pass", "no dev node projects")
+        if not dev_only_names:
+            return CheckResult("pass", "no dev-only projects")
 
         violations = []
-        for dev_name in dev_node_names:
+        for dev_name in dev_only_names:
             # Collect non-dev dependents: runtime and explicit scopes
             dependents = set()
             for scope in ("runtime", "explicit"):
@@ -217,10 +217,10 @@ def register_workspace_checks(app):
                 dep_proj = projects_by_name.get(dep_name)
                 if dep_proj is None:
                     continue
-                if not dep_proj.get("dev_node"):
+                if not dep_proj.dev_only:
                     violations.append(
-                        f"non-dev-node project '{dep_name}' has a runtime dependency "
-                        f"on dev node project '{dev_name}'. "
+                        f"non-dev-only project '{dep_name}' has a runtime dependency "
+                        f"on dev-only project '{dev_name}'. "
                         f"Bug fixes in '{dev_name}' won't appear in any changelog."
                     )
 
@@ -230,7 +230,7 @@ def register_workspace_checks(app):
                 f"{len(violations)} boundary violation(s)",
                 details=violations,
             )
-        return CheckResult("pass", "dev node boundary clean")
+        return CheckResult("pass", "dev-only boundary clean")
 
     @app.check("dead-workspace-packages")
     def check_dead_workspace_packages(ctx):
@@ -531,8 +531,8 @@ def register_workspace_checks(app):
         if config is None:
             return CheckResult("skip", "layers not configured")
 
-        # Dev node projects sit outside the layer system entirely
-        projects = [p for p in ctx.projects if not p.get("dev_node")]
+        # Dev-only projects sit outside the layer system entirely
+        projects = [p for p in ctx.projects if not p.dev_only]
 
         violations = check_layer_violations(projects, config, ctx.graph)
         if violations:
@@ -568,8 +568,8 @@ def register_workspace_checks(app):
 
         affected = _affected(changed_files, ctx.projects)
 
-        # Filter out dev_node projects
-        affected = [p for p in affected if not p.get("dev_node")]
+        # Filter out dev-only projects
+        affected = [p for p in affected if not p.dev_only]
 
         if not affected:
             return CheckResult("pass", "no affected projects need testing")
