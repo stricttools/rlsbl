@@ -1,11 +1,12 @@
 """Focused tests for the template engine's process_template() function.
 
-Covers the four behavioral areas of the two-pass renderer:
+Covers the five behavioral areas of the multi-pass renderer:
 
 1. Pass 1 -- action resolution ({{action "owner/name"}} -> pinned version)
 2. Escape handling (\\{{varName}} -> literal {{varName}})
 3. required_vars validation (missing required vars raise ConfigError)
 4. Unreplaced variable collection (unknown vars stay in output, listed in unreplaced)
+5. Conditional blocks ({{#if varName}}...{{/if}} -> include/exclude body)
 """
 
 from __future__ import annotations
@@ -263,3 +264,134 @@ class TestUnreplacedCollection:
         content, unreplaced = process_template("", {})
         assert content == ""
         assert unreplaced == []
+
+
+# ---------------------------------------------------------------------------
+# 5. Conditional blocks -- {{#if varName}}...{{/if}}
+# ---------------------------------------------------------------------------
+
+
+class TestConditionalBlocks:
+    """{{#if varName}}...{{/if}} conditional blocks."""
+
+    def test_truthy_var_keeps_body(self):
+        template = "before\n{{#if feature}}included\n{{/if}}after"
+        content, unreplaced = process_template(template, {"feature": "yes"})
+        assert "included" in content
+        assert unreplaced == []
+
+    def test_falsy_var_removes_block(self):
+        """Empty string is falsy -- block is removed."""
+        template = "before\n{{#if feature}}removed\n{{/if}}after"
+        content, unreplaced = process_template(template, {"feature": ""})
+        assert "removed" not in content
+        assert unreplaced == []
+
+    def test_missing_var_removes_block(self):
+        template = "before\n{{#if feature}}removed\n{{/if}}after"
+        content, unreplaced = process_template(template, {})
+        assert "removed" not in content
+        assert unreplaced == []
+
+    def test_boolean_like_nonempty_string_is_truthy(self):
+        """Both 'true' and 'false' are non-empty strings, so truthy."""
+        for val in ("true", "false", "0", "anything"):
+            content, _ = process_template(
+                "{{#if flag}}body{{/if}}", {"flag": val}
+            )
+            assert content == "body", f"Expected truthy for {val!r}"
+
+    def test_boolean_like_empty_string_is_falsy(self):
+        content, _ = process_template("{{#if flag}}body{{/if}}", {"flag": ""})
+        assert content == ""
+
+    def test_actions_inside_conditional_resolve(self):
+        """Pass 1 (actions) runs before Pass 1.5 (conditionals),
+        so actions inside conditional blocks are resolved."""
+        template = '{{#if enabled}}uses: {{action "actions/checkout"}}{{/if}}'
+        content, unreplaced = process_template(template, {"enabled": "yes"})
+        expected = format_action("actions/checkout")
+        assert content == f"uses: {expected}"
+        assert unreplaced == []
+
+    def test_variables_inside_surviving_block_resolve(self):
+        """Pass 2 (variables) runs after Pass 1.5, so variables inside
+        surviving blocks are resolved."""
+        template = "{{#if enabled}}hello {{name}}{{/if}}"
+        content, unreplaced = process_template(
+            template, {"enabled": "yes", "name": "world"}
+        )
+        assert content == "hello world"
+        assert unreplaced == []
+
+    def test_variables_inside_removed_block_never_reach_pass2(self):
+        """Variables inside removed blocks are gone before Pass 2.
+        They should NOT appear in unreplaced."""
+        template = "{{#if disabled}}{{missingVar}}{{/if}}after"
+        content, unreplaced = process_template(template, {})
+        assert "missingVar" not in content
+        assert unreplaced == []
+
+    def test_blank_line_cleanup_after_removal(self):
+        """Removed blocks don't leave triple-newline gaps."""
+        template = "before\n\n{{#if gone}}removed\n{{/if}}\nafter"
+        content, _ = process_template(template, {})
+        assert "\n\n\n" not in content
+        assert "before" in content
+        assert "after" in content
+
+    def test_multiple_conditional_blocks(self):
+        template = (
+            "{{#if a}}A{{/if}}"
+            " middle "
+            "{{#if b}}B{{/if}}"
+        )
+        # Both present
+        content, _ = process_template(template, {"a": "1", "b": "2"})
+        assert content == "A middle B"
+
+        # Only first
+        content, _ = process_template(template, {"a": "1"})
+        assert content == "A middle "
+
+        # Only second
+        content, _ = process_template(template, {"b": "2"})
+        assert content == " middle B"
+
+        # Neither
+        content, _ = process_template(template, {})
+        assert content == " middle "
+
+    def test_conditional_at_start_of_template(self):
+        template = "{{#if header}}# Title\n{{/if}}body"
+        content, _ = process_template(template, {"header": "yes"})
+        assert content == "# Title\nbody"
+
+        content, _ = process_template(template, {})
+        assert content == "body"
+
+    def test_conditional_at_end_of_template(self):
+        template = "body\n{{#if footer}}---\nThe End{{/if}}"
+        content, _ = process_template(template, {"footer": "yes"})
+        assert content == "body\n---\nThe End"
+
+        # The \n before the block is not part of the conditional, so it stays.
+        content, _ = process_template(template, {})
+        assert content == "body\n"
+
+    def test_conditional_at_very_end_no_preceding_newline(self):
+        template = "body{{#if footer}}---{{/if}}"
+        content, _ = process_template(template, {})
+        assert content == "body"
+
+    def test_multiline_body_preserved(self):
+        template = "{{#if block}}line1\nline2\nline3{{/if}}"
+        content, _ = process_template(template, {"block": "yes"})
+        assert content == "line1\nline2\nline3"
+
+    def test_multiline_body_removed(self):
+        template = "above\n{{#if block}}line1\nline2\nline3\n{{/if}}below"
+        content, _ = process_template(template, {})
+        assert "line1" not in content
+        assert "line2" not in content
+        assert "line3" not in content
