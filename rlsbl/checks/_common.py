@@ -11,9 +11,37 @@ RLSBL_CONFIG = os.path.join(".rlsbl", "config.json")
 def _resolve_version_and_tag(ctx):
     """Detect version and tag from project targets rooted at *ctx*.
 
+    In explicit releasable mode, uses the releasable's version file and
+    tag_format instead of the per-target version and tag format.
+
     Returns ``(version, tag)``; either may be ``None``.
     """
     from ..targets import TARGETS, detect_targets
+
+    # In explicit releasable mode, version and tag come from the releasable
+    if isinstance(ctx, WorkspaceCheckContext) and getattr(ctx, "releasables", None):
+        from ..workspace import (
+            is_explicit_mode,
+            read_releasable_version,
+            resolve_project,
+            resolve_releasable_for_project,
+        )
+
+        ws_root = str(ctx.workspace_root)
+        if is_explicit_mode(ws_root):
+            proj = resolve_project(ws_root, str(ctx.project_root))
+            if proj is not None:
+                rel = resolve_releasable_for_project(proj, ctx.releasables)
+                if rel is not None:
+                    try:
+                        version = read_releasable_version(ws_root, rel.name)
+                    except Exception:
+                        version = None
+                    if version:
+                        tag = rel.tag_format.replace("{version}", version).replace("{name}", rel.name)
+                    else:
+                        tag = None
+                    return version, tag
 
     target_entries = detect_targets(str(ctx.project_root))
     if not target_entries:
