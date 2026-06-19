@@ -2,7 +2,7 @@
 
 Public API:
     lint_library(project_path) -> list[LintResult]
-    scan_imports(project_path) -> set[tuple[str, str, int, bool]]
+    scan_imports(project_path) -> set  (ImportRecord or tuples)
 """
 
 import os
@@ -108,7 +108,7 @@ def lint_library(project_path: str) -> list[LintResult]:
     return results
 
 
-def scan_imports(project_path: str) -> set[tuple[str, str, int, bool]]:
+def scan_imports(project_path: str) -> set:
     """Collect all imports from source files in a project.
 
     Detects languages present and uses AST-based scanners to extract
@@ -117,8 +117,11 @@ def scan_imports(project_path: str) -> set[tuple[str, str, int, bool]]:
     Args:
         project_path: path to the project root directory.
 
-    Returns a set of (package_name, file_path, line_number, guarded) tuples.
-    Guarded imports are those inside try/except ImportError blocks (Python).
+    Returns a set of import records. Python imports are ImportRecord
+    namedtuples (top_level, full_path, filepath, line, guarded).
+    npm imports are (package_name, file_path, line_number, guarded) tuples.
+    All record types support ``record[0]`` or ``pkg, *_ = record`` for
+    the package/top-level name.
     """
     project_path = os.path.abspath(project_path)
     languages = _detect_languages(project_path)
@@ -126,7 +129,7 @@ def scan_imports(project_path: str) -> set[tuple[str, str, int, bool]]:
     if not languages:
         return set()
 
-    all_imports: set[tuple[str, str, int, bool]] = set()
+    all_imports: set = set()
     for language in languages:
         scanner = _create_import_scanner(language)
         if scanner is not None:

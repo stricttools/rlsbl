@@ -36,7 +36,7 @@ class TestPythonImportExtraction:
         )
         linter = PythonAstLinter()
         result = linter.scan_imports(str(tmp_path))
-        by_pkg = {pkg: line for pkg, _, line, _guarded in result}
+        by_pkg = {record.top_level: record.line for record in result}
         assert by_pkg["os"] == 1
         assert by_pkg["pathlib"] == 3
         assert by_pkg["requests"] == 4
@@ -47,7 +47,7 @@ class TestPythonImportExtraction:
         (tmp_path / "lib.py").write_text("import os\n")
         linter = PythonAstLinter()
         result = linter.scan_imports(str(tmp_path))
-        filepaths = {fp for _, fp, _, _guarded in result}
+        filepaths = {record.filepath for record in result}
         assert len(filepaths) == 1
         assert filepaths.pop().endswith("lib.py")
 

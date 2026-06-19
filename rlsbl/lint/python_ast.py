@@ -3,6 +3,7 @@
 import os
 import sys
 import tomllib
+from collections import namedtuple
 
 import tree_sitter_python
 from tree_sitter import Language, Parser
@@ -10,6 +11,8 @@ from tree_sitter import Language, Parser
 from .config import LanguageLintConfig
 from .result import LintResult
 from .utils import walk_source_files
+
+ImportRecord = namedtuple("ImportRecord", ["top_level", "full_path", "filepath", "line", "guarded"])
 
 PY_LANG = Language(tree_sitter_python.language())
 
@@ -92,9 +95,11 @@ def _try_catches_import_error(try_node, error_names):
 
 
 def _collect_all_imports(tree, filepath):
-    """Walk AST and collect all imported top-level module names.
+    """Walk AST and collect all imported module names with full paths.
 
-    Returns a set of (package_name, file_path, line_number, guarded) tuples.
+    Returns a set of ImportRecord(top_level, full_path, filepath, line, guarded).
+    ``top_level`` is the first component of the dotted path (e.g., "orxt").
+    ``full_path`` is the complete dotted module path (e.g., "orxt.protocols").
     Imports inside try/except ImportError blocks are marked guarded=True
     instead of being dropped, so callers can decide how to handle them.
     """
@@ -112,13 +117,13 @@ def _collect_all_imports(tree, filepath):
                 if child.type == "dotted_name":
                     module = child.text.decode("utf-8")
                     top_level = module.split(".")[0]
-                    imports.add((top_level, filepath, _node_line(node), guarded))
+                    imports.add(ImportRecord(top_level, module, filepath, _node_line(node), guarded))
                 elif child.type == "aliased_import":
                     name_node = child.child_by_field_name("name")
                     if name_node:
                         module = name_node.text.decode("utf-8")
                         top_level = module.split(".")[0]
-                        imports.add((top_level, filepath, _node_line(node), guarded))
+                        imports.add(ImportRecord(top_level, module, filepath, _node_line(node), guarded))
             if guarded:
                 return
         elif node.type == "import_from_statement":
@@ -130,7 +135,7 @@ def _collect_all_imports(tree, filepath):
             if module_node:
                 module = module_node.text.decode("utf-8")
                 top_level = module.split(".")[0]
-                imports.add((top_level, filepath, _node_line(node), guarded))
+                imports.add(ImportRecord(top_level, module, filepath, _node_line(node), guarded))
             if guarded:
                 return
         for child in node.children:
@@ -146,7 +151,8 @@ def _check_forbidden_imports(tree, filepath, config):
     forbidden = frozenset(config.forbidden_imports)
     all_imports = _collect_all_imports(tree, filepath)
 
-    for pkg, fpath, line, _guarded in all_imports:
+    for record in all_imports:
+        pkg, fpath, line = record.top_level, record.filepath, record.line
         if pkg in forbidden:
             results.append(LintResult(
                 file=fpath,
@@ -299,13 +305,13 @@ class PythonAstLinter:
         self,
         project_path: str,
         exclude_dirs: list[str] | None = None,
-    ) -> set[tuple[str, str, int, bool]]:
-        """Collect all imported top-level module names from Python files.
+    ) -> set[ImportRecord]:
+        """Collect all imported module names from Python files.
 
-        Returns a set of (package_name, file_path, line_number, guarded) tuples.
+        Returns a set of ImportRecord(top_level, full_path, filepath, line, guarded).
         Guarded imports are those inside try/except ImportError blocks.
         """
-        all_imports: set[tuple[str, str, int, bool]] = set()
+        all_imports: set[ImportRecord] = set()
         parser = _make_parser()
         for filepath in walk_source_files(project_path, (".py",), [], exclude_dirs=exclude_dirs):
             try:
