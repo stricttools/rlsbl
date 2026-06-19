@@ -1,10 +1,18 @@
-"""Project configuration loading with layered precedence: CLI flags override project-level .rlsbl/config.json which overrides user-level defaults."""
+"""Project configuration loading with layered precedence: CLI flags override project-level .rlsbl/config.json which overrides user-level defaults.
+
+Publishing fields (targets, private, pipelines, push_timeout, tag) can live in
+either ``.rlsbl/config.json`` (legacy) or ``.rlsbl/publish.json`` (preferred).
+Having publishing fields in *both* files is a hard error -- no silent fallback.
+"""
 
 import json
 import os
 import sys
 
 from .errors import ConfigError
+
+# Fields that belong in publish.json (publishing-related configuration).
+PUBLISH_FIELDS = frozenset({"targets", "private", "pipelines", "push_timeout", "tag"})
 
 
 def load_env_file(path):
@@ -77,9 +85,114 @@ def should_tag(flags, config):
     return True
 
 
+def _publish_config_path(project_root):
+    """Resolve publish config path at call time."""
+    return os.path.join(str(project_root), ".rlsbl", "publish.json")
+
+
+def read_publish_config(project_root):
+    """Read ``.rlsbl/publish.json``, returning dict or empty dict if missing."""
+    return read_json_config(_publish_config_path(project_root))
+
+
+def write_publish_config(project_root, config):
+    """Atomically write ``config`` dict to ``.rlsbl/publish.json``."""
+    path = _publish_config_path(project_root)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp_path = path + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    os.replace(tmp_path, path)
+
+
+def _check_publish_field_conflict(config_json, publish_json, project_root):
+    """Raise ConfigError if both config.json and publish.json contain publishing fields."""
+    config_publish_keys = PUBLISH_FIELDS & set(config_json.keys())
+    publish_keys = PUBLISH_FIELDS & set(publish_json.keys())
+    if config_publish_keys and publish_keys:
+        overlap = sorted(config_publish_keys | publish_keys)
+        raise ConfigError(
+            f"Publishing fields found in both .rlsbl/config.json and .rlsbl/publish.json: "
+            f"{', '.join(overlap)}. "
+            f"Use migrate_publish_config() to move publishing fields to publish.json, "
+            f"or remove them from one file."
+        )
+
+
 def read_project_config(project_root):
-    """Read .rlsbl/config.json, return dict or empty dict if missing/malformed."""
-    return read_json_config(_project_config(project_root))
+    """Read project config, merging publishing fields from the correct source.
+
+    Resolution order:
+    - If ``.rlsbl/publish.json`` exists AND ``.rlsbl/config.json`` also has
+      PUBLISH_FIELDS: hard error (ConfigError).
+    - If only ``.rlsbl/config.json`` has publishing fields: read from it
+      (backward compat, pre-migration).
+    - If only ``.rlsbl/publish.json``: use it.
+    - Returns the merged view (non-publishing from config.json + publishing
+      from whichever source).
+    """
+    config_json = read_json_config(_project_config(project_root))
+    publish_json = read_json_config(_publish_config_path(project_root))
+
+    # If publish.json doesn't exist or is empty, return config.json as-is (backward compat)
+    if not publish_json:
+        return config_json
+
+    # Both have content -- check for conflicts
+    _check_publish_field_conflict(config_json, publish_json, project_root)
+
+    # publish.json exists and config.json has no publishing fields -- merge
+    merged = {k: v for k, v in config_json.items() if k not in PUBLISH_FIELDS}
+    merged.update(publish_json)
+    return merged
+
+
+def migrate_publish_config(project_root):
+    """Extract PUBLISH_FIELDS from ``.rlsbl/config.json`` into ``.rlsbl/publish.json``.
+
+    Reads config.json, moves any PUBLISH_FIELDS into a new publish.json, and
+    rewrites config.json without those fields. Both writes are atomic (write to
+    tmp, then rename).
+
+    Returns a tuple of (extracted_fields, remaining_fields) dicts.
+    Raises ConfigError if publish.json already exists and has content.
+    """
+    config_path = _project_config(project_root)
+    publish_path = _publish_config_path(project_root)
+
+    config_json = read_json_config(config_path)
+    existing_publish = read_json_config(publish_path)
+
+    if existing_publish:
+        raise ConfigError(
+            f".rlsbl/publish.json already exists and has content. "
+            f"Migration would overwrite it. Remove or merge manually."
+        )
+
+    # Split config.json into publishing and non-publishing fields
+    extracted = {k: v for k, v in config_json.items() if k in PUBLISH_FIELDS}
+    remaining = {k: v for k, v in config_json.items() if k not in PUBLISH_FIELDS}
+
+    if not extracted:
+        return extracted, remaining
+
+    # Write publish.json atomically
+    os.makedirs(os.path.dirname(publish_path), exist_ok=True)
+    tmp_publish = publish_path + ".tmp"
+    with open(tmp_publish, "w", encoding="utf-8") as f:
+        json.dump(extracted, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    os.replace(tmp_publish, publish_path)
+
+    # Rewrite config.json without publishing fields atomically
+    tmp_config = config_path + ".tmp"
+    with open(tmp_config, "w", encoding="utf-8") as f:
+        json.dump(remaining, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    os.replace(tmp_config, config_path)
+
+    return extracted, remaining
 
 
 def read_deploy_config(config):
