@@ -35,6 +35,7 @@ from .sync import (
     _inject_packages_dir,
     _generate_router,
     _get_monorepo_tag_prefix,
+    scaffold_releasable_dirs,
 )
 
 __all__ = [
@@ -66,4 +67,5 @@ __all__ = [
     "_inject_packages_dir",
     "_generate_router",
     "_get_monorepo_tag_prefix",
+    "scaffold_releasable_dirs",
 ]

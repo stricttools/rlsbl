@@ -62,6 +62,7 @@ def _cmd_add(args, flags, project_root):
     depends_on_raw = flags.get("depends-on")
     library_raw = flags.get("library")
     dev_only_raw = flags.get("dev_only")
+    releasable_raw = flags.get("releasable")
 
     # Parse --library as boolean
     library = None
@@ -85,6 +86,15 @@ def _cmd_add(args, flags, project_root):
             print(f"Error: --dev-only must be 'true' or 'false', got '{dev_only_raw}'.", file=sys.stderr)
             sys.exit(1)
 
+    # Parse --releasable as string name or "false"
+    releasable_value = None  # None means "not set" (omit from project)
+    if releasable_raw is not None:
+        if releasable_raw == "false":
+            releasable_value = False
+        elif releasable_raw:
+            releasable_value = releasable_raw
+        # Empty string means flag not passed (default="")
+
     start = str(project_root)
     root = find_workspace_root(start)
     if root is None:
@@ -100,6 +110,30 @@ def _cmd_add(args, flags, project_root):
             sys.exit(1)
         if proj["name"] == name:
             print(f"Error: Project named '{name}' already exists in workspace.", file=sys.stderr)
+            sys.exit(1)
+
+    # In explicit mode, --releasable is required
+    from ...workspace import is_explicit_mode, load_releasables
+    explicit = is_explicit_mode(root)
+    if explicit and releasable_value is None:
+        print(
+            "Error: --releasable is required in explicit mode "
+            "(workspace has [[releasables]] defined). "
+            "Use --releasable <name> or --releasable false.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    # Validate releasable name exists in [[releasables]]
+    if isinstance(releasable_value, str) and explicit:
+        releasables = load_releasables(root, projects)
+        defined_names = {r.name for r in releasables}
+        if releasable_value not in defined_names:
+            print(
+                f"Error: releasable '{releasable_value}' is not defined in "
+                f"[[releasables]]. Available: {sorted(defined_names)}",
+                file=sys.stderr,
+            )
             sys.exit(1)
 
     # Validate --depends-on against existing project names
@@ -127,6 +161,8 @@ def _cmd_add(args, flags, project_root):
         project["library"] = True
     if dev_only is True:
         project["dev_only"] = True
+    if releasable_value is not None:
+        project["releasable"] = releasable_value
     projects.append(project)
     save_workspace(root, projects)
     print(f"Added project '{name}' at {path}")

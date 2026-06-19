@@ -58,6 +58,32 @@ def _is_non_releasable_project(project_root):
     return not project.is_releasable
 
 
+def _is_releasable_member_project(project_root):
+    """Check if the project belongs to a named releasable in explicit mode.
+
+    When a project has ``releasable = "name"`` (explicit mode), its changelog
+    infrastructure lives at the releasable level, not per-package. Per-package
+    ``CHANGELOG.md`` and ``unreleased.jsonl`` should be skipped.
+
+    Returns False if not in a monorepo, not in explicit mode, or project has
+    no named releasable assignment.
+    """
+    if project_root is None:
+        return False
+    from ..workspace import find_workspace_root, is_explicit_mode, resolve_project
+    ws_root = find_workspace_root(str(project_root))
+    if ws_root is None:
+        return False
+    if not is_explicit_mode(ws_root):
+        return False
+    project = resolve_project(ws_root, str(project_root))
+    if project is None:
+        return False
+    # In explicit mode, projects with a named releasable have their changelog
+    # at the releasable level. Only string values indicate membership.
+    return isinstance(project.releasable, str)
+
+
 def _check_npm_lockfile_missing(start_dir="."):
     """Check if any npm lockfile exists from start_dir up to the git root.
 
@@ -1128,8 +1154,11 @@ def run_cmd(registry, args, flags, ctx):
             shared_mappings = reg.shared_template_mappings(ctx)
             shared_mappings = _append_deploy_workflow_if_configured(shared_mappings, ctx.config)
 
-            # Non-releasable projects skip changelog infrastructure
-            if _is_non_releasable_project(project_root):
+            # Non-releasable projects and releasable members skip per-package
+            # changelog infrastructure. Non-releasable projects have no
+            # changelog at all; releasable members have changelog at the
+            # releasable level (`.rlsbl-monorepo/releasables/{name}/changes/`).
+            if _is_non_releasable_project(project_root) or _is_releasable_member_project(project_root):
                 shared_mappings = [
                     m for m in shared_mappings
                     if m["target"] not in ("CHANGELOG.md", ".rlsbl/changes/unreleased.jsonl")
@@ -1759,8 +1788,9 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         shared_mappings = reg.shared_template_mappings(ctx)
         shared_mappings = _append_deploy_workflow_if_configured(shared_mappings, ctx.config)
 
-        # Non-releasable projects skip changelog infrastructure
-        if _is_non_releasable_project(project_root):
+        # Non-releasable projects and releasable members skip per-package
+        # changelog infrastructure (see comment in run_cmd for rationale).
+        if _is_non_releasable_project(project_root) or _is_releasable_member_project(project_root):
             shared_mappings = [
                 m for m in shared_mappings
                 if m["target"] not in ("CHANGELOG.md", ".rlsbl/changes/unreleased.jsonl")

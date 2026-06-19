@@ -248,6 +248,124 @@ def _build_project_template_vars(project_dir, root):
     return merged
 
 
+def scaffold_releasable_dirs(workspace_root):
+    """Create the directory structure for each releasable in explicit mode.
+
+    In explicit mode (when ``[[releasables]]`` exists in workspace.toml),
+    each releasable gets:
+
+    - ``.rlsbl-monorepo/releasables/{name}/version`` (user-owned, never overwritten)
+    - ``.rlsbl-monorepo/releasables/{name}/changes/unreleased.jsonl`` (user-owned)
+    - ``.rlsbl-monorepo/releasables/{name}/hooks/pre-checks.sh`` (scaffold-managed)
+    - ``.rlsbl-monorepo/releasables/{name}/hooks/pre-release.sh`` (scaffold-managed)
+    - ``.rlsbl-monorepo/releasables/{name}/hooks/post-release.sh`` (scaffold-managed)
+
+    Hook scripts are scaffold-managed: they use three-way merge when updated.
+    Version and unreleased.jsonl are user-owned: created once, never overwritten.
+
+    Args:
+        workspace_root: path to the monorepo root.
+
+    Returns:
+        A list of file paths that were created or updated (for commit tracking).
+    """
+    from ...workspace import is_explicit_mode, load_releasables, load_workspace
+    from ...workspace import get_releasable_dir, get_releasable_version_path, get_releasable_changes_dir
+
+    if not is_explicit_mode(workspace_root):
+        return []
+
+    projects = load_workspace(workspace_root)
+    releasables = load_releasables(workspace_root, projects)
+    if not releasables:
+        return []
+
+    # Load hook templates
+    templates_dir = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+        "templates", "shared", "hooks",
+    )
+    hook_templates = {}
+    for hook_name in ("pre-checks.sh", "pre-release.sh", "post-release.sh"):
+        tpl_path = os.path.join(templates_dir, f"{hook_name}.tpl")
+        if os.path.isfile(tpl_path):
+            with open(tpl_path, "r", encoding="utf-8") as f:
+                hook_templates[hook_name] = f.read()
+
+    created_files = []
+
+    for rel in releasables:
+        rel_dir = get_releasable_dir(workspace_root, rel.name)
+        os.makedirs(rel_dir, exist_ok=True)
+
+        # Version file (user-owned: create if missing, never overwrite)
+        version_path = get_releasable_version_path(workspace_root, rel.name)
+        if not os.path.isfile(version_path):
+            with open(version_path, "w", encoding="utf-8") as f:
+                f.write("0.0.0\n")
+            created_files.append(version_path)
+
+        # Changes directory + unreleased.jsonl (user-owned)
+        changes_dir = get_releasable_changes_dir(workspace_root, rel.name)
+        os.makedirs(changes_dir, exist_ok=True)
+        unreleased_path = os.path.join(changes_dir, "unreleased.jsonl")
+        if not os.path.isfile(unreleased_path):
+            with open(unreleased_path, "w", encoding="utf-8") as f:
+                pass  # empty file
+            created_files.append(unreleased_path)
+
+        # Hook scripts (scaffold-managed: three-way merge on update)
+        hooks_dir = os.path.join(rel_dir, "hooks")
+        os.makedirs(hooks_dir, exist_ok=True)
+
+        for hook_name, template_content in hook_templates.items():
+            hook_path = os.path.join(hooks_dir, hook_name)
+            if not os.path.isfile(hook_path):
+                # First scaffold: write template and make executable
+                with open(hook_path, "w", encoding="utf-8") as f:
+                    f.write(template_content)
+                os.chmod(hook_path, 0o755)
+                created_files.append(hook_path)
+            else:
+                # Existing hook: three-way merge
+                from ...commands.init_cmd import _load_base, _save_base, _three_way_merge
+
+                base_key = os.path.relpath(hook_path, workspace_root)
+                base = _load_base(base_key)
+
+                with open(hook_path, "r", encoding="utf-8") as f:
+                    ours = f.read()
+
+                if ours == template_content:
+                    # No change needed
+                    pass
+                elif base is None:
+                    # No base stored: seed the base for future merges
+                    _save_base(base_key, template_content)
+                elif ours == base:
+                    # User hasn't customized; update to new template
+                    with open(hook_path, "w", encoding="utf-8") as f:
+                        f.write(template_content)
+                    os.chmod(hook_path, 0o755)
+                    _save_base(base_key, template_content)
+                    created_files.append(hook_path)
+                elif base != template_content:
+                    # Both sides changed: three-way merge
+                    merged, has_conflicts = _three_way_merge(ours, base, template_content)
+                    with open(hook_path, "w", encoding="utf-8") as f:
+                        f.write(merged)
+                    os.chmod(hook_path, 0o755)
+                    _save_base(base_key, template_content)
+                    created_files.append(hook_path)
+                    if has_conflicts:
+                        print(
+                            f"Warning: merge conflicts in {hook_path}, resolve manually",
+                            file=sys.stderr,
+                        )
+
+    return created_files
+
+
 def _cmd_sync(flags, project_root):
     start = str(project_root)
     root = find_workspace_root(start)
@@ -259,6 +377,17 @@ def _cmd_sync(flags, project_root):
     if not projects:
         print("No projects in workspace. Nothing to sync.")
         return
+
+    # Scaffold releasable directory structure (explicit mode only).
+    # This runs early so that releasable dirs exist before CI workflow
+    # generation, which may need to reference releasable paths.
+    releasable_files = scaffold_releasable_dirs(root)
+    if releasable_files and not flags.get("no-commit"):
+        commit_files_if_changed(
+            "monorepo: scaffold releasable directories",
+            releasable_files,
+            skip_message=None,
+        )
 
     workflows_dir = os.path.join(root, ".github", "workflows")
     os.makedirs(workflows_dir, exist_ok=True)

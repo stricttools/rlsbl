@@ -824,9 +824,10 @@ def cmd_mono_init(no_commit, **_kwargs):
 @strictcli.flag(name="depends-on", type=str, help="Comma-separated names of workspace projects this project depends on", default="")
 @strictcli.flag(name="library", type=str, help="Mark as a shared library consumed by other workspace projects (true/false)", default="")
 @strictcli.flag(name="dev-only", type=str, help="Mark as a dev-only leaf node excluded from the dependency boundary guardrail (true/false)", default="")
+@strictcli.flag(name="releasable", type=str, help="Releasable group this project belongs to (name of a [[releasables]] entry, or 'false' to opt out of versioning)", default="")
 @strictcli.flag(name="no-commit", type=bool, help="Skip auto-commit of workspace.toml and suppress commits from auto-triggered scaffold/sync")
 @strictcli.arg(name="path", help="Relative path from the repo root to the project directory to register")
-def cmd_mono_add(name, target, watch, subtree_remote, depends_on, library, dev_only, no_commit, path, **_kwargs):
+def cmd_mono_add(name, target, watch, subtree_remote, depends_on, library, dev_only, releasable, no_commit, path, **_kwargs):
     root = _require_project_root()
     flags = {}
     if name:
@@ -843,6 +844,8 @@ def cmd_mono_add(name, target, watch, subtree_remote, depends_on, library, dev_o
         flags["library"] = library
     if dev_only:
         flags["dev_only"] = dev_only
+    if releasable:
+        flags["releasable"] = releasable
     if no_commit:
         flags["no-commit"] = True
     from .commands.monorepo import _cmd_add
