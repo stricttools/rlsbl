@@ -81,6 +81,44 @@ def find_conflicted_scaffold_files(project_root):
     return sorted(conflicted)
 
 
+def _get_releasable_version_for_project(ctx):
+    """Return the releasable version for the project in ctx, or None.
+
+    Returns a version string when ALL of the following hold:
+    - The project is inside a monorepo (ctx.workspace_root is not None)
+    - The workspace uses explicit releasable mode ([[releasables]] present)
+    - The current project has ``releasable = "<name>"`` (belongs to a releasable)
+    - The releasable's version file exists and is non-empty
+
+    Returns None otherwise (implicit mode, non-releasable project, missing
+    version file, or not in a monorepo). Callers should fall through to the
+    standard per-target consistency check when None is returned.
+    """
+    workspace_root = getattr(ctx, "workspace_root", None)
+    if workspace_root is None:
+        return None
+
+    from ..workspace import is_explicit_mode, read_releasable_version, resolve_project
+    from ..errors import WorkspaceError
+
+    ws_root = str(workspace_root)
+    if not is_explicit_mode(ws_root):
+        return None
+
+    project = resolve_project(ws_root, str(ctx.project_root))
+    if project is None:
+        return None
+
+    rel_val = project.releasable
+    if not isinstance(rel_val, str):
+        return None
+
+    try:
+        return read_releasable_version(ws_root, rel_val)
+    except WorkspaceError:
+        return None
+
+
 def register_project_checks(app):
     """Register project-tag checks on *app*."""
 
@@ -102,7 +140,24 @@ def register_project_checks(app):
 
     @app.check("version-consistency")
     def check_version_consistency(ctx):
-        """All detected targets must report the same version."""
+        """All detected targets must report the same version.
+
+        In explicit releasable mode (when the project belongs to a named
+        releasable with a version file), the releasable version file is the
+        source of truth. Member package manifest versions are informational
+        and do not trigger a consistency failure.
+
+        In implicit mode (no [[releasables]]), all targets within the
+        project must agree on the same version.
+        """
+        # In explicit mode, the releasable version file is authoritative.
+        releasable_version = _get_releasable_version_for_project(ctx)
+        if releasable_version is not None:
+            return CheckResult(
+                "pass",
+                f"{releasable_version} (from releasable version file)",
+            )
+
         from ..targets import TARGETS, detect_targets
 
         target_entries = detect_targets(str(ctx.project_root))
