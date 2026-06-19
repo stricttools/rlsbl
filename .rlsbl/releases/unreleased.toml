@@ -1,9 +1,16 @@
 # Version bump type: patch, minor, or major
-bump = ""
+bump = "minor"
 # Short description of this release (required)
-description = ""
+description = "Fix publish workflow releasable tags, UV_NO_SOURCES for monorepos, namespace package scanning"
 # Optional context explaining why these changes were made
-context = ""
+context = """
+Three gaps discovered during first real-world use of the releasable model:
+(1) publish workflow ignored releasable tags, (2) UV_NO_SOURCES broke
+monorepo CI for workspace-source projects, (3) deps-unused produced false
+positives for namespace packages. Also adds template engine conditionals,
+extract/absorb CLI commands, migrate-publish-config command, and removes
+implicit releasable mode (monorepos must define [[releasables]]).
+"""
 # Set to true to generate a blog post for this release
 # blog = false
 include = ["npm", "pypi"]
