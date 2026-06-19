@@ -50,8 +50,11 @@ def _get_release_branches(ctx):
     return [str(b) for b in branches]
 
 
-def _check_gitignore_guard(dir_path):
+def _check_gitignore_guard(dir_path, *, extra_paths=None):
     """Check that rlsbl-managed files are not gitignored.
+
+    When extra_paths is provided, those paths are also checked (e.g.,
+    releasable-level changes files in explicit monorepo mode).
 
     Returns an error string listing gitignored paths, or None if all clear.
     """
@@ -60,6 +63,8 @@ def _check_gitignore_guard(dir_path):
         os.path.join(dir_path, ".rlsbl", "changes", ".validated"),
         os.path.join(dir_path, "CHANGELOG.md"),
     ]
+    if extra_paths:
+        paths.extend(extra_paths)
     gitignored = []
     for path in paths:
         try:
@@ -82,7 +87,7 @@ def _check_gitignore_guard(dir_path):
     return None
 
 
-def _check_jsonl_changelog(dir_path, refs, pushed_commits=None):
+def _check_jsonl_changelog(dir_path, refs, pushed_commits=None, *, changes_dir=None):
     """Check JSONL changelog coverage for commits being pushed.
 
     Verifies that every commit in the push range exists in at least one
@@ -92,9 +97,14 @@ def _check_jsonl_changelog(dir_path, refs, pushed_commits=None):
     calling _get_pushed_commits(refs). This allows callers (e.g. monorepo
     check) to pass a pre-filtered set of commits.
 
+    When changes_dir is provided, uses that directory instead of computing
+    it from dir_path. This supports explicit releasable mode where the
+    changes directory lives at the releasable level, not per-project.
+
     Returns None on success, or an error message string on failure.
     """
-    changes_dir = get_changes_dir(dir_path)
+    if changes_dir is None:
+        changes_dir = get_changes_dir(dir_path)
     entries = read_unreleased(changes_dir)
 
     # Also read all versioned JSONL files (e.g. 0.30.1.jsonl) so that

@@ -35,7 +35,13 @@ def register_prepush_checks(app):
 
         # Monorepo mode: check each affected project independently
         if ctx.workspace_root is not None:
-            from ..workspace import load_workspace
+            from ..workspace import (
+                get_releasable_changes_dir,
+                is_explicit_mode,
+                load_workspace,
+                members_of,
+                resolve_releasable_for_project,
+            )
 
             ws_root = str(ctx.workspace_root)
             changed_files = get_push_changed_files(refs)
@@ -52,18 +58,47 @@ def register_prepush_checks(app):
                 return CheckResult("skip", "could not determine pushed commits")
 
             failures = []
-            for proj in affected:
-                if not project_is_releasable(proj):
-                    continue
-                proj_dir = os.path.join(ws_root, proj["path"])
-                if not changes_dir_exists(proj_dir):
-                    continue
-                proj_commits = filter_commits_for_project(all_pushed, proj)
-                if not proj_commits:
-                    continue
-                error = _check_jsonl_changelog(proj_dir, refs, pushed_commits=proj_commits)
-                if error:
-                    failures.append(f"{proj['name']}: {error}")
+
+            # In explicit releasable mode, group projects by releasable
+            # and check at the releasable level (shared changes dir).
+            if is_explicit_mode(ws_root) and getattr(ctx, "releasables", None):
+                from ..git_util import filter_commits_for_releasable
+
+                checked_releasables = set()
+                for proj in affected:
+                    if not project_is_releasable(proj):
+                        continue
+                    rel = resolve_releasable_for_project(proj, ctx.releasables)
+                    if rel is None or rel.name in checked_releasables:
+                        continue
+                    checked_releasables.add(rel.name)
+                    rel_changes_dir = get_releasable_changes_dir(ws_root, rel.name)
+                    if not os.path.isdir(rel_changes_dir):
+                        continue
+                    member_projs = members_of(rel.name, projects)
+                    rel_commits = filter_commits_for_releasable(all_pushed, member_projs)
+                    if not rel_commits:
+                        continue
+                    error = _check_jsonl_changelog(
+                        ws_root, refs, pushed_commits=rel_commits,
+                        changes_dir=rel_changes_dir,
+                    )
+                    if error:
+                        failures.append(f"{rel.name}: {error}")
+            else:
+                # Implicit mode: check each project independently
+                for proj in affected:
+                    if not project_is_releasable(proj):
+                        continue
+                    proj_dir = os.path.join(ws_root, proj["path"])
+                    if not changes_dir_exists(proj_dir):
+                        continue
+                    proj_commits = filter_commits_for_project(all_pushed, proj)
+                    if not proj_commits:
+                        continue
+                    error = _check_jsonl_changelog(proj_dir, refs, pushed_commits=proj_commits)
+                    if error:
+                        failures.append(f"{proj['name']}: {error}")
 
             if failures:
                 return CheckResult("fail", "; ".join(failures))
@@ -84,7 +119,32 @@ def register_prepush_checks(app):
         """rlsbl-managed files must not be gitignored."""
         from ..commands.pre_push_check import _check_gitignore_guard
 
-        error = _check_gitignore_guard(str(ctx.project_root))
+        # In explicit releasable mode, also check releasable-level files
+        extra_paths = None
+        if (
+            ctx.workspace_root is not None
+            and getattr(ctx, "releasables", None)
+        ):
+            from ..workspace import (
+                get_releasable_changes_dir,
+                is_explicit_mode,
+                resolve_project,
+                resolve_releasable_for_project,
+            )
+
+            ws_root = str(ctx.workspace_root)
+            if is_explicit_mode(ws_root):
+                proj = resolve_project(ws_root, str(ctx.project_root))
+                if proj is not None:
+                    rel = resolve_releasable_for_project(proj, ctx.releasables)
+                    if rel is not None:
+                        rel_changes_dir = get_releasable_changes_dir(ws_root, rel.name)
+                        extra_paths = [
+                            os.path.join(rel_changes_dir, "unreleased.jsonl"),
+                            os.path.join(rel_changes_dir, ".validated"),
+                        ]
+
+        error = _check_gitignore_guard(str(ctx.project_root), extra_paths=extra_paths)
         if error is not None:
             return CheckResult("fail", error)
         return CheckResult("pass", "no rlsbl-managed files are gitignored")
