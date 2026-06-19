@@ -254,6 +254,10 @@ class WorkspaceProject:
         )
 
     @property
+    def import_name(self) -> str:
+        return self._data.get("import_name", "")
+
+    @property
     def registry_name(self) -> str:
         return self._data.get("registry_name", "")
 

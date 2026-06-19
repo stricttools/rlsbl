@@ -9,12 +9,9 @@ a workspace member distributed under the ``orxt`` namespace),
 imported.
 """
 
-import pytest
-
 from rlsbl.import_scanners import PythonImportScanner
 
 
-@pytest.mark.xfail(reason="namespace package imports not yet supported")
 class TestNamespacePackageImports:
     """PythonImportScanner should detect workspace packages imported via namespace prefixes."""
 

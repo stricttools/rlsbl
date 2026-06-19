@@ -180,6 +180,7 @@ def _build_dep_import_cache(ctx):
         return cached
 
     from ..dep_validation import _get_imported_workspace_packages, _read_go_module_path
+    from ..import_scanners import build_namespace_map
 
     root = str(ctx.workspace_root)
     workspace_names = {p["name"] for p in ctx.projects}
@@ -192,6 +193,16 @@ def _build_dep_import_cache(ctx):
         if mod_path is not None:
             module_path_map[proj["name"]] = mod_path
 
+    # Build namespace map for Python namespace package detection
+    namespace_map = build_namespace_map(ctx.projects, root)
+
+    # Collect import_names from workspace projects
+    import_names: dict[str, str] = {}
+    for proj in ctx.projects:
+        imp_name = proj.get("import_name", "")
+        if imp_name:
+            import_names[proj["name"]] = imp_name
+
     cache = {}
     for proj in ctx.projects:
         project_dir = os.path.join(root, proj["path"])
@@ -200,6 +211,8 @@ def _build_dep_import_cache(ctx):
             project_dir, workspace_names,
             exclude_dirs=exclude or None,
             module_path_map=module_path_map or None,
+            namespace_map=namespace_map or None,
+            import_names=import_names or None,
         )
     ctx._dep_import_cache = cache
     return cache
