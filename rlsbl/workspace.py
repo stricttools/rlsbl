@@ -2,6 +2,7 @@
 
 import os
 import tomllib
+from dataclasses import dataclass, field
 
 import tomlkit
 
@@ -10,6 +11,25 @@ from .errors import WorkspaceError
 
 WORKSPACE_DIR = ".rlsbl-monorepo"
 WORKSPACE_FILE = "workspace.toml"
+
+DEFAULT_TAG_FORMAT = "{name}@v{version}"
+
+
+@dataclass
+class Releasable:
+    """A named unit of versioning: a group of packages sharing version, changelog, and release.
+
+    In explicit mode, releasables are defined via ``[[releasables]]`` in
+    workspace.toml.  In implicit mode (no ``[[releasables]]`` section),
+    each non-dev_node project is its own single-member releasable.
+    """
+
+    name: str
+    tag_format: str = field(default=DEFAULT_TAG_FORMAT)
+
+    def __post_init__(self):
+        if not self.name:
+            raise WorkspaceError("releasable name must be a non-empty string")
 
 
 class WorkspaceProject:
@@ -47,6 +67,32 @@ class WorkspaceProject:
     @property
     def depends_on(self) -> list[str]:
         return self._data.get("depends_on", [])
+
+    @property
+    def releasable(self) -> "str | bool | None":
+        """The releasable this project belongs to.
+
+        Returns:
+            str: name of the releasable group this project belongs to.
+            False: project is explicitly unversioned (no releases).
+            None: field not set (implicit mode -- project is its own releasable).
+        """
+        val = self._data.get("releasable")
+        if val is None:
+            return None
+        if isinstance(val, str):
+            return val
+        if isinstance(val, bool):
+            if val is True:
+                raise WorkspaceError(
+                    f"project '{self.name}': releasable = true is not valid; "
+                    "use a string name or false"
+                )
+            return False
+        raise WorkspaceError(
+            f"project '{self.name}': releasable must be a string or false, "
+            f"got {type(val).__name__}"
+        )
 
     @property
     def registry_name(self) -> str:
@@ -134,13 +180,153 @@ def load_workspace(root):
     return result
 
 
-def save_workspace(root, projects):
+def load_releasables(root, projects=None):
+    """Load releasable definitions from workspace.toml.
+
+    In explicit mode (``[[releasables]]`` section present), reads and validates
+    the section, then validates that every non-dev_node project has a valid
+    ``releasable`` field referencing a defined releasable name (or ``false``).
+
+    In implicit mode (no ``[[releasables]]`` section), each non-dev_node
+    project becomes its own single-member releasable with the default tag
+    format.
+
+    Args:
+        root: path to the monorepo root (containing .rlsbl-monorepo/).
+        projects: optional pre-loaded project list. If None, loads via
+            load_workspace(root).
+
+    Returns:
+        A list of Releasable instances.
+
+    Raises:
+        WorkspaceError on invalid releasable definitions or missing/invalid
+        project releasable fields in explicit mode.
+    """
+    if projects is None:
+        projects = load_workspace(root)
+
+    path = os.path.join(root, WORKSPACE_DIR, WORKSPACE_FILE)
+    with open(path, "rb") as f:
+        data = tomllib.load(f)
+
+    raw_releasables = data.get("releasables")
+
+    if raw_releasables is not None:
+        return _load_explicit_releasables(raw_releasables, projects)
+    else:
+        return _load_implicit_releasables(projects)
+
+
+def _load_explicit_releasables(raw_releasables, projects):
+    """Parse [[releasables]] section and validate project membership.
+
+    Every non-dev_node project must have a ``releasable`` field that is either
+    a string referencing a defined releasable name, or ``false``.
+    """
+    if not isinstance(raw_releasables, list):
+        raise WorkspaceError("'releasables' must be a list of tables ([[releasables]])")
+
+    releasables = []
+    seen_names = set()
+
+    for i, raw in enumerate(raw_releasables):
+        if not isinstance(raw, dict):
+            raise WorkspaceError(
+                f"releasables[{i}] must be a table, got {type(raw).__name__}"
+            )
+        name = raw.get("name")
+        if not name or not isinstance(name, str):
+            raise WorkspaceError(
+                f"releasables[{i}] missing required 'name' string"
+            )
+        if name in seen_names:
+            raise WorkspaceError(f"duplicate releasable name: '{name}'")
+        seen_names.add(name)
+
+        tag_format = raw.get("tag_format", DEFAULT_TAG_FORMAT)
+        if not isinstance(tag_format, str):
+            raise WorkspaceError(
+                f"releasables[{i}] ('{{name}}'): tag_format must be a string"
+                .format(name=name)
+            )
+        releasables.append(Releasable(name=name, tag_format=tag_format))
+
+    # Validate project membership: every non-dev_node project must declare releasable.
+    defined_names = {r.name for r in releasables}
+    for proj in projects:
+        if proj.dev_node:
+            continue
+        val = proj.releasable
+        if val is None:
+            raise WorkspaceError(
+                f"project '{proj.name}' missing required 'releasable' field "
+                f"(explicit mode: [[releasables]] is defined, so every "
+                f"non-dev_node project must set releasable = \"<name>\" or "
+                f"releasable = false)"
+            )
+        if isinstance(val, str) and val not in defined_names:
+            raise WorkspaceError(
+                f"project '{proj.name}': releasable = \"{val}\" does not "
+                f"match any defined releasable (available: "
+                f"{sorted(defined_names)})"
+            )
+
+    return releasables
+
+
+def _load_implicit_releasables(projects):
+    """Generate implicit single-member releasables for projects without explicit config.
+
+    Each non-dev_node project becomes its own releasable with the default
+    tag format.
+    """
+    releasables = []
+    for proj in projects:
+        if proj.dev_node:
+            continue
+        releasables.append(Releasable(name=proj.name))
+    return releasables
+
+
+def members_of(releasable_name, projects):
+    """Return the list of projects that belong to a given releasable.
+
+    In explicit mode, these are projects with ``releasable = "<name>"``.
+    In implicit mode (no releasable field set), a project is a member of
+    the releasable with its own name.
+
+    Args:
+        releasable_name: the releasable name to look up.
+        projects: list of WorkspaceProject instances.
+
+    Returns:
+        List of WorkspaceProject instances that are members of the releasable.
+    """
+    result = []
+    for proj in projects:
+        val = proj.releasable
+        if isinstance(val, str) and val == releasable_name:
+            # Explicit membership
+            result.append(proj)
+        elif val is None and proj.name == releasable_name:
+            # Implicit mode: project is its own releasable
+            result.append(proj)
+    return result
+
+
+def save_workspace(root, projects, releasables=None):
     """Write workspace.toml atomically using tomlkit for clean TOML output.
 
     Preserves top-level sections, comments, and formatting from the existing
     file by reading it with tomlkit first and modifying the ``[[projects]]``
     array in-place.  Falls back to creating a new document when the file does
     not yet exist.
+
+    When ``releasables`` is passed (a list of Releasable instances), the
+    ``[[releasables]]`` section is replaced.  When ``releasables`` is None,
+    any existing ``[[releasables]]`` section is preserved as-is.  Pass an
+    empty list to explicitly remove the section.
 
     Creates .rlsbl-monorepo/ directory if it doesn't exist.
     """
@@ -158,6 +344,21 @@ def save_workspace(root, projects):
             del doc["projects"]
     else:
         doc = tomlkit.document()
+
+    # Handle releasables section.
+    if releasables is not None:
+        if "releasables" in doc:
+            del doc["releasables"]
+        if releasables:
+            raot = tomlkit.aot()
+            for rel in releasables:
+                table = tomlkit.table()
+                table.add("name", rel.name)
+                if rel.tag_format != DEFAULT_TAG_FORMAT:
+                    table.add("tag_format", rel.tag_format)
+                raot.append(table)
+            doc.add("releasables", raot)
+    # When releasables is None, the existing section (if any) is preserved.
 
     if not projects:
         # Empty AoT produces no output in tomlkit; use inline array instead

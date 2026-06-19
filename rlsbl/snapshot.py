@@ -5,19 +5,22 @@ import os
 from datetime import datetime, timezone
 
 from .targets import detect_targets, TARGETS
-from .workspace import WORKSPACE_DIR
+from .workspace import WORKSPACE_DIR, members_of
 
 
 SNAPSHOT_FILE = "snapshot.json"
 
 
-def generate_snapshot(root, projects, graph):
+def generate_snapshot(root, projects, graph, releasables=None):
     """Build the snapshot dict from workspace data.
 
     Args:
         root: absolute path to the monorepo root.
         projects: list of project dicts from load_workspace().
         graph: WorkspaceGraph instance.
+        releasables: optional list of Releasable instances. When provided,
+            the snapshot includes a ``releasables`` section and per-package
+            ``releasable`` fields.
 
     Returns a dict matching the snapshot schema.
     """
@@ -43,7 +46,7 @@ def generate_snapshot(root, projects, graph):
         deps = [d.name for d in graph.dependencies(name)]
         rdeps = graph.dependents(name)
 
-        packages[name] = {
+        pkg_entry = {
             "path": path,
             "targets": target_names,
             "version": version,
@@ -55,6 +58,19 @@ def generate_snapshot(root, projects, graph):
             "test_only": proj.get("test_only", False),
         }
 
+        # Add releasable field when releasables are provided.
+        if releasables is not None:
+            rel_val = proj.get("releasable")
+            if rel_val is None:
+                # Implicit mode: project is its own releasable (unless dev_node)
+                pkg_entry["releasable"] = name if not proj.get("dev_node", False) else None
+            elif rel_val is False:
+                pkg_entry["releasable"] = None
+            else:
+                pkg_entry["releasable"] = rel_val
+
+        packages[name] = pkg_entry
+
     # Compute graph metadata
     leaf_nodes = sorted(
         name for name in packages if graph.dep_count(name) == 0
@@ -64,7 +80,7 @@ def generate_snapshot(root, projects, graph):
     )
     max_depth = _compute_max_depth(packages, graph, topo_order)
 
-    return {
+    result = {
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "package_count": len(packages),
         "packages": packages,
@@ -75,6 +91,20 @@ def generate_snapshot(root, projects, graph):
             "topological_order": topo_order,
         },
     }
+
+    # Add releasables section when releasables are provided.
+    if releasables is not None:
+        releasables_section = {}
+        for rel in releasables:
+            member_projs = members_of(rel.name, projects)
+            releasables_section[rel.name] = {
+                "members": sorted(p.name for p in member_projs),
+                "version": None,
+                "tag_format": rel.tag_format,
+            }
+        result["releasables"] = releasables_section
+
+    return result
 
 
 def _compute_max_depth(packages, graph, topo_order):
