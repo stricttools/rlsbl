@@ -61,8 +61,39 @@ class WorkspaceProject:
         return bool(self._data.get("library", False))
 
     @property
+    def dev_only(self) -> bool:
+        return bool(self._data.get("dev_only", False) or self._data.get("dev_node", False))
+
+    @property
     def dev_node(self) -> bool:
+        """Derived shorthand: True when dev_only and not a member of any releasable.
+
+        A project is considered non-releasable when ``releasable`` is explicitly
+        ``False``, OR when ``releasable`` is ``None`` (implicit mode) and the
+        legacy ``dev_node`` flag is set.  This preserves backward compatibility
+        with workspaces that still use ``dev_node = true``.
+        """
+        if not self.dev_only:
+            return False
+        rel = self._data.get("releasable")
+        if isinstance(rel, str):
+            # Explicitly assigned to a releasable -- not a dev_node
+            return False
+        if rel is False:
+            return True
+        # rel is None (implicit mode): legacy dev_node semantics apply
         return bool(self._data.get("dev_node", False))
+
+    @property
+    def is_releasable(self) -> bool:
+        """Whether this project can produce releases.
+
+        A project is releasable when it belongs to some releasable unit
+        (explicit ``releasable = "name"`` or implicit single-member mode).
+        Returns False when ``releasable = false`` is set explicitly, or
+        when the project is a legacy ``dev_node`` in implicit mode.
+        """
+        return not self.dev_node and self.releasable is not False
 
     @property
     def depends_on(self) -> list[str]:
@@ -184,10 +215,10 @@ def load_releasables(root, projects=None):
     """Load releasable definitions from workspace.toml.
 
     In explicit mode (``[[releasables]]`` section present), reads and validates
-    the section, then validates that every non-dev_node project has a valid
+    the section, then validates that every releasable project has a valid
     ``releasable`` field referencing a defined releasable name (or ``false``).
 
-    In implicit mode (no ``[[releasables]]`` section), each non-dev_node
+    In implicit mode (no ``[[releasables]]`` section), each releasable
     project becomes its own single-member releasable with the default tag
     format.
 
@@ -252,17 +283,17 @@ def _load_explicit_releasables(raw_releasables, projects):
             )
         releasables.append(Releasable(name=name, tag_format=tag_format))
 
-    # Validate project membership: every non-dev_node project must declare releasable.
+    # Validate project membership: every releasable project must declare releasable.
     defined_names = {r.name for r in releasables}
     for proj in projects:
-        if proj.dev_node:
+        if not proj.is_releasable:
             continue
         val = proj.releasable
         if val is None:
             raise WorkspaceError(
                 f"project '{proj.name}' missing required 'releasable' field "
                 f"(explicit mode: [[releasables]] is defined, so every "
-                f"non-dev_node project must set releasable = \"<name>\" or "
+                f"releasable project must set releasable = \"<name>\" or "
                 f"releasable = false)"
             )
         if isinstance(val, str) and val not in defined_names:
@@ -278,12 +309,12 @@ def _load_explicit_releasables(raw_releasables, projects):
 def _load_implicit_releasables(projects):
     """Generate implicit single-member releasables for projects without explicit config.
 
-    Each non-dev_node project becomes its own releasable with the default
+    Each releasable project becomes its own releasable with the default
     tag format.
     """
     releasables = []
     for proj in projects:
-        if proj.dev_node:
+        if not proj.is_releasable:
             continue
         releasables.append(Releasable(name=proj.name))
     return releasables
