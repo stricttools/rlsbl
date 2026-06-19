@@ -188,7 +188,7 @@ class TestReleaseGateUsesReleasable:
         project_dir = root / "dev-rel"
 
         # resolve_monorepo_context should NOT raise for dev_only + releasable
-        name, path, is_lib, is_dev = resolve_monorepo_context(
+        name, path, is_lib, is_dev, _rel_name = resolve_monorepo_context(
             str(root), project_dir, lambda msg: None
         )
         assert name == "dev-rel"
@@ -227,7 +227,7 @@ class TestReleaseGateUsesReleasable:
         root = split_monorepo.root
         project_dir = root / "regular"
 
-        name, path, is_lib, is_dev = resolve_monorepo_context(
+        name, path, is_lib, is_dev, _rel_name = resolve_monorepo_context(
             str(root), project_dir, lambda msg: None
         )
         assert name == "regular"

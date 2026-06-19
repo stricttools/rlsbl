@@ -242,15 +242,18 @@ def validate_branch_and_remote(flags):
 def resolve_monorepo_context(monorepo_root, project_root, log):
     """Resolve monorepo project context if inside a monorepo.
 
-    Returns (monorepo_name, monorepo_project_path, is_library, is_dev_node).
-    All values are None/False when not in a monorepo.
+    Returns (monorepo_name, monorepo_project_path, is_library, is_dev_node, releasable_name).
+    All values are None/False/None when not in a monorepo.
+    ``releasable_name`` is a string when the project explicitly belongs to a
+    named releasable (``releasable = "name"``), or None in implicit mode.
     Raises ReleaseValidationError if inside a monorepo but not a recognized project,
     or if the project is non-releasable.
     """
     from . import resolve_project
+    from ...workspace import is_explicit_mode
 
     if not monorepo_root:
-        return None, None, False, False
+        return None, None, False, False, None
 
     project = resolve_project(monorepo_root, str(project_root))
     if project is None:
@@ -271,19 +274,41 @@ def resolve_monorepo_context(monorepo_root, project_root, log):
             "releasable = false to confirm it is non-releasable."
         )
 
-    return monorepo_name, monorepo_project_path, is_library, is_dev_node
+    # In explicit mode, the project's releasable field names the releasable
+    # whose version file is the canonical version source.
+    releasable_name = None
+    if is_explicit_mode(str(monorepo_root)):
+        rel_val = project.releasable
+        if isinstance(rel_val, str):
+            releasable_name = rel_val
+
+    return monorepo_name, monorepo_project_path, is_library, is_dev_node, releasable_name
 
 
 def compute_release_version(target, primary_path, bump_arg, monorepo_name,
-                            monorepo_project_path, log):
+                            monorepo_project_path, log, *,
+                            workspace_root=None, releasable_name=None):
     """Compute current and new version, bump type, and tag.
+
+    In explicit releasable mode (when ``workspace_root`` and ``releasable_name``
+    are both provided), the version is read from the releasable's version file
+    at ``.rlsbl-monorepo/releasables/<name>/version`` instead of from the
+    target's manifest file. This is the canonical version source for
+    multi-package releasables.
+
+    In implicit mode (the default, when either parameter is None), the version
+    is read from the target's manifest as before.
 
     Returns (current_version, new_version, bump_type, tag).
     Raises ReleaseValidationError on invalid bump type or duplicate tag.
     """
     from . import run, bump_version
 
-    current_version = target.read_version(primary_path)
+    if workspace_root is not None and releasable_name is not None:
+        from ...workspace import read_releasable_version
+        current_version = read_releasable_version(str(workspace_root), releasable_name)
+    else:
+        current_version = target.read_version(primary_path)
     log(f"Current version: {current_version}")
 
     if monorepo_name:

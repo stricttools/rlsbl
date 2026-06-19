@@ -128,7 +128,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     branch = validate_branch_and_remote(flags)
 
     # --- Resolve context ---
-    monorepo_name, monorepo_project_path, is_library, is_dev_node = resolve_monorepo_context(
+    monorepo_name, monorepo_project_path, is_library, is_dev_node, releasable_name = resolve_monorepo_context(
         monorepo_root, project_root, log,
     )
 
@@ -145,6 +145,8 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     current_version, new_version, bump_type, tag = compute_release_version(
         target, primary_path, release_config.bump,
         monorepo_name, monorepo_project_path, log,
+        workspace_root=monorepo_root if releasable_name else None,
+        releasable_name=releasable_name,
     )
 
     # --- Validate changelog ---
