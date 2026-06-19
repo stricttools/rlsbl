@@ -35,7 +35,8 @@ Register a project directory in the monorepo workspace.toml configuration. The p
 | `--subtree-remote` |  | str |  |  | Git remote URL for split-publishing this project as a standalone repo |
 | `--depends-on` |  | str |  |  | Comma-separated names of workspace projects this project depends on |
 | `--library` |  | str |  |  | Mark as a shared library consumed by other workspace projects (true/false) |
-| `--dev-node` |  | str |  |  | Mark as a dev-only leaf node that skips changelog enforcement (true/false) |
+| `--dev-only` |  | str |  |  | Mark as a dev-only leaf node excluded from the dependency boundary guardrail (true/false) |
+| `--releasable` |  | str |  |  | Releasable group this project belongs to (name of a [[releasables]] entry, or 'false' to opt out of versioning) |
 | `--no-commit` |  | bool |  |  | Skip auto-commit of workspace.toml and suppress commits from auto-triggered scaffold/sync |
 
 ### Arguments
