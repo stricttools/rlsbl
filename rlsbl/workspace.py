@@ -127,10 +127,10 @@ def write_releasable_version(workspace_root, releasable_name, version):
 
 
 def is_explicit_mode(workspace_root):
-    """Check whether the workspace uses explicit releasable definitions.
+    """Check whether the workspace has a ``[[releasables]]`` section.
 
     Returns True when ``[[releasables]]`` is present in workspace.toml,
-    False otherwise (implicit mode where each project is its own releasable).
+    False otherwise.
 
     Args:
         workspace_root: path to the monorepo root.
@@ -151,9 +151,7 @@ def is_explicit_mode(workspace_root):
 class Releasable:
     """A named unit of versioning: a group of packages sharing version, changelog, and release.
 
-    In explicit mode, releasables are defined via ``[[releasables]]`` in
-    workspace.toml.  In implicit mode (no ``[[releasables]]`` section),
-    each releasable project is its own single-member releasable.
+    Releasables are defined via ``[[releasables]]`` in workspace.toml.
     """
 
     name: str
@@ -201,9 +199,8 @@ class WorkspaceProject:
         """Derived shorthand: True when dev_only and not a member of any releasable.
 
         A project is considered non-releasable when ``releasable`` is explicitly
-        ``False``, OR when ``releasable`` is ``None`` (implicit mode) and the
-        legacy ``dev_node`` flag is set.  This preserves backward compatibility
-        with workspaces that still use ``dev_node = true``.
+        ``False``, OR when ``releasable`` is ``None`` and the legacy
+        ``dev_node`` flag is set.
         """
         if not self.dev_only:
             return False
@@ -213,7 +210,7 @@ class WorkspaceProject:
             return False
         if rel is False:
             return True
-        # rel is None (implicit mode): legacy dev_node semantics apply
+        # rel is None: legacy dev_node semantics apply
         return bool(self._data.get("dev_node", False))
 
     @property
@@ -221,9 +218,8 @@ class WorkspaceProject:
         """Whether this project can produce releases.
 
         A project is releasable when it belongs to some releasable unit
-        (explicit ``releasable = "name"`` or implicit single-member mode).
-        Returns False when ``releasable = false`` is set explicitly, or
-        when the project is a legacy ``dev_node`` in implicit mode.
+        (``releasable = "name"``). Returns False when ``releasable = false``
+        is set explicitly, or when the project is a dev_node.
         """
         return not self.dev_node and self.releasable is not False
 
@@ -238,7 +234,7 @@ class WorkspaceProject:
         Returns:
             str: name of the releasable group this project belongs to.
             False: project is explicitly unversioned (no releases).
-            None: field not set (implicit mode -- project is its own releasable).
+            None: field not set.
         """
         val = self._data.get("releasable")
         if val is None:
@@ -363,13 +359,9 @@ def load_workspace(root):
 def load_releasables(root, projects=None):
     """Load releasable definitions from workspace.toml.
 
-    In explicit mode (``[[releasables]]`` section present), reads and validates
-    the section, then validates that every releasable project has a valid
-    ``releasable`` field referencing a defined releasable name (or ``false``).
-
-    In implicit mode (no ``[[releasables]]`` section), each releasable
-    project becomes its own single-member releasable with the default tag
-    format.
+    Reads and validates the ``[[releasables]]`` section, then validates that
+    every releasable project has a valid ``releasable`` field referencing a
+    defined releasable name (or ``false``).
 
     Args:
         root: path to the monorepo root (containing .rlsbl-monorepo/).
@@ -380,8 +372,8 @@ def load_releasables(root, projects=None):
         A list of Releasable instances.
 
     Raises:
-        WorkspaceError on invalid releasable definitions or missing/invalid
-        project releasable fields in explicit mode.
+        WorkspaceError if ``[[releasables]]`` is missing, or on invalid
+        releasable definitions or missing/invalid project releasable fields.
     """
     if projects is None:
         projects = load_workspace(root)
@@ -392,10 +384,10 @@ def load_releasables(root, projects=None):
 
     raw_releasables = data.get("releasables")
 
-    if raw_releasables is not None:
-        return _load_explicit_releasables(raw_releasables, projects)
-    else:
-        return _load_implicit_releasables(projects)
+    if raw_releasables is None:
+        raise WorkspaceError("[[releasables]] section required in workspace.toml")
+
+    return _load_explicit_releasables(raw_releasables, projects)
 
 
 def _load_explicit_releasables(raw_releasables, projects):
@@ -455,26 +447,11 @@ def _load_explicit_releasables(raw_releasables, projects):
     return releasables
 
 
-def _load_implicit_releasables(projects):
-    """Generate implicit single-member releasables for projects without explicit config.
-
-    Each releasable project becomes its own releasable with the default
-    tag format.
-    """
-    releasables = []
-    for proj in projects:
-        if not proj.is_releasable:
-            continue
-        releasables.append(Releasable(name=proj.name))
-    return releasables
-
-
 def members_of(releasable_name, projects):
     """Return the list of projects that belong to a given releasable.
 
-    In explicit mode, these are projects with ``releasable = "<name>"``.
-    In implicit mode (no releasable field set), a project is a member of
-    the releasable with its own name.
+    Projects with ``releasable = "<name>"`` matching the given name are
+    returned as members.
 
     Args:
         releasable_name: the releasable name to look up.
@@ -486,12 +463,7 @@ def members_of(releasable_name, projects):
     result = []
     for proj in projects:
         val = _get_releasable_value(proj)
-        name = proj.name if isinstance(proj, WorkspaceProject) else proj["name"]
         if isinstance(val, str) and val == releasable_name:
-            # Explicit membership
-            result.append(proj)
-        elif val is None and name == releasable_name:
-            # Implicit mode: project is its own releasable
             result.append(proj)
     return result
 
@@ -500,8 +472,7 @@ def resolve_releasable_for_project(proj, releasables):
     """Return the Releasable that a project belongs to, or None.
 
     Looks up the project's ``releasable`` field and matches it against the
-    list of releasables.  In implicit mode (field is None), matches by
-    project name.
+    list of releasables.
 
     Args:
         proj: WorkspaceProject or dict with at least ``name`` and optionally
@@ -513,12 +484,10 @@ def resolve_releasable_for_project(proj, releasables):
         (``releasable = false``) or no match is found.
     """
     val = _get_releasable_value(proj)
-    if val is False:
+    if val is False or not isinstance(val, str):
         return None
-    name = proj.name if isinstance(proj, WorkspaceProject) else proj["name"]
-    target_name = val if isinstance(val, str) else name
     for rel in releasables:
-        if rel.name == target_name:
+        if rel.name == val:
             return rel
     return None
 
