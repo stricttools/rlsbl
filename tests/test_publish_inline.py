@@ -633,7 +633,7 @@ class TestGenerateInlinePublishRouter:
         ]
         with patch(
             "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
-            side_effect=lambda proj, _root: f"{proj['name']}@v",
+            side_effect=lambda proj, _root, **kw: f"{proj['name']}@v",
         ):
             result = generate_inline_publish_router(projects, root)
 
@@ -684,7 +684,7 @@ class TestGenerateInlinePublishRouter:
         ]
         with patch(
             "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
-            side_effect=lambda proj, _root: f"{proj['name']}@v",
+            side_effect=lambda proj, _root, **kw: f"{proj['name']}@v",
         ):
             result = generate_inline_publish_router(projects, root)
 
@@ -1058,7 +1058,7 @@ class TestIntegrationRealWorkflows:
             {"name": "golib", "path": "packages/golib"},
         ]
 
-        def mock_tag_prefix(proj, _root):
+        def mock_tag_prefix(proj, _root, **kw):
             return f"{proj['name']}@v"
 
         with patch(
@@ -1114,7 +1114,7 @@ class TestIntegrationRealWorkflows:
         router_path = os.path.join(root, ".github", "workflows", "publish.yml")
         os.makedirs(os.path.dirname(router_path), exist_ok=True)
 
-        def mock_tag_prefix(proj, _root):
+        def mock_tag_prefix(proj, _root, **kw):
             return f"{proj['name']}@v"
 
         # --- First run: no cache, generates router ---

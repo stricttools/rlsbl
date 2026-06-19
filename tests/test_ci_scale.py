@@ -224,7 +224,7 @@ def _make_projects_on_disk(root, count):
     return projects
 
 
-def _mock_tag_prefix(proj, _root):
+def _mock_tag_prefix(proj, _root, **kw):
     return f"{proj['name']}@v"
 
 

@@ -108,7 +108,7 @@ def _setup_project(root, path, workflow_content):
         f.write(workflow_content)
 
 
-def _mock_tag_prefix(proj, _root):
+def _mock_tag_prefix(proj, _root, **kw):
     return f"{proj['name']}@v"
 
 

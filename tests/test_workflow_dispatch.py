@@ -87,7 +87,7 @@ class TestMonorepoRouterWorkflowDispatch:
         with open(os.path.join(wf_dir, "publish.yml"), "w") as f:
             f.write(publish_content)
 
-        def mock_tag_prefix(proj, _root):
+        def mock_tag_prefix(proj, _root, **kw):
             return f"{proj['name']}@v"
 
         with patch(
@@ -123,7 +123,7 @@ class TestMonorepoRouterWorkflowDispatch:
         with open(os.path.join(wf_dir, "publish.yml"), "w") as f:
             f.write(publish_content)
 
-        def mock_tag_prefix(proj, _root):
+        def mock_tag_prefix(proj, _root, **kw):
             return f"{proj['name']}@v"
 
         with patch(
