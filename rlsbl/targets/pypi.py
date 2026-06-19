@@ -164,27 +164,14 @@ class PypiTarget(BaseTarget):
         if scripts:
             bin_command = next(iter(scripts))  # first script entry
 
-        # Derive the actual Python import name.
-        # 1) Check hatch build config for an explicit packages list.
-        import_name = None
-        hatch = data.get("tool", {}).get("hatch", {})
-        packages = (
-            hatch.get("build", {}).get("targets", {}).get("wheel", {}).get("packages")
-        )
-        if packages and isinstance(packages, list) and len(packages) > 0:
+        # Derive the actual Python import name using shared detection.
+        from .utils import detect_python_package_root
+        pkg_root = detect_python_package_root(dir_path)
+        if pkg_root:
             # Strip src/ prefix (common hatch src layout) and convert path to module name
-            first_pkg = packages[0]
-            import_name = first_pkg.removeprefix("src/").replace("/", ".")
-
-        # 2) Fall back to filesystem detection, then underscore convention.
-        if not import_name:
-            underscored = name.replace("-", "_")
-            if os.path.isdir(os.path.join(dir_path, underscored)):
-                import_name = underscored
-            elif os.path.isdir(os.path.join(dir_path, name)):
-                import_name = name
-            else:
-                import_name = underscored  # fallback to convention
+            import_name = pkg_root.removeprefix("src/").replace("/", ".")
+        else:
+            import_name = name.replace("-", "_")
 
         result = {
             "name": name,

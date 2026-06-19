@@ -13,7 +13,7 @@ from .lint.go_ast import scan_imports as _go_scan_imports
 from .lint.npm_ast import NpmAstLinter
 from .lint.python_ast import PythonAstLinter
 from .lint.utils import walk_source_files
-from .targets.utils import normalize_pypi
+from .targets.utils import detect_python_package_root, normalize_pypi
 
 # Python 3.10+ provides this; used to exclude stdlib imports.
 _STDLIB_MODULES: frozenset[str] = frozenset(sys.stdlib_module_names)
@@ -87,11 +87,72 @@ def _is_test_context(filepath: str, project_path: str) -> bool:
     return any(pat.match(basename) for pat in _TEST_FILE_PATTERNS)
 
 
+def build_namespace_map(projects, workspace_root: str) -> dict[str, str]:
+    """Map namespace-qualified import paths to workspace project names.
+
+    For a project named 'protocols' at 'protocols/src/orxt/protocols/',
+    returns {'orxt.protocols': 'protocols'}.
+
+    Algorithm:
+    1. For each project, call detect_python_package_root() to get the
+       package root (e.g., 'src/orxt')
+    2. The namespace is the package root's leaf directory name (e.g., 'orxt')
+    3. Walk subdirectories of the package root looking for the project's
+       directory name
+    4. If src/orxt/protocols/ exists and project name is 'protocols',
+       map 'orxt.protocols' -> 'protocols'
+    """
+    namespace_map: dict[str, str] = {}
+
+    for proj in projects:
+        proj_name = proj["name"] if isinstance(proj, dict) else proj.name
+        proj_path = proj["path"] if isinstance(proj, dict) else proj.path
+        project_dir = os.path.join(workspace_root, proj_path)
+
+        pkg_root = detect_python_package_root(project_dir)
+        if not pkg_root:
+            continue
+
+        # The namespace is the leaf directory of the package root
+        # e.g., 'src/orxt' -> namespace is 'orxt'
+        namespace = os.path.basename(pkg_root)
+        if not namespace:
+            continue
+
+        # Build the absolute path to the package root
+        abs_pkg_root = os.path.join(project_dir, pkg_root)
+        if not os.path.isdir(abs_pkg_root):
+            continue
+
+        # Normalize the project name for filesystem matching
+        proj_name_underscored = proj_name.replace("-", "_")
+
+        # Walk immediate subdirectories of the package root looking for
+        # the project's directory name
+        try:
+            entries = os.listdir(abs_pkg_root)
+        except OSError:
+            continue
+
+        for entry in entries:
+            entry_path = os.path.join(abs_pkg_root, entry)
+            if not os.path.isdir(entry_path):
+                continue
+            if entry == proj_name or entry == proj_name_underscored:
+                # Found: namespace.project_name -> project_name
+                import_path = f"{namespace}.{entry}"
+                namespace_map[import_path] = proj_name
+                break
+
+    return namespace_map
+
+
 class PythonImportScanner:
     """Scan Python source files for workspace-relevant imports.
 
     Uses the AST-based scanner from the lint system, then post-processes
     to filter out stdlib, relative imports, and non-workspace packages.
+    Supports namespace package detection via namespace_map and import_names.
     """
 
     def scan(
@@ -99,6 +160,9 @@ class PythonImportScanner:
         project_path: str,
         workspace_names: set[str],
         exclude_dirs: list[str] | None = None,
+        *,
+        namespace_map: dict[str, str] | None = None,
+        import_names: dict[str, str] | None = None,
     ) -> list[ImportInfo]:
         """Scan project_path for Python imports matching workspace members.
 
@@ -108,6 +172,11 @@ class PythonImportScanner:
                 (as they appear in pyproject.toml, e.g. "my-lib").
             exclude_dirs: directory paths to skip during the walk
                 (relative to project_path or absolute).
+            namespace_map: mapping of namespace-qualified import paths
+                to workspace project names (e.g., {'orxt.protocols': 'protocols'}).
+                Built by build_namespace_map().
+            import_names: mapping of project_name -> import_name from workspace
+                config. Used for explicit import_name overrides.
 
         Returns:
             list of ImportInfo for imports that match workspace members.
@@ -119,32 +188,78 @@ class PythonImportScanner:
             normalize_pypi(name): name for name in workspace_names
         }
 
+        # Build reverse import_name lookup: import_name -> project_name
+        import_name_lookup: dict[str, str] = {}
+        if import_names:
+            for proj_name, imp_name in import_names.items():
+                if imp_name:
+                    import_name_lookup[imp_name] = proj_name
+
+        # Sort namespace_map keys by length descending for longest-prefix matching
+        ns_keys_sorted: list[str] = []
+        if namespace_map:
+            ns_keys_sorted = sorted(namespace_map.keys(), key=len, reverse=True)
+
         linter = PythonAstLinter()
         raw_imports = linter.scan_imports(project_path, exclude_dirs=exclude_dirs)
 
         results = []
-        for pkg_name, filepath, line_number, guarded in raw_imports:
+        for record in raw_imports:
+            top_level = record.top_level
+            full_path = record.full_path
+
             # Skip empty names (relative imports produce empty top-level)
-            if not pkg_name:
+            if not top_level:
                 continue
 
             # Skip relative imports that start with a dot
-            if pkg_name.startswith("."):
+            if top_level.startswith("."):
                 continue
 
             # Skip stdlib modules
-            if pkg_name in _STDLIB_MODULES:
+            if top_level in _STDLIB_MODULES:
                 continue
 
-            # Map import name to PyPI-normalized form and check workspace
-            normalized = normalize_pypi(pkg_name)
+            matched_name = None
+
+            # 1. Top-level match against workspace names (existing behavior)
+            normalized = normalize_pypi(top_level)
             if normalized in normalized_lookup:
+                matched_name = normalized_lookup[normalized]
+
+            # 2. Check import_name overrides: if full_path starts with any import_name
+            if matched_name is None and import_name_lookup:
+                for imp_name, proj_name in import_name_lookup.items():
+                    if full_path == imp_name or full_path.startswith(imp_name + "."):
+                        matched_name = proj_name
+                        break
+
+            # 3. Longest-prefix match against namespace_map using full_path
+            if matched_name is None and ns_keys_sorted:
+                for ns_key in ns_keys_sorted:
+                    if full_path == ns_key or full_path.startswith(ns_key + "."):
+                        matched_name = namespace_map[ns_key]
+                        break
+
+            # 4. Sub-component match: check each component of the dotted
+            #    import path against workspace names. This catches namespace
+            #    package imports like 'from orxt.protocols import Tool' where
+            #    'protocols' is a workspace member under the 'orxt' namespace.
+            if matched_name is None and "." in full_path:
+                parts = full_path.split(".")
+                for part in parts[1:]:  # skip top-level (already checked in step 1)
+                    normalized_part = normalize_pypi(part)
+                    if normalized_part in normalized_lookup:
+                        matched_name = normalized_lookup[normalized_part]
+                        break
+
+            if matched_name is not None:
                 results.append(ImportInfo(
-                    package_name=normalized_lookup[normalized],
-                    file_path=filepath,
-                    line_number=line_number,
-                    is_test_context=_is_test_context(filepath, project_path),
-                    guarded=guarded,
+                    package_name=matched_name,
+                    file_path=record.filepath,
+                    line_number=record.line,
+                    is_test_context=_is_test_context(record.filepath, project_path),
+                    guarded=record.guarded,
                 ))
 
         return results
