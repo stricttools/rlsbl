@@ -36,35 +36,83 @@ def _get_changelog_context(ctx):
 
     Returns ``(changes_dir, tag_glob, project, entries)`` or ``None`` when the
     changes directory does not exist (caller should return skip).
-    The ``project`` value is a dict with ``path`` and ``watch`` keys when
-    running in monorepo mode, or ``None`` for standalone projects.
+
+    The ``project`` value depends on mode:
+
+    - **Standalone** (no workspace): ``None``.
+    - **Implicit monorepo** (no ``[[releasables]]``): a single WorkspaceProject
+      dict with ``path`` and ``watch`` keys for scoping.
+    - **Explicit monorepo** (``[[releasables]]`` present): a list of
+      WorkspaceProject instances representing all member projects of the
+      releasable.  Callers that pass ``project`` to validation functions
+      handle both single-project and list-of-projects via
+      ``filter_commits_for_releasable``.
+
+    In explicit mode, ``changes_dir`` points to the releasable's changes
+    directory (``.rlsbl-monorepo/releasables/{name}/changes/``) and
+    ``tag_glob`` is derived from the releasable's ``tag_format``.
     """
     from ..changelog.files import get_changes_dir, read_unreleased
+    from ..workspace import (
+        get_releasable_changes_dir,
+        is_explicit_mode,
+        members_of,
+        resolve_project,
+        resolve_releasable_for_project,
+    )
 
+    if not isinstance(ctx, WorkspaceCheckContext):
+        # Standalone project
+        changes_dir = get_changes_dir(str(ctx.project_root))
+        if not os.path.isdir(changes_dir):
+            return None
+        entries = read_unreleased(changes_dir)
+        return changes_dir, None, None, entries
+
+    # Monorepo mode
+    ws_root = str(ctx.workspace_root)
+    proj = resolve_project(ws_root, str(ctx.project_root))
+    if proj is None:
+        # CWD is not inside any workspace project -- fall back to per-project
+        changes_dir = get_changes_dir(str(ctx.project_root))
+        if not os.path.isdir(changes_dir):
+            return None
+        entries = read_unreleased(changes_dir)
+        return changes_dir, None, None, entries
+
+    if is_explicit_mode(ws_root) and getattr(ctx, "releasables", None):
+        # Explicit mode: resolve the releasable for this project
+        rel = resolve_releasable_for_project(proj, ctx.releasables)
+        if rel is None:
+            # Project is not releasable (releasable = false)
+            return None
+        changes_dir = get_releasable_changes_dir(ws_root, rel.name)
+        if not os.path.isdir(changes_dir):
+            return None
+        # tag_glob from releasable's tag_format: replace {version} with *
+        tag_glob = rel.tag_format.replace("{version}", "*").replace("{name}", rel.name)
+        # All member projects of this releasable for commit scoping
+        member_projects = members_of(rel.name, ctx.projects)
+        entries = read_unreleased(changes_dir)
+        return changes_dir, tag_glob, member_projects, entries
+
+    # Implicit mode: per-project changes dir
     changes_dir = get_changes_dir(str(ctx.project_root))
     if not os.path.isdir(changes_dir):
         return None
 
-    tag_glob = None
-    project = None
-    if isinstance(ctx, WorkspaceCheckContext):
-        # Derive tag_glob and project dict from workspace for monorepo scoping
-        from ..workspace import resolve_project
-        proj = resolve_project(str(ctx.workspace_root), str(ctx.project_root))
-        if proj is not None:
-            # Use the target's monorepo_tag_glob() to get the correct
-            # tag pattern (e.g. Go uses "path/v*" not "name@v*").
-            from ..targets import TARGETS, detect_targets
-            target_entries = detect_targets(str(ctx.project_root))
-            if target_entries:
-                target = TARGETS[target_entries[0].name]
-                tag_glob = target.monorepo_tag_glob(proj['name'], path=proj['path'])
-            else:
-                tag_glob = f"{proj['name']}@v*"
-            project = proj
+    # Use the target's monorepo_tag_glob() to get the correct
+    # tag pattern (e.g. Go uses "path/v*" not "name@v*").
+    from ..targets import TARGETS, detect_targets
+    target_entries = detect_targets(str(ctx.project_root))
+    if target_entries:
+        target = TARGETS[target_entries[0].name]
+        tag_glob = target.monorepo_tag_glob(proj['name'], path=proj['path'])
+    else:
+        tag_glob = f"{proj['name']}@v*"
 
     entries = read_unreleased(changes_dir)
-    return changes_dir, tag_glob, project, entries
+    return changes_dir, tag_glob, proj, entries
 
 
 def _sibling_exclude_dirs(root, project_path, all_projects):

@@ -77,6 +77,40 @@ def filter_commits_for_project(commits, project):
     return filtered
 
 
+def filter_commits_for_releasable(commits, member_projects):
+    """Filter commits to those touching files in any of the member projects.
+
+    Like ``filter_commits_for_project`` but accepts a list of projects
+    (the members of a releasable).  Calls ``get_commit_files()`` once per
+    commit and checks in-memory against the combined path prefixes and
+    watch globs of all member projects.
+
+    Args:
+        commits: set of commit SHAs to filter.
+        member_projects: list of project dicts/WorkspaceProject instances,
+            each with ``path`` and optionally ``watch`` keys.
+
+    Returns:
+        The subset of commits where at least one file belongs to any
+        member project.
+    """
+    filtered = set()
+    for sha in commits:
+        files = get_commit_files(sha)
+        if files is None:
+            # Cannot determine files -- include the commit to be safe
+            filtered.add(sha)
+            continue
+        for filepath in files:
+            for proj in member_projects:
+                if file_matches_project(filepath, proj):
+                    filtered.add(sha)
+                    break
+            if sha in filtered:
+                break
+    return filtered
+
+
 # -- SSH host validation for subtree remotes ---------------------------------
 
 # Matches git@HOST:owner/repo.git (SCP-like syntax)

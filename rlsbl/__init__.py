@@ -167,9 +167,11 @@ def _check_context_factory():
     workspace_root = find_workspace_root()
     if workspace_root is not None:
         from .workspace_graph import WorkspaceGraph
+        from .workspace import load_releasables
 
         projects = load_workspace(workspace_root)
         graph = WorkspaceGraph(workspace_root, projects)
+        releasables = load_releasables(workspace_root, projects=projects)
         ctx = create_context(Path.cwd(), workspace_root=Path(workspace_root))
         wctx = WorkspaceCheckContext(
             project_root=ctx.project_root,
@@ -177,6 +179,7 @@ def _check_context_factory():
             config=ctx.config,
             projects=projects,
             graph=graph,
+            releasables=releasables,
         )
         wctx.push_stdin = push_stdin
         return wctx

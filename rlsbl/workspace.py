@@ -37,6 +37,21 @@ def get_releasable_dir(workspace_root, releasable_name):
     return os.path.join(workspace_root, WORKSPACE_DIR, RELEASABLES_DIR, releasable_name)
 
 
+def get_releasable_changes_dir(workspace_root, releasable_name):
+    """Return the path to a releasable's changelog changes directory.
+
+    Path: ``<workspace_root>/.rlsbl-monorepo/releasables/<name>/changes/``
+
+    Args:
+        workspace_root: path to the monorepo root.
+        releasable_name: name of the releasable.
+
+    Returns:
+        Absolute path string to the changes directory.
+    """
+    return os.path.join(get_releasable_dir(workspace_root, releasable_name), "changes")
+
+
 def get_releasable_version_path(workspace_root, releasable_name):
     """Return the path to a releasable's version file.
 
@@ -478,6 +493,33 @@ def members_of(releasable_name, projects):
             # Implicit mode: project is its own releasable
             result.append(proj)
     return result
+
+
+def resolve_releasable_for_project(proj, releasables):
+    """Return the Releasable that a project belongs to, or None.
+
+    Looks up the project's ``releasable`` field and matches it against the
+    list of releasables.  In implicit mode (field is None), matches by
+    project name.
+
+    Args:
+        proj: WorkspaceProject or dict with at least ``name`` and optionally
+            ``releasable``.
+        releasables: list of Releasable instances.
+
+    Returns:
+        The matching Releasable, or None if the project is not releasable
+        (``releasable = false``) or no match is found.
+    """
+    val = _get_releasable_value(proj)
+    if val is False:
+        return None
+    name = proj.name if isinstance(proj, WorkspaceProject) else proj["name"]
+    target_name = val if isinstance(val, str) else name
+    for rel in releasables:
+        if rel.name == target_name:
+            return rel
+    return None
 
 
 def _get_releasable_value(proj):

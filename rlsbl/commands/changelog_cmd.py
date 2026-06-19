@@ -21,15 +21,52 @@ from ..changelog.resolve import resolve_hash
 from ..changelog.schema import ChangelogEntry, parse_jsonl, serialize_entry, validate_schema
 from ..changelog.validate import _get_batch_limits_config
 from ..config import read_project_config
-from ..git_util import filter_commits_for_project
+from ..git_util import filter_commits_for_project, filter_commits_for_releasable
 from ..utils import commit_files
-from ..workspace import find_workspace_root, resolve_project
+from ..workspace import (
+    find_workspace_root,
+    get_releasable_changes_dir,
+    is_explicit_mode,
+    load_releasables,
+    load_workspace,
+    members_of,
+    resolve_project,
+    resolve_releasable_for_project,
+)
+
+
+class _ResolvedContext:
+    """Carries project, releasable, and workspace info for changelog commands."""
+
+    def __init__(self, project, releasable=None, ws_root=None, member_projects=None):
+        self.project = project
+        self.releasable = releasable
+        self.ws_root = ws_root
+        self.member_projects = member_projects or []
+
+    @property
+    def is_releasable(self):
+        return self.project.is_releasable if self.project else True
+
+    @property
+    def name(self):
+        return self.project.name if self.project else None
+
+    # Forward dict-like access to the underlying project for backward compat
+    def get(self, key, default=None):
+        if self.project is not None:
+            return self.project.get(key, default)
+        return default
+
+    def __getitem__(self, key):
+        return self.project[key]
 
 
 def _resolve_workspace_project(project_root):
     """Resolve the WorkspaceProject for project_root, or None in standalone mode.
 
     Also checks and exits if the project is non-releasable.
+    Returns a _ResolvedContext with releasable info when in explicit mode.
     """
     if project_root is None:
         return None
@@ -42,17 +79,53 @@ def _resolve_workspace_project(project_root):
     if not project.is_releasable:
         print("Error: non-releasable projects don't use changelogs.", file=sys.stderr)
         sys.exit(1)
-    return project
+
+    # Check for explicit releasable mode
+    releasable = None
+    member_projects = []
+    if is_explicit_mode(ws_root):
+        projects = load_workspace(ws_root)
+        releasables = load_releasables(ws_root, projects=projects)
+        releasable = resolve_releasable_for_project(project, releasables)
+        if releasable is not None:
+            member_projects = members_of(releasable.name, projects)
+
+    return _ResolvedContext(
+        project=project,
+        releasable=releasable,
+        ws_root=ws_root,
+        member_projects=member_projects,
+    )
 
 
-def _check_project_scope(resolved_commits, project):
-    """Verify all commits touch files belonging to the project.
+def _check_project_scope(resolved_commits, ws_context):
+    """Verify all commits touch files belonging to the project or releasable.
 
     Hard error if any commit does not touch the project's files.
-    Skipped when project is None (standalone mode).
+    In explicit releasable mode, checks against all member projects.
+    Skipped when ws_context is None (standalone mode).
     """
-    if project is None:
+    if ws_context is None:
         return
+
+    # In explicit releasable mode, scope to the releasable's members
+    if isinstance(ws_context, _ResolvedContext) and ws_context.releasable is not None:
+        members = ws_context.member_projects
+        in_scope = filter_commits_for_releasable(set(resolved_commits), members)
+        for sha in resolved_commits:
+            if sha not in in_scope:
+                print(
+                    f"Error: commit {sha[:12]} does not touch files in "
+                    f"releasable '{ws_context.releasable.name}'. Use the "
+                    f"correct project directory or update watch patterns "
+                    f"in workspace.toml.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+        return
+
+    # Implicit mode or raw project: scope to single project
+    project = ws_context.project if isinstance(ws_context, _ResolvedContext) else ws_context
     in_scope = filter_commits_for_project(set(resolved_commits), project)
     for sha in resolved_commits:
         if sha not in in_scope:
@@ -140,6 +213,43 @@ def _build_entry(flags, resolved_commits):
     return entry
 
 
+def _resolve_changes_dir(ws_context, project_root):
+    """Return the appropriate changes directory based on context.
+
+    In explicit releasable mode, returns the releasable's changes dir.
+    Otherwise, returns the per-project changes dir.
+    """
+    if (isinstance(ws_context, _ResolvedContext)
+            and ws_context.releasable is not None
+            and ws_context.ws_root is not None):
+        return get_releasable_changes_dir(ws_context.ws_root, ws_context.releasable.name)
+    return get_changes_dir(project_root)
+
+
+def _derive_packages_from_commits(resolved_commits, member_projects):
+    """Derive the list of affected package names from commit file paths.
+
+    For each commit, checks which member projects have files touched.
+    Returns a sorted, deduplicated list of project names, or None if
+    there are no member projects to check against.
+    """
+    if not member_projects:
+        return None
+    from ..git_util import get_commit_files, file_matches_project
+
+    affected = set()
+    for sha in resolved_commits:
+        files = get_commit_files(sha)
+        if files is None:
+            continue
+        for filepath in files:
+            for proj in member_projects:
+                if file_matches_project(filepath, proj):
+                    name = proj.name if hasattr(proj, "name") else proj["name"]
+                    affected.add(name)
+    return sorted(affected) if affected else None
+
+
 def cmd_add(flags, project_root):
     """Add a changelog entry to unreleased.jsonl.
 
@@ -147,7 +257,7 @@ def cmd_add(flags, project_root):
     - --commits: comma-separated commit hashes
     - --description and --type: required unless --no-user-facing is set
     """
-    ws_project = _resolve_workspace_project(project_root)
+    ws_context = _resolve_workspace_project(project_root)
 
     commits_raw = flags.get("commits", "")
     if not commits_raw:
@@ -168,11 +278,21 @@ def cmd_add(flags, project_root):
             sys.exit(1)
         resolved_commits.append(full)
 
-    _check_project_scope(resolved_commits, ws_project)
+    _check_project_scope(resolved_commits, ws_context)
 
     entry = _build_entry(flags, resolved_commits)
     user_facing = entry.user_facing
     description = entry.description
+
+    # Auto-populate packages field in explicit releasable mode
+    if (isinstance(ws_context, _ResolvedContext)
+            and ws_context.releasable is not None
+            and ws_context.member_projects):
+        packages = _derive_packages_from_commits(
+            resolved_commits, ws_context.member_projects,
+        )
+        if packages:
+            entry.packages = packages
 
     # Check batch size limit before writing
     config = read_project_config(project_root)
@@ -191,7 +311,7 @@ def cmd_add(flags, project_root):
             )
             sys.exit(1)
         # Auto-create an exclusion in config.json
-        changes_dir_for_line = get_changes_dir(project_root)
+        changes_dir_for_line = _resolve_changes_dir(ws_context, project_root)
         existing_for_line = read_unreleased(changes_dir_for_line)
         line_number = len(existing_for_line) + 1
         reason = description if description else "non-user-facing batch"
@@ -210,7 +330,7 @@ def cmd_add(flags, project_root):
             f.write("\n")
         print(f"Auto-created batch exclusion for line {line_number} in .rlsbl/config.json")
 
-    changes_dir = get_changes_dir(project_root)
+    changes_dir = _resolve_changes_dir(ws_context, project_root)
     existing = read_unreleased(changes_dir)
     _check_duplicate_commits(existing, entry)
     append_entry(changes_dir, entry)
@@ -228,19 +348,24 @@ def cmd_add(flags, project_root):
 
 def cmd_generate(flags, project_root):
     """Generate CHANGELOG.md from JSONL changelog files."""
-    _resolve_workspace_project(project_root)
+    ws_context = _resolve_workspace_project(project_root)
 
-    if not changes_dir_exists(project_root):
-        print("Error: .rlsbl/changes/ does not exist.", file=sys.stderr)
+    # Determine the changes dir (releasable or per-project)
+    changes_dir = _resolve_changes_dir(ws_context, project_root)
+    if not os.path.isdir(changes_dir):
+        print("Error: changes directory does not exist.", file=sys.stderr)
         sys.exit(1)
+
+    # Determine where to write CHANGELOG.md
+    is_releasable_mode = (
+        isinstance(ws_context, _ResolvedContext)
+        and ws_context.releasable is not None
+        and ws_context.ws_root is not None
+    )
 
     dry_run = flags.get("dry-run", False)
 
     if dry_run:
-        # Generate content without writing by temporarily redirecting
-        # We need to generate the content but not write CHANGELOG.md.
-        # generate_changelog() both generates and writes, so we replicate
-        # the generation logic without the write step.
         from ..changelog.files import list_versioned_files, read_unreleased
         from ..changelog.generate import (
             _HEADER_COMMENT,
@@ -248,7 +373,6 @@ def cmd_generate(flags, project_root):
             generate_version_section,
         )
 
-        changes_dir = get_changes_dir(project_root)
         sections = []
 
         unreleased = read_unreleased(changes_dir)
@@ -269,7 +393,18 @@ def cmd_generate(flags, project_root):
         print(content)
         print("\n(dry-run: no files written)")
     else:
-        content = generate_changelog(project_root)
+        if is_releasable_mode:
+            from ..workspace import get_releasable_dir
+            releasable_dir = get_releasable_dir(
+                ws_context.ws_root, ws_context.releasable.name,
+            )
+            content = generate_changelog(
+                project_root,
+                changes_dir_override=changes_dir,
+                changelog_output_path=os.path.join(releasable_dir, "CHANGELOG.md"),
+            )
+        else:
+            content = generate_changelog(project_root)
         print("Generated CHANGELOG.md")
 
         if not flags.get("no-commit"):
@@ -298,7 +433,7 @@ def cmd_amend(flags, project_root):
     - --no-user-facing: mark entry as non-user-facing
     - --no-resolve: skip hash validation (for old/amended commits)
     """
-    ws_project = _resolve_workspace_project(project_root)
+    ws_context = _resolve_workspace_project(project_root)
 
     version = flags.get("version", "")
     if not version:
@@ -329,13 +464,13 @@ def cmd_amend(flags, project_root):
             resolved_commits.append(full)
 
     if not no_resolve:
-        _check_project_scope(resolved_commits, ws_project)
+        _check_project_scope(resolved_commits, ws_context)
 
     entry = _build_entry(flags, resolved_commits)
     user_facing = entry.user_facing
     description = entry.description
 
-    changes_dir = get_changes_dir(project_root)
+    changes_dir = _resolve_changes_dir(ws_context, project_root)
     jsonl_path = os.path.join(changes_dir, f"{version}.jsonl")
 
     if not os.path.isfile(jsonl_path):
@@ -386,7 +521,7 @@ def cmd_edit(flags, project_root):
     - --no-user-facing: set user_facing=false, clear description and type
     - --user-facing: set user_facing=true
     """
-    _resolve_workspace_project(project_root)
+    ws_context = _resolve_workspace_project(project_root)
 
     # Validate at least one edit flag is provided
     has_type = bool(flags.get("type"))
@@ -422,7 +557,7 @@ def cmd_edit(flags, project_root):
     search_set = set(resolved_search)
 
     # Search for matching entries across all JSONL files
-    changes_dir = get_changes_dir(project_root)
+    changes_dir = _resolve_changes_dir(ws_context, project_root)
     matches = []  # list of (file_path, line_index, entry, version_or_none)
 
     # Search unreleased.jsonl first

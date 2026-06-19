@@ -191,6 +191,8 @@ def generate_changelog(
     version_override: str | None = None,
     description: str = "",
     context: str = "",
+    changes_dir_override: str | None = None,
+    changelog_output_path: str | None = None,
 ) -> str:
     """Generate the complete CHANGELOG.md from .rlsbl/changes/ JSONL files.
 
@@ -214,10 +216,18 @@ def generate_changelog(
     (the current release being prepared). Previously released version sections
     read their description and context from archived release files at
     ``.rlsbl/releases/v{version}.toml``.
+
+    ``changes_dir_override`` overrides the default ``.rlsbl/changes/`` path.
+    Used in explicit releasable mode where the changes dir lives under the
+    releasable directory.
+
+    ``changelog_output_path`` overrides the default CHANGELOG.md output location.
+    Used in explicit releasable mode to write CHANGELOG.md into the releasable
+    directory instead of the project root.
     """
     _read_changelog_format(project_path)
 
-    changes_dir = get_changes_dir(project_path)
+    changes_dir = changes_dir_override or get_changes_dir(project_path)
     sections: list[str] = []
 
     # Unreleased entries
@@ -241,7 +251,7 @@ def generate_changelog(
     content = f"{_HEADER_COMMENT}\n\n# Changelog\n\n{body}"
 
     if write_to_disk:
-        changelog_path = os.path.join(project_path, "CHANGELOG.md")
+        changelog_path = changelog_output_path or os.path.join(project_path, "CHANGELOG.md")
         with open(changelog_path, "w", encoding="utf-8") as f:
             f.write(content)
 

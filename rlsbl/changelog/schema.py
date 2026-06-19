@@ -20,6 +20,7 @@ class ChangelogEntry:
     description: str | None = None
     type: str | None = None
     release_type: str | None = None  # "ota" or "build" for Flutter targets
+    packages: list[str] | None = None  # optional: affected member packages in a releasable
 
 
 def validate_schema(entry: ChangelogEntry) -> list[str]:
@@ -37,6 +38,11 @@ def validate_schema(entry: ChangelogEntry) -> list[str]:
             f"invalid release_type: {entry.release_type!r} "
             f"(must be one of {VALID_RELEASE_TYPES})"
         )
+    if entry.packages is not None:
+        if not isinstance(entry.packages, list):
+            errors.append("packages must be a list of strings")
+        elif not all(isinstance(p, str) for p in entry.packages):
+            errors.append("packages must be a list of strings")
     return errors
 
 
@@ -68,6 +74,7 @@ def parse_entry(line: str) -> ChangelogEntry:
         description=data.get("description"),
         type=data.get("type"),
         release_type=data.get("release_type"),
+        packages=data.get("packages"),
     )
 
 
@@ -86,6 +93,8 @@ def serialize_entry(entry: ChangelogEntry) -> str:
         data["type"] = entry.type
     if entry.release_type is not None:
         data["release_type"] = entry.release_type
+    if entry.packages is not None:
+        data["packages"] = entry.packages
     return json.dumps(data, separators=(",", ":"))
 
 

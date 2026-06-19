@@ -305,6 +305,7 @@ def remap_jsonl_hashes(changes_dir, sha_map):
                 description=entry.description,
                 type=entry.type,
                 release_type=entry.release_type,
+                packages=entry.packages,
             ))
 
         if entries_modified == 0:

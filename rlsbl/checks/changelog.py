@@ -19,12 +19,31 @@ def register_changelog_checks(app):
     def check_changelog_entry(ctx):
         """CHANGELOG.md must have an entry for the current version."""
         from ..utils import extract_changelog_entry
+        from ..check_context import WorkspaceCheckContext
+        from ..workspace import (
+            get_releasable_dir,
+            is_explicit_mode,
+            resolve_project,
+            resolve_releasable_for_project,
+        )
 
         version, _tag = _resolve_version_and_tag(ctx)
         if not version:
             return CheckResult("skip", "no version detected")
 
+        # In explicit releasable mode, look for CHANGELOG.md in the releasable dir
         changelog_path = os.path.join(str(ctx.project_root), "CHANGELOG.md")
+        if isinstance(ctx, WorkspaceCheckContext) and ctx.workspace_root is not None:
+            ws_root = str(ctx.workspace_root)
+            if is_explicit_mode(ws_root) and getattr(ctx, "releasables", None):
+                proj = resolve_project(ws_root, str(ctx.project_root))
+                if proj is not None:
+                    rel = resolve_releasable_for_project(proj, ctx.releasables)
+                    if rel is not None:
+                        changelog_path = os.path.join(
+                            get_releasable_dir(ws_root, rel.name), "CHANGELOG.md",
+                        )
+
         if not os.path.exists(changelog_path):
             return CheckResult("warn", "CHANGELOG.md not found")
 
@@ -75,7 +94,9 @@ def register_changelog_checks(app):
             return CheckResult("skip", "no .rlsbl/changes/ directory")
         _changes_dir, tag_glob, project, entries = info
 
-        if project is not None and not project.is_releasable:
+        # In implicit mode, project is a single WorkspaceProject; skip if non-releasable.
+        # In explicit mode, project is a list of members (always releasable).
+        if project is not None and not isinstance(project, list) and not project.is_releasable:
             return CheckResult("skip", "non-releasable project")
 
         passed, details = check_coverage(entries, tag_glob, project=project)
@@ -127,7 +148,9 @@ def register_changelog_checks(app):
             return CheckResult("skip", "no .rlsbl/changes/ directory")
         _changes_dir, _tag_glob, project, entries = info
 
-        if project is not None and not project.is_releasable:
+        # In implicit mode, project is a single WorkspaceProject; skip if non-releasable.
+        # In explicit mode, project is a list of members (always releasable).
+        if project is not None and not isinstance(project, list) and not project.is_releasable:
             return CheckResult("skip", "non-releasable project")
 
         passed, details = check_has_user_facing(entries)
