@@ -200,8 +200,8 @@ class TestScaffoldReleasableDirs:
         # Content preserved
         assert "abc" in open(unreleased).read()
 
-    def test_implicit_mode_returns_empty(self, tmp_path):
-        """In implicit mode (no [[releasables]]), returns empty list."""
+    def test_no_releasables_section_returns_empty(self, tmp_path):
+        """Without [[releasables]] section, returns empty list."""
         make_workspace(tmp_path, [
             {"path": "lib", "name": "lib"},
         ])
@@ -270,8 +270,8 @@ class TestReleasableMemberChangelogSkip:
 
         assert _is_releasable_member_project(proj_dir) is True
 
-    def test_is_releasable_member_project_false_implicit_mode(self, mock_git_repo):
-        """_is_releasable_member_project returns False in implicit mode."""
+    def test_is_releasable_member_project_false_no_releasables(self, mock_git_repo):
+        """_is_releasable_member_project returns False without [[releasables]]."""
         proj_dir = mock_git_repo / "lib"
         proj_dir.mkdir()
 
@@ -401,8 +401,8 @@ class TestMonorepoAddReleasable:
                 "no-commit": True,
             }, project_root=mock_git_repo)
 
-    def test_add_without_releasable_in_implicit_mode(self, mock_git_repo):
-        """In implicit mode, --releasable is optional (backward compatible)."""
+    def test_add_without_releasable_flag(self, mock_git_repo):
+        """--releasable is optional when adding a project."""
         from rlsbl.workspace import save_workspace
         save_workspace(str(mock_git_repo), [])
         self._make_project_dir(mock_git_repo, "lib")

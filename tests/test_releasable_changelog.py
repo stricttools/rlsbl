@@ -152,12 +152,12 @@ class TestResolveReleasableForProject:
         assert result is not None
         assert result.name == "core"
 
-    def test_implicit_membership(self):
+    def test_no_releasable_field_returns_none(self):
+        """Project without releasable field does not match any releasable."""
         proj = WorkspaceProject({"name": "alpha", "path": "alpha"})
         rels = [Releasable(name="alpha"), Releasable(name="beta")]
         result = resolve_releasable_for_project(proj, rels)
-        assert result is not None
-        assert result.name == "alpha"
+        assert result is None
 
     def test_false_releasable_returns_none(self):
         proj = WorkspaceProject({"name": "a", "path": "a", "releasable": False})
@@ -234,8 +234,8 @@ class TestGetChangelogContextExplicitMode:
         member_names = {p.name for p in project}
         assert member_names == {"a", "b"}
 
-    def test_implicit_mode_returns_per_project_changes_dir(self, tmp_path, monkeypatch):
-        """In implicit mode (no [[releasables]]), changes_dir is per-project."""
+    def test_no_releasables_returns_per_project_changes_dir(self, tmp_path, monkeypatch):
+        """Without [[releasables]], changes_dir is per-project."""
         monkeypatch.chdir(tmp_path)
 
         # Create workspace without releasables
@@ -272,7 +272,7 @@ class TestGetChangelogContextExplicitMode:
         assert result is not None
         resolved_dir, tag_glob, project, entries = result
         assert resolved_dir == str(changes_dir)
-        # In implicit mode, project is a single WorkspaceProject, not a list
+        # Without releasables, project is a single WorkspaceProject, not a list
         assert not isinstance(project, list)
 
     def test_non_releasable_project_returns_none(self, tmp_path, monkeypatch):
@@ -793,8 +793,8 @@ class TestChangelogAddReleasable:
         expected = get_releasable_changes_dir(ws_root, "core")
         assert result == expected
 
-    def test_resolve_changes_dir_implicit_mode(self, tmp_path):
-        """_resolve_changes_dir returns per-project changes dir in implicit mode."""
+    def test_resolve_changes_dir_no_releasable(self, tmp_path):
+        """_resolve_changes_dir returns per-project changes dir without releasable."""
         from rlsbl.commands.changelog_cmd import _resolve_changes_dir, _ResolvedContext
 
         project = WorkspaceProject({"name": "a", "path": "a"})

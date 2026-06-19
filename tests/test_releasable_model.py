@@ -4,7 +4,7 @@ Covers:
 - Releasable dataclass construction and defaults
 - WorkspaceProject.releasable property (string, false, None, invalid values)
 - load_releasables() in explicit mode (happy path, validation errors)
-- load_releasables() in implicit mode (backward compat, dev_node filtering)
+- load_releasables() raises WorkspaceError when [[releasables]] is missing
 - members_of() function
 - save_workspace() round-trip with releasables
 - Snapshot releasable section
@@ -421,86 +421,26 @@ name = "a"
 
 
 # ---------------------------------------------------------------------------
-# load_releasables: implicit mode
+# load_releasables: missing [[releasables]] section
 # ---------------------------------------------------------------------------
 
 
-class TestLoadReleasablesImplicit:
-    """load_releasables() without [[releasables]] section: implicit mode."""
+class TestLoadReleasablesMissingSection:
+    """load_releasables() raises WorkspaceError when [[releasables]] is absent."""
 
-    def test_each_project_becomes_releasable(self, tmp_project):
-        _write_workspace(tmp_project, """\
-[[projects]]
-path = "a"
-name = "alpha"
-
-[[projects]]
-path = "b"
-name = "beta"
-""")
-        releasables = load_releasables(str(tmp_project))
-        assert len(releasables) == 2
-        names = {r.name for r in releasables}
-        assert names == {"alpha", "beta"}
-
-    def test_dev_node_excluded(self, tmp_project):
-        _write_workspace(tmp_project, """\
-[[projects]]
-path = "a"
-name = "alpha"
-
-[[projects]]
-path = "tests"
-name = "tests"
-dev_node = true
-""")
-        releasables = load_releasables(str(tmp_project))
-        assert len(releasables) == 1
-        assert releasables[0].name == "alpha"
-
-    def test_all_get_default_tag_format(self, tmp_project):
+    def test_missing_releasables_section_raises(self, tmp_project):
         _write_workspace(tmp_project, """\
 [[projects]]
 path = "a"
 name = "alpha"
 """)
-        releasables = load_releasables(str(tmp_project))
-        assert releasables[0].tag_format == DEFAULT_TAG_FORMAT
+        with pytest.raises(WorkspaceError, match=r"\[\[releasables\]\] section required"):
+            load_releasables(str(tmp_project))
 
-    def test_no_validation_on_releasable_field(self, tmp_project):
-        """In implicit mode, the releasable field is ignored (no validation)."""
-        _write_workspace(tmp_project, """\
-[[projects]]
-path = "a"
-name = "alpha"
-releasable = "whatever"
-""")
-        # Should not raise even though "whatever" is not a defined releasable
-        releasables = load_releasables(str(tmp_project))
-        assert len(releasables) == 1
-
-    def test_empty_workspace(self, tmp_project):
+    def test_empty_workspace_raises(self, tmp_project):
         _write_workspace(tmp_project, "projects = []\n")
-        releasables = load_releasables(str(tmp_project))
-        assert releasables == []
-
-    def test_backward_compat_no_releasable_field(self, tmp_project):
-        """Existing workspaces without releasable fields still work."""
-        _write_workspace(tmp_project, """\
-[[projects]]
-path = "libs/core"
-name = "core"
-library = true
-
-[[projects]]
-path = "apps/web"
-name = "web"
-depends_on = ["core"]
-""")
-        releasables = load_releasables(str(tmp_project))
-        assert len(releasables) == 2
-        names = {r.name for r in releasables}
-        assert names == {"core", "web"}
+        with pytest.raises(WorkspaceError, match=r"\[\[releasables\]\] section required"):
+            load_releasables(str(tmp_project))
 
 
 # ---------------------------------------------------------------------------
@@ -540,15 +480,14 @@ class TestMembersOf:
         assert len(result) == 1
         assert result[0].name == "a"
 
-    def test_implicit_mode_matches_by_name(self):
-        """When releasable field is not set, project matches its own name."""
+    def test_no_releasable_field_not_matched(self):
+        """Project without releasable field is not matched by members_of."""
         projects = [
             WorkspaceProject({"name": "alpha", "path": "a"}),
             WorkspaceProject({"name": "beta", "path": "b"}),
         ]
         result = members_of("alpha", projects)
-        assert len(result) == 1
-        assert result[0].name == "alpha"
+        assert result == []
 
     def test_no_members(self):
         projects = [
@@ -561,15 +500,16 @@ class TestMembersOf:
         result = members_of("anything", [])
         assert result == []
 
-    def test_mixed_explicit_and_implicit(self):
-        """An explicit releasable field takes precedence over name matching."""
+    def test_only_explicit_field_matched(self):
+        """Only projects with explicit releasable field are matched."""
         projects = [
             WorkspaceProject({"name": "core", "path": "core", "releasable": "www"}),
             WorkspaceProject({"name": "other", "path": "other"}),
         ]
-        # "core" releasable should have no members because the "core" project
-        # explicitly belongs to "www"
+        # "core" releasable has no members -- the "core" project belongs to "www"
         assert members_of("core", projects) == []
+        # "other" has no releasable field -- not a member of anything
+        assert members_of("other", projects) == []
         result = members_of("www", projects)
         assert len(result) == 1
         assert result[0].name == "core"
@@ -661,11 +601,9 @@ releasable = "core"
         projects = load_workspace(str(tmp_project))
         save_workspace(str(tmp_project), projects, releasables=[])
 
-        # Now loading should be in implicit mode
-        releasables = load_releasables(str(tmp_project))
-        # In implicit mode, "a" becomes its own releasable
-        assert len(releasables) == 1
-        assert releasables[0].name == "a"
+        # Without [[releasables]], load_releasables raises
+        with pytest.raises(WorkspaceError, match=r"\[\[releasables\]\] section required"):
+            load_releasables(str(tmp_project))
 
     def test_full_roundtrip_explicit_mode(self, tmp_project):
         """Full round-trip: write releasables + projects, then load both."""
@@ -731,13 +669,13 @@ class TestSnapshotReleasables:
         assert "releasables" not in snapshot
         assert "releasable" not in snapshot["packages"]["alpha"]
 
-    def test_implicit_releasables(self, tmp_path):
-        """With implicit releasables, each project maps to its own."""
+    def test_explicit_releasables_single_member(self, tmp_path):
+        """With explicit releasables, each project maps to its releasable."""
         root, projects = _make_workspace_with_targets(tmp_path, [
             {"name": "alpha", "path": "packages/alpha", "target": "pypi",
-             "version": "1.0.0"},
+             "version": "1.0.0", "releasable": "alpha"},
             {"name": "beta", "path": "packages/beta", "target": "pypi",
-             "version": "0.2.0"},
+             "version": "0.2.0", "releasable": "beta"},
         ])
         graph = WorkspaceGraph(root, projects)
         releasables = [Releasable(name="alpha"), Releasable(name="beta")]
@@ -785,11 +723,11 @@ class TestSnapshotReleasables:
         assert snapshot["packages"]["a"]["releasable"] == "core"
         assert snapshot["packages"]["b"]["releasable"] is None
 
-    def test_implicit_mode_package_releasable_field(self, tmp_path):
-        """In implicit mode (no releasable field), package gets its own name."""
+    def test_explicit_releasable_package_field(self, tmp_path):
+        """Package with releasable field gets it in snapshot."""
         root, projects = _make_workspace_with_targets(tmp_path, [
             {"name": "alpha", "path": "packages/alpha", "target": "pypi",
-             "version": "1.0.0"},
+             "version": "1.0.0", "releasable": "alpha"},
         ])
         graph = WorkspaceGraph(root, projects)
         releasables = [Releasable(name="alpha")]
@@ -853,9 +791,13 @@ releasable = "my-cool_rel"
     def test_load_releasables_reads_file_twice(self, tmp_project):
         """load_releasables without projects reads workspace.toml independently."""
         _write_workspace(tmp_project, """\
+[[releasables]]
+name = "alpha"
+
 [[projects]]
 path = "a"
 name = "alpha"
+releasable = "alpha"
 """)
         # Call without pre-loaded projects
         releasables = load_releasables(str(tmp_project))

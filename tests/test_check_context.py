@@ -46,8 +46,12 @@ def test_check_context_factory_passes_workspace_root(tmp_path, monkeypatch):
     Previously the call was WorkspaceGraph(projects) which raised TypeError
     because WorkspaceGraph.__init__ requires (root, projects).
     """
-    projects = [{"path": "sub", "name": "subproj"}]
-    make_workspace(tmp_path, projects)
+    ws_dir = tmp_path / ".rlsbl-monorepo"
+    ws_dir.mkdir()
+    (ws_dir / "workspace.toml").write_text(
+        '[[releasables]]\nname = "subproj"\n\n'
+        '[[projects]]\npath = "sub"\nname = "subproj"\nreleasable = "subproj"\n'
+    )
 
     # Create the subproject directory so WorkspaceGraph can scan it
     (tmp_path / "sub").mkdir()

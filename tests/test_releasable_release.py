@@ -108,7 +108,7 @@ class TestReleasableTagGlob:
 class TestReleaseStateReleasable:
 
     def test_defaults_are_none(self):
-        """In implicit mode, new releasable fields default to None."""
+        """Releasable fields default to None when not set."""
         state = ReleaseState(
             registry="pypi",
             target=MagicMock(),
@@ -320,7 +320,7 @@ class TestComputeReleaseVersionReleasable:
         mock_target.monorepo_tag_format.assert_not_called()
 
     @patch("rlsbl.commands.release.run")
-    def test_implicit_mode_no_releasable_tag_fmt(self, mock_run):
+    def test_no_releasable_tag_fmt_uses_target_tag(self, mock_run):
         """Without releasable_tag_fmt, falls back to target tag format."""
         from rlsbl.commands.release.validate import compute_release_version
 
@@ -393,7 +393,7 @@ class TestValidateChangelogStateReleasable:
                 workspace_root=ws_root,
             )
 
-    def test_implicit_mode_uses_project_changes_dir(self, tmp_path):
+    def test_no_releasable_uses_project_changes_dir(self, tmp_path):
         """Without releasable_name, uses per-project .rlsbl/changes/."""
         from rlsbl.commands.release.validate import validate_changelog_state
 
@@ -492,8 +492,8 @@ class TestSyncMemberPackageVersions:
 
 class TestBatchReleaseInitReleasable:
 
-    def test_scaffold_implicit_mode_uses_packages(self, tmp_path):
-        """In implicit mode, scaffold produces [packages.*] sections."""
+    def test_scaffold_package_sections(self, tmp_path):
+        """scaffold produces [packages.*] sections for package mode."""
         from rlsbl.commands.monorepo.batch_release_init import _scaffold_package_sections
 
         ws_root = str(tmp_path)

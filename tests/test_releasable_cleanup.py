@@ -3,7 +3,7 @@
 Covers:
 - cleanup_per_package_release_state removes changes/ and releases/
 - Cleanup skips non-releasable projects (releasable = false)
-- Cleanup skips implicit mode (no [[releasables]] section)
+- Cleanup skips workspaces without [[releasables]] section
 - verify_minimal_rlsbl identifies unexpected files
 - verify_minimal_rlsbl passes for clean state
 - saferm integration (mocked)
@@ -248,15 +248,15 @@ releasable = "core"
 
 
 # ---------------------------------------------------------------------------
-# cleanup_per_package_release_state: skips implicit mode
+# cleanup_per_package_release_state: skips when no [[releasables]]
 # ---------------------------------------------------------------------------
 
 
-class TestCleanupSkipsImplicitMode:
-    """Cleanup does nothing when workspace is in implicit mode."""
+class TestCleanupSkipsNoReleasables:
+    """Cleanup does nothing when workspace has no [[releasables]]."""
 
     @patch("rlsbl.releasable_cleanup.subprocess.run")
-    def test_implicit_mode_no_cleanup(self, mock_run, tmp_project):
+    def test_no_releasables_no_cleanup(self, mock_run, tmp_project):
         """Without [[releasables]], cleanup returns empty list."""
         pkg = tmp_project / "pkg"
         _make_rlsbl_dir(pkg, subdirs=["changes", "releases"])
@@ -270,8 +270,8 @@ name = "pkg"
         mock_run.assert_not_called()
 
     @patch("rlsbl.releasable_cleanup.subprocess.run")
-    def test_implicit_mode_with_dev_node(self, mock_run, tmp_project):
-        """Implicit mode with dev_node projects still does nothing."""
+    def test_no_releasables_with_dev_node(self, mock_run, tmp_project):
+        """Without [[releasables]] and dev_node projects, still does nothing."""
         for name in ("a", "b"):
             _make_rlsbl_dir(tmp_project / name, subdirs=["changes"])
         _write_workspace(tmp_project, """\

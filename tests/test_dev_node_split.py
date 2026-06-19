@@ -64,11 +64,10 @@ class TestDevNodeDerivedProperty:
         proj = WorkspaceProject({"name": "a", "path": "a"})
         assert proj.dev_node is False
 
-    def test_dev_only_implicit_mode(self):
-        """dev_only without dev_node or releasable field -> dev_node is False
-        (dev_only alone in implicit mode doesn't make it dev_node)."""
+    def test_dev_only_without_dev_node_flag(self):
+        """dev_only without dev_node or releasable field -> dev_node is False."""
         proj = WorkspaceProject({"name": "a", "path": "a", "dev_only": True})
-        # In implicit mode (releasable is None), dev_node depends on legacy flag
+        # Without legacy dev_node flag or releasable=false, not a dev_node
         assert proj.dev_node is False
 
 

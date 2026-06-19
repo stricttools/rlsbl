@@ -935,12 +935,12 @@ class TestFinalizeBatchFile:
 
 
 # ==================================================================
-# checks/prepush.py: monorepo implicit mode path
+# checks/prepush.py: monorepo without explicit releasables path
 # ==================================================================
 
 
-class TestPrepushChangelogCoverageMonorepoImplicit:
-    """Tests for prepush-changelog-coverage in implicit monorepo mode."""
+class TestPrepushChangelogCoverageMonorepoNoReleasables:
+    """Tests for prepush-changelog-coverage in monorepo without [[releasables]]."""
 
     def test_monorepo_uncovered_commit_fails(self, tmp_path, monkeypatch):
         repo = tmp_path / "repo"
@@ -1056,7 +1056,7 @@ class TestPrepushChangelogCoverageMonorepoImplicit:
         assert result.status == "pass"
 
     def test_monorepo_non_releasable_skipped(self, tmp_path, monkeypatch):
-        """Non-releasable (dev_node) projects are skipped in implicit mode."""
+        """Non-releasable (dev_node) projects are skipped."""
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)

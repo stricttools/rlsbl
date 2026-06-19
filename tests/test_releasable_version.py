@@ -6,7 +6,7 @@ Covers:
 - Missing/empty version file errors
 - is_explicit_mode detection
 - compute_release_version with releasable version source
-- version-consistency check in explicit vs implicit mode
+- version-consistency check with and without releasables
 """
 
 import json
@@ -240,7 +240,7 @@ releasable = "core"
 """)
         assert is_explicit_mode(str(tmp_path)) is True
 
-    def test_implicit_mode_without_releasables(self, tmp_path):
+    def test_no_releasables_section(self, tmp_path):
         _write_workspace(tmp_path, """\
 [[projects]]
 path = "a"
@@ -303,7 +303,7 @@ class TestComputeReleaseVersionReleasable:
         # The target's read_version should NOT have been called
         mock_target.read_version.assert_not_called()
 
-    def test_implicit_mode_reads_from_target(self, tmp_path):
+    def test_no_releasable_reads_from_target(self, tmp_path):
         """Without workspace_root/releasable_name, reads from target as before."""
         _init_git(tmp_path)
 
@@ -434,8 +434,8 @@ releasable = "core"
         assert "2.0.0" in result.message
         assert "releasable version file" in result.message
 
-    def test_implicit_mode_compares_targets(self, tmp_path):
-        """In implicit mode, the check compares target versions as before."""
+    def test_no_releasables_compares_targets(self, tmp_path):
+        """Without [[releasables]], the check compares target versions."""
         _write_workspace(tmp_path, """\
 [[projects]]
 path = "pkg"
@@ -586,8 +586,8 @@ releasable = "core"
         assert name == "pkg"
         assert rel_name == "core"
 
-    def test_implicit_mode_returns_none(self, tmp_path):
-        """In implicit mode, releasable_name is None."""
+    def test_no_releasables_returns_none(self, tmp_path):
+        """Without [[releasables]], releasable_name is None."""
         _write_workspace(tmp_path, """\
 [[projects]]
 path = "pkg"
