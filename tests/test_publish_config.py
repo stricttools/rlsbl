@@ -115,7 +115,7 @@ class TestConflictDetection:
         _write_json(config_path, {"private": True, "batch_limits": {}})
         _write_json(publish_path, {"private": False})
 
-        with pytest.raises(ConfigError, match="Publishing fields found in both"):
+        with pytest.raises(ConfigError, match="Publishing fields found in .rlsbl/config.json while .rlsbl/publish.json exists"):
             read_project_config(tmp_path)
 
     def test_conflict_mentions_overlapping_fields(self, tmp_path):
@@ -125,7 +125,7 @@ class TestConflictDetection:
         _write_json(config_path, {"private": True, "targets": ["pypi"]})
         _write_json(publish_path, {"tag": True})
 
-        with pytest.raises(ConfigError, match="private.*tag.*targets"):
+        with pytest.raises(ConfigError, match="private.*targets"):
             read_project_config(tmp_path)
 
     def test_no_conflict_when_config_has_only_non_publish_fields(self, tmp_path):

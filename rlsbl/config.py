@@ -106,17 +106,21 @@ def write_publish_config(project_root, config):
     os.replace(tmp_path, path)
 
 
-def _check_publish_field_conflict(config_json, publish_json, project_root):
-    """Raise ConfigError if both config.json and publish.json contain publishing fields."""
+def _check_publish_field_conflict(config_json, publish_json_exists, project_root):
+    """Raise ConfigError if config.json has publishing fields while publish.json exists.
+
+    When publish.json exists (regardless of its content), any PUBLISH_FIELDS
+    left in config.json are a conflict: publish.json's existence signals that
+    publishing config has been migrated, so stale fields in config.json would
+    be silently dropped during merging.
+    """
     config_publish_keys = PUBLISH_FIELDS & set(config_json.keys())
-    publish_keys = PUBLISH_FIELDS & set(publish_json.keys())
-    if config_publish_keys and publish_keys:
-        overlap = sorted(config_publish_keys | publish_keys)
+    if config_publish_keys and publish_json_exists:
         raise ConfigError(
-            f"Publishing fields found in both .rlsbl/config.json and .rlsbl/publish.json: "
-            f"{', '.join(overlap)}. "
+            f"Publishing fields found in .rlsbl/config.json while .rlsbl/publish.json exists: "
+            f"{', '.join(sorted(config_publish_keys))}. "
             f"Use migrate_publish_config() to move publishing fields to publish.json, "
-            f"or remove them from one file."
+            f"or remove them from config.json."
         )
 
 
@@ -133,14 +137,16 @@ def read_project_config(project_root):
       from whichever source).
     """
     config_json = read_json_config(_project_config(project_root))
-    publish_json = read_json_config(_publish_config_path(project_root))
+    publish_path = _publish_config_path(project_root)
+    publish_json_exists = os.path.isfile(publish_path)
+    publish_json = read_json_config(publish_path) if publish_json_exists else {}
 
-    # If publish.json doesn't exist or is empty, return config.json as-is (backward compat)
-    if not publish_json:
+    # If publish.json doesn't exist, return config.json as-is (backward compat)
+    if not publish_json_exists:
         return config_json
 
-    # Both have content -- check for conflicts
-    _check_publish_field_conflict(config_json, publish_json, project_root)
+    # publish.json exists -- check for conflicts (config.json must not have PUBLISH_FIELDS)
+    _check_publish_field_conflict(config_json, publish_json_exists, project_root)
 
     # publish.json exists and config.json has no publishing fields -- merge
     merged = {k: v for k, v in config_json.items() if k not in PUBLISH_FIELDS}
