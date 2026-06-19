@@ -316,22 +316,54 @@ def register_project_checks(app):
 
     @app.check("private-hook-stale")
     def check_private_hook_stale(ctx):
-        """Detect legacy private asset upload code in post-release hook."""
+        """Detect legacy private asset upload code in post-release hook.
+
+        Checks the per-package hook at ``.rlsbl/hooks/post-release.sh``.
+        In explicit releasable mode, also checks the releasable-level hook
+        at ``.rlsbl-monorepo/releasables/{name}/hooks/post-release.sh``.
+        """
+        legacy_marker = "Post-release hook for private repositories"
+        stale_paths = []
+        hooks_found = False
+
+        # Per-package hook
         hook_path = os.path.join(str(ctx.project_root), ".rlsbl", "hooks", "post-release.sh")
-        if not os.path.exists(hook_path):
-            return CheckResult("pass", "no post-release hook")
+        if os.path.exists(hook_path):
+            hooks_found = True
+            with open(hook_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            if legacy_marker in content:
+                stale_paths.append(os.path.relpath(hook_path, str(ctx.project_root)))
 
-        with open(hook_path, "r", encoding="utf-8") as f:
-            content = f.read()
+        # Releasable-level hook (explicit mode only)
+        workspace_root = getattr(ctx, "workspace_root", None)
+        if workspace_root is not None:
+            from ..workspace import is_explicit_mode, resolve_project
+            ws_root = str(workspace_root)
+            if is_explicit_mode(ws_root):
+                project = resolve_project(ws_root, str(ctx.project_root))
+                if project is not None:
+                    rel_val = project.releasable
+                    if isinstance(rel_val, str):
+                        from ..commands.release.hooks import get_releasable_hook_path
+                        rel_hook = get_releasable_hook_path(ws_root, rel_val, "post-release.sh")
+                        if os.path.exists(rel_hook):
+                            hooks_found = True
+                            with open(rel_hook, "r", encoding="utf-8") as f:
+                                rel_content = f.read()
+                            if legacy_marker in rel_content:
+                                stale_paths.append(os.path.relpath(rel_hook, str(ctx.project_root)))
 
-        # The old private hook template had this distinctive comment line
-        if "Post-release hook for private repositories" in content:
+        if stale_paths:
             return CheckResult(
                 "fail",
-                "Post-release hook contains legacy private asset upload code. "
+                f"Post-release hook(s) contain legacy private asset upload code: "
+                f"{', '.join(stale_paths)}. "
                 "Asset upload is now a built-in release step. "
                 "Run `rlsbl scaffold` to get the standard hook template.",
             )
+        if not hooks_found:
+            return CheckResult("pass", "no post-release hook")
         return CheckResult("pass", "no legacy private hook code")
 
     @app.check("config-schema")
