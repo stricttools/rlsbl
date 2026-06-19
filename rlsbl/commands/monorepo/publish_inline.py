@@ -201,13 +201,16 @@ def transform_project_jobs(
 # ---------------------------------------------------------------------------
 
 
-def generate_inline_publish_router(projects_with_publish: list, root: str) -> str:
+def generate_inline_publish_router(projects_with_publish: list, root: str, releasables=None) -> str:
     """Generate a monorepo publish router with all sub-project jobs inlined.
 
     Instead of calling per-project reusable workflows via ``workflow_call``,
     this inlines every sub-project's publish jobs directly into a single
     ``publish.yml``.  Each job gets an ``if: startsWith(...)`` condition
     so only the relevant project's jobs run on a given release.
+
+    When *releasables* are provided, tag prefixes are derived from the
+    releasable's ``tag_format`` instead of the target's ``monorepo_tag_glob``.
 
     Returns the complete YAML string, ready to write to disk.
     """
@@ -221,7 +224,7 @@ def generate_inline_publish_router(projects_with_publish: list, root: str) -> st
     }
 
     for project in projects_with_publish:
-        tag_prefix = _get_monorepo_tag_prefix(project, root)
+        tag_prefix = _get_monorepo_tag_prefix(project, root, releasables=releasables)
         workflow_path = os.path.join(
             root, project["path"], ".github", "workflows", "publish.yml"
         )
