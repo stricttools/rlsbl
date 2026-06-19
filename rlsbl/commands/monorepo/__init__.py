@@ -24,6 +24,16 @@ from .mirror_cmd import _cmd_mirror
 
 from .snapshot_cmd import _cmd_snapshot
 
+from .extract import (
+    require_filter_repo,
+    cmd_extract,
+    cmd_absorb,
+    cmd_extract_releasable,
+    ExtractError,
+    validate_extract_preconditions,
+    validate_absorb_preconditions,
+)
+
 from .sync import (
     _cmd_sync,
     _build_project_template_vars,
@@ -54,6 +64,14 @@ __all__ = [
     "_cmd_impact",
     "_cmd_mirror",
     "_cmd_snapshot",
+    # extract/absorb
+    "require_filter_repo",
+    "cmd_extract",
+    "cmd_absorb",
+    "cmd_extract_releasable",
+    "ExtractError",
+    "validate_extract_preconditions",
+    "validate_absorb_preconditions",
     "_evaluate_constraint",
     "_parse_version_tuple",
     # sync
