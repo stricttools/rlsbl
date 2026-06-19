@@ -39,8 +39,8 @@ def _resolve_workspace_project(project_root):
     project = resolve_project(ws_root, str(project_root))
     if project is None:
         return None
-    if project.get("dev_node"):
-        print("Error: dev node projects don't use changelogs.", file=sys.stderr)
+    if not project.is_releasable:
+        print("Error: non-releasable projects don't use changelogs.", file=sys.stderr)
         sys.exit(1)
     return project
 

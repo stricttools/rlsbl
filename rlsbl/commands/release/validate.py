@@ -245,7 +245,7 @@ def resolve_monorepo_context(monorepo_root, project_root, log):
     Returns (monorepo_name, monorepo_project_path, is_library, is_dev_node).
     All values are None/False when not in a monorepo.
     Raises ReleaseValidationError if inside a monorepo but not a recognized project,
-    or if the project is a dev_node.
+    or if the project is non-releasable.
     """
     from . import resolve_project
 
@@ -261,14 +261,14 @@ def resolve_monorepo_context(monorepo_root, project_root, log):
     monorepo_name = project["name"]
     monorepo_project_path = project["path"]
     is_library = bool(project.get("library"))
-    is_dev_node = bool(project.get("dev_node"))
+    is_dev_node = not project.is_releasable
     log(f"Monorepo project: {monorepo_name} ({monorepo_project_path})")
     if is_dev_node:
         raise ReleaseValidationError(
-            "dev_node projects cannot be released. Dev nodes are "
-            "infrastructure projects that do not produce releases. Remove "
-            "dev_node = true from workspace.toml if this project should be "
-            "releasable."
+            "non-releasable projects cannot be released. Set "
+            "releasable = \"<name>\" in workspace.toml if this project "
+            "should be releasable, or remove dev_node / set "
+            "releasable = false to confirm it is non-releasable."
         )
 
     return monorepo_name, monorepo_project_path, is_library, is_dev_node

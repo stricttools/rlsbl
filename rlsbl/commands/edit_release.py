@@ -35,7 +35,7 @@ def run_cmd(args, flags, project_root):
     # Detect monorepo context
     monorepo_name = None
     monorepo_project_path = None
-    is_dev_node = False
+    is_non_releasable = False
     start_path = str(project_root)
     monorepo_root = find_workspace_root(start_path)
     if monorepo_root:
@@ -43,13 +43,13 @@ def run_cmd(args, flags, project_root):
         if project is not None:
             monorepo_name = project["name"]
             monorepo_project_path = project["path"]
-            is_dev_node = bool(project.get("dev_node"))
+            is_non_releasable = not project.is_releasable
 
-    if is_dev_node:
+    if is_non_releasable:
         print(
-            "Error: dev_node projects cannot be released and have no release "
-            "to edit. Remove dev_node = true from workspace.toml if this "
-            "project should be releasable.",
+            "Error: non-releasable projects cannot be released and have no "
+            "release to edit. Set releasable = \"<name>\" in workspace.toml "
+            "if this project should be releasable.",
             file=sys.stderr,
         )
         sys.exit(1)

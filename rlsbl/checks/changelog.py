@@ -75,8 +75,8 @@ def register_changelog_checks(app):
             return CheckResult("skip", "no .rlsbl/changes/ directory")
         _changes_dir, tag_glob, project, entries = info
 
-        if project is not None and project.get("dev_node"):
-            return CheckResult("skip", "dev node project")
+        if project is not None and not project.is_releasable:
+            return CheckResult("skip", "non-releasable project")
 
         passed, details = check_coverage(entries, tag_glob, project=project)
 
@@ -127,8 +127,8 @@ def register_changelog_checks(app):
             return CheckResult("skip", "no .rlsbl/changes/ directory")
         _changes_dir, _tag_glob, project, entries = info
 
-        if project is not None and project.get("dev_node"):
-            return CheckResult("skip", "dev node project")
+        if project is not None and not project.is_releasable:
+            return CheckResult("skip", "non-releasable project")
 
         passed, details = check_has_user_facing(entries)
         if passed:

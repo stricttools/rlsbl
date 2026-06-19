@@ -51,7 +51,7 @@ def register_prepush_checks(app):
 
             failures = []
             for proj in affected:
-                if proj.get("dev_node"):
+                if not proj.is_releasable:
                     continue
                 proj_dir = os.path.join(ws_root, proj["path"])
                 if not changes_dir_exists(proj_dir):

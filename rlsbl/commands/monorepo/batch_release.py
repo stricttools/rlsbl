@@ -63,17 +63,17 @@ def _cmd_batch_release(flags, project_root):
         )
         sys.exit(1)
 
-    # Reject dev_node projects -- they must be released individually
-    dev_nodes_in_batch = sorted(
+    # Reject non-releasable projects
+    non_releasable_in_batch = sorted(
         name
         for name in batch_config.packages
-        if project_by_name[name].get("dev_node", False)
+        if not project_by_name[name].is_releasable
     )
-    if dev_nodes_in_batch:
+    if non_releasable_in_batch:
         print(
-            "Error: dev_node projects cannot be in batch release: "
-            f"{', '.join(dev_nodes_in_batch)}. "
-            "Remove dev_node = true from workspace.toml if these projects "
+            "Error: non-releasable projects cannot be in batch release: "
+            f"{', '.join(non_releasable_in_batch)}. "
+            "Set releasable = \"<name>\" in workspace.toml if these projects "
             "should be releasable.",
             file=sys.stderr,
         )
