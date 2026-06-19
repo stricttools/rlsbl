@@ -238,6 +238,13 @@ def process_template(template_content, vars_dict, template_path=None, *, require
     unknown action raises :class:`UnknownActionError` immediately -- no
     implicit defaults.
 
+    Pass 1.5 resolves conditional blocks ``{{#if varName}}...{{/if}}``.
+    If ``vars_dict[varName]`` is truthy (present and non-empty string),
+    the body is kept; otherwise the entire block is removed. Blank lines
+    left by removed blocks are collapsed. Non-nested only. Actions inside
+    conditional blocks are resolved (Pass 1 runs first); variables inside
+    surviving blocks are resolved (Pass 2 runs after).
+
     Pass 2 resolves the existing ``{{varName}}`` (and dotted ``{{a.b}}``)
     placeholders against ``vars_dict``.
 
@@ -274,6 +281,27 @@ def process_template(template_content, vars_dict, template_path=None, *, require
     content = re.sub(
         r'\{\{action\s+"([^"]+)"\}\}', action_replacer, content
     )
+
+    # Pass 1.5: conditional blocks — {{#if varName}}...{{/if}}.
+    # Non-nested only. Truthy = present in vars_dict and non-empty string.
+    # Removed blocks have surrounding blank lines collapsed to avoid gaps.
+    def conditional_replacer(match):
+        var_name = match.group(1)
+        body = match.group(2)
+        if vars_dict.get(var_name):
+            return body
+        # Remove the block and strip leading/trailing blank lines from the gap.
+        return ""
+
+    content = re.sub(
+        r"\{\{#if\s+(\w+)\}\}(.*?)\{\{/if\}\}",
+        conditional_replacer,
+        content,
+        flags=re.DOTALL,
+    )
+
+    # Collapse runs of 3+ newlines (left by removed conditional blocks) to 2.
+    content = re.sub(r"\n{3,}", "\n\n", content)
 
     # Pass 2: variable placeholders (existing behavior).
     unreplaced = []
