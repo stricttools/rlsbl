@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -28,16 +27,14 @@ def create_context(
     workspace_root: Path | None = None,
     project: WorkspaceProject | None = None,
 ) -> ProjectContext:
-    """Create a ProjectContext, loading config from .rlsbl/config.json.
+    """Create a ProjectContext, loading config via read_project_config().
 
-    Returns an empty dict for config if the file doesn't exist.
+    Uses the merged view (publish.json + config.json with conflict detection).
+    Returns an empty dict for config if neither file exists.
     """
-    config_path = root / ".rlsbl" / "config.json"
-    try:
-        with open(config_path, "r", encoding="utf-8") as f:
-            config = json.load(f)
-    except FileNotFoundError:
-        config = {}
+    from .config import read_project_config
+
+    config = read_project_config(root)
     return ProjectContext(
         project_root=root,
         workspace_root=workspace_root,
