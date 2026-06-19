@@ -318,6 +318,9 @@ def scaffold_releasable_dirs(workspace_root):
         hooks_dir = os.path.join(rel_dir, "hooks")
         os.makedirs(hooks_dir, exist_ok=True)
 
+        # Store merge bases under the monorepo directory (not cwd's .rlsbl/).
+        bases_dir = os.path.join(workspace_root, ".rlsbl-monorepo", "bases")
+
         for hook_name, template_content in hook_templates.items():
             hook_path = os.path.join(hooks_dir, hook_name)
             if not os.path.isfile(hook_path):
@@ -328,10 +331,16 @@ def scaffold_releasable_dirs(workspace_root):
                 created_files.append(hook_path)
             else:
                 # Existing hook: three-way merge
-                from ...commands.init_cmd import _load_base, _save_base, _three_way_merge
+                from ...commands.init_cmd import _three_way_merge
 
                 base_key = os.path.relpath(hook_path, workspace_root)
-                base = _load_base(base_key)
+                base_path = os.path.join(bases_dir, base_key)
+
+                # Load base
+                base = None
+                if os.path.isfile(base_path):
+                    with open(base_path, "r", encoding="utf-8") as f:
+                        base = f.read()
 
                 with open(hook_path, "r", encoding="utf-8") as f:
                     ours = f.read()
@@ -341,13 +350,16 @@ def scaffold_releasable_dirs(workspace_root):
                     pass
                 elif base is None:
                     # No base stored: seed the base for future merges
-                    _save_base(base_key, template_content)
+                    os.makedirs(os.path.dirname(base_path), exist_ok=True)
+                    with open(base_path, "w", encoding="utf-8") as f:
+                        f.write(template_content)
                 elif ours == base:
                     # User hasn't customized; update to new template
                     with open(hook_path, "w", encoding="utf-8") as f:
                         f.write(template_content)
                     os.chmod(hook_path, 0o755)
-                    _save_base(base_key, template_content)
+                    with open(base_path, "w", encoding="utf-8") as f:
+                        f.write(template_content)
                     created_files.append(hook_path)
                 elif base != template_content:
                     # Both sides changed: three-way merge
@@ -355,7 +367,8 @@ def scaffold_releasable_dirs(workspace_root):
                     with open(hook_path, "w", encoding="utf-8") as f:
                         f.write(merged)
                     os.chmod(hook_path, 0o755)
-                    _save_base(base_key, template_content)
+                    with open(base_path, "w", encoding="utf-8") as f:
+                        f.write(template_content)
                     created_files.append(hook_path)
                     if has_conflicts:
                         print(
