@@ -6,3 +6,4 @@
 {"commits":["d2cd1d465b5b855b641e89129d2703e90e32795d"],"user_facing":true,"description":"**Fix: shallow clone test failure in CI.**","type":"fix"}
 {"commits":["b94d162c8bc15a06653eab01949fff0c7d9b5048","10674feb81e7afbe6540b4cb0ef724d9cb604c5d","9d3b7275607e113723b5bf9520dca1134004a58d","43a8840499c3d196907a388abf4f425ec2e7d382","945c5a20239af44014c9af8c82de59f3a4cbc4c7","600ea1ccef64e00a72f71a6ff0222ee22bb5907d","a05eef2bcb0ed5d84fdfb6ba85c953454e83c1bf"],"user_facing":false}
 {"commits":["3652af51376e6593d93b481539214de9b934981e"],"user_facing":false}
+{"commits":["a0a00539c29e7c41d9bad598fd7c79470d206027"],"user_facing":false}
