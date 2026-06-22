@@ -12,7 +12,7 @@ from rlsbl.pipelines.go import GoPipeline
 from rlsbl.pipelines.cargo import CargoPipeline
 from rlsbl.pipelines.deno import DenoPipeline
 from rlsbl.pipelines.hex import HexPipeline
-from rlsbl.pipelines.maven import MavenPipeline
+from rlsbl.pipelines.maven import MavenPipeline, MavenCentralPipeline
 from rlsbl.pipelines.docker import DockerPipeline
 from rlsbl.pipelines.cloudflare_pages import CloudflarePagesPipeline
 
@@ -23,8 +23,8 @@ from rlsbl.pipelines.cloudflare_pages import CloudflarePagesPipeline
 
 
 class TestPipelineRegistry:
-    def test_all_9_types_registered(self):
-        expected = {"npm", "pypi", "go", "cargo", "deno", "hex", "maven", "docker", "cloudflare-pages"}
+    def test_all_10_types_registered(self):
+        expected = {"npm", "pypi", "go", "cargo", "deno", "hex", "maven", "maven-central", "docker", "cloudflare-pages"}
         assert set(PIPELINE_TYPES.keys()) == expected
 
     def test_registry_maps_to_classes(self):
@@ -35,6 +35,7 @@ class TestPipelineRegistry:
         assert PIPELINE_TYPES["deno"] is DenoPipeline
         assert PIPELINE_TYPES["hex"] is HexPipeline
         assert PIPELINE_TYPES["maven"] is MavenPipeline
+        assert PIPELINE_TYPES["maven-central"] is MavenCentralPipeline
         assert PIPELINE_TYPES["docker"] is DockerPipeline
         assert PIPELINE_TYPES["cloudflare-pages"] is CloudflarePagesPipeline
 
@@ -47,8 +48,8 @@ class TestPipelineRegistry:
 class TestProtocolConformance:
     @pytest.mark.parametrize("cls", [
         NpmPipeline, PypiPipeline, GoPipeline, CargoPipeline,
-        DenoPipeline, HexPipeline, MavenPipeline, DockerPipeline,
-        CloudflarePagesPipeline,
+        DenoPipeline, HexPipeline, MavenPipeline, MavenCentralPipeline,
+        DockerPipeline, CloudflarePagesPipeline,
     ])
     def test_satisfies_pipeline_protocol(self, cls):
         p = cls(name="test", pipeline_type="test", local=False, config={})
@@ -69,6 +70,7 @@ _ALL_PIPELINES = [
     ("deno", "deno", DenoPipeline),
     ("hex", "hex", HexPipeline),
     ("maven", "maven", MavenPipeline),
+    ("maven-central", "maven-central", MavenCentralPipeline),
     ("docker", "docker", DockerPipeline),
     ("cf", "cloudflare-pages", CloudflarePagesPipeline),
 ]

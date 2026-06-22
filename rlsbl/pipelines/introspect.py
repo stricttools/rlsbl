@@ -14,6 +14,7 @@ _ECOSYSTEMS: dict[str, str] = {
     "deno": "JSR (Deno)",
     "hex": "hex.pm (Elixir)",
     "maven": "Maven Central / Gradle",
+    "maven-central": "Maven Central (Central Portal)",
     "docker": "Container registry",
     "cloudflare-pages": "Cloudflare Pages",
 }

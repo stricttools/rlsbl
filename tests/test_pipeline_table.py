@@ -21,9 +21,9 @@ class TestHeaders:
 
 
 class TestRows:
-    def test_returns_9_rows(self):
+    def test_returns_10_rows(self):
         _, rows = generate_pipeline_table_data()
-        assert len(rows) == 9
+        assert len(rows) == 10
 
     def test_rows_match_header_length(self):
         headers, rows = generate_pipeline_table_data()

@@ -149,7 +149,7 @@ class TestTargetTableResolve:
 
 EXPECTED_PIPELINE_TYPES = sorted([
     "cargo", "cloudflare-pages", "deno", "docker", "go",
-    "hex", "maven", "npm", "pypi",
+    "hex", "maven", "maven-central", "npm", "pypi",
 ])
 
 
@@ -162,7 +162,7 @@ class TestPipelineTableResolve:
         assert "|" in result
 
     def test_contains_all_pipeline_types(self):
-        """Output contains all 9 pipeline type names."""
+        """Output contains all 10 pipeline type names."""
         result = _pipeline_table_resolve({}, None, None)
         missing = [t for t in EXPECTED_PIPELINE_TYPES if t not in result]
         assert not missing, (

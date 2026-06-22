@@ -7,7 +7,7 @@ from .go import GoPipeline
 from .cargo import CargoPipeline
 from .deno import DenoPipeline
 from .hex import HexPipeline
-from .maven import MavenPipeline
+from .maven import MavenPipeline, MavenCentralPipeline
 from .docker import DockerPipeline
 from .cloudflare_pages import CloudflarePagesPipeline
 
@@ -19,6 +19,7 @@ PIPELINE_TYPES: dict[str, type] = {
     "deno": DenoPipeline,
     "hex": HexPipeline,
     "maven": MavenPipeline,
+    "maven-central": MavenCentralPipeline,
     "docker": DockerPipeline,
     "cloudflare-pages": CloudflarePagesPipeline,
 }
