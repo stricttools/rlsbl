@@ -91,7 +91,7 @@ class TestCheckTargetsConsistencyWithCode:
     def test_library_lint_targets(self):
         """library-lint supports python/pypi, go, npm per _detect_languages."""
         targets = CHECK_TARGETS["library-lint"]
-        assert targets == frozenset({"pypi", "go", "npm"})
+        assert targets == frozenset({"pypi", "go", "npm", "maven"})
 
     def test_dep_checks_use_import_scanners(self):
         """Dep checks use Python, Dart, npm, Go, Java, and Kotlin import scanners."""
