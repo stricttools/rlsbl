@@ -53,7 +53,7 @@ _BASE_PATCHES = {
     "extract_changelog_entry_from_text": "- test",
     "build_hook_env": {},
     "get_hook_timeout": 30,
-    "_is_hook_effectively_empty": True,
+    "is_hook_customized": False,
     "_run_builtin_tests": None,
     "_run_builtin_lint": None,
     "_run_strictcli_schema_dump": None,

@@ -193,7 +193,7 @@ class TestRunReleasableHooks:
 
         execution_order = []
 
-        def mock_run_release_hook(hook_name, hook_path, cwd, env, timeout):
+        def mock_run_release_hook(hook_name, hook_path, cwd, env, timeout, **kwargs):
             execution_order.append(hook_name)
 
         member_packages = [
@@ -233,7 +233,7 @@ class TestRunReleasableHooks:
 
         execution_order = []
 
-        def mock_run_release_hook(hook_name, hook_path, cwd, env, timeout):
+        def mock_run_release_hook(hook_name, hook_path, cwd, env, timeout, **kwargs):
             execution_order.append(hook_name)
 
         member_packages = [
@@ -269,7 +269,7 @@ class TestRunReleasableHooks:
 
         execution_order = []
 
-        def mock_run_release_hook(hook_name, hook_path, cwd, env, timeout):
+        def mock_run_release_hook(hook_name, hook_path, cwd, env, timeout, **kwargs):
             execution_order.append(hook_name)
 
         with patch("rlsbl.commands.release.hooks.run_release_hook", side_effect=mock_run_release_hook):
@@ -294,7 +294,7 @@ class TestRunReleasableHooks:
 
         execution_order = []
 
-        def mock_run_release_hook(hook_name, hook_path, cwd, env, timeout):
+        def mock_run_release_hook(hook_name, hook_path, cwd, env, timeout, **kwargs):
             execution_order.append(hook_name)
 
         with patch("rlsbl.commands.release.hooks.run_release_hook", side_effect=mock_run_release_hook):
@@ -321,7 +321,7 @@ class TestRunReleasableHooks:
 
         execution_order = []
 
-        def mock_run_release_hook(hook_name, hook_path, cwd, env, timeout):
+        def mock_run_release_hook(hook_name, hook_path, cwd, env, timeout, **kwargs):
             execution_order.append(hook_name)
 
         with patch("rlsbl.commands.release.hooks.run_release_hook", side_effect=mock_run_release_hook):
@@ -349,7 +349,7 @@ class TestRunReleasableHooks:
 
         execution_order = []
 
-        def mock_run_release_hook(hook_name, hook_path, cwd, env, timeout):
+        def mock_run_release_hook(hook_name, hook_path, cwd, env, timeout, **kwargs):
             execution_order.append(hook_name)
 
         with patch("rlsbl.commands.release.hooks.run_release_hook", side_effect=mock_run_release_hook):
@@ -382,7 +382,7 @@ class TestHookFailurePropagation:
         alpha_dir = tmp_path / "alpha"
         alpha_dir.mkdir(exist_ok=True)
 
-        def mock_run_release_hook(hook_name, hook_path, cwd, env, timeout):
+        def mock_run_release_hook(hook_name, hook_path, cwd, env, timeout, **kwargs):
             raise HookError(f"{hook_name} hook exited with code 1.")
 
         with patch("rlsbl.commands.release.hooks.run_release_hook", side_effect=mock_run_release_hook):
@@ -409,7 +409,7 @@ class TestHookFailurePropagation:
 
         call_count = 0
 
-        def mock_run_release_hook(hook_name, hook_path, cwd, env, timeout):
+        def mock_run_release_hook(hook_name, hook_path, cwd, env, timeout, **kwargs):
             nonlocal call_count
             call_count += 1
             if "alpha" in hook_name:
@@ -441,7 +441,7 @@ class TestHookFailurePropagation:
 
         execution_order = []
 
-        def mock_run_release_hook(hook_name, hook_path, cwd, env, timeout):
+        def mock_run_release_hook(hook_name, hook_path, cwd, env, timeout, **kwargs):
             execution_order.append(hook_name)
             if "alpha" in hook_name:
                 raise HookError(f"{hook_name} hook exited with code 1.")
@@ -482,7 +482,7 @@ class TestPerPackageHookEnvVars:
 
         captured_envs = {}
 
-        def mock_run_release_hook(hook_name, hook_path, cwd, env, timeout):
+        def mock_run_release_hook(hook_name, hook_path, cwd, env, timeout, **kwargs):
             captured_envs[hook_name] = dict(env)
 
         with patch("rlsbl.commands.release.hooks.run_release_hook", side_effect=mock_run_release_hook):
@@ -509,7 +509,7 @@ class TestPerPackageHookEnvVars:
 
         captured_envs = {}
 
-        def mock_run_release_hook(hook_name, hook_path, cwd, env, timeout):
+        def mock_run_release_hook(hook_name, hook_path, cwd, env, timeout, **kwargs):
             captured_envs[hook_name] = dict(env)
 
         base_env = {"RLSBL_VERSION": "1.0.0"}
