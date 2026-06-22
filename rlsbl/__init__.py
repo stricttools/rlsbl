@@ -252,13 +252,8 @@ def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, no_watch, **_kwargs
         print(f"Error in release file: {e}", file=sys.stderr)
         sys.exit(1)
 
-    flags = {
-        "dry-run": dry_run,
-        "yes": yes,
-        "quiet": quiet,
-        "allow-dirty": allow_dirty,
-        "watch": bool(watch),
-    }
+    from .commands.release.shared import build_release_flags
+    flags = build_release_flags(dry_run, yes, quiet, allow_dirty, watch=watch)
     from .commands.release import run_cmd
     run_cmd(release_config, flags, ctx=ctx)
 
@@ -984,15 +979,20 @@ def cmd_mono_impact(format, depth=None, since="", **_kwargs):
     _cmd_impact(args, flags, project_root=root)
 
 
-@mono.command(name="release", help="Execute a batch release of multiple monorepo packages in topological order. Reads package configurations from .rlsbl-monorepo/releases/unreleased.toml. Each package is released sequentially using the single-package release flow, with leaves (no dependencies) released first. Supports --dry-run, --yes, --allow-dirty flags.")
+@mono.command(
+    name="release",
+    help="Execute a batch release of multiple monorepo packages in topological order. Reads package configurations from .rlsbl-monorepo/releases/unreleased.toml. Each package is released sequentially using the single-package release flow, with leaves (no dependencies) released first. Supports --dry-run, --yes, --allow-dirty flags.",
+    mutex=[
+        strictcli.MutexGroup(flags=[
+            strictcli.Flag(name="watch", type=bool, negatable=False, help="After batch release, automatically watch CI runs to completion"),
+            strictcli.Flag(name="no-watch", type=bool, negatable=False, help="After batch release, print the watch command hint without watching"),
+        ]),
+    ],
+)
 @strictcli.flag(name="allow-dirty", type=bool, help="Skip the clean working tree check and allow releasing with uncommitted changes")
-def cmd_mono_release(dry_run, yes, quiet, allow_dirty, **_kwargs):
-    flags = {
-        "dry-run": dry_run,
-        "yes": yes,
-        "quiet": quiet,
-        "allow-dirty": allow_dirty,
-    }
+def cmd_mono_release(dry_run, yes, quiet, allow_dirty, watch, no_watch, **_kwargs):
+    from .commands.release.shared import build_release_flags
+    flags = build_release_flags(dry_run, yes, quiet, allow_dirty, watch=watch)
     root = _require_project_root()
     from .commands.monorepo import _cmd_batch_release
     _cmd_batch_release(flags, project_root=root)
