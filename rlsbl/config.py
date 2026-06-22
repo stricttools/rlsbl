@@ -140,52 +140,79 @@ def write_publish_config(project_root, config):
     os.replace(tmp_path, path)
 
 
-def _check_publish_field_conflict(config_json, publish_json_exists, project_root):
-    """Raise ConfigError if config.json has publishing fields while publish.json exists.
+def _load_level_config(config_path, publish_path, label):
+    """Load config.json + publish.json for a single level (package or releasable).
 
-    When publish.json exists (regardless of its content), any PUBLISH_FIELDS
-    left in config.json are a conflict: publish.json's existence signals that
-    publishing config has been migrated, so stale fields in config.json would
-    be silently dropped during merging.
+    Applies per-level conflict detection: if both config.json and publish.json
+    exist at the same level and config.json has PUBLISH_FIELDS, that is a hard
+    error.
+
+    Returns the merged dict for this level (non-publishing from config.json +
+    publishing from whichever source).
     """
+    config_json = read_json_config(config_path)
+    publish_json_exists = os.path.isfile(publish_path)
+    publish_json = read_json_config(publish_path) if publish_json_exists else {}
+
+    if not publish_json_exists:
+        return config_json
+
+    # Conflict check is per-level only
     config_publish_keys = PUBLISH_FIELDS & set(config_json.keys())
     if config_publish_keys and publish_json_exists:
         raise ConfigError(
-            f"Publishing fields found in .rlsbl/config.json while .rlsbl/publish.json exists: "
+            f"Publishing fields found in {label}/config.json while "
+            f"{label}/publish.json exists: "
             f"{', '.join(sorted(config_publish_keys))}. "
             f"Use migrate_publish_config() to move publishing fields to publish.json, "
             f"or remove them from config.json."
         )
 
-
-def read_project_config(project_root):
-    """Read project config, merging publishing fields from the correct source.
-
-    Resolution order:
-    - If ``.rlsbl/publish.json`` exists AND ``.rlsbl/config.json`` also has
-      PUBLISH_FIELDS: hard error (ConfigError).
-    - If only ``.rlsbl/config.json`` has publishing fields: read from it
-      (backward compat, pre-migration).
-    - If only ``.rlsbl/publish.json``: use it.
-    - Returns the merged view (non-publishing from config.json + publishing
-      from whichever source).
-    """
-    config_json = read_json_config(_project_config(project_root))
-    publish_path = _publish_config_path(project_root)
-    publish_json_exists = os.path.isfile(publish_path)
-    publish_json = read_json_config(publish_path) if publish_json_exists else {}
-
-    # If publish.json doesn't exist, return config.json as-is (backward compat)
-    if not publish_json_exists:
-        return config_json
-
-    # publish.json exists -- check for conflicts (config.json must not have PUBLISH_FIELDS)
-    _check_publish_field_conflict(config_json, publish_json_exists, project_root)
-
-    # publish.json exists and config.json has no publishing fields -- merge
     merged = {k: v for k, v in config_json.items() if k not in PUBLISH_FIELDS}
     merged.update(publish_json)
     return merged
+
+
+def read_project_config(project_root, releasable_config_dir=None):
+    """Read project config with optional releasable-level inheritance.
+
+    When ``releasable_config_dir`` is provided (path to a releasable's
+    state directory, e.g. ``.rlsbl-monorepo/releasables/www/``), config
+    is loaded with 4-level precedence:
+
+    1. Per-package publish.json (highest)
+    2. Per-package config.json
+    3. Releasable publish.json
+    4. Releasable config.json (lowest)
+
+    Conflict detection (PUBLISH_FIELDS in config.json while publish.json
+    exists) is enforced per-level only: a releasable-level publish.json
+    does NOT conflict with a per-package config.json that has publishing
+    fields.
+
+    When ``releasable_config_dir`` is None, behaves as before: loads only
+    the per-package level.
+    """
+    # Load per-package level
+    pkg_config = _load_level_config(
+        _project_config(project_root),
+        _publish_config_path(project_root),
+        ".rlsbl",
+    )
+
+    if releasable_config_dir is None:
+        return pkg_config
+
+    # Load releasable level
+    rel_config_path = os.path.join(str(releasable_config_dir), "config.json")
+    rel_publish_path = os.path.join(str(releasable_config_dir), "publish.json")
+    rel_config = _load_level_config(rel_config_path, rel_publish_path, "releasable")
+
+    if not rel_config:
+        return pkg_config
+
+    # Merge: per-package on top of releasable
+    return merge_config(rel_config, pkg_config)
 
 
 def migrate_publish_config(project_root):

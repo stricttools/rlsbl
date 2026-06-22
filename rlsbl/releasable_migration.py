@@ -337,12 +337,14 @@ def _migrate_batch_exclusions(workspace_root, releasable_name,
     """
     # Determine max_commits_per_entry from per-package configs (use the
     # smallest value across members to be conservative).
+    # Uses inheritance-aware loading so releasable-level batch_limits are
+    # picked up by packages that don't override them.
+    from .config import read_project_config
+    rel_config_dir = get_releasable_dir(workspace_root, releasable_name)
     max_commits = 5  # default
     for proj in member_projects:
-        proj_config_path = os.path.join(
-            workspace_root, proj.path, ".rlsbl", "config.json",
-        )
-        proj_config = read_json_config(proj_config_path)
+        abs_pkg = os.path.join(workspace_root, proj.path)
+        proj_config = read_project_config(abs_pkg, releasable_config_dir=rel_config_dir)
         bl = proj_config.get("batch_limits", {})
         if isinstance(bl, dict):
             val = bl.get("max_commits_per_entry")

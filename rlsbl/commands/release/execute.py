@@ -260,12 +260,17 @@ def _sync_member_package_versions(
     member_package_paths, monorepo_root, new_version,
     files_to_commit, git_root, log, ctx,
     exclude_path=None,
+    releasable_config_dir=None,
 ):
     """Sync version to published member packages in explicit releasable mode.
 
     For each member package that has publishing pipelines (non-private,
     has a detected target), writes the version to the manifest.
     Private-only packages are left untouched.
+
+    Uses ``read_project_config`` with releasable inheritance so that
+    releasable-level ``private: false`` is respected by member packages
+    that don't set ``private`` themselves.
 
     Args:
         member_package_paths: list of workspace-relative paths for member packages.
@@ -276,8 +281,11 @@ def _sync_member_package_versions(
         log: logging callable.
         ctx: ProjectContext.
         exclude_path: optional workspace-relative path to skip (already handled).
+        releasable_config_dir: optional path to the releasable's state directory
+            for config inheritance.
     """
     from . import TARGETS, detect_targets
+    from ...config import read_project_config
 
     for pkg_path in member_package_paths:
         if exclude_path and pkg_path == exclude_path:
@@ -287,19 +295,13 @@ def _sync_member_package_versions(
         if not os.path.isdir(abs_pkg):
             continue
 
-        # Check if package has publishing pipelines
-        pkg_config_path = os.path.join(abs_pkg, ".rlsbl", "config.json")
-        if not os.path.exists(pkg_config_path):
-            continue
-
+        # Load config through the inheritance-aware path
         try:
-            import json
-            with open(pkg_config_path, "r") as f:
-                pkg_config = json.load(f)
-        except (json.JSONDecodeError, OSError):
+            pkg_config = read_project_config(abs_pkg, releasable_config_dir=releasable_config_dir)
+        except Exception:
             continue
 
-        # Skip private packages
+        # Skip private packages (default True when unset)
         if pkg_config.get("private", True):
             continue
 
@@ -548,11 +550,14 @@ def _run_release_mutating(state: ReleaseState):
 
             # In explicit mode, sync version to published member packages
             if releasable_name and member_package_paths and monorepo_root:
+                from ...workspace import get_releasable_dir
+                _rel_cfg_dir = get_releasable_dir(str(monorepo_root), releasable_name)
                 _sync_member_package_versions(
                     member_package_paths, monorepo_root, new_version,
                     files_to_commit, _git_root, log, ctx,
                     # Skip the current project's path -- already handled above
                     exclude_path=monorepo_project_path,
+                    releasable_config_dir=_rel_cfg_dir,
                 )
 
             # Bump selfdoc.json version inline (no DocsTarget dependency).
