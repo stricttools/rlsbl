@@ -3,7 +3,9 @@
 import heapq
 import json
 import os
+import re
 import sys
+import xml.etree.ElementTree as ET
 from collections import deque, namedtuple
 from typing import Protocol, runtime_checkable
 
@@ -213,7 +215,313 @@ class DartScanner:
         return deps
 
 
-SCANNERS: list[WorkspaceScanner] = [PypiScanner(), NpmScanner(), DartScanner()]
+class MavenScanner:
+    """Scan Gradle (Kotlin/Groovy) and Maven (pom.xml) for intra-workspace JVM dependencies."""
+
+    # Gradle configuration names that declare dependencies.
+    # Covers standard Java/Kotlin, Android, and test configurations.
+    _GRADLE_CONFIGS = (
+        "implementation", "api", "compileOnly", "runtimeOnly",
+        "testImplementation", "testApi", "testCompileOnly", "testRuntimeOnly",
+        "kapt", "ksp", "annotationProcessor",
+        # Android-specific
+        "debugImplementation", "releaseImplementation",
+    )
+
+    # Configurations that are test/dev-only (scope="dev")
+    _DEV_CONFIGS = frozenset({
+        "testImplementation", "testApi", "testCompileOnly", "testRuntimeOnly",
+        "kapt", "ksp", "annotationProcessor",
+    })
+
+    # Maven scopes that map to dev
+    _MAVEN_DEV_SCOPES = frozenset({"test", "provided"})
+
+    def scan(self, project_dir: str, workspace_names: set[str]) -> list[Dependency]:
+        deps = []
+
+        # Try Gradle Kotlin DSL first
+        kts_path = os.path.join(project_dir, "build.gradle.kts")
+        if os.path.isfile(kts_path):
+            deps.extend(self._scan_gradle_kts(kts_path, workspace_names))
+            return deps
+
+        # Try Gradle Groovy DSL
+        groovy_path = os.path.join(project_dir, "build.gradle")
+        if os.path.isfile(groovy_path):
+            deps.extend(self._scan_gradle_groovy(groovy_path, workspace_names))
+            return deps
+
+        # Try Maven pom.xml
+        pom_path = os.path.join(project_dir, "pom.xml")
+        if os.path.isfile(pom_path):
+            deps.extend(self._scan_pom(pom_path, workspace_names))
+
+        return deps
+
+    def _scan_gradle_kts(self, filepath: str, workspace_names: set[str]) -> list[Dependency]:
+        """Parse build.gradle.kts for dependency declarations."""
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                content = f.read()
+        except Exception as exc:
+            print(f"Warning: failed to read {filepath}: {exc}", file=sys.stderr)
+            return []
+
+        deps = []
+        unrecognized = []
+
+        # Build regex for config names
+        config_pattern = "|".join(re.escape(c) for c in self._GRADLE_CONFIGS)
+
+        # Pattern 1: project dependencies -- config(project(":module"))
+        # Handles: implementation(project(":module")), api(project(":sub:module"))
+        project_re = re.compile(
+            rf'({config_pattern})\s*\(\s*project\s*\(\s*"([^"]+)"\s*\)\s*\)',
+        )
+        for match in project_re.finditer(content):
+            config = match.group(1)
+            module_path = match.group(2)
+            # Convert ":module" or ":sub:module" to the last segment as the name
+            module_name = module_path.split(":")[-1]
+            scope = "dev" if config in self._DEV_CONFIGS else "runtime"
+            if module_name in workspace_names:
+                deps.append(Dependency(
+                    name=module_name,
+                    dep_type="project",
+                    constraint=module_path,
+                    scope=scope,
+                ))
+
+        # Pattern 2: external dependencies -- config("group:artifact:version")
+        # Handles: implementation("com.google.guava:guava:31.1-jre")
+        external_re = re.compile(
+            rf'({config_pattern})\s*\(\s*"([^"]+:[^"]+:[^"]+)"\s*\)',
+        )
+        for match in external_re.finditer(content):
+            config = match.group(1)
+            coords = match.group(2)
+            parts = coords.split(":")
+            if len(parts) >= 2:
+                artifact = parts[1]
+                version = parts[2] if len(parts) >= 3 else ""
+                scope = "dev" if config in self._DEV_CONFIGS else "runtime"
+                if artifact in workspace_names:
+                    deps.append(Dependency(
+                        name=artifact,
+                        dep_type="versioned",
+                        constraint=version,
+                        scope=scope,
+                    ))
+
+        # Detect unrecognized dependency patterns: lines that look like
+        # dependency declarations but don't match our patterns.
+        # Look for config(...) calls that we didn't already match.
+        all_config_call_re = re.compile(
+            rf'({config_pattern})\s*\((.+?)\)',
+        )
+        matched_spans = set()
+        for match in project_re.finditer(content):
+            matched_spans.add((match.start(), match.end()))
+        for match in external_re.finditer(content):
+            matched_spans.add((match.start(), match.end()))
+
+        for match in all_config_call_re.finditer(content):
+            # Skip if this span overlaps with an already-matched pattern
+            span = (match.start(), match.end())
+            if any(
+                s[0] <= span[0] < s[1] or s[0] < span[1] <= s[1]
+                for s in matched_spans
+            ):
+                continue
+            arg = match.group(2).strip()
+            # Skip simple string literals (already handled by external_re)
+            if re.match(r'^"[^"]*"$', arg):
+                continue
+            # Skip project(...) calls (already handled by project_re)
+            if arg.startswith("project("):
+                continue
+            # This is an unrecognized pattern
+            line_start = content.rfind("\n", 0, match.start()) + 1
+            line_end = content.find("\n", match.end())
+            if line_end == -1:
+                line_end = len(content)
+            line = content[line_start:line_end].strip()
+            if line:
+                unrecognized.append(line)
+
+        if unrecognized:
+            print(
+                f"Warning: unrecognized Gradle dependency patterns in {filepath}:",
+                file=sys.stderr,
+            )
+            for line in unrecognized:
+                print(f"  {line}", file=sys.stderr)
+
+        return deps
+
+    def _scan_gradle_groovy(self, filepath: str, workspace_names: set[str]) -> list[Dependency]:
+        """Parse build.gradle (Groovy DSL) for dependency declarations."""
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                content = f.read()
+        except Exception as exc:
+            print(f"Warning: failed to read {filepath}: {exc}", file=sys.stderr)
+            return []
+
+        deps = []
+        unrecognized = []
+
+        config_pattern = "|".join(re.escape(c) for c in self._GRADLE_CONFIGS)
+
+        # Pattern 1: project dependencies -- config project(':module')
+        # Handles: implementation project(':module'), api project(':sub:module')
+        project_re = re.compile(
+            rf"({config_pattern})\s+project\s*\(\s*['\"]([^'\"]+)['\"]\s*\)",
+        )
+        for match in project_re.finditer(content):
+            config = match.group(1)
+            module_path = match.group(2)
+            module_name = module_path.split(":")[-1]
+            scope = "dev" if config in self._DEV_CONFIGS else "runtime"
+            if module_name in workspace_names:
+                deps.append(Dependency(
+                    name=module_name,
+                    dep_type="project",
+                    constraint=module_path,
+                    scope=scope,
+                ))
+
+        # Pattern 2: external dependencies -- config 'group:artifact:version'
+        # Handles: implementation 'com.google.guava:guava:31.1-jre'
+        # Also handles: implementation "group:artifact:version"
+        external_re = re.compile(
+            rf"({config_pattern})\s+['\"]([^'\"]+:[^'\"]+:[^'\"]+)['\"]",
+        )
+        for match in external_re.finditer(content):
+            config = match.group(1)
+            coords = match.group(2)
+            parts = coords.split(":")
+            if len(parts) >= 2:
+                artifact = parts[1]
+                version = parts[2] if len(parts) >= 3 else ""
+                scope = "dev" if config in self._DEV_CONFIGS else "runtime"
+                if artifact in workspace_names:
+                    deps.append(Dependency(
+                        name=artifact,
+                        dep_type="versioned",
+                        constraint=version,
+                        scope=scope,
+                    ))
+
+        # Pattern 3: external dependencies in parenthesized form
+        # Handles: implementation('group:artifact:version'), implementation("group:artifact:version")
+        external_paren_re = re.compile(
+            rf"({config_pattern})\s*\(\s*['\"]([^'\"]+:[^'\"]+:[^'\"]+)['\"]\s*\)",
+        )
+        for match in external_paren_re.finditer(content):
+            config = match.group(1)
+            coords = match.group(2)
+            parts = coords.split(":")
+            if len(parts) >= 2:
+                artifact = parts[1]
+                version = parts[2] if len(parts) >= 3 else ""
+                scope = "dev" if config in self._DEV_CONFIGS else "runtime"
+                if artifact in workspace_names:
+                    deps.append(Dependency(
+                        name=artifact,
+                        dep_type="versioned",
+                        constraint=version,
+                        scope=scope,
+                    ))
+
+        # Detect unrecognized patterns
+        # Look for lines that start with a config name followed by something
+        # that isn't a recognized pattern
+        matched_spans = set()
+        for regex in (project_re, external_re, external_paren_re):
+            for match in regex.finditer(content):
+                matched_spans.add((match.start(), match.end()))
+
+        # General pattern: config followed by something
+        general_re = re.compile(
+            rf"({config_pattern})\s+(\S.+?)$",
+            re.MULTILINE,
+        )
+        for match in general_re.finditer(content):
+            span = (match.start(), match.end())
+            if any(
+                s[0] <= span[0] < s[1] or s[0] < span[1] <= s[1]
+                for s in matched_spans
+            ):
+                continue
+            arg = match.group(2).strip()
+            # Skip already-handled forms
+            if re.match(r"""^['"][^'"]+['"]$""", arg):
+                continue
+            if arg.startswith("project(") or arg.startswith("project '") or arg.startswith('project "'):
+                continue
+            line = match.group(0).strip()
+            if line:
+                unrecognized.append(line)
+
+        if unrecognized:
+            print(
+                f"Warning: unrecognized Gradle dependency patterns in {filepath}:",
+                file=sys.stderr,
+            )
+            for line in unrecognized:
+                print(f"  {line}", file=sys.stderr)
+
+        return deps
+
+    def _scan_pom(self, filepath: str, workspace_names: set[str]) -> list[Dependency]:
+        """Parse pom.xml for <dependency> elements."""
+        try:
+            tree = ET.parse(filepath)
+        except Exception as exc:
+            print(f"Warning: failed to parse {filepath}: {exc}", file=sys.stderr)
+            return []
+
+        root = tree.getroot()
+
+        # Detect namespace
+        ns_match = re.match(r"\{(.+)\}", root.tag)
+        ns = ns_match.group(1) if ns_match else ""
+        prefix = f"{{{ns}}}" if ns else ""
+
+        deps = []
+
+        # Find all <dependency> elements (both in <dependencies> and
+        # <dependencyManagement><dependencies>)
+        for dep_elem in root.iter(f"{prefix}dependency"):
+            group_elem = dep_elem.find(f"{prefix}groupId")
+            artifact_elem = dep_elem.find(f"{prefix}artifactId")
+            version_elem = dep_elem.find(f"{prefix}version")
+            scope_elem = dep_elem.find(f"{prefix}scope")
+
+            group_id = group_elem.text.strip() if group_elem is not None and group_elem.text else ""
+            artifact_id = artifact_elem.text.strip() if artifact_elem is not None and artifact_elem.text else ""
+            version = version_elem.text.strip() if version_elem is not None and version_elem.text else ""
+            maven_scope = scope_elem.text.strip() if scope_elem is not None and scope_elem.text else "compile"
+
+            if not artifact_id:
+                continue
+
+            scope = "dev" if maven_scope in self._MAVEN_DEV_SCOPES else "runtime"
+
+            if artifact_id in workspace_names:
+                deps.append(Dependency(
+                    name=artifact_id,
+                    dep_type="versioned",
+                    constraint=version,
+                    scope=scope,
+                ))
+
+        return deps
+
+
+SCANNERS: list[WorkspaceScanner] = [PypiScanner(), NpmScanner(), DartScanner(), MavenScanner()]
 
 
 class WorkspaceGraph:
