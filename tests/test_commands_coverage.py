@@ -531,6 +531,7 @@ class TestStatusBranchException:
              patch(f"{MOD_STATUS}.TARGETS", {"npm": mock_target}), \
              patch(f"{MOD_STATUS}.get_current_branch", side_effect=RuntimeError("boom")), \
              patch(f"{MOD_STATUS}._get_last_version_tag", return_value=None), \
+             patch(f"{MOD_STATUS}._unreleased_range", return_value="HEAD"), \
              patch(f"{MOD_STATUS}.run", side_effect=Exception("no tag")), \
              patch(f"{MOD_STATUS}.is_clean_tree", side_effect=Exception("no tree")):
             run_cmd("npm", [], {"json": True}, ctx=_ctx(root=tmp_path))
