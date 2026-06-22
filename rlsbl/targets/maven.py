@@ -105,6 +105,15 @@ class MavenTarget(BaseTarget):
 
     def _find_version_file(self, dir_path):
         """Return (filepath, format) tuple for the version source."""
+        # Hard error if Gradle version catalogs are present
+        catalog_path = os.path.join(dir_path, "gradle", "libs.versions.toml")
+        if os.path.exists(catalog_path):
+            raise VersionError(
+                f"Gradle version catalog detected at {catalog_path}. "
+                "Version catalog projects are not yet supported. "
+                "Support will be added in Phase 8a."
+            )
+
         # Priority 1: gradle.properties
         gp = os.path.join(dir_path, "gradle.properties")
         if os.path.exists(gp):

@@ -69,6 +69,8 @@ def run_project_tests(
         return _run_go_tests(project_dir=project_dir)
     elif target_name == "npm":
         return _run_npm_tests(project_dir=project_dir)
+    elif target_name == "maven":
+        return _run_maven_tests(project_dir=project_dir)
     else:
         # Unknown target, skip tests
         return True
@@ -109,6 +111,27 @@ def _run_go_tests(*, project_dir: str | None) -> bool:
         ["go", "test", "./...", "-race", "-short", "-count=1"], cwd=project_dir
     )
     return result.returncode == 0
+
+
+def _run_maven_tests(*, project_dir: str | None) -> bool:
+    """Run Maven/Gradle tests.
+
+    Prefers ./gradlew test if gradlew exists, otherwise falls back to mvn test
+    if pom.xml exists.
+    """
+    effective_dir = project_dir or "."
+    gradlew = os.path.join(effective_dir, "gradlew")
+    if os.path.exists(gradlew):
+        result = subprocess.run(["./gradlew", "test"], cwd=project_dir)
+        return result.returncode == 0
+
+    pom_path = os.path.join(effective_dir, "pom.xml")
+    if os.path.exists(pom_path):
+        result = subprocess.run(["mvn", "test"], cwd=project_dir)
+        return result.returncode == 0
+
+    print("Warning: no gradlew or pom.xml found, skipping maven tests.", file=sys.stderr)
+    return True
 
 
 def _run_npm_tests(*, project_dir: str | None) -> bool:

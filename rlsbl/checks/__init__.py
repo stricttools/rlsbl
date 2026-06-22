@@ -98,8 +98,10 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "prepush-changelog-coverage": None,
     "prepush-gitignore-guard": None,
     "prepush-manual-warning": None,
-    "test-suite": frozenset({"pypi", "go", "npm"}),
+    "test-suite": frozenset({"pypi", "go", "npm", "maven"}),
     "test-suite-workspace": "workspace",
+    # --- maven-specific checks ---
+    "maven-central-metadata": frozenset({"maven"}),
 }
 
 # Excluded targets: checks where a target is deliberately excluded because

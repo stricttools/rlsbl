@@ -260,7 +260,7 @@ def register_quality_checks(app):
         from ..testing import run_project_tests
 
         target_entries = detect_targets(str(ctx.project_root))
-        recognized = {"pypi", "go", "npm"}
+        recognized = {"pypi", "go", "npm", "maven"}
         target_name = None
         for name, _path in target_entries:
             if name in recognized:
@@ -268,7 +268,7 @@ def register_quality_checks(app):
                 break
 
         if target_name is None:
-            return CheckResult("skip", "no recognized test target (pypi, go, npm)")
+            return CheckResult("skip", "no recognized test target (pypi, go, npm, maven)")
 
         passed = run_project_tests(
             target_name, project_dir=str(ctx.project_root), config=ctx.config
@@ -276,3 +276,22 @@ def register_quality_checks(app):
         if passed:
             return CheckResult("pass", f"{target_name} tests passed")
         return CheckResult("fail", f"{target_name} tests failed")
+
+    @app.check("maven-central-metadata")
+    def check_maven_central_metadata(ctx):
+        """Validate Maven Central publishing requirements (POM metadata, sources/javadoc jars)."""
+        from ..targets import detect_targets
+        from ..maven_central import validate_maven_central_metadata
+
+        target_entries = detect_targets(str(ctx.project_root))
+        if not any(name == "maven" for name, _path in target_entries):
+            return CheckResult("skip", "not a maven project")
+
+        errors = validate_maven_central_metadata(str(ctx.project_root))
+        if errors:
+            return CheckResult(
+                "fail",
+                f"{len(errors)} Maven Central requirement(s) not met",
+                details=errors,
+            )
+        return CheckResult("pass", "Maven Central metadata requirements satisfied")

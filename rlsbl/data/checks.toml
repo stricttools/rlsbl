@@ -419,3 +419,15 @@ fast = false
 pure = false
 needs_network = false
 depends_on = ["prepush-changelog-coverage"]
+
+# ---------------------------------------------------------------------------
+# Maven-specific checks
+# ---------------------------------------------------------------------------
+
+[checks.maven-central-metadata]
+tags = ["quality", "maven"]
+severity = "error"
+fast = false
+pure = false
+needs_network = false
+depends_on = []
