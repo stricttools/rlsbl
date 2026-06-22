@@ -157,11 +157,14 @@ def _refresh_selfdoc_hashes(files_to_commit, log, project_dir="."):
         log(f"Warning: could not check selfdoc hash status: {e}")
 
 
-# Lockfile -> (tool name, sync command args)
+# Lockfile specs: (lockfile, tool_name, sync_cmd, guard_file)
+# guard_file: if set, the spec only applies when this file exists in the same directory.
+# This distinguishes e.g. go.sum (per-module) from go.work.sum (workspace root only).
 _LOCKFILE_SPECS = [
-    ("uv.lock", "uv", ["uv", "lock"]),
-    ("package-lock.json", "npm", ["npm", "install", "--package-lock-only"]),
-    ("go.sum", "go", ["go", "mod", "tidy"]),
+    ("uv.lock", "uv", ["uv", "lock"], None),
+    ("package-lock.json", "npm", ["npm", "install", "--package-lock-only"], None),
+    ("go.sum", "go", ["go", "mod", "tidy"], None),
+    ("go.work.sum", "go", ["go", "work", "sync"], "go.work"),
 ]
 
 _LOCKFILE_SYNC_TIMEOUT = 30
@@ -182,7 +185,9 @@ def _sync_lockfiles(target_paths, files_to_commit, log):
     from . import subprocess
 
     for _target_name, t_path in target_paths.items():
-        for lockfile, tool_name, sync_cmd in _LOCKFILE_SPECS:
+        for lockfile, tool_name, sync_cmd, guard_file in _LOCKFILE_SPECS:
+            if guard_file and not os.path.exists(os.path.join(t_path, guard_file)):
+                continue
             lockfile_path = os.path.join(t_path, lockfile)
             if not os.path.exists(lockfile_path):
                 continue
@@ -587,12 +592,20 @@ def _run_release_mutating(state: ReleaseState):
         _sync_lockfiles(target_paths, files_to_commit, log)
         if monorepo_root:
             _sync_lockfiles({"workspace_root": str(monorepo_root)}, files_to_commit, log)
-            ws_lockfile = os.path.join(str(monorepo_root), "uv.lock")
-            if os.path.exists(ws_lockfile):
-                norm = os.path.normpath(ws_lockfile)
-                if norm not in files_to_commit:
-                    files_to_commit.append(norm)
-                    log("Workspace lockfile included in expected files")
+            # Unconditionally include workspace-root lockfiles that exist.
+            # _sync_lockfiles only adds a lockfile when its mtime changes, but the
+            # lockfile may already be stale from the version bump (especially npm,
+            # see npm bug #5967). Including unconditionally ensures the release
+            # commit captures any pre-existing staleness.
+            for ws_lockfile_name, _, _, ws_guard in _LOCKFILE_SPECS:
+                if ws_guard and not os.path.exists(os.path.join(str(monorepo_root), ws_guard)):
+                    continue
+                ws_lockfile = os.path.join(str(monorepo_root), ws_lockfile_name)
+                if os.path.exists(ws_lockfile):
+                    norm = os.path.normpath(ws_lockfile)
+                    if norm not in files_to_commit:
+                        files_to_commit.append(norm)
+                        log(f"Workspace lockfile included: {ws_lockfile_name}")
 
         # Update .rlsbl/version marker so it's included in the release commit
         rlsbl_version_marker = vpath(os.path.join(".rlsbl", "version"))
