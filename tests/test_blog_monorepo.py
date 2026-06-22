@@ -91,7 +91,9 @@ blog = false
                 "bump": release_config.bump,
             })
 
-        with patch("rlsbl.commands.release.run_cmd", mock_run_cmd):
+        with patch("rlsbl.commands.release.run_cmd", mock_run_cmd), \
+             patch("rlsbl.commands.monorepo.batch_release.run", return_value="abc123"), \
+             patch("rlsbl.commands.monorepo.batch_release._finalize_batch_file"):
             _cmd_batch_release(
                 {"dry-run": False, "yes": True, "quiet": True},
                 tmp_path,
@@ -138,7 +140,9 @@ description = "Solo release"
                 "blog": release_config.blog,
             })
 
-        with patch("rlsbl.commands.release.run_cmd", mock_run_cmd):
+        with patch("rlsbl.commands.release.run_cmd", mock_run_cmd), \
+             patch("rlsbl.commands.monorepo.batch_release.run", return_value="abc123"), \
+             patch("rlsbl.commands.monorepo.batch_release._finalize_batch_file"):
             _cmd_batch_release(
                 {"dry-run": False, "yes": True, "quiet": True},
                 tmp_path,
@@ -218,7 +222,9 @@ blog = true
             name = os.path.basename(str(kwargs["ctx"].project_root))
             captured_blogs[name] = release_config.blog
 
-        with patch("rlsbl.commands.release.run_cmd", mock_run_cmd):
+        with patch("rlsbl.commands.release.run_cmd", mock_run_cmd), \
+             patch("rlsbl.commands.monorepo.batch_release.run", return_value="abc123"), \
+             patch("rlsbl.commands.monorepo.batch_release._finalize_batch_file"):
             _cmd_batch_release(
                 {"dry-run": False, "yes": True, "quiet": True},
                 tmp_path,
