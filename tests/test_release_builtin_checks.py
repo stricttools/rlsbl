@@ -801,13 +801,19 @@ class TestFullFlowOrder:
         )
         (hooks_dir / "pre-checks.sh").chmod(0o755)
 
-        # pre-release hook: must match the scaffold template so it is treated
-        # as "effectively empty" (built-in tests/lint still run).
-        tpl_path = (
-            Path(__file__).resolve().parent.parent
-            / "rlsbl" / "templates" / "shared" / "hooks" / "pre-release.sh.tpl"
+        # pre-release hook: must match a known scaffold template hash so it
+        # is treated as "effectively empty" (built-in tests/lint still run).
+        _V1_TEMPLATE = (
+            "#!/usr/bin/env bash\n"
+            "set -euo pipefail\n"
+            "# Project-specific pre-release checks.\n"
+            "# Built-in checks (tests, lint) run automatically before this hook.\n"
+            "# Add custom validation here, e.g.:\n"
+            "#   - Check for uncommitted documentation\n"
+            "#   - Verify external service connectivity\n"
+            "#   - Run integration tests not covered by the test suite\n"
         )
-        (hooks_dir / "pre-release.sh").write_text(tpl_path.read_text())
+        (hooks_dir / "pre-release.sh").write_text(_V1_TEMPLATE)
         (hooks_dir / "pre-release.sh").chmod(0o755)
 
         mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]

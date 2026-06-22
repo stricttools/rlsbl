@@ -36,39 +36,20 @@ class TestPrivateHookTemplateRemoved:
         )
 
 
-class TestPrivateScaffoldUsesStandardHook:
-    """Scaffold with private: true uses the standard post-release.sh.tpl."""
+class TestPrivateScaffoldNoHooks:
+    """Scaffold with private: true does not create hook scripts (config-driven)."""
 
-    def test_standard_hook_installed_for_private(self, tmp_project):
-        """Private scaffold installs the standard post-release.sh.tpl, not the private one."""
-        shared_tpl_dir = (
-            Path(__file__).resolve().parent.parent
-            / "rlsbl"
-            / "templates"
-            / "shared"
-        )
-
-        # Use the real shared template mappings (which include post-release.sh)
+    def test_no_hook_mappings_in_shared_templates(self, tmp_project):
+        """shared_template_mappings should not include hook scripts."""
         from rlsbl.targets.base import BaseTarget
 
         base = BaseTarget()
         shared_mappings = base.shared_template_mappings(".")
 
-        # For a private repo, no hook replacement should happen -- just use as-is
-        # (previously _replace_post_release_hook_for_private would swap the template)
-        created, skipped, warnings, _ = process_mappings(
-            str(shared_tpl_dir), shared_mappings, {"year": "2026"},
-            force=False,
+        hook_targets = [m["target"] for m in shared_mappings if "hooks" in m["target"]]
+        assert hook_targets == [], (
+            f"Hooks should not be in shared_template_mappings: {hook_targets}"
         )
-
-        # The standard post-release.sh should be created
-        created_targets = [t for t, _ in created]
-        assert ".rlsbl/hooks/post-release.sh" in created_targets
-
-        # Read the content -- it should be from the standard template, not the private one
-        hook_content = (tmp_project / ".rlsbl" / "hooks" / "post-release.sh").read_text()
-        assert "Post-release hook for private repositories" not in hook_content
-        assert "gh release upload" not in hook_content
 
 
 class TestFilterMappingsForPrivateRemoved:

@@ -112,8 +112,8 @@ class TestPrivateFlagScaffold:
         publish_path = os.path.join(".github", "workflows", "publish.yml")
         assert not os.path.exists(publish_path), "publish.yml should not exist for auto-detected private repos"
 
-    def test_private_writes_standard_post_release_hook(self, mock_git_repo):
-        """Private scaffold should write the standard post-release hook (asset upload is built-in)."""
+    def test_private_does_not_scaffold_hook_files(self, mock_git_repo):
+        """Private scaffold should not create hook files (hooks are config-driven)."""
         pkg = {"name": "test-pkg", "version": "1.0.0"}
         (mock_git_repo / "package.json").write_text(json.dumps(pkg))
 
@@ -121,15 +121,13 @@ class TestPrivateFlagScaffold:
             with patch("rlsbl.commands.init_cmd.is_private_repo", return_value=True):
                 run_cmd("npm", [], {"private": True, "no-tag": True}, ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={}))
 
-        hook_path = os.path.join(".rlsbl", "hooks", "post-release.sh")
-        assert os.path.exists(hook_path)
-
-        with open(hook_path) as f:
-            content = f.read()
-
-        # Should NOT contain legacy private hook content -- asset upload is now built-in
-        assert "gh release upload" not in content
-        assert "Post-release hook for private repositories" not in content
+        hooks_dir = os.path.join(".rlsbl", "hooks")
+        hook_files = []
+        if os.path.isdir(hooks_dir):
+            hook_files = [f for f in os.listdir(hooks_dir) if f.endswith(".sh")]
+        assert hook_files == [], (
+            "Hook scripts should not be scaffolded -- hooks are config-driven"
+        )
 
     def test_private_saved_to_config(self, mock_git_repo):
         """Private flag should be saved to .rlsbl/config.json."""

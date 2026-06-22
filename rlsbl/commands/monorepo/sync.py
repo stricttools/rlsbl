@@ -285,11 +285,9 @@ def scaffold_releasable_dirs(workspace_root):
 
     - ``.rlsbl-monorepo/releasables/{name}/version`` (user-owned, never overwritten)
     - ``.rlsbl-monorepo/releasables/{name}/changes/unreleased.jsonl`` (user-owned)
-    - ``.rlsbl-monorepo/releasables/{name}/hooks/pre-checks.sh`` (scaffold-managed)
-    - ``.rlsbl-monorepo/releasables/{name}/hooks/pre-release.sh`` (scaffold-managed)
-    - ``.rlsbl-monorepo/releasables/{name}/hooks/post-release.sh`` (scaffold-managed)
 
-    Hook scripts are scaffold-managed: they use three-way merge when updated.
+    Hook scripts are no longer scaffolded here -- hooks are config-driven
+    (see ``hooks`` key in config.json).
     Version and unreleased.jsonl are user-owned: created once, never overwritten.
 
     Args:
@@ -308,18 +306,6 @@ def scaffold_releasable_dirs(workspace_root):
     releasables = load_releasables(workspace_root, projects)
     if not releasables:
         return []
-
-    # Load hook templates
-    templates_dir = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-        "templates", "shared", "hooks",
-    )
-    hook_templates = {}
-    for hook_name in ("pre-checks.sh", "pre-release.sh", "post-release.sh"):
-        tpl_path = os.path.join(templates_dir, f"{hook_name}.tpl")
-        if os.path.isfile(tpl_path):
-            with open(tpl_path, "r", encoding="utf-8") as f:
-                hook_templates[hook_name] = f.read()
 
     created_files = []
 
@@ -342,68 +328,6 @@ def scaffold_releasable_dirs(workspace_root):
             with open(unreleased_path, "w", encoding="utf-8") as f:
                 pass  # empty file
             created_files.append(unreleased_path)
-
-        # Hook scripts (scaffold-managed: three-way merge on update)
-        hooks_dir = os.path.join(rel_dir, "hooks")
-        os.makedirs(hooks_dir, exist_ok=True)
-
-        # Store merge bases under the monorepo directory (not cwd's .rlsbl/).
-        bases_dir = os.path.join(workspace_root, ".rlsbl-monorepo", "bases")
-
-        for hook_name, template_content in hook_templates.items():
-            hook_path = os.path.join(hooks_dir, hook_name)
-            if not os.path.isfile(hook_path):
-                # First scaffold: write template and make executable
-                with open(hook_path, "w", encoding="utf-8") as f:
-                    f.write(template_content)
-                os.chmod(hook_path, 0o755)
-                created_files.append(hook_path)
-            else:
-                # Existing hook: three-way merge
-                from ...commands.init_cmd import _three_way_merge
-
-                base_key = os.path.relpath(hook_path, workspace_root)
-                base_path = os.path.join(bases_dir, base_key)
-
-                # Load base
-                base = None
-                if os.path.isfile(base_path):
-                    with open(base_path, "r", encoding="utf-8") as f:
-                        base = f.read()
-
-                with open(hook_path, "r", encoding="utf-8") as f:
-                    ours = f.read()
-
-                if ours == template_content:
-                    # No change needed
-                    pass
-                elif base is None:
-                    # No base stored: seed the base for future merges
-                    os.makedirs(os.path.dirname(base_path), exist_ok=True)
-                    with open(base_path, "w", encoding="utf-8") as f:
-                        f.write(template_content)
-                elif ours == base:
-                    # User hasn't customized; update to new template
-                    with open(hook_path, "w", encoding="utf-8") as f:
-                        f.write(template_content)
-                    os.chmod(hook_path, 0o755)
-                    with open(base_path, "w", encoding="utf-8") as f:
-                        f.write(template_content)
-                    created_files.append(hook_path)
-                elif base != template_content:
-                    # Both sides changed: three-way merge
-                    merged, has_conflicts = _three_way_merge(ours, base, template_content)
-                    with open(hook_path, "w", encoding="utf-8") as f:
-                        f.write(merged)
-                    os.chmod(hook_path, 0o755)
-                    with open(base_path, "w", encoding="utf-8") as f:
-                        f.write(template_content)
-                    created_files.append(hook_path)
-                    if has_conflicts:
-                        print(
-                            f"Warning: merge conflicts in {hook_path}, resolve manually",
-                            file=sys.stderr,
-                        )
 
     return created_files
 

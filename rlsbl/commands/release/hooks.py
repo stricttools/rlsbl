@@ -26,50 +26,31 @@ import sys
 
 from .validate import HookError
 
-# Lazily computed on first access via _get_pre_release_template_hashes().
-_PRE_RELEASE_TEMPLATE_HASHES = None
-
-
 def _compute_content_hash(content):
     """SHA-256 of content with trailing whitespace stripped."""
     return hashlib.sha256(content.rstrip().encode("utf-8")).hexdigest()
 
 
+# Pre-computed SHA-256 hashes for all known scaffold template versions of
+# pre-release.sh. Used by the backward compatibility bridge to detect
+# whether a script-based hook has been customized. These are inlined so the
+# function does not depend on the template files (which have been removed
+# from scaffold output since config-driven hooks replaced them).
+_PRE_RELEASE_TEMPLATE_HASHES = frozenset({
+    # V1: original scaffold template (before the comment was updated to
+    # describe the override behavior).
+    "f1fa0719da4e07f12d0233bc307c7c6ec827b6a9bc4f91e8cac3b61eef5eabf8",
+    # V2: updated comment describing the override behavior.
+    "838f81546bfc178f1b31b6fb8d3ace95ad59e89fd9ecb5b48ea0559127f1d61b",
+})
+
+
 def _get_pre_release_template_hashes():
     """Return a frozenset of content hashes for known scaffold template versions of pre-release.sh.
 
-    Currently there is only one version (the template has never changed),
-    but using a set follows the same pattern as hook_hashes.py, making it
-    easy to add historical versions later.
+    Used by the backward compatibility bridge to detect whether an existing
+    script-based hook has been customized or is still the default template.
     """
-    global _PRE_RELEASE_TEMPLATE_HASHES
-    if _PRE_RELEASE_TEMPLATE_HASHES is not None:
-        return _PRE_RELEASE_TEMPLATE_HASHES
-
-    template_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-        "templates", "shared", "hooks", "pre-release.sh.tpl",
-    )
-    with open(template_path, "r", encoding="utf-8") as f:
-        template_content = f.read()
-
-    # V1: original scaffold template (before the comment was updated to
-    # describe the override behavior).
-    _V1 = (
-        "#!/usr/bin/env bash\n"
-        "set -euo pipefail\n"
-        "# Project-specific pre-release checks.\n"
-        "# Built-in checks (tests, lint) run automatically before this hook.\n"
-        "# Add custom validation here, e.g.:\n"
-        "#   - Check for uncommitted documentation\n"
-        "#   - Verify external service connectivity\n"
-        "#   - Run integration tests not covered by the test suite\n"
-    )
-
-    _PRE_RELEASE_TEMPLATE_HASHES = frozenset({
-        _compute_content_hash(template_content),
-        _compute_content_hash(_V1),
-    })
     return _PRE_RELEASE_TEMPLATE_HASHES
 
 

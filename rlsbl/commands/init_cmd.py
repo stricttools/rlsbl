@@ -223,7 +223,6 @@ def _is_npm_wrapper(npm_dir_path):
 USER_OWNED = {
     "CHANGELOG.md",
     ".npmignore",
-    ".rlsbl/hooks/pre-checks.sh",
     ".rlsbl/changes/unreleased.jsonl",
     # Custom workflow files: never created by scaffold, never touched on update.
     # Users put extra jobs here to avoid three-way merge conflicts on ci.yml/publish.yml.

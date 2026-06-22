@@ -100,7 +100,8 @@ class TestLintConfigFiltering:
         targets = {m["target"] for m in mappings}
         assert "CHANGELOG.md" in targets
         assert ".gitignore" in targets
-        assert ".rlsbl/hooks/pre-checks.sh" in targets
-        assert ".rlsbl/hooks/pre-release.sh" in targets
-        assert ".rlsbl/hooks/post-release.sh" in targets
         assert ".rlsbl/changes/unreleased.jsonl" in targets
+        # Hook scripts are no longer scaffolded (config-driven hooks)
+        assert ".rlsbl/hooks/pre-checks.sh" not in targets
+        assert ".rlsbl/hooks/pre-release.sh" not in targets
+        assert ".rlsbl/hooks/post-release.sh" not in targets

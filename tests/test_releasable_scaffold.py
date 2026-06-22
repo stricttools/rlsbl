@@ -99,7 +99,10 @@ class TestScaffoldReleasableDirs:
     """Tests for the scaffold_releasable_dirs function."""
 
     def test_creates_directory_structure(self, tmp_path):
-        """Creates version, changes/unreleased.jsonl, and hooks for each releasable."""
+        """Creates version and changes/unreleased.jsonl for each releasable.
+
+        Hook scripts are no longer scaffolded -- hooks are config-driven.
+        """
         _make_explicit_workspace(tmp_path, [{"name": "www"}], [
             {"path": "app", "name": "app", "releasable": "www"},
         ])
@@ -122,20 +125,15 @@ class TestScaffoldReleasableDirs:
         assert os.path.isfile(unreleased)
         assert open(unreleased).read() == ""
 
-        # Hooks
+        # Hooks directory should NOT be created (config-driven hooks)
         hooks_dir = os.path.join(rel_dir, "hooks")
-        assert os.path.isdir(hooks_dir)
-        for hook_name in ("pre-checks.sh", "pre-release.sh", "post-release.sh"):
-            hook_path = os.path.join(hooks_dir, hook_name)
-            assert os.path.isfile(hook_path), f"Missing hook: {hook_name}"
-            # Check executable permission
-            assert os.access(hook_path, os.X_OK), f"Hook not executable: {hook_name}"
+        assert not os.path.isdir(hooks_dir), (
+            "Hook scripts should not be scaffolded -- hooks are config-driven"
+        )
 
         # All created files should be in the returned list
         assert version_path in files
         assert unreleased in files
-        for hook_name in ("pre-checks.sh", "pre-release.sh", "post-release.sh"):
-            assert os.path.join(hooks_dir, hook_name) in files
 
     def test_multiple_releasables(self, tmp_path):
         """Creates directories for all releasables in the workspace."""
@@ -214,41 +212,23 @@ class TestScaffoldReleasableDirs:
         files = scaffold_releasable_dirs(str(tmp_path))
         assert files == []
 
-    def test_hook_content_from_templates(self, tmp_path):
-        """Hook scripts contain content from the shared templates."""
+    def test_no_hook_scripts_scaffolded(self, tmp_path):
+        """Hook scripts are not scaffolded -- hooks are config-driven."""
         _make_explicit_workspace(tmp_path, [{"name": "www"}], [
             {"path": "app", "name": "app", "releasable": "www"},
         ])
         (tmp_path / "app").mkdir()
-
-        scaffold_releasable_dirs(str(tmp_path))
-
-        hooks_dir = os.path.join(get_releasable_dir(str(tmp_path), "www"), "hooks")
-
-        # pre-checks.sh should have the template content
-        content = open(os.path.join(hooks_dir, "pre-checks.sh")).read()
-        assert "#!/usr/bin/env bash" in content
-        assert "set -euo pipefail" in content
-
-    def test_existing_hooks_not_overwritten_without_base(self, tmp_path):
-        """Existing hook scripts are not overwritten when no merge base exists."""
-        _make_explicit_workspace(tmp_path, [{"name": "www"}], [
-            {"path": "app", "name": "app", "releasable": "www"},
-        ])
-        (tmp_path / "app").mkdir()
-
-        # Pre-create a customized hook
-        hooks_dir = os.path.join(get_releasable_dir(str(tmp_path), "www"), "hooks")
-        os.makedirs(hooks_dir, exist_ok=True)
-        hook_path = os.path.join(hooks_dir, "pre-checks.sh")
-        custom_content = "#!/bin/bash\nmy-custom-check\n"
-        with open(hook_path, "w") as f:
-            f.write(custom_content)
 
         files = scaffold_releasable_dirs(str(tmp_path))
 
-        # Custom hook content should be preserved (no base = seed base only)
-        assert open(hook_path).read() == custom_content
+        rel_dir = get_releasable_dir(str(tmp_path), "www")
+        hooks_dir = os.path.join(rel_dir, "hooks")
+
+        # No hooks directory should be created
+        assert not os.path.isdir(hooks_dir)
+        # No hook files in the returned files list
+        hook_files = [f for f in files if "hooks" in f]
+        assert hook_files == []
 
 
 # ---------------------------------------------------------------------------

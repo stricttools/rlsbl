@@ -22,22 +22,19 @@ def _write_file(path, content):
         f.write(content)
 
 
-def test_pre_release_template_is_minimal_stub():
-    """pre-release.sh.tpl should be a minimal stub (built-in checks handle tests/lint)."""
-    tpl_path = (
+def test_hook_templates_not_scaffolded():
+    """Hook templates should no longer exist -- hooks are config-driven."""
+    hooks_dir = (
         Path(__file__).resolve().parent.parent
         / "rlsbl"
         / "templates"
         / "shared"
         / "hooks"
-        / "pre-release.sh.tpl"
     )
-    content = tpl_path.read_text()
-    assert "built-in tests and lint are skipped" in content
-    # Should NOT contain the old test/lint commands
-    assert "go vet" not in content
-    assert "uv run pytest" not in content
-    assert "npm test" not in content
+    assert not hooks_dir.exists(), (
+        "Hook template directory should not exist. "
+        "Hooks are now config-driven via hooks key in config.json."
+    )
 
 
 def test_force_does_not_overwrite_changelog(tmp_project):

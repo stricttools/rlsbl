@@ -55,9 +55,6 @@ class BaseTarget:
         mappings = [
             {"template": "CHANGELOG.md.tpl", "target": "CHANGELOG.md"},
             {"template": "gitignore.tpl", "target": ".gitignore"},
-            {"template": "hooks/pre-checks.sh.tpl", "target": ".rlsbl/hooks/pre-checks.sh"},
-            {"template": "hooks/pre-release.sh.tpl", "target": ".rlsbl/hooks/pre-release.sh"},
-            {"template": "hooks/post-release.sh.tpl", "target": ".rlsbl/hooks/post-release.sh"},
             {"template": "changes/unreleased.jsonl.tpl", "target": ".rlsbl/changes/unreleased.jsonl"},
         ]
         mappings.extend(self._lint_config_mappings(ctx))
