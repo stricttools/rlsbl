@@ -24,6 +24,7 @@ from ...release_file import (
     read_batch_release_file,
 )
 from ...errors import ReleaseFileError
+from ...lock import rlsbl_lock
 from ...utils import commit_files
 from ...workspace import find_workspace_root, load_workspace, is_explicit_mode
 from ...workspace_graph import CycleError, WorkspaceGraph
@@ -147,47 +148,49 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config, 
     log("")
 
     released = []
-    for rel_name in release_order:
-        release_config = batch_config.packages[rel_name]
-        member_projs = members_of(rel_name, projects)
-        if not member_projs:
-            print(f"Error: releasable '{rel_name}' has no member projects.", file=sys.stderr)
-            sys.exit(1)
+    with rlsbl_lock(".rlsbl-monorepo", project_root=workspace_root):
+        for rel_name in release_order:
+            release_config = batch_config.packages[rel_name]
+            member_projs = members_of(rel_name, projects)
+            if not member_projs:
+                print(f"Error: releasable '{rel_name}' has no member projects.", file=sys.stderr)
+                sys.exit(1)
 
-        # Pick the first member as the representative for the release flow
-        representative = member_projs[0]
-        project_dir = os.path.join(workspace_root, representative["path"])
+            # Pick the first member as the representative for the release flow
+            representative = member_projs[0]
+            project_dir = os.path.join(workspace_root, representative["path"])
 
-        log(f"--- Releasing releasable {rel_name} ({release_config.bump}) ---")
+            log(f"--- Releasing releasable {rel_name} ({release_config.bump}) ---")
 
-        try:
-            from pathlib import Path
+            try:
+                from pathlib import Path
 
-            from ...context import create_context
-            from ..release import run_cmd
+                from ...context import create_context
+                from ..release import run_cmd
 
-            release_flags = {
-                "dry-run": dry_run,
-                "yes": yes,
-                "quiet": quiet,
-                "allow-dirty": flags.get("allow-dirty", False),
-            }
-            pkg_ctx = create_context(Path(project_dir), workspace_root=Path(workspace_root))
-            run_cmd(release_config, release_flags, ctx=pkg_ctx)
-            released.append(rel_name)
-        except SystemExit as e:
-            if e.code != 0:
-                print(
-                    f"\nError: release of releasable {rel_name} failed. "
-                    f"Successfully released: {', '.join(released) if released else '(none)'}",
-                    file=sys.stderr,
-                )
-                raise
+                release_flags = {
+                    "dry-run": dry_run,
+                    "yes": yes,
+                    "quiet": quiet,
+                    "allow-dirty": flags.get("allow-dirty", False),
+                    "skip-lock": True,
+                }
+                pkg_ctx = create_context(Path(project_dir), workspace_root=Path(workspace_root))
+                run_cmd(release_config, release_flags, ctx=pkg_ctx)
+                released.append(rel_name)
+            except SystemExit as e:
+                if e.code != 0:
+                    print(
+                        f"\nError: release of releasable {rel_name} failed. "
+                        f"Successfully released: {', '.join(released) if released else '(none)'}",
+                        file=sys.stderr,
+                    )
+                    raise
 
-        log("")
+            log("")
 
-    if not dry_run and released:
-        _finalize_batch_file(batch_path, log)
+        if not dry_run and released:
+            _finalize_batch_file(batch_path, log)
 
     log(f"Batch release complete: {', '.join(released)}")
 
@@ -248,42 +251,44 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config, pro
 
     # Release each package in order
     released = []
-    for pkg_name in release_order:
-        release_config = batch_config.packages[pkg_name]
-        project = project_by_name[pkg_name]
-        project_dir = os.path.join(workspace_root, project["path"])
+    with rlsbl_lock(".rlsbl-monorepo", project_root=workspace_root):
+        for pkg_name in release_order:
+            release_config = batch_config.packages[pkg_name]
+            project = project_by_name[pkg_name]
+            project_dir = os.path.join(workspace_root, project["path"])
 
-        log(f"--- Releasing {pkg_name} ({release_config.bump}) ---")
+            log(f"--- Releasing {pkg_name} ({release_config.bump}) ---")
 
-        try:
-            from pathlib import Path
+            try:
+                from pathlib import Path
 
-            from ...context import create_context
-            from ..release import run_cmd
+                from ...context import create_context
+                from ..release import run_cmd
 
-            release_flags = {
-                "dry-run": dry_run,
-                "yes": yes,
-                "quiet": quiet,
-                "allow-dirty": flags.get("allow-dirty", False),
-            }
-            pkg_ctx = create_context(Path(project_dir), workspace_root=Path(workspace_root))
-            run_cmd(release_config, release_flags, ctx=pkg_ctx)
-            released.append(pkg_name)
-        except SystemExit as e:
-            if e.code != 0:
-                print(
-                    f"\nError: release of {pkg_name} failed. "
-                    f"Successfully released: {', '.join(released) if released else '(none)'}",
-                    file=sys.stderr,
-                )
-                raise
+                release_flags = {
+                    "dry-run": dry_run,
+                    "yes": yes,
+                    "quiet": quiet,
+                    "allow-dirty": flags.get("allow-dirty", False),
+                    "skip-lock": True,
+                }
+                pkg_ctx = create_context(Path(project_dir), workspace_root=Path(workspace_root))
+                run_cmd(release_config, release_flags, ctx=pkg_ctx)
+                released.append(pkg_name)
+            except SystemExit as e:
+                if e.code != 0:
+                    print(
+                        f"\nError: release of {pkg_name} failed. "
+                        f"Successfully released: {', '.join(released) if released else '(none)'}",
+                        file=sys.stderr,
+                    )
+                    raise
 
-        log("")
+            log("")
 
-    # Finalize the batch release file (skip in dry-run)
-    if not dry_run and released:
-        _finalize_batch_file(batch_path, log)
+        # Finalize the batch release file (skip in dry-run)
+        if not dry_run and released:
+            _finalize_batch_file(batch_path, log)
 
     log(f"Batch release complete: {', '.join(released)}")
 
