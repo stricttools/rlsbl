@@ -9,7 +9,15 @@ from unittest.mock import patch
 import pytest
 
 from rlsbl.context import ProjectContext
-from rlsbl.workspace import WORKSPACE_DIR, WORKSPACE_FILE
+from rlsbl.workspace import (
+    WORKSPACE_DIR,
+    WORKSPACE_FILE,
+    Releasable,
+    save_workspace,
+    write_releasable_version,
+    get_releasable_changes_dir,
+    get_releasable_dir,
+)
 
 
 def make_ctx(project_root, config=None):
@@ -304,3 +312,226 @@ def monorepo_fixture(tmp_path, monkeypatch):
         python_dir=python_dir,
         go_dir=go_dir,
     )
+
+
+# ---------------------------------------------------------------------------
+# Default structure for multi_releasable_monorepo fixture
+# ---------------------------------------------------------------------------
+
+# Two releasables, each with 2 member packages, plus one dev_only project.
+_DEFAULT_RELEASABLES = [
+    Releasable(name="alpha"),
+    Releasable(name="beta"),
+]
+
+_DEFAULT_PROJECTS = [
+    {
+        "path": "libs/alpha-core",
+        "name": "alpha-core",
+        "releasable": "alpha",
+    },
+    {
+        "path": "apps/alpha-web",
+        "name": "alpha-web",
+        "releasable": "alpha",
+    },
+    {
+        "path": "libs/beta-api",
+        "name": "beta-api",
+        "releasable": "beta",
+    },
+    {
+        "path": "apps/beta-cli",
+        "name": "beta-cli",
+        "releasable": "beta",
+    },
+    {
+        "path": "tools/devtools",
+        "name": "devtools",
+        "dev_only": True,
+        "releasable": False,
+    },
+]
+
+
+def _create_multi_releasable_monorepo(
+    tmp_path,
+    *,
+    releasables=None,
+    projects=None,
+    releasable_configs=None,
+    publish_configs=None,
+    hook_configs=None,
+    initial_version="0.1.0",
+):
+    """Build a multi-releasable monorepo test repo.
+
+    Factory function that creates the full directory structure, writes
+    workspace.toml with ``[[releasables]]`` and ``[[projects]]`` sections,
+    sets up per-releasable state directories (version, changes, config),
+    and initializes a git repo with an initial commit and version tags.
+
+    Args:
+        tmp_path: the temporary directory root.
+        releasables: list of Releasable instances (defaults to alpha + beta).
+        projects: list of project dicts with at least path, name, releasable
+            (defaults to 2 alpha members + 2 beta members + 1 dev_only).
+        releasable_configs: dict mapping releasable name to config dict,
+            written to ``<releasable_dir>/config.json``.
+        publish_configs: dict mapping releasable name to publish config dict,
+            written to ``<releasable_dir>/publish.json``.
+        hook_configs: dict mapping releasable name to hook config dict,
+            written to ``<releasable_dir>/hooks/`` directory files.
+        initial_version: version string for all releasables (default "0.1.0").
+
+    Returns:
+        SimpleNamespace with root, releasables, projects, and per-project dirs.
+    """
+    from types import SimpleNamespace
+
+    if releasables is None:
+        releasables = list(_DEFAULT_RELEASABLES)
+    if projects is None:
+        projects = [dict(p) for p in _DEFAULT_PROJECTS]
+    if releasable_configs is None:
+        releasable_configs = {}
+    if publish_configs is None:
+        publish_configs = {}
+    if hook_configs is None:
+        hook_configs = {}
+
+    # Initialize git repo
+    run_git(tmp_path, "init", "-q", "-b", "main")
+    run_git(tmp_path, "config", "user.email", "test@test.local")
+    run_git(tmp_path, "config", "user.name", "Test")
+
+    # Initial commit so HEAD exists
+    readme = tmp_path / "README.md"
+    readme.write_text("# multi-releasable monorepo test\n")
+    run_git(tmp_path, "add", "README.md")
+    run_git(tmp_path, "commit", "-q", "-m", "initial")
+
+    # Write workspace.toml via save_workspace (handles releasables + projects)
+    save_workspace(str(tmp_path), projects, releasables=releasables)
+
+    # Create per-project directories with minimal project files
+    project_dirs = {}
+    for proj in projects:
+        proj_dir = tmp_path / proj["path"]
+        proj_dir.mkdir(parents=True, exist_ok=True)
+        # Create a minimal pyproject.toml for each project
+        (proj_dir / "pyproject.toml").write_text(
+            f'[project]\nname = "{proj["name"]}"\nversion = "{initial_version}"\n'
+        )
+        # Per-project .rlsbl/config.json (minimal)
+        rlsbl_dir = proj_dir / ".rlsbl"
+        rlsbl_dir.mkdir(exist_ok=True)
+        (rlsbl_dir / "config.json").write_text(
+            json.dumps({"private": False}) + "\n"
+        )
+        project_dirs[proj["name"]] = proj_dir
+
+    # Set up per-releasable state directories
+    for rel in releasables:
+        # Version file
+        write_releasable_version(str(tmp_path), rel.name, initial_version)
+
+        # Changes directory with empty unreleased.jsonl
+        changes_dir = get_releasable_changes_dir(str(tmp_path), rel.name)
+        os.makedirs(changes_dir, exist_ok=True)
+        unreleased_path = os.path.join(changes_dir, "unreleased.jsonl")
+        with open(unreleased_path, "w") as f:
+            f.write("")
+
+        # Releasable-level config.json
+        rel_dir = get_releasable_dir(str(tmp_path), rel.name)
+        config = releasable_configs.get(rel.name, {})
+        config_path = os.path.join(rel_dir, "config.json")
+        with open(config_path, "w") as f:
+            json.dump(config, f, indent=2)
+            f.write("\n")
+
+        # Releasable-level publish.json (if provided)
+        if rel.name in publish_configs:
+            publish_path = os.path.join(rel_dir, "publish.json")
+            with open(publish_path, "w") as f:
+                json.dump(publish_configs[rel.name], f, indent=2)
+                f.write("\n")
+
+        # Hook config (if provided) -- write hook scripts to hooks/ dir
+        if rel.name in hook_configs:
+            hooks_dir = os.path.join(rel_dir, "hooks")
+            os.makedirs(hooks_dir, exist_ok=True)
+            for hook_name, hook_content in hook_configs[rel.name].items():
+                hook_path = os.path.join(hooks_dir, hook_name)
+                with open(hook_path, "w") as f:
+                    f.write(hook_content)
+                os.chmod(hook_path, 0o755)
+
+    # Commit all workspace and project files
+    run_git(tmp_path, "add", WORKSPACE_DIR)
+    for proj in projects:
+        run_git(tmp_path, "add", proj["path"])
+    run_git(tmp_path, "commit", "-q", "-m", "add multi-releasable monorepo")
+
+    # Tag each releasable at the initial version
+    for rel in releasables:
+        tag = rel.tag_format.format(name=rel.name, version=initial_version)
+        run_git(tmp_path, "tag", tag)
+
+    # Make a post-tag commit so there is an unreleased range
+    marker = tmp_path / "marker.txt"
+    marker.write_text("post-tag marker\n")
+    run_git(tmp_path, "add", "marker.txt")
+    run_git(tmp_path, "commit", "-q", "-m", "post-tag commit")
+
+    return SimpleNamespace(
+        root=tmp_path,
+        releasables=releasables,
+        projects=projects,
+        project_dirs=project_dirs,
+        initial_version=initial_version,
+    )
+
+
+@pytest.fixture
+def multi_releasable_monorepo(tmp_path, monkeypatch):
+    """Create a multi-releasable monorepo with default structure.
+
+    For custom configurations, use multi_releasable_monorepo_factory instead.
+
+    Yields a SimpleNamespace with:
+        root             -- Path to the repo root
+        releasables      -- list of Releasable instances
+        projects         -- list of project dicts
+        project_dirs     -- dict mapping project name to its Path
+        initial_version  -- the initial version string
+    """
+    monkeypatch.chdir(tmp_path)
+    ns = _create_multi_releasable_monorepo(tmp_path)
+    yield ns
+
+
+@pytest.fixture
+def multi_releasable_monorepo_factory(tmp_path, monkeypatch):
+    """Factory fixture for creating customized multi-releasable monorepos.
+
+    Returns a callable that accepts the same keyword arguments as
+    ``_create_multi_releasable_monorepo`` (releasables, projects,
+    releasable_configs, publish_configs, hook_configs, initial_version).
+
+    Example::
+
+        def test_custom(multi_releasable_monorepo_factory):
+            ns = multi_releasable_monorepo_factory(
+                releasable_configs={"alpha": {"batch_limits": {"max_commits_per_entry": 3}}},
+                publish_configs={"alpha": {"pipelines": [{"type": "pypi", "local": false}]}},
+            )
+            assert ns.root.exists()
+    """
+    monkeypatch.chdir(tmp_path)
+
+    def factory(**kwargs):
+        return _create_multi_releasable_monorepo(tmp_path, **kwargs)
+
+    return factory
