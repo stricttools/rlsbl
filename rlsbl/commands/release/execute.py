@@ -585,6 +585,14 @@ def _run_release_mutating(state: ReleaseState):
 
         # Sync lockfiles after version bumps so they reflect the new version
         _sync_lockfiles(target_paths, files_to_commit, log)
+        if monorepo_root:
+            _sync_lockfiles({"workspace_root": str(monorepo_root)}, files_to_commit, log)
+            ws_lockfile = os.path.join(str(monorepo_root), "uv.lock")
+            if os.path.exists(ws_lockfile):
+                norm = os.path.normpath(ws_lockfile)
+                if norm not in files_to_commit:
+                    files_to_commit.append(norm)
+                    log("Workspace lockfile included in expected files")
 
         # Update .rlsbl/version marker so it's included in the release commit
         rlsbl_version_marker = vpath(os.path.join(".rlsbl", "version"))
