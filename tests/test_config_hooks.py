@@ -808,3 +808,198 @@ class TestRunReleaseHookPostRelease:
         )
         captured = capsys.readouterr()
         assert "Warning" in captured.err
+
+
+# ---------------------------------------------------------------------------
+# 11. Config-driven hooks work when no script file exists (call site fix)
+# ---------------------------------------------------------------------------
+
+class TestConfigHooksWithoutScriptFile:
+    """Verify config-driven hooks run even when no script file exists on disk.
+
+    This covers the Phase 4 audit fix: before the fix, call sites gated on
+    ``os.path.exists(script_path)`` which prevented config-driven hooks from
+    running when no script file was present.
+    """
+
+    def test_pre_checks_config_runs_without_script(self, mock_subprocess, tmp_path):
+        """Config-driven pre-checks runs when no pre-checks.sh exists."""
+        # No .rlsbl/hooks/ directory at all
+        config = {"hooks": {"pre_checks": ["echo config-check"]}}
+        nonexistent_script = str(tmp_path / ".rlsbl" / "hooks" / "pre-checks.sh")
+
+        run_release_hook(
+            "pre-checks",
+            nonexistent_script,
+            str(tmp_path),
+            {"PATH": "/usr/bin"},
+            30,
+            config=config,
+        )
+        # Config hook should have run despite no script file
+        assert mock_subprocess.run.call_count == 1
+        args, kwargs = mock_subprocess.run.call_args
+        assert args[0] == ["bash", "-c", "echo config-check"]
+
+    def test_pre_release_config_runs_without_script(self, mock_subprocess, tmp_path):
+        """Config-driven pre-release runs when no pre-release.sh exists."""
+        config = {"hooks": {"pre_release": ["echo config-release"]}}
+        nonexistent_script = str(tmp_path / ".rlsbl" / "hooks" / "pre-release.sh")
+
+        run_release_hook(
+            "pre-release",
+            nonexistent_script,
+            str(tmp_path),
+            {"PATH": "/usr/bin"},
+            30,
+            config=config,
+        )
+        assert mock_subprocess.run.call_count == 1
+        args, kwargs = mock_subprocess.run.call_args
+        assert args[0] == ["bash", "-c", "echo config-release"]
+
+    def test_post_release_config_runs_without_script(self, mock_subprocess, tmp_path):
+        """Config-driven post-release runs when no post-release.sh exists."""
+        config = {"hooks": {"post_release": ["echo config-deploy"]}}
+        nonexistent_script = str(tmp_path / ".rlsbl" / "hooks" / "post-release.sh")
+
+        run_release_hook(
+            "post-release",
+            nonexistent_script,
+            str(tmp_path),
+            {"PATH": "/usr/bin"},
+            30,
+            config=config,
+        )
+        assert mock_subprocess.run.call_count == 1
+        args, kwargs = mock_subprocess.run.call_args
+        assert args[0] == ["bash", "-c", "echo config-deploy"]
+
+    def test_no_config_no_script_is_silent_noop(self, mock_subprocess, tmp_path):
+        """No config hooks and no script file results in no subprocess calls."""
+        config = {}
+        nonexistent_script = str(tmp_path / ".rlsbl" / "hooks" / "pre-checks.sh")
+
+        run_release_hook(
+            "pre-checks",
+            nonexistent_script,
+            str(tmp_path),
+            {},
+            30,
+            config=config,
+        )
+        mock_subprocess.run.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# 12. Releasable hooks receive config at both levels
+# ---------------------------------------------------------------------------
+
+class TestReleasableHooksReceiveConfig:
+    """Verify run_releasable_hooks passes config to both releasable and package levels."""
+
+    def test_releasable_pre_checks_with_config_no_scripts(self, mock_subprocess, tmp_path):
+        """Releasable pre-checks runs config hooks when no script files exist."""
+        workspace_root = str(tmp_path)
+        # Create the releasable directory (but no hook scripts)
+        rel_hooks_dir = (
+            tmp_path / ".rlsbl-monorepo" / "releasables" / "myrel" / "hooks"
+        )
+        rel_hooks_dir.mkdir(parents=True)
+
+        pkg_dir = tmp_path / "packages" / "pkg-a"
+        pkg_dir.mkdir(parents=True)
+
+        releasable_config = {
+            "hooks": {"pre_checks": ["echo rel-check"]},
+        }
+        package_configs = {
+            "pkg-a": {"hooks": {"pre_checks": ["echo pkg-check"]}},
+        }
+        log = MagicMock()
+
+        run_releasable_hooks(
+            "pre-checks",
+            workspace_root,
+            "myrel",
+            [("pkg-a", str(pkg_dir))],
+            {"PATH": "/bin"},
+            30,
+            log,
+            releasable_config=releasable_config,
+            package_configs=package_configs,
+        )
+        # Both releasable and package config hooks should have run
+        assert mock_subprocess.run.call_count == 2
+        calls = mock_subprocess.run.call_args_list
+        # pre-checks: releasable first, then per-package
+        assert calls[0][0][0] == ["bash", "-c", "echo rel-check"]
+        assert calls[1][0][0] == ["bash", "-c", "echo pkg-check"]
+
+    def test_releasable_post_release_with_config(self, mock_subprocess, tmp_path):
+        """Releasable post-release runs config hooks (covers execute.py path)."""
+        workspace_root = str(tmp_path)
+        rel_hooks_dir = (
+            tmp_path / ".rlsbl-monorepo" / "releasables" / "myrel" / "hooks"
+        )
+        rel_hooks_dir.mkdir(parents=True)
+
+        pkg_dir = tmp_path / "packages" / "pkg-a"
+        pkg_dir.mkdir(parents=True)
+
+        releasable_config = {
+            "hooks": {"post_release": ["echo rel-deploy"]},
+        }
+        package_configs = {
+            "pkg-a": {"hooks": {"post_release": ["echo pkg-deploy"]}},
+        }
+        log = MagicMock()
+
+        run_releasable_hooks(
+            "post-release",
+            workspace_root,
+            "myrel",
+            [("pkg-a", str(pkg_dir))],
+            {"PATH": "/bin"},
+            30,
+            log,
+            releasable_config=releasable_config,
+            package_configs=package_configs,
+        )
+        # post-release: releasable first, then per-package
+        assert mock_subprocess.run.call_count == 2
+        calls = mock_subprocess.run.call_args_list
+        assert calls[0][0][0] == ["bash", "-c", "echo rel-deploy"]
+        assert calls[1][0][0] == ["bash", "-c", "echo pkg-deploy"]
+
+    def test_package_config_without_releasable_config(self, mock_subprocess, tmp_path):
+        """Package-level config hooks run even when releasable has no config."""
+        workspace_root = str(tmp_path)
+        rel_hooks_dir = (
+            tmp_path / ".rlsbl-monorepo" / "releasables" / "myrel" / "hooks"
+        )
+        rel_hooks_dir.mkdir(parents=True)
+
+        pkg_dir = tmp_path / "packages" / "pkg-a"
+        pkg_dir.mkdir(parents=True)
+
+        package_configs = {
+            "pkg-a": {"hooks": {"pre_checks": ["echo pkg-only"]}},
+        }
+        log = MagicMock()
+
+        run_releasable_hooks(
+            "pre-checks",
+            workspace_root,
+            "myrel",
+            [("pkg-a", str(pkg_dir))],
+            {"PATH": "/bin"},
+            30,
+            log,
+            releasable_config=None,
+            package_configs=package_configs,
+        )
+        # Only package hook should run (no releasable hook)
+        assert mock_subprocess.run.call_count == 1
+        args, kwargs = mock_subprocess.run.call_args
+        assert args[0] == ["bash", "-c", "echo pkg-only"]

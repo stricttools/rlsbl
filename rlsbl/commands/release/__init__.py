@@ -247,7 +247,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     if _use_releasable_hooks:
         # Build (name, dir) tuples for member packages
         _member_tuples = []
-        from ...workspace import load_workspace, members_of
+        from ...workspace import load_workspace, members_of, get_releasable_dir
         _ws_projects = load_workspace(str(monorepo_root))
         _member_projs = members_of(releasable_name, _ws_projects)
         for mp in _member_projs:
@@ -256,17 +256,27 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             mp_dir = os.path.join(str(monorepo_root), mp_path)
             _member_tuples.append((mp_name, mp_dir))
 
+        # Load releasable-level config and per-package configs for hook dispatch
+        _rel_cfg_dir = get_releasable_dir(str(monorepo_root), releasable_name)
+        _releasable_config = read_json_config(os.path.join(_rel_cfg_dir, "config.json"))
+        _package_configs = {}
+        for _mp_name, _mp_dir in _member_tuples:
+            _pkg_cfg = read_json_config(os.path.join(_mp_dir, ".rlsbl", "config.json"))
+            if _pkg_cfg:
+                _package_configs[_mp_name] = _pkg_cfg
+
         # 1+2. Pre-checks: releasable first, then per-package
         run_releasable_hooks(
             "pre-checks", monorepo_root, releasable_name,
             _member_tuples, hook_env, hook_timeout, log,
             project_dir=project_dir,
+            releasable_config=_releasable_config,
+            package_configs=_package_configs,
         )
     else:
         pre_checks_script = os.path.join(project_dir, ".rlsbl", "hooks", "pre-checks.sh")
-        if os.path.exists(pre_checks_script):
-            log("Running pre-checks hook...")
-            run_release_hook("pre-checks", pre_checks_script, project_dir, hook_env, hook_timeout)
+        log("Running pre-checks hook...")
+        run_release_hook("pre-checks", pre_checks_script, project_dir, hook_env, hook_timeout, config=config)
 
     _run_strictcli_schema_dump(flags, log, project_dir=project_dir)
 
@@ -308,7 +318,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
 
     if _use_releasable_hooks:
         # Check if releasable-level pre-release hook is customized
-        hook_is_customized = is_releasable_hook_customized(str(monorepo_root), releasable_name, config=config)
+        hook_is_customized = is_releasable_hook_customized(str(monorepo_root), releasable_name, config=_releasable_config)
 
         # 3. Built-in tests and lint (skipped when releasable pre-release hook is customized)
         if hook_is_customized:
@@ -326,6 +336,8 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             "pre-release", monorepo_root, releasable_name,
             _member_tuples, hook_env, hook_timeout, log,
             project_dir=project_dir,
+            releasable_config=_releasable_config,
+            package_configs=_package_configs,
         )
     else:
         # Built-in tests and lint (skipped when pre-release hook is customized)
@@ -349,9 +361,8 @@ def _run_cmd_inner(release_config, flags, *, ctx):
 
         # Run pre-release hook
         pre_release_script = os.path.join(project_dir, ".rlsbl", "hooks", "pre-release.sh")
-        if os.path.exists(pre_release_script):
-            log("Running pre-release hook...")
-            run_release_hook("pre-release", pre_release_script, project_dir, hook_env, hook_timeout)
+        log("Running pre-release hook...")
+        run_release_hook("pre-release", pre_release_script, project_dir, hook_env, hook_timeout, config=config)
 
     # Snapshot dirty files after all hooks
     post_hook_output = run("git", ["status", "--porcelain"])

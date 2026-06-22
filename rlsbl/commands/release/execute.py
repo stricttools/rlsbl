@@ -1010,7 +1010,8 @@ def _run_release_mutating(state: ReleaseState):
     if _use_releasable_hooks:
         # Multi-level post-release: releasable first, then per-package
         from .hooks import build_hook_env, run_releasable_hooks
-        from ...workspace import members_of
+        from ...workspace import members_of, get_releasable_dir
+        from . import read_json_config
 
         _ws_projects = load_workspace(str(monorepo_root))
         _member_projs = members_of(releasable_name, _ws_projects)
@@ -1020,6 +1021,15 @@ def _run_release_mutating(state: ReleaseState):
             mp_path = mp.path if hasattr(mp, "path") else mp["path"]
             mp_dir = os.path.join(str(monorepo_root), mp_path)
             _member_tuples.append((mp_name, mp_dir))
+
+        # Load releasable-level config and per-package configs for hook dispatch
+        _rel_cfg_dir = get_releasable_dir(str(monorepo_root), releasable_name)
+        _releasable_config = read_json_config(os.path.join(_rel_cfg_dir, "config.json"))
+        _package_configs = {}
+        for _mp_name, _mp_dir in _member_tuples:
+            _pkg_cfg = read_json_config(os.path.join(_mp_dir, ".rlsbl", "config.json"))
+            if _pkg_cfg:
+                _package_configs[_mp_name] = _pkg_cfg
 
         hook_env = build_hook_env(
             os.environ.copy(),
@@ -1034,26 +1044,32 @@ def _run_release_mutating(state: ReleaseState):
                 "post-release", monorepo_root, releasable_name,
                 _member_tuples, hook_env, hook_timeout, log,
                 project_dir=project_dir,
+                releasable_config=_releasable_config,
+                package_configs=_package_configs,
             )
         except Exception as e:
             # Post-release hooks are non-fatal
             print(f"Warning: post-release hook failed: {e}", file=sys.stderr)
     else:
+        from .hooks import build_hook_env, run_release_hook
+
         post_release_script = os.path.join(project_dir, ".rlsbl", "hooks", "post-release.sh")
-        if os.path.exists(post_release_script):
-            post_release_script = os.path.abspath(post_release_script)
-            log("Running post-release hook...")
-            try:
-                env = os.environ.copy()
-                env["RLSBL_VERSION"] = new_version
-                env["RLSBL_BUMP_TYPE"] = bump_type or ""
-                env["RLSBL_PREV_VERSION"] = current_version or ""
-                env["RLSBL_DESCRIPTION"] = description or ""
-                subprocess.run(["bash", post_release_script], env=env, check=True, timeout=hook_timeout, cwd=project_dir)
-            except subprocess.CalledProcessError as e:
-                print(f"Warning: post-release hook exited with code {e.returncode}.", file=sys.stderr)
-            except subprocess.TimeoutExpired:
-                print(f"Warning: post-release hook timed out after {hook_timeout}s.", file=sys.stderr)
+        hook_env = build_hook_env(
+            os.environ.copy(),
+            new_version,
+            bump_type=bump_type or "",
+            prev_version=current_version or "",
+            description=description or "",
+        )
+        log("Running post-release hook...")
+        try:
+            run_release_hook(
+                "post-release", post_release_script, project_dir,
+                hook_env, hook_timeout, config=ctx.config,
+            )
+        except Exception as e:
+            # Post-release hooks are non-fatal
+            print(f"Warning: post-release hook failed: {e}", file=sys.stderr)
 
     # Auto-regenerate monorepo snapshot after release (non-fatal)
     if monorepo_name:
