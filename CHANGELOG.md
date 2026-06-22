@@ -2,6 +2,14 @@
 
 # Changelog
 
+## 0.81.1
+
+Fix CI test failure: mock saferm in migration tests
+
+### Fixes
+
+- **Fix CI test failure.** Migration tests now mock saferm for CI environments where it is not installed.
+
 ## 0.81.0
 
 Config-driven hooks, releasable config inheritance, Maven Central publishing, JVM monorepo support, Go strictcli detection, and migration CLI
