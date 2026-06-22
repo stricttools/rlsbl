@@ -118,7 +118,11 @@ releasable = "core"
     def test_skips_when_dirs_absent(self, mock_run, tmp_project):
         """No saferm calls when changes/ and releases/ don't exist."""
         pkg = tmp_project / "pkg"
-        _make_rlsbl_dir(pkg, files=["config.json"])
+        _make_rlsbl_dir(pkg)
+        # Write valid JSON so read_json_config doesn't choke on empty content.
+        # Use a unique value so it differs from the releasable config (empty dict),
+        # preventing config.json cleanup from triggering.
+        (pkg / ".rlsbl" / "config.json").write_text('{"unique": true}\n')
         _write_workspace(tmp_project, """\
 [[releasables]]
 name = "core"
@@ -455,7 +459,6 @@ class TestVerifyMinimalCleanState:
         pkg = tmp_project / "pkg"
         _make_rlsbl_dir(
             pkg,
-            subdirs=["hooks"],
             files=["publish.json", "config.json", "hashes.json", "managed-files.json"],
         )
         result = verify_minimal_rlsbl(str(pkg))
@@ -468,35 +471,35 @@ class TestVerifyMinimalCleanState:
         result = verify_minimal_rlsbl(str(pkg))
         assert result == []
 
-    def test_only_hooks_dir(self, tmp_project):
-        """Only hooks/ directory is clean."""
+    def test_hooks_dir_is_unexpected(self, tmp_project):
+        """hooks/ directory is now unexpected (moved to releasable level)."""
         pkg = tmp_project / "pkg"
         _make_rlsbl_dir(pkg, subdirs=["hooks"])
         result = verify_minimal_rlsbl(str(pkg))
-        assert result == []
+        assert "hooks" in result
 
     def test_expected_contents_match(self):
         """EXPECTED_RLSBL_CONTENTS has the documented set."""
         assert EXPECTED_RLSBL_CONTENTS == {
             "publish.json",
             "config.json",
-            "hooks",
             "hashes.json",
             "managed-files.json",
         }
 
     def test_clean_after_cleanup(self, tmp_project):
-        """After cleanup removes changes/ and releases/, verify passes."""
+        """After cleanup removes all non-minimal state, verify passes."""
         pkg = tmp_project / "pkg"
         _make_rlsbl_dir(
             pkg,
-            subdirs=["changes", "releases", "hooks"],
-            files=["config.json", "publish.json"],
+            subdirs=["changes", "releases", "hooks", "bases", "lint"],
+            files=["config.json", "publish.json", "version"],
         )
-        # Simulate cleanup by removing the directories
+        # Simulate cleanup by removing all non-minimal entries
         import shutil
-        shutil.rmtree(str(pkg / ".rlsbl" / "changes"))
-        shutil.rmtree(str(pkg / ".rlsbl" / "releases"))
+        for subdir in ("changes", "releases", "hooks", "bases", "lint"):
+            shutil.rmtree(str(pkg / ".rlsbl" / subdir))
+        os.remove(str(pkg / ".rlsbl" / "version"))
 
         result = verify_minimal_rlsbl(str(pkg))
         assert result == []
@@ -521,6 +524,6 @@ class TestVerifyMinimalMixedState:
         result = verify_minimal_rlsbl(str(pkg))
         assert "changes" in result
         assert "version" in result
-        assert "hooks" not in result
+        assert "hooks" in result  # hooks is now unexpected after cleanup scope extension
         assert "config.json" not in result
         assert "publish.json" not in result

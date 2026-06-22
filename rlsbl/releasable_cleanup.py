@@ -12,8 +12,10 @@ automatic invocation during scaffold or release.
 import os
 import subprocess
 
+from .config import read_json_config
 from .workspace import (
     WorkspaceProject,
+    get_releasable_dir,
     is_explicit_mode,
     load_releasables,
     load_workspace,
@@ -23,25 +25,34 @@ from .workspace import (
 
 # Files and directories expected to remain in a per-package .rlsbl/ after
 # cleanup.  Anything else is unexpected and flagged by verify_minimal_rlsbl().
+# config.json is kept only when it differs from the releasable-level config;
+# hooks/, bases/, lint/, version are all removed during cleanup.
 EXPECTED_RLSBL_CONTENTS = frozenset({
     "publish.json",
     "config.json",
-    "hooks",
     "hashes.json",
     "managed-files.json",
 })
 
 
 def cleanup_per_package_release_state(workspace_root, projects=None, releasables=None):
-    """Remove .rlsbl/changes/ and .rlsbl/releases/ for packages in explicit-mode releasables.
+    """Remove per-package .rlsbl/ state for packages in explicit-mode releasables.
 
     Only acts when the workspace is in explicit mode (``[[releasables]]`` is
     defined in workspace.toml).  For each project that belongs to a releasable
-    (``releasable`` is a string, not False), removes the per-package changelog
-    and release directories if they exist.
+    (``releasable`` is a string, not False), removes:
 
-    Uses ``saferm delete -r`` for removal so there is an audit trail and
-    the files are recoverable.
+    - ``.rlsbl/changes/`` -- changelog state (moved to releasable level)
+    - ``.rlsbl/releases/`` -- release state (moved to releasable level)
+    - ``.rlsbl/hooks/`` -- hook scripts (moved to releasable level)
+    - ``.rlsbl/bases/`` -- merge bases (moved to releasable level)
+    - ``.rlsbl/lint/`` -- lint configs (moved to releasable level)
+    - ``.rlsbl/version`` -- rlsbl scaffold version file
+    - ``CHANGELOG.md`` -- generated changelog (now per-releasable)
+    - ``.rlsbl/config.json`` -- only when identical to the releasable-level config
+
+    Uses ``saferm`` for removal so there is an audit trail and the files
+    are recoverable.
 
     Args:
         workspace_root: path to the monorepo root (containing .rlsbl-monorepo/).
@@ -68,6 +79,13 @@ def cleanup_per_package_release_state(workspace_root, projects=None, releasables
     releasable_names = {r.name for r in releasables}
     removed = []
 
+    # Pre-load releasable-level configs for config.json comparison
+    releasable_configs = {}
+    for r in releasables:
+        rel_dir = get_releasable_dir(workspace_root, r.name)
+        rel_config_path = os.path.join(rel_dir, "config.json")
+        releasable_configs[r.name] = read_json_config(rel_config_path)
+
     for proj in projects:
         rel_val = _get_project_releasable(proj)
         # Skip projects not in a releasable (releasable=false or None)
@@ -78,11 +96,35 @@ def cleanup_per_package_release_state(workspace_root, projects=None, releasables
             continue
 
         proj_path = os.path.join(workspace_root, proj.path)
-        for subdir in ("changes", "releases"):
-            target = os.path.join(proj_path, ".rlsbl", subdir)
+        rlsbl_dir = os.path.join(proj_path, ".rlsbl")
+
+        # Remove directories: changes, releases, hooks, bases, lint
+        for subdir in ("changes", "releases", "hooks", "bases", "lint"):
+            target = os.path.join(rlsbl_dir, subdir)
             if os.path.isdir(target):
                 _saferm_dir(target, proj.name, subdir)
                 removed.append(target)
+
+        # Remove .rlsbl/version file
+        version_file = os.path.join(rlsbl_dir, "version")
+        if os.path.isfile(version_file):
+            _saferm_file(version_file, proj.name, "version")
+            removed.append(version_file)
+
+        # Remove CHANGELOG.md
+        changelog_file = os.path.join(proj_path, "CHANGELOG.md")
+        if os.path.isfile(changelog_file):
+            _saferm_file(changelog_file, proj.name, "CHANGELOG.md")
+            removed.append(changelog_file)
+
+        # Remove config.json when identical to releasable-level config
+        config_file = os.path.join(rlsbl_dir, "config.json")
+        if os.path.isfile(config_file):
+            pkg_config = read_json_config(config_file)
+            rel_config = releasable_configs.get(rel_val, {})
+            if pkg_config == rel_config:
+                _saferm_file(config_file, proj.name, "config.json")
+                removed.append(config_file)
 
     return removed
 
@@ -93,10 +135,9 @@ def verify_minimal_rlsbl(project_path):
     After cleanup, a per-package ``.rlsbl/`` should contain only:
 
     - ``publish.json`` (publishing config)
-    - ``config.json`` (non-publishing config fields)
-    - ``hooks/`` (per-package hooks)
     - ``hashes.json`` (scaffold metadata)
     - ``managed-files.json`` (scaffold metadata)
+    - ``config.json`` (only if it has overrides differing from releasable config)
 
     Args:
         project_path: absolute or relative path to the project directory.
@@ -141,6 +182,34 @@ def _saferm_dir(path, project_name, subdir_name):
         subprocess.run(
             [
                 "saferm", "delete", "-r",
+                "--description", description,
+                path,
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        raise RuntimeError(
+            "saferm is not installed or not on PATH. "
+            "Install saferm before running cleanup."
+        ) from None
+
+
+def _saferm_file(path, project_name, file_name):
+    """Remove a single file using saferm with an audit trail.
+
+    Raises RuntimeError if saferm is not on PATH.
+    Raises subprocess.CalledProcessError if saferm exits non-zero.
+    """
+    description = (
+        f"Removing per-package {file_name} from '{project_name}' "
+        f"-- state moved to per-releasable directory"
+    )
+    try:
+        subprocess.run(
+            [
+                "saferm", "delete",
                 "--description", description,
                 path,
             ],
