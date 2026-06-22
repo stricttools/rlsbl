@@ -78,12 +78,12 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "subtree-remote-reachable": "workspace",
     "workspace-unbuildable": "workspace",
     # --- workspace + language-specific import scanners ---
-    "deps-unused": frozenset({"pypi", "dart", "npm", "go"}),
-    "deps-undeclared": frozenset({"pypi", "dart", "npm", "go"}),
-    "deps-runtime-test-only": frozenset({"pypi", "dart", "npm", "go"}),
-    "deps-dev-in-lib": frozenset({"pypi", "dart", "npm", "go"}),
+    "deps-unused": frozenset({"pypi", "dart", "npm", "go", "maven"}),
+    "deps-undeclared": frozenset({"pypi", "dart", "npm", "go", "maven"}),
+    "deps-runtime-test-only": frozenset({"pypi", "dart", "npm", "go", "maven"}),
+    "deps-dev-in-lib": frozenset({"pypi", "dart", "npm", "go", "maven"}),
     # --- target-specific quality checks ---
-    "dead-modules": frozenset({"pypi", "go", "npm", "dart"}),
+    "dead-modules": frozenset({"pypi", "go", "npm", "dart", "maven"}),
     "circular-deps": frozenset({"pypi", "npm", "dart"}),
     "library-lint": frozenset({"pypi", "go", "npm"}),
     # --- quality tag (universal) ---

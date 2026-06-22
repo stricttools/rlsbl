@@ -84,9 +84,9 @@ class TestCheckTargetsConsistencyWithCode:
     """Verify CHECK_TARGETS matches the actual skip logic in check functions."""
 
     def test_dead_modules_targets(self):
-        """dead-modules check supports pypi, go, npm, dart per its implementation."""
+        """dead-modules check supports pypi, go, npm, dart, maven per its implementation."""
         targets = CHECK_TARGETS["dead-modules"]
-        assert targets == frozenset({"pypi", "go", "npm", "dart"})
+        assert targets == frozenset({"pypi", "go", "npm", "dart", "maven"})
 
     def test_library_lint_targets(self):
         """library-lint supports python/pypi, go, npm per _detect_languages."""
@@ -94,8 +94,8 @@ class TestCheckTargetsConsistencyWithCode:
         assert targets == frozenset({"pypi", "go", "npm"})
 
     def test_dep_checks_use_import_scanners(self):
-        """Dep checks use PythonImportScanner, DartImportScanner, NpmImportScanner, GoImportScanner."""
-        scanner_targets = frozenset({"pypi", "dart", "npm", "go"})
+        """Dep checks use Python, Dart, npm, Go, Java, and Kotlin import scanners."""
+        scanner_targets = frozenset({"pypi", "dart", "npm", "go", "maven"})
         for check_name in ("deps-unused", "deps-undeclared",
                            "deps-runtime-test-only", "deps-dev-in-lib"):
             assert CHECK_TARGETS[check_name] == scanner_targets, (

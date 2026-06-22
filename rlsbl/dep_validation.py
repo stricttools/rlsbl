@@ -17,6 +17,8 @@ from .errors import ConfigError
 from .import_scanners import (
     DartImportScanner,
     GoImportScanner,
+    JavaImportScanner,
+    KotlinImportScanner,
     NpmImportScanner,
     PythonImportScanner,
     _is_test_context,
@@ -76,6 +78,7 @@ def _get_imported_workspace_packages(
     module_path_map: dict[str, str] | None = None,
     namespace_map: dict[str, str] | None = None,
     import_names: dict[str, str] | None = None,
+    jvm_package_map: dict[str, str] | None = None,
 ) -> tuple[set[str], set[str], set[str]]:
     """Scan a project for workspace imports, split by context.
 
@@ -89,6 +92,9 @@ def _get_imported_workspace_packages(
             workspace project names. Passed through to PythonImportScanner.
         import_names: mapping of project_name -> import_name from workspace
             config. Passed through to PythonImportScanner.
+        jvm_package_map: mapping of dotted package prefix to workspace
+            project name. Passed through to JavaImportScanner and
+            KotlinImportScanner.
 
     Returns (lib_imports, test_imports, guarded_imports) where each is a
     set of workspace package names. Guarded imports are those inside
@@ -146,6 +152,21 @@ def _get_imported_workspace_packages(
             test_imports.add(info.package_name)
         else:
             lib_imports.add(info.package_name)
+
+    # JVM scanners (Java and Kotlin) need the jvm_package_map
+    for jvm_scanner in (JavaImportScanner(), KotlinImportScanner()):
+        jvm_results = jvm_scanner.scan(
+            project_dir, workspace_names,
+            exclude_dirs=exclude_dirs,
+            package_map=jvm_package_map,
+        )
+        for info in jvm_results:
+            if info.guarded:
+                guarded_imports.add(info.package_name)
+            elif info.is_test_context:
+                test_imports.add(info.package_name)
+            else:
+                lib_imports.add(info.package_name)
 
     return lib_imports, test_imports, guarded_imports
 

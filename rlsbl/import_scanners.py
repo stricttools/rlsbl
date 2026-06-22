@@ -1,4 +1,4 @@
-"""Python, Dart, and npm import scanners for dependency-import validation.
+"""Python, Dart, npm, Go, Java, and Kotlin import scanners for dependency-import validation.
 
 Filters raw import data to workspace-relevant imports, handles
 language-specific edge cases, and distinguishes lib/ vs test/ contexts.
@@ -36,11 +36,21 @@ _TEST_FILE_PATTERNS = (
     re.compile(r"^.*\.test\.[jt]sx?$"),
     re.compile(r"^.*\.spec\.[jt]sx?$"),
     re.compile(r"^conftest\.py$"),
+    re.compile(r"^.*Test\.java$"),
+    re.compile(r"^.*Tests\.java$"),
+    re.compile(r"^.*Test\.kt$"),
+    re.compile(r"^.*Tests\.kt$"),
 )
 
 # Regex for Dart package imports: import 'package:foo/bar.dart'
 # Also matches export statements.
 _DART_PACKAGE_RE = re.compile(r"""(?:import|export)\s+['"]package:(\w+)/""")
+
+# Regex for Java/Kotlin import statements: import com.example.Foo
+# Handles optional semicolons (Kotlin doesn't require them, Java does).
+# Handles static imports (import static com.example.Foo.bar).
+# Captures the full package path (e.g., com.example.Foo).
+_JVM_IMPORT_RE = re.compile(r"^import\s+(?:static\s+)?([a-zA-Z_][\w]*(?:\.\w+)*(?:\.\*)?)\s*;?\s*$")
 
 
 @dataclass(frozen=True)
@@ -548,3 +558,195 @@ class GoImportScanner:
             if import_path == mod_path or import_path.startswith(mod_path + "/"):
                 return ws_name
         return None
+
+
+def build_jvm_package_map(
+    projects: list,
+    workspace_root: str,
+) -> dict[str, str]:
+    """Map Java/Kotlin package prefixes to workspace project names.
+
+    For each workspace project with a pom.xml or build.gradle(.kts),
+    reads the groupId (from POM) or group (from Gradle) and maps it
+    to the project name. This allows import scanning to determine
+    which workspace project an import like ``com.example.foo.Bar``
+    belongs to.
+
+    Args:
+        projects: list of workspace project dicts/objects with ``name``
+            and ``path`` attributes.
+        workspace_root: absolute path to the workspace root.
+
+    Returns:
+        dict mapping dotted package prefix to workspace project name.
+        E.g. ``{"com.example.foo": "foo-lib"}``
+    """
+    import xml.etree.ElementTree as ET
+
+    ns = {"m": "http://maven.apache.org/POM/4.0.0"}
+    package_map: dict[str, str] = {}
+
+    for proj in projects:
+        proj_name = proj["name"] if isinstance(proj, dict) else proj.name
+        proj_path = proj["path"] if isinstance(proj, dict) else proj.path
+        project_dir = os.path.join(workspace_root, proj_path)
+
+        group_id = None
+
+        # Try pom.xml first
+        pom_path = os.path.join(project_dir, "pom.xml")
+        if os.path.isfile(pom_path):
+            try:
+                tree = ET.parse(pom_path)
+                root = tree.getroot()
+                group_elem = root.find("m:groupId", ns)
+                if group_elem is None:
+                    group_elem = root.find("groupId")
+                artifact_elem = root.find("m:artifactId", ns)
+                if artifact_elem is None:
+                    artifact_elem = root.find("artifactId")
+                if group_elem is not None and group_elem.text:
+                    group_id = group_elem.text.strip()
+                    # Use groupId.artifactId as the package prefix
+                    if artifact_elem is not None and artifact_elem.text:
+                        prefix = f"{group_id}.{artifact_elem.text.strip()}"
+                    else:
+                        prefix = group_id
+                    package_map[prefix] = proj_name
+            except ET.ParseError:
+                pass
+            if group_id is not None:
+                continue
+
+        # Try build.gradle.kts
+        kts_path = os.path.join(project_dir, "build.gradle.kts")
+        if os.path.isfile(kts_path):
+            try:
+                with open(kts_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                group_m = re.search(r'group\s*=\s*"([^"]+)"', content)
+                if group_m:
+                    group_id = group_m.group(1)
+                    package_map[group_id] = proj_name
+            except (OSError, UnicodeDecodeError):
+                pass
+            if group_id is not None:
+                continue
+
+        # Try build.gradle (Groovy)
+        groovy_path = os.path.join(project_dir, "build.gradle")
+        if os.path.isfile(groovy_path):
+            try:
+                with open(groovy_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                group_m = re.search(r"""group\s*=?\s*['"]([^'"]+)['"]""", content)
+                if group_m:
+                    group_id = group_m.group(1)
+                    package_map[group_id] = proj_name
+            except (OSError, UnicodeDecodeError):
+                pass
+
+    return package_map
+
+
+class _JvmImportScannerBase:
+    """Base class for Java and Kotlin import scanners.
+
+    Scans source files for import statements matching workspace
+    projects via a package prefix map. Subclasses specify which
+    file extensions to scan.
+    """
+
+    extensions: tuple[str, ...]
+
+    def scan(
+        self,
+        project_path: str,
+        workspace_names: set[str],
+        exclude_dirs: list[str] | None = None,
+        *,
+        package_map: dict[str, str] | None = None,
+    ) -> list[ImportInfo]:
+        """Scan project_path for JVM imports matching workspace members.
+
+        Args:
+            project_path: absolute path to the project root.
+            workspace_names: set of workspace member package names.
+            exclude_dirs: directory paths to skip during the walk
+                (relative to project_path or absolute).
+            package_map: mapping of dotted package prefix to workspace
+                project name. Built by build_jvm_package_map().
+                Required for JVM import detection.
+
+        Returns:
+            list of ImportInfo for imports that match workspace members.
+        """
+        project_path = os.path.abspath(project_path)
+
+        if not package_map:
+            return []
+
+        # Sort package_map keys by length descending for longest-prefix matching
+        prefixes_sorted = sorted(package_map.keys(), key=len, reverse=True)
+
+        source_files = walk_source_files(
+            project_path, self.extensions, [], exclude_dirs=exclude_dirs,
+        )
+
+        results = []
+        for filepath in source_files:
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    lines = f.readlines()
+            except (OSError, UnicodeDecodeError):
+                continue
+
+            is_test = _is_test_context(filepath, project_path)
+
+            for i, line in enumerate(lines, start=1):
+                match = _JVM_IMPORT_RE.match(line.strip())
+                if not match:
+                    continue
+
+                import_path = match.group(1)
+                # Strip trailing .* for wildcard imports
+                clean_path = import_path.rstrip(".*").rstrip(".")
+                if not clean_path:
+                    continue
+
+                # Longest-prefix match against package_map
+                matched_name = None
+                for prefix in prefixes_sorted:
+                    if clean_path == prefix or clean_path.startswith(prefix + "."):
+                        matched_name = package_map[prefix]
+                        break
+
+                if matched_name is not None:
+                    results.append(ImportInfo(
+                        package_name=matched_name,
+                        file_path=filepath,
+                        line_number=i,
+                        is_test_context=is_test,
+                    ))
+
+        return results
+
+
+class JavaImportScanner(_JvmImportScannerBase):
+    """Scan Java source files for workspace-relevant imports.
+
+    Uses regex to extract import statements from .java files, then
+    matches against the workspace package prefix map.
+    """
+
+    extensions = (".java",)
+
+
+class KotlinImportScanner(_JvmImportScannerBase):
+    """Scan Kotlin source files for workspace-relevant imports.
+
+    Uses regex to extract import statements from .kt and .kts files,
+    then matches against the workspace package prefix map.
+    """
+
+    extensions = (".kt", ".kts")
