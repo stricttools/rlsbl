@@ -1823,6 +1823,9 @@ class TestBatchReleaseReleasablesImplicitMode:
     @patch(f"{MOD_BATCH}.find_workspace_root", return_value="/ws")
     @patch(f"{MOD_BATCH}.get_batch_release_file_path", return_value="/ws/batch.toml")
     @patch(f"{MOD_BATCH}.read_batch_release_file")
+    @patch(f"{MOD_BATCH}.validate_gh_cli")
+    @patch(f"{MOD_BATCH}.validate_clean_tree", return_value=set())
+    @patch(f"{MOD_BATCH}.validate_branch_and_remote", return_value="main")
     @patch(f"{MOD_BATCH}.load_workspace", return_value=[])
     @patch(f"{MOD_BATCH}.is_explicit_mode", return_value=False)
     def test_releasables_in_implicit_mode(self, *mocks):
@@ -1831,7 +1834,7 @@ class TestBatchReleaseReleasablesImplicitMode:
         batch = MagicMock()
         batch.section_type = "releasables"
         batch.packages = {"rel1": MagicMock()}
-        mocks[2].return_value = batch  # read_batch_release_file
+        mocks[5].return_value = batch  # read_batch_release_file
 
         with patch("os.path.exists", return_value=True):
             with pytest.raises(SystemExit) as exc:
@@ -1845,19 +1848,23 @@ class TestBatchReleasePackagesMissing:
     @patch(f"{MOD_BATCH}.find_workspace_root", return_value="/ws")
     @patch(f"{MOD_BATCH}.get_batch_release_file_path", return_value="/ws/batch.toml")
     @patch(f"{MOD_BATCH}.read_batch_release_file")
+    @patch(f"{MOD_BATCH}.validate_gh_cli")
+    @patch(f"{MOD_BATCH}.validate_clean_tree", return_value=set())
+    @patch(f"{MOD_BATCH}.validate_branch_and_remote", return_value="main")
     @patch(f"{MOD_BATCH}.load_workspace")
     @patch(f"{MOD_BATCH}.is_explicit_mode", return_value=False)
-    def test_missing_packages(self, *mocks):
+    def test_missing_packages(self, mock_explicit, mock_load_ws, _vb, _vc, _vg,
+                              mock_read, mock_path, mock_find):
         from rlsbl.commands.monorepo.batch_release import _cmd_batch_release
 
         batch = MagicMock()
         batch.section_type = "packages"
         batch.packages = {"nonexistent": MagicMock()}
-        mocks[2].return_value = batch
+        mock_read.return_value = batch
 
         proj = MagicMock()
         proj.__getitem__ = lambda self, k: {"name": "existing"}[k]
-        mocks[1].return_value = [proj]
+        mock_load_ws.return_value = [proj]
 
         with patch("os.path.exists", return_value=True):
             with pytest.raises(SystemExit) as exc:
@@ -1871,20 +1878,24 @@ class TestBatchReleaseNonReleasable:
     @patch(f"{MOD_BATCH}.find_workspace_root", return_value="/ws")
     @patch(f"{MOD_BATCH}.get_batch_release_file_path", return_value="/ws/batch.toml")
     @patch(f"{MOD_BATCH}.read_batch_release_file")
+    @patch(f"{MOD_BATCH}.validate_gh_cli")
+    @patch(f"{MOD_BATCH}.validate_clean_tree", return_value=set())
+    @patch(f"{MOD_BATCH}.validate_branch_and_remote", return_value="main")
     @patch(f"{MOD_BATCH}.load_workspace")
     @patch(f"{MOD_BATCH}.is_explicit_mode", return_value=False)
-    def test_non_releasable_in_batch(self, *mocks):
+    def test_non_releasable_in_batch(self, mock_explicit, mock_load_ws, _vb, _vc, _vg,
+                                     mock_read, mock_path, mock_find):
         from rlsbl.commands.monorepo.batch_release import _cmd_batch_release
 
         batch = MagicMock()
         batch.section_type = "packages"
         batch.packages = {"devnode": MagicMock()}
-        mocks[2].return_value = batch
+        mock_read.return_value = batch
 
         proj = MagicMock()
         proj.__getitem__ = lambda self, k: {"name": "devnode"}[k]
         proj.is_releasable = False
-        mocks[1].return_value = [proj]
+        mock_load_ws.return_value = [proj]
 
         with patch("os.path.exists", return_value=True):
             with pytest.raises(SystemExit) as exc:
@@ -1898,22 +1909,26 @@ class TestBatchReleaseCycleError:
     @patch(f"{MOD_BATCH}.find_workspace_root", return_value="/ws")
     @patch(f"{MOD_BATCH}.get_batch_release_file_path", return_value="/ws/batch.toml")
     @patch(f"{MOD_BATCH}.read_batch_release_file")
+    @patch(f"{MOD_BATCH}.validate_gh_cli")
+    @patch(f"{MOD_BATCH}.validate_clean_tree", return_value=set())
+    @patch(f"{MOD_BATCH}.validate_branch_and_remote", return_value="main")
     @patch(f"{MOD_BATCH}.load_workspace")
     @patch(f"{MOD_BATCH}.is_explicit_mode", return_value=False)
     @patch(f"{MOD_BATCH}.WorkspaceGraph")
-    def test_cycle_error(self, mock_graph, *mocks):
+    def test_cycle_error(self, mock_graph, mock_explicit, mock_load_ws, _vb, _vc, _vg,
+                         mock_read, mock_path, mock_find):
         from rlsbl.commands.monorepo.batch_release import _cmd_batch_release
         from rlsbl.workspace_graph import CycleError
 
         batch = MagicMock()
         batch.section_type = "packages"
         batch.packages = {"pkg-a": MagicMock()}
-        mocks[2].return_value = batch
+        mock_read.return_value = batch
 
         proj = MagicMock()
         proj.__getitem__ = lambda self, k: {"name": "pkg-a"}[k]
         proj.is_releasable = True
-        mocks[1].return_value = [proj]
+        mock_load_ws.return_value = [proj]
 
         graph_inst = MagicMock()
         graph_inst.topological_order.side_effect = CycleError("cycle!")
@@ -1931,10 +1946,16 @@ class TestBatchReleasePackageFailure:
     @patch(f"{MOD_BATCH}.find_workspace_root", return_value="/ws")
     @patch(f"{MOD_BATCH}.get_batch_release_file_path", return_value="/ws/batch.toml")
     @patch(f"{MOD_BATCH}.read_batch_release_file")
+    @patch(f"{MOD_BATCH}.validate_gh_cli")
+    @patch(f"{MOD_BATCH}.validate_clean_tree", return_value=set())
+    @patch(f"{MOD_BATCH}.validate_branch_and_remote", return_value="main")
     @patch(f"{MOD_BATCH}.load_workspace")
     @patch(f"{MOD_BATCH}.is_explicit_mode", return_value=False)
     @patch(f"{MOD_BATCH}.WorkspaceGraph")
-    def test_package_release_failure(self, mock_graph, *mocks):
+    @patch(f"{MOD_BATCH}.rlsbl_lock")
+    def test_package_release_failure(self, _mock_lock, mock_graph,
+                                     mock_explicit, mock_load_ws, _vb, _vc, _vg,
+                                     mock_read, mock_path, mock_find):
         from rlsbl.commands.monorepo.batch_release import _cmd_batch_release
 
         rc = MagicMock()
@@ -1942,12 +1963,12 @@ class TestBatchReleasePackageFailure:
         batch = MagicMock()
         batch.section_type = "packages"
         batch.packages = {"pkg-a": rc}
-        mocks[2].return_value = batch
+        mock_read.return_value = batch
 
         proj = MagicMock()
         proj.__getitem__ = lambda self, k: {"name": "pkg-a", "path": "packages/pkg-a"}[k]
         proj.is_releasable = True
-        mocks[1].return_value = [proj]
+        mock_load_ws.return_value = [proj]
 
         graph_inst = MagicMock()
         graph_inst.topological_order.return_value = ["pkg-a"]
@@ -1966,6 +1987,9 @@ class TestBatchReleaseReleasablesMissing:
     @patch(f"{MOD_BATCH}.find_workspace_root", return_value="/ws")
     @patch(f"{MOD_BATCH}.get_batch_release_file_path", return_value="/ws/batch.toml")
     @patch(f"{MOD_BATCH}.read_batch_release_file")
+    @patch(f"{MOD_BATCH}.validate_gh_cli")
+    @patch(f"{MOD_BATCH}.validate_clean_tree", return_value=set())
+    @patch(f"{MOD_BATCH}.validate_branch_and_remote", return_value="main")
     @patch(f"{MOD_BATCH}.load_workspace", return_value=[])
     @patch(f"{MOD_BATCH}.is_explicit_mode", return_value=True)
     def test_missing_releasables(self, *mocks):
@@ -1974,7 +1998,7 @@ class TestBatchReleaseReleasablesMissing:
         batch = MagicMock()
         batch.section_type = "releasables"
         batch.packages = {"missing-rel": MagicMock()}
-        mocks[2].return_value = batch
+        mocks[5].return_value = batch
 
         with patch("os.path.exists", return_value=True):
             with patch("rlsbl.workspace.load_releasables", return_value=[]):
@@ -1989,6 +2013,9 @@ class TestBatchReleaseReleasableCycle:
     @patch(f"{MOD_BATCH}.find_workspace_root", return_value="/ws")
     @patch(f"{MOD_BATCH}.get_batch_release_file_path", return_value="/ws/batch.toml")
     @patch(f"{MOD_BATCH}.read_batch_release_file")
+    @patch(f"{MOD_BATCH}.validate_gh_cli")
+    @patch(f"{MOD_BATCH}.validate_clean_tree", return_value=set())
+    @patch(f"{MOD_BATCH}.validate_branch_and_remote", return_value="main")
     @patch(f"{MOD_BATCH}.load_workspace", return_value=[])
     @patch(f"{MOD_BATCH}.is_explicit_mode", return_value=True)
     @patch(f"{MOD_BATCH}.WorkspaceGraph")
@@ -2001,7 +2028,7 @@ class TestBatchReleaseReleasableCycle:
         batch = MagicMock()
         batch.section_type = "releasables"
         batch.packages = {"core": MagicMock()}
-        mocks[2].return_value = batch
+        mocks[5].return_value = batch
 
         graph_inst = MagicMock()
         graph_inst.topological_order.side_effect = CycleError("cycle!")
@@ -2020,10 +2047,14 @@ class TestBatchReleaseReleasableNoMembers:
     @patch(f"{MOD_BATCH}.find_workspace_root", return_value="/ws")
     @patch(f"{MOD_BATCH}.get_batch_release_file_path", return_value="/ws/batch.toml")
     @patch(f"{MOD_BATCH}.read_batch_release_file")
+    @patch(f"{MOD_BATCH}.validate_gh_cli")
+    @patch(f"{MOD_BATCH}.validate_clean_tree", return_value=set())
+    @patch(f"{MOD_BATCH}.validate_branch_and_remote", return_value="main")
     @patch(f"{MOD_BATCH}.load_workspace", return_value=[])
     @patch(f"{MOD_BATCH}.is_explicit_mode", return_value=True)
     @patch(f"{MOD_BATCH}.WorkspaceGraph")
-    def test_no_members(self, mock_graph, *mocks):
+    @patch(f"{MOD_BATCH}.rlsbl_lock")
+    def test_no_members(self, _mock_lock, mock_graph, *mocks):
         from rlsbl.commands.monorepo.batch_release import _cmd_batch_release
 
         rc = MagicMock()
@@ -2033,7 +2064,7 @@ class TestBatchReleaseReleasableNoMembers:
         batch = MagicMock()
         batch.section_type = "releasables"
         batch.packages = {"core": rc}
-        mocks[2].return_value = batch
+        mocks[5].return_value = batch
 
         graph_inst = MagicMock()
         graph_inst.topological_order.return_value = []
@@ -2053,10 +2084,14 @@ class TestBatchReleaseReleasableFailure:
     @patch(f"{MOD_BATCH}.find_workspace_root", return_value="/ws")
     @patch(f"{MOD_BATCH}.get_batch_release_file_path", return_value="/ws/batch.toml")
     @patch(f"{MOD_BATCH}.read_batch_release_file")
+    @patch(f"{MOD_BATCH}.validate_gh_cli")
+    @patch(f"{MOD_BATCH}.validate_clean_tree", return_value=set())
+    @patch(f"{MOD_BATCH}.validate_branch_and_remote", return_value="main")
     @patch(f"{MOD_BATCH}.load_workspace", return_value=[])
     @patch(f"{MOD_BATCH}.is_explicit_mode", return_value=True)
     @patch(f"{MOD_BATCH}.WorkspaceGraph")
-    def test_releasable_release_failure(self, mock_graph, *mocks):
+    @patch(f"{MOD_BATCH}.rlsbl_lock")
+    def test_releasable_release_failure(self, _mock_lock, mock_graph, *mocks):
         from rlsbl.commands.monorepo.batch_release import _cmd_batch_release
 
         rc = MagicMock()
@@ -2066,7 +2101,7 @@ class TestBatchReleaseReleasableFailure:
         batch = MagicMock()
         batch.section_type = "releasables"
         batch.packages = {"core": rc}
-        mocks[2].return_value = batch
+        mocks[5].return_value = batch
 
         graph_inst = MagicMock()
         graph_inst.topological_order.return_value = ["pkg-a"]
