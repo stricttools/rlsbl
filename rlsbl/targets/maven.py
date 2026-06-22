@@ -13,7 +13,7 @@ class MavenTarget(BaseTarget):
     """Release target for Maven/Gradle (Java/Kotlin) projects."""
 
     detection_files = ("build.gradle.kts", "build.gradle", "pom.xml")
-    capabilities = frozenset({"read_name", "ci_templates"})
+    capabilities = frozenset({"read_name", "read_metadata", "ci_templates"})
     ecosystem = "Java / Maven"
 
     @property
@@ -73,8 +73,134 @@ class MavenTarget(BaseTarget):
         return self._read_project_name(dir_path)
 
     def read_metadata(self, dir_path):
-        """Maven/Gradle metadata extraction not yet implemented."""
+        """Read metadata from pom.xml, build.gradle.kts, or build.gradle.
+
+        Extracts available fields:
+        - POM: groupId, artifactId, version, name, description, url, licenses
+        - Gradle: group, version, description
+
+        Returns a dict with string keys and values. Only fields that are
+        present in the build file are included.
+        """
+        # Try pom.xml first (richest metadata)
+        pom_path = os.path.join(dir_path, "pom.xml")
+        if os.path.isfile(pom_path):
+            result = self._read_pom_metadata(pom_path)
+            if result:
+                return result
+
+        # Try build.gradle.kts
+        kts_path = os.path.join(dir_path, "build.gradle.kts")
+        if os.path.isfile(kts_path):
+            return self._read_gradle_metadata(kts_path, kts=True)
+
+        # Try build.gradle (Groovy)
+        groovy_path = os.path.join(dir_path, "build.gradle")
+        if os.path.isfile(groovy_path):
+            return self._read_gradle_metadata(groovy_path, kts=False)
+
         return {}
+
+    def _read_pom_metadata(self, pom_path):
+        """Extract metadata from a pom.xml file."""
+        ns = {"m": "http://maven.apache.org/POM/4.0.0"}
+        try:
+            tree = ET.parse(pom_path)
+        except ET.ParseError:
+            return {}
+        root = tree.getroot()
+
+        result = {}
+
+        def _find_text(tag):
+            elem = root.find(f"m:{tag}", ns)
+            if elem is None:
+                elem = root.find(tag)
+            if elem is not None and elem.text:
+                return elem.text.strip()
+            return None
+
+        group_id = _find_text("groupId")
+        if group_id:
+            result["groupId"] = group_id
+
+        artifact_id = _find_text("artifactId")
+        if artifact_id:
+            result["artifactId"] = artifact_id
+
+        version = _find_text("version")
+        if version:
+            result["version"] = version
+
+        name = _find_text("name")
+        if name:
+            result["name"] = name
+
+        description = _find_text("description")
+        if description:
+            result["description"] = description
+
+        url = _find_text("url")
+        if url:
+            result["url"] = url
+
+        # Extract licenses: look for <licenses><license><name>...</name></license></licenses>
+        licenses_elem = root.find("m:licenses", ns)
+        if licenses_elem is None:
+            licenses_elem = root.find("licenses")
+        if licenses_elem is not None:
+            license_names = []
+            for lic in licenses_elem:
+                # Handle both namespaced and non-namespaced
+                lic_name = lic.find("m:name", ns)
+                if lic_name is None:
+                    lic_name = lic.find("name")
+                if lic_name is not None and lic_name.text:
+                    license_names.append(lic_name.text.strip())
+            if license_names:
+                result["license"] = ", ".join(license_names)
+
+        return result
+
+    @staticmethod
+    def _read_gradle_metadata(gradle_path, *, kts):
+        """Extract metadata from a build.gradle or build.gradle.kts file."""
+        try:
+            with open(gradle_path, "r", encoding="utf-8") as f:
+                content = f.read()
+        except (OSError, UnicodeDecodeError):
+            return {}
+
+        result = {}
+
+        if kts:
+            # Kotlin DSL: group = "com.example"
+            group_m = re.search(r'group\s*=\s*"([^"]+)"', content)
+            if group_m:
+                result["group"] = group_m.group(1)
+
+            version_m = re.search(r'version\s*=\s*"([^"]+)"', content)
+            if version_m:
+                result["version"] = version_m.group(1)
+
+            desc_m = re.search(r'description\s*=\s*"([^"]+)"', content)
+            if desc_m:
+                result["description"] = desc_m.group(1)
+        else:
+            # Groovy DSL: group = 'com.example' or group 'com.example'
+            group_m = re.search(r"""group\s*=?\s*['"]([^'"]+)['"]""", content)
+            if group_m:
+                result["group"] = group_m.group(1)
+
+            version_m = re.search(r"""version\s*=?\s*['"]([^'"]+)['"]""", content)
+            if version_m:
+                result["version"] = version_m.group(1)
+
+            desc_m = re.search(r"""description\s*=?\s*['"]([^'"]+)['"]""", content)
+            if desc_m:
+                result["description"] = desc_m.group(1)
+
+        return result
 
     def _is_android_app(self, dir_path):
         """Check if a gradle file declares the Android application plugin."""
