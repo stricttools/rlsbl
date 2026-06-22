@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: {{action "actions/checkout"}}
       - uses: {{action "astral-sh/setup-uv"}}
-      - run: uv build
+      - run: uv build --out-dir dist
       - uses: {{action "pypa/gh-action-pypi-publish"}}
         with:
           skip-existing: true
