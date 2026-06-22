@@ -1086,6 +1086,53 @@ def cmd_mono_extract_releasable(dry_run, releasable_name, target_path, **_kwargs
         print(f"  Changelog: {result['entries_migrated']} entries in {result['files_written']} files")
 
 
+@mono.command(name="migrate-releasable", help="Migrate a releasable from per-package release state to the releasable model. Detects current state, consolidates per-package changelogs and versions into the releasable directory, creates a releasable-format migration tag, and removes orphaned per-package .rlsbl/changes/ and .rlsbl/releases/ directories. Requires the workspace to be in explicit mode (with [[releasables]] in workspace.toml).")
+@strictcli.arg(name="releasable_name", help="Name of the releasable group in workspace.toml to migrate")
+def cmd_mono_migrate_releasable(dry_run, yes, releasable_name, **_kwargs):
+    root = _require_project_root()
+    from .workspace import find_workspace_root
+    ws_root = find_workspace_root(str(root))
+    if ws_root is None:
+        print("Error: No workspace found. Run 'rlsbl monorepo init' first.", file=sys.stderr)
+        sys.exit(1)
+    from .releasable_migration import cmd_migrate_releasable
+    try:
+        result = cmd_migrate_releasable(
+            ws_root, releasable_name, dry_run=dry_run, yes=yes,
+        )
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    if dry_run:
+        members = ", ".join(result.get("members", []))
+        print(f"Would migrate releasable '{releasable_name}'")
+        print(f"  Members: {members}")
+        print(f"  Tag format: {result.get('tag_format', 'N/A')}")
+        # Summarize state
+        state = result.get("state", {})
+        for proj in state.get("projects", []):
+            if proj.get("has_changelog"):
+                print(f"  {proj['name']}: {proj['unreleased_entry_count']} unreleased entries")
+    else:
+        changelogs = result.get("changelogs") or {}
+        versions = result.get("versions") or {}
+        tag = result.get("tag") or {}
+        cleanup = result.get("cleanup") or []
+
+        print(f"Migrated releasable '{releasable_name}'")
+        print(f"  Changelogs merged: {changelogs.get('entries_merged', 0)} entries from {', '.join(changelogs.get('source_projects', []))}")
+        print(f"  Version: {versions.get('version', 'N/A')} ({versions.get('status', 'N/A')})")
+        if tag.get("tag"):
+            print(f"  Tag created: {tag['tag']} (from {tag.get('source_tag', 'N/A')})")
+        elif tag.get("status") == "no_tags":
+            print("  Tag: no per-package tags found, skipped")
+        if tag.get("skipped_members"):
+            print(f"  Skipped members (no scoped tag): {', '.join(tag['skipped_members'])}")
+        if cleanup:
+            print(f"  Cleaned up: {len(cleanup)} per-package directories")
+
+
 # ---------------------------------------------------------------------------
 # dev group
 # ---------------------------------------------------------------------------
