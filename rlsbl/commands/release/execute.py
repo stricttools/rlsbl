@@ -165,6 +165,7 @@ _LOCKFILE_SPECS = [
     ("package-lock.json", "npm", ["npm", "install", "--package-lock-only"], None),
     ("go.sum", "go", ["go", "mod", "tidy"], None),
     ("go.work.sum", "go", ["go", "work", "sync"], "go.work"),
+    ("gradle.lockfile", "gradle", ["./gradlew", "dependencies", "--write-locks"], None),
 ]
 
 _LOCKFILE_SYNC_TIMEOUT = 30

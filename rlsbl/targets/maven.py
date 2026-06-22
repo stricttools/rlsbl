@@ -1,8 +1,12 @@
-"""Maven and Gradle release target supporting version management across pom.xml, build.gradle, build.gradle.kts, and gradle.properties files."""
+"""Maven and Gradle release target supporting version management across pom.xml, build.gradle, build.gradle.kts, gradle.properties, and gradle/libs.versions.toml files."""
 
+import json
 import os
 import re
+import subprocess
 import xml.etree.ElementTree as ET
+
+import tomlkit
 
 from .base import BaseTarget
 from ..errors import VersionError
@@ -229,16 +233,37 @@ class MavenTarget(BaseTarget):
             or os.path.exists(os.path.join(dir_path, "pom.xml"))
         )
 
+    @staticmethod
+    def _load_version_catalog_key(dir_path):
+        """Load the version_catalog_key from .rlsbl/config.json.
+
+        Returns the key string or raises VersionError if not configured.
+        """
+        config_path = os.path.join(dir_path, ".rlsbl", "config.json")
+        if not os.path.exists(config_path):
+            raise VersionError(
+                "Gradle version catalog detected but no .rlsbl/config.json found. "
+                'Set "version_catalog_key" in config to specify which [versions] '
+                "entry holds the project version."
+            )
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = json.load(f)
+        key = config.get("version_catalog_key")
+        if not key:
+            raise VersionError(
+                "Gradle version catalog detected but version_catalog_key is not set "
+                "in .rlsbl/config.json. Add a version_catalog_key field specifying "
+                "which [versions] entry holds the project version "
+                '(e.g., "version_catalog_key": "app-version").'
+            )
+        return key
+
     def _find_version_file(self, dir_path):
         """Return (filepath, format) tuple for the version source."""
-        # Hard error if Gradle version catalogs are present
+        # Priority 0: Gradle version catalog
         catalog_path = os.path.join(dir_path, "gradle", "libs.versions.toml")
         if os.path.exists(catalog_path):
-            raise VersionError(
-                f"Gradle version catalog detected at {catalog_path}. "
-                "Version catalog projects are not yet supported. "
-                "Support will be added in Phase 8a."
-            )
+            return catalog_path, "version_catalog"
 
         # Priority 1: gradle.properties
         gp = os.path.join(dir_path, "gradle.properties")
@@ -265,11 +290,88 @@ class MavenTarget(BaseTarget):
 
         return None, None
 
+    def _read_version_catalog(self, dir_path, catalog_path):
+        """Read version from a Gradle version catalog (libs.versions.toml).
+
+        Requires version_catalog_key in .rlsbl/config.json to specify which
+        [versions] entry holds the project version.
+        """
+        key = self._load_version_catalog_key(dir_path)
+
+        with open(catalog_path, "r", encoding="utf-8") as f:
+            doc = tomlkit.load(f)
+
+        versions = doc.get("versions")
+        if versions is None:
+            raise VersionError(
+                f"No [versions] section found in {catalog_path}"
+            )
+
+        if key not in versions:
+            raise VersionError(
+                f"Key {key!r} not found in [versions] section of {catalog_path}"
+            )
+
+        value = versions[key]
+        # Rich version declarations are TOML tables/inline-tables, not strings
+        if isinstance(value, dict):
+            raise VersionError(
+                f"Rich version declaration for {key!r} in {catalog_path}. "
+                "rlsbl cannot write complex version objects "
+                "(e.g., {{strictly = ...}}, {{require = ...}}). "
+                "Use a plain string version instead."
+            )
+
+        return str(value)
+
+    def _write_version_catalog(self, dir_path, catalog_path, version):
+        """Write version to a Gradle version catalog (libs.versions.toml).
+
+        Returns the relative path of the modified file.
+        """
+        key = self._load_version_catalog_key(dir_path)
+
+        with open(catalog_path, "r", encoding="utf-8") as f:
+            doc = tomlkit.load(f)
+
+        versions = doc.get("versions")
+        if versions is None:
+            raise VersionError(
+                f"No [versions] section found in {catalog_path}"
+            )
+
+        if key not in versions:
+            raise VersionError(
+                f"Key {key!r} not found in [versions] section of {catalog_path}"
+            )
+
+        current = versions[key]
+        if isinstance(current, dict):
+            raise VersionError(
+                f"Rich version declaration for {key!r} in {catalog_path}. "
+                "rlsbl cannot write complex version objects "
+                "(e.g., {{strictly = ...}}, {{require = ...}}). "
+                "Use a plain string version instead."
+            )
+
+        versions[key] = version
+
+        # Atomic write
+        tmp_path = catalog_path + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            tomlkit.dump(doc, f)
+        os.replace(tmp_path, catalog_path)
+
+        return os.path.relpath(catalog_path, dir_path)
+
     def read_version(self, dir_path):
         """Read version from the detected version source."""
         filepath, fmt = self._find_version_file(dir_path)
         if filepath is None:
             raise VersionError(f"No version source found in {dir_path}")
+
+        if fmt == "version_catalog":
+            return self._read_version_catalog(dir_path, filepath)
 
         with open(filepath, "r", encoding="utf-8") as f:
             content = f.read()
@@ -321,6 +423,10 @@ class MavenTarget(BaseTarget):
         filepath, fmt = self._find_version_file(dir_path)
         if filepath is None:
             raise VersionError(f"No version source found in {dir_path}")
+
+        if fmt == "version_catalog":
+            rel = self._write_version_catalog(dir_path, filepath, version)
+            return [rel]
 
         rel_path = os.path.relpath(filepath, dir_path)
 
@@ -429,3 +535,63 @@ class MavenTarget(BaseTarget):
 
     def get_project_init_hint(self):
         return 'Run "gradle init" or create a pom.xml first'
+
+    def build(self, dir_path, version):
+        """Run the project build step.
+
+        Uses ./gradlew build for Gradle projects, mvn package for Maven.
+        """
+        gradlew = os.path.join(dir_path, "gradlew")
+        if os.path.exists(gradlew):
+            result = subprocess.run(
+                ["./gradlew", "build"], cwd=dir_path,
+                capture_output=True, text=True,
+            )
+            if result.returncode != 0:
+                raise RuntimeError(
+                    f"./gradlew build failed (exit {result.returncode}):\n"
+                    f"{result.stderr}"
+                )
+            return
+
+        pom_path = os.path.join(dir_path, "pom.xml")
+        if os.path.exists(pom_path):
+            result = subprocess.run(
+                ["mvn", "package"], cwd=dir_path,
+                capture_output=True, text=True,
+            )
+            if result.returncode != 0:
+                raise RuntimeError(
+                    f"mvn package failed (exit {result.returncode}):\n"
+                    f"{result.stderr}"
+                )
+            return
+
+    @staticmethod
+    def detect_lint_command(dir_path):
+        """Detect the appropriate lint command for a Gradle project.
+
+        Checks build.gradle.kts and build.gradle for lint plugins:
+        - detekt plugin -> ./gradlew detekt
+        - checkstyle plugin -> ./gradlew checkstyleMain
+        - neither -> ./gradlew check (fallback)
+
+        Returns a list of command args, or None if no Gradle wrapper found.
+        """
+        gradlew = os.path.join(dir_path, "gradlew")
+        if not os.path.exists(gradlew):
+            return None
+
+        # Check build files for lint plugins
+        for build_file in ("build.gradle.kts", "build.gradle"):
+            path = os.path.join(dir_path, build_file)
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                if "detekt" in content:
+                    return ["./gradlew", "detekt"]
+                if "checkstyle" in content:
+                    return ["./gradlew", "checkstyleMain"]
+
+        # Fallback
+        return ["./gradlew", "check"]

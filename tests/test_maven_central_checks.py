@@ -414,32 +414,32 @@ class TestMavenTestExecutionMaven:
 
 
 # ---------------------------------------------------------------------------
-# Phase 6e: Version catalog detection
+# Phase 6e: Version catalog detection (updated for Phase 8a support)
 # ---------------------------------------------------------------------------
 
 class TestVersionCatalogDetection:
-    """Gradle version catalog detection raises hard error."""
+    """Gradle version catalog detection requires version_catalog_key config."""
 
-    def test_version_catalog_raises_error(self, tmp_project):
-        """Presence of gradle/libs.versions.toml raises VersionError."""
+    def test_version_catalog_requires_config_key(self, tmp_project):
+        """Presence of gradle/libs.versions.toml without config raises VersionError."""
         gradle_dir = tmp_project / "gradle"
         gradle_dir.mkdir()
         (gradle_dir / "libs.versions.toml").write_text("[versions]\n")
         (tmp_project / "build.gradle.kts").write_text('version = "1.0.0"\n')
 
         target = MavenTarget()
-        with pytest.raises(VersionError, match="version catalog"):
+        with pytest.raises(VersionError, match="version_catalog_key"):
             target.read_version(str(tmp_project))
 
-    def test_version_catalog_raises_on_write(self, tmp_project):
-        """write_version also raises when version catalog is present."""
+    def test_version_catalog_requires_config_key_on_write(self, tmp_project):
+        """write_version also requires config when version catalog is present."""
         gradle_dir = tmp_project / "gradle"
         gradle_dir.mkdir()
         (gradle_dir / "libs.versions.toml").write_text("[versions]\n")
         (tmp_project / "build.gradle.kts").write_text('version = "1.0.0"\n')
 
         target = MavenTarget()
-        with pytest.raises(VersionError, match="version catalog"):
+        with pytest.raises(VersionError, match="version_catalog_key"):
             target.write_version(str(tmp_project), "2.0.0", None)
 
     def test_no_catalog_no_error(self, tmp_project):
@@ -460,13 +460,19 @@ class TestVersionCatalogDetection:
         version = target.read_version(str(tmp_project))
         assert version == "1.0.0"
 
-    def test_version_catalog_error_message_mentions_phase_8a(self, tmp_project):
-        """Error message mentions Phase 8a for future support."""
+    def test_version_catalog_with_config_reads_version(self, tmp_project):
+        """Version catalog reads correctly when config key is set."""
         gradle_dir = tmp_project / "gradle"
         gradle_dir.mkdir()
-        (gradle_dir / "libs.versions.toml").write_text("[versions]\n")
+        (gradle_dir / "libs.versions.toml").write_text(
+            '[versions]\napp-version = "2.5.0"\n'
+        )
         (tmp_project / "build.gradle.kts").write_text('version = "1.0.0"\n')
+        rlsbl_dir = tmp_project / ".rlsbl"
+        rlsbl_dir.mkdir()
+        (rlsbl_dir / "config.json").write_text(
+            '{"version_catalog_key": "app-version"}'
+        )
 
         target = MavenTarget()
-        with pytest.raises(VersionError, match="Phase 8a"):
-            target.read_version(str(tmp_project))
+        assert target.read_version(str(tmp_project)) == "2.5.0"
