@@ -9,7 +9,9 @@ Covers:
 
 import json
 import os
+import shutil
 import subprocess
+from unittest.mock import patch
 
 import pytest
 
@@ -30,6 +32,16 @@ from rlsbl.workspace import (
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _mock_saferm_dir(path, project_name, subdir_name):
+    """Mock _saferm_dir that performs actual directory deletion."""
+    shutil.rmtree(path)
+
+
+def _mock_saferm_file(path, project_name, file_name):
+    """Mock _saferm_file that performs actual file deletion."""
+    os.unlink(path)
 
 
 def _init_git(path):
@@ -355,7 +367,9 @@ class TestMigrateReleasableDryRun:
 class TestMigrateReleasableFullFlow:
     """Full migration flow on a test monorepo."""
 
-    def test_full_migration(self, tmp_project):
+    @patch("rlsbl.releasable_cleanup._saferm_file", side_effect=_mock_saferm_file)
+    @patch("rlsbl.releasable_cleanup._saferm_dir", side_effect=_mock_saferm_dir)
+    def test_full_migration(self, mock_dir, mock_file, tmp_project):
         """Complete migration: changelogs, versions, tag, cleanup."""
         setup = _setup_migration_monorepo(tmp_project)
         root = str(setup["root"])
@@ -391,7 +405,9 @@ class TestMigrateReleasableFullFlow:
         )
         assert check.returncode == 0
 
-    def test_full_migration_cleans_per_package_state(self, tmp_project):
+    @patch("rlsbl.releasable_cleanup._saferm_file", side_effect=_mock_saferm_file)
+    @patch("rlsbl.releasable_cleanup._saferm_dir", side_effect=_mock_saferm_dir)
+    def test_full_migration_cleans_per_package_state(self, mock_dir, mock_file, tmp_project):
         """Migration removes per-package .rlsbl/changes/ and .rlsbl/releases/."""
         setup = _setup_migration_monorepo(tmp_project)
         root = str(setup["root"])
@@ -420,7 +436,9 @@ class TestMigrateReleasableFullFlow:
             assert not os.path.isdir(changes_path)
             assert not os.path.isdir(releases_path)
 
-    def test_migration_with_partial_scoped_tags(self, tmp_project):
+    @patch("rlsbl.releasable_cleanup._saferm_file", side_effect=_mock_saferm_file)
+    @patch("rlsbl.releasable_cleanup._saferm_dir", side_effect=_mock_saferm_dir)
+    def test_migration_with_partial_scoped_tags(self, mock_dir, mock_file, tmp_project):
         """Migration works when only some members have scoped tags."""
         setup = _setup_migration_monorepo(tmp_project, tag_a=True, tag_b=False)
         root = str(setup["root"])
@@ -433,7 +451,9 @@ class TestMigrateReleasableFullFlow:
         assert "b" in tag["skipped_members"]
         assert "a" in tag["member_tags"]
 
-    def test_migration_with_no_scoped_tags(self, tmp_project):
+    @patch("rlsbl.releasable_cleanup._saferm_file", side_effect=_mock_saferm_file)
+    @patch("rlsbl.releasable_cleanup._saferm_dir", side_effect=_mock_saferm_dir)
+    def test_migration_with_no_scoped_tags(self, mock_dir, mock_file, tmp_project):
         """Migration succeeds even with no scoped tags (tag step reports no_tags)."""
         setup = _setup_migration_monorepo(tmp_project, tag_a=False, tag_b=False)
         root = str(setup["root"])
