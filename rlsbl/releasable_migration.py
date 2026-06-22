@@ -8,11 +8,13 @@ Provides functions for Phase 10 of the releasable model redesign:
 - ``create_migration_tag()`` -- create releasable-format tag from last per-package tags
 """
 
+import json
 import os
 import subprocess
 
 from .changelog.files import get_changes_dir, read_unreleased, list_versioned_files
 from .changelog.schema import ChangelogEntry, serialize_entry, parse_jsonl
+from .config import read_json_config
 from .errors import WorkspaceError
 from .git_util import get_commit_files, file_matches_project
 from .targets import detect_targets, TARGETS
@@ -20,6 +22,7 @@ from .workspace import (
     Releasable,
     WorkspaceProject,
     get_releasable_changes_dir,
+    get_releasable_dir,
     is_explicit_mode,
     load_releasables,
     load_workspace,
@@ -135,13 +138,29 @@ def _read_project_version(project_path):
 # ---------------------------------------------------------------------------
 
 
-def consolidate_changelogs(workspace_root, releasable_name, member_projects):
+def consolidate_changelogs(workspace_root, releasable_name, member_projects,
+                           *, tag_format=None, version=None):
     """Merge member packages' unreleased.jsonl into per-releasable changelog.
 
     For each member project, reads their per-package unreleased.jsonl and
     merges all entries into the releasable's changes directory. Each entry
     gains a ``packages`` field listing which member packages are affected
     (derived from commit file paths via project path/watch matching).
+
+    Cross-package dedup: entries from different packages that reference the
+    exact same set of commits are merged into a single entry, combining
+    their ``packages`` lists. This prevents the same commit from appearing
+    in too many entries and violating ``max_entries_per_commit``.
+
+    Batch limit exclusions: per-package ``batch_limits.exclusions`` from
+    each member's ``.rlsbl/config.json`` are collected. After merging, any
+    consolidated entry that exceeds ``max_commits_per_entry`` (default 5)
+    gets a new exclusion auto-created in the releasable's config.
+
+    Consolidation-point tag: when ``tag_format`` and ``version`` are
+    provided, a tag is created at HEAD after writing the merged file. This
+    resets the unreleased range so that only post-consolidation commits
+    need coverage -- the merged entries cover pre-consolidation work.
 
     Historical versioned JSONL files are left in place (they are read-only
     records of past releases).
@@ -150,12 +169,19 @@ def consolidate_changelogs(workspace_root, releasable_name, member_projects):
         workspace_root: path to the monorepo root.
         releasable_name: name of the target releasable.
         member_projects: list of WorkspaceProject instances in this releasable.
+        tag_format: optional releasable tag format (e.g., "{name}@v{version}").
+            When provided with version, a consolidation-point tag is created
+            at HEAD.
+        version: optional version string for the consolidation-point tag.
 
     Returns:
         A dict with:
             - ``entries_merged`` (int): total entries written
             - ``source_projects`` (list[str]): projects that had entries
             - ``dest_path`` (str): path to the releasable's unreleased.jsonl
+            - ``duplicates_merged`` (int): entries merged due to identical commits
+            - ``exclusions_created`` (int): batch limit exclusions auto-created
+            - ``consolidation_tag`` (str or None): tag created at HEAD, if any
     """
     dest_changes_dir = get_releasable_changes_dir(workspace_root, releasable_name)
     os.makedirs(dest_changes_dir, exist_ok=True)
@@ -185,15 +211,37 @@ def consolidate_changelogs(workspace_root, releasable_name, member_projects):
                 )
                 all_entries.append(merged)
 
+    # Bug 3 fix: deduplicate entries with identical commit sets across packages.
+    # Group by frozenset of commits; merge entries with identical commit lists.
+    all_entries, duplicates_merged = _dedup_entries(all_entries)
+
     # Write all merged entries to the releasable's unreleased.jsonl
     lines = [serialize_entry(e) + "\n" for e in all_entries]
     with open(dest_path, "w", encoding="utf-8") as f:
         f.writelines(lines)
 
+    # Bug 2 fix: collect batch_limits exclusions from per-package configs
+    # and auto-create exclusions for entries exceeding max_commits_per_entry.
+    exclusions_created = _migrate_batch_exclusions(
+        workspace_root, releasable_name, member_projects, all_entries,
+    )
+
+    # Bug 1 fix: create a consolidation-point tag at HEAD so the unreleased
+    # range starts from this point. Pre-consolidation commits are covered by
+    # the merged entries; only post-consolidation commits need new coverage.
+    consolidation_tag = None
+    if tag_format and version:
+        consolidation_tag = _create_consolidation_tag(
+            workspace_root, releasable_name, tag_format, version,
+        )
+
     return {
         "entries_merged": len(all_entries),
         "source_projects": source_projects,
         "dest_path": dest_path,
+        "duplicates_merged": duplicates_merged,
+        "exclusions_created": exclusions_created,
+        "consolidation_tag": consolidation_tag,
     }
 
 
@@ -217,6 +265,160 @@ def _derive_packages_for_entry(entry, member_projects, workspace_root):
                 if file_matches_project(filepath, proj):
                     affected.add(proj.name)
     return sorted(affected)
+
+
+def _dedup_entries(entries):
+    """Deduplicate entries with identical commit sets.
+
+    Entries from different packages that reference the exact same set of
+    commits are merged into one entry, combining their ``packages`` lists.
+    When merging, the first user-facing entry's description and type win
+    (non-user-facing entries contribute only their packages).
+
+    Returns ``(deduped_entries, count_of_merges)`` where count_of_merges is
+    the number of entries that were folded into another (i.e.,
+    ``len(original) - len(deduped)``).
+    """
+    # Group entries by their commit set (as a frozen sorted tuple for order-
+    # independent matching).
+    groups = {}
+    for entry in entries:
+        key = tuple(sorted(entry.commits))
+        groups.setdefault(key, []).append(entry)
+
+    deduped = []
+    total_merged = 0
+    for _key, group in groups.items():
+        if len(group) == 1:
+            deduped.append(group[0])
+            continue
+
+        # Merge all entries in the group into one
+        total_merged += len(group) - 1
+        combined_packages = set()
+        # Pick the first user-facing entry for description/type; fall back
+        # to the first entry if none are user-facing.
+        base = None
+        for entry in group:
+            if entry.user_facing and base is None:
+                base = entry
+            if entry.packages:
+                combined_packages.update(entry.packages)
+        if base is None:
+            base = group[0]
+
+        merged = ChangelogEntry(
+            commits=base.commits,
+            user_facing=base.user_facing,
+            description=base.description,
+            type=base.type,
+            release_type=base.release_type,
+            packages=sorted(combined_packages) if combined_packages else base.packages,
+        )
+        deduped.append(merged)
+
+    return deduped, total_merged
+
+
+def _migrate_batch_exclusions(workspace_root, releasable_name,
+                              member_projects, entries):
+    """Collect per-package batch exclusions and create releasable-level ones.
+
+    Per-package exclusions reference ``(version, line_number)`` tuples that
+    become invalid after consolidation (line numbers change in the merged
+    file). Instead of carrying over stale exclusions, this function scans
+    the consolidated entries and auto-creates new exclusions for any entry
+    that exceeds ``max_commits_per_entry``.
+
+    Writes the exclusions to a ``config.json`` in the releasable's directory
+    (``<workspace>/.rlsbl-monorepo/releasables/<name>/config.json``).
+
+    Returns the number of exclusions created.
+    """
+    # Determine max_commits_per_entry from per-package configs (use the
+    # smallest value across members to be conservative).
+    max_commits = 5  # default
+    for proj in member_projects:
+        proj_config_path = os.path.join(
+            workspace_root, proj.path, ".rlsbl", "config.json",
+        )
+        proj_config = read_json_config(proj_config_path)
+        bl = proj_config.get("batch_limits", {})
+        if isinstance(bl, dict):
+            val = bl.get("max_commits_per_entry")
+            if isinstance(val, int) and not isinstance(val, bool) and val > 0:
+                max_commits = min(max_commits, val)
+
+    # Find entries that exceed the limit and need exclusions
+    new_exclusions = []
+    for i, entry in enumerate(entries):
+        if len(entry.commits) > max_commits:
+            new_exclusions.append({
+                "reason": "auto-created during changelog consolidation",
+                "entries": [{"version": "unreleased", "line": i + 1}],
+            })
+
+    if not new_exclusions:
+        return 0
+
+    # Write to the releasable's config.json
+    rel_dir = get_releasable_dir(workspace_root, releasable_name)
+    os.makedirs(rel_dir, exist_ok=True)
+    config_path = os.path.join(rel_dir, "config.json")
+    config = read_json_config(config_path)
+    bl = config.setdefault("batch_limits", {})
+    existing = bl.setdefault("exclusions", [])
+    existing.extend(new_exclusions)
+
+    tmp_path = config_path + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    os.replace(tmp_path, config_path)
+
+    return len(new_exclusions)
+
+
+def _create_consolidation_tag(workspace_root, releasable_name, tag_format,
+                              version):
+    """Create a consolidation-point tag at HEAD.
+
+    The tag uses the releasable's tag format and version, marking the
+    point where per-package changelogs were consolidated. This resets
+    the unreleased range (``<tag>..HEAD``) so only post-consolidation
+    commits need coverage.
+
+    Returns the tag name on success, None on failure.
+    """
+    tag = tag_format.format(name=releasable_name, version=version)
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=workspace_root,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode != 0:
+            return None
+        head_sha = result.stdout.strip()
+        if len(head_sha) != 40:
+            return None
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return None
+
+    try:
+        subprocess.run(
+            ["git", "tag", tag, head_sha],
+            cwd=workspace_root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError:
+        return None
+
+    return tag
 
 
 # ---------------------------------------------------------------------------
