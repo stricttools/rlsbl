@@ -1049,8 +1049,10 @@ def _run_release_mutating(state: ReleaseState):
         _print_stale_dep_advisory(monorepo_name, new_version, monorepo_root=monorepo_root)
 
     # Watch CI or print hint (uses SHA captured before post-release hooks).
+    # In batch-mode, the batch orchestrator handles watch after all packages
+    # are released, so skip both the watch call and the hint here.
     # Dry-run returns earlier (no push happens), but guard defensively.
-    if not flags.get("dry-run", False):
+    if not flags.get("dry-run", False) and not flags.get("batch-mode", False):
         if flags.get("watch"):
             log(f"Watching CI for {pushed_sha}...")
             from ..watch import run_cmd as watch_run_cmd

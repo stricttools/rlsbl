@@ -25,7 +25,7 @@ from ...release_file import (
 )
 from ...errors import ReleaseFileError
 from ...lock import rlsbl_lock
-from ...utils import commit_files
+from ...utils import commit_files, run
 from ...workspace import find_workspace_root, load_workspace, is_explicit_mode
 from ...workspace_graph import CycleError, WorkspaceGraph
 from ..release.validate import (
@@ -160,6 +160,12 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config, 
 
     log(f"Batch release: {len(release_order)} releasable(s)")
     log(f"Release order: {', '.join(release_order)}")
+
+    if dry_run:
+        for i, name in enumerate(release_order, 1):
+            rc = batch_config.packages[name]
+            log(f"  {i}. {name} ({rc.bump}) — {rc.description}")
+
     log("")
 
     released = []
@@ -189,10 +195,13 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config, 
                     "quiet": quiet,
                     "allow-dirty": flags.get("allow-dirty", False),
                     "skip-lock": True,
+                    "batch-mode": True,
                 }
                 pkg_ctx = create_context(Path(project_dir), workspace_root=Path(workspace_root))
                 run_cmd(release_config, release_flags, ctx=pkg_ctx)
                 released.append(rel_name)
+                if not dry_run:
+                    last_sha = run("git", ["rev-parse", "HEAD"])
             except SystemExit as e:
                 if e.code != 0:
                     print(
@@ -206,6 +215,14 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config, 
 
         if not dry_run and released:
             _finalize_batch_file(batch_path, log)
+
+            # Watch CI or print hint for the last release's commit
+            if flags.get("watch"):
+                log(f"Watching CI for {last_sha}...")
+                from ..watch import run_cmd as watch_run_cmd
+                watch_run_cmd(None, [last_sha], {})
+            else:
+                log(f"Watch CI: rlsbl watch {last_sha}")
 
     log(f"Batch release complete: {', '.join(released)}")
 
@@ -262,6 +279,12 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config, pro
 
     log(f"Batch release: {len(release_order)} package(s)")
     log(f"Release order: {', '.join(release_order)}")
+
+    if dry_run:
+        for i, name in enumerate(release_order, 1):
+            rc = batch_config.packages[name]
+            log(f"  {i}. {name} ({rc.bump}) — {rc.description}")
+
     log("")
 
     # Release each package in order
@@ -286,10 +309,13 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config, pro
                     "quiet": quiet,
                     "allow-dirty": flags.get("allow-dirty", False),
                     "skip-lock": True,
+                    "batch-mode": True,
                 }
                 pkg_ctx = create_context(Path(project_dir), workspace_root=Path(workspace_root))
                 run_cmd(release_config, release_flags, ctx=pkg_ctx)
                 released.append(pkg_name)
+                if not dry_run:
+                    last_sha = run("git", ["rev-parse", "HEAD"])
             except SystemExit as e:
                 if e.code != 0:
                     print(
@@ -304,6 +330,14 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config, pro
         # Finalize the batch release file (skip in dry-run)
         if not dry_run and released:
             _finalize_batch_file(batch_path, log)
+
+            # Watch CI or print hint for the last release's commit
+            if flags.get("watch"):
+                log(f"Watching CI for {last_sha}...")
+                from ..watch import run_cmd as watch_run_cmd
+                watch_run_cmd(None, [last_sha], {})
+            else:
+                log(f"Watch CI: rlsbl watch {last_sha}")
 
     log(f"Batch release complete: {', '.join(released)}")
 
