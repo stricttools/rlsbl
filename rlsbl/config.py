@@ -1,4 +1,13 @@
-"""Project configuration loading with layered precedence: CLI flags override project-level .rlsbl/config.json which overrides user-level defaults.
+"""Project configuration loading with layered precedence.
+
+Layers (highest to lowest priority):
+1. Per-package publish.json
+2. Per-package config.json
+3. Releasable publish.json
+4. Releasable config.json
+
+CLI flags override project-level .rlsbl/config.json which overrides
+user-level defaults.
 
 Publishing fields (targets, private, pipelines, push_timeout, tag) can live in
 either ``.rlsbl/config.json`` (legacy) or ``.rlsbl/publish.json`` (preferred).
@@ -13,6 +22,31 @@ from .errors import ConfigError
 
 # Fields that belong in publish.json (publishing-related configuration).
 PUBLISH_FIELDS = frozenset({"targets", "private", "pipelines", "push_timeout", "tag"})
+
+
+def merge_config(base, overlay):
+    """Merge two config dicts with shallow-replace, deep-merge for nested dicts.
+
+    Top-level keys in ``overlay`` replace those in ``base``, except when
+    both values are dicts -- in that case the nested dict is merged
+    recursively (overlay nested keys merge into base nested keys).
+
+    Keys present in ``base`` but absent in ``overlay`` are preserved.
+
+    Returns a new dict; neither input is mutated.
+    """
+    merged = dict(base)
+    for key, value in overlay.items():
+        if (
+            key in merged
+            and isinstance(merged[key], dict)
+            and isinstance(value, dict)
+        ):
+            # Deep merge for nested dicts
+            merged[key] = merge_config(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
 
 
 def load_env_file(path):
