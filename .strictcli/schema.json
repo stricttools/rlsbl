@@ -38,7 +38,7 @@
   },
   "project_id": "rlsbl",
   "name": "rlsbl",
-  "version": "0.79.2",
+  "version": "0.80.0",
   "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 32 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
   "global_flags": [
     {
@@ -996,6 +996,16 @@
               "help": "Name of the releasable group in workspace.toml to extract"
             }
           ]
+        },
+        "migrate-releasable": {
+          "name": "migrate-releasable",
+          "help": "Migrate a releasable from per-package release state to the releasable model. Detects current state, consolidates per-package changelogs and versions into the releasable directory, creates a releasable-format migration tag, and removes orphaned per-package .rlsbl/changes/ and .rlsbl/releases/ directories. Requires the workspace to be in explicit mode (with [[releasables]] in workspace.toml).",
+          "args": [
+            {
+              "name": "releasable_name",
+              "help": "Name of the releasable group in workspace.toml to migrate"
+            }
+          ]
         }
       }
     },
@@ -1564,6 +1574,17 @@
       "depends_on": [
         "prepush-changelog-coverage"
       ]
+    },
+    "maven-central-metadata": {
+      "tags": [
+        "quality",
+        "maven"
+      ],
+      "severity": "error",
+      "fast": false,
+      "pure": false,
+      "needs_network": false,
+      "depends_on": []
     }
   }
 }
