@@ -267,6 +267,14 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             run_release_hook("pre-checks", pre_checks_script, project_dir, hook_env, hook_timeout)
 
     _run_strictcli_schema_dump(flags, log, project_dir=project_dir)
+
+    # Snapshot dirty files before selfdoc runs so we can isolate files that
+    # selfdoc generates (excluding anything dirtied by pre-checks hooks or
+    # strictcli schema dump).  Only needed in non-dry-run mode.
+    if not flags.get("dry-run", False):
+        _pre_selfdoc_output = run("git", ["status", "--porcelain"])
+        _pre_selfdoc_dirty = parse_porcelain_paths(_pre_selfdoc_output) if _pre_selfdoc_output else set()
+
     _run_selfdoc_gen(flags, project_dir=project_dir)
     _run_selfdoc_check(flags, project_dir=project_dir)
 
@@ -282,12 +290,12 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     )
 
     # Commit selfdoc-generated files immediately so the tree is clean if later
-    # steps fail.  Compare dirty snapshot against pre_hook_dirty to isolate
-    # files produced by selfdoc gen/check/post_generate.
+    # steps fail.  Compare dirty snapshot against _pre_selfdoc_dirty to isolate
+    # files produced by selfdoc gen/check/post_generate only.
     if not flags.get("dry-run", False):
         _post_selfdoc_output = run("git", ["status", "--porcelain"])
         _post_selfdoc_dirty = parse_porcelain_paths(_post_selfdoc_output) if _post_selfdoc_output else set()
-        _selfdoc_generated = _post_selfdoc_dirty - pre_hook_dirty
+        _selfdoc_generated = _post_selfdoc_dirty - _pre_selfdoc_dirty
         if _selfdoc_generated:
             commit_files(
                 "selfdoc: regenerate",

@@ -250,7 +250,8 @@ class TestWatchInvokedAfterRelease:
 
         fake_sha = "abc123def456"
         # mock_run calls: fetch, rev-list, tag-l (current tag exists),
-        # tag-l (new tag), pre-hook status, post-hook status,
+        # tag-l (new tag), pre-hook status, post-selfdoc status,
+        # post-hook status,
         # status --porcelain (baseline), status --porcelain (re-check),
         # rev-parse HEAD (pre-release sha), status --porcelain (backfilled
         # .md detection), tag, push tag,
@@ -261,6 +262,8 @@ class TestWatchInvokedAfterRelease:
             "v1.0.0", # tag -l current (exists)
             "",       # tag -l new (doesn't exist)
             "",       # pre-hook dirty snapshot
+            "",       # pre-selfdoc dirty snapshot
+            "",       # post-selfdoc dirty snapshot
             "",       # post-hook dirty snapshot
             "",       # baseline dirty snapshot
             "/tmp/fake-repo",  # git rev-parse --show-toplevel (for vpath)
@@ -344,6 +347,8 @@ class TestWatchInvokedAfterRelease:
             "v1.0.0", # tag -l current
             "",       # tag -l new
             "",       # pre-hook status
+            "",       # pre-selfdoc status
+            "",       # post-selfdoc status
             "",       # post-hook status
             "",       # baseline status
             "/tmp/fake-repo",  # git rev-parse --show-toplevel (for vpath)

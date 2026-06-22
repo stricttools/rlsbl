@@ -131,7 +131,7 @@ class TestPreReleaseHookOutput:
     ):
         """A hook exiting with code 2 produces an error mentioning 'exited with code 2'."""
         _setup_project(tmp_project, "pre-release.sh", "#!/bin/bash\nexit 2\n")
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
+        mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", ""]
 
         with patch("rlsbl.commands.release.subprocess") as mock_sp:
             mock_sp.run.side_effect = subprocess.CalledProcessError(2, "bash")
@@ -390,7 +390,7 @@ class TestHookTimeout:
         """When a pre-release hook times out, the error message includes the configured seconds."""
         monkeypatch.setenv("RLSBL_HOOK_TIMEOUT", "45")
         _setup_project(tmp_project, "pre-release.sh", "#!/bin/bash\nsleep 999\n")
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
+        mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", ""]
 
         with patch("rlsbl.commands.release.subprocess") as mock_sp:
             mock_sp.run.side_effect = subprocess.TimeoutExpired("bash", 45)

@@ -90,6 +90,8 @@ class TestReleaseValidatedCache:
             "v1.0.0",         # git tag -l v1.0.0 (exists -> bump)
             "",               # git tag -l v1.0.1 (doesn't exist -> proceed)
             "",               # git status --porcelain (pre-hook snapshot)
+            "",               # git status --porcelain (pre-selfdoc snapshot)
+            "",               # git status --porcelain (post-selfdoc snapshot)
             "",               # git status --porcelain (post-hook snapshot)
             # _run_release_mutating phase:
             "",                 # git status --porcelain (baseline snapshot)
@@ -146,6 +148,8 @@ class TestReleaseValidatedCache:
             "v1.0.0",         # git tag -l v1.0.0 (exists -> bump)
             "",               # git tag -l v1.0.1 (doesn't exist -> proceed)
             "",               # git status --porcelain (pre-hook snapshot)
+            "",               # git status --porcelain (pre-selfdoc snapshot)
+            "",               # git status --porcelain (post-selfdoc snapshot)
             "",               # git status --porcelain (post-hook snapshot)
             # _run_release_mutating phase:
             "",                 # git status --porcelain (baseline snapshot)
