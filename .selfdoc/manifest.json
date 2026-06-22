@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.79.1",
+  "version": "0.79.2",
   "description": null,
   "language": "python",
   "base_url": "https://rlsbl.smmh.dev",
@@ -405,6 +405,11 @@
     {
       "path": "rlsbl-commands-release-rollback.md",
       "title": "rlsbl.commands.release.rollback",
+      "type": "doc"
+    },
+    {
+      "path": "rlsbl-commands-release-shared.md",
+      "title": "rlsbl.commands.release.shared",
       "type": "doc"
     },
     {
@@ -849,5 +854,5 @@
     }
   ],
   "posts": [],
-  "last_gen": "2026-06-22T09:04:49.221161+00:00"
+  "last_gen": "2026-06-22T11:49:25.455620+00:00"
 }

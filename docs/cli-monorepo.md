@@ -149,6 +149,8 @@ Execute a batch release of multiple monorepo packages in topological order. Read
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--allow-dirty` |  | bool |  |  | Skip the clean working tree check and allow releasing with uncommitted changes |
+| `--watch` |  | bool |  |  | After batch release, automatically watch CI runs to completion |
+| `--no-watch` |  | bool |  |  | After batch release, print the watch command hint without watching |
 
 ## monorepo release-init
 

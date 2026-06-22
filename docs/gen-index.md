@@ -57,6 +57,7 @@ order: 90
 - [rlsbl.commands.release.hooks](rlsbl-commands-release-hooks.html)
 - [rlsbl.commands.release.publish](rlsbl-commands-release-publish.html)
 - [rlsbl.commands.release.rollback](rlsbl-commands-release-rollback.html)
+- [rlsbl.commands.release.shared](rlsbl-commands-release-shared.html)
 - [rlsbl.commands.release.validate](rlsbl-commands-release-validate.html)
 - [rlsbl.commands.release_init](rlsbl-commands-release_init.html)
 - [rlsbl.commands.release_retry](rlsbl-commands-release_retry.html)

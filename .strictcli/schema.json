@@ -38,7 +38,7 @@
   },
   "project_id": "rlsbl",
   "name": "rlsbl",
-  "version": "0.79.1",
+  "version": "0.79.2",
   "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 32 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
   "global_flags": [
     {
@@ -918,6 +918,20 @@
               "help": "Skip the clean working tree check and allow releasing with uncommitted changes",
               "default": false,
               "negatable": true
+            },
+            {
+              "name": "watch",
+              "type": "bool",
+              "help": "After batch release, automatically watch CI runs to completion",
+              "default": false,
+              "negatable": false
+            },
+            {
+              "name": "no-watch",
+              "type": "bool",
+              "help": "After batch release, print the watch command hint without watching",
+              "default": false,
+              "negatable": false
             }
           ]
         },
