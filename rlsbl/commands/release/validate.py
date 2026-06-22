@@ -655,11 +655,21 @@ def _abort_on_scaffold_conflicts(project_dir):
         raise ReleaseValidationError("Unresolved scaffold conflict markers")
 
 
+def _schema_dump_command(entry_point: str, lang: str) -> list[str]:
+    """Build the command list for running --dump-schema based on language."""
+    if lang == "python":
+        return ["uv", "run", entry_point, "--dump-schema"]
+    elif lang == "go":
+        return ["go", "run", entry_point, "--dump-schema"]
+    else:
+        raise ValueError(f"unsupported strictcli language: {lang}")
+
+
 def _run_strictcli_schema_dump(flags, log, project_dir="."):
     """Run --dump-schema for strictcli projects to regenerate .strictcli/schema.json.
 
-    Detects strictcli usage via pyproject.toml, runs the entry point with
-    --dump-schema, and logs the result. The generated file is picked up by
+    Detects strictcli usage via pyproject.toml or go.mod, runs the entry point
+    with --dump-schema, and logs the result. The generated file is picked up by
     the hook-generated file mechanism (pre/post hook dirty snapshots).
 
     Non-fatal: a failing dump command prints a warning but does not abort.
@@ -670,8 +680,9 @@ def _run_strictcli_schema_dump(flags, log, project_dir="."):
         check_dir = project_dir
         result = detect_strictcli(check_dir)
         if result:
-            entry_point, _ = result
-            log(f"Would run: uv run {entry_point} --dump-schema")
+            entry_point, lang = result
+            cmd = _schema_dump_command(entry_point, lang)
+            log(f"Would run: {' '.join(cmd)}")
         return
 
     check_dir = project_dir
@@ -680,11 +691,12 @@ def _run_strictcli_schema_dump(flags, log, project_dir="."):
         return
 
     entry_point, lang = result
+    cmd = _schema_dump_command(entry_point, lang)
     log(f"Dumping strictcli schema ({entry_point})...")
 
     try:
         _subprocess.run(
-            ["uv", "run", entry_point, "--dump-schema"],
+            cmd,
             cwd=project_dir,
             timeout=_SCHEMA_DUMP_TIMEOUT,
         )
