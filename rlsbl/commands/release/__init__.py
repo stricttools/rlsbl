@@ -67,6 +67,7 @@ from .hooks import (
     build_hook_env, run_releasable_hooks,
     run_releasable_tests, run_releasable_lint,
     is_releasable_hook_customized,
+    warn_if_hook_needs_migration,
 )
 from .execute import (
     _bump_selfdoc_version,
@@ -329,6 +330,11 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     else:
         # Built-in tests and lint (skipped when pre-release hook is customized)
         pre_release_script = os.path.join(project_dir, ".rlsbl", "hooks", "pre-release.sh")
+
+        # Backward compatibility bridge: warn if customized script exists
+        # without config-driven hook entries
+        warn_if_hook_needs_migration(config, pre_release_script)
+
         hook_is_customized = is_hook_customized(config, pre_release_script)
 
         if hook_is_customized:

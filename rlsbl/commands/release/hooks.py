@@ -94,6 +94,46 @@ def _is_hook_effectively_empty(hook_path):
 
 
 # ---------------------------------------------------------------------------
+# Backward compatibility bridge
+# ---------------------------------------------------------------------------
+
+
+def warn_if_hook_needs_migration(config, hook_path):
+    """Emit a warning if a customized pre-release.sh exists without config entries.
+
+    This detects projects that still use the old script-based hook system
+    without having migrated to config-driven hooks. The warning is
+    informational only -- no auto-conversion is performed.
+
+    Args:
+        config: project config dict (from ``ctx.config``).
+        hook_path: absolute path to the pre-release.sh script.
+
+    Returns:
+        True if a warning was emitted, False otherwise.
+    """
+    # If config already has hooks.pre_release entries (even empty list),
+    # no migration needed -- the project is using the config system.
+    if isinstance(config, dict):
+        hooks_section = config.get("hooks")
+        if isinstance(hooks_section, dict) and "pre_release" in hooks_section:
+            return False
+
+    # Check if the script exists and is customized (not matching template)
+    if not _is_hook_effectively_empty(hook_path):
+        print(
+            "Warning: Customized hook script found at "
+            f"{hook_path} but no hook config entries.\n"
+            "Migrate to config-driven hooks by adding to .rlsbl/config.json:\n"
+            '  "hooks": {"pre_release": ["<your commands here>"]}',
+            file=sys.stderr,
+        )
+        return True
+
+    return False
+
+
+# ---------------------------------------------------------------------------
 # Config-driven hooks
 # ---------------------------------------------------------------------------
 
