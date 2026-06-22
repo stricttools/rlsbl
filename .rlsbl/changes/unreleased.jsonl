@@ -1,2 +1,3 @@
 {"commits":["40bbacb297759196aed31dcc06002aa9acc88fc6"],"user_facing":false}
 {"commits":["6a2309f43081259938588dba9fc874ac11dc2e96"],"user_facing":false}
+{"commits":["40bbacb297759196aed31dcc06002aa9acc88fc6"],"user_facing":true,"description":"**Fix CI test failure.** Migration tests now mock saferm for CI environments where it is not installed.","type":"fix"}
