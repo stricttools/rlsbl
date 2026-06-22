@@ -10,7 +10,13 @@ import tempfile
 
 from ..action_versions import format_action, UnknownActionError
 from ..errors import ConfigError
-from ..config import read_deploy_config, should_tag, write_project_config
+from ..config import (
+    read_deploy_config,
+    read_json_config,
+    read_publish_config,
+    should_tag,
+    write_project_config,
+)
 from ..lock import acquire_lock, release_lock
 from ..pipelines import PIPELINE_TYPES, load_pipelines
 from ..targets import TARGETS, detect_targets
@@ -82,6 +88,89 @@ def _is_releasable_member_project(project_root):
     # In explicit mode, projects with a named releasable have their changelog
     # at the releasable level. Only string values indicate membership.
     return isinstance(project.releasable, str)
+
+
+def _get_releasable_config_dir(project_root):
+    """Return the releasable config directory for a releasable member project.
+
+    Returns the path to ``.rlsbl-monorepo/releasables/{name}/`` if the
+    project belongs to a releasable in explicit mode, or None otherwise.
+    """
+    if project_root is None:
+        return None
+    from ..workspace import (
+        find_workspace_root,
+        get_releasable_dir,
+        is_explicit_mode,
+        load_releasables,
+        load_workspace,
+        resolve_releasable_for_project,
+        resolve_project,
+    )
+
+    ws_root = find_workspace_root(str(project_root))
+    if ws_root is None:
+        return None
+    if not is_explicit_mode(ws_root):
+        return None
+    project = resolve_project(ws_root, str(project_root))
+    if project is None:
+        return None
+    if not isinstance(project.releasable, str):
+        return None
+    projects = load_workspace(ws_root)
+    releasables = load_releasables(ws_root, projects=projects)
+    rel = resolve_releasable_for_project(project, releasables)
+    if rel is None:
+        return None
+    return get_releasable_dir(ws_root, rel.name)
+
+
+def _skip_redundant_releasable_configs(project_root, warnings):
+    """Remove per-package config.json and publish.json that duplicate releasable-level configs.
+
+    When a releasable member's per-package config is identical to the
+    releasable-level config, the per-package file is redundant -- the
+    config inheritance system will produce the same result without it.
+
+    For files that existed before scaffold and are identical to the
+    releasable config, a warning is emitted suggesting cleanup.
+
+    Modifies ``warnings`` list in place (appends cleanup warnings).
+
+    Returns a list of paths that were removed (for commit tracking).
+    """
+    rel_config_dir = _get_releasable_config_dir(project_root)
+    if rel_config_dir is None:
+        return []
+
+    removed = []
+    _FILES = [
+        ("config.json", read_json_config),
+        ("publish.json", read_json_config),
+    ]
+
+    for filename, reader in _FILES:
+        rel_path = os.path.join(rel_config_dir, filename)
+        pkg_path = os.path.join(str(project_root), ".rlsbl", filename)
+
+        if not os.path.isfile(pkg_path):
+            continue
+        if not os.path.isfile(rel_path):
+            continue
+
+        pkg_config = reader(pkg_path)
+        rel_config = reader(rel_path)
+
+        if pkg_config == rel_config:
+            os.unlink(pkg_path)
+            removed.append(pkg_path)
+            print(
+                f"Skipped per-package .rlsbl/{filename} "
+                f"(identical to releasable config)"
+            )
+
+    return removed
 
 
 def _check_npm_lockfile_missing(start_dir="."):
@@ -1220,6 +1309,9 @@ def run_cmd(registry, args, flags, ctx):
                     file=sys.stderr,
                 )
 
+        # Remove per-package config/publish.json that duplicate releasable config
+        _skip_redundant_releasable_configs(project_root, warnings)
+
         _finalize_scaffold(
             existing_hashes, [reg_hashes, pipe_hashes, shared_hashes],
             created, skipped, warnings, registry=registry,
@@ -1844,6 +1936,9 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         created = ci_created + extra_created + merged_created + shared_created
         skipped = ci_skipped + extra_skipped + merged_skipped + shared_skipped
         warnings = ci_warnings + extra_warnings + merged_warnings + shared_warnings
+
+        # Remove per-package config/publish.json that duplicate releasable config
+        _skip_redundant_releasable_configs(project_root, warnings)
 
         _finalize_scaffold(
             existing_hashes, [ci_hashes, extra_hashes, merged_hashes, shared_hashes],
