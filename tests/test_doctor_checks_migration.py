@@ -77,6 +77,7 @@ EXPECTED_CHECKS = [
     "prepush-manual-warning",
     "test-suite",
     "test-suite-workspace",
+    "maven-central-metadata",
 ]
 
 
