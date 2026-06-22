@@ -19,6 +19,7 @@ from rlsbl.commands.monorepo.batch_release import _cmd_batch_release, _finalize_
 from rlsbl.workspace import save_workspace, WORKSPACE_DIR
 
 
+
 def _write_toml(path, content):
     """Write a TOML string to a file, creating directories as needed."""
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -221,7 +222,7 @@ class TestReadBatchReleaseFile:
 
 class TestBatchValidation:
 
-    def test_package_not_in_workspace(self, mock_git_repo, capsys):
+    def test_package_not_in_workspace(self, mock_git_repo, capsys, bypass_upfront_validation):
         """Package listed in batch file but not in workspace triggers error."""
         _make_npm_project(mock_git_repo, "alpha")
         projects = [{"path": "alpha", "name": "alpha"}]
@@ -269,7 +270,7 @@ class TestBatchValidation:
 
 class TestBatchTopologicalOrder:
 
-    def test_leaves_released_first(self, mock_git_repo, capsys):
+    def test_leaves_released_first(self, mock_git_repo, capsys, bypass_upfront_validation):
         """Packages are released in topological order: leaves first."""
         # A depends on B, B depends on C -> order: C, B, A
         _make_npm_project(mock_git_repo, "A", deps={"B": "^1.0.0"})
@@ -315,7 +316,7 @@ class TestBatchTopologicalOrder:
         # Verify release_order: C before B before A
         assert release_order == ["C", "B", "A"]
 
-    def test_subset_ordering(self, mock_git_repo, capsys):
+    def test_subset_ordering(self, mock_git_repo, capsys, bypass_upfront_validation):
         """Batch file with a subset of workspace packages preserves topo order."""
         # A -> B -> C, but only releasing A and C
         _make_npm_project(mock_git_repo, "A", deps={"B": "^1.0.0"})
@@ -355,7 +356,7 @@ class TestBatchTopologicalOrder:
         # C should come before A (C is a leaf)
         assert release_order == ["C", "A"]
 
-    def test_independent_packages_alphabetical(self, mock_git_repo, capsys):
+    def test_independent_packages_alphabetical(self, mock_git_repo, capsys, bypass_upfront_validation):
         """Independent packages (no deps) are released in deterministic order."""
         _make_npm_project(mock_git_repo, "zeta")
         _make_npm_project(mock_git_repo, "alpha")
@@ -476,7 +477,7 @@ class TestBatchFinalization:
 
 class TestBatchReleaseDevNode:
 
-    def test_dev_node_project_included_in_batch(self, mock_git_repo, capsys):
+    def test_dev_node_project_included_in_batch(self, mock_git_repo, capsys, bypass_upfront_validation):
         """Dev node projects in batch TOML trigger a hard error.
 
         Dev nodes must be released individually via `rlsbl release run` in
@@ -517,7 +518,7 @@ class TestBatchReleaseDevNode:
         assert "internal" in captured.err
         assert "non-releasable projects cannot be in batch release" in captured.err
 
-    def test_batch_without_dev_nodes_succeeds(self, mock_git_repo, capsys):
+    def test_batch_without_dev_nodes_succeeds(self, mock_git_repo, capsys, bypass_upfront_validation):
         """Batch release with only non-dev-node projects succeeds."""
         _make_npm_project(mock_git_repo, "alpha", version="0.1.0")
         _make_npm_project(mock_git_repo, "beta", version="0.1.0")

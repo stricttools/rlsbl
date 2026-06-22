@@ -44,7 +44,7 @@ def _init_workspace(base_path, projects):
 class TestBatchReleaseBlogWiring:
     """Verify that blog field is preserved and passed through in batch releases."""
 
-    def test_batch_release_preserves_blog_field(self, tmp_path, monkeypatch):
+    def test_batch_release_preserves_blog_field(self, tmp_path, monkeypatch, bypass_upfront_validation):
         """Each per-project run_cmd call receives the ReleaseConfig with its blog field."""
         monkeypatch.chdir(tmp_path)
 
@@ -109,7 +109,7 @@ blog = false
         assert beta_cfg["blog"] is False, "beta should have blog=false"
         assert beta_cfg["description"] == "Beta release without blog"
 
-    def test_batch_release_blog_default_false(self, tmp_path, monkeypatch):
+    def test_batch_release_blog_default_false(self, tmp_path, monkeypatch, bypass_upfront_validation):
         """When blog is not specified in batch TOML, it defaults to False."""
         monkeypatch.chdir(tmp_path)
 
@@ -171,7 +171,7 @@ blog = false
         assert config.packages["pkg_a"].blog is True
         assert config.packages["pkg_b"].blog is False
 
-    def test_batch_release_mixed_blog_per_project(self, tmp_path, monkeypatch):
+    def test_batch_release_mixed_blog_per_project(self, tmp_path, monkeypatch, bypass_upfront_validation):
         """In a batch with mixed blog settings, each project gets its own blog value."""
         monkeypatch.chdir(tmp_path)
 

@@ -28,6 +28,12 @@ from ...lock import rlsbl_lock
 from ...utils import commit_files
 from ...workspace import find_workspace_root, load_workspace, is_explicit_mode
 from ...workspace_graph import CycleError, WorkspaceGraph
+from ..release.validate import (
+    ReleaseValidationError,
+    validate_branch_and_remote,
+    validate_clean_tree,
+    validate_gh_cli,
+)
 
 
 def _releasable_release_order(batch_names, releasables, projects, graph):
@@ -84,6 +90,15 @@ def _cmd_batch_release(flags, project_root):
         batch_config = read_batch_release_file(batch_path)
     except ReleaseFileError as e:
         print(f"Error in batch release file: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    # Upfront validation: fail before releasing anything
+    try:
+        validate_gh_cli()
+        validate_clean_tree(flags)
+        validate_branch_and_remote(flags)
+    except ReleaseValidationError as e:
+        print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
     projects = load_workspace(workspace_root)
