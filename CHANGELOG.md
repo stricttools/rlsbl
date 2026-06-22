@@ -2,6 +2,16 @@
 
 # Changelog
 
+## 0.79.2
+
+Fix migration consolidation bugs, CI template variable, and shallow clone test failure
+
+### Fixes
+
+- **Fix: migration consolidation bugs.** `consolidate_changelogs()` now deduplicates cross-package entries, auto-creates batch exclusions for oversized entries, and creates a consolidation tag to prevent scope expansion failures.
+- **Fix: unreplaced `minRequiredPython` in CI template comment.** Template now uses un-namespaced variable name that works in both single and multi-target scaffold.
+- **Fix: status command test failure in CI shallow clones.**
+
 ## 0.79.1
 
 Raise CI coverage threshold to 90% with 4873 tests at 91.78% coverage
