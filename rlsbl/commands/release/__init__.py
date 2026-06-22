@@ -61,7 +61,8 @@ from .validate import (
 )
 from .hooks import (
     _compute_content_hash, _get_pre_release_template_hashes,
-    _is_hook_effectively_empty, run_release_hook,
+    _is_hook_effectively_empty, is_hook_customized, run_release_hook,
+    normalize_hook_entry, run_config_hooks, _get_config_hooks,
     get_releasable_hook_path, get_package_hook_path,
     build_hook_env, run_releasable_hooks,
     run_releasable_tests, run_releasable_lint,
@@ -306,7 +307,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
 
     if _use_releasable_hooks:
         # Check if releasable-level pre-release hook is customized
-        hook_is_customized = is_releasable_hook_customized(str(monorepo_root), releasable_name)
+        hook_is_customized = is_releasable_hook_customized(str(monorepo_root), releasable_name, config=config)
 
         # 3. Built-in tests and lint (skipped when releasable pre-release hook is customized)
         if hook_is_customized:
@@ -328,7 +329,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     else:
         # Built-in tests and lint (skipped when pre-release hook is customized)
         pre_release_script = os.path.join(project_dir, ".rlsbl", "hooks", "pre-release.sh")
-        hook_is_customized = not _is_hook_effectively_empty(pre_release_script)
+        hook_is_customized = is_hook_customized(config, pre_release_script)
 
         if hook_is_customized:
             log("Skipping built-in tests (pre-release hook handles testing)")
