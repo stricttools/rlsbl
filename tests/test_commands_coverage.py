@@ -582,6 +582,8 @@ class TestStatusNonReleasableProject:
              patch(f"{MOD_STATUS}.detect_targets", return_value=[entry]), \
              patch(f"{MOD_STATUS}.TARGETS", {None: mock_target, "npm": mock_target}), \
              patch(f"{MOD_STATUS}.get_current_branch", return_value="main"), \
+             patch(f"{MOD_STATUS}._get_last_version_tag", return_value=None), \
+             patch(f"{MOD_STATUS}._unreleased_range", return_value="HEAD"), \
              patch(f"{MOD_STATUS}.run", return_value="v1.0.0"), \
              patch(f"{MOD_STATUS}.is_clean_tree", return_value=True), \
              patch(f"{MOD_STATUS}.changes_dir_exists", return_value=False):
@@ -610,6 +612,8 @@ class TestStatusTextOutputPaths:
              patch(f"{MOD_STATUS}.detect_targets", return_value=[entry]), \
              patch(f"{MOD_STATUS}.TARGETS", {"npm": mock_target}), \
              patch(f"{MOD_STATUS}.get_current_branch", return_value="main"), \
+             patch(f"{MOD_STATUS}._get_last_version_tag", return_value=None), \
+             patch(f"{MOD_STATUS}._unreleased_range", return_value="HEAD"), \
              patch(f"{MOD_STATUS}.run", side_effect=Exception("no tag")), \
              patch(f"{MOD_STATUS}.is_clean_tree", return_value=True):
             run_cmd("npm", [], {}, ctx=_ctx(root=tmp_path))
