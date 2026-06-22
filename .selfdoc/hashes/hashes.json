@@ -157,7 +157,7 @@
     "description": "92c829699be90c4ea09e05c6e0ff3830b755bdd05be47a9427e51074cedcb831"
   },
   "en/cli-index.md": {
-    "content": "720a9a0a6b3c682aee59ac67fb09257b0bf45dcfcacd7ae60e97f5e9134fe797",
+    "content": "3d11fccd35404a70de7d48f1f8d767d519c52efec480e704bc97938309669b69",
     "description": "0f01533cb10562a220aa70ea5e33e2500c0c1e4aa8e16b2f80c532449a68b7ea"
   },
   "en/cli-migrate-publish-config.md": {
@@ -169,7 +169,7 @@
     "description": "ed5d34392baa022c09e4daec00277910a7cbc15b08d430083b3bff2510762617"
   },
   "en/cli-monorepo.md": {
-    "content": "14bd80c7c4a979449290d212276aee3db9b91ae76b5b4684c279609861512c9e",
+    "content": "e41c935a26329065facf7aceea78b592840fed01dc9702fdf5804228e472fcd6",
     "description": "752342d5365828fb0c019d6c4bf04f94b450d75f34ab4ac641fd3a028e963749"
   },
   "en/cli-pre-push-check.md": {
@@ -240,7 +240,7 @@
     "description": "8909eda4fd51ca2ffd6ded1b7ec9ab0dce01924c31e9cd097b6fe8281a0e9e7d"
   },
   "en/gen-index.md": {
-    "content": "d16a8586171d4912fe5a12e54e9d725b5fc8ced11f055b118dc71d1cbe49b3d0",
+    "content": "d926746b2c289560c08616ea1638f228a2f8c769e6aeb906c0a0bb4b1010345f",
     "description": "bb3cd9d34f014c0674a9285c25ee14b5b4abc5cf941f0d83594c301405e8f3b6"
   },
   "en/import-scanning.md": {
@@ -501,6 +501,11 @@
     "content": "3cdcd2c5df0f5a26606219fe9f0a3ecb3ffd4704250ce47dbc88a7c17957aa2f",
     "description": "87d73c89a26adc7033ddbcebf9c426eec96d238b7287f9dc00aaf3c98619649a",
     "source_docstring": "87d73c89a26adc7033ddbcebf9c426eec96d238b7287f9dc00aaf3c98619649a"
+  },
+  "en/rlsbl-commands-release-shared.md": {
+    "content": "7125f29b94493c18d0445fa2115acdc3d0de565edca112953da4e679591113ff",
+    "description": "b3b63796b7aeacfe4406215e72f33590559da9a1235e3f6f2e4a750324f06e34",
+    "source_docstring": "b3b63796b7aeacfe4406215e72f33590559da9a1235e3f6f2e4a750324f06e34"
   },
   "en/rlsbl-commands-release-validate.md": {
     "content": "70a5d96ce71555b015c712c00584aacbc029e0d602e96c982c3d1a769d34605f",
@@ -934,7 +939,7 @@
     "source_docstring": "cbc6efd4505a9d5f40720a9c4b6607789053bc8eb9137163a99e5e3ca41e240e"
   },
   "en/rlsbl.md": {
-    "content": "c6acbada4c82e1a867b5e07164c05149a212a409c628485aca21200df79d2a28",
+    "content": "0bc692fdfc6c2a03fcd4bf06bdee7c9115bea3b04b508d869b9e8954792e290b",
     "description": "846d7106c20777b824e0116e8e62127eb6c86ab277fe4904e1cbecc2e9839d43",
     "source_docstring": "68bb1a67dac6f4a7650d2caa71eb15eba57ae3de312ab26eba869806b91420cd"
   },
