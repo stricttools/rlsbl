@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.79.2",
+  "version": "0.80.0",
   "description": null,
   "language": "python",
   "base_url": "https://rlsbl.smmh.dev",
@@ -583,6 +583,11 @@
       "type": "doc"
     },
     {
+      "path": "rlsbl-maven_central.md",
+      "title": "rlsbl.maven_central",
+      "type": "doc"
+    },
+    {
       "path": "rlsbl-npm_wrapper.md",
       "title": "rlsbl.npm_wrapper",
       "type": "doc"
@@ -854,5 +859,5 @@
     }
   ],
   "posts": [],
-  "last_gen": "2026-06-22T11:49:25.455620+00:00"
+  "last_gen": "2026-06-22T21:17:46.568149+00:00"
 }

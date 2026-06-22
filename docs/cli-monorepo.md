@@ -200,3 +200,13 @@ Extract all member packages of a releasable into a new repository. If the releas
 | --- | --- | --- |
 | `target_path` | yes | Filesystem path where the new repository will be created |
 | `releasable_name` | yes | Name of the releasable group in workspace.toml to extract |
+
+## monorepo migrate-releasable
+
+Migrate a releasable from per-package release state to the releasable model. Detects current state, consolidates per-package changelogs and versions into the releasable directory, creates a releasable-format migration tag, and removes orphaned per-package .rlsbl/changes/ and .rlsbl/releases/ directories. Requires the workspace to be in explicit mode (with [[releasables]] in workspace.toml).
+
+### Arguments
+
+| Name | Required | Description |
+| --- | --- | --- |
+| `releasable_name` | yes | Name of the releasable group in workspace.toml to migrate |
