@@ -175,7 +175,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     # --- Validate changelog ---
     # In monorepo mode, resolve the project dict for scoped coverage checks
     monorepo_project = None
-    if monorepo_name:
+    if monorepo_name and not releasable_name:
         monorepo_project = resolve_project(monorepo_root, str(project_root))
 
     changes_dir = validate_changelog_state(
@@ -347,7 +347,9 @@ def _run_cmd_inner(release_config, flags, *, ctx):
 
     lock_dir = ".rlsbl-monorepo" if monorepo_name else ".rlsbl"
     lock_root = monorepo_root if monorepo_name else project_root
-    acquire_lock(lock_dir=lock_dir, project_root=lock_root)
+    skip_lock = flags.get("skip-lock", False)
+    if not skip_lock:
+        acquire_lock(lock_dir=lock_dir, project_root=lock_root)
 
     # Materialize CHANGELOG.md on disk now that all pre-release checks passed
     if changes_dir is not None:
@@ -392,7 +394,8 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     except (KeyboardInterrupt, SystemExit):
         raise
     finally:
-        release_lock()
+        if not skip_lock:
+            release_lock()
 
     # Track build releases for Flutter OTA validation
     flutter_targets = [t for t in release_config.include if t.startswith("flutter-")]
