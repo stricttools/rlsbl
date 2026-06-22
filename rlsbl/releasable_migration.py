@@ -9,6 +9,7 @@ Provides functions for Phase 10 of the releasable model redesign:
 """
 
 import json
+import logging
 import os
 import subprocess
 
@@ -509,21 +510,31 @@ def create_migration_tag(workspace_root, releasable_name, tag_format,
             - ``commit`` (str or None): the commit the tag points to
             - ``source_tag`` (str or None): the per-package tag used as source
             - ``member_tags`` (dict[str, str]): project name -> latest tag
+            - ``skipped_members`` (list[str]): members skipped (no scoped tag)
     """
+    logger = logging.getLogger(__name__)
+
     member_tags = {}
     tag_commits = {}
+    skipped_members = []
 
     for proj in member_projects:
         tag_glob = f"{proj.name}@v*"
         tag = _git_describe_tag(tag_glob, workspace_root)
         if tag is None:
-            # Try simple v* pattern (for projects that used simple tag format)
-            tag = _git_describe_tag("v*", workspace_root)
-        if tag is not None:
-            member_tags[proj.name] = tag
-            commit = _git_rev_parse(tag, workspace_root)
-            if commit:
-                tag_commits[tag] = commit
+            # No scoped tag found for this member -- skip it rather than
+            # falling back to the repo-wide v* glob, which in a monorepo
+            # may belong to a completely different package.
+            logger.warning(
+                "No scoped tag matching '%s' found for member '%s'; skipping",
+                tag_glob, proj.name,
+            )
+            skipped_members.append(proj.name)
+            continue
+        member_tags[proj.name] = tag
+        commit = _git_rev_parse(tag, workspace_root)
+        if commit:
+            tag_commits[tag] = commit
 
     if not member_tags:
         return {
@@ -532,6 +543,7 @@ def create_migration_tag(workspace_root, releasable_name, tag_format,
             "commit": None,
             "source_tag": None,
             "member_tags": member_tags,
+            "skipped_members": skipped_members,
         }
 
     # Find the most recent tag by commit date
@@ -545,6 +557,7 @@ def create_migration_tag(workspace_root, releasable_name, tag_format,
             "commit": None,
             "source_tag": None,
             "member_tags": member_tags,
+            "skipped_members": skipped_members,
         }
 
     commit = tag_commits.get(most_recent_tag)
@@ -558,6 +571,7 @@ def create_migration_tag(workspace_root, releasable_name, tag_format,
             "commit": None,
             "source_tag": most_recent_tag,
             "member_tags": member_tags,
+            "skipped_members": skipped_members,
         }
 
     # Extract version from the source tag (e.g., "mylib@v0.1.0" -> "0.1.0")
@@ -569,6 +583,7 @@ def create_migration_tag(workspace_root, releasable_name, tag_format,
             "commit": commit,
             "source_tag": most_recent_tag,
             "member_tags": member_tags,
+            "skipped_members": skipped_members,
         }
 
     # Format the new releasable tag
@@ -590,6 +605,7 @@ def create_migration_tag(workspace_root, releasable_name, tag_format,
             "commit": commit,
             "source_tag": most_recent_tag,
             "member_tags": member_tags,
+            "skipped_members": skipped_members,
         }
 
     return {
@@ -598,6 +614,7 @@ def create_migration_tag(workspace_root, releasable_name, tag_format,
         "commit": commit,
         "source_tag": most_recent_tag,
         "member_tags": member_tags,
+        "skipped_members": skipped_members,
     }
 
 
@@ -708,3 +725,135 @@ def _extract_version_from_tag(tag):
     if match:
         return match.group(1)
     return None
+
+
+# ---------------------------------------------------------------------------
+# 10.6: cmd_migrate_releasable -- orchestrate full migration
+# ---------------------------------------------------------------------------
+
+
+def cmd_migrate_releasable(workspace_root, releasable_name, *, dry_run=False,
+                           yes=False):
+    """Orchestrate the full migration of a releasable from per-package to releasable model.
+
+    Steps:
+    1. ``detect_migration_state()`` -- show current state
+    2. ``consolidate_changelogs()`` -- merge per-package changelogs into per-releasable
+    3. ``consolidate_versions()`` -- write releasable version from member versions
+    4. ``create_migration_tag()`` -- create releasable-format tag
+    5. ``cleanup_per_package_release_state()`` -- remove orphaned per-package state
+
+    Args:
+        workspace_root: path to the monorepo root.
+        releasable_name: name of the releasable to migrate.
+        dry_run: if True, report what would happen without making changes.
+        yes: if True, skip interactive confirmation prompts.
+
+    Returns:
+        A dict with:
+            - ``releasable_name`` (str)
+            - ``dry_run`` (bool)
+            - ``state`` (dict): result of detect_migration_state
+            - ``changelogs`` (dict or None): result of consolidate_changelogs
+            - ``versions`` (dict or None): result of consolidate_versions
+            - ``tag`` (dict or None): result of create_migration_tag
+            - ``cleanup`` (list or None): paths removed by cleanup
+
+    Raises:
+        WorkspaceError: if workspace is not in explicit mode or releasable
+            not found.
+    """
+    from .releasable_cleanup import cleanup_per_package_release_state
+
+    # Load workspace and validate releasable exists
+    projects = load_workspace(workspace_root)
+    if not is_explicit_mode(workspace_root):
+        raise WorkspaceError(
+            "Workspace is not in explicit mode. "
+            "Add [[releasables]] to workspace.toml first."
+        )
+
+    releasables = load_releasables(workspace_root, projects=projects)
+    target_releasable = None
+    for rel in releasables:
+        if rel.name == releasable_name:
+            target_releasable = rel
+            break
+    if target_releasable is None:
+        available = ", ".join(r.name for r in releasables)
+        raise WorkspaceError(
+            f"Releasable '{releasable_name}' not found. Available: {available}"
+        )
+
+    member_projects = members_of(releasable_name, projects)
+    if not member_projects:
+        raise WorkspaceError(
+            f"Releasable '{releasable_name}' has no member packages"
+        )
+
+    # Step 1: detect migration state
+    state = detect_migration_state(workspace_root)
+
+    result = {
+        "releasable_name": releasable_name,
+        "dry_run": dry_run,
+        "state": state,
+        "changelogs": None,
+        "versions": None,
+        "tag": None,
+        "cleanup": None,
+    }
+
+    if dry_run:
+        # In dry-run mode, report what would happen without side effects
+        member_names = [p.name for p in member_projects]
+        result["members"] = member_names
+        result["tag_format"] = target_releasable.tag_format
+        return result
+
+    # Interactive confirmation before destructive steps
+    if not yes:
+        member_names = [p.name for p in member_projects]
+        print(f"Migrating releasable '{releasable_name}' with members: "
+              f"{', '.join(member_names)}")
+        print("This will:")
+        print("  1. Merge per-package changelogs into the releasable directory")
+        print("  2. Consolidate member versions into the releasable version file")
+        print("  3. Create a releasable-format migration tag")
+        print("  4. Remove per-package .rlsbl/changes/ and .rlsbl/releases/ directories")
+        response = input("Proceed? [y/N] ").strip().lower()
+        if response not in ("y", "yes"):
+            raise WorkspaceError("Migration cancelled by user")
+
+    # Step 2: consolidate changelogs
+    changelog_result = consolidate_changelogs(
+        workspace_root, releasable_name, member_projects,
+    )
+    result["changelogs"] = changelog_result
+
+    # Step 3: consolidate versions
+    version_result = consolidate_versions(
+        workspace_root, releasable_name, member_projects,
+    )
+    result["versions"] = version_result
+
+    if version_result["status"] == "conflict":
+        raise WorkspaceError(
+            f"Version conflict among members: {version_result['versions']}. "
+            "Resolve version differences before migrating."
+        )
+
+    # Step 4: create migration tag
+    tag_result = create_migration_tag(
+        workspace_root, releasable_name,
+        target_releasable.tag_format, member_projects,
+    )
+    result["tag"] = tag_result
+
+    # Step 5: cleanup per-package release state
+    removed = cleanup_per_package_release_state(
+        workspace_root, projects=projects, releasables=releasables,
+    )
+    result["cleanup"] = removed
+
+    return result
