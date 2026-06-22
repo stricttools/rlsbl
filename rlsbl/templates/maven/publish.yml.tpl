@@ -16,7 +16,7 @@ jobs:
       - uses: {{action "actions/setup-java"}}
         with:
           distribution: temurin
-          java-version: "21"
+          java-version: "25"
       - uses: {{action "gradle/actions/setup-gradle"}}
       # GitHub Packages allows re-publishing the same version (overwrites),
       # so this step is inherently idempotent -- no pre-check needed.

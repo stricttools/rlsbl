@@ -14,6 +14,6 @@ jobs:
       - uses: {{action "actions/setup-java"}}
         with:
           distribution: temurin
-          java-version: "21"
+          java-version: "25"
       - uses: {{action "gradle/actions/setup-gradle"}}
       - run: ./gradlew build
