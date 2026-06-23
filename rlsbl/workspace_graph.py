@@ -80,9 +80,14 @@ def _parse_pypi_dep_name(dep_string):
 class PypiScanner:
     """Scan pyproject.toml for intra-workspace PyPI dependencies."""
 
-    def scan(self, project_dir: str, workspace_names: set[str]) -> list[Dependency]:
+    def scan(self, project_dir: str, workspace_names: set[str], *, pypi_name_map: dict[str, str] | None = None) -> list[Dependency]:
         # Build normalized lookup internally: normalize_pypi(name) -> original name
         pypi_normalized = {normalize_pypi(name): name for name in workspace_names}
+        # Merge actual PyPI names that differ from workspace names
+        if pypi_name_map:
+            for norm_pypi, ws_name in pypi_name_map.items():
+                if norm_pypi not in pypi_normalized:
+                    pypi_normalized[norm_pypi] = ws_name
 
         manifest = os.path.join(project_dir, "pyproject.toml")
         if not os.path.isfile(manifest):
@@ -542,13 +547,32 @@ class WorkspaceGraph:
             self._deps[name] = []
             self._rdeps[name] = []
 
+        # Build PyPI name map: normalize_pypi(actual_pypi_name) -> workspace_name
+        # for projects where the PyPI name differs from the workspace name.
+        pypi_name_map: dict[str, str] = {}
+        for proj in projects:
+            pyproject_path = os.path.join(root, proj["path"], "pyproject.toml")
+            if not os.path.isfile(pyproject_path):
+                continue
+            try:
+                with open(pyproject_path, "r", encoding="utf-8") as f:
+                    pyproject_data = tomlkit.parse(f.read())
+                pypi_name = pyproject_data.get("project", {}).get("name")
+                if pypi_name and normalize_pypi(pypi_name) != normalize_pypi(proj["name"]):
+                    pypi_name_map[normalize_pypi(pypi_name)] = proj["name"]
+            except Exception:
+                pass  # Skip unreadable files; PypiScanner will warn later
+
         for proj in projects:
             name = proj["name"]
             project_dir = os.path.join(root, proj["path"])
 
             found_deps = []
             for scanner in SCANNERS:
-                found_deps.extend(scanner.scan(project_dir, workspace_names))
+                if isinstance(scanner, PypiScanner):
+                    found_deps.extend(scanner.scan(project_dir, workspace_names, pypi_name_map=pypi_name_map))
+                else:
+                    found_deps.extend(scanner.scan(project_dir, workspace_names))
 
             # Explicit depends_on from workspace config
             for dep_name in proj.get("depends_on", []):
