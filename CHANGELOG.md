@@ -2,6 +2,14 @@
 
 # Changelog
 
+## 0.81.4
+
+Fix CI: mock saferm in all scaffold tests
+
+### Fixes
+
+- **Fix CI test failures.** All scaffold tests now mock saferm for CI environments.
+
 ## 0.81.3
 
 Fix CI: mock saferm in scaffold orphan tests
