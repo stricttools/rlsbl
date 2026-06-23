@@ -102,6 +102,8 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "test-suite-workspace": "workspace",
     # --- maven-specific checks ---
     "maven-central-metadata": frozenset({"maven"}),
+    # --- scaffold checks ---
+    "scaffold-gitignore-stale": "workspace",
 }
 
 # Excluded targets: checks where a target is deliberately excluded because
@@ -214,6 +216,9 @@ def register_checks(app):
     """
     if not getattr(app, "_checks_enabled", False):
         return
+
+    from .scope import scope_adapter
+    app.set_scope_adapter(scope_adapter)
 
     from .project import register_project_checks
     from .release import register_release_checks
