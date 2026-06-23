@@ -45,7 +45,7 @@ def _setup_npm_project(tmp_path, test_script=None):
     changes_dir.mkdir(parents=True, exist_ok=True)
     (changes_dir / "unreleased.jsonl").write_text("")
     (tmp_path / ".rlsbl" / "config.json").write_text(
-        json.dumps({"private": False}) + "\n"
+        json.dumps({"private": False, "targets": ["npm"]}) + "\n"
     )
 
 

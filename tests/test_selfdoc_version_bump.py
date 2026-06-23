@@ -52,6 +52,8 @@ def _make_project(root, *, targets=None, pkg_version="1.0.0", selfdoc_version="1
     config = {"private": False}
     if targets is not None:
         config["targets"] = targets
+    else:
+        config["targets"] = ["npm"]
     (rlsbl_dir / "config.json").write_text(json.dumps(config))
 
 

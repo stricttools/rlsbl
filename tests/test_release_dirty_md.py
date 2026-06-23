@@ -88,7 +88,7 @@ def _setup_released_project_with_stale_md(repo):
     (changes_dir / "unreleased.jsonl").write_text("")
 
     (repo / ".rlsbl" / "config.json").write_text(
-        json.dumps({"private": False}) + "\n"
+        json.dumps({"private": False, "targets": ["npm"]}) + "\n"
     )
 
     # Archived release file for v1.0.0 carrying the description that

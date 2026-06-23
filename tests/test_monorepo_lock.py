@@ -116,7 +116,7 @@ class TestMonorepoReleaseLockPlacement:
         changes_dir.mkdir(parents=True, exist_ok=True)
         (changes_dir / "unreleased.jsonl").write_text("")
         (proj_dir / ".rlsbl" / "config.json").write_text(
-            json.dumps({"private": False}) + "\n"
+            json.dumps({"private": False, "targets": ["npm"]}) + "\n"
         )
 
         subprocess.run(["git", "add", "."], cwd=str(repo_root), check=True)

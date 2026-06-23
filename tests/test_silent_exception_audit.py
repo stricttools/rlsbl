@@ -17,7 +17,7 @@ class TestQualityCheckLibraryLint:
         """When load_workspace raises, check returns fail, not pass."""
         cfg_dir = tmp_project / ".rlsbl"
         cfg_dir.mkdir(exist_ok=True)
-        (cfg_dir / "config.json").write_text(json.dumps({}))
+        (cfg_dir / "config.json").write_text(json.dumps({"targets": []}))
 
         ctx = make_ctx(tmp_project)
 
@@ -36,7 +36,7 @@ class TestVersionConsistencyCorruptedTarget:
         """Check completes even when read_version raises for a target."""
         cfg_dir = tmp_project / ".rlsbl"
         cfg_dir.mkdir(exist_ok=True)
-        (cfg_dir / "config.json").write_text(json.dumps({}))
+        (cfg_dir / "config.json").write_text(json.dumps({"targets": ["pypi"]}))
         (tmp_project / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "1.0.0"\n'
         )
@@ -55,7 +55,7 @@ class TestVersionConsistencyCorruptedTarget:
         and a warning is printed to stderr."""
         cfg_dir = tmp_project / ".rlsbl"
         cfg_dir.mkdir(exist_ok=True)
-        (cfg_dir / "config.json").write_text(json.dumps({}))
+        (cfg_dir / "config.json").write_text(json.dumps({"targets": ["pypi"]}))
         (tmp_project / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "1.0.0"\n'
         )
@@ -77,7 +77,7 @@ class TestNameConsistencyCorruptedTarget:
         """Check completes even when read_name raises for a target."""
         cfg_dir = tmp_project / ".rlsbl"
         cfg_dir.mkdir(exist_ok=True)
-        (cfg_dir / "config.json").write_text(json.dumps({}))
+        (cfg_dir / "config.json").write_text(json.dumps({"targets": ["pypi"]}))
         (tmp_project / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "1.0.0"\n'
         )
@@ -94,7 +94,7 @@ class TestNameConsistencyCorruptedTarget:
         """When read_name raises, a warning is printed to stderr."""
         cfg_dir = tmp_project / ".rlsbl"
         cfg_dir.mkdir(exist_ok=True)
-        (cfg_dir / "config.json").write_text(json.dumps({}))
+        (cfg_dir / "config.json").write_text(json.dumps({"targets": ["pypi"]}))
         (tmp_project / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "1.0.0"\n'
         )
@@ -116,7 +116,7 @@ class TestResolveVersionAndTag:
         """When read_version raises, version is None and warning is printed."""
         cfg_dir = tmp_project / ".rlsbl"
         cfg_dir.mkdir(exist_ok=True)
-        (cfg_dir / "config.json").write_text(json.dumps({}))
+        (cfg_dir / "config.json").write_text(json.dumps({"targets": ["pypi"]}))
         (tmp_project / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "1.0.0"\n'
         )

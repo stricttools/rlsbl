@@ -159,7 +159,7 @@ def split_monorepo(tmp_path, monkeypatch):
         (proj_dir / ".rlsbl" / "changes").mkdir(parents=True)
         (proj_dir / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         (proj_dir / ".rlsbl" / "config.json").write_text(
-            json.dumps({"private": False}) + "\n"
+            json.dumps({"private": False, "targets": ["npm"]}) + "\n"
         )
         (proj_dir / "package.json").write_text(
             json.dumps({"name": subdir, "version": "0.1.0"})

@@ -29,8 +29,15 @@ from rlsbl.changelog.schema import ChangelogEntry, serialize_entry
 # ------------------------------------------------------------------
 
 
-def _setup_changelog_repo(repo, tag="v0.1.0"):
-    """Set up a git repo with .rlsbl/changes/ and a tag."""
+def _setup_changelog_repo(repo, tag="v0.1.0", targets=None):
+    """Set up a git repo with .rlsbl/changes/ and a tag.
+
+    Args:
+        targets: list of target names to declare in config.json.
+            Defaults to [] (explicitly no targets).
+    """
+    if targets is None:
+        targets = []
     run_git(repo, "init", "-q", "-b", "main")
     run_git(repo, "config", "user.email", "test@test.local")
     run_git(repo, "config", "user.name", "Test")
@@ -44,7 +51,7 @@ def _setup_changelog_repo(repo, tag="v0.1.0"):
     changes.mkdir(parents=True)
     (changes / "unreleased.jsonl").write_text("")
     (repo / ".rlsbl" / "config.json").write_text(
-        json.dumps({"private": False}) + "\n"
+        json.dumps({"private": False, "targets": targets}) + "\n"
     )
     run_git(repo, "add", ".rlsbl")
     run_git(repo, "commit", "-q", "-m", "scaffold")
@@ -67,7 +74,7 @@ class TestLocalTagCheck:
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
-        _setup_changelog_repo(repo, tag="v0.1.0")
+        _setup_changelog_repo(repo, tag="v0.1.0", targets=["pypi"])
         (repo / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "0.1.0"\n'
         )
@@ -83,7 +90,7 @@ class TestLocalTagCheck:
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
-        _setup_changelog_repo(repo, tag=None)
+        _setup_changelog_repo(repo, tag=None, targets=["pypi"])
         (repo / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "9.9.9"\n'
         )
@@ -124,7 +131,7 @@ class TestRemoteTagCheck:
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
-        _setup_changelog_repo(repo, tag="v0.1.0")
+        _setup_changelog_repo(repo, tag="v0.1.0", targets=["pypi"])
         (repo / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "0.1.0"\n'
         )
@@ -144,7 +151,7 @@ class TestRemoteTagCheck:
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
-        _setup_changelog_repo(repo, tag="v0.1.0")
+        _setup_changelog_repo(repo, tag="v0.1.0", targets=["pypi"])
         (repo / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "0.1.0"\n'
         )
@@ -174,7 +181,7 @@ class TestGithubReleaseCheck:
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
-        _setup_changelog_repo(repo, tag="v0.1.0")
+        _setup_changelog_repo(repo, tag="v0.1.0", targets=["pypi"])
         (repo / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "0.1.0"\n'
         )
@@ -191,7 +198,7 @@ class TestGithubReleaseCheck:
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
-        _setup_changelog_repo(repo, tag="v0.1.0")
+        _setup_changelog_repo(repo, tag="v0.1.0", targets=["pypi"])
         (repo / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "0.1.0"\n'
         )
@@ -211,7 +218,7 @@ class TestGithubReleaseCheck:
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
-        _setup_changelog_repo(repo, tag="v0.1.0")
+        _setup_changelog_repo(repo, tag="v0.1.0", targets=["pypi"])
         (repo / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "0.1.0"\n'
         )
@@ -231,7 +238,7 @@ class TestGithubReleaseCheck:
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
-        _setup_changelog_repo(repo, tag="v0.1.0")
+        _setup_changelog_repo(repo, tag="v0.1.0", targets=["pypi"])
         (repo / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "0.1.0"\n'
         )
@@ -396,7 +403,7 @@ class TestChangelogEntryCheck:
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
-        _setup_changelog_repo(repo, tag="v0.1.0")
+        _setup_changelog_repo(repo, tag="v0.1.0", targets=["pypi"])
         (repo / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "0.1.0"\n'
         )
@@ -411,7 +418,7 @@ class TestChangelogEntryCheck:
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
-        _setup_changelog_repo(repo, tag="v0.1.0")
+        _setup_changelog_repo(repo, tag="v0.1.0", targets=["pypi"])
         (repo / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "0.1.0"\n'
         )
@@ -426,7 +433,7 @@ class TestChangelogEntryCheck:
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
-        _setup_changelog_repo(repo, tag="v0.1.0")
+        _setup_changelog_repo(repo, tag="v0.1.0", targets=["pypi"])
         (repo / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "0.1.0"\n'
         )

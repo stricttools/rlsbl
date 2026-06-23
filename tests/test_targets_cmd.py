@@ -109,7 +109,7 @@ class TestMultiTargetRelease:
         with open(os.path.join(".rlsbl", "changes", "unreleased.jsonl"), "w") as f:
             f.write("")
         with open(os.path.join(".rlsbl", "config.json"), "w") as f:
-            json.dump({"private": False}, f)
+            json.dump({"private": False, "targets": ["npm", "spec"]}, f)
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")

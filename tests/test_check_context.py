@@ -101,7 +101,7 @@ def test_get_changelog_context_uses_target_specific_tag_glob(tmp_path, monkeypat
     # Create .rlsbl/changes/ with an empty unreleased.jsonl
     (go_dir / ".rlsbl" / "changes").mkdir(parents=True)
     (go_dir / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
-    (go_dir / ".rlsbl" / "config.json").write_text(json.dumps({"private": False}) + "\n")
+    (go_dir / ".rlsbl" / "config.json").write_text(json.dumps({"private": False, "targets": ["go"]}) + "\n")
 
     run_git(tmp_path, "add", ".")
     run_git(tmp_path, "commit", "-q", "-m", "add go project")

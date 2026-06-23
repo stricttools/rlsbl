@@ -78,6 +78,7 @@ class TestPrivateConfigRequired:
         """Release exits when private=true and a pipeline has local=true."""
         _write_config(self.tmp_dir, {
             "private": True,
+            "targets": ["npm"],
             "pipelines": {"npm": {"type": "npm", "local": True}},
         })
 
@@ -105,7 +106,7 @@ class TestPrivateConfigRequired:
         _commit_files, mock_run, _push, _remote_exists, capsys,
     ):
         """Release does not abort when private=true and no local pipeline config."""
-        _write_config(self.tmp_dir, {"private": True, "pipelines": {}})
+        _write_config(self.tmp_dir, {"private": True, "targets": ["npm"], "pipelines": {}})
 
         mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
 
@@ -129,7 +130,7 @@ class TestPrivateConfigRequired:
         _commit_files, mock_run, _push, _remote_exists, capsys,
     ):
         """Release does not abort when private=false (normal public repo)."""
-        _write_config(self.tmp_dir, {"private": False, "pipelines": {}})
+        _write_config(self.tmp_dir, {"private": False, "targets": ["npm"], "pipelines": {}})
 
         mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
 
@@ -182,7 +183,7 @@ class TestPrivatePublishGuardrail:
         _remote_exists, capsys,
     ):
         """When private=true, pipeline.publish() is not called."""
-        _write_config(self.tmp_dir, {"private": True, "pipelines": {"npm": {"type": "npm", "local": False}}})
+        _write_config(self.tmp_dir, {"private": True, "targets": ["npm"], "pipelines": {"npm": {"type": "npm", "local": False}}})
 
         from rlsbl.commands.release import run_cmd
 
@@ -242,6 +243,7 @@ class TestPrivatePublishGuardrail:
         """When private=true with assets: true, asset upload still runs."""
         _write_config(self.tmp_dir, {
             "private": True,
+            "targets": ["npm"],
             "pipelines": {"npm": {"type": "npm", "local": False, "assets": True, "max_asset_size_mb": 50}},
         })
 

@@ -51,7 +51,7 @@ class TestReleaseValidatedCache:
         with open(os.path.join(changes_dir, ".validated"), "w") as f:
             f.write("fakehash123\n")
         with open(os.path.join(".rlsbl", "config.json"), "w") as f:
-            json.dump({"private": False}, f)
+            json.dump({"private": False, "targets": ["npm"]}, f)
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.release_lock")

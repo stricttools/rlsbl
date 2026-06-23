@@ -41,7 +41,7 @@ class TestReleaseAllowDirty:
         with open(os.path.join(".rlsbl", "changes", "unreleased.jsonl"), "w") as f:
             f.write('{"commits":["abc1234"],"user_facing":true,"description":"Bugfix","type":"fix"}\n')
         with open(os.path.join(".rlsbl", "config.json"), "w") as f:
-            json.dump({"private": False}, f)
+            json.dump({"private": False, "targets": ["npm"]}, f)
 
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)

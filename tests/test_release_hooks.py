@@ -41,9 +41,9 @@ def _setup_project(tmp_path, hook_name, hook_body):
     changes_dir = tmp_path / ".rlsbl" / "changes"
     changes_dir.mkdir(parents=True, exist_ok=True)
     (changes_dir / "unreleased.jsonl").write_text("")
-    # Config with required private key
+    # Config with required private key and targets
     (tmp_path / ".rlsbl" / "config.json").write_text(
-        json.dumps({"private": False}) + "\n"
+        json.dumps({"private": False, "targets": ["npm"]}) + "\n"
     )
     # Hook script
     hooks_dir = tmp_path / ".rlsbl" / "hooks"
@@ -159,7 +159,7 @@ class TestPreReleaseHookOutput:
         changes_dir.mkdir(parents=True, exist_ok=True)
         (changes_dir / "unreleased.jsonl").write_text("")
         (tmp_project / ".rlsbl" / "config.json").write_text(
-            json.dumps({"private": False}) + "\n"
+            json.dumps({"private": False, "targets": ["npm"]}) + "\n"
         )
         # No .rlsbl/hooks/pre-release.sh created
 
@@ -831,7 +831,7 @@ def _setup_releasable_project_with_hook(repo, hook_name, hook_body):
     changes_dir.mkdir(parents=True)
     (changes_dir / "unreleased.jsonl").write_text("")
     (repo / ".rlsbl" / "config.json").write_text(
-        json.dumps({"private": False}) + "\n"
+        json.dumps({"private": False, "targets": ["npm"]}) + "\n"
     )
     _git(repo, "add", "package.json", "CHANGELOG.md", ".rlsbl/changes/unreleased.jsonl", ".rlsbl/config.json")
     _git(repo, "commit", "-q", "-m", "initial")
@@ -1007,7 +1007,7 @@ class TestHookGeneratedFiles:
         changes_dir.mkdir(parents=True)
         (changes_dir / "unreleased.jsonl").write_text("")
         (tmp_project / ".rlsbl" / "config.json").write_text(
-            json.dumps({"private": False}) + "\n"
+            json.dumps({"private": False, "targets": ["npm"]}) + "\n"
         )
         _git(tmp_project, "add", "package.json", "CHANGELOG.md", ".rlsbl/changes/unreleased.jsonl", ".rlsbl/config.json")
         _git(tmp_project, "commit", "-q", "-m", "initial")

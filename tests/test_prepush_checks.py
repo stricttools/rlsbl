@@ -44,7 +44,7 @@ def prepush_repo(tmp_path, monkeypatch):
     changes.mkdir(parents=True)
     (changes / "unreleased.jsonl").write_text("")
 
-    (repo / ".rlsbl" / "config.json").write_text(json.dumps({"private": False}))
+    (repo / ".rlsbl" / "config.json").write_text(json.dumps({"private": False, "targets": []}))
 
     run_git(repo, "add", ".rlsbl")
     run_git(repo, "commit", "-q", "-m", "scaffold rlsbl")
@@ -229,6 +229,10 @@ class TestTestSuiteRunsAndPasses:
         (prepush_repo / "pyproject.toml").write_text(
             '[project]\nname = "testpkg"\nversion = "0.1.0"\n'
         )
+        # Declare pypi target in config
+        (prepush_repo / ".rlsbl" / "config.json").write_text(
+            json.dumps({"private": False, "targets": ["pypi"]})
+        )
 
         ctx = make_ctx(prepush_repo)
 
@@ -252,6 +256,10 @@ class TestTestSuiteFailsOnTestFailure:
     def test_pypi_tests_fail(self, prepush_repo):
         (prepush_repo / "pyproject.toml").write_text(
             '[project]\nname = "testpkg"\nversion = "0.1.0"\n'
+        )
+        # Declare pypi target in config
+        (prepush_repo / ".rlsbl" / "config.json").write_text(
+            json.dumps({"private": False, "targets": ["pypi"]})
         )
 
         ctx = make_ctx(prepush_repo)
@@ -332,7 +340,7 @@ class TestPrePushCheckAtMonorepoRoot:
         changes = pkg / ".rlsbl" / "changes"
         changes.mkdir(parents=True)
         (changes / "unreleased.jsonl").write_text("")
-        (pkg / ".rlsbl" / "config.json").write_text(json.dumps({"private": False}))
+        (pkg / ".rlsbl" / "config.json").write_text(json.dumps({"private": False, "targets": ["npm"]}))
 
         # Set up workspace
         make_workspace(repo, [{"path": "packages/alpha", "name": "alpha"}])

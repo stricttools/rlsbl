@@ -211,7 +211,7 @@ class TestReleaseNoDeployConfig:
 
     def test_release_no_deploy_config(self, mock_git_repo, monkeypatch, capsys):
         # Write config without deploy key
-        _write_config(mock_git_repo, {"tag": True})
+        _write_config(mock_git_repo, {"tag": True, "targets": ["npm"]})
 
         deploy_calls = []
 

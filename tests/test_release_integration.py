@@ -76,7 +76,7 @@ def _setup_releasable_npm_project(repo):
     changes_dir.mkdir(parents=True)
     (changes_dir / "unreleased.jsonl").write_text("")
     (repo / ".rlsbl" / "config.json").write_text(
-        json.dumps({"private": False}) + "\n"
+        json.dumps({"private": False, "targets": ["npm"]}) + "\n"
     )
 
     _git(repo, "add",

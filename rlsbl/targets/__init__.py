@@ -24,7 +24,7 @@ from .pgdesign import PgdesignTarget
 from .plain import PlainTarget
 from .protocol import ReleaseTarget
 from .base import BaseTarget
-from ..config import read_json_config
+from ..config import read_project_config
 from ..errors import ConfigError
 
 
@@ -70,23 +70,48 @@ def _parse_target_entry(entry, base_dir):
     raise TypeError(f"invalid target entry type: {type(entry)}")
 
 
-def detect_targets(dir_path="."):
+def _auto_detect(dir_path):
+    """Auto-detect targets from project file presence.
+
+    Returns list of TargetEntry(name, path) tuples for targets whose
+    manifest files exist in dir_path.
+    """
+    found = []
+    for name, target in TARGETS.items():
+        if target.detect(dir_path):
+            found.append(TargetEntry(name=name, path=dir_path))
+    return found
+
+
+def detect_targets(dir_path=".", releasable_config_dir=None):
     """Detect which targets are applicable in the given directory.
 
-    If .rlsbl/config.json has a "targets" array, use that (opt-in config).
-    Each entry can be a plain string (defaults to dir_path) or a dict with
-    "name" and optional "path" (subdirectory relative to dir_path).
+    Uses ``read_project_config()`` with optional releasable-level
+    inheritance to get the merged config view.  If the merged config
+    has a ``"targets"`` list, uses that (opt-in config).  Each entry
+    can be a plain string (defaults to dir_path) or a dict with
+    ``"name"`` and optional ``"path"`` (subdirectory relative to dir_path).
 
-    Otherwise, fall back to auto-detection based on project file presence.
+    Two-tier rule when ``targets`` key is absent from the merged config:
+
+    - **No ``.rlsbl/config.json`` exists** (discovery case): fall through
+      to auto-detection from project file manifests.
+    - **``.rlsbl/config.json`` exists but merged config has no ``targets``
+      key**: auto-detect to populate hints, then raise ``ConfigError``
+      listing detected targets as suggestions.
+
+    Args:
+        dir_path: project directory to scan.
+        releasable_config_dir: optional path to a releasable's state
+            directory for config inheritance (4-level precedence).
 
     Returns list of TargetEntry(name, path) tuples.
     """
-    config_path = os.path.join(dir_path, ".rlsbl", "config.json")
-    config = read_json_config(config_path)
+    config = read_project_config(dir_path, releasable_config_dir=releasable_config_dir)
     configured = config.get("targets")
 
     if configured is not None and isinstance(configured, list):
-        # Config-declared targets take precedence
+        # Config-declared targets take precedence (including empty list)
         result = []
         for entry in configured:
             try:
@@ -100,13 +125,30 @@ def detect_targets(dir_path="."):
                           file=sys.stderr)
                 result.append(te)
             else:
-                print(f"Warning: unknown target '{te.name}' in .rlsbl/config.json, skipping",
+                print(f"Warning: unknown target '{te.name}' in config, skipping",
                       file=sys.stderr)
         return result
 
-    # Fallback: auto-detect from project files
-    found = []
-    for name, target in TARGETS.items():
-        if target.detect(dir_path):
-            found.append(TargetEntry(name=name, path=dir_path))
-    return found
+    # No targets key in the merged config -- apply two-tier rule
+    has_config_file = os.path.exists(os.path.join(dir_path, ".rlsbl", "config.json"))
+
+    if not has_config_file:
+        # Discovery case: no config.json at all, auto-detect
+        return _auto_detect(dir_path)
+
+    # Config file exists but no targets key: hard error with hints
+    hints = _auto_detect(dir_path)
+    hint_names = [e.name for e in hints]
+    if hint_names:
+        suggestion = (
+            f"Add a \"targets\" key to .rlsbl/config.json or .rlsbl/publish.json. "
+            f"Auto-detected targets: {', '.join(hint_names)}"
+        )
+    else:
+        suggestion = (
+            "Add a \"targets\" key to .rlsbl/config.json or .rlsbl/publish.json. "
+            "No targets could be auto-detected from project manifests."
+        )
+    raise ConfigError(
+        f"Config exists but no \"targets\" key in merged config for {dir_path}. {suggestion}"
+    )

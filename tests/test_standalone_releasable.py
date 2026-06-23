@@ -257,7 +257,7 @@ class TestCheckContextFactoryStandalone:
         # Create a minimal rlsbl project
         rlsbl_dir = tmp_project / ".rlsbl"
         rlsbl_dir.mkdir()
-        (rlsbl_dir / "config.json").write_text("{}")
+        (rlsbl_dir / "config.json").write_text('{"targets": ["pypi"]}')
         (tmp_project / "pyproject.toml").write_text(
             '[project]\nname = "testpkg"\nversion = "0.1.0"\n'
         )

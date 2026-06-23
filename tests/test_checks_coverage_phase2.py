@@ -41,7 +41,9 @@ def _init_repo(repo):
 def _setup_scaffold(repo, config=None, tag=None):
     """Add .rlsbl/ scaffold to a repo."""
     if config is None:
-        config = {"private": False}
+        config = {"private": False, "targets": []}
+    elif "targets" not in config:
+        config = {**config, "targets": []}
     changes = repo / ".rlsbl" / "changes"
     changes.mkdir(parents=True, exist_ok=True)
     (changes / "unreleased.jsonl").write_text("")
@@ -106,7 +108,7 @@ class TestPrepushMonorepoPushedCommitsNone:
         changes = pkg / ".rlsbl" / "changes"
         changes.mkdir(parents=True)
         (changes / "unreleased.jsonl").write_text("")
-        (pkg / ".rlsbl" / "config.json").write_text(json.dumps({"private": False}))
+        (pkg / ".rlsbl" / "config.json").write_text(json.dumps({"private": False, "targets": ["npm"]}))
 
         make_workspace(repo, [{"path": "packages/alpha", "name": "alpha"}])
         run_git(repo, "add", ".")
@@ -307,7 +309,7 @@ class TestPrepushImplicitMonorepoEdgeCases:
         changes.mkdir(parents=True)
         (changes / "unreleased.jsonl").write_text("")
         (repo / "packages" / "alpha" / ".rlsbl" / "config.json").write_text(
-            json.dumps({"private": False})
+            json.dumps({"private": False, "targets": ["npm"]})
         )
 
         make_workspace(repo, [
@@ -567,7 +569,7 @@ class TestVersionConsistency:
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
-        _setup_scaffold(repo)
+        _setup_scaffold(repo, config={"private": False, "targets": ["pypi", "npm"]})
         (repo / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "0.1.0"\n'
         )
@@ -587,7 +589,7 @@ class TestVersionConsistency:
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
-        _setup_scaffold(repo)
+        _setup_scaffold(repo, config={"private": False, "targets": ["pypi"]})
         (repo / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "0.1.0"\n'
         )
@@ -666,7 +668,7 @@ class TestNameConsistency:
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
-        _setup_scaffold(repo)
+        _setup_scaffold(repo, config={"private": False, "targets": ["pypi", "npm"]})
         (repo / "pyproject.toml").write_text(
             '[project]\nname = "alpha"\nversion = "0.1.0"\n'
         )
@@ -685,7 +687,7 @@ class TestNameConsistency:
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
-        _setup_scaffold(repo)
+        _setup_scaffold(repo, config={"private": False, "targets": ["pypi"]})
         (repo / "pyproject.toml").write_text(
             '[project]\nname = "mylib"\nversion = "0.1.0"\n'
         )
@@ -1264,7 +1266,7 @@ class TestTargetVersionReadable:
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
-        _setup_scaffold(repo)
+        _setup_scaffold(repo, config={"private": False, "targets": ["pypi"]})
         (repo / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "0.1.0"\n'
         )
@@ -1392,7 +1394,7 @@ class TestSelfdocVersionDrift:
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
-        _setup_scaffold(repo)
+        _setup_scaffold(repo, config={"private": False, "targets": ["pypi"]})
         (repo / "selfdoc.json").write_text('{"version": "0.1.0"}\n')
         (repo / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "0.1.0"\n'
@@ -1410,7 +1412,7 @@ class TestSelfdocVersionDrift:
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
-        _setup_scaffold(repo)
+        _setup_scaffold(repo, config={"private": False, "targets": ["pypi"]})
         (repo / "selfdoc.json").write_text('{"version": "0.2.0"}\n')
         (repo / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "0.1.0"\n'
@@ -2206,7 +2208,7 @@ class TestWorkspaceUnregistered:
         gamma.mkdir()
         rlsbl = gamma / ".rlsbl"
         rlsbl.mkdir()
-        (rlsbl / "config.json").write_text('{"private": false}\n')
+        (rlsbl / "config.json").write_text('{"private": false, "targets": ["npm"]}\n')
 
         from rlsbl.workspace import WorkspaceProject
         projects = []  # No projects registered
