@@ -127,6 +127,13 @@ class TestGoDetection:
         result = detect_strictcli(str(tmp_path))
         assert result is None
 
+    def test_go_mod_only_no_entry_points(self, tmp_path):
+        """go.mod with strictcli dep but no main.go anywhere returns None."""
+        _write_go_mod(tmp_path)
+        # No main.go at root, no cmd/ directory at all -- just go.mod
+        result = detect_strictcli(str(tmp_path))
+        assert result is None
+
 
 class TestSchemaDumpBranching:
     """Tests for schema dump command construction and invocation."""
