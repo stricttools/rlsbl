@@ -25,12 +25,24 @@ class MavenLinter:
         if cmd is None:
             return []
 
-        result = subprocess.run(
-            cmd,
-            cwd=project_path,
-            capture_output=True,
-            text=True,
-        )
+        try:
+            result = subprocess.run(
+                cmd,
+                cwd=project_path,
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+        except subprocess.TimeoutExpired:
+            return [
+                LintResult(
+                    file=project_path,
+                    line=0,
+                    rule="maven-lint",
+                    severity="error",
+                    message=f"Lint command timed out after 120s: {cmd}",
+                )
+            ]
 
         if result.returncode == 0:
             return []

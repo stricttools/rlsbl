@@ -37,6 +37,7 @@ class TestMavenLinterLint:
             cwd=str(tmp_path),
             capture_output=True,
             text=True,
+            timeout=120,
         )
 
     def test_returns_lint_result_on_failure(self, tmp_path):
