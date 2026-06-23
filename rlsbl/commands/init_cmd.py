@@ -909,7 +909,7 @@ def _install_or_update_pre_push_hook():
 def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnings, *,
                        registry=None, flags=None, registries=None,
                        npm_lockfile_missing=False, target_paths=None,
-                       project_root, config):
+                       project_root, config, removed_paths=None):
     """Shared post-processing for scaffold: chmod, hooks, version marker, hashes, tagging, summary.
 
     all_hash_dicts is a list of dicts to merge into existing_hashes.
@@ -1004,6 +1004,14 @@ def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnin
 
     # Save hashes (all files for change detection)
     existing_hashes.update(all_new_hashes)
+
+    # Purge hashes for files removed by _skip_redundant_releasable_configs.
+    # removed_paths are absolute; existing_hashes keys are relative to CWD.
+    if removed_paths:
+        for abs_path in removed_paths:
+            rel_key = os.path.relpath(abs_path, project_root)
+            existing_hashes.pop(rel_key, None)
+
     save_hashes(existing_hashes)
 
     # Ecosystem tagging
@@ -1969,7 +1977,7 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         warnings = ci_warnings + extra_warnings + merged_warnings + shared_warnings
 
         # Remove per-package config/publish.json that duplicate releasable config
-        _skip_redundant_releasable_configs(project_root, warnings)
+        removed_paths = _skip_redundant_releasable_configs(project_root, warnings)
 
         _finalize_scaffold(
             existing_hashes, [ci_hashes, extra_hashes, merged_hashes, shared_hashes],
@@ -1978,6 +1986,7 @@ def run_cmd_multi(registries_list, args, flags, ctx):
             target_paths=target_paths,
             project_root=project_root,
             config=ctx.config,
+            removed_paths=removed_paths,
         )
 
         if private:
