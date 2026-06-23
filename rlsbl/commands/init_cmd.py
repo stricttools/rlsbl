@@ -163,7 +163,18 @@ def _skip_redundant_releasable_configs(project_root, warnings):
         rel_config = reader(rel_path)
 
         if pkg_config == rel_config:
-            os.unlink(pkg_path)
+            subprocess.run(
+                [
+                    "saferm", "delete",
+                    "--description",
+                    f"Removing redundant per-package .rlsbl/{filename} "
+                    f"(identical to releasable config)",
+                    pkg_path,
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             removed.append(pkg_path)
             print(
                 f"Skipped per-package .rlsbl/{filename} "
@@ -955,11 +966,31 @@ def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnin
             continue
         stored_hash = old_managed[orphan_path]
         if force or file_hash(orphan_path) == stored_hash:
-            os.unlink(orphan_path)
+            subprocess.run(
+                [
+                    "saferm", "delete",
+                    "--description",
+                    f"Removing orphaned scaffold file: {orphan_path}",
+                    orphan_path,
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             # Also clean up the merge base if it exists
             base_path = os.path.join(BASES_DIR, orphan_path)
             if os.path.exists(base_path):
-                os.unlink(base_path)
+                subprocess.run(
+                    [
+                        "saferm", "delete",
+                        "--description",
+                        f"Removing orphaned scaffold merge base: {base_path}",
+                        base_path,
+                    ],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
             created.append((orphan_path, "removed (orphan)"))
         else:
             print(
@@ -1309,7 +1340,7 @@ def run_cmd(registry, args, flags, ctx):
                 )
 
         # Remove per-package config/publish.json that duplicate releasable config
-        _skip_redundant_releasable_configs(project_root, warnings)
+        removed_paths = _skip_redundant_releasable_configs(project_root, warnings)
 
         _finalize_scaffold(
             existing_hashes, [reg_hashes, pipe_hashes, shared_hashes],
@@ -1319,6 +1350,7 @@ def run_cmd(registry, args, flags, ctx):
             target_paths={registry: "."},
             project_root=project_root,
             config=ctx.config,
+            removed_paths=removed_paths,
         )
 
         if private:

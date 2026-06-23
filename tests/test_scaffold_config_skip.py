@@ -366,3 +366,131 @@ class TestNonReleasableConfigPreserved:
         config = json.loads(config_path.read_text())
         assert "targets" in config
         assert "plain" in config["targets"]
+
+
+# ---------------------------------------------------------------------------
+# Phase 1e: saferm invocation for file removal
+# ---------------------------------------------------------------------------
+
+
+class TestSafermInvocation:
+    """Verify that scaffold uses saferm instead of os.unlink for file deletion."""
+
+    def test_skip_redundant_uses_saferm(self, mock_git_repo, monkeypatch):
+        """_skip_redundant_releasable_configs calls saferm to remove identical configs."""
+        from unittest.mock import patch, MagicMock
+        import subprocess as real_subprocess
+
+        proj_dir = mock_git_repo / "app"
+        proj_dir.mkdir()
+        _make_explicit_workspace(mock_git_repo, [{"name": "www"}], [
+            {"path": "app", "name": "app", "releasable": "www"},
+        ])
+
+        config = {"private": False, "targets": ["pypi"]}
+        _setup_releasable(mock_git_repo, "www", config=config)
+        _write_pkg_config(proj_dir, config)
+
+        saferm_calls = []
+        original_run = real_subprocess.run
+
+        def tracking_run(cmd, *args, **kwargs):
+            if cmd and cmd[0] == "saferm":
+                saferm_calls.append(cmd)
+                # Actually delete the file so the rest of the logic works
+                target_file = cmd[-1]
+                if os.path.exists(target_file):
+                    os.unlink(target_file)
+                return real_subprocess.CompletedProcess(args=cmd, returncode=0)
+            return original_run(cmd, *args, **kwargs)
+
+        with patch("rlsbl.commands.init_cmd.subprocess.run", side_effect=tracking_run):
+            warnings = []
+            removed = _skip_redundant_releasable_configs(proj_dir, warnings)
+
+        assert len(saferm_calls) == 1
+        call = saferm_calls[0]
+        assert call[0] == "saferm"
+        assert call[1] == "delete"
+        assert "--description" in call
+        assert str(proj_dir / ".rlsbl" / "config.json") == call[-1]
+        assert any("config.json" in str(p) for p in removed)
+
+    def test_orphan_cleanup_uses_saferm(self, mock_git_repo, monkeypatch):
+        """_finalize_scaffold uses saferm to remove orphaned files and their bases."""
+        from unittest.mock import patch
+        import subprocess as real_subprocess
+        from rlsbl.commands.init_cmd import (
+            _finalize_scaffold,
+            BASES_DIR,
+            save_managed_files,
+            save_hashes,
+            file_hash,
+        )
+
+        # Set up a minimal scaffold environment
+        monkeypatch.chdir(mock_git_repo)
+        rlsbl_dir = mock_git_repo / ".rlsbl"
+        rlsbl_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create an orphan file and its merge base (use relative paths as
+        # _finalize_scaffold operates in the cwd context)
+        orphan_rel = os.path.join("old_workflow.yml")
+        orphan_abs = mock_git_repo / "old_workflow.yml"
+        orphan_abs.write_text("old content\n")
+        orphan_hash = file_hash(orphan_rel)
+
+        bases_dir = mock_git_repo / BASES_DIR
+        bases_dir.mkdir(parents=True, exist_ok=True)
+        base_file = bases_dir / orphan_rel
+        base_file.parent.mkdir(parents=True, exist_ok=True)
+        base_file.write_text("base content\n")
+
+        # Save the orphan in managed-files so _finalize_scaffold sees it as an orphan
+        save_managed_files({orphan_rel: orphan_hash})
+        save_hashes({orphan_rel: orphan_hash})
+
+        saferm_calls = []
+        original_run = real_subprocess.run
+
+        def tracking_run(cmd, *args, **kwargs):
+            if isinstance(cmd, list) and cmd and cmd[0] == "saferm":
+                saferm_calls.append(list(cmd))
+                # Actually delete the file so the rest of the logic works
+                target_file = cmd[-1]
+                if os.path.exists(target_file):
+                    os.unlink(target_file)
+                return real_subprocess.CompletedProcess(args=cmd, returncode=0)
+            return original_run(cmd, *args, **kwargs)
+
+        with patch("rlsbl.commands.init_cmd.subprocess.run", side_effect=tracking_run):
+            config = {"targets": ["plain"], "private": False}
+            created = []
+            _finalize_scaffold(
+                existing_hashes={orphan_rel: orphan_hash},
+                all_hash_dicts=[{}],
+                created=created,
+                skipped=[],
+                warnings=[],
+                flags={"no-commit": True, "no-tag": True, "skip-shared": False},
+                project_root=str(mock_git_repo),
+                config=config,
+            )
+
+        # Should have 2 saferm calls: one for orphan file, one for base file
+        assert len(saferm_calls) == 2
+
+        # First call: orphan file
+        assert saferm_calls[0][0] == "saferm"
+        assert saferm_calls[0][1] == "delete"
+        assert "--description" in saferm_calls[0]
+        assert orphan_rel == saferm_calls[0][-1]
+
+        # Second call: base file
+        assert saferm_calls[1][0] == "saferm"
+        assert saferm_calls[1][1] == "delete"
+        assert "--description" in saferm_calls[1]
+
+        # Verify the orphan shows up in created list
+        orphan_entries = [e for e in created if e[1] == "removed (orphan)"]
+        assert len(orphan_entries) == 1
