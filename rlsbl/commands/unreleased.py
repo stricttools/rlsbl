@@ -75,7 +75,9 @@ def run_cmd(registry, args, flags, project_root):
                         from ..commands.release.validate import _releasable_tag_glob
                         tag_glob = _releasable_tag_glob(rel.tag_format, rel.name)
                 if tag_glob is None:
-                    targets = detect_targets(root_str)
+                    from ..targets import resolve_releasable_config_dir
+                    rel_dir = resolve_releasable_config_dir(monorepo_project, ws_root)
+                    targets = detect_targets(root_str, releasable_config_dir=rel_dir)
                     if targets:
                         target = TARGETS[targets[0].name]
                         tag_glob = target.monorepo_tag_glob(

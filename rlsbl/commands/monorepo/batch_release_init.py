@@ -8,7 +8,7 @@ import sys
 import tomlkit
 
 from ...release_file import get_batch_release_file_path
-from ...targets import detect_targets, TARGETS
+from ...targets import detect_targets, resolve_releasable_config_dir, TARGETS
 from ...workspace import find_workspace_root, load_workspace
 
 
@@ -28,7 +28,8 @@ def _get_unreleased_commit_count(proj, workspace_root):
 
     # Determine tag glob for this project
     project_dir = os.path.join(workspace_root, path)
-    target_entries = detect_targets(project_dir)
+    rel_dir = resolve_releasable_config_dir(proj, workspace_root)
+    target_entries = detect_targets(project_dir, releasable_config_dir=rel_dir)
     if target_entries and target_entries[0].name in TARGETS:
         tag_glob = TARGETS[target_entries[0].name].monorepo_tag_glob(name, path=path)
     else:
@@ -131,7 +132,8 @@ def _collect_releasable_targets(releasable_name, member_projects, workspace_root
     result = []
     for proj in member_projects:
         project_dir = os.path.join(workspace_root, proj["path"])
-        entries = detect_targets(project_dir)
+        rel_dir = resolve_releasable_config_dir(proj, workspace_root)
+        entries = detect_targets(project_dir, releasable_config_dir=rel_dir)
         for e in entries:
             if e.name not in seen:
                 seen.add(e.name)
@@ -311,7 +313,8 @@ def _scaffold_package_sections(workspace_root, projects, batch_path, filter_name
             continue
 
         project_dir = os.path.join(workspace_root, proj["path"])
-        entries = detect_targets(project_dir)
+        rel_dir = resolve_releasable_config_dir(proj, workspace_root)
+        entries = detect_targets(project_dir, releasable_config_dir=rel_dir)
         if not entries:
             print(
                 f"Warning: no targets detected for {proj['name']}, skipping.",

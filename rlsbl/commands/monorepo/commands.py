@@ -10,7 +10,7 @@ from ...git_util import validate_subtree_remote_ssh_host
 from ...utils import commit_files
 from ...workspace import find_workspace_root, load_workspace, save_workspace, WORKSPACE_DIR, WORKSPACE_FILE
 from ...workspace_graph import WorkspaceGraph
-from ...targets import detect_targets, TARGETS, TargetEntry
+from ...targets import detect_targets, resolve_releasable_config_dir, TARGETS, TargetEntry
 
 
 def _cmd_init(flags, project_root):
@@ -288,7 +288,8 @@ def _cmd_status(flags, project_root):
         path = proj["path"]
 
         # Detect targets
-        target_entries = detect_targets(os.path.join(root, path))
+        rel_dir = resolve_releasable_config_dir(proj, root)
+        target_entries = detect_targets(os.path.join(root, path), releasable_config_dir=rel_dir)
         target_names = [e.name for e in target_entries]
         target_display = ", ".join(target_names) if target_names else "none"
 
@@ -551,7 +552,8 @@ def _cmd_outdated(flags, project_root):
     for proj in projects:
         name = proj["name"]
         path = proj["path"]
-        target_entries = detect_targets(os.path.join(root, path))
+        rel_dir = resolve_releasable_config_dir(proj, root)
+        target_entries = detect_targets(os.path.join(root, path), releasable_config_dir=rel_dir)
         if target_entries and target_entries[0].name in TARGETS:
             project_version_info[name] = (target_entries[0].name, target_entries[0].path)
 

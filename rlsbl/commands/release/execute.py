@@ -315,7 +315,7 @@ def _sync_member_package_versions(
             continue
 
         # Detect targets and write version
-        entries = detect_targets(abs_pkg)
+        entries = detect_targets(abs_pkg, releasable_config_dir=releasable_config_dir)
         if not entries:
             continue
 

@@ -63,10 +63,11 @@ def register_quality_checks(app):
     @app.check("dead-modules")
     def check_dead_modules(ctx):
         """Unreferenced Python modules, Go internal packages, npm or Dart source files."""
-        from ..targets import detect_targets
+        from ..targets import detect_targets, resolve_releasable_config_dir_for_ctx
 
         root_str = str(ctx.project_root)
-        target_entries = detect_targets(root_str)
+        rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
+        target_entries = detect_targets(root_str, releasable_config_dir=rel_dir)
         target_names = {e.name for e in target_entries}
 
         supported = {"pypi", "go", "npm", "dart"} & target_names
@@ -135,10 +136,11 @@ def register_quality_checks(app):
     @app.check("circular-deps")
     def check_circular_deps(ctx):
         """Detect intra-package circular import dependencies."""
-        from ..targets import detect_targets
+        from ..targets import detect_targets, resolve_releasable_config_dir_for_ctx
 
         root_str = str(ctx.project_root)
-        target_entries = detect_targets(root_str)
+        rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
+        target_entries = detect_targets(root_str, releasable_config_dir=rel_dir)
         target_names = {e.name for e in target_entries}
 
         supported = {"pypi", "npm", "dart"} & target_names
@@ -256,10 +258,11 @@ def register_quality_checks(app):
         if ctx.workspace_root is not None and str(ctx.project_root) == str(ctx.workspace_root):
             return CheckResult("skip", "workspace root — use test-suite-workspace")
 
-        from ..targets import detect_targets
+        from ..targets import detect_targets, resolve_releasable_config_dir_for_ctx
         from ..testing import run_project_tests
 
-        target_entries = detect_targets(str(ctx.project_root))
+        rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
+        target_entries = detect_targets(str(ctx.project_root), releasable_config_dir=rel_dir)
         recognized = {"pypi", "go", "npm", "maven"}
         target_name = None
         for name, _path in target_entries:
@@ -280,10 +283,11 @@ def register_quality_checks(app):
     @app.check("maven-central-metadata")
     def check_maven_central_metadata(ctx):
         """Validate Maven Central publishing requirements (POM metadata, sources/javadoc jars)."""
-        from ..targets import detect_targets
+        from ..targets import detect_targets, resolve_releasable_config_dir_for_ctx
         from ..maven_central import validate_maven_central_metadata
 
-        target_entries = detect_targets(str(ctx.project_root))
+        rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
+        target_entries = detect_targets(str(ctx.project_root), releasable_config_dir=rel_dir)
         if not any(name == "maven" for name, _path in target_entries):
             return CheckResult("skip", "not a maven project")
 

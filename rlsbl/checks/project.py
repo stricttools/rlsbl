@@ -158,9 +158,10 @@ def register_project_checks(app):
                 f"{releasable_version} (from releasable version file)",
             )
 
-        from ..targets import TARGETS, detect_targets
+        from ..targets import TARGETS, detect_targets, resolve_releasable_config_dir_for_ctx
 
-        target_entries = detect_targets(str(ctx.project_root))
+        rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
+        target_entries = detect_targets(str(ctx.project_root), releasable_config_dir=rel_dir)
         if not target_entries:
             return CheckResult("warn", "no targets detected")
 
@@ -203,7 +204,7 @@ def register_project_checks(app):
     @app.check("name-consistency")
     def check_name_consistency(ctx):
         """All detected targets must report the same package name."""
-        from ..targets import TARGETS, detect_targets
+        from ..targets import TARGETS, detect_targets, resolve_releasable_config_dir_for_ctx
         from ..targets.utils import normalize_go, normalize_npm, normalize_pypi
 
         def _normalize_name(target_name, raw_name):
@@ -215,7 +216,8 @@ def register_project_checks(app):
             normalizer = normalizers.get(target_name, str.lower)
             return normalizer(raw_name)
 
-        target_entries = detect_targets(str(ctx.project_root))
+        rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
+        target_entries = detect_targets(str(ctx.project_root), releasable_config_dir=rel_dir)
         if not target_entries:
             return CheckResult("warn", "no targets detected")
 
@@ -251,9 +253,10 @@ def register_project_checks(app):
     @app.check("license-consistency")
     def check_license_consistency(ctx):
         """All detected targets must report the same license."""
-        from ..targets import TARGETS, detect_targets
+        from ..targets import TARGETS, detect_targets, resolve_releasable_config_dir_for_ctx
 
-        target_entries = detect_targets(str(ctx.project_root))
+        rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
+        target_entries = detect_targets(str(ctx.project_root), releasable_config_dir=rel_dir)
         if not target_entries:
             return CheckResult("pass", "no targets declare a license")
 
@@ -284,9 +287,10 @@ def register_project_checks(app):
     @app.check("description-consistency")
     def check_description_consistency(ctx):
         """All detected targets must report the same description."""
-        from ..targets import TARGETS, detect_targets
+        from ..targets import TARGETS, detect_targets, resolve_releasable_config_dir_for_ctx
 
-        target_entries = detect_targets(str(ctx.project_root))
+        rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
+        target_entries = detect_targets(str(ctx.project_root), releasable_config_dir=rel_dir)
         if not target_entries:
             return CheckResult("pass", "no targets declare a description")
 
@@ -498,9 +502,10 @@ def register_project_checks(app):
     @app.check("target-version-readable")
     def check_target_version_readable(ctx):
         """Every detected target must be able to read its version without error."""
-        from ..targets import TARGETS, detect_targets
+        from ..targets import TARGETS, detect_targets, resolve_releasable_config_dir_for_ctx
 
-        target_entries = detect_targets(str(ctx.project_root))
+        rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
+        target_entries = detect_targets(str(ctx.project_root), releasable_config_dir=rel_dir)
         if not target_entries:
             return CheckResult("skip", "no targets detected")
 
@@ -541,9 +546,10 @@ def register_project_checks(app):
         if selfdoc_version is None:
             return CheckResult("skip", "selfdoc.json has no version field")
 
-        from ..targets import TARGETS, detect_targets
+        from ..targets import TARGETS, detect_targets, resolve_releasable_config_dir_for_ctx
 
-        target_entries = detect_targets(root_str)
+        rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
+        target_entries = detect_targets(root_str, releasable_config_dir=rel_dir)
         if not target_entries:
             return CheckResult("skip", "no targets detected")
 

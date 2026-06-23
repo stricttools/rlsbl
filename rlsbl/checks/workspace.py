@@ -66,11 +66,12 @@ def register_workspace_checks(app):
         if not isinstance(ctx, WorkspaceCheckContext):
             return CheckResult("skip", "not a monorepo workspace")
 
-        from ..targets import detect_targets
+        from ..targets import detect_targets, resolve_releasable_config_dir
 
         missing = []
         for proj in ctx.projects:
-            targets = detect_targets(os.path.join(str(ctx.workspace_root), proj["path"]))
+            rel_dir = resolve_releasable_config_dir(proj, ctx.workspace_root)
+            targets = detect_targets(os.path.join(str(ctx.workspace_root), proj["path"]), releasable_config_dir=rel_dir)
             if not targets:
                 missing.append(proj["name"])
 
@@ -292,13 +293,14 @@ def register_workspace_checks(app):
             return CheckResult("skip", "not a workspace")
 
         # Only relevant when there are pypi-target projects in the workspace
-        from ..targets import detect_targets
+        from ..targets import detect_targets, resolve_releasable_config_dir
 
         root = str(ctx.workspace_root)
         has_pypi = False
         for proj in ctx.projects:
             proj_dir = os.path.join(root, proj["path"])
-            target_entries = detect_targets(proj_dir)
+            rel_dir = resolve_releasable_config_dir(proj, ctx.workspace_root)
+            target_entries = detect_targets(proj_dir, releasable_config_dir=rel_dir)
             if any(e.name == "pypi" for e in target_entries):
                 has_pypi = True
                 break
@@ -471,7 +473,7 @@ def register_workspace_checks(app):
             return CheckResult("skip", "not a monorepo workspace")
 
         from ..commands.monorepo import _evaluate_constraint
-        from ..targets import TARGETS, detect_targets
+        from ..targets import TARGETS, detect_targets, resolve_releasable_config_dir
 
         root = str(ctx.workspace_root)
 
@@ -479,7 +481,8 @@ def register_workspace_checks(app):
         project_versions = {}
         for proj in ctx.projects:
             proj_dir = os.path.join(root, proj["path"])
-            target_entries = detect_targets(proj_dir)
+            rel_dir = resolve_releasable_config_dir(proj, ctx.workspace_root)
+            target_entries = detect_targets(proj_dir, releasable_config_dir=rel_dir)
             for entry in target_entries:
                 target = TARGETS.get(entry.name)
                 if target is None:
@@ -555,7 +558,7 @@ def register_workspace_checks(app):
 
         from ..commands.pre_push_check import _parse_stdin_refs
         from ..git_util import affected_projects as _affected, get_push_changed_files
-        from ..targets import detect_targets
+        from ..targets import detect_targets, resolve_releasable_config_dir
         from ..testing import run_project_tests, sync_workspace
 
         stdin_lines = ctx.push_stdin.strip().splitlines()
@@ -584,7 +587,8 @@ def register_workspace_checks(app):
         has_pypi = False
         for proj in affected:
             project_dir = os.path.join(str(ctx.workspace_root), proj["path"])
-            target_entries = detect_targets(project_dir)
+            rel_dir = resolve_releasable_config_dir(proj, ctx.workspace_root)
+            target_entries = detect_targets(project_dir, releasable_config_dir=rel_dir)
 
             target_name = None
             for name, _path in target_entries:

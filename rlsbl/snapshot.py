@@ -4,7 +4,7 @@ import json
 import os
 from datetime import datetime, timezone
 
-from .targets import detect_targets, TARGETS
+from .targets import detect_targets, resolve_releasable_config_dir, TARGETS
 from .workspace import WORKSPACE_DIR, WorkspaceProject, members_of, project_is_dev_only, project_is_releasable
 
 
@@ -32,7 +32,8 @@ def generate_snapshot(root, projects, graph, releasables=None):
         path = proj["path"]
 
         # Detect targets
-        target_entries = detect_targets(os.path.join(root, path))
+        rel_dir = resolve_releasable_config_dir(proj, root)
+        target_entries = detect_targets(os.path.join(root, path), releasable_config_dir=rel_dir)
         target_names = [e.name for e in target_entries]
 
         # Read version (use first target -- one version per project)

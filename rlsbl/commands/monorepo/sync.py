@@ -13,7 +13,7 @@ from ...commands.init_cmd import process_template
 from ...context import create_context
 from ...utils import commit_files, commit_files_if_changed
 from ...workspace import find_workspace_root, load_workspace
-from ...targets import detect_targets, TARGETS
+from ...targets import detect_targets, resolve_releasable_config_dir, TARGETS
 
 
 def parse_ci_workflow(content):
@@ -230,7 +230,8 @@ def _get_monorepo_tag_prefix(project, root, releasables=None):
                     # Format with empty version to get the prefix
                     return rel.tag_format.format(name=rel.name, version="")
 
-    target_entries = detect_targets(os.path.join(root, project["path"]))
+    rel_dir = resolve_releasable_config_dir(project, root)
+    target_entries = detect_targets(os.path.join(root, project["path"]), releasable_config_dir=rel_dir)
     if target_entries and target_entries[0].name in TARGETS:
         glob = TARGETS[target_entries[0].name].monorepo_tag_glob(
             project["name"], path=project["path"]
@@ -250,8 +251,10 @@ def _build_project_template_vars(project_dir, root):
     in workflow comments.
     """
     from pathlib import Path
+    from ...context import _resolve_releasable_config_dir
 
-    target_entries = detect_targets(project_dir)
+    rel_dir = _resolve_releasable_config_dir(Path(project_dir), Path(root))
+    target_entries = detect_targets(project_dir, releasable_config_dir=rel_dir)
     if not target_entries:
         return {}
 
@@ -556,7 +559,8 @@ def _cmd_sync(flags, project_root):
 
     # Warn about Swift projects without subtree_remote
     for proj in projects:
-        proj_targets = detect_targets(os.path.join(root, proj["path"]))
+        rel_dir = resolve_releasable_config_dir(proj, root)
+        proj_targets = detect_targets(os.path.join(root, proj["path"]), releasable_config_dir=rel_dir)
         if any(te.name in ("swift", "swift-apple") for te in proj_targets):
             if not proj.get("subtree_remote"):
                 print(

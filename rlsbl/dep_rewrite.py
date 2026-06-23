@@ -6,7 +6,7 @@ import sys
 import tomlkit
 
 from .errors import VersionError
-from .targets import TARGETS, detect_targets
+from .targets import TARGETS, detect_targets, resolve_releasable_config_dir
 from .workspace_graph import _parse_pypi_dep_name
 
 
@@ -119,7 +119,8 @@ def build_rewrite_map(workspace_root, projects, graph):
     rewrite_map = {}
     for proj in projects:
         proj_dir = os.path.join(workspace_root, proj["path"])
-        targets = detect_targets(proj_dir)
+        rel_dir = resolve_releasable_config_dir(proj, workspace_root)
+        targets = detect_targets(proj_dir, releasable_config_dir=rel_dir)
         for entry in targets:
             target = TARGETS.get(entry.name)
             if target is None:

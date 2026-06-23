@@ -179,17 +179,12 @@ def run_cmd(registry, args, flags, ctx):
     project_root = ctx.project_root
     root_str = str(project_root)
 
-    # Build per-target path mapping from detect_targets
-    target_entries = detect_targets(root_str)
-    target_paths = {entry.name: entry.path for entry in target_entries}
-
-    # Use per-target path for the primary registry
-    primary_path = target_paths.get(registry, root_str)
-
     # Detect monorepo context early so coverage uses scoped tags
+    # and detect_targets can use releasable config inheritance
     monorepo_project = None
     monorepo_count = None
     releasable_info = None  # (releasable_name, tag_format, version) in explicit mode
+    releasable_config_dir = None
     try:
         ws_root = find_workspace_root(root_str)
         if ws_root is not None:
@@ -208,8 +203,18 @@ def run_cmd(registry, args, flags, ctx):
                         except Exception:
                             rel_ver = None
                         releasable_info = (rel.name, rel.tag_format, rel_ver)
+            if monorepo_project:
+                from ..targets import resolve_releasable_config_dir
+                releasable_config_dir = resolve_releasable_config_dir(monorepo_project, ws_root)
     except Exception as e:
         print(f"Warning: could not detect monorepo context: {e}", file=sys.stderr)
+
+    # Build per-target path mapping from detect_targets
+    target_entries = detect_targets(root_str, releasable_config_dir=releasable_config_dir)
+    target_paths = {entry.name: entry.path for entry in target_entries}
+
+    # Use per-target path for the primary registry
+    primary_path = target_paths.get(registry, root_str)
 
     if releasable_info:
         # In explicit mode, use releasable's tag glob

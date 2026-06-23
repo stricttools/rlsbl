@@ -16,7 +16,7 @@ def _resolve_version_and_tag(ctx):
 
     Returns ``(version, tag)``; either may be ``None``.
     """
-    from ..targets import TARGETS, detect_targets
+    from ..targets import TARGETS, detect_targets, resolve_releasable_config_dir_for_ctx
 
     # In explicit releasable mode, version and tag come from the releasable
     if isinstance(ctx, WorkspaceCheckContext) and getattr(ctx, "releasables", None):
@@ -43,7 +43,8 @@ def _resolve_version_and_tag(ctx):
                         tag = None
                     return version, tag
 
-    target_entries = detect_targets(str(ctx.project_root))
+    rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
+    target_entries = detect_targets(str(ctx.project_root), releasable_config_dir=rel_dir)
     if not target_entries:
         return None, None
 
@@ -136,8 +137,9 @@ def _get_changelog_context(ctx):
 
     # Use the target's monorepo_tag_glob() to get the correct
     # tag pattern (e.g. Go uses "path/v*" not "name@v*").
-    from ..targets import TARGETS, detect_targets
-    target_entries = detect_targets(str(ctx.project_root))
+    from ..targets import TARGETS, detect_targets, resolve_releasable_config_dir_for_ctx
+    rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
+    target_entries = detect_targets(str(ctx.project_root), releasable_config_dir=rel_dir)
     if target_entries:
         target = TARGETS[target_entries[0].name]
         tag_glob = target.monorepo_tag_glob(proj['name'], path=proj['path'])

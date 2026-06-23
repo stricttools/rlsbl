@@ -6,7 +6,7 @@ import sys
 
 from ...workspace import find_workspace_root, load_workspace
 from ...workspace_graph import WorkspaceGraph
-from ...targets import detect_targets, TARGETS
+from ...targets import detect_targets, resolve_releasable_config_dir, TARGETS
 
 
 def _collect_graph_data(root, projects, graph):
@@ -23,7 +23,8 @@ def _collect_graph_data(root, projects, graph):
         path = proj["path"]
 
         # Detect targets
-        target_entries = detect_targets(os.path.join(root, path))
+        rel_dir = resolve_releasable_config_dir(proj, root)
+        target_entries = detect_targets(os.path.join(root, path), releasable_config_dir=rel_dir)
         target_names = [e.name for e in target_entries]
 
         # Read version (use first target -- one version per project)

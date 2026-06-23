@@ -56,6 +56,55 @@ TARGETS = {
 }
 
 
+def resolve_releasable_config_dir_for_ctx(ctx):
+    """Resolve the releasable config directory from a check context.
+
+    When ``ctx`` is a WorkspaceCheckContext and the current project
+    belongs to a releasable, returns the releasable config dir path.
+    Otherwise returns None.
+
+    Uses the project attribute on the context to determine releasable
+    membership.
+    """
+    from ..check_context import WorkspaceCheckContext
+
+    if not isinstance(ctx, WorkspaceCheckContext):
+        return None
+    if ctx.project is None:
+        return None
+    return resolve_releasable_config_dir(ctx.project, ctx.workspace_root)
+
+
+def resolve_releasable_config_dir(proj, workspace_root):
+    """Resolve the releasable config directory for a workspace project.
+
+    Checks the project's ``releasable`` field (works with both
+    WorkspaceProject objects and plain dicts). Returns the path to
+    the releasable's state directory if the project belongs to a named
+    releasable, or None otherwise.
+
+    Args:
+        proj: a WorkspaceProject or dict with optional ``releasable`` key.
+        workspace_root: path to the monorepo root (str or Path).
+
+    Returns:
+        Path string to the releasable config directory, or None.
+    """
+    from ..workspace import WorkspaceProject, get_releasable_dir
+
+    if isinstance(proj, WorkspaceProject):
+        rel_name = proj.releasable if isinstance(proj.releasable, str) else None
+    elif isinstance(proj, dict):
+        val = proj.get("releasable")
+        rel_name = val if isinstance(val, str) else None
+    else:
+        return None
+
+    if rel_name is not None:
+        return get_releasable_dir(str(workspace_root), rel_name)
+    return None
+
+
 def _parse_target_entry(entry, base_dir):
     """Parse a target config entry (string or dict) into a TargetEntry."""
     if isinstance(entry, str):
