@@ -2,6 +2,14 @@
 
 # Changelog
 
+## 0.81.5
+
+Fix CI: autouse saferm mock for scaffold tests
+
+### Fixes
+
+- **Fix CI test failures.** Autouse saferm mock fixture applied to all scaffold tests.
+
 ## 0.81.4
 
 Fix CI: mock saferm in all scaffold tests
