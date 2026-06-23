@@ -1497,6 +1497,9 @@ class TestRootProjectDepScan:
         class MockApp:
             _checks_enabled = True
 
+            def set_scope_adapter(self, adapter):
+                pass
+
             def check(self, name):
                 def decorator(fn):
                     captured[name] = fn
@@ -1576,6 +1579,9 @@ class TestRootProjectDepScan:
         class MockApp:
             _checks_enabled = True
 
+            def set_scope_adapter(self, adapter):
+                pass
+
             def check(self, name):
                 def decorator(fn):
                     captured[name] = fn
@@ -1608,6 +1614,9 @@ class TestDepsChecksIntegration:
         class MockApp:
             _checks_enabled = True
 
+            def set_scope_adapter(self, adapter):
+                pass
+
             def check(self, name):
                 def decorator(fn):
                     captured[name] = fn
@@ -1629,25 +1638,21 @@ class TestDepsChecksIntegration:
         assert "deps-undeclared" in captured
 
     def test_deps_unused_skip_not_workspace(self):
-        """deps-unused skips when context is not a workspace."""
-        from strictcli import CheckResult
-
+        """deps-unused skips when context is not a workspace (via scope adapter)."""
+        from rlsbl.checks.scope import scope_adapter
         from rlsbl.context import ProjectContext
 
-        captured = self._capture_checks()
         ctx = ProjectContext(project_root=Path("/tmp/fake"), workspace_root=None, config={})
-        result = captured["deps-unused"](ctx)
+        result = scope_adapter(ctx, "workspace")
         assert result.status == "skip"
 
     def test_deps_undeclared_skip_not_workspace(self):
-        """deps-undeclared skips when context is not a workspace."""
-        from strictcli import CheckResult
-
+        """deps-undeclared skips when context is not a workspace (via scope adapter)."""
+        from rlsbl.checks.scope import scope_adapter
         from rlsbl.context import ProjectContext
 
-        captured = self._capture_checks()
         ctx = ProjectContext(project_root=Path("/tmp/fake"), workspace_root=None, config={})
-        result = captured["deps-undeclared"](ctx)
+        result = scope_adapter(ctx, "workspace")
         assert result.status == "skip"
 
     def test_deps_unused_pass_clean_workspace(self, tmp_path):
@@ -1801,21 +1806,21 @@ class TestDepsChecksIntegration:
         assert "deps-dev-in-lib" in captured
 
     def test_deps_runtime_test_only_skip_not_workspace(self):
-        """deps-runtime-test-only skips when context is not a workspace."""
+        """deps-runtime-test-only skips when context is not a workspace (via scope adapter)."""
+        from rlsbl.checks.scope import scope_adapter
         from rlsbl.context import ProjectContext
 
-        captured = self._capture_checks()
         ctx = ProjectContext(project_root=Path("/tmp/fake"), workspace_root=None, config={})
-        result = captured["deps-runtime-test-only"](ctx)
+        result = scope_adapter(ctx, "workspace")
         assert result.status == "skip"
 
     def test_deps_dev_in_lib_skip_not_workspace(self):
-        """deps-dev-in-lib skips when context is not a workspace."""
+        """deps-dev-in-lib skips when context is not a workspace (via scope adapter)."""
+        from rlsbl.checks.scope import scope_adapter
         from rlsbl.context import ProjectContext
 
-        captured = self._capture_checks()
         ctx = ProjectContext(project_root=Path("/tmp/fake"), workspace_root=None, config={})
-        result = captured["deps-dev-in-lib"](ctx)
+        result = scope_adapter(ctx, "workspace")
         assert result.status == "skip"
 
     def test_deps_runtime_test_only_warns(self, tmp_path):
@@ -2194,6 +2199,9 @@ class TestDeadWorkspacePackagesCheck:
         class MockApp:
             _checks_enabled = True
 
+            def set_scope_adapter(self, adapter):
+                pass
+
             def check(self, name):
                 def decorator(fn):
                     captured[name] = fn
@@ -2210,12 +2218,12 @@ class TestDeadWorkspacePackagesCheck:
         assert "dead-workspace-packages" in captured
 
     def test_skip_not_workspace(self):
-        """Skips when context is not a workspace."""
+        """Skips when context is not a workspace (via scope adapter)."""
+        from rlsbl.checks.scope import scope_adapter
         from rlsbl.context import ProjectContext
 
-        captured = self._capture_checks()
         ctx = ProjectContext(project_root=Path("/tmp/fake"), workspace_root=None, config={})
-        result = captured["dead-workspace-packages"](ctx)
+        result = scope_adapter(ctx, "workspace")
         assert result.status == "skip"
 
     def test_pass_all_libraries_imported(self, tmp_path):
@@ -2511,6 +2519,9 @@ class TestDeadDartModulesCheck:
 
         class MockApp:
             _checks_enabled = True
+
+            def set_scope_adapter(self, adapter):
+                pass
 
             def check(self, name):
                 def decorator(fn):

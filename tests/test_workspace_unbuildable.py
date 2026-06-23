@@ -15,11 +15,13 @@ class TestWorkspaceUnbuildableSkips:
     """The check skips when the context is not a workspace or has no pypi targets."""
 
     def test_skips_non_workspace(self, mock_git_repo):
-        """Non-workspace context -> skip."""
+        """Non-workspace context -> skip (via scope adapter)."""
+        from rlsbl.checks.scope import scope_adapter
+
         ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
-        result = app._check_defs["workspace-unbuildable"].impl(ctx)
+        result = scope_adapter(ctx, "workspace")
         assert result.status == "skip"
-        assert "not a workspace" in result.message
+        assert "not a monorepo" in result.message
 
     def test_skips_no_pypi_targets(self, mock_git_repo):
         """Workspace with no pypi-target projects -> skip."""

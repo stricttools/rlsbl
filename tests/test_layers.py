@@ -470,6 +470,9 @@ class TestLayersViolationsCheck:
         class MockApp:
             _checks_enabled = True
 
+            def set_scope_adapter(self, adapter):
+                pass
+
             def check(self, name):
                 def decorator(fn):
                     captured[name] = fn
@@ -485,30 +488,14 @@ class TestLayersViolationsCheck:
         assert result.status == "pass"
 
     def test_check_skip_not_workspace(self):
-        """The check skips when context is not a workspace."""
+        """The check skips when context is not a workspace (via scope adapter)."""
         from pathlib import Path
 
-        from strictcli import CheckResult
-
+        from rlsbl.checks.scope import scope_adapter
         from rlsbl.context import ProjectContext
 
         ctx = ProjectContext(project_root=Path("/tmp/fake"), workspace_root=None, config={})
-
-        captured = {}
-
-        class MockApp:
-            _checks_enabled = True
-
-            def check(self, name):
-                def decorator(fn):
-                    captured[name] = fn
-                    return fn
-                return decorator
-
-        from rlsbl.checks import register_checks
-        register_checks(MockApp())
-
-        result = captured["layers-violations"](ctx)
+        result = scope_adapter(ctx, "workspace:non_dev_only")
         assert result.status == "skip"
 
     def test_check_skip_no_layers(self, tmp_path):
@@ -541,6 +528,9 @@ class TestLayersViolationsCheck:
 
         class MockApp:
             _checks_enabled = True
+
+            def set_scope_adapter(self, adapter):
+                pass
 
             def check(self, name):
                 def decorator(fn):
@@ -597,6 +587,9 @@ class TestLayersViolationsCheck:
         class MockApp:
             _checks_enabled = True
 
+            def set_scope_adapter(self, adapter):
+                pass
+
             def check(self, name):
                 def decorator(fn):
                     captured[name] = fn
@@ -611,10 +604,15 @@ class TestLayersViolationsCheck:
         assert "1 layer violation" in result.message
 
     def test_check_pass_dev_node_unassigned(self, tmp_path):
-        """A dev_node project not assigned to any layer is auto-exempted."""
+        """A dev_node project not assigned to any layer is auto-exempted.
+
+        The scope adapter (workspace:non_dev_only) filters out dev_node
+        projects before the check runs.
+        """
         from pathlib import Path
 
         from rlsbl.check_context import WorkspaceCheckContext
+        from rlsbl.checks.scope import scope_adapter
 
         ws_dir = tmp_path / ".rlsbl-monorepo"
         ws_dir.mkdir()
@@ -648,10 +646,16 @@ class TestLayersViolationsCheck:
             graph=graph,
         )
 
+        # Apply scope adapter to filter out dev_node projects
+        adapted = scope_adapter(ctx, "workspace:non_dev_only")
+
         captured = {}
 
         class MockApp:
             _checks_enabled = True
+
+            def set_scope_adapter(self, adapter):
+                pass
 
             def check(self, name):
                 def decorator(fn):
@@ -662,7 +666,7 @@ class TestLayersViolationsCheck:
         from rlsbl.checks import register_checks
         register_checks(MockApp())
 
-        result = captured["layers-violations"](ctx)
+        result = captured["layers-violations"](adapted)
         assert result.status == "pass"
 
     def test_check_fail_non_dev_node_unassigned(self, tmp_path):
@@ -707,6 +711,9 @@ class TestLayersViolationsCheck:
 
         class MockApp:
             _checks_enabled = True
+
+            def set_scope_adapter(self, adapter):
+                pass
 
             def check(self, name):
                 def decorator(fn):

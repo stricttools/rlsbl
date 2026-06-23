@@ -78,6 +78,8 @@ EXPECTED_CHECKS = [
     "test-suite",
     "test-suite-workspace",
     "maven-central-metadata",
+    # Scaffold checks
+    "scaffold-gitignore-stale",
 ]
 
 
@@ -519,7 +521,11 @@ class TestChangelogHashesCheck:
 # ---------------------------------------------------------------------------
 
 class TestWorkspaceChecksSkipForNonWorkspace:
-    """Workspace checks return skip when context is not a WorkspaceCheckContext."""
+    """Workspace checks return skip when context is not a WorkspaceCheckContext.
+
+    After the scope migration, the scope adapter handles this via the
+    ``workspace`` scope token. Tests verify through the adapter.
+    """
 
     @pytest.mark.parametrize("name", [
         "workspace-ci-router",
@@ -529,8 +535,11 @@ class TestWorkspaceChecksSkipForNonWorkspace:
         "workspace-stale-entries",
     ])
     def test_skip_for_project_context(self, mock_git_repo, name):
+        from rlsbl.checks.scope import scope_adapter
+
         ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
-        result = app._check_defs[name].impl(ctx)
+        cdef = app._check_defs[name]
+        result = scope_adapter(ctx, cdef.scope)
         assert result.status == "skip"
         assert "not a monorepo" in result.message
 
@@ -793,11 +802,17 @@ class TestPrivateHookStaleCheck:
 # ---------------------------------------------------------------------------
 
 class TestLibraryLintCheck:
-    """The library-lint check skips non-library projects."""
+    """The library-lint check skips non-library projects.
+
+    After the scope migration, library-lint uses scope ``workspace:library``
+    which skips non-workspace contexts via the scope adapter.
+    """
 
     def test_standalone_project_skips(self, mock_git_repo):
-        """Standalone (non-monorepo) project -> skip."""
+        """Standalone (non-monorepo) project -> skip (via scope adapter)."""
+        from rlsbl.checks.scope import scope_adapter
+
         ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
-        result = app._check_defs["library-lint"].impl(ctx)
+        result = scope_adapter(ctx, "workspace:library")
         assert result.status == "skip"
-        assert "not a library" in result.message
+        assert "not a monorepo" in result.message

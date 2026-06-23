@@ -11,22 +11,25 @@ from rlsbl.checks._common import _resolve_version_and_tag
 
 
 class TestQualityCheckLibraryLint:
-    """load_workspace failure should not silently pass."""
+    """After the scope migration, library-lint no longer calls load_workspace.
+
+    The scope adapter handles workspace detection. Non-workspace contexts
+    are skipped by the scope adapter before the check runs.
+    """
 
     def test_workspace_load_failure_returns_fail(self, tmp_project):
-        """When load_workspace raises, check returns fail, not pass."""
+        """Non-workspace context -> scope adapter returns skip."""
+        from rlsbl.checks.scope import scope_adapter
+
         cfg_dir = tmp_project / ".rlsbl"
         cfg_dir.mkdir(exist_ok=True)
         (cfg_dir / "config.json").write_text(json.dumps({"targets": []}))
 
         ctx = make_ctx(tmp_project)
+        result = scope_adapter(ctx, "workspace:library")
 
-        with patch("rlsbl.workspace.find_workspace_root", return_value=str(tmp_project)), \
-             patch("rlsbl.workspace.load_workspace", side_effect=RuntimeError("corrupt workspace")):
-            result = app._check_defs["library-lint"].impl(ctx)
-
-        assert result.status == "fail"
-        assert "corrupt workspace" in result.message
+        assert result.status == "skip"
+        assert "not a monorepo" in result.message
 
 
 class TestVersionConsistencyCorruptedTarget:

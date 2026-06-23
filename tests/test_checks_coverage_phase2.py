@@ -18,14 +18,34 @@ import pytest
 
 from conftest import git_head, make_commit, make_ctx, make_workspace, run_git
 
+from strictcli import CheckResult
+
 from rlsbl import app
 from rlsbl.check_context import WorkspaceCheckContext
+from rlsbl.checks.scope import scope_adapter
 from rlsbl.context import ProjectContext
 
 
 # ------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------
+
+
+def _run_check(name, ctx):
+    """Run a check through the scope adapter, mirroring the real runtime.
+
+    If the check has a scope and the scope adapter returns a CheckResult
+    (e.g. skip), that result is returned directly. Otherwise the adapted
+    context is passed to the check's impl function.
+    """
+    cdef = app._check_defs[name]
+    check_ctx = ctx
+    if cdef.scope:
+        adapted = scope_adapter(ctx, cdef.scope)
+        if isinstance(adapted, CheckResult):
+            return adapted
+        check_ctx = adapted
+    return cdef.impl(check_ctx)
 
 
 def _init_repo(repo):
@@ -1496,7 +1516,12 @@ class TestGetReleasableVersionForProject:
 
 
 class TestLibraryLint:
-    """library-lint check."""
+    """library-lint check.
+
+    After the scope migration, library-lint relies on the scope adapter
+    (``workspace:library``) to ensure the context is a WorkspaceCheckContext
+    with ctx.projects pre-filtered to library projects only.
+    """
 
     def test_not_in_workspace_skips(self, tmp_path, monkeypatch):
         repo = tmp_path / "repo"
@@ -1506,7 +1531,7 @@ class TestLibraryLint:
         _setup_scaffold(repo)
 
         ctx = make_ctx(repo)
-        result = app._check_defs["library-lint"].impl(ctx)
+        result = _run_check("library-lint", ctx)
         assert result.status == "skip"
 
     def test_workspace_no_libraries_passes(self, tmp_path, monkeypatch):
@@ -1525,13 +1550,21 @@ class TestLibraryLint:
         run_git(repo, "add", ".")
         run_git(repo, "commit", "-q", "-m", "scaffold")
 
-        ctx = make_ctx(repo)
-        # Library-lint uses find_workspace_root internally
-        result = app._check_defs["library-lint"].impl(ctx)
+        from rlsbl.workspace import WorkspaceProject
+
+        projects = [WorkspaceProject({"name": "pkg", "path": "pkg"})]
+        ctx = _make_ws_ctx(repo, projects)
+        # scope:library filters projects to [] since pkg has no library=True
+        result = _run_check("library-lint", ctx)
         assert result.status == "pass"
         assert "no library" in result.message
 
-    def test_workspace_load_failure(self, tmp_path, monkeypatch):
+    def test_workspace_load_failure_now_skips(self, tmp_path, monkeypatch):
+        """After scope migration, library-lint no longer calls load_workspace.
+
+        A non-workspace context is skipped by the scope adapter, so this
+        test verifies that behavior instead of the old load_workspace error path.
+        """
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
@@ -1539,13 +1572,8 @@ class TestLibraryLint:
         _setup_scaffold(repo)
 
         ctx = make_ctx(repo)
-        with (
-            patch("rlsbl.workspace.find_workspace_root", return_value=str(repo)),
-            patch("rlsbl.workspace.load_workspace", side_effect=Exception("bad workspace")),
-        ):
-            result = app._check_defs["library-lint"].impl(ctx)
-        assert result.status == "fail"
-        assert "failed to load workspace" in result.message
+        result = _run_check("library-lint", ctx)
+        assert result.status == "skip"
 
     def test_library_lint_errors(self, tmp_path, monkeypatch):
         repo = tmp_path / "repo"
@@ -1562,13 +1590,10 @@ class TestLibraryLint:
         ]
         errors = [LintResult("file.py", 1, "R001", "error", "bad import")]
 
-        ctx = make_ctx(repo)
-        with (
-            patch("rlsbl.workspace.find_workspace_root", return_value=str(repo)),
-            patch("rlsbl.workspace.load_workspace", return_value=projects),
-            patch("rlsbl.lint.lint_library", return_value=errors),
-        ):
-            result = app._check_defs["library-lint"].impl(ctx)
+        # scope:library pre-filters to library projects; provide a WS context
+        ctx = _make_ws_ctx(repo, projects)
+        with patch("rlsbl.lint.lint_library", return_value=errors):
+            result = _run_check("library-lint", ctx)
         assert result.status == "fail"
         assert "1 error" in result.message
 
@@ -1587,13 +1612,9 @@ class TestLibraryLint:
         ]
         warnings = [LintResult("file.py", 1, "R001", "warning", "minor issue")]
 
-        ctx = make_ctx(repo)
-        with (
-            patch("rlsbl.workspace.find_workspace_root", return_value=str(repo)),
-            patch("rlsbl.workspace.load_workspace", return_value=projects),
-            patch("rlsbl.lint.lint_library", return_value=warnings),
-        ):
-            result = app._check_defs["library-lint"].impl(ctx)
+        ctx = _make_ws_ctx(repo, projects)
+        with patch("rlsbl.lint.lint_library", return_value=warnings):
+            result = _run_check("library-lint", ctx)
         assert result.status == "warn"
 
     def test_library_lint_clean(self, tmp_path, monkeypatch):
@@ -1609,13 +1630,9 @@ class TestLibraryLint:
             WorkspaceProject({"name": "mylib", "path": "mylib", "library": True}),
         ]
 
-        ctx = make_ctx(repo)
-        with (
-            patch("rlsbl.workspace.find_workspace_root", return_value=str(repo)),
-            patch("rlsbl.workspace.load_workspace", return_value=projects),
-            patch("rlsbl.lint.lint_library", return_value=[]),
-        ):
-            result = app._check_defs["library-lint"].impl(ctx)
+        ctx = _make_ws_ctx(repo, projects)
+        with patch("rlsbl.lint.lint_library", return_value=[]):
+            result = _run_check("library-lint", ctx)
         assert result.status == "pass"
         assert "clean" in result.message
 
@@ -1957,7 +1974,7 @@ class TestWorkspaceCiRouter:
         _setup_scaffold(repo)
 
         ctx = make_ctx(repo)
-        result = app._check_defs["workspace-ci-router"].impl(ctx)
+        result = _run_check("workspace-ci-router", ctx)
         assert result.status == "skip"
 
     def test_router_missing_fails(self, tmp_path, monkeypatch):
@@ -2003,7 +2020,7 @@ class TestWorkspaceCiSynced:
         _init_repo(repo)
 
         ctx = make_ctx(repo)
-        result = app._check_defs["workspace-ci-synced"].impl(ctx)
+        result = _run_check("workspace-ci-synced", ctx)
         assert result.status == "skip"
 
     def test_missing_workflows_fails(self, tmp_path, monkeypatch):
@@ -2057,7 +2074,7 @@ class TestWorkspaceTargets:
         _init_repo(repo)
 
         ctx = make_ctx(repo)
-        result = app._check_defs["workspace-targets"].impl(ctx)
+        result = _run_check("workspace-targets", ctx)
         assert result.status == "skip"
 
     def test_no_targets_fails(self, tmp_path, monkeypatch):
@@ -2109,7 +2126,7 @@ class TestWorkspaceUnregistered:
         _init_repo(repo)
 
         ctx = make_ctx(repo)
-        result = app._check_defs["workspace-unregistered"].impl(ctx)
+        result = _run_check("workspace-unregistered", ctx)
         assert result.status == "skip"
 
     def test_unregistered_project_fails(self, tmp_path, monkeypatch):
@@ -2232,7 +2249,7 @@ class TestWorkspaceStaleEntries:
         _init_repo(repo)
 
         ctx = make_ctx(repo)
-        result = app._check_defs["workspace-stale-entries"].impl(ctx)
+        result = _run_check("workspace-stale-entries", ctx)
         assert result.status == "skip"
 
     def test_stale_entry_fails(self, tmp_path, monkeypatch):
@@ -2282,7 +2299,7 @@ class TestDevOnlyBoundary:
         _init_repo(repo)
 
         ctx = make_ctx(repo)
-        result = app._check_defs["dev-only-boundary"].impl(ctx)
+        result = _run_check("dev-only-boundary", ctx)
         assert result.status == "skip"
 
     def test_no_dev_only_passes(self, tmp_path, monkeypatch):
@@ -2335,7 +2352,7 @@ class TestSubtreeRemoteReachable:
         _init_repo(repo)
 
         ctx = make_ctx(repo)
-        result = app._check_defs["subtree-remote-reachable"].impl(ctx)
+        result = _run_check("subtree-remote-reachable", ctx)
         assert result.status == "skip"
 
     def test_no_subtree_remotes_skips(self, tmp_path, monkeypatch):
@@ -2401,7 +2418,7 @@ class TestWorkspaceUnbuildable:
         _init_repo(repo)
 
         ctx = make_ctx(repo)
-        result = app._check_defs["workspace-unbuildable"].impl(ctx)
+        result = _run_check("workspace-unbuildable", ctx)
         assert result.status == "skip"
 
     def test_no_pypi_targets_skips(self, tmp_path, monkeypatch):
@@ -2433,7 +2450,7 @@ class TestLayersViolations:
         _init_repo(repo)
 
         ctx = make_ctx(repo)
-        result = app._check_defs["layers-violations"].impl(ctx)
+        result = _run_check("layers-violations", ctx)
         assert result.status == "skip"
 
     def test_no_layer_config_skips(self, tmp_path, monkeypatch):
@@ -2462,7 +2479,7 @@ class TestDeadWorkspacePackages:
         _init_repo(repo)
 
         ctx = make_ctx(repo)
-        result = app._check_defs["dead-workspace-packages"].impl(ctx)
+        result = _run_check("dead-workspace-packages", ctx)
         assert result.status == "skip"
 
 
@@ -2476,7 +2493,7 @@ class TestDepsUnused:
         _init_repo(repo)
 
         ctx = make_ctx(repo)
-        result = app._check_defs["deps-unused"].impl(ctx)
+        result = _run_check("deps-unused", ctx)
         assert result.status == "skip"
 
 
@@ -2490,7 +2507,7 @@ class TestDepsUndeclared:
         _init_repo(repo)
 
         ctx = make_ctx(repo)
-        result = app._check_defs["deps-undeclared"].impl(ctx)
+        result = _run_check("deps-undeclared", ctx)
         assert result.status == "skip"
 
 
@@ -2504,7 +2521,7 @@ class TestDepsRuntimeTestOnly:
         _init_repo(repo)
 
         ctx = make_ctx(repo)
-        result = app._check_defs["deps-runtime-test-only"].impl(ctx)
+        result = _run_check("deps-runtime-test-only", ctx)
         assert result.status == "skip"
 
 
@@ -2518,7 +2535,7 @@ class TestDepsDevInLib:
         _init_repo(repo)
 
         ctx = make_ctx(repo)
-        result = app._check_defs["deps-dev-in-lib"].impl(ctx)
+        result = _run_check("deps-dev-in-lib", ctx)
         assert result.status == "skip"
 
 
@@ -2532,7 +2549,7 @@ class TestDepsStale:
         _init_repo(repo)
 
         ctx = make_ctx(repo)
-        result = app._check_defs["deps-stale"].impl(ctx)
+        result = _run_check("deps-stale", ctx)
         assert result.status == "skip"
 
 
@@ -2546,7 +2563,7 @@ class TestTestSuiteWorkspace:
         _init_repo(repo)
 
         ctx = make_ctx(repo)
-        result = app._check_defs["test-suite-workspace"].impl(ctx)
+        result = _run_check("test-suite-workspace", ctx)
         assert result.status == "skip"
 
     def test_no_push_context_skips(self, tmp_path, monkeypatch):
@@ -2572,7 +2589,11 @@ class TestTestSuiteWorkspace:
 
 
 class TestLibraryLintFindWorkspaceException:
-    """quality.py lines 28-29: find_workspace_root raises exception."""
+    """After scope migration, library-lint no longer calls find_workspace_root.
+
+    The scope adapter handles workspace detection. This test verifies
+    non-workspace contexts are properly skipped.
+    """
 
     def test_find_workspace_root_exception_skips(self, tmp_path, monkeypatch):
         repo = tmp_path / "repo"
@@ -2582,12 +2603,7 @@ class TestLibraryLintFindWorkspaceException:
         _setup_scaffold(repo)
 
         ctx = make_ctx(repo)
-        with patch(
-            "rlsbl.workspace.find_workspace_root",
-            side_effect=RuntimeError("broken"),
-        ):
-            result = app._check_defs["library-lint"].impl(ctx)
-        # Exception caught -> ws_root stays None -> skip
+        result = _run_check("library-lint", ctx)
         assert result.status == "skip"
 
 

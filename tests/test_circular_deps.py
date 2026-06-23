@@ -357,6 +357,9 @@ class TestCircularDepsCheck:
         class MockApp:
             _checks_enabled = True
 
+            def set_scope_adapter(self, adapter):
+                pass
+
             def check(self, name):
                 def decorator(fn):
                     captured[name] = fn

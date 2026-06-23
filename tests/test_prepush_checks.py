@@ -415,15 +415,17 @@ class TestTestSuiteHardErrorsAtWorkspaceRoot:
 
 
 class TestWorkspaceTestSuiteSkipsNonWorkspace:
-    """test-suite-workspace returns skip for non-workspace context."""
+    """test-suite-workspace returns skip for non-workspace context (via scope adapter)."""
 
     def test_non_workspace_skips(self, prepush_repo):
+        from rlsbl.checks.scope import scope_adapter
+
         ctx = make_ctx(prepush_repo)
         ctx.push_stdin = "refs/heads/main abc123 refs/heads/main 000000"
 
-        result = app._check_defs["test-suite-workspace"].impl(ctx)
+        result = scope_adapter(ctx, "workspace:non_dev_only")
         assert result.status == "skip"
-        assert "not a workspace" in result.message
+        assert "not a monorepo" in result.message
 
 
 class TestWorkspaceTestSuiteSkipsNoPushContext:
@@ -516,9 +518,15 @@ class TestWorkspaceTestSuiteRunsAffectedProjects:
 
 
 class TestWorkspaceTestSuiteSkipsDevNodes:
-    """test-suite-workspace does not test dev_node projects."""
+    """test-suite-workspace does not test dev_node projects.
+
+    After the scope migration, the scope adapter (workspace:non_dev_only)
+    filters out dev_node projects before the check runs.
+    """
 
     def test_dev_node_skipped(self, tmp_path, monkeypatch):
+        from rlsbl.checks.scope import scope_adapter
+
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
@@ -570,8 +578,11 @@ class TestWorkspaceTestSuiteSkipsDevNodes:
         )
         ctx.push_stdin = push_stdin
 
+        # Apply scope adapter to filter out dev_node projects
+        adapted = scope_adapter(ctx, "workspace:non_dev_only")
+
         with patch("rlsbl.testing.run_project_tests") as mock_tests:
-            result = app._check_defs["test-suite-workspace"].impl(ctx)
+            result = app._check_defs["test-suite-workspace"].impl(adapted)
 
         # dev_node projects should be filtered out, so no tests run
         mock_tests.assert_not_called()

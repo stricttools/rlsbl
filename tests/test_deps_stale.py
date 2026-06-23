@@ -52,9 +52,11 @@ class TestDepsStaleCheck:
     """The deps-stale check detects outdated intra-workspace constraints."""
 
     def test_skip_for_non_workspace(self, mock_git_repo):
-        """Non-workspace context -> skip."""
+        """Non-workspace context -> skip (via scope adapter)."""
+        from rlsbl.checks.scope import scope_adapter
+
         ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
-        result = app._check_defs["deps-stale"].impl(ctx)
+        result = scope_adapter(ctx, "workspace")
         assert result.status == "skip"
         assert "not a monorepo" in result.message
 
