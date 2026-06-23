@@ -2,6 +2,14 @@
 
 # Changelog
 
+## 0.81.7
+
+Add 120s subprocess timeouts to Maven lint and all test runners
+
+### Fixes
+
+- **Add subprocess timeouts.** Maven lint and all test runners now have 120-second timeouts, preventing the release pipeline from hanging indefinitely on slow or stuck subprocesses.
+
 ## 0.81.6
 
 Fix PyPI scanner false positives for prefixed package names
