@@ -26,6 +26,7 @@ from ..utils import commit_files
 from ..workspace import (
     find_workspace_root,
     get_releasable_changes_dir,
+    get_releasable_dir,
     is_explicit_mode,
     load_releasables,
     load_workspace,
@@ -295,7 +296,15 @@ def cmd_add(flags, project_root):
             entry.packages = packages
 
     # Check batch size limit before writing
-    config = read_project_config(project_root)
+    # In releasable mode, inherit batch_limits from releasable-level config
+    releasable_config_dir = None
+    if (isinstance(ws_context, _ResolvedContext)
+            and ws_context.releasable is not None
+            and ws_context.ws_root is not None):
+        releasable_config_dir = get_releasable_dir(
+            ws_context.ws_root, ws_context.releasable.name,
+        )
+    config = read_project_config(project_root, releasable_config_dir=releasable_config_dir)
     batch_config = _get_batch_limits_config(config)
     max_commits = batch_config.get("max_commits_per_entry", 5)
     if len(resolved_commits) > max_commits:
@@ -311,6 +320,7 @@ def cmd_add(flags, project_root):
             )
             sys.exit(1)
         # Auto-create an exclusion in config.json
+        # In releasable mode, write to releasable-level config.json
         changes_dir_for_line = _resolve_changes_dir(ws_context, project_root)
         existing_for_line = read_unreleased(changes_dir_for_line)
         line_number = len(existing_for_line) + 1
@@ -319,7 +329,10 @@ def cmd_add(flags, project_root):
             "reason": reason,
             "entries": [{"version": "unreleased", "line": line_number}],
         }
-        config_path = os.path.join(project_root, ".rlsbl", "config.json")
+        if releasable_config_dir is not None:
+            config_path = os.path.join(releasable_config_dir, "config.json")
+        else:
+            config_path = os.path.join(project_root, ".rlsbl", "config.json")
         with open(config_path, "r", encoding="utf-8") as f:
             config_data = json.load(f)
         batch_limits = config_data.setdefault("batch_limits", {})
