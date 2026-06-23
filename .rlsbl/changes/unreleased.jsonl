@@ -4,3 +4,4 @@
 {"commits":["d3bcf77972dc05f9749bfa9b2b927174baab3f01"],"user_facing":true,"description":"**Batch limits inherit from releasable config.** `rlsbl changelog add` now respects releasable-level `batch_limits` settings, and auto-created exclusions are written to releasable-level config when in releasable mode.","type":"fix"}
 {"commits":["7501a9172daafe55a097c5273beda41d07cacb10"],"user_facing":true,"description":"**Fix phantom hashes.json entries.** Scaffold no longer leaves stale entries in hashes.json for config files removed by the releasable config skip.","type":"fix"}
 {"commits":["414aa5f4ab8b4e001ded582d38a3dee1af345615","b97ea2017eaa6fc1c5d554395f18b2d28814ff2e","5f953a223c2a38d5fc9edea7e639fa933161be96"],"user_facing":false}
+{"commits":["2e18b14d0549deee60a560397bd5289910ea7e38","ee640b6848ff99fb34db5ec6b2d41ed53fdd64ee"],"user_facing":false}
