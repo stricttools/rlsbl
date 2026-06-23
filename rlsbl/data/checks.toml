@@ -111,6 +111,7 @@ fast = false
 pure = true
 needs_network = false
 depends_on = []
+scope = "workspace:library"
 
 # ---------------------------------------------------------------------------
 # Changelog validation checks (from changelog/validate.py)
@@ -191,6 +192,7 @@ fast = true
 pure = true
 needs_network = false
 depends_on = []
+scope = "workspace"
 
 [checks.workspace-ci-synced]
 tags = ["workspace"]
@@ -199,6 +201,7 @@ fast = true
 pure = true
 needs_network = false
 depends_on = []
+scope = "workspace"
 
 [checks.workspace-targets]
 tags = ["workspace"]
@@ -207,6 +210,7 @@ fast = true
 pure = true
 needs_network = false
 depends_on = []
+scope = "workspace"
 
 [checks.workspace-unregistered]
 tags = ["workspace"]
@@ -215,6 +219,7 @@ fast = true
 pure = true
 needs_network = false
 depends_on = []
+scope = "workspace"
 
 [checks.workspace-stale-entries]
 tags = ["workspace"]
@@ -223,6 +228,7 @@ fast = true
 pure = true
 needs_network = false
 depends_on = []
+scope = "workspace"
 
 [checks.dev-only-boundary]
 tags = ["workspace"]
@@ -231,6 +237,7 @@ fast = true
 pure = true
 needs_network = false
 depends_on = []
+scope = "workspace"
 
 [checks.dead-workspace-packages]
 tags = ["workspace"]
@@ -239,6 +246,7 @@ fast = false
 pure = true
 needs_network = false
 depends_on = []
+scope = "workspace"
 
 [checks.subtree-remote-reachable]
 tags = ["workspace"]
@@ -247,6 +255,7 @@ fast = false
 pure = false
 needs_network = true
 depends_on = []
+scope = "workspace"
 
 [checks.workspace-unbuildable]
 tags = ["workspace"]
@@ -255,6 +264,7 @@ fast = false
 pure = true
 needs_network = false
 depends_on = []
+scope = "workspace"
 
 [checks.layers-violations]
 tags = []
@@ -263,6 +273,7 @@ fast = true
 pure = true
 needs_network = false
 depends_on = []
+scope = "workspace:non_dev_only"
 
 # ---------------------------------------------------------------------------
 # Dependency validation checks (from dep_validation.py)
@@ -275,6 +286,7 @@ fast = false
 pure = true
 needs_network = false
 depends_on = []
+scope = "workspace"
 
 [checks.deps-undeclared]
 tags = []
@@ -283,6 +295,7 @@ fast = false
 pure = true
 needs_network = false
 depends_on = []
+scope = "workspace"
 
 [checks.deps-stale]
 tags = []
@@ -291,6 +304,7 @@ fast = false
 pure = true
 needs_network = false
 depends_on = []
+scope = "workspace"
 
 [checks.deps-runtime-test-only]
 tags = ["quality"]
@@ -299,6 +313,7 @@ fast = false
 pure = true
 needs_network = false
 depends_on = []
+scope = "workspace"
 
 [checks.deps-dev-in-lib]
 tags = ["quality"]
@@ -307,6 +322,7 @@ fast = false
 pure = true
 needs_network = false
 depends_on = []
+scope = "workspace"
 
 [checks.dead-modules]
 tags = ["quality"]
@@ -419,6 +435,7 @@ fast = false
 pure = false
 needs_network = false
 depends_on = ["prepush-changelog-coverage"]
+scope = "workspace:non_dev_only"
 
 # ---------------------------------------------------------------------------
 # Maven-specific checks
@@ -431,3 +448,16 @@ fast = false
 pure = false
 needs_network = false
 depends_on = []
+
+# ---------------------------------------------------------------------------
+# Scaffold checks
+# ---------------------------------------------------------------------------
+
+[checks.scaffold-gitignore-stale]
+tags = ["workspace"]
+severity = "warn"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "workspace"
