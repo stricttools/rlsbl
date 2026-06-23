@@ -1,0 +1,2 @@
+{"commits":["2a5e71d80f694825356e18f0c25347017819f743"],"user_facing":true,"description":"**Fix CI test failures.** Autouse saferm mock fixture applied to all scaffold tests.","type":"fix"}
+{"commits":["3851d1148e6df8bed442f89d37c1dc55186ede6d","13839027037c2173f9d39112772d73df425cfcca","3851d1148e6df8bed442f89d37c1dc55186ede6d"],"user_facing":false}
