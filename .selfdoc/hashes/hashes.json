@@ -157,7 +157,7 @@
     "description": "92c829699be90c4ea09e05c6e0ff3830b755bdd05be47a9427e51074cedcb831"
   },
   "en/cli-index.md": {
-    "content": "7e58f8bcd46c65d5b7436123056bd126b319ae480754bb0d17b84da5985cf1f0",
+    "content": "7f593ae0189cc0271283c4db5f2aa82896a6503b9ab99aeed7915c606698bebb",
     "description": "0f01533cb10562a220aa70ea5e33e2500c0c1e4aa8e16b2f80c532449a68b7ea"
   },
   "en/cli-migrate-publish-config.md": {
@@ -240,7 +240,7 @@
     "description": "8909eda4fd51ca2ffd6ded1b7ec9ab0dce01924c31e9cd097b6fe8281a0e9e7d"
   },
   "en/gen-index.md": {
-    "content": "19411104ab3bc823d76766c765455f593c182e709fee55941ea1267747547e2a",
+    "content": "afbc5c0f59eb3caec85d26bd78350ac25c368708a8a928fe41d762e2a436767f",
     "description": "bb3cd9d34f014c0674a9285c25ee14b5b4abc5cf941f0d83594c301405e8f3b6"
   },
   "en/import-scanning.md": {
@@ -324,7 +324,7 @@
     "source_docstring": "7f52758b12945c83a74b17070807fb8e77f602b859af6366124ba91982e104df"
   },
   "en/rlsbl-checks-_common.md": {
-    "content": "9e418ecf4ba078be09fdb458edb0e90dc627894ae792f997e46168aa85463ccc",
+    "content": "f6f07214a01889250dbfa38bc02686fd12d89d75b76a0fab9747c30fddfcddad",
     "description": "427bbd4b3d9c084d910ca83faf191613c08d48ee79213d62ba6f9b97a0517f62",
     "source_docstring": "52d2f588d1c3c7eee22afaeb9f96ab04082bb9552fdfaddc0498d021fb459b8e"
   },
@@ -404,7 +404,7 @@
     "source_docstring": "77349d50382ca6c0faf97553b8abf8c24bb360c895f32005f7de62abdf1bbe75"
   },
   "en/rlsbl-commands-init_cmd.md": {
-    "content": "826f2c65d0ea346ac24ab21e4e7af6da3cdf189c2086f93ab8b812b1b32eb61f",
+    "content": "a7ffe44bd149d3a94fc91ac4d92b35944e06c599e0004f7ee49794b6d8ffc959",
     "description": "b4a7db2e3882de4af592870ee977b98522a4635188b12262d78e7441b533611c",
     "source_docstring": "ac73a657ec7256d7c0c8c1f7b1ad359d3673262242500bdb32944a51dddafb30"
   },
@@ -630,6 +630,11 @@
     "content": "40625b3856e12bfac25b035c144d41ccab344327d6bd02c404ac795d4858cb44",
     "description": "5a0f0cecdfebc9da2256523df104047099921c4462247d6b5742edde582fcb06",
     "source_docstring": "5a0f0cecdfebc9da2256523df104047099921c4462247d6b5742edde582fcb06"
+  },
+  "en/rlsbl-lint-maven.md": {
+    "content": "ac4b0c5b80c4184693dc1de80292fa809ce52e38a3c59a25db34981a0c2e593d",
+    "description": "2c3fd5e3705aa8ddb1b092739abd2110e4918ace4b46df0b9a2f86bf610e6b87",
+    "source_docstring": "2c3fd5e3705aa8ddb1b092739abd2110e4918ace4b46df0b9a2f86bf610e6b87"
   },
   "en/rlsbl-lint-npm_ast.md": {
     "content": "9dbda22d0fc93709fd379cf4e4693118eb6f694e39c0ccb907032f605dd89b34",
