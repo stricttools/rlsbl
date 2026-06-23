@@ -11,8 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: {{action "actions/checkout"}}
-      # rust-version: {{cargo.minRequiredRust}}
-      - uses: {{action "dtolnay/rust-toolchain"}}
+{{#if minRequiredRust}}      # rust-version: {{minRequiredRust}}
+{{/if}}      - uses: {{action "dtolnay/rust-toolchain"}}
       - run: cargo fmt --check
       - run: cargo clippy -- -D warnings
       - run: cargo test

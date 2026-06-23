@@ -430,6 +430,19 @@ def process_template(template_content, vars_dict, template_path=None, *, require
     return content, unreplaced
 
 
+def check_unreplaced_vars(source_path, unreplaced):
+    """Raise ConfigError if *unreplaced* is non-empty.
+
+    Shared by scaffold (apply_plans) and monorepo sync so the check
+    logic lives in one place and tests can exercise it directly.
+    """
+    if unreplaced:
+        raise ConfigError(
+            f"{source_path}: unresolved template variables: "
+            f"{', '.join(unreplaced)}"
+        )
+
+
 def _save_base(target, content):
     """Save rendered template content as the merge base for future three-way merges."""
     base_path = os.path.join(BASES_DIR, target)
@@ -746,11 +759,7 @@ def apply_plans(plans):
                 skipped.append((target, plan["status"]))
             if plan.get("warning"):
                 warnings.append(plan["warning"])
-            if plan.get("unreplaced"):
-                raise ConfigError(
-                    f"{target}: unresolved template variables: "
-                    f"{', '.join(plan['unreplaced'])}"
-                )
+            check_unreplaced_vars(target, plan.get("unreplaced"))
             continue
 
     return created, skipped, warnings, new_hashes
@@ -810,11 +819,7 @@ def _print_dry_run_report(plans_groups, registry=None, registries=None, existing
                 skipped.append((plan["target"], plan["status"]))
             if plan.get("warning"):
                 warnings.append(plan["warning"])
-            if plan.get("unreplaced"):
-                raise ConfigError(
-                    f"{plan['target']}: unresolved template variables: "
-                    f"{', '.join(plan['unreplaced'])}"
-                )
+            check_unreplaced_vars(plan["target"], plan.get("unreplaced"))
 
     _print_file_status_table(created, skipped)
 

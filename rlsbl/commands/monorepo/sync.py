@@ -9,7 +9,7 @@ from ruamel.yaml import YAML
 from ruamel.yaml.scalarstring import LiteralScalarString
 
 from ...action_versions import format_action
-from ...commands.init_cmd import process_template
+from ...commands.init_cmd import check_unreplaced_vars, process_template
 from ...context import create_context
 from ...errors import ConfigError
 from ...utils import commit_files, commit_files_if_changed
@@ -426,11 +426,7 @@ def _cmd_sync(flags, project_root):
                 # workflow content (e.g. {{pypi.minRequiredPython}} in comments
                 # that scaffold left unresolved).
                 content, unreplaced = process_template(content, tvars)
-                if unreplaced:
-                    raise ConfigError(
-                        f"{ci_src}: unresolved template variables: "
-                        f"{', '.join(unreplaced)}"
-                    )
+                check_unreplaced_vars(ci_src, unreplaced)
 
                 doc = parse_ci_workflow(content)
                 if doc is None:

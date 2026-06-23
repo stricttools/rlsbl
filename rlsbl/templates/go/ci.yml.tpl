@@ -12,8 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: {{action "actions/checkout"}}
-      # go.mod: go {{go.minRequiredGo}}
-      - uses: {{action "actions/setup-go"}}
+{{#if minRequiredGo}}      # go.mod: go {{minRequiredGo}}
+{{/if}}      - uses: {{action "actions/setup-go"}}
         with:
           go-version-file: go.mod
       - run: go vet ./...

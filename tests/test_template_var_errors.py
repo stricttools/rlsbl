@@ -17,6 +17,7 @@ import pytest
 
 from rlsbl.commands.init_cmd import (
     apply_plans,
+    check_unreplaced_vars,
     plan_mappings,
     process_mappings,
     process_template,
@@ -109,10 +110,10 @@ class TestSyncUnresolvedVarsError:
     """Monorepo sync raises ConfigError on unresolved template vars in workflows."""
 
     def test_sync_raises_on_unresolved_var(self, tmp_project):
-        """process_template with unresolved vars + the sync check raises ConfigError.
+        """process_template + check_unreplaced_vars raises ConfigError.
 
-        We test the logic directly: call process_template with an empty vars
-        dict (simulating tvars={}) and verify unresolved vars are detected.
+        Exercises the same code path as sync.py: process_template detects
+        unresolved vars, then check_unreplaced_vars raises ConfigError.
         """
         content = (
             "name: CI\n"
@@ -127,13 +128,8 @@ class TestSyncUnresolvedVarsError:
         )
         result_content, unreplaced = process_template(content, {})
         assert unreplaced == ["pypi.minRequiredPython"]
-        # This is what sync.py now does:
-        if unreplaced:
-            with pytest.raises(ConfigError, match="pypi.minRequiredPython"):
-                raise ConfigError(
-                    f"test.yml: unresolved template variables: "
-                    f"{', '.join(unreplaced)}"
-                )
+        with pytest.raises(ConfigError, match="pypi.minRequiredPython"):
+            check_unreplaced_vars("test.yml", unreplaced)
 
     def test_sync_no_error_when_all_resolved(self):
         """When tvars resolves all vars, no error is raised."""
