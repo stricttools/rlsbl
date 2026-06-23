@@ -1,0 +1,3 @@
+{"commits":["e4f98efaf8497343a97820c982d1ab6c21f6fdca"],"user_facing":true,"description":"**Fix PyPI scanner false positives.** `deps-undeclared` no longer reports false positives when a workspace project's PyPI name differs from its workspace name (e.g., `orxtra-transport` vs `transport`).","type":"fix"}
+{"commits":["1cfdc5d35320f59fb37cff5c5c8478ead3a2958e","caf780fcd8d34d37cd1f0df111363ef65dd8d3a7","780c34af2aa99cff2e474f053c49df712482f0da"],"user_facing":false}
+{"commits":["3949a9a5f476a325e61b81466eb00afd4f707f68","0a871028cd336c0b68881abcb8bbfa29d29142c6","3949a9a5f476a325e61b81466eb00afd4f707f68"],"user_facing":false}
