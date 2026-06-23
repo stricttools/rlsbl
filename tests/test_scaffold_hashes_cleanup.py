@@ -86,7 +86,7 @@ class TestFinalizeScaffoldPurgesRemovedPaths:
     """After _skip_redundant_releasable_configs removes files,
     _finalize_scaffold must purge them from hashes.json."""
 
-    def test_removed_config_not_in_hashes(self, mock_git_repo, monkeypatch, mock_saferm):
+    def test_removed_config_not_in_hashes(self, mock_git_repo, monkeypatch):
         """A config.json removed by skip_redundant does not appear in hashes.json."""
         proj_dir = mock_git_repo / "app"
         proj_dir.mkdir()
@@ -124,7 +124,7 @@ class TestFinalizeScaffoldPurgesRemovedPaths:
             f"Removed config path {rel_config_key} should not be in hashes.json"
         )
 
-    def test_non_removed_files_preserved_in_hashes(self, mock_git_repo, monkeypatch, mock_saferm):
+    def test_non_removed_files_preserved_in_hashes(self, mock_git_repo, monkeypatch):
         """Files not removed by skip_redundant are preserved in hashes.json."""
         proj_dir = mock_git_repo / "app"
         proj_dir.mkdir()
@@ -207,7 +207,7 @@ class TestCallSitesPassRemovedPaths:
     """Verify that both run_cmd and run_cmd_multi capture
     _skip_redundant_releasable_configs return value and pass it through."""
 
-    def test_run_cmd_passes_removed_paths(self, mock_git_repo, monkeypatch, mock_saferm):
+    def test_run_cmd_passes_removed_paths(self, mock_git_repo, monkeypatch):
         """run_cmd captures removed paths and passes them to _finalize_scaffold."""
         proj_dir = mock_git_repo / "app"
         proj_dir.mkdir()

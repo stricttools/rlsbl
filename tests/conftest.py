@@ -140,16 +140,17 @@ def bypass_upfront_validation():
         yield
 
 
-@pytest.fixture
-def mock_saferm():
+@pytest.fixture(autouse=True)
+def _mock_saferm():
     """Mock saferm subprocess calls in rlsbl.commands.init_cmd.
 
     Intercepts subprocess.run calls where the first arg is 'saferm',
     performs the actual file deletion via os.unlink, and passes through
     all other subprocess calls to the real subprocess.run.
 
-    Use this fixture in any test that triggers _skip_redundant_releasable_configs()
-    with identical configs or _finalize_scaffold() with orphaned files.
+    Applied automatically to all tests so that any code path triggering
+    _skip_redundant_releasable_configs() or _finalize_scaffold() works
+    without saferm being installed.
     """
     import subprocess as real_subprocess
     original_run = real_subprocess.run

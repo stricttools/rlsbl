@@ -140,7 +140,7 @@ class TestGetReleasableConfigDir:
 class TestConfigJsonSkip:
     """Tests for skipping redundant per-package config.json in releasables."""
 
-    def test_identical_config_removed(self, mock_git_repo, mock_saferm):
+    def test_identical_config_removed(self, mock_git_repo):
         """Per-package config.json is removed when identical to releasable config."""
         proj_dir = mock_git_repo / "app"
         proj_dir.mkdir()
@@ -183,7 +183,7 @@ class TestConfigJsonSkip:
         )
         assert len(removed) == 0
 
-    def test_scaffold_skips_config_for_releasable_member(self, mock_git_repo, monkeypatch, mock_saferm):
+    def test_scaffold_skips_config_for_releasable_member(self, mock_git_repo, monkeypatch):
         """Full scaffold of a releasable member produces no per-package config.json
         when the releasable config already has the same fields."""
         proj_dir = mock_git_repo / "app"
@@ -246,7 +246,7 @@ class TestConfigJsonSkip:
 class TestPublishJsonSkip:
     """Tests for skipping redundant per-package publish.json in releasables."""
 
-    def test_identical_publish_removed(self, mock_git_repo, mock_saferm):
+    def test_identical_publish_removed(self, mock_git_repo):
         """Per-package publish.json is removed when identical to releasable publish.json."""
         proj_dir = mock_git_repo / "app"
         proj_dir.mkdir()
@@ -289,7 +289,7 @@ class TestPublishJsonSkip:
         )
         assert len(removed) == 0
 
-    def test_both_config_and_publish_removed_when_identical(self, mock_git_repo, mock_saferm):
+    def test_both_config_and_publish_removed_when_identical(self, mock_git_repo):
         """Both config.json and publish.json are removed when both match releasable."""
         proj_dir = mock_git_repo / "app"
         proj_dir.mkdir()
