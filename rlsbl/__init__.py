@@ -167,11 +167,16 @@ def _check_context_factory():
     workspace_root = find_workspace_root()
     if workspace_root is not None:
         from .workspace_graph import WorkspaceGraph
-        from .workspace import load_releasables
+        from .workspace import is_explicit_mode, load_releasables
 
         projects = load_workspace(workspace_root)
         graph = WorkspaceGraph(workspace_root, projects)
-        releasables = load_releasables(workspace_root, projects=projects)
+        # load_releasables raises WorkspaceError when [[releasables]] is
+        # missing (implicit mode).  Only call it in explicit mode.
+        if is_explicit_mode(workspace_root):
+            releasables = load_releasables(workspace_root, projects=projects)
+        else:
+            releasables = []
         ctx = create_context(Path.cwd(), workspace_root=Path(workspace_root))
         wctx = WorkspaceCheckContext(
             project_root=ctx.project_root,

@@ -101,7 +101,12 @@ def _get_changelog_context(ctx):
     ws_root = str(ctx.workspace_root)
     proj = resolve_project(ws_root, str(ctx.project_root))
     if proj is None:
-        # CWD is not inside any workspace project -- fall back to per-project
+        # CWD is not inside any workspace project.
+        # In explicit mode with releasables, return None here -- callers
+        # should use _get_all_changelog_contexts() to iterate releasables.
+        if is_explicit_mode(ws_root) and getattr(ctx, "releasables", None):
+            return None
+        # Otherwise fall back to per-project (standalone-like)
         changes_dir = get_changes_dir(str(ctx.project_root))
         if not os.path.isdir(changes_dir):
             return None
@@ -141,6 +146,51 @@ def _get_changelog_context(ctx):
 
     entries = read_unreleased(changes_dir)
     return changes_dir, tag_glob, proj, entries
+
+
+def _get_all_changelog_contexts(ctx):
+    """Return changelog contexts for ALL releasables when CWD is the workspace root.
+
+    When CWD is inside a specific project, delegates to ``_get_changelog_context``
+    and wraps the result in a list.  When CWD is the workspace root in an
+    explicit-mode workspace, iterates all releasables and returns a context
+    tuple for each one that has a changes directory.
+
+    Returns a list of ``(changes_dir, tag_glob, project, entries)`` tuples,
+    or an empty list when no contexts are available (caller should skip).
+    """
+    from ..changelog.files import read_unreleased
+    from ..workspace import (
+        get_releasable_changes_dir,
+        is_explicit_mode,
+        members_of,
+        resolve_project,
+    )
+
+    # Non-workspace or CWD is inside a specific project: delegate
+    if not isinstance(ctx, WorkspaceCheckContext):
+        single = _get_changelog_context(ctx)
+        return [single] if single is not None else []
+
+    ws_root = str(ctx.workspace_root)
+    proj = resolve_project(ws_root, str(ctx.project_root))
+
+    if proj is not None or not is_explicit_mode(ws_root) or not getattr(ctx, "releasables", None):
+        # CWD is inside a project, or implicit mode -- single context
+        single = _get_changelog_context(ctx)
+        return [single] if single is not None else []
+
+    # CWD is workspace root in explicit mode: iterate all releasables
+    contexts = []
+    for rel in ctx.releasables:
+        changes_dir = get_releasable_changes_dir(ws_root, rel.name)
+        if not os.path.isdir(changes_dir):
+            continue
+        tag_glob = rel.tag_format.replace("{version}", "*").replace("{name}", rel.name)
+        member_projects = members_of(rel.name, ctx.projects)
+        entries = read_unreleased(changes_dir)
+        contexts.append((changes_dir, tag_glob, member_projects, entries))
+    return contexts
 
 
 def _sibling_exclude_dirs(root, project_path, all_projects):
