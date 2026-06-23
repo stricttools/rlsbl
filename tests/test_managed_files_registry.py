@@ -2,6 +2,7 @@
 
 import json
 import os
+import subprocess as real_subprocess
 from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
@@ -182,15 +183,29 @@ class TestOrphanDetection:
 
         created = []
         skipped = []
+
+        original_run = real_subprocess.run
+
+        def mock_subprocess_run(cmd, *args, **kwargs):
+            """Intercept saferm calls and perform os.unlink instead."""
+            if isinstance(cmd, list) and cmd and cmd[0] == "saferm":
+                target_file = cmd[-1]
+                if os.path.exists(target_file):
+                    os.unlink(target_file)
+                return real_subprocess.CompletedProcess(args=cmd, returncode=0)
+            return original_run(cmd, *args, **kwargs)
+
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
             with patch("rlsbl.commands.init_cmd._install_or_update_pre_push_hook"):
-                _finalize_scaffold(
-                    existing_hashes, [new_hashes_dict],
-                    created, skipped, [],
-                    flags=flags,
-                    project_root=mock_git_repo,
-                    config={},
-                )
+                with patch("rlsbl.commands.init_cmd.subprocess.run",
+                           side_effect=mock_subprocess_run):
+                    _finalize_scaffold(
+                        existing_hashes, [new_hashes_dict],
+                        created, skipped, [],
+                        flags=flags,
+                        project_root=mock_git_repo,
+                        config={},
+                    )
         return created, skipped, mock_out.getvalue()
 
     def test_orphan_deleted_on_rescaffold(self, mock_git_repo):
