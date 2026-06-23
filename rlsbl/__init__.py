@@ -424,7 +424,7 @@ def cmd_scaffold(target, force, private, no_commit, skip_shared, no_tag, dry_run
 # ---------------------------------------------------------------------------
 
 @app.command(name="check-name", help="Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.")
-@strictcli.flag(name="target", type=str, help="Registry to query for name availability (npm, pypi, or go); repeatable", repeatable=True, unique=True)
+@strictcli.flag(name="target", type=str, help="Registry to query for name availability (npm, pypi, go, or github); repeatable", repeatable=True, unique=True)
 @strictcli.flag(name="delay", type=str, help="Milliseconds to wait between consecutive registry API queries (default: 200)", default="200")
 def cmd_check_name(target, delay, **_kwargs):
     # --target is required for check-name; with repeatable=True, target is a list
@@ -432,17 +432,17 @@ def cmd_check_name(target, delay, **_kwargs):
     if not targets:
         print(
             "Error: --target is required. "
-            "Usage: rlsbl check-name <name> [<name2> ...] --target <npm|pypi|go>",
+            "Usage: rlsbl check-name <name> [<name2> ...] --target <npm|pypi|go|github>",
             file=sys.stderr,
         )
         sys.exit(1)
     # Validate ALL targets upfront before any network calls
-    valid_targets = {"npm", "pypi", "go"}
+    valid_targets = {"npm", "pypi", "go", "github"}
     invalid = [t for t in targets if t not in valid_targets]
     if invalid:
         print(
             f"Error: unknown target(s): {', '.join(repr(t) for t in invalid)}. "
-            f"Valid: npm, pypi, go",
+            f"Valid: npm, pypi, go, github",
             file=sys.stderr,
         )
         sys.exit(1)

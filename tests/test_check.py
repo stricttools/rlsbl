@@ -156,92 +156,76 @@ class TestCheckGitHub:
 class TestCheckSingleName:
     """Tests for the _check_single_name structured result function."""
 
-    @patch("rlsbl.commands.check.check_github_availability")
     @patch("rlsbl.commands.check.check_npm_availability")
-    def test_npm_available_result(self, mock_npm, mock_gh):
+    def test_npm_available_result(self, mock_npm):
         """Available npm name returns correct structured result."""
         mock_npm.return_value = {"status": "available"}
-        mock_gh.return_value = {"status": "available", "count": 0}
 
         result = _check_single_name("my-new-pkg", "npm")
         assert result["name"] == "my-new-pkg"
         assert result["registry"] == "npm"
         assert result["status"] == "available"
         assert isinstance(result["variants"], list)
-        assert result["github_count"] == 0
+        assert "github_count" not in result
 
-    @patch("rlsbl.commands.check.check_github_availability")
     @patch("rlsbl.commands.check.check_npm_availability")
-    def test_npm_taken_result(self, mock_npm, mock_gh):
-        """Taken npm name returns correct structured result; GitHub check skipped."""
+    def test_npm_taken_result(self, mock_npm):
+        """Taken npm name returns correct structured result; no GitHub check."""
         mock_npm.return_value = {"status": "taken"}
-        mock_gh.return_value = {"status": "exists", "count": 5, "note": "5 repos"}
 
         result = _check_single_name("express", "npm")
         assert result["status"] == "taken"
-        assert result["github_count"] is None
-        mock_gh.assert_not_called()
+        assert "github_count" not in result
 
-    @patch("rlsbl.commands.check.check_github_availability")
     @patch("rlsbl.commands.check.check_npm_availability")
-    def test_npm_error_result(self, mock_npm, mock_gh):
-        """Error checking npm returns error in result; GitHub skipped."""
+    def test_npm_error_result(self, mock_npm):
+        """Error checking npm returns error in result; no GitHub check."""
         mock_npm.return_value = {"status": "error", "message": "npm CLI not found"}
-        mock_gh.return_value = {"status": "available", "count": 0}
 
         result = _check_single_name("some-pkg", "npm")
         assert result["status"] == "error"
         assert result["error"] == "npm CLI not found"
-        mock_gh.assert_not_called()
 
-    @patch("rlsbl.commands.check.check_github_availability")
     @patch("rlsbl.commands.check.check_pypi_availability")
-    def test_pypi_available_result(self, mock_pypi, mock_gh):
+    def test_pypi_available_result(self, mock_pypi):
         """Available PyPI name returns correct structured result."""
         mock_pypi.return_value = {"status": "available"}
-        mock_gh.return_value = {"status": "available", "count": 0}
 
         result = _check_single_name("my-new-pkg", "pypi")
         assert result["name"] == "my-new-pkg"
         assert result["registry"] == "pypi"
         assert result["status"] == "available"
 
-    @patch("rlsbl.commands.check.check_github_availability")
     @patch("rlsbl.commands.check.check_go_availability")
-    def test_go_not_found_result(self, mock_go, mock_gh):
+    def test_go_not_found_result(self, mock_go):
         """Not-found Go module returns correct structured result with note."""
         mock_go.return_value = {
             "status": "not_found",
             "note": "Go modules use repository paths, not a central registry.",
         }
-        mock_gh.return_value = {"status": "available", "count": 0}
 
         result = _check_single_name("github.com/fake/module", "go")
         assert result["status"] == "not_found"
         assert "note" in result
         assert result["registry"] == "go"
 
-    @patch("rlsbl.commands.check.check_github_availability")
     @patch("rlsbl.commands.check.check_go_availability")
-    def test_go_exists_result(self, mock_go, mock_gh):
-        """Existing Go module returns 'exists' status; GitHub check skipped."""
+    def test_go_exists_result(self, mock_go):
+        """Existing Go module returns 'exists' status; no GitHub check."""
         mock_go.return_value = {"status": "exists"}
-        mock_gh.return_value = {"status": "exists", "count": 3, "note": "3 repos"}
 
         result = _check_single_name("github.com/gorilla/mux", "go")
         assert result["status"] == "exists"
-        assert result["github_count"] is None
-        mock_gh.assert_not_called()
+        assert "github_count" not in result
 
     @patch("rlsbl.commands.check.check_github_availability")
-    @patch("rlsbl.commands.check.check_npm_availability")
-    def test_github_error_sets_count_none(self, mock_npm, mock_gh):
-        """When GitHub check errors, github_count is None."""
-        mock_npm.return_value = {"status": "available"}
+    def test_github_error_sets_count_absent(self, mock_gh):
+        """When GitHub registry check errors, github_count is not set."""
         mock_gh.return_value = {"status": "error", "message": "Connection refused"}
 
-        result = _check_single_name("some-pkg", "npm")
-        assert result["github_count"] is None
+        result = _check_single_name("some-pkg", "github")
+        assert result["status"] == "error"
+        assert "github_count" not in result
 
 
 class TestCheckTargetRequired:
@@ -980,10 +964,9 @@ class TestShortCircuit:
 
     # -- 1A: Skip variants when taken --
 
-    @patch("rlsbl.commands.check.check_github_availability")
     @patch("rlsbl.commands.check._check_variants")
     @patch("rlsbl.commands.check.check_npm_availability")
-    def test_npm_taken_skips_variants(self, mock_npm, mock_variants, mock_gh):
+    def test_npm_taken_skips_variants(self, mock_npm, mock_variants):
         """npm taken name does not call _check_variants."""
         mock_npm.return_value = {"status": "taken"}
 
@@ -991,25 +974,22 @@ class TestShortCircuit:
         assert result["status"] == "taken"
         mock_variants.assert_not_called()
 
-    @patch("rlsbl.commands.check.check_github_availability")
     @patch("rlsbl.commands.check._search_npm_similar")
     @patch("rlsbl.commands.check._check_variants")
     @patch("rlsbl.commands.check.check_npm_availability")
-    def test_npm_available_calls_variants(self, mock_npm, mock_variants, mock_similar, mock_gh):
+    def test_npm_available_calls_variants(self, mock_npm, mock_variants, mock_similar):
         """npm available name calls _check_variants."""
         mock_npm.return_value = {"status": "available"}
         mock_variants.return_value = []
         mock_similar.return_value = []
-        mock_gh.return_value = {"status": "available", "count": 0}
 
         result = _check_single_name("my-unique-pkg", "npm")
         assert result["status"] == "available"
         mock_variants.assert_called_once()
 
-    @patch("rlsbl.commands.check.check_github_availability")
     @patch("rlsbl.commands.check._check_variants")
     @patch("rlsbl.commands.check.check_pypi_availability")
-    def test_pypi_taken_skips_variants(self, mock_pypi, mock_variants, mock_gh):
+    def test_pypi_taken_skips_variants(self, mock_pypi, mock_variants):
         """PyPI taken name does not call _check_variants."""
         mock_pypi.return_value = {"status": "taken"}
 
@@ -1017,59 +997,46 @@ class TestShortCircuit:
         assert result["status"] == "taken"
         mock_variants.assert_not_called()
 
-    @patch("rlsbl.commands.check.check_github_availability")
     @patch("rlsbl.commands.check._check_variants")
     @patch("rlsbl.commands.check.check_pypi_availability")
-    def test_pypi_stdlib_skips_variants_and_github(self, mock_pypi, mock_variants, mock_gh):
-        """PyPI stdlib collision skips both _check_variants and GitHub check."""
-        mock_gh.return_value = {"status": "available", "count": 0}
-
+    def test_pypi_stdlib_skips_variants(self, mock_pypi, mock_variants):
+        """PyPI stdlib collision skips _check_variants."""
         result = _check_single_name("queue", "pypi")
         assert result["status"] == "taken"
         assert result["reason"] == "stdlib"
         mock_variants.assert_not_called()
         mock_pypi.assert_not_called()
-        mock_gh.assert_not_called()
 
-    @patch("rlsbl.commands.check.check_github_availability")
     @patch("rlsbl.commands.check._check_variants")
     @patch("rlsbl.commands.check.check_pypi_availability")
-    def test_pypi_available_calls_variants_and_github(self, mock_pypi, mock_variants, mock_gh):
-        """PyPI available name calls both _check_variants and GitHub check."""
+    def test_pypi_available_calls_variants(self, mock_pypi, mock_variants):
+        """PyPI available name calls _check_variants."""
         mock_pypi.return_value = {"status": "available"}
         mock_variants.return_value = []
-        mock_gh.return_value = {"status": "available", "count": 0}
 
         result = _check_single_name("my-unique-pkg", "pypi")
         assert result["status"] == "available"
         mock_variants.assert_called_once()
-        mock_gh.assert_called_once()
 
-    # -- 1B: Skip GitHub when taken --
+    # -- 1B: GitHub is only called when registry is "github" --
 
     @patch("rlsbl.commands.check.check_github_availability")
     @patch("rlsbl.commands.check.check_npm_availability")
-    def test_npm_taken_skips_github(self, mock_npm, mock_gh):
-        """npm taken name does not call check_github_availability."""
+    def test_npm_never_calls_github(self, mock_npm, mock_gh):
+        """npm registry never calls check_github_availability."""
         mock_npm.return_value = {"status": "taken"}
 
         result = _check_single_name("express", "npm")
         assert result["status"] == "taken"
-        assert result["github_count"] is None
+        assert "github_count" not in result
         mock_gh.assert_not_called()
 
     @patch("rlsbl.commands.check.check_github_availability")
-    @patch("rlsbl.commands.check._search_npm_similar")
-    @patch("rlsbl.commands.check._check_variants")
-    @patch("rlsbl.commands.check.check_npm_availability")
-    def test_npm_available_calls_github(self, mock_npm, mock_variants, mock_similar, mock_gh):
-        """npm available name calls check_github_availability."""
-        mock_npm.return_value = {"status": "available"}
-        mock_variants.return_value = []
-        mock_similar.return_value = []
+    def test_github_registry_calls_github(self, mock_gh):
+        """github registry calls check_github_availability."""
         mock_gh.return_value = {"status": "available", "count": 0}
 
-        result = _check_single_name("my-unique-pkg", "npm")
+        result = _check_single_name("my-unique-pkg", "github")
         assert result["status"] == "available"
         assert result["github_count"] == 0
         mock_gh.assert_called_once()

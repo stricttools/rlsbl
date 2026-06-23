@@ -414,14 +414,14 @@ def _check_single_name(name, registry, delay_ms=0):
         - registry: which registry was checked
         - status: "available", "taken", "exists", "not_found", or "error"
         - variants: list of similar names that are taken (npm/pypi only)
-        - github_count: number of GitHub repos with this name (or None on error)
         - reason: why the name is taken/unavailable, or None if available/error.
           Values: "registered", "stdlib", "moniker", "normalized", "ultranorm"
           (set by _apply_ultranorm_check), or None.
         - error: error message if status is "error" (absent otherwise)
-        - note: informational note (go only, absent otherwise)
+        - note: informational note (go/github only, absent otherwise)
+        - github_count: number of GitHub repos (only when registry is "github")
     """
-    result = {"name": name, "registry": registry, "status": "", "variants": None, "github_count": None, "reason": None}
+    result = {"name": name, "registry": registry, "status": "", "variants": None, "reason": None}
 
     # Registry-specific availability check
     if registry == "npm":
@@ -490,13 +490,15 @@ def _check_single_name(name, registry, delay_ms=0):
         if check_result.get("note"):
             result["note"] = check_result["note"]
 
-    # GitHub informational check (skip when name is already taken/exists)
-    if result["status"] in ("available", "not_found"):
+    elif registry == "github":
         gh_result = check_github_availability(name)
-        if gh_result["status"] != "error":
-            result["github_count"] = gh_result.get("count", 0)
+        result["status"] = gh_result["status"]
+        if gh_result["status"] == "error":
+            result["error"] = gh_result.get("message", "GitHub API error")
         else:
-            result["github_count"] = None
+            result["github_count"] = gh_result.get("count", 0)
+            if gh_result.get("note"):
+                result["note"] = gh_result["note"]
 
     return result
 
@@ -563,6 +565,18 @@ def _format_single_result(result):
         if result.get("note"):
             print(f"  Note: {result['note']}")
 
+    elif registry == "github":
+        print(f'Checking GitHub for "{name}"...')
+        if status == "error":
+            print(f"Error checking GitHub: {result['error']}", file=sys.stderr)
+            return 2
+        github_count = result.get("github_count", 0)
+        if github_count == 0:
+            print(f'No GitHub repos named "{name}".')
+        else:
+            print(f'{github_count} GitHub repo(s) named "{name}".')
+            print("  Note: GitHub names are org-scoped, not globally unique.")
+
     # Variant warnings (npm/pypi only)
     available = status in ("available", "not_found")
     variants = result.get("variants", [])
@@ -588,16 +602,17 @@ def _format_single_result(result):
             "(not publicly available)."
         )
 
-    # GitHub informational
-    github_count = result.get("github_count")
-    if github_count is not None:
-        if github_count == 0:
-            print(f"\n  (i) No GitHub repos named \"{name}\"")
-        else:
-            print(f"\n  (i) {github_count} GitHub repo(s) named \"{name}\" (informational, not a registry)")
+    # GitHub informational (only for non-github registries that happen to have github_count set)
+    if registry != "github":
+        github_count = result.get("github_count")
+        if github_count is not None:
+            if github_count == 0:
+                print(f"\n  (i) No GitHub repos named \"{name}\"")
+            else:
+                print(f"\n  (i) {github_count} GitHub repo(s) named \"{name}\" (informational, not a registry)")
 
     # Steps-run summary
-    _REGISTRY_DISPLAY = {"npm": "npm", "pypi": "PyPI", "go": "pkg.go.dev"}
+    _REGISTRY_DISPLAY = {"npm": "npm", "pypi": "PyPI", "go": "pkg.go.dev", "github": "GitHub"}
     steps = [_REGISTRY_DISPLAY.get(registry, registry)]
     if registry == "pypi":
         # stdlib check always runs for PyPI (it's local)
@@ -631,6 +646,9 @@ def _format_table_row(result):
         display_status = "error"
     elif registry == "go":
         display_status = "not found" if status == "not_found" else "exists"
+    elif registry == "github":
+        count = result.get("github_count", 0)
+        display_status = f"{count} repos" if status == "exists" else "no repos"
     elif result.get("ultranorm_conflicts"):
         display_status = "CONFLICT"
     else:
@@ -684,13 +702,13 @@ def _apply_ultranorm_check(result, registry, delay_ms):
 def run_cmd(registry, args, flags):
     """Check command handler.
 
-    Checks package name availability on npm, PyPI, or Go, and warns about similar names.
+    Checks package name availability on npm, PyPI, Go, or GitHub, and warns about similar names.
     Accepts one or more package names as positional arguments.
     """
     names = args if args else []
     if not names:
         print(
-            "Error: missing package name(s). Usage: rlsbl check <name> [<name2> ...] --target <npm|pypi|go>",
+            "Error: missing package name(s). Usage: rlsbl check <name> [<name2> ...] --target <npm|pypi|go|github>",
             file=sys.stderr,
         )
         sys.exit(1)
