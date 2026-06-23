@@ -8,8 +8,10 @@ from unittest.mock import MagicMock, patch, call
 import pytest
 
 from rlsbl.commands.release import _run_cmd_inner
+from rlsbl.commands.release_init import run_cmd as release_init_run_cmd
 from rlsbl.context import ProjectContext
 from rlsbl.release_file import ReleaseConfig
+from rlsbl.workspace import WORKSPACE_DIR, WORKSPACE_FILE
 
 
 # ---------------------------------------------------------------------------
@@ -114,3 +116,70 @@ class TestBatchModeSkipsValidation:
         mock_validate_gh.assert_called_once()
         mock_validate_clean.assert_called_once()
         mock_validate_branch.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Phase 1c: release init warns in explicit-mode monorepo
+# ---------------------------------------------------------------------------
+
+
+def _setup_explicit_workspace(tmp_path):
+    """Set up a monorepo workspace with [[releasables]] and a pypi project."""
+    ws_dir = tmp_path / WORKSPACE_DIR
+    ws_dir.mkdir()
+    ws_toml = ws_dir / WORKSPACE_FILE
+    ws_toml.write_text(
+        '[[projects]]\npath = "pkg-a"\n\n'
+        '[[releasables]]\nname = "core"\nmembers = ["pkg-a"]\n'
+    )
+    # Create the project directory with a detectable target
+    proj_dir = tmp_path / "pkg-a"
+    proj_dir.mkdir()
+    (proj_dir / "pyproject.toml").write_text(
+        '[project]\nname = "pkg-a"\nversion = "0.1.0"\n'
+    )
+    return proj_dir
+
+
+def _setup_implicit_workspace(tmp_path):
+    """Set up a monorepo workspace WITHOUT [[releasables]] (implicit mode)."""
+    ws_dir = tmp_path / WORKSPACE_DIR
+    ws_dir.mkdir()
+    ws_toml = ws_dir / WORKSPACE_FILE
+    ws_toml.write_text('[[projects]]\npath = "pkg-a"\n')
+    proj_dir = tmp_path / "pkg-a"
+    proj_dir.mkdir()
+    (proj_dir / "pyproject.toml").write_text(
+        '[project]\nname = "pkg-a"\nversion = "0.1.0"\n'
+    )
+    return proj_dir
+
+
+class TestReleaseInitExplicitModeWarning:
+    """rlsbl release init should warn when run inside an explicit-mode monorepo."""
+
+    def test_warns_in_explicit_mode(self, tmp_path, capsys):
+        """release init emits a warning when workspace uses [[releasables]]."""
+        proj_dir = _setup_explicit_workspace(tmp_path)
+        release_init_run_cmd(proj_dir)
+        captured = capsys.readouterr()
+        assert "rlsbl monorepo release-init" in captured.err
+        assert "explicit mode" in captured.err
+
+    def test_no_warning_in_implicit_mode(self, tmp_path, capsys):
+        """release init does NOT warn when workspace is in implicit mode."""
+        proj_dir = _setup_implicit_workspace(tmp_path)
+        release_init_run_cmd(proj_dir)
+        captured = capsys.readouterr()
+        assert "explicit mode" not in captured.err
+
+    def test_no_warning_outside_monorepo(self, tmp_path, capsys):
+        """release init does NOT warn when not inside a monorepo."""
+        proj_dir = tmp_path / "standalone"
+        proj_dir.mkdir()
+        (proj_dir / "pyproject.toml").write_text(
+            '[project]\nname = "standalone"\nversion = "0.1.0"\n'
+        )
+        release_init_run_cmd(proj_dir)
+        captured = capsys.readouterr()
+        assert "explicit mode" not in captured.err
