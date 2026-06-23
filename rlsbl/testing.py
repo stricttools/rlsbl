@@ -23,7 +23,11 @@ def sync_workspace(workspace_root: str, *, verbose: bool = False) -> bool:
     sync_cmd = ["uv", "sync", "--all-packages"]
     if not verbose:
         sync_cmd.append("--quiet")
-    result = subprocess.run(sync_cmd, cwd=workspace_root)
+    try:
+        result = subprocess.run(sync_cmd, cwd=workspace_root, timeout=120)
+    except subprocess.TimeoutExpired:
+        print(f"Error: command timed out after 120s: {sync_cmd}", file=sys.stderr)
+        return False
     if result.returncode != 0:
         print("Error: uv sync failed.", file=sys.stderr)
         return False
@@ -91,13 +95,25 @@ def _run_pypi_tests(
             if not uv_verbose:
                 sync_cmd.append("--quiet")
             sync_cwd = workspace_root if workspace_root else project_dir
-            result = subprocess.run(sync_cmd, cwd=sync_cwd)
+            try:
+                result = subprocess.run(sync_cmd, cwd=sync_cwd, timeout=120)
+            except subprocess.TimeoutExpired:
+                print(f"Error: command timed out after 120s: {sync_cmd}", file=sys.stderr)
+                return False
             if result.returncode != 0:
                 print("Error: uv sync failed.", file=sys.stderr)
                 return False
-        result = subprocess.run(["uv", "run", "pytest"], cwd=project_dir)
+        try:
+            result = subprocess.run(["uv", "run", "pytest"], cwd=project_dir, timeout=120)
+        except subprocess.TimeoutExpired:
+            print("Error: command timed out after 120s: ['uv', 'run', 'pytest']", file=sys.stderr)
+            return False
     elif require_tool("pytest", fatal=False):
-        result = subprocess.run(["pytest"], cwd=project_dir)
+        try:
+            result = subprocess.run(["pytest"], cwd=project_dir, timeout=120)
+        except subprocess.TimeoutExpired:
+            print("Error: command timed out after 120s: ['pytest']", file=sys.stderr)
+            return False
     else:
         print("Warning: neither uv nor pytest found, skipping tests.", file=sys.stderr)
         return True
@@ -107,9 +123,12 @@ def _run_pypi_tests(
 
 def _run_go_tests(*, project_dir: str | None) -> bool:
     """Run Go tests."""
-    result = subprocess.run(
-        ["go", "test", "./...", "-race", "-short", "-count=1"], cwd=project_dir
-    )
+    cmd = ["go", "test", "./...", "-race", "-short", "-count=1"]
+    try:
+        result = subprocess.run(cmd, cwd=project_dir, timeout=120)
+    except subprocess.TimeoutExpired:
+        print(f"Error: command timed out after 120s: {cmd}", file=sys.stderr)
+        return False
     return result.returncode == 0
 
 
@@ -122,12 +141,22 @@ def _run_maven_tests(*, project_dir: str | None) -> bool:
     effective_dir = project_dir or "."
     gradlew = os.path.join(effective_dir, "gradlew")
     if os.path.exists(gradlew):
-        result = subprocess.run(["./gradlew", "test"], cwd=project_dir)
+        cmd = ["./gradlew", "test"]
+        try:
+            result = subprocess.run(cmd, cwd=project_dir, timeout=120)
+        except subprocess.TimeoutExpired:
+            print(f"Error: command timed out after 120s: {cmd}", file=sys.stderr)
+            return False
         return result.returncode == 0
 
     pom_path = os.path.join(effective_dir, "pom.xml")
     if os.path.exists(pom_path):
-        result = subprocess.run(["mvn", "test"], cwd=project_dir)
+        cmd = ["mvn", "test"]
+        try:
+            result = subprocess.run(cmd, cwd=project_dir, timeout=120)
+        except subprocess.TimeoutExpired:
+            print(f"Error: command timed out after 120s: {cmd}", file=sys.stderr)
+            return False
         return result.returncode == 0
 
     print("Warning: no gradlew or pom.xml found, skipping maven tests.", file=sys.stderr)
@@ -142,7 +171,11 @@ def _run_npm_tests(*, project_dir: str | None) -> bool:
             with open(pkg_path, "r", encoding="utf-8") as f:
                 pkg = json.load(f)
             if pkg.get("scripts", {}).get("test"):
-                result = subprocess.run(["npm", "test"], cwd=project_dir)
+                try:
+                    result = subprocess.run(["npm", "test"], cwd=project_dir, timeout=120)
+                except subprocess.TimeoutExpired:
+                    print("Error: command timed out after 120s: ['npm', 'test']", file=sys.stderr)
+                    return False
                 return result.returncode == 0
             else:
                 print("No test script in package.json, skipping tests.")
