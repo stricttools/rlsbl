@@ -35,6 +35,12 @@ def _detect_languages(project_path: str) -> list[str]:
         languages.append("go")
     if os.path.isfile(os.path.join(project_path, "package.json")):
         languages.append("npm")
+    if (
+        os.path.isfile(os.path.join(project_path, "build.gradle.kts"))
+        or os.path.isfile(os.path.join(project_path, "build.gradle"))
+        or os.path.isfile(os.path.join(project_path, "pom.xml"))
+    ):
+        languages.append("maven")
     return languages
 
 
@@ -58,6 +64,9 @@ def _create_linter(language: str, parser_type: str):
             return NpmRegexLinter()
         from .npm_ast import NpmAstLinter
         return NpmAstLinter()
+    if language == "maven":
+        from .maven import MavenLinter
+        return MavenLinter()
     return None
 
 
