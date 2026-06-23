@@ -193,7 +193,15 @@ def _sync_lockfiles(target_paths, files_to_commit, log):
             if not os.path.exists(lockfile_path):
                 continue
 
-            if shutil.which(tool_name) is None:
+            # For commands using a project-local wrapper (e.g. ./gradlew),
+            # check if the wrapper exists in the target directory instead of
+            # looking for the tool on PATH.
+            if sync_cmd[0].startswith("./"):
+                wrapper_path = os.path.join(t_path, sync_cmd[0][2:])
+                if not os.path.exists(wrapper_path):
+                    log(f"Warning: {sync_cmd[0]} not found in {t_path}, skipping {lockfile} sync")
+                    continue
+            elif shutil.which(tool_name) is None:
                 log(f"Warning: {tool_name} not found on PATH, skipping {lockfile} sync")
                 continue
 

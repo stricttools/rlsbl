@@ -274,3 +274,69 @@ class TestWorkspaceRootUnconditionalInclusion:
         # go.sum has no guard, so it IS included if present
         expected = os.path.normpath(str(ws_root / "go.sum"))
         assert expected in files
+
+
+class TestGradleLockfileWrapperCheck:
+    """Test that gradle lockfile sync uses path existence check, not shutil.which."""
+
+    @patch("rlsbl.commands.release.subprocess")
+    @patch("shutil.which", return_value=None)
+    def test_gradlew_present_syncs_despite_no_gradle_on_path(
+        self, mock_which, mock_subprocess, tmp_path
+    ):
+        """./gradlew in project dir should be used even when gradle is not on PATH."""
+        target_dir = tmp_path / "project"
+        target_dir.mkdir()
+        (target_dir / "gradle.lockfile").write_text("# lockfile\n")
+        # Create the gradlew wrapper
+        gradlew = target_dir / "gradlew"
+        gradlew.write_text("#!/bin/sh\n")
+        gradlew.chmod(0o755)
+
+        mock_subprocess.run.return_value = MagicMock(returncode=0)
+        mock_subprocess.CalledProcessError = type("CalledProcessError", (Exception,), {})
+        mock_subprocess.TimeoutExpired = type("TimeoutExpired", (Exception,), {})
+
+        files_to_commit = []
+        log = MagicMock()
+
+        _sync_lockfiles({"target": str(target_dir)}, files_to_commit, log)
+
+        # ./gradlew should have been called even though shutil.which("gradle") is None
+        mock_subprocess.run.assert_any_call(
+            ["./gradlew", "dependencies", "--write-locks"],
+            cwd=str(target_dir),
+            timeout=30,
+            check=True,
+            capture_output=True,
+        )
+
+    @patch("rlsbl.commands.release.subprocess")
+    @patch("shutil.which", return_value=None)
+    def test_gradlew_missing_skips_with_warning(
+        self, mock_which, mock_subprocess, tmp_path
+    ):
+        """Missing ./gradlew should skip sync with a warning about the wrapper."""
+        target_dir = tmp_path / "project"
+        target_dir.mkdir()
+        (target_dir / "gradle.lockfile").write_text("# lockfile\n")
+        # No gradlew created
+
+        files_to_commit = []
+        log_messages = []
+        log = lambda msg: log_messages.append(msg)
+
+        _sync_lockfiles({"target": str(target_dir)}, files_to_commit, log)
+
+        # Should warn about ./gradlew not being found, not about gradle on PATH
+        gradle_warnings = [m for m in log_messages if "gradlew" in m]
+        assert len(gradle_warnings) == 1
+        assert "./gradlew" in gradle_warnings[0]
+        assert "not found" in gradle_warnings[0]
+
+        # No subprocess calls for gradle
+        gradle_calls = [
+            c for c in mock_subprocess.run.call_args_list
+            if c[0][0][0] == "./gradlew"
+        ] if mock_subprocess.run.called else []
+        assert len(gradle_calls) == 0
