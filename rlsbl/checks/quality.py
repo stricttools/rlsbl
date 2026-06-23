@@ -20,45 +20,28 @@ def register_quality_checks(app):
         """Library projects must pass boundary lint."""
         from ..lint import lint_library
 
-        # Try monorepo path first
-        ws_root = None
-        try:
-            from ..workspace import find_workspace_root, load_workspace
-            ws_root = find_workspace_root(str(ctx.project_root))
-        except Exception:
-            pass
+        # scope = "workspace:library" ensures ctx is WorkspaceCheckContext
+        # and ctx.projects is pre-filtered to library projects only.
+        if not ctx.projects:
+            return CheckResult("pass", "no library projects configured")
 
-        if ws_root:
-            try:
-                projects = load_workspace(ws_root)
-            except Exception as e:
-                return CheckResult("fail", f"failed to load workspace: {e}")
+        ws_root = str(ctx.workspace_root)
+        total_errors = 0
+        total_warnings = 0
+        for proj in ctx.projects:
+            proj_path = os.path.join(ws_root, proj["path"])
+            results = lint_library(proj_path)
+            for r in results:
+                if r.severity == "error":
+                    total_errors += 1
+                elif r.severity == "warning":
+                    total_warnings += 1
 
-            library_projects = [p for p in projects if p.get("library")]
-            if not library_projects:
-                return CheckResult("pass", "no library projects configured")
-
-            total_errors = 0
-            total_warnings = 0
-            for proj in library_projects:
-                proj_path = os.path.join(ws_root, proj["path"])
-                results = lint_library(proj_path)
-                for r in results:
-                    if r.severity == "error":
-                        total_errors += 1
-                    elif r.severity == "warning":
-                        total_warnings += 1
-
-            if total_errors > 0:
-                return CheckResult("fail", f"{total_errors} error(s), {total_warnings} warning(s)")
-            if total_warnings > 0:
-                return CheckResult("warn", f"{total_warnings} warning(s)")
-            return CheckResult("pass", "all library projects clean")
-
-        # Standalone projects are never libraries (only monorepo projects
-        # with library = true are).  Match the release flow which skips lint
-        # for non-library projects.
-        return CheckResult("skip", "not a library project")
+        if total_errors > 0:
+            return CheckResult("fail", f"{total_errors} error(s), {total_warnings} warning(s)")
+        if total_warnings > 0:
+            return CheckResult("warn", f"{total_warnings} warning(s)")
+        return CheckResult("pass", "all library projects clean")
 
     @app.check("dead-modules")
     def check_dead_modules(ctx):

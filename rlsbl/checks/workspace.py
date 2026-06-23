@@ -13,8 +13,7 @@ import subprocess
 
 from strictcli import CheckResult
 
-from ..check_context import WorkspaceCheckContext
-from ..workspace import project_is_dev_only, project_is_releasable
+from ..workspace import project_is_dev_only
 from ._common import (
     RLSBL_CONFIG,
     _build_dep_import_cache,
@@ -29,9 +28,6 @@ def register_workspace_checks(app):
     @app.check("workspace-ci-router")
     def check_workspace_ci_router(ctx):
         """ci-router.yml must exist at the repo root."""
-        if not isinstance(ctx, WorkspaceCheckContext):
-            return CheckResult("skip", "not a monorepo workspace")
-
         router = os.path.join(str(ctx.workspace_root), ".github", "workflows", "ci-router.yml")
         if os.path.isfile(router):
             return CheckResult("pass", "ci-router.yml exists")
@@ -40,9 +36,6 @@ def register_workspace_checks(app):
     @app.check("workspace-ci-synced")
     def check_workspace_ci_synced(ctx):
         """Each project must have a synced CI workflow at the repo root."""
-        if not isinstance(ctx, WorkspaceCheckContext):
-            return CheckResult("skip", "not a monorepo workspace")
-
         missing = []
         for proj in ctx.projects:
             name = proj["name"]
@@ -63,9 +56,6 @@ def register_workspace_checks(app):
     @app.check("workspace-targets")
     def check_workspace_targets(ctx):
         """Every project must have at least one detectable target."""
-        if not isinstance(ctx, WorkspaceCheckContext):
-            return CheckResult("skip", "not a monorepo workspace")
-
         from ..targets import detect_targets, resolve_releasable_config_dir
 
         missing = []
@@ -86,9 +76,6 @@ def register_workspace_checks(app):
     @app.check("workspace-unregistered")
     def check_workspace_unregistered(ctx):
         """No project directories on disk should be missing from workspace.toml."""
-        if not isinstance(ctx, WorkspaceCheckContext):
-            return CheckResult("skip", "not a monorepo workspace")
-
         root = str(ctx.workspace_root)
         registered_paths = {proj["path"].rstrip("/") for proj in ctx.projects}
 
@@ -158,9 +145,6 @@ def register_workspace_checks(app):
     @app.check("workspace-stale-entries")
     def check_workspace_stale_entries(ctx):
         """No workspace.toml entries should point to missing or manifest-less dirs."""
-        if not isinstance(ctx, WorkspaceCheckContext):
-            return CheckResult("skip", "not a monorepo workspace")
-
         root = str(ctx.workspace_root)
 
         stale = []
@@ -189,9 +173,6 @@ def register_workspace_checks(app):
     @app.check("dev-only-boundary")
     def check_dev_only_boundary(ctx):
         """Non-dev-only projects must not have runtime deps on dev-only projects."""
-        if not isinstance(ctx, WorkspaceCheckContext):
-            return CheckResult("skip", "not a monorepo workspace")
-
         # Build lookup: project name -> project dict
         projects_by_name = {p["name"]: p for p in ctx.projects}
 
@@ -237,9 +218,6 @@ def register_workspace_checks(app):
     @app.check("dead-workspace-packages")
     def check_dead_workspace_packages(ctx):
         """Library packages must be imported by at least one workspace sibling."""
-        if not isinstance(ctx, WorkspaceCheckContext):
-            return CheckResult("skip", "not a monorepo workspace")
-
         from ..dep_validation import find_dead_workspace_packages
 
         import_cache = _build_dep_import_cache(ctx)
@@ -258,9 +236,6 @@ def register_workspace_checks(app):
     @app.check("subtree-remote-reachable")
     def check_subtree_remote_reachable(ctx):
         """Every project with subtree_remote must have a reachable remote."""
-        if not isinstance(ctx, WorkspaceCheckContext):
-            return CheckResult("skip", "not a monorepo workspace")
-
         from ..utils import run as _run
 
         errors = []
@@ -289,9 +264,6 @@ def register_workspace_checks(app):
     @app.check("workspace-unbuildable")
     def check_workspace_unbuildable(ctx):
         """Detect workspace members that fail ``uv sync --all-packages``."""
-        if not isinstance(ctx, WorkspaceCheckContext):
-            return CheckResult("skip", "not a workspace")
-
         # Only relevant when there are pypi-target projects in the workspace
         from ..targets import detect_targets, resolve_releasable_config_dir
 
@@ -333,9 +305,6 @@ def register_workspace_checks(app):
     @app.check("deps-unused")
     def check_deps_unused(ctx):
         """Declared workspace deps must be imported by at least one source file."""
-        if not isinstance(ctx, WorkspaceCheckContext):
-            return CheckResult("skip", "not a monorepo workspace")
-
         from ..dep_validation import check_unused_deps, load_dep_overrides
 
         root = str(ctx.workspace_root)
@@ -372,9 +341,6 @@ def register_workspace_checks(app):
     @app.check("deps-undeclared")
     def check_deps_undeclared(ctx):
         """Source files must not import workspace packages not declared as deps."""
-        if not isinstance(ctx, WorkspaceCheckContext):
-            return CheckResult("skip", "not a monorepo workspace")
-
         from ..dep_validation import check_undeclared_deps
 
         root = str(ctx.workspace_root)
@@ -403,9 +369,6 @@ def register_workspace_checks(app):
     @app.check("deps-runtime-test-only")
     def check_deps_runtime_test_only(ctx):
         """Runtime deps used only in test code should be dev deps instead."""
-        if not isinstance(ctx, WorkspaceCheckContext):
-            return CheckResult("skip", "not a monorepo workspace")
-
         from ..dep_validation import check_runtime_test_only
 
         import_cache = _build_dep_import_cache(ctx)
@@ -437,9 +400,6 @@ def register_workspace_checks(app):
     @app.check("deps-dev-in-lib")
     def check_deps_dev_in_lib(ctx):
         """Dev deps must not be imported in production code."""
-        if not isinstance(ctx, WorkspaceCheckContext):
-            return CheckResult("skip", "not a monorepo workspace")
-
         from ..dep_validation import check_dev_in_lib
 
         import_cache = _build_dep_import_cache(ctx)
@@ -469,9 +429,6 @@ def register_workspace_checks(app):
     @app.check("deps-stale")
     def check_deps_stale(ctx):
         """Intra-workspace dependency constraints must satisfy current versions."""
-        if not isinstance(ctx, WorkspaceCheckContext):
-            return CheckResult("skip", "not a monorepo workspace")
-
         from ..commands.monorepo import _evaluate_constraint
         from ..targets import TARGETS, detect_targets, resolve_releasable_config_dir
 
@@ -526,19 +483,13 @@ def register_workspace_checks(app):
     @app.check("layers-violations")
     def check_layers_violations(ctx):
         """Dependency edges must not violate layer ordering."""
-        if not isinstance(ctx, WorkspaceCheckContext):
-            return CheckResult("skip", "not a monorepo workspace")
-
         from ..layers import check_layer_violations, load_layer_config
 
         config = load_layer_config(str(ctx.workspace_root))
         if config is None:
             return CheckResult("skip", "layers not configured")
 
-        # Dev-only projects sit outside the layer system entirely
-        projects = [p for p in ctx.projects if not project_is_dev_only(p)]
-
-        violations = check_layer_violations(projects, config, ctx.graph)
+        violations = check_layer_violations(ctx.projects, config, ctx.graph)
         if violations:
             return CheckResult(
                 "fail",
@@ -550,9 +501,6 @@ def register_workspace_checks(app):
     @app.check("test-suite-workspace")
     def check_test_suite_workspace(ctx):
         """Run tests for affected workspace projects."""
-        if not isinstance(ctx, WorkspaceCheckContext):
-            return CheckResult("skip", "not a workspace")
-
         if ctx.push_stdin is None:
             return CheckResult("skip", "not in push context")
 
@@ -571,9 +519,6 @@ def register_workspace_checks(app):
             return CheckResult("skip", "could not determine changed files")
 
         affected = _affected(changed_files, ctx.projects)
-
-        # Filter out dev-only projects
-        affected = [p for p in affected if not project_is_dev_only(p)]
 
         if not affected:
             return CheckResult("pass", "no affected projects need testing")
@@ -626,3 +571,60 @@ def register_workspace_checks(app):
                 f"tests failed for: {', '.join(failed_projects)}",
             )
         return CheckResult("pass", f"{passed_count} project(s) tests passed")
+
+    @app.check("scaffold-gitignore-stale")
+    def check_scaffold_gitignore_stale(ctx):
+        """Workspace project .gitignore files must contain rlsbl-managed entries."""
+        from importlib.resources import files as pkg_files
+
+        # Load expected entries from the scaffold gitignore template
+        template_text = (
+            pkg_files("rlsbl") / "templates" / "shared" / "gitignore.tpl"
+        ).read_text()
+        # Only check rlsbl-specific entries (lines containing ".rlsbl")
+        rlsbl_entries = [
+            line.strip()
+            for line in template_text.splitlines()
+            if ".rlsbl" in line and line.strip() and not line.strip().startswith("#")
+        ]
+
+        if not rlsbl_entries:
+            return CheckResult("pass", "no rlsbl-specific gitignore entries in template")
+
+        ws_root = str(ctx.workspace_root)
+        missing_projects = []
+
+        for proj in ctx.projects:
+            proj_dir = os.path.join(ws_root, proj["path"])
+            gitignore_path = os.path.join(proj_dir, ".gitignore")
+            if not os.path.isfile(gitignore_path):
+                missing_projects.append(
+                    f"{proj['name']}: .gitignore not found"
+                )
+                continue
+
+            try:
+                with open(gitignore_path, encoding="utf-8") as f:
+                    gitignore_lines = {line.strip() for line in f}
+            except OSError:
+                missing_projects.append(
+                    f"{proj['name']}: could not read .gitignore"
+                )
+                continue
+
+            missing_entries = [
+                entry for entry in rlsbl_entries
+                if entry not in gitignore_lines
+            ]
+            if missing_entries:
+                missing_projects.append(
+                    f"{proj['name']}: missing {', '.join(missing_entries)}"
+                )
+
+        if missing_projects:
+            return CheckResult(
+                "warn",
+                f"{len(missing_projects)} project(s) with stale .gitignore",
+                details=missing_projects,
+            )
+        return CheckResult("pass", "all project .gitignore files are up to date")
