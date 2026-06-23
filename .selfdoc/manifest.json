@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.81.0",
+  "version": "0.81.1",
   "description": null,
   "language": "python",
   "base_url": "https://rlsbl.smmh.dev",
@@ -538,6 +538,11 @@
       "type": "doc"
     },
     {
+      "path": "rlsbl-lint-maven.md",
+      "title": "rlsbl.lint.maven",
+      "type": "doc"
+    },
+    {
       "path": "rlsbl-lint-npm_ast.md",
       "title": "rlsbl.lint.npm_ast",
       "type": "doc"
@@ -859,5 +864,5 @@
     }
   ],
   "posts": [],
-  "last_gen": "2026-06-22T21:30:52.552689+00:00"
+  "last_gen": "2026-06-23T08:21:32.693713+00:00"
 }

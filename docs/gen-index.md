@@ -82,6 +82,7 @@ order: 90
 - [rlsbl.lint.config](rlsbl-lint-config.html)
 - [rlsbl.lint.go_ast](rlsbl-lint-go_ast.html)
 - [rlsbl.lint.go_regex](rlsbl-lint-go_regex.html)
+- [rlsbl.lint.maven](rlsbl-lint-maven.html)
 - [rlsbl.lint.npm_ast](rlsbl-lint-npm_ast.html)
 - [rlsbl.lint.npm_regex](rlsbl-lint-npm_regex.html)
 - [rlsbl.lint.protocol](rlsbl-lint-protocol.html)
