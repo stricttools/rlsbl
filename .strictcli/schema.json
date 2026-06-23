@@ -1,12 +1,15 @@
 {
+  "schema_version": 1,
   "defaults": {
+    "schema_version": 1,
     "app": {
       "env_prefix": null,
       "config": false,
       "global_flags": [],
       "commands": {},
       "groups": {},
-      "deprecated": {}
+      "deprecated": {},
+      "tag_contracts": {}
     },
     "flag": {
       "short": null,
@@ -20,25 +23,32 @@
       "hidden": false
     },
     "arg": {
+      "type": "str",
       "required": true,
-      "variadic": false
+      "default": null,
+      "variadic": false,
+      "choices": null
     },
     "command": {
       "passthrough": false,
       "flags": [],
       "args": [],
-      "tags": []
+      "tags": [],
+      "constraints": [],
+      "hidden": false,
+      "interactive": false
     },
     "group": {
       "commands": {},
       "groups": {},
       "deprecated": {},
-      "tags": []
+      "tags": [],
+      "hidden": false
     }
   },
   "project_id": "rlsbl",
   "name": "rlsbl",
-  "version": "0.81.4",
+  "version": "0.81.5",
   "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 32 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
   "global_flags": [
     {
@@ -397,6 +407,15 @@
               "default": false,
               "negatable": false
             }
+          ],
+          "constraints": [
+            {
+              "type": "mutex",
+              "flags": [
+                "watch",
+                "no-watch"
+              ]
+            }
           ]
         },
         "init": {
@@ -420,6 +439,15 @@
               "help": "After retry, print the watch command hint without watching",
               "default": false,
               "negatable": false
+            }
+          ],
+          "constraints": [
+            {
+              "type": "mutex",
+              "flags": [
+                "watch",
+                "no-watch"
+              ]
             }
           ]
         },
@@ -520,6 +548,29 @@
               "help": "Rewrite every commit in the repository from the initial commit onward",
               "default": false,
               "negatable": false
+            }
+          ],
+          "constraints": [
+            {
+              "type": "mutex",
+              "flags": [
+                "pattern",
+                "file"
+              ]
+            },
+            {
+              "type": "mutex",
+              "flags": [
+                "replace",
+                "mangle"
+              ]
+            },
+            {
+              "type": "mutex",
+              "flags": [
+                "from-commit",
+                "entire-history"
+              ]
             }
           ]
         }
@@ -932,6 +983,15 @@
               "help": "After batch release, print the watch command hint without watching",
               "default": false,
               "negatable": false
+            }
+          ],
+          "constraints": [
+            {
+              "type": "mutex",
+              "flags": [
+                "watch",
+                "no-watch"
+              ]
             }
           ]
         },

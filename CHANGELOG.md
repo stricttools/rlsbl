@@ -2,6 +2,14 @@
 
 # Changelog
 
+## 0.81.6
+
+Fix PyPI scanner false positives for prefixed package names
+
+### Fixes
+
+- **Fix PyPI scanner false positives.** `deps-undeclared` no longer reports false positives when a workspace project's PyPI name differs from its workspace name (e.g., `orxtra-transport` vs `transport`).
+
 ## 0.81.5
 
 Fix CI: autouse saferm mock for scaffold tests
