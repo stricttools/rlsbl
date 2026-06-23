@@ -13,7 +13,7 @@ import subprocess
 
 from strictcli import CheckResult
 
-from ..workspace import project_is_dev_only
+from ..workspace import WorkspaceProject, members_of, project_is_dev_only
 from ._common import (
     RLSBL_CONFIG,
     _build_dep_import_cache,
@@ -56,22 +56,56 @@ def register_workspace_checks(app):
     @app.check("workspace-targets")
     def check_workspace_targets(ctx):
         """Every project must have at least one detectable target."""
+        from ..commands.monorepo.batch_release_init import _collect_releasable_targets
         from ..targets import detect_targets, resolve_releasable_config_dir
 
+        def _is_releasable_false(proj):
+            if isinstance(proj, WorkspaceProject):
+                return proj.releasable is False
+            return proj.get("releasable") is False
+
+        # Filter out projects that don't need targets:
+        # - dev_only projects (can't release)
+        # - releasable=false projects (explicitly non-releasable)
+        checkable = [
+            proj for proj in ctx.projects
+            if not project_is_dev_only(proj) and not _is_releasable_false(proj)
+        ]
+
         missing = []
-        for proj in ctx.projects:
+        for proj in checkable:
             rel_dir = resolve_releasable_config_dir(proj, ctx.workspace_root)
             targets = detect_targets(os.path.join(str(ctx.workspace_root), proj["path"]), releasable_config_dir=rel_dir)
             if not targets:
                 missing.append(proj["name"])
 
-        if missing:
-            return CheckResult(
-                "fail",
-                f"no targets detected: {', '.join(missing)}",
-                details=[f"{n}: no release target found" for n in missing],
-            )
-        return CheckResult("pass", f"all {len(ctx.projects)} project(s) have targets")
+        # Verify union of targets per releasable is non-empty
+        missing_releasables = []
+        for rel in ctx.releasables:
+            member_projs = members_of(rel.name, ctx.projects)
+            target_names = _collect_releasable_targets(rel.name, member_projs, str(ctx.workspace_root))
+            if not target_names:
+                missing_releasables.append(rel.name)
+
+        details = [f"{n}: no release target found" for n in missing]
+        details += [f"releasable '{r}': no targets across any member" for r in missing_releasables]
+
+        if missing or missing_releasables:
+            parts = []
+            if missing:
+                parts.append(f"no targets detected: {', '.join(missing)}")
+            if missing_releasables:
+                parts.append(f"releasable(s) with no targets: {', '.join(missing_releasables)}")
+            return CheckResult("fail", "; ".join(parts), details=details)
+
+        skipped = len(ctx.projects) - len(checkable)
+        rel_count = len(ctx.releasables)
+        msg = f"all {len(checkable)} project(s) have targets"
+        if skipped:
+            msg += f" ({skipped} skipped)"
+        if rel_count:
+            msg += f", {rel_count} releasable(s) verified"
+        return CheckResult("pass", msg)
 
     @app.check("workspace-unregistered")
     def check_workspace_unregistered(ctx):
