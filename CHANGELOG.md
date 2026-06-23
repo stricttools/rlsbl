@@ -2,6 +2,14 @@
 
 # Changelog
 
+## 0.81.3
+
+Fix CI: mock saferm in scaffold orphan tests
+
+### Fixes
+
+- **Fix CI test failure.** Scaffold orphan detection tests now mock saferm for CI environments.
+
 ## 0.81.2
 
 Fix coverage check for releasable monorepos, Maven lint support, gradle lockfile sync, batch_limits inheritance
