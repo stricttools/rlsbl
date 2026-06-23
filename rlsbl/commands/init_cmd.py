@@ -747,8 +747,9 @@ def apply_plans(plans):
             if plan.get("warning"):
                 warnings.append(plan["warning"])
             if plan.get("unreplaced"):
-                warnings.append(
-                    f"{target}: unreplaced vars: {', '.join(plan['unreplaced'])}"
+                raise ConfigError(
+                    f"{target}: unresolved template variables: "
+                    f"{', '.join(plan['unreplaced'])}"
                 )
             continue
 
@@ -810,8 +811,9 @@ def _print_dry_run_report(plans_groups, registry=None, registries=None, existing
             if plan.get("warning"):
                 warnings.append(plan["warning"])
             if plan.get("unreplaced"):
-                warnings.append(
-                    f"{plan['target']}: unreplaced vars: {', '.join(plan['unreplaced'])}"
+                raise ConfigError(
+                    f"{plan['target']}: unresolved template variables: "
+                    f"{', '.join(plan['unreplaced'])}"
                 )
 
     _print_file_status_table(created, skipped)

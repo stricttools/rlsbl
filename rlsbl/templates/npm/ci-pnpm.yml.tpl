@@ -12,8 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # engines.node: >= {{npm.minRequiredNode}}
-        node-version: [20, 22, 24]
+{{#if minRequiredNode}}        # engines.node: >= {{npm.minRequiredNode}}
+{{/if}}        node-version: [20, 22, 24]
     steps:
       - uses: {{action "actions/checkout"}}
       - uses: {{action "pnpm/action-setup"}}

@@ -243,20 +243,18 @@ class TestScaffold:
         assert "0.1.0" in content
         assert "{{version}}" not in content
 
-    def test_unreplaced_variables_emit_warning(self):
-        """Scaffold with a template containing unknown vars should warn."""
+    def test_unreplaced_variables_raise_error(self):
+        """Scaffold with a template containing unknown vars should raise ConfigError."""
         tpl_dir = os.path.join(self.tmp_dir, "_tpls")
         os.makedirs(tpl_dir)
         with open(os.path.join(tpl_dir, "test.tpl"), "w") as f:
             f.write("Hello {{name}} from {{planet}}")
 
         mappings = [{"template": "test.tpl", "target": "output.txt"}]
-        created, skipped, warnings, hashes = process_mappings(
-            tpl_dir, mappings, {"name": "test-pkg"}, force=False,
-        )
-        assert ("output.txt", "created") in created
-        assert any("planet" in w for w in warnings), \
-            f"Expected warning about 'planet', got: {warnings}"
+        with pytest.raises(ConfigError, match="planet"):
+            process_mappings(
+                tpl_dir, mappings, {"name": "test-pkg"}, force=False,
+            )
 
     # -- Base storage tests --
 

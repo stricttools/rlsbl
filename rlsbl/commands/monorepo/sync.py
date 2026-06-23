@@ -11,6 +11,7 @@ from ruamel.yaml.scalarstring import LiteralScalarString
 from ...action_versions import format_action
 from ...commands.init_cmd import process_template
 from ...context import create_context
+from ...errors import ConfigError
 from ...utils import commit_files, commit_files_if_changed
 from ...workspace import find_workspace_root, load_workspace
 from ...targets import detect_targets, resolve_releasable_config_dir, TARGETS
@@ -424,8 +425,12 @@ def _cmd_sync(flags, project_root):
                 # Resolve any remaining {{...}} template variables in the
                 # workflow content (e.g. {{pypi.minRequiredPython}} in comments
                 # that scaffold left unresolved).
-                if tvars:
-                    content, _ = process_template(content, tvars)
+                content, unreplaced = process_template(content, tvars)
+                if unreplaced:
+                    raise ConfigError(
+                        f"{ci_src}: unresolved template variables: "
+                        f"{', '.join(unreplaced)}"
+                    )
 
                 doc = parse_ci_workflow(content)
                 if doc is None:

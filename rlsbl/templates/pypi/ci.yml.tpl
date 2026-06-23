@@ -17,8 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # requires-python: >= {{minRequiredPython}}
-        python-version: ["3.12", "3.13", "3.14"]
+{{#if minRequiredPython}}        # requires-python: >= {{minRequiredPython}}
+{{/if}}        python-version: ["3.12", "3.13", "3.14"]
     steps:
       - uses: {{action "actions/checkout"}}
       - uses: {{action "astral-sh/setup-uv"}}
