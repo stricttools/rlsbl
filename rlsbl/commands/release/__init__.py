@@ -133,9 +133,16 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             os.environ["CLOUDFLARE_ACCOUNT_ID"] = os.environ["CF_ACCOUNT_ID"]
 
     validate_pipeline_config(config)
-    validate_gh_cli()
-    pre_existing_dirty = validate_clean_tree(flags)
-    branch = validate_branch_and_remote(flags)
+
+    # In batch mode the batch orchestrator already validated gh CLI,
+    # clean tree, and branch/remote upfront -- skip redundant checks.
+    if flags.get("batch-mode", False):
+        pre_existing_dirty = set()
+        branch = get_current_branch()
+    else:
+        validate_gh_cli()
+        pre_existing_dirty = validate_clean_tree(flags)
+        branch = validate_branch_and_remote(flags)
 
     # --- Resolve context ---
     monorepo_name, monorepo_project_path, is_library, is_non_releasable, releasable_name = resolve_monorepo_context(
