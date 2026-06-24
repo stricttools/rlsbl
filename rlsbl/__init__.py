@@ -691,27 +691,6 @@ def cmd_migrate(dry_run, status, **_kwargs):
 
 
 # ---------------------------------------------------------------------------
-# migrate-publish-config
-# ---------------------------------------------------------------------------
-
-@app.command(name="migrate-publish-config", help="Extract publishing fields (targets, private, pipelines, push_timeout, tag) from .rlsbl/config.json into a separate .rlsbl/publish.json file. This is the preferred config layout for new projects. Fails if publish.json already has content.")
-def cmd_migrate_publish_config(**_kwargs):
-    root = _require_sub_project_root()
-    from .config import migrate_publish_config
-    from .errors import ConfigError
-    try:
-        extracted, remaining = migrate_publish_config(root)
-    except ConfigError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
-    if not extracted:
-        print("No publishing fields found in .rlsbl/config.json. Nothing to migrate.")
-    else:
-        print(f"Migrated {len(extracted)} field(s) to .rlsbl/publish.json: {', '.join(sorted(extracted.keys()))}")
-        print(f"Remaining in .rlsbl/config.json: {len(remaining)} field(s)")
-
-
-# ---------------------------------------------------------------------------
 # deploy
 # ---------------------------------------------------------------------------
 

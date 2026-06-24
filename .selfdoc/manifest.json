@@ -68,11 +68,6 @@
       "type": "doc"
     },
     {
-      "path": "cli-migrate-publish-config.md",
-      "title": "rlsbl migrate-publish-config",
-      "type": "doc"
-    },
-    {
       "path": "cli-migrate.md",
       "title": "rlsbl migrate",
       "type": "doc"

@@ -13,7 +13,6 @@ from ..errors import ConfigError
 from ..config import (
     read_deploy_config,
     read_json_config,
-    read_publish_config,
     should_tag,
     write_project_config,
 )
@@ -128,7 +127,7 @@ def _get_releasable_config_dir(project_root):
 
 
 def _skip_redundant_releasable_configs(project_root, warnings):
-    """Remove per-package config.json and publish.json that duplicate releasable-level configs.
+    """Remove per-package config.json that duplicates releasable-level config.
 
     When a releasable member's per-package config is identical to the
     releasable-level config, the per-package file is redundant -- the
@@ -146,41 +145,36 @@ def _skip_redundant_releasable_configs(project_root, warnings):
         return []
 
     removed = []
-    _FILES = [
-        ("config.json", read_json_config),
-        ("publish.json", read_json_config),
-    ]
 
-    for filename, reader in _FILES:
-        rel_path = os.path.join(rel_config_dir, filename)
-        pkg_path = os.path.join(str(project_root), ".rlsbl", filename)
+    rel_path = os.path.join(rel_config_dir, "config.json")
+    pkg_path = os.path.join(str(project_root), ".rlsbl", "config.json")
 
-        if not os.path.isfile(pkg_path):
-            continue
-        if not os.path.isfile(rel_path):
-            continue
+    if not os.path.isfile(pkg_path):
+        return []
+    if not os.path.isfile(rel_path):
+        return []
 
-        pkg_config = reader(pkg_path)
-        rel_config = reader(rel_path)
+    pkg_config = read_json_config(pkg_path)
+    rel_config = read_json_config(rel_path)
 
-        if pkg_config == rel_config:
-            subprocess.run(
-                [
-                    "saferm", "delete",
-                    "--description",
-                    f"Removing redundant per-package .rlsbl/{filename} "
-                    f"(identical to releasable config)",
-                    pkg_path,
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            removed.append(pkg_path)
-            print(
-                f"Skipped per-package .rlsbl/{filename} "
-                f"(identical to releasable config)"
-            )
+    if pkg_config == rel_config:
+        subprocess.run(
+            [
+                "saferm", "delete",
+                "--description",
+                "Removing redundant per-package .rlsbl/config.json "
+                "(identical to releasable config)",
+                pkg_path,
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        removed.append(pkg_path)
+        print(
+            "Skipped per-package .rlsbl/config.json "
+            "(identical to releasable config)"
+        )
 
     return removed
 

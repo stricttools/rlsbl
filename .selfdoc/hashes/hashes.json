@@ -160,10 +160,6 @@
     "content": "42e479ba1fea29e5e55b68aca7c3c2076f1fa1158b120a11fbebd2007ba27e75",
     "description": "0f01533cb10562a220aa70ea5e33e2500c0c1e4aa8e16b2f80c532449a68b7ea"
   },
-  "en/cli-migrate-publish-config.md": {
-    "content": "0021cfc0e617cedc1f5b00293545895cd65bb04a9e2e52c18fe1f30e5078650f",
-    "description": "e4a1e3ae1944fdddd732aa07abf18fd76005f9181cf53996efb71ea899410141"
-  },
   "en/cli-migrate.md": {
     "content": "951c62d4da5855fc9584ab0d642ea6ab09502ea92c5845387e914ee135be3465",
     "description": "ed5d34392baa022c09e4daec00277910a7cbc15b08d430083b3bff2510762617"

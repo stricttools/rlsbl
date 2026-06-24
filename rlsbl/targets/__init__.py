@@ -190,12 +190,12 @@ def detect_targets(dir_path=".", releasable_config_dir=None):
     hint_names = [e.name for e in hints]
     if hint_names:
         suggestion = (
-            f"Add a \"targets\" key to .rlsbl/config.json or .rlsbl/publish.json. "
+            f"Add a \"targets\" key to .rlsbl/config.json. "
             f"Auto-detected targets: {', '.join(hint_names)}"
         )
     else:
         suggestion = (
-            "Add a \"targets\" key to .rlsbl/config.json or .rlsbl/publish.json. "
+            "Add a \"targets\" key to .rlsbl/config.json. "
             "No targets could be auto-detected from project manifests."
         )
     raise ConfigError(

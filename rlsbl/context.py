@@ -84,8 +84,7 @@ def create_context(
     releasable membership and applies config inheritance (releasable-level
     config as base, per-package config on top).
 
-    Uses the merged view (publish.json + config.json with conflict detection).
-    Returns an empty dict for config if neither file exists.
+    Returns an empty dict for config if no config.json exists.
     """
     from .config import read_project_config
 

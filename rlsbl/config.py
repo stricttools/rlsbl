@@ -1,17 +1,11 @@
 """Project configuration loading with layered precedence.
 
 Layers (highest to lowest priority):
-1. Per-package publish.json
-2. Per-package config.json
-3. Releasable publish.json
-4. Releasable config.json
+1. Per-package config.json
+2. Releasable config.json
 
 CLI flags override project-level .rlsbl/config.json which overrides
 user-level defaults.
-
-Publishing fields (targets, private, pipelines, push_timeout, tag) can live in
-either ``.rlsbl/config.json`` (legacy) or ``.rlsbl/publish.json`` (preferred).
-Having publishing fields in *both* files is a hard error -- no silent fallback.
 """
 
 import json
@@ -19,9 +13,6 @@ import os
 import sys
 
 from .errors import ConfigError
-
-# Fields that belong in publish.json (publishing-related configuration).
-PUBLISH_FIELDS = frozenset({"targets", "private", "pipelines", "push_timeout", "tag"})
 
 
 def merge_config(base, overlay):
@@ -119,147 +110,32 @@ def should_tag(flags, config):
     return True
 
 
-def _publish_config_path(project_root):
-    """Resolve publish config path at call time."""
-    return os.path.join(str(project_root), ".rlsbl", "publish.json")
-
-
-def read_publish_config(project_root):
-    """Read ``.rlsbl/publish.json``, returning dict or empty dict if missing."""
-    return read_json_config(_publish_config_path(project_root))
-
-
-def write_publish_config(project_root, config):
-    """Atomically write ``config`` dict to ``.rlsbl/publish.json``."""
-    path = _publish_config_path(project_root)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    tmp_path = path + ".tmp"
-    with open(tmp_path, "w", encoding="utf-8") as f:
-        json.dump(config, f, indent=2, ensure_ascii=False)
-        f.write("\n")
-    os.replace(tmp_path, path)
-
-
-def _load_level_config(config_path, publish_path, label):
-    """Load config.json + publish.json for a single level (package or releasable).
-
-    Applies per-level conflict detection: if both config.json and publish.json
-    exist at the same level and config.json has PUBLISH_FIELDS, that is a hard
-    error.
-
-    Returns the merged dict for this level (non-publishing from config.json +
-    publishing from whichever source).
-    """
-    config_json = read_json_config(config_path)
-    publish_json_exists = os.path.isfile(publish_path)
-    publish_json = read_json_config(publish_path) if publish_json_exists else {}
-
-    if not publish_json_exists:
-        return config_json
-
-    # Conflict check is per-level only
-    config_publish_keys = PUBLISH_FIELDS & set(config_json.keys())
-    if config_publish_keys and publish_json_exists:
-        raise ConfigError(
-            f"Publishing fields found in {label}/config.json while "
-            f"{label}/publish.json exists: "
-            f"{', '.join(sorted(config_publish_keys))}. "
-            f"Use migrate_publish_config() to move publishing fields to publish.json, "
-            f"or remove them from config.json."
-        )
-
-    merged = {k: v for k, v in config_json.items() if k not in PUBLISH_FIELDS}
-    merged.update(publish_json)
-    return merged
-
-
 def read_project_config(project_root, releasable_config_dir=None):
     """Read project config with optional releasable-level inheritance.
 
     When ``releasable_config_dir`` is provided (path to a releasable's
     state directory, e.g. ``.rlsbl-monorepo/releasables/www/``), config
-    is loaded with 4-level precedence:
+    is loaded with 2-level precedence:
 
-    1. Per-package publish.json (highest)
-    2. Per-package config.json
-    3. Releasable publish.json
-    4. Releasable config.json (lowest)
+    1. Per-package config.json (highest)
+    2. Releasable config.json (lowest)
 
-    Conflict detection (PUBLISH_FIELDS in config.json while publish.json
-    exists) is enforced per-level only: a releasable-level publish.json
-    does NOT conflict with a per-package config.json that has publishing
-    fields.
-
-    When ``releasable_config_dir`` is None, behaves as before: loads only
-    the per-package level.
+    When ``releasable_config_dir`` is None, loads only the per-package level.
     """
-    # Load per-package level
-    pkg_config = _load_level_config(
-        _project_config(project_root),
-        _publish_config_path(project_root),
-        ".rlsbl",
-    )
+    pkg_config = read_json_config(_project_config(project_root))
 
     if releasable_config_dir is None:
         return pkg_config
 
     # Load releasable level
     rel_config_path = os.path.join(str(releasable_config_dir), "config.json")
-    rel_publish_path = os.path.join(str(releasable_config_dir), "publish.json")
-    rel_config = _load_level_config(rel_config_path, rel_publish_path, "releasable")
+    rel_config = read_json_config(rel_config_path)
 
     if not rel_config:
         return pkg_config
 
     # Merge: per-package on top of releasable
     return merge_config(rel_config, pkg_config)
-
-
-def migrate_publish_config(project_root):
-    """Extract PUBLISH_FIELDS from ``.rlsbl/config.json`` into ``.rlsbl/publish.json``.
-
-    Reads config.json, moves any PUBLISH_FIELDS into a new publish.json, and
-    rewrites config.json without those fields. Both writes are atomic (write to
-    tmp, then rename).
-
-    Returns a tuple of (extracted_fields, remaining_fields) dicts.
-    Raises ConfigError if publish.json already exists and has content.
-    """
-    config_path = _project_config(project_root)
-    publish_path = _publish_config_path(project_root)
-
-    config_json = read_json_config(config_path)
-    existing_publish = read_json_config(publish_path)
-
-    if existing_publish:
-        raise ConfigError(
-            f".rlsbl/publish.json already exists and has content. "
-            f"Migration would overwrite it. Remove or merge manually."
-        )
-
-    # Split config.json into publishing and non-publishing fields
-    extracted = {k: v for k, v in config_json.items() if k in PUBLISH_FIELDS}
-    remaining = {k: v for k, v in config_json.items() if k not in PUBLISH_FIELDS}
-
-    if not extracted:
-        return extracted, remaining
-
-    # Write publish.json atomically
-    os.makedirs(os.path.dirname(publish_path), exist_ok=True)
-    tmp_publish = publish_path + ".tmp"
-    with open(tmp_publish, "w", encoding="utf-8") as f:
-        json.dump(extracted, f, indent=2, ensure_ascii=False)
-        f.write("\n")
-    os.replace(tmp_publish, publish_path)
-
-    # Rewrite config.json without publishing fields atomically
-    tmp_config = config_path + ".tmp"
-    with open(tmp_config, "w", encoding="utf-8") as f:
-        json.dump(remaining, f, indent=2, ensure_ascii=False)
-        f.write("\n")
-    os.replace(tmp_config, config_path)
-
-    return extracted, remaining
 
 
 def read_deploy_config(config):

@@ -28,7 +28,6 @@ from .workspace import (
 # config.json is kept only when it differs from the releasable-level config;
 # hooks/, bases/, lint/, version are all removed during cleanup.
 EXPECTED_RLSBL_CONTENTS = frozenset({
-    "publish.json",
     "config.json",
     "hashes.json",
     "managed-files.json",

@@ -372,7 +372,7 @@ def register_project_checks(app):
 
     @app.check("config-schema")
     def check_config_schema(ctx):
-        """Validate config schema: private key, pipelines, and publish.json if present."""
+        """Validate config schema: private key and pipelines."""
         config = ctx.config
         errors = []
 
@@ -385,18 +385,6 @@ def register_project_checks(app):
             validate_pipelines_config(config)
         except ConfigError as e:
             errors.append(str(e))
-
-        # Validate publish.json schema if it exists
-        from ..config import PUBLISH_FIELDS, read_publish_config
-        publish_json = read_publish_config(ctx.project_root)
-        if publish_json:
-            unknown_keys = set(publish_json.keys()) - PUBLISH_FIELDS
-            if unknown_keys:
-                errors.append(
-                    f".rlsbl/publish.json contains unknown keys: "
-                    f"{', '.join(sorted(unknown_keys))}. "
-                    f"Valid keys: {', '.join(sorted(PUBLISH_FIELDS))}"
-                )
 
         if errors:
             return CheckResult("fail", f"{len(errors)} config error(s)", details=errors)
