@@ -1349,7 +1349,7 @@ def run_cmd(registry, args, flags, ctx):
                     file=sys.stderr,
                 )
 
-        # Remove per-package config/publish.json that duplicate releasable config
+        # Remove per-package config.json that duplicates releasable config
         removed_paths = _skip_redundant_releasable_configs(project_root, warnings)
 
         _finalize_scaffold(
@@ -1995,7 +1995,7 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         skipped = ci_skipped + extra_skipped + merged_skipped + shared_skipped
         warnings = ci_warnings + extra_warnings + merged_warnings + shared_warnings
 
-        # Remove per-package config/publish.json that duplicate releasable config
+        # Remove per-package config.json that duplicates releasable config
         removed_paths = _skip_redundant_releasable_configs(project_root, warnings)
 
         _finalize_scaffold(

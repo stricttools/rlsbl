@@ -133,7 +133,6 @@ def verify_minimal_rlsbl(project_path):
 
     After cleanup, a per-package ``.rlsbl/`` should contain only:
 
-    - ``publish.json`` (publishing config)
     - ``hashes.json`` (scaffold metadata)
     - ``managed-files.json`` (scaffold metadata)
     - ``config.json`` (only if it has overrides differing from releasable config)
