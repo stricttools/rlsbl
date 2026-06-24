@@ -2,6 +2,20 @@
 
 # Changelog
 
+## 0.85.0
+
+Hotfix release type, TYPE_CHECKING import detection, ci-synced dev_node skip, root .rlsbl coexistence guard.
+
+### Features
+
+- **New feature.** `if TYPE_CHECKING:` imports are now excluded from both `deps-undeclared` and `deps-unused` checks, eliminating false positives for typing-only imports.
+- **New feature.** `bump = "hotfix"` release type for infrastructure-only releases. Bypasses the user-facing entry requirement, generates a `### Hotfix` changelog section from the release description, and errors if user-facing entries are present.
+- **New feature.** `root-rlsbl-conflict` check errors when both `.rlsbl/` and `.rlsbl-monorepo/` exist at the workspace root. Scaffold now skips entirely at workspace roots.
+
+### Fixes
+
+- **Fix.** `workspace-ci-synced` check no longer fails for dev_node projects missing CI workflows.
+
 ## 0.84.0
 
 Go companion tags, workspace root CI fix, uvNoSources lint, BaseTarget fix.

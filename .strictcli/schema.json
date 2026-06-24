@@ -48,7 +48,7 @@
   },
   "project_id": "rlsbl",
   "name": "rlsbl",
-  "version": "0.83.1",
+  "version": "0.84.0",
   "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 32 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
   "global_flags": [
     {
@@ -380,7 +380,7 @@
       "commands": {
         "run": {
           "name": "run",
-          "help": "Bump version, validate the JSONL changelog, run tests and lint, commit, tag, push, and create a GitHub Release. Reads the bump type (patch, minor, or major) and target selection from .rlsbl/releases/unreleased.toml, which can be scaffolded with rlsbl release init. Supports dry-run preview, non-interactive mode with --yes, and --allow-dirty to skip the clean working tree check.",
+          "help": "Bump version, validate the JSONL changelog, run tests and lint, commit, tag, push, and create a GitHub Release. Reads the bump type (patch, minor, major, or hotfix) and target selection from .rlsbl/releases/unreleased.toml, which can be scaffolded with rlsbl release init. Supports dry-run preview, non-interactive mode with --yes, and --allow-dirty to skip the clean working tree check.",
           "flags": [
             {
               "name": "allow-dirty",
@@ -1380,7 +1380,7 @@
       "pure": true,
       "needs_network": false,
       "depends_on": [],
-      "scope": "workspace"
+      "scope": "workspace:non_dev_node"
     },
     "workspace-targets": {
       "tags": [
@@ -1672,6 +1672,17 @@
         "workspace"
       ],
       "severity": "warn",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [],
+      "scope": "workspace"
+    },
+    "root-rlsbl-conflict": {
+      "tags": [
+        "workspace"
+      ],
+      "severity": "error",
       "fast": true,
       "pure": true,
       "needs_network": false,
