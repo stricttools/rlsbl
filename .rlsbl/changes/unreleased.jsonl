@@ -5,3 +5,4 @@
 {"commits":["9b43d1fa6e4cc8784289967c22afcb7c14d1dd46"],"user_facing":true,"description":"**New feature.** Automatic Go companion tags during releasable releases. When a releasable contains non-private Go packages, `{path}/v{version}` tags are created alongside the primary releasable tag for Go module proxy compatibility.","type":"feature"}
 {"commits":["5d2445c4e296c55fbb1b672a1c27cf2a44802c05"],"user_facing":true,"description":"**New feature.** Release rollback and `release undo` now clean up companion Go tags alongside the primary release tag.","type":"feature"}
 {"commits":["d1c16726ad0551cb5ab24c3f7b43f640fa9d5ce8"],"user_facing":true,"description":"**New feature.** `go-companion-tags` workspace check validates that Go releasable members have companion tags for the current version.","type":"feature"}
+{"commits":["f7b06ac8a16fd8a61f36a001f1c3b30e973a1357"],"user_facing":false}
