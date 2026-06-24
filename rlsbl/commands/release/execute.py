@@ -788,6 +788,7 @@ def _run_release_mutating(state: ReleaseState):
             blog_body_dst = archive_blog_body(project_dir, new_version)
             release_finalize_files = [
                 _rel_to_git_root(versioned_release, _git_root),
+                _rel_to_git_root(release_file_path, _git_root),
             ]
             if blog_body_dst:
                 release_finalize_files.append(_rel_to_git_root(blog_body_dst, _git_root))

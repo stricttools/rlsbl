@@ -355,6 +355,7 @@ def _finalize_batch_file(batch_path, log):
     # Commit finalized files
     finalize_files = [
         os.path.normpath(versioned_path),
+        os.path.normpath(batch_path),
     ]
     commit_files(
         f"chore: finalize batch release file ({versioned_name})",

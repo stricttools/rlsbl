@@ -441,9 +441,10 @@ class TestBatchFinalization:
         with patch("rlsbl.commands.monorepo.batch_release.commit_files", mock_commit):
             _finalize_batch_file(batch_path, lambda msg: None)
 
-        # Should commit only the versioned file (no empty unreleased.toml recreated)
-        assert len(committed_files) == 1
+        # Should commit the versioned file and the deleted unreleased.toml
+        assert len(committed_files) == 2
         assert any("batch-" in f for f in committed_files)
+        assert any("unreleased.toml" in f for f in committed_files)
 
     def test_timestamp_format(self, mock_git_repo):
         """Versioned file name follows batch-YYYYMMDD-HHMMSS.toml format."""
