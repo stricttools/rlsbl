@@ -1,0 +1,10 @@
+# Version bump type: patch, minor, major, or hotfix
+bump = "minor"
+# Short description of this release (required)
+description = "Hotfix release type, TYPE_CHECKING import detection, ci-synced dev_node skip, root .rlsbl coexistence guard."
+# Optional context explaining why these changes were made
+context = ""
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["npm", "pypi"]
+exclude = []
