@@ -602,15 +602,6 @@ def _format_single_result(result):
             "(not publicly available)."
         )
 
-    # GitHub informational (only for non-github registries that happen to have github_count set)
-    if registry != "github":
-        github_count = result.get("github_count")
-        if github_count is not None:
-            if github_count == 0:
-                print(f"\n  (i) No GitHub repos named \"{name}\"")
-            else:
-                print(f"\n  (i) {github_count} GitHub repo(s) named \"{name}\" (informational, not a registry)")
-
     # Steps-run summary
     _REGISTRY_DISPLAY = {"npm": "npm", "pypi": "PyPI", "go": "pkg.go.dev", "github": "GitHub"}
     steps = [_REGISTRY_DISPLAY.get(registry, registry)]
@@ -621,7 +612,7 @@ def _format_single_result(result):
         steps.append("variants")
     if result.get("moniker_checked"):
         steps.append("moniker similarity")
-    if result.get("github_count") is not None:
+    if result.get("github_count") is not None and registry != "github":
         steps.append("GitHub repos")
     if result.get("ultranorm_checked"):
         steps.append("ultranormalization")
