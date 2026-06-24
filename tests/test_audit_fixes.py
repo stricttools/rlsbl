@@ -5,29 +5,18 @@ Covers:
 - Gap 2: prepush-changelog-coverage is releasable-aware
 - Gap 3: prepush-gitignore-guard checks releasable-level files
 - Gap 4: post-release hooks use run_releasable_hooks in releasable mode
-- Gap 5: read_project_config detects silent field drop when publish.json
-  exists with non-publish content and config.json has publish fields
 """
 
 import json
 import os
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 from conftest import make_workspace, run_git, make_commit, git_head
 
 from rlsbl.check_context import WorkspaceCheckContext
-from rlsbl.config import read_project_config, PUBLISH_FIELDS
 from rlsbl.errors import ConfigError
 from rlsbl.workspace import Releasable, WorkspaceProject
-
-
-def _write_json(path, data):
-    """Write a JSON file, creating parent dirs."""
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data))
 
 
 # ---------------------------------------------------------------------------
@@ -253,69 +242,3 @@ class TestPostReleaseHooksReleasable:
         assert '"post-release"' in source
         # Verify the releasable hooks path is conditioned on _use_releasable_hooks
         assert "_use_releasable_hooks" in source
-
-
-# ---------------------------------------------------------------------------
-# Gap 5: read_project_config detects silent field drop
-# ---------------------------------------------------------------------------
-
-
-class TestPublishFieldSilentDrop:
-    """publish.json with non-publish content + config.json with publish fields = hard error."""
-
-    def test_publish_json_with_non_publish_content_and_config_has_publish_fields(self, tmp_path):
-        """Bug scenario: publish.json has non-publish content, config.json has
-        publish fields -> publish fields were silently dropped. Now it should
-        be a hard error."""
-        config_path = tmp_path / ".rlsbl" / "config.json"
-        publish_path = tmp_path / ".rlsbl" / "publish.json"
-
-        # config.json has a PUBLISH_FIELD
-        _write_json(config_path, {"private": False, "batch_limits": {}})
-        # publish.json exists but has no PUBLISH_FIELDS -- only non-publish content
-        _write_json(publish_path, {"some_custom_field": "value"})
-
-        with pytest.raises(ConfigError, match="Publishing fields found in .rlsbl/config.json"):
-            read_project_config(tmp_path)
-
-    def test_empty_publish_json_returns_config_as_is(self, tmp_path):
-        """Empty publish.json (file exists but empty) should be treated as
-        non-existent (backward compat)."""
-        config_path = tmp_path / ".rlsbl" / "config.json"
-        publish_path = tmp_path / ".rlsbl" / "publish.json"
-
-        _write_json(config_path, {"private": True, "batch_limits": {}})
-        # Note: _write_json writes '{}' which is truthy. We need truly empty.
-        # But the real question is: does the file exist at all?
-        # With our fix, we check os.path.isfile, not truthiness of content.
-        # An existing publish.json with {} is actually non-empty JSON.
-        # Let's test the "file doesn't exist" case.
-        result = read_project_config(tmp_path)
-        assert result["private"] is True
-        assert result["batch_limits"] == {}
-
-    def test_publish_json_exists_with_only_publish_fields_no_conflict(self, tmp_path):
-        """publish.json has publish fields, config.json has no publish fields -> OK."""
-        config_path = tmp_path / ".rlsbl" / "config.json"
-        publish_path = tmp_path / ".rlsbl" / "publish.json"
-
-        _write_json(config_path, {"batch_limits": {"max_commits_per_entry": 5}})
-        _write_json(publish_path, {"private": False, "targets": ["pypi"]})
-
-        result = read_project_config(tmp_path)
-        assert result["private"] is False
-        assert result["targets"] == ["pypi"]
-        assert result["batch_limits"] == {"max_commits_per_entry": 5}
-
-    def test_publish_json_empty_dict_with_config_publish_fields_is_error(self, tmp_path):
-        """publish.json exists with empty dict '{}', config.json has publish
-        fields. The file EXISTS so it's a conflict -- even though its content
-        is an empty dict."""
-        config_path = tmp_path / ".rlsbl" / "config.json"
-        publish_path = tmp_path / ".rlsbl" / "publish.json"
-
-        _write_json(config_path, {"private": True})
-        _write_json(publish_path, {})  # exists but empty dict
-
-        with pytest.raises(ConfigError, match="Publishing fields found in .rlsbl/config.json"):
-            read_project_config(tmp_path)

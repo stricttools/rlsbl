@@ -1012,25 +1012,6 @@ class TestConfigSchema:
         assert result.status == "fail"
         assert any("private" in d for d in result.details)
 
-    def test_unknown_publish_json_keys_fails(self, tmp_path, monkeypatch):
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        monkeypatch.chdir(repo)
-        _init_repo(repo)
-        _setup_scaffold(repo, config={"private": False})
-
-        publish_dir = repo / ".rlsbl"
-        (publish_dir / "publish.json").write_text(
-            json.dumps({"unknown_key": "value"}) + "\n"
-        )
-        run_git(repo, "add", ".rlsbl/publish.json")
-        run_git(repo, "commit", "-q", "-m", "add publish.json")
-
-        ctx = make_ctx(repo)
-        result = app._check_defs["config-schema"].impl(ctx)
-        assert result.status == "fail"
-        assert any("unknown keys" in d for d in result.details)
-
 
 class TestLicenseFile:
     """license-file check."""

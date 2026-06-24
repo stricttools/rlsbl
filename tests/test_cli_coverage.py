@@ -523,36 +523,6 @@ class TestCmdMigrate:
 
 
 # ============================================================================
-# cmd_migrate_publish_config
-# ============================================================================
-
-
-class TestCmdMigratePublishConfig:
-    @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
-    @patch("rlsbl.config.migrate_publish_config", return_value=({}, {}))
-    def test_no_fields(self, mock_migrate, _, capsys):
-        rlsbl.cmd_migrate_publish_config()
-        assert "Nothing to migrate" in capsys.readouterr().out
-
-    @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
-    @patch("rlsbl.config.migrate_publish_config", return_value=({"targets": {}}, {"private": True}))
-    def test_with_fields(self, mock_migrate, _, capsys):
-        rlsbl.cmd_migrate_publish_config()
-        out = capsys.readouterr().out
-        assert "Migrated 1 field(s)" in out
-        assert "targets" in out
-
-    @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
-    @patch("rlsbl.config.migrate_publish_config")
-    def test_config_error_exits(self, mock_migrate, _):
-        from rlsbl.errors import ConfigError
-        mock_migrate.side_effect = ConfigError("bad")
-        with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_migrate_publish_config()
-        assert exc.value.code == 1
-
-
-# ============================================================================
 # cmd_deploy
 # ============================================================================
 

@@ -4,8 +4,7 @@ Covers:
 1. New package in a releasable: no per-package config.json when identical to releasable
 2. New package in a releasable: per-package config.json written when different from releasable
 3. Existing identical config.json: removed with informational message
-4. Same for publish.json
-5. Package NOT in a releasable: config.json written normally (backward compat)
+4. Package NOT in a releasable: config.json written normally (backward compat)
 """
 
 import json
@@ -70,8 +69,8 @@ def _make_explicit_workspace(root, releasables, projects):
     (ws_dir / WORKSPACE_FILE).write_text("\n".join(lines))
 
 
-def _setup_releasable(root, releasable_name, config=None, publish=None):
-    """Create the releasable directory with optional config.json and publish.json."""
+def _setup_releasable(root, releasable_name, config=None):
+    """Create the releasable directory with optional config.json."""
     rel_dir = Path(get_releasable_dir(str(root), releasable_name))
     rel_dir.mkdir(parents=True, exist_ok=True)
 
@@ -79,23 +78,12 @@ def _setup_releasable(root, releasable_name, config=None, publish=None):
         config_path = rel_dir / "config.json"
         config_path.write_text(json.dumps(config, indent=2) + "\n")
 
-    if publish is not None:
-        publish_path = rel_dir / "publish.json"
-        publish_path.write_text(json.dumps(publish, indent=2) + "\n")
-
 
 def _write_pkg_config(proj_dir, config):
     """Write .rlsbl/config.json for a package."""
     rlsbl_dir = proj_dir / ".rlsbl"
     rlsbl_dir.mkdir(parents=True, exist_ok=True)
     (rlsbl_dir / "config.json").write_text(json.dumps(config, indent=2) + "\n")
-
-
-def _write_pkg_publish(proj_dir, publish):
-    """Write .rlsbl/publish.json for a package."""
-    rlsbl_dir = proj_dir / ".rlsbl"
-    rlsbl_dir.mkdir(parents=True, exist_ok=True)
-    (rlsbl_dir / "publish.json").write_text(json.dumps(publish, indent=2) + "\n")
 
 
 # ---------------------------------------------------------------------------
@@ -236,79 +224,6 @@ class TestConfigJsonSkip:
             "Per-package config.json should be kept when releasable has no config.json"
         )
         assert len(removed) == 0
-
-
-# ---------------------------------------------------------------------------
-# Phase 3d: publish.json skip for releasable members
-# ---------------------------------------------------------------------------
-
-
-class TestPublishJsonSkip:
-    """Tests for skipping redundant per-package publish.json in releasables."""
-
-    def test_identical_publish_removed(self, mock_git_repo):
-        """Per-package publish.json is removed when identical to releasable publish.json."""
-        proj_dir = mock_git_repo / "app"
-        proj_dir.mkdir()
-        _make_explicit_workspace(mock_git_repo, [{"name": "www"}], [
-            {"path": "app", "name": "app", "releasable": "www"},
-        ])
-
-        publish = {"pipelines": {"pypi": {"type": "pypi", "local": False}}}
-        _setup_releasable(mock_git_repo, "www", publish=publish)
-        _write_pkg_publish(proj_dir, publish)
-
-        warnings = []
-        removed = _skip_redundant_releasable_configs(proj_dir, warnings)
-
-        pkg_publish_path = proj_dir / ".rlsbl" / "publish.json"
-        assert not pkg_publish_path.exists(), (
-            "Per-package publish.json should be removed when identical to releasable"
-        )
-        assert any("publish.json" in str(p) for p in removed)
-
-    def test_different_publish_kept(self, mock_git_repo):
-        """Per-package publish.json is kept when different from releasable publish.json."""
-        proj_dir = mock_git_repo / "app"
-        proj_dir.mkdir()
-        _make_explicit_workspace(mock_git_repo, [{"name": "www"}], [
-            {"path": "app", "name": "app", "releasable": "www"},
-        ])
-
-        releasable_publish = {"pipelines": {"pypi": {"type": "pypi", "local": False}}}
-        pkg_publish = {"pipelines": {"npm": {"type": "npm", "local": False}}}
-        _setup_releasable(mock_git_repo, "www", publish=releasable_publish)
-        _write_pkg_publish(proj_dir, pkg_publish)
-
-        warnings = []
-        removed = _skip_redundant_releasable_configs(proj_dir, warnings)
-
-        pkg_publish_path = proj_dir / ".rlsbl" / "publish.json"
-        assert pkg_publish_path.exists(), (
-            "Per-package publish.json should be kept when different from releasable"
-        )
-        assert len(removed) == 0
-
-    def test_both_config_and_publish_removed_when_identical(self, mock_git_repo):
-        """Both config.json and publish.json are removed when both match releasable."""
-        proj_dir = mock_git_repo / "app"
-        proj_dir.mkdir()
-        _make_explicit_workspace(mock_git_repo, [{"name": "www"}], [
-            {"path": "app", "name": "app", "releasable": "www"},
-        ])
-
-        config = {"batch_limits": {"max_commits_per_entry": 5}}
-        publish = {"targets": ["pypi"], "private": False}
-        _setup_releasable(mock_git_repo, "www", config=config, publish=publish)
-        _write_pkg_config(proj_dir, config)
-        _write_pkg_publish(proj_dir, publish)
-
-        warnings = []
-        removed = _skip_redundant_releasable_configs(proj_dir, warnings)
-
-        assert not (proj_dir / ".rlsbl" / "config.json").exists()
-        assert not (proj_dir / ".rlsbl" / "publish.json").exists()
-        assert len(removed) == 2
 
 
 # ---------------------------------------------------------------------------

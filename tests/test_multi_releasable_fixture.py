@@ -119,18 +119,6 @@ class TestMultiReleasableFactory:
             config = json.load(f)
         assert config["batch_limits"]["max_commits_per_entry"] == 3
 
-    def test_custom_publish_config(self, multi_releasable_monorepo_factory):
-        publish = {"pipelines": [{"type": "pypi", "local": False}]}
-        ns = multi_releasable_monorepo_factory(
-            publish_configs={"beta": publish},
-        )
-        rel_dir = get_releasable_dir(str(ns.root), "beta")
-        publish_path = os.path.join(rel_dir, "publish.json")
-        assert os.path.isfile(publish_path)
-        with open(publish_path) as f:
-            data = json.load(f)
-        assert data["pipelines"][0]["type"] == "pypi"
-
     def test_custom_hook_config(self, multi_releasable_monorepo_factory):
         ns = multi_releasable_monorepo_factory(
             hook_configs={

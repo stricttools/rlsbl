@@ -7,7 +7,6 @@ import subprocess
 import pytest
 
 from rlsbl.config import merge_config, read_project_config
-from rlsbl.errors import ConfigError
 
 
 class TestMergeConfigShallow:
@@ -178,24 +177,6 @@ class TestReadProjectConfigReleasableInheritance:
             },
         }
 
-    def test_releasable_publish_json_inherited(self, tmp_path):
-        """Publish.json at releasable level is inherited by packages."""
-        rel_dir = _make_releasable_dir(tmp_path, "alpha")
-        _write_json(rel_dir / "publish.json", {
-            "private": False,
-            "pipelines": {"pypi": {"type": "pypi", "local": False}},
-        })
-
-        pkg_dir = tmp_path / "pkgs" / "core"
-        _write_json(pkg_dir / ".rlsbl" / "config.json", {
-            "batch_limits": {"max_commits_per_entry": 10},
-        })
-
-        result = read_project_config(pkg_dir, releasable_config_dir=str(rel_dir))
-        assert result["private"] is False
-        assert result["pipelines"] == {"pypi": {"type": "pypi", "local": False}}
-        assert result["batch_limits"] == {"max_commits_per_entry": 10}
-
     def test_per_package_overrides_releasable(self, tmp_path):
         """Per-package values override releasable values."""
         rel_dir = _make_releasable_dir(tmp_path, "alpha")
@@ -210,7 +191,7 @@ class TestReadProjectConfigReleasableInheritance:
         assert result["push_timeout"] == 120
 
     def test_releasable_dir_empty_returns_package_config(self, tmp_path):
-        """Empty releasable dir (no config.json, no publish.json) -> per-package only."""
+        """Empty releasable dir (no config.json) -> per-package only."""
         rel_dir = _make_releasable_dir(tmp_path, "alpha")
 
         pkg_dir = tmp_path / "pkgs" / "core"
@@ -218,46 +199,6 @@ class TestReadProjectConfigReleasableInheritance:
 
         result = read_project_config(pkg_dir, releasable_config_dir=str(rel_dir))
         assert result == {"private": True}
-
-
-class TestConflictCheckPerLevel:
-    """Conflict check is per-level: releasable publish.json + per-package config.json
-    with publishing fields -> no error."""
-
-    def test_releasable_publish_and_package_config_with_publish_fields_no_error(self, tmp_path):
-        """A releasable publish.json must NOT trigger conflict against per-package config.json."""
-        rel_dir = _make_releasable_dir(tmp_path, "alpha")
-        _write_json(rel_dir / "publish.json", {"private": False})
-
-        pkg_dir = tmp_path / "pkgs" / "core"
-        # Per-package config.json has a publish field (private) -- no publish.json at package level
-        _write_json(pkg_dir / ".rlsbl" / "config.json", {"private": True})
-
-        # This should NOT raise -- conflict check is per-level only
-        result = read_project_config(pkg_dir, releasable_config_dir=str(rel_dir))
-        # Per-package private=True overrides releasable private=False
-        assert result["private"] is True
-
-    def test_same_level_conflict_still_raises(self, tmp_path):
-        """Both config.json and publish.json at per-package level -> error."""
-        pkg_dir = tmp_path / "pkgs" / "core"
-        _write_json(pkg_dir / ".rlsbl" / "config.json", {"private": True})
-        _write_json(pkg_dir / ".rlsbl" / "publish.json", {"private": False})
-
-        with pytest.raises(ConfigError, match="Publishing fields found"):
-            read_project_config(pkg_dir)
-
-    def test_releasable_level_conflict_raises(self, tmp_path):
-        """Both config.json and publish.json at releasable level -> error."""
-        rel_dir = _make_releasable_dir(tmp_path, "alpha")
-        _write_json(rel_dir / "config.json", {"private": True})
-        _write_json(rel_dir / "publish.json", {"private": False})
-
-        pkg_dir = tmp_path / "pkgs" / "core"
-        pkg_dir.mkdir(parents=True)
-
-        with pytest.raises(ConfigError, match="Publishing fields found"):
-            read_project_config(pkg_dir, releasable_config_dir=str(rel_dir))
 
 
 # ---------------------------------------------------------------------------

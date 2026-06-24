@@ -72,30 +72,6 @@ class TestReleasableConfigInheritance:
         assert len(entries) == 1
         assert entries[0].name == "npm"
 
-    def test_inherits_targets_from_releasable_publish_json(self, tmp_path):
-        """Targets can also be inherited from releasable-level publish.json."""
-        pkg_dir = tmp_path / "pkg"
-        pkg_dir.mkdir()
-
-        # Per-package config.json with no targets key
-        rlsbl_dir = pkg_dir / ".rlsbl"
-        rlsbl_dir.mkdir()
-        (rlsbl_dir / "config.json").write_text(json.dumps({"private": False}))
-
-        # Releasable-level publish.json with targets (targets is a PUBLISH_FIELD)
-        rel_dir = tmp_path / "releasable"
-        rel_dir.mkdir()
-        (rel_dir / "config.json").write_text(json.dumps({}))
-        (rel_dir / "publish.json").write_text(json.dumps({"targets": ["npm"]}))
-
-        # Create package.json for npm target
-        (pkg_dir / "package.json").write_text(
-            json.dumps({"name": "test", "version": "1.0.0"})
-        )
-
-        entries = detect_targets(str(pkg_dir), releasable_config_dir=str(rel_dir))
-        assert len(entries) == 1
-        assert entries[0].name == "npm"
 
 
 class TestTwoTierRule:

@@ -387,7 +387,6 @@ def _create_multi_releasable_monorepo(
     releasables=None,
     projects=None,
     releasable_configs=None,
-    publish_configs=None,
     hook_configs=None,
     initial_version="0.1.0",
 ):
@@ -405,8 +404,6 @@ def _create_multi_releasable_monorepo(
             (defaults to 2 alpha members + 2 beta members + 1 dev_only).
         releasable_configs: dict mapping releasable name to config dict,
             written to ``<releasable_dir>/config.json``.
-        publish_configs: dict mapping releasable name to publish config dict,
-            written to ``<releasable_dir>/publish.json``.
         hook_configs: dict mapping releasable name to hook config dict,
             written to ``<releasable_dir>/hooks/`` directory files.
         initial_version: version string for all releasables (default "0.1.0").
@@ -422,8 +419,6 @@ def _create_multi_releasable_monorepo(
         projects = [dict(p) for p in _DEFAULT_PROJECTS]
     if releasable_configs is None:
         releasable_configs = {}
-    if publish_configs is None:
-        publish_configs = {}
     if hook_configs is None:
         hook_configs = {}
 
@@ -477,13 +472,6 @@ def _create_multi_releasable_monorepo(
         with open(config_path, "w") as f:
             json.dump(config, f, indent=2)
             f.write("\n")
-
-        # Releasable-level publish.json (if provided)
-        if rel.name in publish_configs:
-            publish_path = os.path.join(rel_dir, "publish.json")
-            with open(publish_path, "w") as f:
-                json.dump(publish_configs[rel.name], f, indent=2)
-                f.write("\n")
 
         # Hook config (if provided) -- write hook scripts to hooks/ dir
         if rel.name in hook_configs:
@@ -545,14 +533,13 @@ def multi_releasable_monorepo_factory(tmp_path, monkeypatch):
 
     Returns a callable that accepts the same keyword arguments as
     ``_create_multi_releasable_monorepo`` (releasables, projects,
-    releasable_configs, publish_configs, hook_configs, initial_version).
+    releasable_configs, hook_configs, initial_version).
 
     Example::
 
         def test_custom(multi_releasable_monorepo_factory):
             ns = multi_releasable_monorepo_factory(
                 releasable_configs={"alpha": {"batch_limits": {"max_commits_per_entry": 3}}},
-                publish_configs={"alpha": {"pipelines": [{"type": "pypi", "local": false}]}},
             )
             assert ns.root.exists()
     """

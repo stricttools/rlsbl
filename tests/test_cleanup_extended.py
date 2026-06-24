@@ -334,7 +334,7 @@ class TestVerifyMinimalAfterFullCleanup:
             pkg,
             subdirs=["changes", "releases", "hooks", "bases", "lint"],
             files=[
-                "config.json", "publish.json", "hashes.json",
+                "config.json", "hashes.json",
                 "managed-files.json", "version",
             ],
         )
@@ -348,11 +348,11 @@ class TestVerifyMinimalAfterFullCleanup:
         assert result == []
 
     def test_minimal_set_only(self, tmp_project):
-        """Only publish.json, hashes.json, managed-files.json is clean."""
+        """Only hashes.json, managed-files.json is clean."""
         pkg = tmp_project / "pkg"
         _make_rlsbl_dir(
             pkg,
-            files=["publish.json", "hashes.json", "managed-files.json"],
+            files=["hashes.json", "managed-files.json"],
         )
         result = verify_minimal_rlsbl(str(pkg))
         assert result == []
@@ -362,7 +362,7 @@ class TestVerifyMinimalAfterFullCleanup:
         pkg = tmp_project / "pkg"
         _make_rlsbl_dir(
             pkg,
-            files=["publish.json", "hashes.json", "managed-files.json", "config.json"],
+            files=["hashes.json", "managed-files.json", "config.json"],
         )
         result = verify_minimal_rlsbl(str(pkg))
         assert result == []
@@ -432,7 +432,6 @@ class TestVerifyMinimalFlagsUnexpected:
     def test_expected_contents_is_minimal(self):
         """EXPECTED_RLSBL_CONTENTS contains only the minimal set."""
         assert EXPECTED_RLSBL_CONTENTS == {
-            "publish.json",
             "config.json",
             "hashes.json",
             "managed-files.json",
@@ -480,15 +479,3 @@ class TestCleanupAllNewTargets:
 
         assert len(removed) == 8  # 5 dirs + 3 files
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
-    def test_cleanup_preserves_publish_json(self, mock_run, tmp_project):
-        """publish.json is never removed during cleanup."""
-        pkg = tmp_project / "pkg"
-        _make_rlsbl_dir(pkg, files=["publish.json"])
-        _write_workspace(tmp_project, WORKSPACE_WITH_RELEASABLE)
-        _write_releasable_config(tmp_project, "core", {})
-
-        removed = cleanup_per_package_release_state(str(tmp_project))
-        removed_names = [os.path.basename(p) for p in removed]
-        assert "publish.json" not in removed_names
-        assert (pkg / ".rlsbl" / "publish.json").exists()

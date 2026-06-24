@@ -459,7 +459,7 @@ class TestVerifyMinimalCleanState:
         pkg = tmp_project / "pkg"
         _make_rlsbl_dir(
             pkg,
-            files=["publish.json", "config.json", "hashes.json", "managed-files.json"],
+            files=["config.json", "hashes.json", "managed-files.json"],
         )
         result = verify_minimal_rlsbl(str(pkg))
         assert result == []
@@ -467,7 +467,7 @@ class TestVerifyMinimalCleanState:
     def test_subset_of_expected_files(self, tmp_project):
         """A subset of expected files is still clean."""
         pkg = tmp_project / "pkg"
-        _make_rlsbl_dir(pkg, files=["publish.json", "config.json"])
+        _make_rlsbl_dir(pkg, files=["config.json"])
         result = verify_minimal_rlsbl(str(pkg))
         assert result == []
 
@@ -481,7 +481,6 @@ class TestVerifyMinimalCleanState:
     def test_expected_contents_match(self):
         """EXPECTED_RLSBL_CONTENTS has the documented set."""
         assert EXPECTED_RLSBL_CONTENTS == {
-            "publish.json",
             "config.json",
             "hashes.json",
             "managed-files.json",
@@ -493,7 +492,7 @@ class TestVerifyMinimalCleanState:
         _make_rlsbl_dir(
             pkg,
             subdirs=["changes", "releases", "hooks", "bases", "lint"],
-            files=["config.json", "publish.json", "version"],
+            files=["config.json", "version"],
         )
         # Simulate cleanup by removing all non-minimal entries
         import shutil
@@ -519,11 +518,10 @@ class TestVerifyMinimalMixedState:
         _make_rlsbl_dir(
             pkg,
             subdirs=["hooks", "changes"],
-            files=["config.json", "publish.json", "version"],
+            files=["config.json", "version"],
         )
         result = verify_minimal_rlsbl(str(pkg))
         assert "changes" in result
         assert "version" in result
         assert "hooks" in result  # hooks is now unexpected after cleanup scope extension
         assert "config.json" not in result
-        assert "publish.json" not in result
