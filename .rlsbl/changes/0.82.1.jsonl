@@ -1,0 +1,4 @@
+{"commits":["0e3ce7ce5e676d167c0de6fdd29237cc81cb5750"],"user_facing":true,"description":"**Fix.** `check-name --target github` no longer shows redundant 'GitHub repos' in the Checked summary.","type":"fix"}
+{"commits":["4452c633d60a812f10a10a0a8553e37df7218f34"],"user_facing":true,"description":"**Fix.** Monorepo `check-names --target` help text now includes `github`.","type":"fix"}
+{"commits":["486253ec7b9ed6782cca446b1194569ca4ec4dc3","3fbe2d40cb43a31fd482135fb6895bc2638f1f96"],"user_facing":false}
+{"commits":["621f5db72fbb2e20f402e3ba30a0560daefc35da"],"user_facing":true,"description":"**New feature.** `TemplateVars` dict subclass auto-generates namespaced template variable keys, ensuring all scaffold modes (single-target, multi-target, monorepo sync) resolve variables consistently.","type":"feature"}
