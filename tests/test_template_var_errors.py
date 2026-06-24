@@ -16,6 +16,7 @@ import os
 import pytest
 
 from rlsbl.commands.init_cmd import (
+    _generate_merged_publish,
     apply_plans,
     check_unreplaced_vars,
     plan_mappings,
@@ -153,7 +154,11 @@ class TestSyncUnresolvedVarsError:
 
 
 class TestMergedPublishToleratesUnresolved:
-    """_generate_merged_publish intentionally handles unresolved vars without error."""
+    """_generate_merged_publish intentionally handles unresolved vars without error.
+
+    Tests the full pipeline: process_template -> whole-line drop -> inline
+    sheltering -> YAML round-trip -> unsheltering.
+    """
 
     def test_process_template_returns_unreplaced_without_error(self):
         """process_template itself does not raise on unresolved vars
@@ -163,6 +168,43 @@ class TestMergedPublishToleratesUnresolved:
         assert "1.0.0" in result
         assert "pypi.minPython" in unreplaced
         # No error -- caller must check unreplaced and decide
+
+    def test_whole_line_unresolved_dropped(self):
+        """Whole-line {{var}} placeholders (e.g. {{homebrewEnv}}) are dropped
+        from the merged output when unresolved."""
+        result = _generate_merged_publish(
+            ["npm", "go"],
+            template_vars={
+                # Resolve npm's registryUrl so only go's whole-line vars are unresolved
+                "registryUrl": "https://registry.npmjs.org",
+            },
+        )
+        # go template has {{homebrewEnv}} and {{npmPublishJobs}} as whole-line
+        # placeholders -- both should be dropped entirely
+        assert "homebrewEnv" not in result
+        assert "npmPublishJobs" not in result
+        # Both targets' jobs should be present
+        assert "npm:" in result or "npm" in result
+        assert "goreleaser" in result or "go:" in result
+
+    def test_inline_unresolved_survives_via_sheltering(self):
+        """Inline {{var}} placeholders survive YAML round-trip via the
+        __UNRESOLVED__ sheltering mechanism and appear as {{var}} in output."""
+        result = _generate_merged_publish(
+            ["npm", "pypi"],
+            template_vars={
+                # Don't provide registryUrl -- it's inline in npm's template
+                # (registry-url: {{registryUrl}}) so it should be sheltered
+                # and restored after YAML round-trip
+            },
+        )
+        # The inline {{registryUrl}} should survive as a template placeholder
+        assert "{{registryUrl}}" in result
+        # The sheltering sentinel must NOT appear in the final output
+        assert "__UNRESOLVED__" not in result
+        # Both targets' jobs should be present
+        assert "npm:" in result
+        assert "pypi:" in result
 
 
 # ---------------------------------------------------------------------------
