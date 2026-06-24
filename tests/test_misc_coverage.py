@@ -757,7 +757,7 @@ class TestClaimNameAdditionalCoverage:
     def test_ambiguous_status_without_yes_exits(self, mock_check, capsys):
         mock_check.return_value = {
             "name": "pkg", "registry": "npm", "status": "unknown",
-            "variants": None, "github_count": None, "reason": None,
+            "variants": None, "reason": None,
         }
         with pytest.raises(SystemExit) as exc_info:
             claim_run_cmd("npm", ["pkg"], {"yes": False})
@@ -770,7 +770,7 @@ class TestClaimNameAdditionalCoverage:
     def test_ambiguous_status_with_yes_proceeds(self, mock_check, mock_run, capsys, tmp_path):
         mock_check.return_value = {
             "name": "pkg", "registry": "npm", "status": "unknown",
-            "variants": None, "github_count": None, "reason": None,
+            "variants": None, "reason": None,
         }
         mock_run.return_value = MagicMock(returncode=0)
 

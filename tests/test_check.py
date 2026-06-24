@@ -344,7 +344,7 @@ class TestDelayFlag:
         """--delay is recognized as a value flag and passed to run_cmd."""
         mock_check.return_value = {
             "name": "my-pkg", "registry": "npm", "status": "available",
-            "variants": [], "github_count": 0,
+            "variants": [],
         }
         import rlsbl
         result = rlsbl.app.test(["check-name", "--target", "npm", "--delay", "500"])
@@ -358,9 +358,9 @@ class TestDelayFlag:
         """When --delay is not provided, the default is 200ms."""
         mock_check.side_effect = [
             {"name": "a", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
             {"name": "b", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
         ]
         import rlsbl
         result = rlsbl.app.test(["check-name", "--target", "npm"])
@@ -378,7 +378,7 @@ class TestMultiNameCheck:
         """A single name should use the verbose _format_single_result output."""
         mock_check.return_value = {
             "name": "foo", "registry": "npm", "status": "available",
-            "variants": [], "github_count": 0,
+            "variants": [],
         }
         mock_format.return_value = 0
         with pytest.raises(SystemExit) as exc_info:
@@ -393,11 +393,11 @@ class TestMultiNameCheck:
         """Multiple names should print a compact table with Name and Status columns."""
         mock_check.side_effect = [
             {"name": "foo", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
             {"name": "bar", "registry": "npm", "status": "taken",
-             "variants": [], "github_count": 5},
+             "variants": []},
             {"name": "baz", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
         ]
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             with pytest.raises(SystemExit) as exc_info:
@@ -422,11 +422,11 @@ class TestMultiNameCheck:
         """Delay should be applied between names, not after the last one."""
         mock_check.side_effect = [
             {"name": "a", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
             {"name": "b", "registry": "npm", "status": "taken",
-             "variants": [], "github_count": 0},
+             "variants": []},
             {"name": "c", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
         ]
         with patch("sys.stdout", new_callable=StringIO):
             with pytest.raises(SystemExit):
@@ -712,7 +712,7 @@ class TestUltranormIntegration:
         # "cli" generates variants: "cl1", "c1i", "c11"
         result = {
             "name": "cli", "registry": "pypi", "status": "available",
-            "variants": [], "github_count": 0,
+            "variants": [],
         }
         def pypi_side_effect(name):
             if name == "cl1":
@@ -730,7 +730,7 @@ class TestUltranormIntegration:
         """Available name with no existing variants has no conflicts."""
         result = {
             "name": "cli", "registry": "pypi", "status": "available",
-            "variants": [], "github_count": 0,
+            "variants": [],
         }
         mock_pypi.return_value = {"status": "available"}
 
@@ -741,7 +741,7 @@ class TestUltranormIntegration:
         """Non-pypi registry does no ultranorm checking."""
         result = {
             "name": "cli", "registry": "npm", "status": "available",
-            "variants": [], "github_count": 0,
+            "variants": [],
         }
         _apply_ultranorm_check(result, "npm", 200)
         assert "ultranorm_conflicts" not in result
@@ -882,7 +882,7 @@ class TestReasonField:
         """Ultranorm conflict sets reason='ultranorm' and status='taken'."""
         result = {
             "name": "cli", "registry": "pypi", "status": "available",
-            "variants": [], "github_count": 0, "reason": None,
+            "variants": [], "reason": None,
         }
         def pypi_side_effect(name):
             if name == "cl1":
@@ -903,7 +903,7 @@ class TestReasonExplanations:
         """PyPI stdlib reason prints standard library explanation."""
         result = {
             "name": "queue", "registry": "pypi", "status": "taken",
-            "variants": [], "github_count": None, "reason": "stdlib",
+            "variants": [], "reason": "stdlib",
             "note": "conflicts with Python stdlib module 'queue'",
         }
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
@@ -914,7 +914,7 @@ class TestReasonExplanations:
         """npm moniker reason prints punctuation-stripping explanation."""
         result = {
             "name": "selfdoc", "registry": "npm", "status": "taken",
-            "variants": [], "github_count": None, "reason": "moniker",
+            "variants": [], "reason": "moniker",
             "note": "moniker conflict with 'self-doc' (npm strips punctuation)",
         }
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
@@ -925,7 +925,7 @@ class TestReasonExplanations:
         """PyPI ultranorm reason prints visual similarity explanation."""
         result = {
             "name": "cli", "registry": "pypi", "status": "taken",
-            "variants": [], "github_count": None, "reason": "ultranorm",
+            "variants": [], "reason": "ultranorm",
             "ultranorm_conflicts": ["cl1"],
         }
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
@@ -936,7 +936,7 @@ class TestReasonExplanations:
         """PyPI registered reason does NOT print any reason explanation."""
         result = {
             "name": "requests", "registry": "pypi", "status": "taken",
-            "variants": [], "github_count": None, "reason": "registered",
+            "variants": [], "reason": "registered",
         }
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             _format_single_result(result)
@@ -949,7 +949,7 @@ class TestReasonExplanations:
         """npm available result does NOT print any reason explanation."""
         result = {
             "name": "my-unique-pkg", "registry": "npm", "status": "available",
-            "variants": [], "github_count": 0, "reason": None,
+            "variants": [], "reason": None,
         }
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             _format_single_result(result)
@@ -1055,7 +1055,7 @@ class TestUltranormEarlyExit:
 
         result = {
             "name": "test-pkg", "registry": "pypi", "status": "available",
-            "variants": [], "github_count": 0,
+            "variants": [],
         }
         _apply_ultranorm_check(result, "pypi", 200)
 
@@ -1074,7 +1074,7 @@ class TestUltranormEarlyExit:
 
         result = {
             "name": "test-pkg", "registry": "pypi", "status": "available",
-            "variants": [], "github_count": 0,
+            "variants": [],
         }
         _apply_ultranorm_check(result, "pypi", 200)
 
@@ -1095,7 +1095,7 @@ class TestUltranormEarlyExit:
 
         result = {
             "name": "test-pkg", "registry": "pypi", "status": "available",
-            "variants": [], "github_count": 0,
+            "variants": [],
         }
         _apply_ultranorm_check(result, "pypi", 200)
 
@@ -1113,7 +1113,7 @@ class TestUltranormEarlyExit:
 
         result = {
             "name": "lllllll", "registry": "pypi", "status": "available",
-            "variants": [], "github_count": 0,
+            "variants": [],
         }
         _apply_ultranorm_check(result, "pypi", 200)
 
@@ -1131,7 +1131,7 @@ class TestPyPICaveats:
         """PyPI available name shows prohibited names note."""
         result = {
             "name": "my-new-pkg", "registry": "pypi", "status": "available",
-            "variants": [], "github_count": 0, "reason": None,
+            "variants": [], "reason": None,
         }
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             _format_single_result(result)
@@ -1147,7 +1147,7 @@ class TestPyPICaveats:
         """PyPI taken name does not show prohibited names note."""
         result = {
             "name": "requests", "registry": "pypi", "status": "taken",
-            "variants": [], "github_count": None, "reason": "registered",
+            "variants": [], "reason": "registered",
         }
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             _format_single_result(result)
@@ -1158,7 +1158,7 @@ class TestPyPICaveats:
         """npm available name does not show PyPI-specific caveats."""
         result = {
             "name": "my-new-pkg", "registry": "npm", "status": "available",
-            "variants": [], "github_count": 0, "reason": None,
+            "variants": [], "reason": None,
         }
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             _format_single_result(result)
@@ -1170,10 +1170,10 @@ class TestStepsSummary:
     """Tests for the steps-run summary line in verbose output."""
 
     def test_pypi_available_summary(self):
-        """PyPI available result includes PyPI, stdlib, variants, GitHub repos."""
+        """PyPI available result includes PyPI, stdlib, variants."""
         result = {
             "name": "my-new-pkg", "registry": "pypi", "status": "available",
-            "variants": [], "github_count": 0, "reason": None,
+            "variants": [], "reason": None,
         }
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             _format_single_result(result)
@@ -1183,13 +1183,13 @@ class TestStepsSummary:
         assert "PyPI" in checked_line
         assert "stdlib" in checked_line
         assert "variants" in checked_line
-        assert "GitHub repos" in checked_line
+        assert "GitHub repos" not in checked_line
 
     def test_pypi_taken_by_stdlib_summary(self):
         """PyPI taken by stdlib includes only PyPI and stdlib."""
         result = {
             "name": "queue", "registry": "pypi", "status": "taken",
-            "variants": None, "github_count": None, "reason": "stdlib",
+            "variants": None, "reason": "stdlib",
             "note": "conflicts with Python stdlib module 'queue'",
         }
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
@@ -1202,10 +1202,10 @@ class TestStepsSummary:
         assert "GitHub repos" not in checked_line
 
     def test_npm_available_summary(self):
-        """npm available result includes npm, variants, moniker similarity, GitHub repos."""
+        """npm available result includes npm, variants, moniker similarity."""
         result = {
             "name": "my-new-pkg", "registry": "npm", "status": "available",
-            "variants": [], "github_count": 0, "reason": None,
+            "variants": [], "reason": None,
             "moniker_checked": True,
         }
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
@@ -1215,14 +1215,14 @@ class TestStepsSummary:
         assert "npm" in checked_line
         assert "variants" in checked_line
         assert "moniker similarity" in checked_line
-        assert "GitHub repos" in checked_line
+        assert "GitHub repos" not in checked_line
         assert "stdlib" not in checked_line
 
     def test_npm_taken_summary(self):
         """npm taken result includes only npm."""
         result = {
             "name": "express", "registry": "npm", "status": "taken",
-            "variants": None, "github_count": None, "reason": "registered",
+            "variants": None, "reason": "registered",
         }
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             _format_single_result(result)
@@ -1234,7 +1234,7 @@ class TestStepsSummary:
         """PyPI available always includes ultranormalization in steps summary."""
         result = {
             "name": "my-new-pkg", "registry": "pypi", "status": "available",
-            "variants": [], "github_count": 0, "reason": None,
+            "variants": [], "reason": None,
             "ultranorm_checked": True,
         }
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
@@ -1244,7 +1244,7 @@ class TestStepsSummary:
         assert "PyPI" in checked_line
         assert "stdlib" in checked_line
         assert "variants" in checked_line
-        assert "GitHub repos" in checked_line
+        assert "GitHub repos" not in checked_line
         assert "ultranormalization" in checked_line
 
 
@@ -1257,11 +1257,11 @@ class TestMultiNameSummary:
         """3 names: 2 available, 1 taken -> summary says '2 available, 1 taken (3 total)'."""
         mock_check.side_effect = [
             {"name": "foo", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
             {"name": "bar", "registry": "npm", "status": "taken",
-             "variants": [], "github_count": None},
+             "variants": []},
             {"name": "baz", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
         ]
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             with pytest.raises(SystemExit) as exc_info:
@@ -1278,11 +1278,11 @@ class TestMultiNameSummary:
         """3 names: 1 error -> summary includes error count."""
         mock_check.side_effect = [
             {"name": "foo", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
             {"name": "bar", "registry": "npm", "status": "error",
-             "variants": [], "github_count": None, "error": "timeout"},
+             "variants": [], "error": "timeout"},
             {"name": "baz", "registry": "npm", "status": "taken",
-             "variants": [], "github_count": None},
+             "variants": []},
         ]
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             with pytest.raises(SystemExit) as exc_info:
@@ -1297,11 +1297,11 @@ class TestMultiNameSummary:
         """3 names: all available -> no error in summary."""
         mock_check.side_effect = [
             {"name": "foo", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
             {"name": "bar", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
             {"name": "baz", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
         ]
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             with pytest.raises(SystemExit) as exc_info:
@@ -1317,9 +1317,9 @@ class TestMultiNameSummary:
         """Default delay -> output contains 'Increase --delay if rate limited'."""
         mock_check.side_effect = [
             {"name": "foo", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
             {"name": "bar", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
         ]
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             with pytest.raises(SystemExit) as exc_info:
@@ -1335,9 +1335,9 @@ class TestMultiNameSummary:
         """Custom delay -> output does NOT contain the increase tip."""
         mock_check.side_effect = [
             {"name": "foo", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
             {"name": "bar", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
         ]
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             with pytest.raises(SystemExit) as exc_info:
@@ -1618,7 +1618,7 @@ class TestExitCodes:
         """Available name returns exit code 0."""
         result = {
             "name": "my-new-pkg", "registry": "npm", "status": "available",
-            "variants": [], "github_count": 0, "reason": None,
+            "variants": [], "reason": None,
         }
         with patch("sys.stdout", new_callable=StringIO):
             exit_code = _format_single_result(result)
@@ -1628,7 +1628,7 @@ class TestExitCodes:
         """Go not_found status returns exit code 0."""
         result = {
             "name": "github.com/fake/module", "registry": "go",
-            "status": "not_found", "variants": None, "github_count": 0,
+            "status": "not_found", "variants": None,
             "reason": None, "note": "Go modules use repository paths.",
         }
         with patch("sys.stdout", new_callable=StringIO):
@@ -1639,7 +1639,7 @@ class TestExitCodes:
         """Taken name returns exit code 1."""
         result = {
             "name": "express", "registry": "npm", "status": "taken",
-            "variants": None, "github_count": None, "reason": "registered",
+            "variants": None, "reason": "registered",
         }
         with patch("sys.stdout", new_callable=StringIO):
             exit_code = _format_single_result(result)
@@ -1649,7 +1649,7 @@ class TestExitCodes:
         """Go exists status returns exit code 1."""
         result = {
             "name": "github.com/gorilla/mux", "registry": "go",
-            "status": "exists", "variants": None, "github_count": None,
+            "status": "exists", "variants": None,
             "reason": "registered",
         }
         with patch("sys.stdout", new_callable=StringIO):
@@ -1660,7 +1660,7 @@ class TestExitCodes:
         """Normalized collision (taken via moniker) returns exit code 1."""
         result = {
             "name": "selfdoc", "registry": "npm", "status": "taken",
-            "variants": [], "github_count": None, "reason": "moniker",
+            "variants": [], "reason": "moniker",
             "note": "moniker conflict with 'self-doc'",
         }
         with patch("sys.stdout", new_callable=StringIO):
@@ -1671,7 +1671,7 @@ class TestExitCodes:
         """Ultranorm collision returns exit code 1."""
         result = {
             "name": "cli", "registry": "pypi", "status": "taken",
-            "variants": [], "github_count": None, "reason": "ultranorm",
+            "variants": [], "reason": "ultranorm",
             "ultranorm_conflicts": ["cl1"],
         }
         with patch("sys.stdout", new_callable=StringIO):
@@ -1682,7 +1682,7 @@ class TestExitCodes:
         """npm error returns exit code 2."""
         result = {
             "name": "some-pkg", "registry": "npm", "status": "error",
-            "variants": None, "github_count": None, "reason": None,
+            "variants": None, "reason": None,
             "error": "npm CLI not found",
         }
         with patch("sys.stdout", new_callable=StringIO):
@@ -1694,7 +1694,7 @@ class TestExitCodes:
         """PyPI error returns exit code 2."""
         result = {
             "name": "some-pkg", "registry": "pypi", "status": "error",
-            "variants": None, "github_count": None, "reason": None,
+            "variants": None, "reason": None,
             "error": "Connection refused",
         }
         with patch("sys.stdout", new_callable=StringIO):
@@ -1706,7 +1706,7 @@ class TestExitCodes:
         """Go error returns exit code 2."""
         result = {
             "name": "github.com/some/module", "registry": "go",
-            "status": "error", "variants": None, "github_count": None,
+            "status": "error", "variants": None,
             "reason": None, "error": "DNS resolution failed",
         }
         with patch("sys.stdout", new_callable=StringIO):
@@ -1721,7 +1721,7 @@ class TestExitCodes:
         """run_cmd with single available name exits 0."""
         mock_check.return_value = {
             "name": "my-new-pkg", "registry": "npm", "status": "available",
-            "variants": [], "github_count": 0, "reason": None,
+            "variants": [], "reason": None,
         }
         with patch("sys.stdout", new_callable=StringIO):
             with pytest.raises(SystemExit) as exc_info:
@@ -1733,7 +1733,7 @@ class TestExitCodes:
         """run_cmd with single taken name exits 1."""
         mock_check.return_value = {
             "name": "express", "registry": "npm", "status": "taken",
-            "variants": None, "github_count": None, "reason": "registered",
+            "variants": None, "reason": "registered",
         }
         with patch("sys.stdout", new_callable=StringIO):
             with pytest.raises(SystemExit) as exc_info:
@@ -1745,7 +1745,7 @@ class TestExitCodes:
         """run_cmd with single error result exits 2."""
         mock_check.return_value = {
             "name": "some-pkg", "registry": "npm", "status": "error",
-            "variants": None, "github_count": None, "reason": None,
+            "variants": None, "reason": None,
             "error": "npm CLI not found",
         }
         with patch("sys.stdout", new_callable=StringIO):
@@ -1762,9 +1762,9 @@ class TestExitCodes:
         """All names available -> exit 0."""
         mock_check.side_effect = [
             {"name": "a", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
             {"name": "b", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
         ]
         with patch("sys.stdout", new_callable=StringIO):
             with pytest.raises(SystemExit) as exc_info:
@@ -1777,9 +1777,9 @@ class TestExitCodes:
         """One taken, one available -> exit 1."""
         mock_check.side_effect = [
             {"name": "a", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
             {"name": "b", "registry": "npm", "status": "taken",
-             "variants": [], "github_count": None},
+             "variants": []},
         ]
         with patch("sys.stdout", new_callable=StringIO):
             with pytest.raises(SystemExit) as exc_info:
@@ -1792,9 +1792,9 @@ class TestExitCodes:
         """One error, one taken -> exit 2 (highest severity wins)."""
         mock_check.side_effect = [
             {"name": "a", "registry": "npm", "status": "error",
-             "variants": None, "github_count": None, "error": "timeout"},
+             "variants": None, "error": "timeout"},
             {"name": "b", "registry": "npm", "status": "taken",
-             "variants": [], "github_count": None},
+             "variants": []},
         ]
         with patch("sys.stdout", new_callable=StringIO):
             with pytest.raises(SystemExit) as exc_info:
@@ -1807,9 +1807,9 @@ class TestExitCodes:
         """Go 'exists' status counts as taken -> exit 1."""
         mock_check.side_effect = [
             {"name": "github.com/fake/a", "registry": "go",
-             "status": "not_found", "variants": None, "github_count": 0},
+             "status": "not_found", "variants": None},
             {"name": "github.com/gorilla/mux", "registry": "go",
-             "status": "exists", "variants": None, "github_count": None},
+             "status": "exists", "variants": None},
         ]
         with patch("sys.stdout", new_callable=StringIO):
             with pytest.raises(SystemExit) as exc_info:

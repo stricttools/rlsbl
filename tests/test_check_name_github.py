@@ -265,7 +265,9 @@ class TestCheckedSummaryNoGithubLeak:
         assert "GitHub repos" not in captured.out
         assert "Checked: npm" in captured.out
 
-    def test_github_summary_includes_github(self, capsys):
+    def test_github_summary_no_redundant_repos_step(self, capsys):
+        """When github IS the primary target, 'GitHub repos' does not appear
+        as a separate step -- 'GitHub' is already the primary registry."""
         result = {
             "name": "test",
             "registry": "github",
@@ -276,4 +278,5 @@ class TestCheckedSummaryNoGithubLeak:
         }
         _format_single_result(result)
         captured = capsys.readouterr()
-        assert "Checked: GitHub, GitHub repos" in captured.out
+        checked_line = [l for l in captured.out.split("\n") if l.startswith("Checked:")][0]
+        assert checked_line == "Checked: GitHub"

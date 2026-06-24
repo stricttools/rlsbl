@@ -31,7 +31,7 @@ class TestClaimName:
     @patch("rlsbl.commands.check._check_single_name")
     def test_npm_claim_available_publishes(self, mock_check, mock_run, real_tmpdir):
         """check-name returns available, mock npm publish succeeds."""
-        mock_check.return_value = {"name": "my-pkg", "registry": "npm", "status": "available", "variants": None, "github_count": None, "reason": None}
+        mock_check.return_value = {"name": "my-pkg", "registry": "npm", "status": "available", "variants": None, "reason": None}
         mock_run.return_value = MagicMock(returncode=0)
 
         with patch.dict(os.environ, {"NPM_TOKEN": "tok123"}):
@@ -52,7 +52,7 @@ class TestClaimName:
     @patch("rlsbl.commands.check._check_single_name")
     def test_pypi_claim_available_publishes(self, mock_check, mock_run, real_tmpdir):
         """check-name returns available, mock uv build+publish succeeds."""
-        mock_check.return_value = {"name": "my-pkg", "registry": "pypi", "status": "available", "variants": None, "github_count": None, "reason": None}
+        mock_check.return_value = {"name": "my-pkg", "registry": "pypi", "status": "available", "variants": None, "reason": None}
         mock_run.return_value = MagicMock(returncode=0)
 
         with patch.dict(os.environ, {"PYPI_TOKEN": "tok456"}):
@@ -76,7 +76,7 @@ class TestClaimName:
     @patch("rlsbl.commands.check._check_single_name")
     def test_claim_taken_without_yes_exits(self, mock_check):
         """check-name returns taken, no --yes. Exits 1 without publishing."""
-        mock_check.return_value = {"name": "taken-pkg", "registry": "npm", "status": "taken", "variants": None, "github_count": None, "reason": "registered"}
+        mock_check.return_value = {"name": "taken-pkg", "registry": "npm", "status": "taken", "variants": None, "reason": "registered"}
 
         with pytest.raises(SystemExit) as exc_info:
             run_cmd("npm", ["taken-pkg"], {"yes": False})
@@ -86,7 +86,7 @@ class TestClaimName:
     @patch("rlsbl.commands.check._check_single_name")
     def test_claim_taken_with_yes_publishes(self, mock_check, mock_run, real_tmpdir):
         """check-name returns taken, --yes passed. Publish is attempted."""
-        mock_check.return_value = {"name": "taken-pkg", "registry": "npm", "status": "taken", "variants": None, "github_count": None, "reason": "registered"}
+        mock_check.return_value = {"name": "taken-pkg", "registry": "npm", "status": "taken", "variants": None, "reason": "registered"}
         mock_run.return_value = MagicMock(returncode=0)
 
         with patch.dict(os.environ, {"NPM_TOKEN": "tok123"}):
@@ -99,7 +99,7 @@ class TestClaimName:
     @patch("rlsbl.commands.check._check_single_name")
     def test_claim_error_exits(self, mock_check):
         """check-name returns error. Exits 2 without publishing."""
-        mock_check.return_value = {"name": "err-pkg", "registry": "npm", "status": "error", "variants": None, "github_count": None, "reason": None, "error": "network timeout"}
+        mock_check.return_value = {"name": "err-pkg", "registry": "npm", "status": "error", "variants": None, "reason": None, "error": "network timeout"}
 
         with pytest.raises(SystemExit) as exc_info:
             run_cmd("npm", ["err-pkg"], {"yes": False})
@@ -109,7 +109,7 @@ class TestClaimName:
     @patch("rlsbl.commands.check._check_single_name")
     def test_npm_publish_failure_exits(self, mock_check, mock_run, real_tmpdir):
         """npm publish subprocess fails. Error message shown, exits 1."""
-        mock_check.return_value = {"name": "my-pkg", "registry": "npm", "status": "available", "variants": None, "github_count": None, "reason": None}
+        mock_check.return_value = {"name": "my-pkg", "registry": "npm", "status": "available", "variants": None, "reason": None}
         mock_run.side_effect = subprocess.CalledProcessError(1, ["npm", "publish"], stderr="403 Forbidden")
 
         with patch.dict(os.environ, {"NPM_TOKEN": "tok123"}):
@@ -121,7 +121,7 @@ class TestClaimName:
     @patch("rlsbl.commands.check._check_single_name")
     def test_pypi_publish_failure_exits(self, mock_check, mock_run, real_tmpdir):
         """uv publish fails. Error message shown, exits 1."""
-        mock_check.return_value = {"name": "my-pkg", "registry": "pypi", "status": "available", "variants": None, "github_count": None, "reason": None}
+        mock_check.return_value = {"name": "my-pkg", "registry": "pypi", "status": "available", "variants": None, "reason": None}
         # uv build succeeds, uv publish fails
         mock_run.side_effect = [
             MagicMock(returncode=0),  # uv build
@@ -136,7 +136,7 @@ class TestClaimName:
     @patch("rlsbl.commands.check._check_single_name")
     def test_npm_requires_token(self, mock_check):
         """NPM_TOKEN not set. Error message, exits 1."""
-        mock_check.return_value = {"name": "my-pkg", "registry": "npm", "status": "available", "variants": None, "github_count": None, "reason": None}
+        mock_check.return_value = {"name": "my-pkg", "registry": "npm", "status": "available", "variants": None, "reason": None}
 
         env = {k: v for k, v in os.environ.items() if k != "NPM_TOKEN"}
         with patch.dict(os.environ, env, clear=True):
@@ -147,7 +147,7 @@ class TestClaimName:
     @patch("rlsbl.commands.check._check_single_name")
     def test_pypi_requires_token(self, mock_check):
         """No PYPI_TOKEN or UV_PUBLISH_TOKEN. Error message, exits 1."""
-        mock_check.return_value = {"name": "my-pkg", "registry": "pypi", "status": "available", "variants": None, "github_count": None, "reason": None}
+        mock_check.return_value = {"name": "my-pkg", "registry": "pypi", "status": "available", "variants": None, "reason": None}
 
         env = {k: v for k, v in os.environ.items() if k not in ("PYPI_TOKEN", "UV_PUBLISH_TOKEN")}
         with patch.dict(os.environ, env, clear=True):

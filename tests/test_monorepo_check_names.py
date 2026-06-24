@@ -49,11 +49,11 @@ class TestBasicCheckNames:
 
         mock_check.side_effect = [
             {"name": "core", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
             {"name": "api", "registry": "npm", "status": "taken",
-             "variants": [], "github_count": 5},
+             "variants": []},
             {"name": "utils", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
         ]
 
         _cmd_check_names([], {"target": "npm"}, project_root=".")
@@ -97,9 +97,9 @@ class TestPrefix:
 
         mock_check.side_effect = [
             {"name": "www-core", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
             {"name": "www-api", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
         ]
 
         _cmd_check_names([], {"target": "npm", "prefix": "www-"}, project_root=".")
@@ -123,9 +123,9 @@ class TestSuffix:
 
         mock_check.side_effect = [
             {"name": "core-js", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
             {"name": "api-js", "registry": "npm", "status": "taken",
-             "variants": [], "github_count": 0},
+             "variants": []},
         ]
 
         _cmd_check_names([], {"target": "npm", "suffix": "-js"}, project_root=".")
@@ -148,7 +148,7 @@ class TestPrefixAndSuffix:
 
         mock_check.side_effect = [
             {"name": "@scope/core-lib", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
         ]
 
         _cmd_check_names([], {"target": "npm", "prefix": "@scope/", "suffix": "-lib"}, project_root=".")
@@ -170,11 +170,11 @@ class TestDelay:
 
         mock_check.side_effect = [
             {"name": "a", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
             {"name": "b", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
             {"name": "c", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
         ]
 
         _cmd_check_names([], {"target": "npm", "delay": "500"}, project_root=".")
@@ -193,9 +193,9 @@ class TestDelay:
 
         mock_check.side_effect = [
             {"name": "a", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
             {"name": "b", "registry": "npm", "status": "available",
-             "variants": [], "github_count": 0},
+             "variants": []},
         ]
 
         _cmd_check_names([], {"target": "npm"}, project_root=".")
