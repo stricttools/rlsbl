@@ -81,7 +81,7 @@ Check package name availability on a target registry for all projects in the mon
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--target` |  | str |  |  | Registry to query for name availability across all workspace projects (npm, pypi, or go) |
+| `--target` |  | str |  |  | Registry to query for name availability across all workspace projects (npm, pypi, go, or github) |
 | `--prefix` |  | str |  |  | String to prepend to each project name before checking availability |
 | `--suffix` |  | str |  |  | String to append to each project name before checking availability |
 | `--delay` |  | str | 200 |  | Milliseconds to wait between consecutive registry API queries (default: 200) |
