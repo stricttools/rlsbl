@@ -143,6 +143,24 @@ class BaseTarget:
     def build(self, dir_path, version):
         pass
 
+    def companion_tags(self, name, version, path=None):
+        """Return additional tags to create alongside the primary release tag.
+
+        Ecosystems that require extra tags (e.g. Go module proxy tags)
+        override this to return a list of tag strings.  The default
+        implementation returns no companion tags.
+
+        Args:
+            name: the releasable or project name.
+            version: the version being released (without ``v`` prefix).
+            path: workspace-relative path to the package directory, or
+                None for standalone projects.
+
+        Returns:
+            List of tag strings to create alongside the primary tag.
+        """
+        return []
+
     def dev_install_command(self, project_dir):
         """Specs for local install via `rlsbl dev install`, keyed by mode.
 

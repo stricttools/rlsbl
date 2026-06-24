@@ -392,6 +392,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             bump_type, current_version, new_version, tag,
             commit_msg, branch, target_paths, project_dir,
             changelog_entry, monorepo_root=monorepo_root,
+            member_package_paths=member_package_paths,
         )
         return
 

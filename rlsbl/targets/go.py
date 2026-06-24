@@ -147,6 +147,21 @@ class GoTarget(BaseTarget):
     def tag_format(self, version):
         return f"v{version}"
 
+    def companion_tags(self, name, version, path=None):
+        """Return Go module proxy companion tags for monorepo packages.
+
+        When ``path`` is set (monorepo member), the Go module proxy
+        needs a tag of the form ``{path}/v{version}`` to resolve the
+        module.  This tag is identical to the Go target's primary
+        ``monorepo_tag_format`` output, so it is only useful as a
+        *companion* when a different target (e.g. npm) is the primary
+        release target and produces a non-Go-compatible primary tag.
+        """
+        if path is not None:
+            sep = "" if path.endswith("/") else "/"
+            return [f"{path}{sep}v{version}"]
+        return []
+
     def monorepo_tag_format(self, name, version, path=None):
         if path is not None:
             sep = "" if path.endswith("/") else "/"

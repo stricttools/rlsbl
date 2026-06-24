@@ -265,6 +265,67 @@ def archive_blog_body(project_dir, version):
     return None
 
 
+def collect_companion_tags(member_package_paths, workspace_root, version, primary_tag):
+    """Collect companion tags from all non-private member packages.
+
+    Iterates member packages in an explicit releasable, detects their
+    targets, and collects companion tags (e.g. Go module proxy tags).
+
+    Guards:
+    - Only meaningful in explicit releasable mode (caller checks).
+    - Skips companion creation if the primary tag already contains a
+      ``/v`` pattern (Go-compatible), to avoid duplicate tags.
+    - Skips private packages (same logic as _sync_member_package_versions).
+
+    Args:
+        member_package_paths: workspace-relative paths for member packages.
+        workspace_root: absolute path to the monorepo root.
+        version: version string being released.
+        primary_tag: the primary release tag string.
+
+    Returns:
+        List of companion tag strings (deduplicated, excluding the primary tag).
+    """
+    from . import TARGETS, detect_targets
+    from ...config import read_project_config
+
+    # If the primary tag is already Go-compatible (contains /v), skip
+    # companion creation to avoid duplicates.
+    if "/v" in primary_tag:
+        return []
+
+    seen = set()
+    result = []
+    for pkg_path in member_package_paths:
+        abs_pkg = os.path.join(str(workspace_root), pkg_path)
+        if not os.path.isdir(abs_pkg):
+            continue
+
+        try:
+            pkg_config = read_project_config(abs_pkg)
+        except Exception:
+            continue
+
+        # Skip private packages (default True when unset)
+        if pkg_config.get("private", True):
+            continue
+
+        entries = detect_targets(abs_pkg)
+        if not entries:
+            continue
+
+        for entry in entries:
+            tgt = TARGETS.get(entry.name)
+            if not tgt:
+                continue
+            for ctag in tgt.companion_tags(entry.name, version, path=pkg_path):
+                if ctag not in seen and ctag != primary_tag:
+                    seen.add(ctag)
+                    result.append(ctag)
+
+    return result
+
+
 def _sync_member_package_versions(
     member_package_paths, monorepo_root, new_version,
     files_to_commit, git_root, log, ctx,
@@ -373,6 +434,7 @@ class ReleaseState:
     pre_existing_dirty: set | None = None
     hook_generated: set | None = None
     secondary_targets: dict | None = None
+    companion_tags: list[str] = dataclasses.field(default_factory=list)
 
     # Control
     flags: dict = dataclasses.field(default_factory=dict)
@@ -819,7 +881,17 @@ def _run_release_mutating(state: ReleaseState):
         run("git", ["tag", tag])
         log(f"Tagged: {tag}")
 
-        # Push commits and tag
+        # Create companion tags (e.g. Go module proxy tags in releasable mode)
+        if member_package_paths is not None:
+            _companion_list = collect_companion_tags(
+                member_package_paths, monorepo_root, new_version, tag,
+            )
+            for ctag in _companion_list:
+                run("git", ["tag", ctag])
+                state.companion_tags.append(ctag)
+                log(f"Created Go companion tag: {ctag}")
+
+        # Push commits and tag (including companions for atomic push)
         push_timeout = get_push_timeout(ctx.config)
         if push_timeout != 120:
             log(f"Push timeout: {push_timeout}s (from RLSBL_PUSH_TIMEOUT)")
@@ -827,7 +899,7 @@ def _run_release_mutating(state: ReleaseState):
         # "manual push" warning. The hook still runs JSONL coverage checks.
         push_env = {**os.environ, "RLSBL_RELEASE_PUSH": "1"}
         push_if_needed(branch, env=push_env, config=ctx.config)
-        run("git", ["push", "origin", tag], timeout=push_timeout, env=push_env)
+        run("git", ["push", "origin", tag] + state.companion_tags, timeout=push_timeout, env=push_env)
         log(f"Pushed to origin/{branch}")
     except ReleaseAbortError as e:
         # Release was explicitly aborted (e.g., unexpected dirty files).
@@ -848,6 +920,12 @@ def _run_release_mutating(state: ReleaseState):
             run("git", ["tag", "-d", tag])
         except Exception:
             pass
+        # Clean up companion tags (best-effort)
+        for ctag in state.companion_tags:
+            try:
+                run("git", ["tag", "-d", ctag])
+            except Exception:
+                pass
         run("git", ["reset", "--hard", pre_release_sha])
         _cleanup_release_artifacts(project_dir, new_version)
         print(

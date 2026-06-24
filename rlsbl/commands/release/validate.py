@@ -434,9 +434,11 @@ def validate_changelog_state(project_dir, target, monorepo_name,
 def print_dry_run_summary(log, registry, monorepo_name, monorepo_project_path,
                           bump_type, current_version, new_version, tag,
                           commit_msg, branch, target_paths, project_dir,
-                          changelog_entry, monorepo_root=None):
+                          changelog_entry, monorepo_root=None,
+                          member_package_paths=None):
     """Print dry-run summary and return (caller should exit after this)."""
     from . import TARGETS, load_workspace
+    from .execute import collect_companion_tags
 
     log("\n--- Dry run summary ---")
     log(f"Registry:  {registry}")
@@ -462,6 +464,13 @@ def print_dry_run_summary(log, registry, monorepo_name, monorepo_project_path,
                 other_files.append(os.path.normpath(rel))
     if other_files:
         log(f"Sync to:   {', '.join(other_files)}")
+    # Show companion tags (e.g. Go module proxy tags)
+    if member_package_paths is not None and monorepo_root:
+        companion = collect_companion_tags(
+            member_package_paths, monorepo_root, new_version, tag,
+        )
+        if companion:
+            log(f"Companion tags: {', '.join(companion)}")
     # Show subtree publishing info
     if monorepo_name:
         target = TARGETS[registry]
