@@ -131,7 +131,7 @@ class TestCiTemplateWithPathSources:
     def test_renders_uv_no_sources_env(self):
         template = _read_ci_template()
         content, _ = process_template(template, {
-            "uvNoSources": "true",
+            "pypi.uvNoSources": "true",
             "importName": "mylib",
         })
         assert 'UV_NO_SOURCES: "1"' in content
@@ -140,7 +140,7 @@ class TestCiTemplateWithPathSources:
     def test_env_block_before_jobs(self):
         template = _read_ci_template()
         content, _ = process_template(template, {
-            "uvNoSources": "true",
+            "pypi.uvNoSources": "true",
             "importName": "mylib",
         })
         env_pos = content.index("env:")

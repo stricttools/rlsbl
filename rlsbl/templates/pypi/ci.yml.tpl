@@ -7,7 +7,7 @@ on:
     branches: [main]
   workflow_dispatch:
 
-{{#if uvNoSources}}
+{{#if pypi.uvNoSources}}
 env:
   UV_NO_SOURCES: "1"
 
