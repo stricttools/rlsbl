@@ -2,6 +2,19 @@
 
 # Changelog
 
+## 0.82.1
+
+TemplateVars auto-namespacing, check-name polish, template fixes.
+
+### Features
+
+- **New feature.** `TemplateVars` dict subclass auto-generates namespaced template variable keys, ensuring all scaffold modes (single-target, multi-target, monorepo sync) resolve variables consistently.
+
+### Fixes
+
+- **Fix.** `check-name --target github` no longer shows redundant 'GitHub repos' in the Checked summary.
+- **Fix.** Monorepo `check-names --target` help text now includes `github`.
+
 ## 0.82.0
 
 Check system scope adapter, detect_targets config inheritance, template var hard errors, workspace-targets fix, check-name --target github, batch release bug fixes.
