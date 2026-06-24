@@ -46,6 +46,21 @@ def _find_git_dir():
         return None
 
 
+def _is_workspace_root(project_root):
+    """Check if project_root is a monorepo workspace root.
+
+    Returns True when ``.rlsbl-monorepo/workspace.toml`` exists at the
+    project root. Workspace roots are not importable Python packages, so
+    CI templates (which run import checks) should be skipped -- the
+    ci-router already handles per-package CI.
+    """
+    if project_root is None:
+        return False
+    return os.path.isfile(
+        os.path.join(str(project_root), ".rlsbl-monorepo", "workspace.toml")
+    )
+
+
 def _is_non_releasable_project(project_root):
     """Check if the current project is non-releasable in its monorepo workspace.
 
@@ -1285,17 +1300,22 @@ def run_cmd(registry, args, flags, ctx):
 
         existing_hashes = load_hashes()
 
-        # Process registry-specific templates (CI only, no publish)
-        reg_mappings = reg.template_mappings(ctx)
+        # Process registry-specific templates (CI only, no publish).
+        # Workspace roots skip CI templates -- the ci-router handles
+        # per-package CI, and root-level import checks would fail.
+        is_ws_root = _is_workspace_root(project_root)
+        reg_plans = []
+        if not is_ws_root:
+            reg_mappings = reg.template_mappings(ctx)
 
-        reg_plans = plan_mappings(
-            reg.template_dir(), reg_mappings, vars_dict, force,
-            required_vars={"name", "registryUrl"},
-        )
+            reg_plans = plan_mappings(
+                reg.template_dir(), reg_mappings, vars_dict, force,
+                required_vars={"name", "registryUrl"},
+            )
 
-        # Process pipeline publish templates (skip for private repos)
+        # Process pipeline publish templates (skip for private repos and workspace roots)
         pipeline_plans = []
-        if not private:
+        if not private and not is_ws_root:
             pipelines = load_pipelines(ctx.config)
             for pipeline in pipelines.values():
                 p_mappings = pipeline.template_mappings(ctx)
@@ -1895,62 +1915,66 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         force = flags.get("force", False)
         existing_hashes = load_hashes()
 
-        # Process per-target CI templates: each target gets its own ci-{name}.yml
+        # Process per-target CI templates: each target gets its own ci-{name}.yml.
+        # Workspace roots skip CI templates -- the ci-router handles
+        # per-package CI, and root-level import checks would fail.
+        is_ws_root = _is_workspace_root(project_root)
         _wf_prefix = os.path.join(".github", "workflows", "")
         _ci_prefix = os.path.join(".github", "workflows", "ci")
         ci_plans = []
         seen_targets = set()
         extra_plans = []
-        for r in registries_list:
-            target_obj = TARGETS[r]
-            all_mappings = target_obj.template_mappings(ctx)
+        if not is_ws_root:
+            for r in registries_list:
+                target_obj = TARGETS[r]
+                all_mappings = target_obj.template_mappings(ctx)
 
-            # Split into CI mappings and non-workflow mappings
-            ci_mappings = []
-            non_wf_mappings = []
-            for m in all_mappings:
-                if m["target"].startswith(_ci_prefix):
-                    ci_mappings.append(m)
-                elif not m["target"].startswith(_wf_prefix):
-                    non_wf_mappings.append(m)
+                # Split into CI mappings and non-workflow mappings
+                ci_mappings = []
+                non_wf_mappings = []
+                for m in all_mappings:
+                    if m["target"].startswith(_ci_prefix):
+                        ci_mappings.append(m)
+                    elif not m["target"].startswith(_wf_prefix):
+                        non_wf_mappings.append(m)
 
-            # Skip npm CI for wrapper packages (no test script)
-            if r == "npm" and ci_mappings:
-                npm_dir = target_paths.get("npm", ".")
-                if _is_npm_wrapper(npm_dir):
-                    print("Skipping npm CI (no test script in package.json)")
-                    ci_mappings = []
+                # Skip npm CI for wrapper packages (no test script)
+                if r == "npm" and ci_mappings:
+                    npm_dir = target_paths.get("npm", ".")
+                    if _is_npm_wrapper(npm_dir):
+                        print("Skipping npm CI (no test script in package.json)")
+                        ci_mappings = []
 
-            # Rewrite CI target filenames: ci.yml -> ci-{target}.yml
-            for m in ci_mappings:
-                original = m["target"]
-                dirname = os.path.dirname(original)
-                basename = os.path.basename(original)
-                new_basename = basename.replace("ci.yml", f"ci-{r}.yml")
-                m["target"] = os.path.join(dirname, new_basename)
+                # Rewrite CI target filenames: ci.yml -> ci-{target}.yml
+                for m in ci_mappings:
+                    original = m["target"]
+                    dirname = os.path.dirname(original)
+                    basename = os.path.basename(original)
+                    new_basename = basename.replace("ci.yml", f"ci-{r}.yml")
+                    m["target"] = os.path.join(dirname, new_basename)
 
-            if ci_mappings:
-                # Build per-target vars: overlay this target's namespaced vars
-                # un-namespaced so {{importName}} etc. resolve even when this
-                # target is not the primary.
-                ci_vars = dict(vars_dict)
-                _overlay_target_vars(ci_vars, r)
-                ci_plans.extend(plan_mappings(
-                    target_obj.template_dir(), ci_mappings, ci_vars, force,
-                ))
-
-            # Collect non-workflow files (deduplicated)
-            for m in non_wf_mappings:
-                if m["target"] not in seen_targets:
-                    seen_targets.add(m["target"])
-                    extra_plans.extend(plan_mappings(
-                        target_obj.template_dir(), [m], vars_dict, force,
+                if ci_mappings:
+                    # Build per-target vars: overlay this target's namespaced vars
+                    # un-namespaced so {{importName}} etc. resolve even when this
+                    # target is not the primary.
+                    ci_vars = dict(vars_dict)
+                    _overlay_target_vars(ci_vars, r)
+                    ci_plans.extend(plan_mappings(
+                        target_obj.template_dir(), ci_mappings, ci_vars, force,
                     ))
 
-        # Plan the merged publish workflow (skip for private repos)
+                # Collect non-workflow files (deduplicated)
+                for m in non_wf_mappings:
+                    if m["target"] not in seen_targets:
+                        seen_targets.add(m["target"])
+                        extra_plans.extend(plan_mappings(
+                            target_obj.template_dir(), [m], vars_dict, force,
+                        ))
+
+        # Plan the merged publish workflow (skip for private repos and workspace roots)
         # Read publish templates from pipeline types instead of targets
         merged_plans = []
-        if not private:
+        if not private and not is_ws_root:
             publish_target = os.path.join(".github", "workflows", "publish.yml")
             merged_content = _generate_merged_publish(registries_list, vars_dict, target_paths)
             merged_plans = [_plan_merged_publish(
