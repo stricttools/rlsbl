@@ -20,6 +20,9 @@ def sync_workspace(workspace_root: str, *, verbose: bool = False) -> bool:
     if not require_tool("uv", fatal=False):
         return True
 
+    if not os.path.exists(os.path.join(workspace_root, "pyproject.toml")):
+        return True
+
     sync_cmd = ["uv", "sync", "--all-packages"]
     if not verbose:
         sync_cmd.append("--quiet")

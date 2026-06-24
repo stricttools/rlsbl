@@ -326,6 +326,7 @@ class TestSyncWorkspace:
     def test_sync_workspace_runs_uv_sync_at_root(self, tmp_project):
         """sync_workspace runs uv sync --all-packages --quiet at the given root."""
         root = str(tmp_project)
+        (tmp_project / "pyproject.toml").write_text("[project]\nname = 'test'\nversion = '0.1.0'\n")
 
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
@@ -344,6 +345,7 @@ class TestSyncWorkspace:
     def test_sync_workspace_verbose(self, tmp_project):
         """sync_workspace with verbose=True omits --quiet."""
         root = str(tmp_project)
+        (tmp_project / "pyproject.toml").write_text("[project]\nname = 'test'\nversion = '0.1.0'\n")
 
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
@@ -360,6 +362,7 @@ class TestSyncWorkspace:
     def test_sync_workspace_failure(self, tmp_project):
         """sync_workspace returns False when uv sync fails."""
         root = str(tmp_project)
+        (tmp_project / "pyproject.toml").write_text("[project]\nname = 'test'\nversion = '0.1.0'\n")
 
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
