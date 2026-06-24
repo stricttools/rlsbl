@@ -124,10 +124,28 @@ def _render_commented_section(name, target_names, reason, section_key="packages"
 
 
 def _collect_releasable_targets(releasable_name, member_projects, workspace_root):
-    """Collect the union of targets across all member projects of a releasable.
+    """Collect targets for a releasable, preferring the releasable config.
+
+    If the releasable's config.json has a ``targets`` key, returns those
+    directly (the releasable is the source of truth for targets in explicit
+    mode).  Falls back to unioning member-level detected targets for
+    backward compatibility with releasables that haven't set targets yet.
 
     Returns a deduplicated list of target names.
     """
+    from ...config import read_json_config
+
+    # Try the releasable config first
+    rel_config_path = os.path.join(
+        workspace_root, ".rlsbl-monorepo", "releasables",
+        releasable_name, "config.json",
+    )
+    rel_config = read_json_config(rel_config_path)
+    rel_targets = rel_config.get("targets")
+    if rel_targets is not None and isinstance(rel_targets, list):
+        return list(rel_targets)
+
+    # Fallback: union member-level targets (backward compat)
     seen = set()
     result = []
     for proj in member_projects:

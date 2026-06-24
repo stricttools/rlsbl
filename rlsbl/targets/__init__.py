@@ -24,7 +24,7 @@ from .pgdesign import PgdesignTarget
 from .plain import PlainTarget
 from .protocol import ReleaseTarget
 from .base import BaseTarget
-from ..config import read_project_config
+from ..config import read_json_config, read_project_config
 from ..errors import ConfigError
 
 
@@ -156,6 +156,33 @@ def detect_targets(dir_path=".", releasable_config_dir=None):
 
     Returns list of TargetEntry(name, path) tuples.
     """
+    # When the project is a releasable member, the releasable config's
+    # targets are authoritative -- per-package config cannot override them.
+    # This prevents per-package targets: [] from erasing releasable-level
+    # targets: ["pypi"] via merge_config's shallow-replace semantics.
+    if releasable_config_dir is not None:
+        rel_config_path = os.path.join(str(releasable_config_dir), "config.json")
+        rel_config = read_json_config(rel_config_path)
+        rel_targets = rel_config.get("targets")
+        if rel_targets is not None and isinstance(rel_targets, list):
+            # Releasable defines targets -- use them directly, skip merge
+            result = []
+            for entry in rel_targets:
+                try:
+                    te = _parse_target_entry(entry, dir_path)
+                except (ConfigError, TypeError) as e:
+                    print(f"Warning: {e}, skipping", file=sys.stderr)
+                    continue
+                if te.name in TARGETS:
+                    if te.path != dir_path and not os.path.isdir(te.path):
+                        print(f"Warning: target '{te.name}' path '{te.path}' does not exist",
+                              file=sys.stderr)
+                    result.append(te)
+                else:
+                    print(f"Warning: unknown target '{te.name}' in config, skipping",
+                          file=sys.stderr)
+            return result
+
     config = read_project_config(dir_path, releasable_config_dir=releasable_config_dir)
     configured = config.get("targets")
 

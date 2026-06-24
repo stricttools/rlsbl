@@ -46,8 +46,39 @@ class TestReleasableConfigInheritance:
         assert len(entries) == 1
         assert entries[0].name == "pypi"
 
-    def test_per_package_targets_override_releasable(self, tmp_path):
-        """Per-package targets take precedence over releasable-level targets."""
+    def test_releasable_targets_override_per_package(self, tmp_path):
+        """Releasable-level targets take precedence over per-package targets.
+
+        When the releasable config defines targets, those are authoritative.
+        Per-package targets cannot override them (this prevents per-package
+        targets: [] from erasing releasable-level targets via merge_config).
+        """
+        pkg_dir = tmp_path / "pkg"
+        pkg_dir.mkdir()
+
+        # Per-package config with targets (should be ignored)
+        rlsbl_dir = pkg_dir / ".rlsbl"
+        rlsbl_dir.mkdir()
+        (rlsbl_dir / "config.json").write_text(
+            json.dumps({"private": False, "targets": ["npm"]})
+        )
+
+        # Releasable-level config with different targets (authoritative)
+        rel_dir = tmp_path / "releasable"
+        rel_dir.mkdir()
+        (rel_dir / "config.json").write_text(json.dumps({"targets": ["pypi"]}))
+
+        # Create pyproject.toml for pypi target
+        (pkg_dir / "pyproject.toml").write_text(
+            '[project]\nname = "test"\nversion = "0.1.0"\n'
+        )
+
+        entries = detect_targets(str(pkg_dir), releasable_config_dir=str(rel_dir))
+        assert len(entries) == 1
+        assert entries[0].name == "pypi"
+
+    def test_releasable_no_targets_falls_through_to_per_package(self, tmp_path):
+        """When the releasable config has no targets key, per-package targets apply."""
         pkg_dir = tmp_path / "pkg"
         pkg_dir.mkdir()
 
@@ -58,10 +89,10 @@ class TestReleasableConfigInheritance:
             json.dumps({"private": False, "targets": ["npm"]})
         )
 
-        # Releasable-level config with different targets
+        # Releasable-level config WITHOUT targets key
         rel_dir = tmp_path / "releasable"
         rel_dir.mkdir()
-        (rel_dir / "config.json").write_text(json.dumps({"targets": ["pypi"]}))
+        (rel_dir / "config.json").write_text(json.dumps({"private": False}))
 
         # Create package.json for npm target
         (pkg_dir / "package.json").write_text(
