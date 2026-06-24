@@ -206,7 +206,7 @@ Manage multi-package workspaces with `rlsbl monorepo`:
 - `monorepo graph` -- export dependency graph (JSON, DOT, text)
 - `monorepo snapshot` -- committed JSON artifact of workspace state
 - `monorepo impact` -- change analysis across the dependency graph
-- `monorepo release` -- batch release in topological order
+- `monorepo release run` -- batch release in topological order
 
 Supports architectural layer rules via `[layers]` in `workspace.toml` for enforcing dependency direction.
 
