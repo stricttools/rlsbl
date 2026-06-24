@@ -137,6 +137,35 @@ def run_cmd(registry, args, flags, *, ctx):
         traceback.print_exc()
         results.append(("Delete local tag", FAILED, f"git tag -d {tag}"))
 
+    # Delete companion tags (e.g. Go module proxy tags in releasable mode)
+    if releasable_name and ws_root:
+        try:
+            from ..commands.release.execute import collect_companion_tags
+            from ..workspace import load_workspace as _load_ws2, members_of as _members_of2
+
+            _version_for_companion = re.search(r"v(\d+\.\d+\.\d+)$", tag)
+            if _version_for_companion:
+                _ver = _version_for_companion.group(1)
+                _ws_projects2 = _load_ws2(ws_root)
+                _member_projs2 = _members_of2(releasable_name, _ws_projects2)
+                _member_paths2 = [p["path"] for p in _member_projs2]
+                _companion_tags = collect_companion_tags(_member_paths2, ws_root, _ver, tag)
+                for ctag in _companion_tags:
+                    try:
+                        undo_push_env_ct = {**os.environ, "RLSBL_RELEASE_PUSH": "1"}
+                        run("git", ["push", "origin", f":{ctag}"], timeout=get_push_timeout(ctx.config), env=undo_push_env_ct)
+                    except Exception:
+                        pass  # Remote tag may not exist
+                    try:
+                        run("git", ["tag", "-d", ctag])
+                    except Exception:
+                        pass  # Local tag may not exist
+                if _companion_tags:
+                    results.append(("Delete companion tags", OK, f"deleted {len(_companion_tags)} companion tag(s)"))
+        except Exception:
+            traceback.print_exc()
+            results.append(("Delete companion tags", FAILED, "manually delete Go companion tags"))
+
     # Revert release commits (should be HEAD, or HEAD + HEAD~1 for two-commit pattern)
     # In explicit releasable mode, commit message is "<releasable>: release v<version>"
     # In implicit monorepo mode, commit message is "<project>: release v<version>"
