@@ -2,6 +2,14 @@
 
 # Changelog
 
+## 0.83.1
+
+Fix release finalization leaving deleted unreleased.toml uncommitted.
+
+### Fixes
+
+- **Fix.** Release finalization now properly commits the deletion of `unreleased.toml` after archiving, preventing a dirty working tree.
+
 ## 0.83.0
 
 Remove publish.json, releasable-owned targets, no empty release files, monorepo release subgroup.
