@@ -3,7 +3,7 @@
 import json
 import os
 
-from .base import BaseTarget
+from .base import BaseTarget, TemplateVars
 
 
 class SpecTarget(BaseTarget):
@@ -99,10 +99,10 @@ class SpecTarget(BaseTarget):
         except (FileNotFoundError, KeyError):
             version = "0.0.0"
 
-        return {
+        return TemplateVars(self.name, {
             "name": dir_name,
             "version": version,
-        }
+        })
 
     def template_mappings(self, ctx):
         return [

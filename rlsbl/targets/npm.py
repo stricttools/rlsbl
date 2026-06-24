@@ -4,7 +4,7 @@ import json
 import os
 import re
 
-from .base import BaseTarget
+from .base import BaseTarget, TemplateVars
 from ..errors import VersionError
 
 _MIN_VERSION_RE = re.compile(r">=\s*(\d+(?:\.\d+)*)")
@@ -170,7 +170,7 @@ class NpmTarget(BaseTarget):
             if m:
                 result["minRequiredNode"] = m.group(1)
 
-        return result
+        return TemplateVars(self.name, result)
 
     def template_mappings(self, ctx):
         pm = self._detect_package_manager(".")

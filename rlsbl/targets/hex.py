@@ -3,7 +3,7 @@
 import os
 import re
 
-from .base import BaseTarget
+from .base import BaseTarget, TemplateVars
 from .utils import _get_git_author
 from ..errors import VersionError
 from ..utils import run
@@ -89,12 +89,12 @@ class HexTarget(BaseTarget):
 
         author = _get_git_author()
 
-        return {
+        return TemplateVars(self.name, {
             "name": app_name,
             "version": self.read_version(dir_path),
             "author": author,
             "publishSetup": "Requires HEX_API_KEY secret on GitHub (Settings > Secrets > Actions)",
-        }
+        })
 
     def template_mappings(self, ctx):
         return [

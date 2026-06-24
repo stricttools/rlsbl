@@ -6,7 +6,7 @@ import sys
 
 import tomlkit
 
-from .base import BaseTarget
+from .base import BaseTarget, TemplateVars
 from ..errors import VersionError
 
 
@@ -121,7 +121,7 @@ class PgdesignTarget(BaseTarget):
             version = self.read_version(dir_path)
         except (FileNotFoundError, VersionError):
             version = "0.0.0"
-        return {
+        return TemplateVars(self.name, {
             "name": dir_name,
             "version": version,
-        }
+        })

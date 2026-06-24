@@ -4,7 +4,7 @@ import json
 import os
 import re
 
-from .base import BaseTarget
+from .base import BaseTarget, TemplateVars
 from .utils import _get_git_author
 from ..errors import VersionError
 from ..utils import run
@@ -138,12 +138,12 @@ class DenoTarget(BaseTarget):
 
         author = _get_git_author()
 
-        return {
+        return TemplateVars(self.name, {
             "name": data.get("name", ""),
             "version": data.get("version", "0.1.0"),
             "author": author,
             "publishSetup": "Requires DENO_TOKEN or JSR_TOKEN secret on GitHub (Settings > Secrets > Actions)",
-        }
+        })
 
     def template_mappings(self, ctx):
         return [

@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: {{action "actions/checkout"}}
-{{#if minRequiredGo}}      # go.mod: go {{minRequiredGo}}
+{{#if go.minRequiredGo}}      # go.mod: go {{go.minRequiredGo}}
 {{/if}}      - uses: {{action "actions/setup-go"}}
         with:
           go-version-file: go.mod

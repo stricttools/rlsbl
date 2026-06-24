@@ -5,7 +5,7 @@ import re
 
 import tomlkit
 
-from .base import BaseTarget
+from .base import BaseTarget, TemplateVars
 from ..errors import VersionError
 from ..utils import run
 
@@ -166,7 +166,7 @@ class CargoTarget(BaseTarget):
         if edition:
             result["edition"] = str(edition)
 
-        return result
+        return TemplateVars(self.name, result)
 
     def template_mappings(self, ctx):
         mappings = [

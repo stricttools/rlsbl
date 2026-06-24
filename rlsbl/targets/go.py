@@ -4,7 +4,7 @@ import glob
 import os
 import re
 
-from .base import BaseTarget
+from .base import BaseTarget, TemplateVars
 from ..npm_wrapper import (
     build_artifacts,
     build_npm_publish_jobs,
@@ -271,7 +271,7 @@ class GoTarget(BaseTarget):
             if m:
                 result["minRequiredGo"] = m.group(1)
 
-        return result
+        return TemplateVars(self.name, result)
 
     def template_mappings(self, ctx):
         project_root = str(ctx.project_root)

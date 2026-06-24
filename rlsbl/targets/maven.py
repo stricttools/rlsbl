@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 
 import tomlkit
 
-from .base import BaseTarget
+from .base import BaseTarget, TemplateVars
 from ..errors import VersionError
 from ..utils import run
 
@@ -518,12 +518,12 @@ class MavenTarget(BaseTarget):
         except (VersionError, FileNotFoundError):
             version = "0.0.0"
 
-        return {
+        return TemplateVars(self.name, {
             "name": name,
             "version": version,
             "author": author,
             "publishSetup": "Requires GITHUB_TOKEN secret (auto-provided for GitHub Packages)",
-        }
+        })
 
     def template_mappings(self, ctx):
         return [

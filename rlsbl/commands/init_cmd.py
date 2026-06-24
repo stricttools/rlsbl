@@ -20,6 +20,7 @@ from ..config import (
 from ..lock import acquire_lock, release_lock
 from ..pipelines import PIPELINE_TYPES, load_pipelines
 from ..targets import TARGETS, detect_targets
+from ..targets.base import TemplateVars
 from ..tagging import ensure_tags
 from ..utils import commit_files, is_private_repo
 
@@ -393,7 +394,7 @@ def process_template(template_content, vars_dict, template_path=None, *, require
         return ""
 
     content = re.sub(
-        r"\{\{#if\s+(\w+)\}\}(.*?)\{\{/if\}\}",
+        r"\{\{#if\s+(\w+(?:\.\w+)*)\}\}(.*?)\{\{/if\}\}",
         conditional_replacer,
         content,
         flags=re.DOTALL,
@@ -1572,11 +1573,8 @@ def _generate_merged_publish(targets, template_vars, target_paths=None):
         # Build per-target vars: start with the full merged dict, then overlay
         # this target's own vars un-namespaced so {{registryUrl}} etc. resolve
         # even when this target is not the primary.
-        prefix = f"{target_name}."
         per_target_vars = dict(template_vars)
-        for key, value in template_vars.items():
-            if key.startswith(prefix):
-                per_target_vars[key[len(prefix):]] = value
+        _overlay_target_vars(per_target_vars, target_name)
 
         # Process template variables, then parse as structured YAML.
         # Unresolved {{var}} placeholders are not valid YAML (parsed as flow
@@ -1732,27 +1730,50 @@ def _rewrite_action_paths_for_jobs(jobs, project_path):
                             with_block[version_key] = f"{project_path}/{val}"
 
 
+def _overlay_target_vars(merged_vars, target_name):
+    """Promote namespaced ``{target_name}.{key}`` entries to bare ``{key}``.
+
+    Scans *merged_vars* for keys starting with ``{target_name}.`` and adds
+    bare versions so templates like ``{{registryUrl}}`` resolve even when
+    the target is not the primary.  Does not overwrite existing bare keys.
+    """
+    prefix = f"{target_name}."
+    for key, value in list(merged_vars.items()):
+        if key.startswith(prefix):
+            bare = key[len(prefix):]
+            merged_vars[bare] = value
+
+
 def _merge_template_vars(registries_list, primary, target_paths, ctx):
     """Build a merged template vars dict with namespaced keys from all targets.
 
     The primary target's vars are included un-namespaced (as the base).
-    Every target's vars are also included with a namespace prefix:
-    ``{target_name}.{key}`` so templates can reference target-specific values
-    like ``{{pypi.minRequiredPython}}``.
+    Non-primary targets contribute only their namespaced keys (keys
+    containing a dot), so they do not overwrite the primary's bare keys.
+
+    TemplateVars auto-generates ``{target_name}.{key}`` entries, so no
+    manual namespacing loop is needed.
 
     target_paths is a dict mapping target name to its directory path.
     """
     merged = {}
-    # Primary target's vars as base (un-namespaced)
+    # Primary target's vars as base (un-namespaced + namespaced)
     primary_target = TARGETS[primary]
     primary_vars = primary_target.template_vars(target_paths.get(primary, "."), ctx)
+    if not isinstance(primary_vars, TemplateVars):
+        primary_vars = TemplateVars(primary, primary_vars)
     merged.update(primary_vars)
-    # All targets' vars namespaced
+    # Non-primary targets: add only namespaced keys (preserve primary's bare keys)
     for target_name in registries_list:
+        if target_name == primary:
+            continue
         target = TARGETS[target_name]
         target_vars = target.template_vars(target_paths.get(target_name, "."), ctx)
+        if not isinstance(target_vars, TemplateVars):
+            target_vars = TemplateVars(target_name, target_vars)
         for key, value in target_vars.items():
-            merged[f"{target_name}.{key}"] = value
+            if "." in key:
+                merged[key] = value
     return merged
 
 
@@ -1923,11 +1944,8 @@ def run_cmd_multi(registries_list, args, flags, ctx):
                 # Build per-target vars: overlay this target's namespaced vars
                 # un-namespaced so {{importName}} etc. resolve even when this
                 # target is not the primary.
-                prefix = f"{r}."
                 ci_vars = dict(vars_dict)
-                for key, value in vars_dict.items():
-                    if key.startswith(prefix):
-                        ci_vars[key[len(prefix):]] = value
+                _overlay_target_vars(ci_vars, r)
                 ci_plans.extend(plan_mappings(
                     target_obj.template_dir(), ci_mappings, ci_vars, force,
                 ))

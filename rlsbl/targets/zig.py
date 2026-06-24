@@ -3,7 +3,7 @@
 import os
 import re
 
-from .base import BaseTarget
+from .base import BaseTarget, TemplateVars
 from .zig_version import read_zig_version, write_zig_version
 from ..npm_wrapper import (
     build_artifacts,
@@ -133,15 +133,15 @@ class ZigTarget(BaseTarget):
                 npm_scope, name, artifacts, depends_on="build-and-upload"
             )
 
-        return {
+        return TemplateVars(self.name, {
             "name": name,
             "version": version,
-            "zig.minRequiredZig": min_zig,
-            "zig.projectName": name,
-            "zig.isLibrary": is_library,
+            "minRequiredZig": min_zig,
+            "projectName": name,
+            "isLibrary": is_library,
             "npmScope": npm_scope,
             "npmPublishJobs": npm_publish_jobs,
-        }
+        })
 
     def template_mappings(self, ctx):
         return [

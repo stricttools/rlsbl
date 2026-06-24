@@ -3,7 +3,7 @@
 import os
 import re
 
-from .base import BaseTarget
+from .base import BaseTarget, TemplateVars
 from ..utils import run
 
 VERSION_FILE = "VERSION"
@@ -89,11 +89,11 @@ class SwiftTarget(BaseTarget):
         except FileNotFoundError:
             version = "0.0.0"
 
-        return {
+        return TemplateVars(self.name, {
             "name": package_name,
             "version": version,
             "author": author,
-        }
+        })
 
     def template_mappings(self, ctx):
         return [

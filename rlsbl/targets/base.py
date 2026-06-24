@@ -4,6 +4,28 @@ import os
 from typing import ClassVar
 
 
+class TemplateVars(dict):
+    """Dict subclass that auto-generates namespaced ``{target}.{key}`` entries.
+
+    On construction, for every key in *base_dict*, an additional entry
+    ``"{target_name}.{key}"`` is stored so templates can reference
+    target-specific values like ``{{pypi.minRequiredPython}}``.
+
+    Post-construction mutations (``tv["newkey"] = val``) produce bare-only
+    keys -- this is correct for non-target-specific additions like ``year``
+    or ``repoName`` that callers add after the target returns its vars.
+    """
+
+    def __init__(self, target_name: str, base_dict: dict | None = None):
+        if base_dict is None:
+            base_dict = {}
+        super().__init__(base_dict)
+        self._target_name = target_name
+        for key, value in base_dict.items():
+            ns_key = f"{target_name}.{key}"
+            super().__setitem__(ns_key, value)
+
+
 class BaseTarget:
     """Concrete base providing defaults for optional Protocol methods.
 

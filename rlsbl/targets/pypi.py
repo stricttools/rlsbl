@@ -9,7 +9,7 @@ import tomllib
 
 import tomlkit
 
-from .base import BaseTarget
+from .base import BaseTarget, TemplateVars
 from ..errors import VersionError
 from ..utils import run
 
@@ -199,7 +199,7 @@ class PypiTarget(BaseTarget):
         if has_path_sources:
             result["uvNoSources"] = "true"
 
-        return result
+        return TemplateVars(self.name, result)
 
     def template_mappings(self, ctx):
         return [

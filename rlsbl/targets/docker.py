@@ -2,7 +2,7 @@
 
 import os
 
-from .base import BaseTarget
+from .base import BaseTarget, TemplateVars
 from ..utils import run
 
 VERSION_FILE = "VERSION"
@@ -80,12 +80,12 @@ class DockerTarget(BaseTarget):
         from .utils import _get_git_author
         author = _get_git_author()
 
-        return {
+        return TemplateVars(self.name, {
             "image": image,
             "registry": registry,
             "name": name,
             "author": author,
-        }
+        })
 
     def template_mappings(self, ctx):
         return [

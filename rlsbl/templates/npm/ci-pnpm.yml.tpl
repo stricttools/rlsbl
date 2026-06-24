@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-{{#if minRequiredNode}}        # engines.node: >= {{minRequiredNode}}
+{{#if npm.minRequiredNode}}        # engines.node: >= {{npm.minRequiredNode}}
 {{/if}}        node-version: [20, 22, 24]
     steps:
       - uses: {{action "actions/checkout"}}
