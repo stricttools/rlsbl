@@ -27,6 +27,7 @@ order: 90
 - [rlsbl.checks.project](rlsbl-checks-project.html)
 - [rlsbl.checks.quality](rlsbl-checks-quality.html)
 - [rlsbl.checks.release](rlsbl-checks-release.html)
+- [rlsbl.checks.scope](rlsbl-checks-scope.html)
 - [rlsbl.checks.workspace](rlsbl-checks-workspace.html)
 - [rlsbl.commands](rlsbl-commands.html)
 - [rlsbl.commands.changelog_cmd](rlsbl-commands-changelog_cmd.html)

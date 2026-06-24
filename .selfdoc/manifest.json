@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.81.6",
+  "version": "0.81.7",
   "description": null,
   "language": "python",
   "base_url": "https://rlsbl.smmh.dev",
@@ -260,6 +260,11 @@
     {
       "path": "rlsbl-checks-release.md",
       "title": "rlsbl.checks.release",
+      "type": "doc"
+    },
+    {
+      "path": "rlsbl-checks-scope.md",
+      "title": "rlsbl.checks.scope",
       "type": "doc"
     },
     {
@@ -864,5 +869,5 @@
     }
   ],
   "posts": [],
-  "last_gen": "2026-06-23T10:52:47.300671+00:00"
+  "last_gen": "2026-06-24T07:59:03.183173+00:00"
 }

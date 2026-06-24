@@ -15,5 +15,5 @@ Query npm, PyPI, or other registries to check whether one or more package names 
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--target` |  | str |  |  | Registry to query for name availability (npm, pypi, or go); repeatable |
+| `--target` |  | str |  |  | Registry to query for name availability (npm, pypi, go, or github); repeatable |
 | `--delay` |  | str | 200 |  | Milliseconds to wait between consecutive registry API queries (default: 200) |
