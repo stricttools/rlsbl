@@ -2,6 +2,37 @@
 
 # Changelog
 
+## 0.82.0
+
+Check system scope adapter, detect_targets config inheritance, template var hard errors, workspace-targets fix, check-name --target github, batch release bug fixes.
+
+<details>
+<summary>Context</summary>
+
+Major architectural changes: declarative scope adapter for the check system (requires strictcli 0.21.0), detect_targets() now uses 4-level config inheritance with a two-tier rule (missing targets key is a hard error when config.json exists), and unresolved template variables are now hard errors instead of silent pass-through.
+
+Breaking: projects with .rlsbl/config.json that lack an explicit "targets" key will now get a hard error with auto-detected hints. Template vars that previously survived as literal {{varName}} in output files will now error at scaffold/sync time.
+
+</details>
+
+### Breaking
+
+- **Unresolved template variables are now hard errors.** Scaffold and sync operations raise `ConfigError` instead of emitting a warning when template variables cannot be resolved. Namespace mismatches in cargo/go/npm templates fixed; optional variables wrapped in `{{#if}}` blocks.
+
+### Features
+
+- **Release init warning for explicit-mode monorepos.** `release init` now warns when run in a monorepo with `[[releasables]]`, directing users to `monorepo release-init` instead.
+- **`check-name --target github` support.** GitHub is now a first-class target for name availability checks, showing repo count and org-scoped availability.
+- **`detect_targets` config inheritance with two-tier rule.** Target detection now supports 4-level config precedence via `read_project_config` (releasable config dir for monorepo inheritance). Two-tier rule: no config.json means auto-detect from manifests; config exists without `targets` key raises `ConfigError` with hints.
+- **Scope adapter for check system.** Checks now declare scope tokens (e.g. `workspace`, `non_dev_only`, `library`) in `checks.toml`, and a scope adapter pre-filters context before check functions run. Removes `isinstance` boilerplate and inline filtering from all check implementations. Also adds a new `scaffold-gitignore-stale` check that warns when project `.gitignore` files are missing rlsbl-specific entries.
+
+### Fixes
+
+- **Batch release fix.** Skip redundant environment validation (gh auth, clean tree, branch/remote checks) per sub-project in batch release mode -- the batch orchestrator already validates upfront.
+- **`check-name` no longer leaks GitHub API calls.** Previously, every npm/pypi/go name check also ran an unconditional GitHub lookup. GitHub checks now only run when `--target github` is specified.
+- **`workspace-targets` check improvements.** Skip `dev_only` and `releasable=false` projects in per-project target validation. Add union-per-releasable verification: each releasable must have at least one target across all its member packages.
+- **Fix.** `sync_workspace` skips `uv sync` when no `pyproject.toml` exists at workspace root, fixing pre-push failures in non-Python monorepos.
+
 ## 0.81.7
 
 Add 120s subprocess timeouts to Maven lint and all test runners

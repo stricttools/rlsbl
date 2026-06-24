@@ -48,7 +48,7 @@
   },
   "project_id": "rlsbl",
   "name": "rlsbl",
-  "version": "0.81.6",
+  "version": "0.81.7",
   "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 32 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
   "global_flags": [
     {
@@ -201,7 +201,7 @@
         {
           "name": "target",
           "type": "str",
-          "help": "Registry to query for name availability (npm, pypi, or go); repeatable",
+          "help": "Registry to query for name availability (npm, pypi, go, or github); repeatable",
           "default": [],
           "repeatable": true,
           "unique": true
@@ -1269,7 +1269,8 @@
       "fast": false,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "scope": "workspace:library"
     },
     "changelog-hashes": {
       "tags": [
@@ -1363,7 +1364,8 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "scope": "workspace"
     },
     "workspace-ci-synced": {
       "tags": [
@@ -1373,7 +1375,8 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "scope": "workspace"
     },
     "workspace-targets": {
       "tags": [
@@ -1383,7 +1386,8 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "scope": "workspace"
     },
     "workspace-unregistered": {
       "tags": [
@@ -1393,7 +1397,8 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "scope": "workspace"
     },
     "workspace-stale-entries": {
       "tags": [
@@ -1403,7 +1408,8 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "scope": "workspace"
     },
     "dev-only-boundary": {
       "tags": [
@@ -1413,7 +1419,8 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "scope": "workspace"
     },
     "dead-workspace-packages": {
       "tags": [
@@ -1423,7 +1430,8 @@
       "fast": false,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "scope": "workspace"
     },
     "subtree-remote-reachable": {
       "tags": [
@@ -1433,7 +1441,8 @@
       "fast": false,
       "pure": false,
       "needs_network": true,
-      "depends_on": []
+      "depends_on": [],
+      "scope": "workspace"
     },
     "workspace-unbuildable": {
       "tags": [
@@ -1443,7 +1452,8 @@
       "fast": false,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "scope": "workspace"
     },
     "layers-violations": {
       "tags": [],
@@ -1451,7 +1461,8 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "scope": "workspace:non_dev_only"
     },
     "deps-unused": {
       "tags": [],
@@ -1459,7 +1470,8 @@
       "fast": false,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "scope": "workspace"
     },
     "deps-undeclared": {
       "tags": [],
@@ -1467,7 +1479,8 @@
       "fast": false,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "scope": "workspace"
     },
     "deps-stale": {
       "tags": [],
@@ -1475,7 +1488,8 @@
       "fast": false,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "scope": "workspace"
     },
     "deps-runtime-test-only": {
       "tags": [
@@ -1485,7 +1499,8 @@
       "fast": false,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "scope": "workspace"
     },
     "deps-dev-in-lib": {
       "tags": [
@@ -1495,7 +1510,8 @@
       "fast": false,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "scope": "workspace"
     },
     "dead-modules": {
       "tags": [
@@ -1633,7 +1649,8 @@
       "needs_network": false,
       "depends_on": [
         "prepush-changelog-coverage"
-      ]
+      ],
+      "scope": "workspace:non_dev_only"
     },
     "maven-central-metadata": {
       "tags": [
@@ -1645,6 +1662,17 @@
       "pure": false,
       "needs_network": false,
       "depends_on": []
+    },
+    "scaffold-gitignore-stale": {
+      "tags": [
+        "workspace"
+      ],
+      "severity": "warn",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [],
+      "scope": "workspace"
     }
   }
 }
