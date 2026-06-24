@@ -27,20 +27,34 @@ def _read_release_metadata(project_path: str, version: str) -> tuple[str, str]:
     and context fields. Returns ("", "") if the file doesn't exist or can't
     be parsed.
     """
+    desc, ctx, _bump = _read_release_metadata_full(project_path, version)
+    return (desc, ctx)
+
+
+def _read_release_metadata_full(project_path: str, version: str) -> tuple[str, str, str]:
+    """Read description, context, and bump type from an archived release toml file.
+
+    Looks for .rlsbl/releases/v{version}.toml and extracts the description,
+    context, and bump fields. Returns ("", "", "") if the file doesn't exist
+    or can't be parsed.
+    """
     toml_path = os.path.join(project_path, ".rlsbl", "releases", f"v{version}.toml")
     try:
         with open(toml_path, "r", encoding="utf-8") as f:
             data = tomlkit.load(f)
     except (OSError, tomlkit.exceptions.ParseError):
-        return ("", "")
+        return ("", "", "")
 
     description = data.get("description", "")
     context = data.get("context", "")
+    bump = data.get("bump", "")
     if not isinstance(description, str):
         description = ""
     if not isinstance(context, str):
         context = ""
-    return (description.strip(), context.strip())
+    if not isinstance(bump, str):
+        bump = ""
+    return (description.strip(), context.strip(), bump.strip())
 
 
 def generate_version_section(
@@ -49,6 +63,7 @@ def generate_version_section(
     *,
     description: str = "",
     context: str = "",
+    bump_type: str | None = None,
 ) -> str:
     """Generate markdown for one version section.
 
@@ -82,7 +97,10 @@ def generate_version_section(
                 "<details>\n<summary>Context</summary>\n\n"
                 f"{context}\n\n</details>\n\n"
             )
-        section += "- No user-facing changes.\n"
+        if bump_type == "hotfix" and description:
+            section += f"### Hotfix\n\n- {description}\n"
+        else:
+            section += "- No user-facing changes.\n"
         return section
 
     # Bucket entries by type.
@@ -135,6 +153,7 @@ def generate_version_file(
     *,
     description: str = "",
     context: str = "",
+    bump_type: str | None = None,
 ) -> str:
     """Read the JSONL file for a version, generate markdown, optionally write .md alongside it.
 
@@ -146,7 +165,7 @@ def generate_version_file(
     """
     jsonl_path = os.path.join(changes_dir, f"{version}.jsonl")
     entries = parse_jsonl(jsonl_path)
-    md = generate_version_section(version, entries, description=description, context=context)
+    md = generate_version_section(version, entries, description=description, context=context, bump_type=bump_type)
 
     if write_to_disk:
         md_path = os.path.join(changes_dir, f"{version}.md")
@@ -193,6 +212,7 @@ def generate_changelog(
     context: str = "",
     changes_dir_override: str | None = None,
     changelog_output_path: str | None = None,
+    bump_type: str | None = None,
 ) -> str:
     """Generate the complete CHANGELOG.md from .rlsbl/changes/ JSONL files.
 
@@ -224,6 +244,10 @@ def generate_changelog(
     ``changelog_output_path`` overrides the default CHANGELOG.md output location.
     Used in explicit releasable mode to write CHANGELOG.md into the releasable
     directory instead of the project root.
+
+    ``bump_type`` is passed through to ``generate_version_section()`` for the
+    unreleased section. For versioned sections, the bump type is read from the
+    archived release file.
     """
     _read_changelog_format(project_path)
 
@@ -236,14 +260,16 @@ def generate_changelog(
         heading = version_override if version_override else "Unreleased"
         sections.append(generate_version_section(
             heading, unreleased, description=description, context=context,
+            bump_type=bump_type,
         ))
 
     # Versioned entries (newest first)
     for version, jsonl_path in list_versioned_files(changes_dir):
-        ver_desc, ver_ctx = _read_release_metadata(project_path, version)
+        ver_desc, ver_ctx, ver_bump = _read_release_metadata_full(project_path, version)
         md = generate_version_file(
             changes_dir, version, write_to_disk=write_to_disk,
             description=ver_desc, context=ver_ctx,
+            bump_type=ver_bump or None,
         )
         sections.append(md)
 

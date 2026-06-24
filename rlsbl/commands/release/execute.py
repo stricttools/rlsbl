@@ -510,6 +510,7 @@ def _run_release_mutating(state: ReleaseState):
         ReleaseValidationError,
         HookError,
         _read_release_metadata,
+        _read_release_metadata_full,
     )
 
     project_root = ctx.project_root
@@ -797,6 +798,7 @@ def _run_release_mutating(state: ReleaseState):
                 changes_dir, new_version,
                 description=(description or "").strip(),
                 context=(context or "").strip(),
+                bump_type=bump_type,
             )
             log(f"Finalized JSONL changelog for {new_version}")
             # Commit the finalized JSONL file and the new empty unreleased.jsonl
@@ -863,10 +865,11 @@ def _run_release_mutating(state: ReleaseState):
             # consistent with what future generate_changelog() calls produce.
             changes_dir_regen = state.changes_dir or (get_changes_dir(project_dir) if changes_dir_exists(project_dir) else None)
             if changes_dir_regen and os.path.isdir(changes_dir_regen):
-                ver_desc, ver_ctx = _read_release_metadata(project_dir, new_version)
+                ver_desc, ver_ctx, ver_bump = _read_release_metadata_full(project_dir, new_version)
                 generate_version_file(
                     changes_dir_regen, new_version,
                     description=ver_desc, context=ver_ctx,
+                    bump_type=ver_bump or None,
                 )
                 md_regen_path = os.path.join(changes_dir_regen, f"{new_version}.md")
                 md_regen_rel = _rel_to_git_root(md_regen_path, _git_root)

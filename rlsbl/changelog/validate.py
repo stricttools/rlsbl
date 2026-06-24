@@ -533,7 +533,7 @@ def _read_all_versioned_entries(changes_dir: str) -> dict[str, list[ChangelogEnt
 # Combined validation
 # ---------------------------------------------------------------------------
 
-def validate_unreleased(changes_dir: str, tag_glob: str | None = None, project=None, *, config: dict) -> dict:
+def validate_unreleased(changes_dir: str, tag_glob: str | None = None, project=None, *, config: dict, bump_type: str | None = None) -> dict:
     """Run all 8 validation checks on unreleased.jsonl.
 
     Returns a dict with:
@@ -593,6 +593,17 @@ def validate_unreleased(changes_dir: str, tag_glob: str | None = None, project=N
         "batch_size_entries": check_batch_size_entries(entries_by_version, batch_config),
         "user_facing": check_has_user_facing(entries),
     }
+
+    # Hotfix releases exempt the user_facing requirement but forbid
+    # user-facing entries (use patch/minor/major for those).
+    if bump_type == "hotfix":
+        checks["user_facing"] = (True, [])
+        has_user_facing = any(e.user_facing for e in entries)
+        if has_user_facing:
+            checks["hotfix_no_user_facing"] = (
+                False,
+                ["hotfix releases must not have user-facing entries — use patch, minor, or major instead"],
+            )
 
     overall = all(passed for passed, _ in checks.values())
 
