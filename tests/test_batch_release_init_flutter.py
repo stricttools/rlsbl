@@ -175,7 +175,7 @@ class TestBatchReleaseInitComments:
 
         batch_path = get_batch_release_file_path(str(mock_git_repo))
         raw = open(batch_path).read()
-        assert "# Version bump type: patch, minor, or major" in raw
+        assert "# Version bump type: patch, minor, major, or hotfix" in raw
 
     def test_has_description_comment(self, mock_git_repo):
         """Scaffolded file contains description comment."""
