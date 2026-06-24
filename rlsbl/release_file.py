@@ -14,7 +14,7 @@ import tomlkit
 from .errors import ReleaseFileError
 
 
-VALID_BUMP_TYPES = ("patch", "minor", "major")
+VALID_BUMP_TYPES = ("patch", "minor", "major", "hotfix")
 
 VALID_TARGET_MODES = ("ota", "build")
 
@@ -24,7 +24,7 @@ VALID_TARGET_MODES = ("ota", "build")
 # name used in UI and documentation.
 @dataclass
 class ReleaseConfig:
-    bump: str  # "patch", "minor", "major"
+    bump: str  # "patch", "minor", "major", "hotfix"
     include: list[str]  # target names to release
     exclude: list[str]  # target names to skip
     targets: dict[str, dict] = field(default_factory=dict)  # per-target config

@@ -22,7 +22,7 @@ class HookError(Exception):
     pass
 
 
-VALID_BUMP_TYPES = ("patch", "minor", "major")
+from ...release_file import VALID_BUMP_TYPES
 
 
 def validate_release_targets(release_config, project_root):
@@ -379,7 +379,7 @@ def compute_release_version(target, primary_path, bump_arg, monorepo_name,
 def validate_changelog_state(project_dir, target, monorepo_name,
                              monorepo_project_path, config, monorepo_project=None,
                              releasable_name=None, releasable_tag_fmt=None,
-                             workspace_root=None):
+                             workspace_root=None, bump_type=None):
     """Validate JSONL changelog is set up and passes validation.
 
     In explicit releasable mode (when ``releasable_name`` is provided along
@@ -416,7 +416,8 @@ def validate_changelog_state(project_dir, target, monorepo_name,
         tag_glob = None
 
     validation = validate_unreleased(
-        changes_dir, tag_glob=tag_glob, project=monorepo_project, config=config
+        changes_dir, tag_glob=tag_glob, project=monorepo_project, config=config,
+        bump_type=bump_type,
     )
     if not validation["passed"]:
         lines = []

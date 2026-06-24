@@ -15,7 +15,7 @@ from ...changelog import (
     get_changes_dir,
     validate_unreleased,
 )
-from ...changelog.generate import _read_release_metadata
+from ...changelog.generate import _read_release_metadata, _read_release_metadata_full
 from ...errors import ConfigError, PostReleaseError
 from ...git_util import validate_subtree_remote_ssh_host
 from ...config import read_deploy_config, read_json_config, should_tag, update_last_build_release
@@ -84,7 +84,7 @@ from .execute import (
     _LOCKFILE_SYNC_TIMEOUT,
 )
 
-VALID_BUMP_TYPES = ("patch", "minor", "major")
+from ...release_file import VALID_BUMP_TYPES
 
 
 def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
@@ -198,6 +198,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         releasable_name=releasable_name,
         releasable_tag_fmt=releasable_tag_fmt,
         workspace_root=monorepo_root,
+        bump_type=bump_type,
     )
 
     # Validate blog body file if blog is enabled
@@ -214,6 +215,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     changelog_content = generate_changelog(
         project_dir, write_to_disk=False, version_override=new_version,
         description=release_config.description, context=release_config.context,
+        bump_type=bump_type,
         **changelog_gen_kwargs,
     )
     log("Generated CHANGELOG.md from JSONL entries (in-memory preview)")
@@ -410,6 +412,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         generate_changelog(
             project_dir, version_override=new_version,
             description=release_config.description, context=release_config.context,
+            bump_type=bump_type,
             **changelog_gen_kwargs,
         )
 

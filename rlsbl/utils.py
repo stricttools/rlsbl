@@ -347,7 +347,7 @@ def commit_files_if_changed(
 
 
 def bump_version(version, bump_type):
-    """Bump a semver version string by the given type (patch, minor, major).
+    """Bump a semver version string by the given type (patch, minor, major, hotfix).
 
     Handles pre-release suffixes (e.g. "1.0.0-beta.1"): the suffix is stripped
     and the bump is applied to the base version.
@@ -371,8 +371,10 @@ def bump_version(version, bump_type):
         return f"{major}.{minor + 1}.0"
     elif bump_type == "patch":
         return f"{major}.{minor}.{patch + 1}"
+    elif bump_type == "hotfix":
+        return f"{major}.{minor}.{patch + 1}"
     else:
-        raise VersionError(f'Invalid bump type: "{bump_type}". Use patch, minor, or major.')
+        raise VersionError(f'Invalid bump type: "{bump_type}". Use patch, minor, major, or hotfix.')
 
 
 def is_private_repo():
