@@ -924,10 +924,8 @@ class TestFinalizeBatchFile:
         with patch("rlsbl.commands.monorepo.batch_release.commit_files"):
             _finalize_batch_file(batch_path, log_messages.append)
 
-        # Original path should now be an empty file
-        assert os.path.exists(batch_path)
-        with open(batch_path) as f:
-            assert f.read() == ""
+        # Original path should no longer exist (renamed, not recreated)
+        assert not os.path.exists(batch_path)
 
         # A timestamped batch-*.toml should exist
         toml_files = [f for f in os.listdir(str(releases_dir)) if f.startswith("batch-")]

@@ -165,14 +165,12 @@ def unfinalize_release_file(releases_dir: str, version: str) -> list[str]:
     """Reverse a release-file finalization: restore vX.Y.Z.toml to unreleased.toml.
 
     Inverse of the finalization step in `release run`, which renames
-    unreleased.toml to vX.Y.Z.toml, chmods it read-only (0o444), and creates
-    a fresh empty unreleased.toml.
+    unreleased.toml to vX.Y.Z.toml and chmods it read-only (0o444).
 
     1. No-op (returns []) if the versioned file doesn't exist.
     2. If unreleased.toml exists with content that differs from the versioned
-       file (finalization only ever writes an empty file, so anything else is
-       user content), warns on stderr and skips -- nothing is deleted.
-    3. Otherwise removes the fresh unreleased.toml, makes the versioned file
+       file, warns on stderr and skips -- nothing is deleted.
+    3. Otherwise removes any stale unreleased.toml, makes the versioned file
        writable, and renames it back to unreleased.toml.
 
     Returns the list of changed file paths (for committing).

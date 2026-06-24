@@ -784,14 +784,10 @@ def _run_release_mutating(state: ReleaseState):
             versioned_release = os.path.join(releases_dir, f"v{new_version}.toml")
             os.rename(release_file_path, versioned_release)
             os.chmod(versioned_release, 0o444)
-            # Create a fresh empty unreleased.toml
-            with open(release_file_path, "w", encoding="utf-8") as f:
-                pass  # empty file
             # Archive blog body file if it exists (unreleased.md -> v{version}.md)
             blog_body_dst = archive_blog_body(project_dir, new_version)
             release_finalize_files = [
                 _rel_to_git_root(versioned_release, _git_root),
-                _rel_to_git_root(release_file_path, _git_root),
             ]
             if blog_body_dst:
                 release_finalize_files.append(_rel_to_git_root(blog_body_dst, _git_root))

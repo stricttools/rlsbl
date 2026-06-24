@@ -2135,8 +2135,8 @@ class TestFinalizeBatchFile:
         with patch(f"{MOD_BATCH}.commit_files"):
             _finalize_batch_file(str(batch_path), print)
 
-        # Original file should be empty now
-        assert batch_path.read_text() == ""
+        # Original file should no longer exist (renamed, not recreated)
+        assert not batch_path.exists()
         # Archived file should exist with read-only permission
         archived = list(tmp_path.glob("batch-*.toml"))
         assert len(archived) == 1

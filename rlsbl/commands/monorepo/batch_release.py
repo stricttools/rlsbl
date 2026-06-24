@@ -352,14 +352,9 @@ def _finalize_batch_file(batch_path, log):
     os.rename(batch_path, versioned_path)
     os.chmod(versioned_path, stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)  # 444
 
-    # Create a fresh empty unreleased.toml
-    with open(batch_path, "w", encoding="utf-8") as f:
-        pass  # empty file
-
     # Commit finalized files
     finalize_files = [
         os.path.normpath(versioned_path),
-        os.path.normpath(batch_path),
     ]
     commit_files(
         f"chore: finalize batch release file ({versioned_name})",
