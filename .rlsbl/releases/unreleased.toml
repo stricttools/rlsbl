@@ -1,0 +1,12 @@
+# Version bump type: patch, minor, or major
+bump = "minor"
+# Short description of this release (required)
+description = "Remove publish.json, releasable-owned targets, no empty release files, monorepo release subgroup."
+# Optional context explaining why these changes were made
+context = """
+Breaking changes: publish.json config file removed (unused by all projects, 4-level inheritance simplified to 2-level). Release finalization no longer creates empty unreleased.toml. Monorepo release commands restructured into a subgroup (monorepo release -> monorepo release run, release-init -> release init, release-order -> release order). In explicit releasable mode, targets are releasable-owned and cannot be overridden by per-package config.
+"""
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["npm", "pypi"]
+exclude = []
