@@ -157,7 +157,7 @@
     "description": "92c829699be90c4ea09e05c6e0ff3830b755bdd05be47a9427e51074cedcb831"
   },
   "en/cli-index.md": {
-    "content": "bbda692a1b9adfa579a90fb4d4bec9bd5b740b9b7d7f3f5256dc11544d13c523",
+    "content": "42e479ba1fea29e5e55b68aca7c3c2076f1fa1158b120a11fbebd2007ba27e75",
     "description": "0f01533cb10562a220aa70ea5e33e2500c0c1e4aa8e16b2f80c532449a68b7ea"
   },
   "en/cli-migrate-publish-config.md": {
@@ -169,7 +169,7 @@
     "description": "ed5d34392baa022c09e4daec00277910a7cbc15b08d430083b3bff2510762617"
   },
   "en/cli-monorepo.md": {
-    "content": "b4760432436030a3adbcbe0dd8d67c10c2bcc0fea7805b6973d3c11722d5b8bb",
+    "content": "6b2fc19954264a981a13f077adb0208820024f985281a478baddd8022a2a894b",
     "description": "752342d5365828fb0c019d6c4bf04f94b450d75f34ab4ac641fd3a028e963749"
   },
   "en/cli-pre-push-check.md": {
@@ -409,7 +409,7 @@
     "source_docstring": "77349d50382ca6c0faf97553b8abf8c24bb360c895f32005f7de62abdf1bbe75"
   },
   "en/rlsbl-commands-init_cmd.md": {
-    "content": "9e60f6befad01b466f608ea98d0d9224af9db1abf65e7d5b175e643cb81b250c",
+    "content": "8756398da0fbaa741c08bd804e422b0c43345481938c34c2f9a53b5f7e422557",
     "description": "b4a7db2e3882de4af592870ee977b98522a4635188b12262d78e7441b533611c",
     "source_docstring": "ac73a657ec7256d7c0c8c1f7b1ad359d3673262242500bdb32944a51dddafb30"
   },
@@ -797,7 +797,7 @@
     "source_docstring": "1dab5473e391e8bb1f1cad9802c9de83079fd1461e8ce00a68091cfa332a2b31"
   },
   "en/rlsbl-targets-base.md": {
-    "content": "08afbc3201b926170c79263dc216754b19c9cfcaa4b59d8e856a1244a6346409",
+    "content": "511977548d7d0989f5cef80585bd4f173b0b2724a80f83d5d18be6e8eb0d741d",
     "description": "9c45f2d173069765b86d5b12cc6ace11871012cf64a449c29879627cba6d68d1",
     "source_docstring": "d3cef465ea6650eb83544c087112b90d4df665ffeb56fd88a740fb2dfa85df92"
   },
@@ -963,7 +963,7 @@
     "description": "598d83250a3323ab6a05742ec023189563bed4b49139f3240533da2bf63afe11"
   },
   "en/targets.md": {
-    "content": "7ea2663a9f1e62af0347fa5b15e55fd1cbfbc9558f4203e96c317bf5e6b6c076",
+    "content": "fc2df2aece7b24af7de6c769c2917b433eed6ff735fe77a9ca3861f321b38b04",
     "description": "b95797e13fbcdab0b3128fc7d664c84ffd9042fbd600266b57c5e9569f7d5a05",
     "source_docstring": "c56d3fd8faeccc73911eabfe28f4f825c8b563105a8f969351411cbc6784f2fc"
   },
