@@ -1,9 +1,9 @@
 """Python linter using tree-sitter AST parsing to detect library boundary violations including forbidden imports and stdout/logging usage."""
 
+import dataclasses
 import os
 import sys
 import tomllib
-from collections import namedtuple
 
 import tree_sitter_python
 from tree_sitter import Language, Parser
@@ -12,7 +12,14 @@ from .config import LanguageLintConfig
 from .result import LintResult
 from .utils import walk_source_files
 
-ImportRecord = namedtuple("ImportRecord", ["top_level", "full_path", "filepath", "line", "guarded"])
+@dataclasses.dataclass(frozen=True)
+class ImportRecord:
+    top_level: str
+    full_path: str
+    filepath: str
+    line: int
+    guarded: bool = False
+    type_checking: bool = False
 
 PY_LANG = Language(tree_sitter_python.language())
 
@@ -94,20 +101,53 @@ def _try_catches_import_error(try_node, error_names):
     return False
 
 
+def _is_in_type_checking_block(node):
+    """Check if an import node is inside an `if TYPE_CHECKING:` block.
+
+    Walks up the parent chain looking for an if_statement ancestor whose
+    condition is:
+    - An identifier node with text `TYPE_CHECKING`, OR
+    - An attribute node whose last identifier is `TYPE_CHECKING`
+      (for `typing.TYPE_CHECKING`)
+
+    Returns True if found, False otherwise.
+    """
+    current = node.parent
+    while current is not None:
+        if current.type == "if_statement":
+            # The condition is the second child (index 1) of if_statement:
+            # if_statement -> "if" <condition> ":" <body>
+            condition = current.children[1] if len(current.children) > 1 else None
+            if condition is not None:
+                if (condition.type == "identifier"
+                        and condition.text.decode("utf-8") == "TYPE_CHECKING"):
+                    return True
+                if condition.type == "attribute":
+                    # Check the last identifier child (e.g., typing.TYPE_CHECKING)
+                    attr = condition.child_by_field_name("attribute")
+                    if (attr is not None
+                            and attr.text.decode("utf-8") == "TYPE_CHECKING"):
+                        return True
+        current = current.parent
+    return False
+
+
 def _collect_all_imports(tree, filepath):
     """Walk AST and collect all imported module names with full paths.
 
-    Returns a set of ImportRecord(top_level, full_path, filepath, line, guarded).
+    Returns a set of ImportRecord with top_level, full_path, filepath,
+    line, guarded, and type_checking fields.
     ``top_level`` is the first component of the dotted path (e.g., "orxt").
     ``full_path`` is the complete dotted module path (e.g., "orxt.protocols").
-    Imports inside try/except ImportError blocks are marked guarded=True
-    instead of being dropped, so callers can decide how to handle them.
+    Imports inside try/except ImportError blocks are marked guarded=True.
+    Imports inside ``if TYPE_CHECKING:`` blocks are marked type_checking=True.
     """
     imports = set()
 
     def _walk(node):
         if node.type == "import_statement":
             guarded = _is_in_try_except_import_error(node)
+            tc = _is_in_type_checking_block(node)
             if guarded:
                 # Still walk children for nested structures, but also
                 # collect the import as guarded below.
@@ -117,17 +157,26 @@ def _collect_all_imports(tree, filepath):
                 if child.type == "dotted_name":
                     module = child.text.decode("utf-8")
                     top_level = module.split(".")[0]
-                    imports.add(ImportRecord(top_level, module, filepath, _node_line(node), guarded))
+                    imports.add(ImportRecord(
+                        top_level=top_level, full_path=module,
+                        filepath=filepath, line=_node_line(node),
+                        guarded=guarded, type_checking=tc,
+                    ))
                 elif child.type == "aliased_import":
                     name_node = child.child_by_field_name("name")
                     if name_node:
                         module = name_node.text.decode("utf-8")
                         top_level = module.split(".")[0]
-                        imports.add(ImportRecord(top_level, module, filepath, _node_line(node), guarded))
+                        imports.add(ImportRecord(
+                            top_level=top_level, full_path=module,
+                            filepath=filepath, line=_node_line(node),
+                            guarded=guarded, type_checking=tc,
+                        ))
             if guarded:
                 return
         elif node.type == "import_from_statement":
             guarded = _is_in_try_except_import_error(node)
+            tc = _is_in_type_checking_block(node)
             if guarded:
                 for child in node.children:
                     _walk(child)
@@ -135,7 +184,11 @@ def _collect_all_imports(tree, filepath):
             if module_node:
                 module = module_node.text.decode("utf-8")
                 top_level = module.split(".")[0]
-                imports.add(ImportRecord(top_level, module, filepath, _node_line(node), guarded))
+                imports.add(ImportRecord(
+                    top_level=top_level, full_path=module,
+                    filepath=filepath, line=_node_line(node),
+                    guarded=guarded, type_checking=tc,
+                ))
             if guarded:
                 return
         for child in node.children:
@@ -308,8 +361,10 @@ class PythonAstLinter:
     ) -> set[ImportRecord]:
         """Collect all imported module names from Python files.
 
-        Returns a set of ImportRecord(top_level, full_path, filepath, line, guarded).
+        Returns a set of ImportRecord with top_level, full_path, filepath,
+        line, guarded, and type_checking fields.
         Guarded imports are those inside try/except ImportError blocks.
+        TYPE_CHECKING imports are those inside ``if TYPE_CHECKING:`` blocks.
         """
         all_imports: set[ImportRecord] = set()
         parser = _make_parser()

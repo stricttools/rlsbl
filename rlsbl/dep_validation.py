@@ -115,6 +115,8 @@ def _get_imported_workspace_packages(
     except RuntimeError:
         py_results = []
     for info in py_results:
+        if info.type_checking:
+            continue
         if info.guarded:
             guarded_imports.add(info.package_name)
         elif info.is_test_context:

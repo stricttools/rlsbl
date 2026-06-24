@@ -62,6 +62,7 @@ class ImportInfo:
     line_number: int
     is_test_context: bool
     guarded: bool = False
+    type_checking: bool = False
 
 
 def _is_test_context(filepath: str, project_path: str) -> bool:
@@ -270,6 +271,7 @@ class PythonImportScanner:
                     line_number=record.line,
                     is_test_context=_is_test_context(record.filepath, project_path),
                     guarded=record.guarded,
+                    type_checking=record.type_checking,
                 ))
 
         return results

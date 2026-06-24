@@ -127,10 +127,8 @@ def scan_imports(project_path: str) -> set:
         project_path: path to the project root directory.
 
     Returns a set of import records. Python imports are ImportRecord
-    namedtuples (top_level, full_path, filepath, line, guarded).
+    dataclasses (top_level, full_path, filepath, line, guarded, type_checking).
     npm imports are (package_name, file_path, line_number, guarded) tuples.
-    All record types support ``record[0]`` or ``pkg, *_ = record`` for
-    the package/top-level name.
     """
     project_path = os.path.abspath(project_path)
     languages = _detect_languages(project_path)
