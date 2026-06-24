@@ -558,6 +558,74 @@ class TestCheckUndeclaredDeps:
         assert errors == []
 
 
+class TestTypeCheckingDepValidation:
+    """TYPE_CHECKING imports are invisible to dependency validation."""
+
+    def test_type_checking_import_not_undeclared(self, tmp_path):
+        """A workspace dep imported only inside TYPE_CHECKING is NOT flagged as undeclared."""
+        project_dir = tmp_path / "app"
+        project_dir.mkdir()
+        (project_dir / "pyproject.toml").write_text(_PYPROJECT)
+        (project_dir / "main.py").write_text(
+            "from __future__ import annotations\n"
+            "from typing import TYPE_CHECKING\n"
+            "if TYPE_CHECKING:\n"
+            "    import auth\n"
+        )
+
+        errors = check_undeclared_deps(
+            project_name="app",
+            project_dir=str(project_dir),
+            manifest_deps=set(),
+            workspace_names={"app", "auth"},
+        )
+        assert errors == []
+
+    def test_type_checking_only_import_flagged_as_unused(self, tmp_path):
+        """A dep imported ONLY inside TYPE_CHECKING IS flagged as unused."""
+        project_dir = tmp_path / "app"
+        project_dir.mkdir()
+        (project_dir / "pyproject.toml").write_text(_PYPROJECT)
+        (project_dir / "main.py").write_text(
+            "from __future__ import annotations\n"
+            "from typing import TYPE_CHECKING\n"
+            "if TYPE_CHECKING:\n"
+            "    import auth\n"
+        )
+
+        errors = check_unused_deps(
+            project_name="app",
+            project_dir=str(project_dir),
+            manifest_deps_with_scope={"auth": "runtime"},
+            workspace_names={"app", "auth"},
+            whitelist={},
+        )
+        assert len(errors) == 1
+        assert "auth" in errors[0]
+        assert "no source file imports it" in errors[0]
+
+    def test_normal_and_type_checking_import_not_unused(self, tmp_path):
+        """A dep imported both normally and inside TYPE_CHECKING is NOT flagged as unused."""
+        project_dir = tmp_path / "app"
+        project_dir.mkdir()
+        (project_dir / "pyproject.toml").write_text(_PYPROJECT)
+        (project_dir / "main.py").write_text("import auth\n")
+        (project_dir / "types.py").write_text(
+            "from typing import TYPE_CHECKING\n"
+            "if TYPE_CHECKING:\n"
+            "    import auth\n"
+        )
+
+        errors = check_unused_deps(
+            project_name="app",
+            project_dir=str(project_dir),
+            manifest_deps_with_scope={"auth": "runtime"},
+            workspace_names={"app", "auth"},
+            whitelist={},
+        )
+        assert errors == []
+
+
 class TestLoadDepOverrides:
     """load_dep_overrides reads the whitelist config file."""
 

@@ -3,7 +3,7 @@
 Covers:
 - build_namespace_map with orxt-style layout
 - build_namespace_map with no namespace (flat package)
-- ImportRecord namedtuple fields
+- ImportRecord dataclass fields
 - Composite matching: top-level wins, import_name overrides, namespace map fallback
 - Sub-component matching for namespace imports
 - End-to-end: workspace check with namespace imports
@@ -166,10 +166,10 @@ class TestBuildNamespaceMap:
 
 
 class TestImportRecord:
-    """ImportRecord namedtuple has the expected fields."""
+    """ImportRecord dataclass has the expected fields."""
 
     def test_fields(self):
-        """ImportRecord has top_level, full_path, filepath, line, guarded."""
+        """ImportRecord has top_level, full_path, filepath, line, guarded, type_checking."""
         record = ImportRecord(
             top_level="orxt",
             full_path="orxt.protocols",
@@ -182,20 +182,30 @@ class TestImportRecord:
         assert record.filepath == "/a/b.py"
         assert record.line == 5
         assert record.guarded is False
+        assert record.type_checking is False
 
-    def test_indexing(self):
-        """ImportRecord supports positional indexing."""
-        record = ImportRecord("orxt", "orxt.protocols", "/a.py", 1, True)
-        assert record[0] == "orxt"
-        assert record[1] == "orxt.protocols"
-        assert record[4] is True
+    def test_type_checking_field(self):
+        """ImportRecord type_checking field defaults to False and can be set."""
+        record_default = ImportRecord(
+            top_level="orxt", full_path="orxt.protocols",
+            filepath="/a.py", line=1,
+        )
+        assert record_default.type_checking is False
 
-    def test_unpacking_star(self):
-        """ImportRecord supports *_ unpacking for backward compat."""
-        record = ImportRecord("json", "json", "/a.py", 3, False)
-        pkg, *rest = record
-        assert pkg == "json"
-        assert len(rest) == 4
+        record_tc = ImportRecord(
+            top_level="orxt", full_path="orxt.protocols",
+            filepath="/a.py", line=1, type_checking=True,
+        )
+        assert record_tc.type_checking is True
+
+    def test_frozen(self):
+        """ImportRecord is frozen (immutable)."""
+        record = ImportRecord(
+            top_level="orxt", full_path="orxt.protocols",
+            filepath="/a.py", line=1,
+        )
+        with pytest.raises(AttributeError):
+            record.top_level = "changed"
 
 
 class TestCompositeMatching:

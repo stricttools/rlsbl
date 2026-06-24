@@ -25,7 +25,7 @@ class TestPythonImportExtraction:
         )
         linter = PythonAstLinter()
         result = linter.scan_imports(str(tmp_path))
-        pkg_names = {pkg for pkg, *_ in result}
+        pkg_names = {r.top_level for r in result}
         assert pkg_names == {"os", "pathlib", "requests"}
 
     def test_line_numbers(self, tmp_path):
@@ -61,7 +61,7 @@ class TestPythonImportExtraction:
         (sub / "c.py").write_text("from collections import OrderedDict\n")
         linter = PythonAstLinter()
         result = linter.scan_imports(str(tmp_path))
-        pkg_names = {pkg for pkg, *_ in result}
+        pkg_names = {r.top_level for r in result}
         assert pkg_names == {"os", "json", "sys", "collections"}
 
     def test_empty_project(self, tmp_path):
@@ -77,7 +77,7 @@ class TestPythonImportExtraction:
         (tmp_path / "lib.py").write_text("import numpy as np\n")
         linter = PythonAstLinter()
         result = linter.scan_imports(str(tmp_path))
-        pkg_names = {pkg for pkg, *_ in result}
+        pkg_names = {r.top_level for r in result}
         assert "numpy" in pkg_names
 
     def test_dotted_import(self, tmp_path):
@@ -86,7 +86,7 @@ class TestPythonImportExtraction:
         (tmp_path / "lib.py").write_text("import os.path\n")
         linter = PythonAstLinter()
         result = linter.scan_imports(str(tmp_path))
-        pkg_names = {pkg for pkg, *_ in result}
+        pkg_names = {r.top_level for r in result}
         assert pkg_names == {"os"}
 
     def test_from_dotted_import(self, tmp_path):
@@ -95,8 +95,81 @@ class TestPythonImportExtraction:
         (tmp_path / "lib.py").write_text("from os.path import join\n")
         linter = PythonAstLinter()
         result = linter.scan_imports(str(tmp_path))
-        pkg_names = {pkg for pkg, *_ in result}
+        pkg_names = {r.top_level for r in result}
         assert pkg_names == {"os"}
+
+
+class TestTypeCheckingImportExtraction:
+    """Imports inside TYPE_CHECKING blocks are marked type_checking=True."""
+
+    def test_type_checking_bare(self, tmp_path):
+        """Import inside `if TYPE_CHECKING:` is marked type_checking=True."""
+        (tmp_path / "pyproject.toml").write_text(_PYPROJECT)
+        (tmp_path / "lib.py").write_text(
+            "from __future__ import annotations\n"
+            "from typing import TYPE_CHECKING\n"
+            "if TYPE_CHECKING:\n"
+            "    import requests\n"
+        )
+        linter = PythonAstLinter()
+        result = linter.scan_imports(str(tmp_path))
+        records = [r for r in result if r.top_level == "requests"]
+        assert len(records) == 1
+        assert records[0].type_checking is True
+
+    def test_type_checking_qualified(self, tmp_path):
+        """Import inside `if typing.TYPE_CHECKING:` is marked type_checking=True."""
+        (tmp_path / "pyproject.toml").write_text(_PYPROJECT)
+        (tmp_path / "lib.py").write_text(
+            "import typing\n"
+            "if typing.TYPE_CHECKING:\n"
+            "    from collections import OrderedDict\n"
+        )
+        linter = PythonAstLinter()
+        result = linter.scan_imports(str(tmp_path))
+        records = [r for r in result if r.top_level == "collections"]
+        assert len(records) == 1
+        assert records[0].type_checking is True
+
+    def test_outside_type_checking_not_marked(self, tmp_path):
+        """Import outside TYPE_CHECKING block has type_checking=False."""
+        (tmp_path / "pyproject.toml").write_text(_PYPROJECT)
+        (tmp_path / "lib.py").write_text("import requests\n")
+        linter = PythonAstLinter()
+        result = linter.scan_imports(str(tmp_path))
+        records = [r for r in result if r.top_level == "requests"]
+        assert len(records) == 1
+        assert records[0].type_checking is False
+
+    def test_guarded_not_type_checking(self, tmp_path):
+        """Import in try/except but NOT TYPE_CHECKING has guarded=True, type_checking=False."""
+        (tmp_path / "pyproject.toml").write_text(_PYPROJECT)
+        (tmp_path / "lib.py").write_text(
+            "try:\n"
+            "    import requests\n"
+            "except ImportError:\n"
+            "    requests = None\n"
+        )
+        linter = PythonAstLinter()
+        result = linter.scan_imports(str(tmp_path))
+        records = [r for r in result if r.top_level == "requests"]
+        assert len(records) == 1
+        assert records[0].guarded is True
+        assert records[0].type_checking is False
+
+    def test_from_import_type_checking(self, tmp_path):
+        """from-import inside TYPE_CHECKING is marked type_checking=True."""
+        (tmp_path / "pyproject.toml").write_text(_PYPROJECT)
+        (tmp_path / "lib.py").write_text(
+            "from typing import TYPE_CHECKING\n"
+            "if TYPE_CHECKING:\n"
+            "    from pathlib import Path\n"
+        )
+        linter = PythonAstLinter()
+        result = linter.scan_imports(str(tmp_path))
+        records = [r for r in result if r.top_level == "pathlib"]
+        assert len(records) == 1
+        assert records[0].type_checking is True
 
 
 class TestNpmImportExtraction:
@@ -109,7 +182,7 @@ class TestNpmImportExtraction:
         (tmp_path / "lib.js").write_text("import express from 'express';\n")
         linter = NpmAstLinter()
         result = linter.scan_imports(str(tmp_path))
-        pkg_names = {pkg for pkg, *_ in result}
+        pkg_names = {r[0] for r in result}
         assert "express" in pkg_names
 
     def test_require(self, tmp_path):
@@ -119,7 +192,7 @@ class TestNpmImportExtraction:
         (tmp_path / "lib.js").write_text("const fs = require('fs');\n")
         linter = NpmAstLinter()
         result = linter.scan_imports(str(tmp_path))
-        pkg_names = {pkg for pkg, *_ in result}
+        pkg_names = {r[0] for r in result}
         assert "fs" in pkg_names
 
     def test_dynamic_import(self, tmp_path):
@@ -129,7 +202,7 @@ class TestNpmImportExtraction:
         (tmp_path / "lib.js").write_text("const mod = import('lodash');\n")
         linter = NpmAstLinter()
         result = linter.scan_imports(str(tmp_path))
-        pkg_names = {pkg for pkg, *_ in result}
+        pkg_names = {r[0] for r in result}
         assert "lodash" in pkg_names
 
     def test_export_from(self, tmp_path):
@@ -139,7 +212,7 @@ class TestNpmImportExtraction:
         (tmp_path / "lib.js").write_text("export { handler } from 'express';\n")
         linter = NpmAstLinter()
         result = linter.scan_imports(str(tmp_path))
-        pkg_names = {pkg for pkg, *_ in result}
+        pkg_names = {r[0] for r in result}
         assert "express" in pkg_names
 
     def test_multiple_files(self, tmp_path):
@@ -150,7 +223,7 @@ class TestNpmImportExtraction:
         (tmp_path / "b.ts").write_text("import { readFile } from 'fs';\n")
         linter = NpmAstLinter()
         result = linter.scan_imports(str(tmp_path))
-        pkg_names = {pkg for pkg, *_ in result}
+        pkg_names = {r[0] for r in result}
         assert pkg_names == {"express", "fs"}
 
     def test_empty_project(self, tmp_path):
@@ -169,7 +242,7 @@ class TestScanImportsTopLevel:
         (tmp_path / "pyproject.toml").write_text(_PYPROJECT)
         (tmp_path / "lib.py").write_text("import os\nimport json\n")
         result = scan_imports(str(tmp_path))
-        pkg_names = {pkg for pkg, *_ in result}
+        pkg_names = {r.top_level for r in result}
         assert pkg_names == {"os", "json"}
 
     def test_npm_project(self, tmp_path):
@@ -178,7 +251,7 @@ class TestScanImportsTopLevel:
         )
         (tmp_path / "lib.js").write_text("import express from 'express';\n")
         result = scan_imports(str(tmp_path))
-        pkg_names = {pkg for pkg, *_ in result}
+        pkg_names = {r[0] for r in result}
         assert "express" in pkg_names
 
     def test_no_language_markers(self, tmp_path):
