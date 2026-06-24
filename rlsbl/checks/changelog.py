@@ -198,7 +198,7 @@ def register_changelog_checks(app):
 
         if not any_failed:
             return CheckResult("pass", "has user-facing entries")
-        return CheckResult("warn", "no user-facing entries", details=all_details)
+        return CheckResult("warn", "no user-facing entries (use bump = \"hotfix\" for infrastructure-only releases)", details=all_details)
 
     @app.check("changelog-batch-commits")
     def check_changelog_batch_commits(ctx):

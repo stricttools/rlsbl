@@ -48,7 +48,7 @@ def run_cmd(project_root):
     target_names = [e.name for e in entries]
 
     doc = tomlkit.document()
-    doc.add(tomlkit.comment("Version bump type: patch, minor, or major"))
+    doc.add(tomlkit.comment("Version bump type: patch, minor, major, or hotfix"))
     doc.add("bump", "")
     doc.add(tomlkit.comment("Short description of this release (required)"))
     doc.add("description", "")
