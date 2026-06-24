@@ -1,0 +1,14 @@
+# Version bump type: patch, minor, or major
+bump = "minor"
+# Short description of this release (required)
+description = "Check system scope adapter, detect_targets config inheritance, template var hard errors, workspace-targets fix, check-name --target github, batch release bug fixes."
+# Optional context explaining why these changes were made
+context = """
+Major architectural changes: declarative scope adapter for the check system (requires strictcli 0.21.0), detect_targets() now uses 4-level config inheritance with a two-tier rule (missing targets key is a hard error when config.json exists), and unresolved template variables are now hard errors instead of silent pass-through.
+
+Breaking: projects with .rlsbl/config.json that lack an explicit "targets" key will now get a hard error with auto-detected hints. Template vars that previously survived as literal {{varName}} in output files will now error at scaffold/sync time.
+"""
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["npm", "pypi"]
+exclude = []
