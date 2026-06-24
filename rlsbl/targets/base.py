@@ -40,6 +40,11 @@ class BaseTarget:
     ecosystem: ClassVar[str] = ""
     auto_detectable: ClassVar[str] = "yes"
 
+    @property
+    def name(self):
+        """Target registry name. Subclasses must override."""
+        return "base"
+
     def version_file(self, dir_path=None):
         return None
 
@@ -68,7 +73,7 @@ class BaseTarget:
         return {}
 
     def template_vars(self, dir_path, ctx):
-        return {}
+        return TemplateVars(self.name, {})
 
     def template_mappings(self, ctx):
         return []

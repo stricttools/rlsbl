@@ -1,6 +1,6 @@
-"""Tests for the TemplateVars class and _overlay_target_vars helper."""
+"""Tests for the TemplateVars class, BaseTarget.template_vars(), and _overlay_target_vars helper."""
 
-from rlsbl.targets.base import TemplateVars
+from rlsbl.targets.base import BaseTarget, TemplateVars
 from rlsbl.commands.init_cmd import _overlay_target_vars
 
 
@@ -62,6 +62,24 @@ class TestTemplateVars:
         tv.update({"repoName": "user/repo"})
         assert tv["repoName"] == "user/repo"
         assert "pypi.repoName" not in tv
+
+
+class TestBaseTargetTemplateVars:
+    """BaseTarget.template_vars() returns TemplateVars, not a plain dict."""
+
+    def test_returns_template_vars_instance(self):
+        target = BaseTarget()
+        result = target.template_vars(".", None)
+        assert isinstance(result, TemplateVars)
+
+    def test_returns_empty_template_vars(self):
+        target = BaseTarget()
+        result = target.template_vars(".", None)
+        assert len(result) == 0
+
+    def test_base_target_has_name(self):
+        target = BaseTarget()
+        assert target.name == "base"
 
 
 class TestOverlayTargetVars:

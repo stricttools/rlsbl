@@ -15,7 +15,6 @@ from ...errors import ConfigError
 from ...utils import commit_files, commit_files_if_changed
 from ...workspace import find_workspace_root, load_workspace
 from ...targets import detect_targets, resolve_releasable_config_dir, TARGETS
-from ...targets.base import TemplateVars
 
 
 def parse_ci_workflow(content):
@@ -272,8 +271,6 @@ def _build_project_template_vars(project_dir, root):
             from ...utils import warn_exception
             warn_exception(f"template_vars failed for target {entry.name}", e)
             continue
-        if not isinstance(tvars, TemplateVars):
-            tvars = TemplateVars(entry.name, tvars)
         # TemplateVars already contains both bare and namespaced keys.
         # First target wins for bare keys; namespaced keys always added.
         for key, value in tvars.items():

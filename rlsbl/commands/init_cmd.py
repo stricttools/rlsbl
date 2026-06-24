@@ -19,7 +19,6 @@ from ..config import (
 from ..lock import acquire_lock, release_lock
 from ..pipelines import PIPELINE_TYPES, load_pipelines
 from ..targets import TARGETS, detect_targets
-from ..targets.base import TemplateVars
 from ..tagging import ensure_tags
 from ..utils import commit_files, is_private_repo
 
@@ -1754,8 +1753,6 @@ def _merge_template_vars(registries_list, primary, target_paths, ctx):
     # Primary target's vars as base (un-namespaced + namespaced)
     primary_target = TARGETS[primary]
     primary_vars = primary_target.template_vars(target_paths.get(primary, "."), ctx)
-    if not isinstance(primary_vars, TemplateVars):
-        primary_vars = TemplateVars(primary, primary_vars)
     merged.update(primary_vars)
     # Non-primary targets: add only namespaced keys (preserve primary's bare keys)
     for target_name in registries_list:
@@ -1763,8 +1760,6 @@ def _merge_template_vars(registries_list, primary, target_paths, ctx):
             continue
         target = TARGETS[target_name]
         target_vars = target.template_vars(target_paths.get(target_name, "."), ctx)
-        if not isinstance(target_vars, TemplateVars):
-            target_vars = TemplateVars(target_name, target_vars)
         for key, value in target_vars.items():
             if "." in key:
                 merged[key] = value
