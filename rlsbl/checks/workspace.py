@@ -662,3 +662,72 @@ def register_workspace_checks(app):
                 details=missing_projects,
             )
         return CheckResult("pass", "all project .gitignore files are up to date")
+
+    @app.check("go-companion-tags")
+    def check_go_companion_tags(ctx):
+        """Releasables with non-private Go members should have companion tags."""
+        from ..config import read_project_config
+        from ..targets import detect_targets, resolve_releasable_config_dir
+        from ..workspace import read_releasable_version
+
+        if not ctx.releasables:
+            return CheckResult("skip", "no releasables defined")
+
+        root = str(ctx.workspace_root)
+        missing = []
+        checked_any = False
+
+        for rel in ctx.releasables:
+            member_projs = members_of(rel.name, ctx.projects)
+            if not member_projs:
+                continue
+
+            # Read the releasable's current version
+            try:
+                version = read_releasable_version(root, rel.name)
+            except Exception:
+                continue
+
+            for proj in member_projs:
+                pkg_path = proj["path"]
+                abs_pkg = os.path.join(root, pkg_path)
+
+                # Check if private
+                try:
+                    pkg_config = read_project_config(abs_pkg)
+                except Exception:
+                    continue
+                if pkg_config.get("private", True):
+                    continue
+
+                # Detect Go targets
+                rel_dir = resolve_releasable_config_dir(proj, ctx.workspace_root)
+                entries = detect_targets(abs_pkg, releasable_config_dir=rel_dir)
+                has_go = any(e.name == "go" for e in entries)
+                if not has_go:
+                    continue
+
+                checked_any = True
+
+                # Check if the companion tag exists
+                sep = "" if pkg_path.endswith("/") else "/"
+                expected_tag = f"{pkg_path}{sep}v{version}"
+                result = subprocess.run(
+                    ["git", "tag", "-l", expected_tag],
+                    capture_output=True, text=True, cwd=root,
+                )
+                if not result.stdout.strip():
+                    missing.append(
+                        f"{rel.name}/{proj['name']}: missing companion tag {expected_tag}"
+                    )
+
+        if not checked_any:
+            return CheckResult("skip", "no non-private Go members in releasables")
+
+        if missing:
+            return CheckResult(
+                "warn",
+                f"{len(missing)} Go companion tag(s) missing",
+                details=missing,
+            )
+        return CheckResult("pass", "all Go companion tags exist")

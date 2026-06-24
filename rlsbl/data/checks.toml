@@ -461,3 +461,12 @@ pure = true
 needs_network = false
 depends_on = []
 scope = "workspace"
+
+[checks.go-companion-tags]
+tags = ["workspace"]
+severity = "warn"
+fast = true
+pure = false
+needs_network = false
+depends_on = []
+scope = "workspace"
