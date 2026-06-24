@@ -201,7 +201,7 @@ fast = true
 pure = true
 needs_network = false
 depends_on = []
-scope = "workspace"
+scope = "workspace:non_dev_node"
 
 [checks.workspace-targets]
 tags = ["workspace"]
@@ -456,6 +456,15 @@ depends_on = []
 [checks.scaffold-gitignore-stale]
 tags = ["workspace"]
 severity = "warn"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "workspace"
+
+[checks.root-rlsbl-conflict]
+tags = ["workspace"]
+severity = "error"
 fast = true
 pure = true
 needs_network = false

@@ -263,6 +263,76 @@ def test_unknown_token_in_composition():
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# workspace-ci-synced + non_dev_node scope integration
+# ---------------------------------------------------------------------------
+
+
+def _register_and_get_check(name):
+    """Register workspace checks on a mock app and return the named check fn."""
+    from unittest.mock import MagicMock
+
+    from rlsbl.checks.workspace import register_workspace_checks
+
+    mock_app = MagicMock()
+    checks = {}
+
+    def capture_check(check_name):
+        def decorator(fn):
+            checks[check_name] = fn
+            return fn
+        return decorator
+
+    mock_app.check = capture_check
+    register_workspace_checks(mock_app)
+    return checks[name]
+
+
+def test_ci_synced_skips_dev_node_via_scope(tmp_path):
+    """A dev_node project with no CI workflow is filtered out by the
+    workspace:non_dev_node scope, so workspace-ci-synced passes."""
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / ".github" / "workflows").mkdir(parents=True)
+
+    projects = [
+        {"name": "devtool", "path": "devtool", "dev_node": True},
+    ]
+    ctx = _make_ws_ctx(projects=projects, workspace_root=ws)
+
+    # Apply the scope adapter (simulates what strictcli does before calling the check)
+    filtered = scope_adapter(ctx, "workspace:non_dev_node")
+    assert isinstance(filtered, WorkspaceCheckContext)
+    assert len(filtered.projects) == 0  # dev_node filtered out
+
+    check_fn = _register_and_get_check("workspace-ci-synced")
+    result = check_fn(filtered)
+    assert result.status == "pass"
+
+
+def test_ci_synced_fails_non_dev_node_missing_workflow(tmp_path):
+    """A non-dev-node project missing its CI workflow should still fail
+    workspace-ci-synced even after the scope adapter runs."""
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / ".github" / "workflows").mkdir(parents=True)
+
+    projects = [
+        {"name": "mylib", "path": "mylib"},
+    ]
+    ctx = _make_ws_ctx(projects=projects, workspace_root=ws)
+
+    # Apply the scope adapter -- non-dev-node project is NOT filtered out
+    filtered = scope_adapter(ctx, "workspace:non_dev_node")
+    assert isinstance(filtered, WorkspaceCheckContext)
+    assert len(filtered.projects) == 1
+
+    check_fn = _register_and_get_check("workspace-ci-synced")
+    result = check_fn(filtered)
+    assert result.status == "fail"
+    assert "mylib" in result.message
+
+
 def test_scaffold_gitignore_stale_passes_when_entries_present(tmp_path):
     """Check passes when all rlsbl-specific entries are in .gitignore."""
     from importlib.resources import files as pkg_files
