@@ -236,7 +236,7 @@ def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, no_watch, **_kwargs
         if project is None:
             print(
                 "Error: cannot release from monorepo root. "
-                "Use `rlsbl monorepo release` for batch releases, "
+                "Use `rlsbl monorepo release run` for batch releases, "
                 "or cd to a package directory.",
                 file=sys.stderr,
             )
@@ -807,7 +807,7 @@ def cmd_chlog_edit(commits, type, description, no_user_facing, user_facing, no_c
 # monorepo group
 # ---------------------------------------------------------------------------
 
-mono = app.group("monorepo", help="Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Provides 10 monorepo subcommands and supports all 18 release targets in a single workspace.toml.")
+mono = app.group("monorepo", help="Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Provides 15 monorepo subcommands plus a release subgroup, and supports all 18 release targets in a single workspace.toml.")
 
 
 @mono.command(name="init", help="Create a new monorepo workspace by generating the .rlsbl-monorepo directory and an empty workspace.toml configuration file at the current directory. This must be run at the repository root before adding individual projects with the add subcommand. Each workspace tracks multiple independently-versioned projects that share a single git repository.")
@@ -896,13 +896,6 @@ def cmd_mono_check_names(target, prefix, suffix, delay, **_kwargs):
     _cmd_check_names(_variadic_args, flags, project_root=root)
 
 
-@mono.command(name="release-order", help="Compute and display the topological release order for all projects in the monorepo workspace based on their declared depends-on relationships. Projects with no dependencies are listed first, followed by projects that depend on them, ensuring each project is released only after its dependencies. Detects and reports circular dependency errors.")
-def cmd_mono_release_order(**_kwargs):
-    root = _require_project_root()
-    from .commands.monorepo import _cmd_release_order
-    _cmd_release_order({}, project_root=root)
-
-
 @mono.command(name="outdated", help="Scan all projects in the monorepo workspace for intra-workspace dependencies that reference older versions than what is currently available in the workspace. Lists each outdated dependency with the referenced version and the latest available version, helping identify which downstream projects need a version bump after upstream releases.")
 def cmd_mono_outdated(**_kwargs):
     root = _require_project_root()
@@ -963,8 +956,11 @@ def cmd_mono_impact(format, depth=None, since="", **_kwargs):
     _cmd_impact(args, flags, project_root=root)
 
 
-@mono.command(
-    name="release",
+mono_release = mono.group("release", help="Release commands for monorepo workspaces. Provides 3 subcommands: run (batch release), init (scaffold release file), and order (topological release order).")
+
+
+@mono_release.command(
+    name="run",
     help="Execute a batch release of multiple monorepo packages in topological order. Reads package configurations from .rlsbl-monorepo/releases/unreleased.toml. Each package is released sequentially using the single-package release flow, with leaves (no dependencies) released first. Supports --dry-run, --yes, --allow-dirty flags.",
     mutex=[
         strictcli.MutexGroup(flags=[
@@ -974,7 +970,7 @@ def cmd_mono_impact(format, depth=None, since="", **_kwargs):
     ],
 )
 @strictcli.flag(name="allow-dirty", type=bool, help="Skip the clean working tree check and allow releasing with uncommitted changes")
-def cmd_mono_release(dry_run, yes, quiet, allow_dirty, watch, no_watch, **_kwargs):
+def cmd_mono_release_run(dry_run, yes, quiet, allow_dirty, watch, no_watch, **_kwargs):
     from .commands.release.shared import build_release_flags
     flags = build_release_flags(dry_run, yes, quiet, allow_dirty, watch=watch)
     root = _require_project_root()
@@ -982,12 +978,19 @@ def cmd_mono_release(dry_run, yes, quiet, allow_dirty, watch, no_watch, **_kwarg
     _cmd_batch_release(flags, project_root=root)
 
 
-@mono.command(name="release-init", help="Scaffold a batch release file for all workspace projects by auto-detecting each project's release targets and generating per-package configuration sections. Creates .rlsbl-monorepo/releases/unreleased.toml with a [packages.<name>] section for each non-dev-node project, pre-populated with bump type, description, and include lists. Packages with no unreleased commits since their last tag are rendered as commented-out sections.")
+@mono_release.command(name="init", help="Scaffold a batch release file for all workspace projects by auto-detecting each project's release targets and generating per-package configuration sections. Creates .rlsbl-monorepo/releases/unreleased.toml with a [packages.<name>] section for each non-dev-node project, pre-populated with bump type, description, and include lists. Packages with no unreleased commits since their last tag are rendered as commented-out sections.")
 @strictcli.flag(name="packages", type=str, help="Comma-separated package names to include (default: all)", default="")
 def cmd_mono_release_init(packages, **_kwargs):
     root = _require_project_root()
     from .commands.monorepo import _cmd_batch_release_init
     _cmd_batch_release_init(project_root=root, packages=packages or None)
+
+
+@mono_release.command(name="order", help="Compute and display the topological release order for all projects in the monorepo workspace based on their declared depends-on relationships. Projects with no dependencies are listed first, followed by projects that depend on them, ensuring each project is released only after its dependencies. Detects and reports circular dependency errors.")
+def cmd_mono_release_order(**_kwargs):
+    root = _require_project_root()
+    from .commands.monorepo import _cmd_release_order
+    _cmd_release_order({}, project_root=root)
 
 
 @mono.command(name="extract", help="Extract a package from the monorepo into a new standalone repository. Clones the monorepo, runs git filter-repo to keep only the package's history, migrates changelog entries, creates .rlsbl/ config in the new repo, and removes the project from workspace.toml.")

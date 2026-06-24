@@ -163,7 +163,7 @@ class TestReleaseInitExplicitModeWarning:
         proj_dir = _setup_explicit_workspace(tmp_path)
         release_init_run_cmd(proj_dir)
         captured = capsys.readouterr()
-        assert "rlsbl monorepo release-init" in captured.err
+        assert "rlsbl monorepo release init" in captured.err
         assert "explicit mode" in captured.err
 
     def test_no_warning_in_implicit_mode(self, tmp_path, capsys):

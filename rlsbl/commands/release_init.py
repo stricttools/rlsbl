@@ -26,7 +26,7 @@ def run_cmd(project_root):
             print(
                 "Warning: this project belongs to a monorepo workspace that uses "
                 "[[releasables]] (explicit mode). Batch releases should use "
-                "'rlsbl monorepo release-init' instead of 'rlsbl release init'.",
+                "'rlsbl monorepo release init' instead of 'rlsbl release init'.",
                 file=sys.stderr,
             )
         project = resolve_project(monorepo_root, start_path)

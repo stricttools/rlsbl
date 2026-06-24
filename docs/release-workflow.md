@@ -169,7 +169,7 @@ Dev nodes are projects at the edge of the dependency graph that nothing user-fac
 - `rlsbl changelog add` errors with "dev node projects don't use changelogs"
 - Scaffold skips changelog infrastructure
 - Pre-push check ignores dev node commits
-- Batch release (`rlsbl monorepo release`) excludes dev nodes
+- Batch release (`rlsbl monorepo release run`) excludes dev nodes
 - Remove `dev_node = true` from workspace.toml to make a project releasable
 - The `dev-node-boundary` check prevents non-dev-node projects from declaring runtime dependencies on dev nodes
 

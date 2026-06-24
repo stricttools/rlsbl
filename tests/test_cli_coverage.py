@@ -756,7 +756,7 @@ class TestCmdMonoRelease:
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.monorepo._cmd_batch_release")
     def test_delegates(self, mock_release, _):
-        rlsbl.cmd_mono_release(dry_run=True, yes=True, quiet=False, allow_dirty=True, watch=False, no_watch=False)
+        rlsbl.cmd_mono_release_run(dry_run=True, yes=True, quiet=False, allow_dirty=True, watch=False, no_watch=False)
         mock_release.assert_called_once()
         flags = mock_release.call_args[0][0]
         assert flags["allow-dirty"] is True
@@ -764,7 +764,7 @@ class TestCmdMonoRelease:
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.monorepo._cmd_batch_release")
     def test_watch_flag_passed(self, mock_release, _):
-        rlsbl.cmd_mono_release(dry_run=False, yes=True, quiet=False, allow_dirty=False, watch=True, no_watch=False)
+        rlsbl.cmd_mono_release_run(dry_run=False, yes=True, quiet=False, allow_dirty=False, watch=True, no_watch=False)
         flags = mock_release.call_args[0][0]
         assert flags["watch"] is True
 

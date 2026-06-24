@@ -116,7 +116,7 @@ Dev nodes are projects at the edge of the dependency graph that nothing user-fac
 - `rlsbl changelog add` errors with "dev node projects don't use changelogs"
 - Scaffold skips changelog infrastructure
 - Pre-push check ignores dev node commits
-- Batch release (`rlsbl monorepo release`) excludes dev nodes
+- Batch release (`rlsbl monorepo release run`) excludes dev nodes
 - Remove `dev_node = true` from workspace.toml to make a project releasable
 - The `dev-node-boundary` check prevents non-dev-node projects from declaring runtime dependencies on dev nodes
 
@@ -155,7 +155,7 @@ rlsbl monorepo graph --root mylib --depth 2
 
 ```bash
 # Show release order (leaves first, dependents after their dependencies)
-rlsbl monorepo release-order
+rlsbl monorepo release order
 ```
 
 Uses Kahn's algorithm. Projects with no dependencies appear first. Detects and reports circular dependencies as a hard error.
@@ -193,17 +193,17 @@ Supports `--depth N` to limit BFS traversal depth (default: unlimited, traverses
 
 ## Batch release
 
-`rlsbl monorepo release` releases multiple packages in a single coordinated flow, respecting topological order so that leaf packages (those with no intra-workspace dependencies) are released first, followed by their dependents. This ensures downstream packages always reference the latest versions of their workspace dependencies.
+`rlsbl monorepo release run` releases multiple packages in a single coordinated flow, respecting topological order so that leaf packages (those with no intra-workspace dependencies) are released first, followed by their dependents. This ensures downstream packages always reference the latest versions of their workspace dependencies.
 
 ### Workflow
 
-1. Run `rlsbl monorepo release-init` to scaffold `.rlsbl-monorepo/releases/unreleased.toml`
+1. Run `rlsbl monorepo release init` to scaffold `.rlsbl-monorepo/releases/unreleased.toml`
 2. Edit the file: set bump type, description, and context per package
-3. Run `rlsbl monorepo release --watch --yes`
+3. Run `rlsbl monorepo release run --watch --yes`
 
-### release-init scaffolding
+### release init scaffolding
 
-`rlsbl monorepo release-init` auto-detects release targets for each workspace project and generates a TOML file with pre-populated per-package sections. Packages with no unreleased commits are commented out, and dev nodes are excluded entirely since they cannot be released:
+`rlsbl monorepo release init` auto-detects release targets for each workspace project and generates a TOML file with pre-populated per-package sections. Packages with no unreleased commits are commented out, and dev nodes are excluded entirely since they cannot be released:
 
 ```toml
 [packages.mylib]

@@ -1,4 +1,4 @@
-"""Monorepo workspace management commands: init, add, remove, list, status, outdated, release-order, and check-names."""
+"""Monorepo workspace management commands: init, add, remove, list, status, outdated, and check-names."""
 
 import os
 import re

@@ -1,4 +1,4 @@
-"""Monorepo workspace management commands: init, add, remove, list, sync, status, outdated, release-order, check-names, graph, impact, and batch release."""
+"""Monorepo workspace management commands: init, add, remove, list, sync, status, outdated, check-names, graph, impact, and batch release (release run/init/order subgroup)."""
 
 from .commands import (
     _cmd_init,

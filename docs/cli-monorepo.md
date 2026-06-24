@@ -86,7 +86,7 @@ Check package name availability on a target registry for all projects in the mon
 | `--suffix` |  | str |  |  | String to append to each project name before checking availability |
 | `--delay` |  | str | 200 |  | Milliseconds to wait between consecutive registry API queries (default: 200) |
 
-## monorepo release-order
+## monorepo release order
 
 Compute and display the topological release order for all projects in the monorepo workspace based on their declared depends-on relationships. Projects with no dependencies are listed first, followed by projects that depend on them, ensuring each project is released only after its dependencies. Detects and reports circular dependency errors.
 
@@ -140,7 +140,7 @@ Analyze the impact of changes to a package, file, or git diff range on the monor
 | `--depth` |  | int |  |  | Maximum number of dependency hops to traverse when computing transitive impact |
 | `--since` |  | str |  |  | Git ref to diff against HEAD (e.g. HEAD~3, v1.0.0) |
 
-## monorepo release
+## monorepo release run
 
 Execute a batch release of multiple monorepo packages in topological order. Reads package configurations from .rlsbl-monorepo/releases/unreleased.toml. Each package is released sequentially using the single-package release flow, with leaves (no dependencies) released first. Supports --dry-run, --yes, --allow-dirty flags.
 
@@ -152,7 +152,7 @@ Execute a batch release of multiple monorepo packages in topological order. Read
 | `--watch` |  | bool |  |  | After batch release, automatically watch CI runs to completion |
 | `--no-watch` |  | bool |  |  | After batch release, print the watch command hint without watching |
 
-## monorepo release-init
+## monorepo release init
 
 Scaffold a batch release file for all workspace projects by auto-detecting each project's release targets and generating per-package configuration sections. Creates .rlsbl-monorepo/releases/unreleased.toml with a [packages.<name>] section for each non-dev-node project, pre-populated with bump type, description, and include lists. Packages with no unreleased commits since their last tag are rendered as commented-out sections.
 

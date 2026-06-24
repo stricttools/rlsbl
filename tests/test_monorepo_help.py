@@ -5,10 +5,10 @@ import pytest
 from rlsbl import app
 
 
-# All expected monorepo subcommands
+# All expected monorepo subcommands (release is a subgroup, not listed here)
 EXPECTED_SUBCOMMANDS = [
     "init", "add", "remove", "list", "sync",
-    "status", "check-names", "release-order", "outdated",
+    "status", "check-names", "outdated", "release",
 ]
 
 
