@@ -906,7 +906,7 @@ def cmd_mono_status(**_kwargs):
 
 
 @mono.command(name="check-names", help="Check package name availability on a target registry for all projects in the monorepo workspace. Queries the registry API for each project name and reports whether it is available or already taken. Supports optional prefix and suffix arguments to test naming conventions like scoped packages, with a configurable delay between registry queries to avoid rate limiting.")
-@strictcli.flag(name="target", type=str, help="Registry to query for name availability across all workspace projects (npm, pypi, or go)")
+@strictcli.flag(name="target", type=str, help="Registry to query for name availability across all workspace projects (npm, pypi, go, or github)")
 @strictcli.flag(name="prefix", type=str, help="String to prepend to each project name before checking availability", default="")
 @strictcli.flag(name="suffix", type=str, help="String to append to each project name before checking availability", default="")
 @strictcli.flag(name="delay", type=str, help="Milliseconds to wait between consecutive registry API queries (default: 200)", default="200")
