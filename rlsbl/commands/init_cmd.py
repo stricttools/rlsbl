@@ -1258,6 +1258,12 @@ def run_cmd(registry, args, flags, ctx):
     from templates.
     """
     project_root = ctx.project_root if ctx else None
+
+    # Workspace roots are not packages -- skip all per-package scaffold
+    if _is_workspace_root(project_root):
+        print("Skipping scaffold at workspace root (use rlsbl monorepo sync instead)")
+        return
+
     reg = TARGETS[registry]
 
     # Check that a project file exists
@@ -1866,6 +1872,12 @@ def run_cmd_multi(registries_list, args, flags, ctx):
     publish.yml that contains jobs for all detected registries.
     """
     project_root = ctx.project_root if ctx else None
+
+    # Workspace roots are not packages -- skip all per-package scaffold
+    if _is_workspace_root(project_root):
+        print("Skipping scaffold at workspace root (use rlsbl monorepo sync instead)")
+        return
+
     primary = registries_list[0]
     reg = TARGETS[primary]
 

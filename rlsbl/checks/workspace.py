@@ -4,7 +4,7 @@ Checks: workspace-ci-router, workspace-ci-synced, workspace-targets,
 workspace-unregistered, workspace-stale-entries, dev-only-boundary,
 dead-workspace-packages, subtree-remote-reachable, workspace-unbuildable,
 layers-violations, deps-unused, deps-undeclared, deps-runtime-test-only,
-deps-dev-in-lib, deps-stale, test-suite-workspace.
+deps-dev-in-lib, deps-stale, root-rlsbl-conflict, test-suite-workspace.
 """
 
 import json
@@ -662,6 +662,20 @@ def register_workspace_checks(app):
                 details=missing_projects,
             )
         return CheckResult("pass", "all project .gitignore files are up to date")
+
+    @app.check("root-rlsbl-conflict")
+    def check_root_rlsbl_conflict(ctx):
+        """Root .rlsbl/ must not coexist with .rlsbl-monorepo/."""
+        root = str(ctx.workspace_root)
+        has_rlsbl = os.path.isdir(os.path.join(root, ".rlsbl"))
+        has_monorepo = os.path.isdir(os.path.join(root, ".rlsbl-monorepo"))
+        if has_rlsbl and has_monorepo:
+            return CheckResult(
+                "fail",
+                "root .rlsbl/ conflicts with .rlsbl-monorepo/ "
+                "— remove root .rlsbl/ after migrating its contents to the releasable",
+            )
+        return CheckResult("pass", "no root config conflict")
 
     @app.check("go-companion-tags")
     def check_go_companion_tags(ctx):

@@ -93,8 +93,8 @@ class TestRunCmdWorkspaceRoot:
             "publish.yml should not be created at a workspace root"
         )
 
-    def test_workspace_root_still_creates_shared_files(self, mock_git_repo):
-        """Scaffold at a workspace root must still create non-CI files."""
+    def test_workspace_root_skips_all_scaffold(self, mock_git_repo):
+        """Scaffold at a workspace root skips entirely -- creates nothing."""
         root = mock_git_repo
 
         (root / "pyproject.toml").write_text(
@@ -110,14 +110,12 @@ class TestRunCmdWorkspaceRoot:
         with patch("sys.stdout", new_callable=StringIO):
             run_cmd("pypi", [], {"no-commit": True, "no-tag": True}, ctx=_ctx())
 
-        gitignore = root / ".gitignore"
-        changelog = root / "CHANGELOG.md"
-
-        assert gitignore.exists(), (
-            ".gitignore should still be created at a workspace root"
+        # Workspace roots are not packages -- scaffold returns early
+        assert not (root / ".rlsbl").exists(), (
+            ".rlsbl/ should not be created at a workspace root"
         )
-        assert changelog.exists(), (
-            "CHANGELOG.md should still be created at a workspace root"
+        assert not (root / ".gitignore").exists(), (
+            ".gitignore should not be created at a workspace root"
         )
 
     def test_non_workspace_root_creates_ci_templates(self, mock_git_repo):
@@ -178,8 +176,8 @@ class TestRunCmdMultiWorkspaceRoot:
             "publish.yml should not be created at a workspace root"
         )
 
-    def test_workspace_root_multi_still_creates_shared(self, mock_git_repo):
-        """Multi-target scaffold at workspace root must still create non-CI files."""
+    def test_workspace_root_multi_skips_all_scaffold(self, mock_git_repo):
+        """Multi-target scaffold at workspace root skips entirely -- creates nothing."""
         root = mock_git_repo
 
         (root / "pyproject.toml").write_text(
@@ -198,12 +196,10 @@ class TestRunCmdMultiWorkspaceRoot:
         with patch("sys.stdout", new_callable=StringIO):
             run_cmd_multi(["pypi", "go"], [], {"no-commit": True, "no-tag": True}, ctx=_ctx())
 
-        gitignore = root / ".gitignore"
-        changelog = root / "CHANGELOG.md"
-
-        assert gitignore.exists(), (
-            ".gitignore should still be created at a workspace root (multi)"
+        # Workspace roots are not packages -- scaffold returns early
+        assert not (root / ".rlsbl").exists(), (
+            ".rlsbl/ should not be created at a workspace root (multi)"
         )
-        assert changelog.exists(), (
-            "CHANGELOG.md should still be created at a workspace root (multi)"
+        assert not (root / ".gitignore").exists(), (
+            ".gitignore should not be created at a workspace root (multi)"
         )

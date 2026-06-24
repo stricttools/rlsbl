@@ -80,6 +80,8 @@ EXPECTED_CHECKS = [
     "maven-central-metadata",
     # Scaffold checks
     "scaffold-gitignore-stale",
+    # Root config conflict
+    "root-rlsbl-conflict",
     # Go companion tags
     "go-companion-tags",
 ]

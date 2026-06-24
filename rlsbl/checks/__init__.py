@@ -104,6 +104,8 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "maven-central-metadata": frozenset({"maven"}),
     # --- scaffold checks ---
     "scaffold-gitignore-stale": "workspace",
+    # --- root config conflict ---
+    "root-rlsbl-conflict": "workspace",
     # --- go companion tags ---
     "go-companion-tags": "workspace",
 }
