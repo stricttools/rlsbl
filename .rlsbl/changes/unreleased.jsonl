@@ -10,3 +10,4 @@
 {"commits":["a241345f72c424140a5750f73584ec89b38955dd","3616bcefee31f28d6169061e08d7966b4b194383","9e36ef168e41ead085d81c61abef2b3960d806d4","6065cfcc6459e9ef815a092a8f55a4cb36b71d37","38a53385c93a8f1490dc0f79d78455e44117efa8"],"user_facing":true,"description":"**New feature.** Pypi test runner detects where pytest is declared per project (dependency groups, optional extras, uv dev deps) and builds the correct `uv run` invocation. Hard error when pytest is not declared. Workspace members preserve existing behavior.","type":"feature"}
 {"commits":["6b16fce4c2d19aae7b523735aeec0081b2a2eba1","dec5e0ec19bd6baac306d9b950e1845b8c897343","3659068e041b09d2558eb1c38773be3095e38408","071ade41a088cd466e4dc4d17833a2efb83ac2af","3fa190cb280cd54537838829bf780c5741caee0a"],"user_facing":false}
 {"commits":["2c702ef5cd11013a9a1897f9ec0345642980f746"],"user_facing":false}
+{"commits":["6de621cf5c6acc195033b2a582ed625ce2e26cef"],"user_facing":false}
