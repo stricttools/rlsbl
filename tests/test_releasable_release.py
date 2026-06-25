@@ -21,7 +21,7 @@ from rlsbl.commands.release.validate import (
     _format_releasable_tag,
     _releasable_tag_glob,
 )
-from rlsbl.errors import ReleaseFileError, VersionError
+from rlsbl.errors import ConfigError, ReleaseFileError, VersionError
 from rlsbl.release_file import (
     BatchReleaseConfig,
     read_batch_release_file,
@@ -505,6 +505,22 @@ class TestSyncMemberPackageVersions:
         with patch("rlsbl.targets.pypi.PypiTarget.write_version",
                    side_effect=VersionError("test error")):
             with pytest.raises(VersionError, match="test error"):
+                _sync_member_package_versions(
+                    [pkg_path], ws_root, "1.0.0",
+                    files, ws_root, lambda msg: None, MagicMock(),
+                )
+
+    def test_config_error_propagates(self, tmp_path):
+        """ConfigError from read_project_config must propagate, not be swallowed."""
+        ws_root = str(tmp_path)
+        pkg_path = "packages/broken"
+        abs_pkg = os.path.join(ws_root, pkg_path)
+        os.makedirs(abs_pkg, exist_ok=True)
+
+        files = []
+        with patch("rlsbl.config.read_project_config",
+                   side_effect=ConfigError("malformed JSON")):
+            with pytest.raises(ConfigError, match="malformed JSON"):
                 _sync_member_package_versions(
                     [pkg_path], ws_root, "1.0.0",
                     files, ws_root, lambda msg: None, MagicMock(),
