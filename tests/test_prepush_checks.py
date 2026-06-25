@@ -241,7 +241,10 @@ class TestTestSuiteRunsAndPasses:
 
         assert result.status == "pass"
         mock_tests.assert_called_once_with(
-            "pypi", project_dir=str(prepush_repo), config=ctx.config,
+            "pypi",
+            project_dir=str(prepush_repo),
+            workspace_root=None,
+            config=ctx.config,
         )
 
 
