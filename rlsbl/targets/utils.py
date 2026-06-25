@@ -4,14 +4,22 @@ import os
 import re
 import tomllib
 
+from ..errors import VersionError
+
 
 def detect_python_package_root(project_dir: str) -> str | None:
     """Return the package root (e.g., 'src/orxt') from hatch config or filesystem.
 
     Detection order:
     1. Hatch ``[tool.hatch.build.targets.wheel].packages`` in pyproject.toml
-    2. Filesystem: directory matching underscored project name, then raw name
-    3. Fallback to underscored project name convention (may not exist on disk)
+    2. uv build-backend ``[tool.uv.build-backend].module-root`` in pyproject.toml
+    3. Filesystem: ``src/{underscored}/`` directory
+    4. Filesystem: ``{underscored}/`` directory (flat layout)
+    5. Filesystem: ``{raw_name}/`` directory
+    6. Fallback to underscored project name convention (may not exist on disk)
+
+    Raises VersionError if both ``{underscored}/`` and ``src/{underscored}/``
+    exist on disk and no config (hatch or uv) declares the canonical location.
 
     Returns the relative path from project_dir to the package root directory,
     or None if pyproject.toml is missing or the project name cannot be read.
@@ -39,14 +47,34 @@ def detect_python_package_root(project_dir: str) -> str | None:
     if packages and isinstance(packages, list) and len(packages) > 0:
         return packages[0]
 
-    # 2) Fall back to filesystem detection, then underscore convention.
+    # 2) Check uv build-backend for module-root.
     underscored = name.replace("-", "_")
-    if os.path.isdir(os.path.join(project_dir, underscored)):
+    uv_backend = data.get("tool", {}).get("uv", {}).get("build-backend", {})
+    module_root = uv_backend.get("module-root")
+    if module_root and isinstance(module_root, str):
+        return os.path.join(module_root, underscored)
+
+    # 3-5) Filesystem detection with ambiguity guard.
+    has_flat = os.path.isdir(os.path.join(project_dir, underscored))
+    has_src = os.path.isdir(os.path.join(project_dir, "src", underscored))
+
+    if has_flat and has_src:
+        raise VersionError(
+            f"Ambiguous package layout: both {underscored}/ and src/{underscored}/ "
+            f"exist. Add [tool.hatch.build.targets.wheel] packages or "
+            f"[tool.uv.build-backend] module-root to pyproject.toml to declare "
+            f"the canonical location."
+        )
+
+    if has_src:
+        return os.path.join("src", underscored)
+    if has_flat:
         return underscored
-    elif os.path.isdir(os.path.join(project_dir, name)):
+    if os.path.isdir(os.path.join(project_dir, name)):
         return name
-    else:
-        return underscored  # fallback to convention
+
+    # 6) Fallback to underscored convention (may not exist on disk).
+    return underscored
 
 
 def normalize_npm(name):

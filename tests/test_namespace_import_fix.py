@@ -10,9 +10,11 @@ Covers:
 """
 
 import os
+from unittest.mock import patch
 
 import pytest
 
+from rlsbl.errors import VersionError
 from rlsbl.import_scanners import (
     ImportInfo,
     PythonImportScanner,
@@ -71,6 +73,82 @@ class TestDetectPythonPackageRoot:
         (tmp_path / "pyproject.toml").write_text("[project]\n")
         result = detect_python_package_root(str(tmp_path))
         assert result is None
+
+    def test_src_layout_filesystem(self, tmp_path):
+        """src-layout detected when src/{underscored}/ exists, no config."""
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "my-lib"\n'
+        )
+        (tmp_path / "src" / "my_lib").mkdir(parents=True)
+        result = detect_python_package_root(str(tmp_path))
+        assert result == os.path.join("src", "my_lib")
+
+    def test_uv_build_backend(self, tmp_path):
+        """uv build-backend module-root returns joined path."""
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "pixelweaver"\n'
+            '[tool.uv.build-backend]\n'
+            'module-root = "server/src"\n'
+        )
+        result = detect_python_package_root(str(tmp_path))
+        assert result == os.path.join("server/src", "pixelweaver")
+
+    def test_ambiguity_guard(self, tmp_path):
+        """Raises VersionError when both flat and src dirs exist without config."""
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "my-lib"\n'
+        )
+        (tmp_path / "my_lib").mkdir()
+        (tmp_path / "src" / "my_lib").mkdir(parents=True)
+        with pytest.raises(VersionError, match="Ambiguous package layout"):
+            detect_python_package_root(str(tmp_path))
+
+    def test_ambiguity_resolved_by_hatch(self, tmp_path):
+        """Hatch config resolves ambiguity when both dirs exist."""
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "my-lib"\n'
+            '[tool.hatch.build.targets.wheel]\n'
+            'packages = ["src/my_lib"]\n'
+        )
+        (tmp_path / "my_lib").mkdir()
+        (tmp_path / "src" / "my_lib").mkdir(parents=True)
+        # Hatch config takes precedence, no error raised.
+        result = detect_python_package_root(str(tmp_path))
+        assert result == "src/my_lib"
+
+    def test_ambiguity_resolved_by_uv(self, tmp_path):
+        """uv build-backend config resolves ambiguity when both dirs exist."""
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "my-lib"\n'
+            '[tool.uv.build-backend]\n'
+            'module-root = "src"\n'
+        )
+        (tmp_path / "my_lib").mkdir()
+        (tmp_path / "src" / "my_lib").mkdir(parents=True)
+        # uv config takes precedence, no error raised.
+        result = detect_python_package_root(str(tmp_path))
+        assert result == os.path.join("src", "my_lib")
+
+
+class TestBuildNamespaceMapGracefulSkip:
+    """build_namespace_map gracefully skips projects that raise VersionError."""
+
+    def test_version_error_skipped(self, tmp_path):
+        """Projects raising VersionError are skipped without aborting."""
+        ws_root = str(tmp_path)
+
+        proj_dir = tmp_path / "ambiguous"
+        proj_dir.mkdir()
+        (proj_dir / "pyproject.toml").write_text(
+            '[project]\nname = "ambiguous"\n'
+        )
+        (proj_dir / "ambiguous").mkdir()
+        (proj_dir / "src" / "ambiguous").mkdir(parents=True)
+
+        projects = [{"name": "ambiguous", "path": "ambiguous"}]
+        # Should not raise; VersionError is caught and project is skipped.
+        result = build_namespace_map(projects, ws_root)
+        assert result == {}
 
 
 class TestBuildNamespaceMap:
