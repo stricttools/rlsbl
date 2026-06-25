@@ -92,6 +92,7 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "private-publish-workflow": None,
     "npm-private-mismatch": frozenset({"npm"}),
     "target-version-readable": None,
+    "dunder-version-missing": frozenset({"pypi"}),
     "selfdoc-version-drift": None,
     "scaffold-conflicts": None,
     # --- prepush tag ---

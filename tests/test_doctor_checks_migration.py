@@ -69,6 +69,7 @@ EXPECTED_CHECKS = [
     "private-publish-workflow",
     "npm-private-mismatch",
     "target-version-readable",
+    "dunder-version-missing",
     "selfdoc-version-drift",
     "scaffold-conflicts",
     # Pre-push checks
