@@ -384,16 +384,13 @@ def _sync_member_package_versions(
             tgt = TARGETS.get(entry.name)
             if not tgt:
                 continue
-            try:
-                modified = tgt.write_version(entry.path, new_version, ctx=ctx)
-                for rel in modified:
-                    fpath = _rel_to_git_root(os.path.join(entry.path, rel), git_root)
-                    if fpath not in files_to_commit:
-                        files_to_commit.append(fpath)
-                if modified:
-                    log(f"Synced version to member {pkg_path}: {', '.join(modified)}")
-            except Exception as e:
-                log(f"Warning: failed to sync version to {pkg_path}/{entry.name}: {e}")
+            modified = tgt.write_version(entry.path, new_version, ctx=ctx)
+            for rel in modified:
+                fpath = _rel_to_git_root(os.path.join(entry.path, rel), git_root)
+                if fpath not in files_to_commit:
+                    files_to_commit.append(fpath)
+            if modified:
+                log(f"Synced version to member {pkg_path}: {', '.join(modified)}")
 
 
 @dataclasses.dataclass
