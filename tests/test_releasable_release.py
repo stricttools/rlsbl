@@ -21,7 +21,7 @@ from rlsbl.commands.release.validate import (
     _format_releasable_tag,
     _releasable_tag_glob,
 )
-from rlsbl.errors import ReleaseFileError
+from rlsbl.errors import ReleaseFileError, VersionError
 from rlsbl.release_file import (
     BatchReleaseConfig,
     read_batch_release_file,
@@ -483,6 +483,32 @@ class TestSyncMemberPackageVersions:
         )
         # Should have written the version -- files list should be non-empty
         assert len(files) > 0
+
+    def test_write_version_error_propagates(self, tmp_path):
+        """VersionError from write_version must propagate, not be swallowed."""
+        ws_root = str(tmp_path)
+        pkg_path = "packages/api"
+        abs_pkg = os.path.join(ws_root, pkg_path)
+        os.makedirs(abs_pkg, exist_ok=True)
+
+        # Create a public config with pypi target
+        rlsbl_dir = os.path.join(abs_pkg, ".rlsbl")
+        os.makedirs(rlsbl_dir, exist_ok=True)
+        with open(os.path.join(rlsbl_dir, "config.json"), "w") as f:
+            json.dump({"private": False, "targets": ["pypi"]}, f)
+
+        # Create a pyproject.toml so pypi target is detected
+        with open(os.path.join(abs_pkg, "pyproject.toml"), "w") as f:
+            f.write('[project]\nname = "api"\nversion = "0.1.0"\n')
+
+        files = []
+        with patch("rlsbl.targets.pypi.PypiTarget.write_version",
+                   side_effect=VersionError("test error")):
+            with pytest.raises(VersionError, match="test error"):
+                _sync_member_package_versions(
+                    [pkg_path], ws_root, "1.0.0",
+                    files, ws_root, lambda msg: None, MagicMock(),
+                )
 
 
 # ---------------------------------------------------------------------------
