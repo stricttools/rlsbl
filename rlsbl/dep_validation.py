@@ -25,6 +25,7 @@ from .import_scanners import (
 )
 from .lint.go_ast import scan_imports as _go_scan_imports
 from .lint.utils import walk_source_files
+from .utils import read_go_module_path
 from .workspace import WORKSPACE_DIR, project_is_dev_only as _is_dev_only
 
 # Root-level directories containing standalone executables (not importable modules).
@@ -558,25 +559,6 @@ def find_dead_modules(
     return dead
 
 
-def _read_go_module_path(project_dir: str) -> str | None:
-    """Read the module path from go.mod.
-
-    Returns None if go.mod does not exist or cannot be parsed.
-    """
-    go_mod = os.path.join(project_dir, "go.mod")
-    if not os.path.isfile(go_mod):
-        return None
-    try:
-        with open(go_mod, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line.startswith("module "):
-                    return line[len("module "):].strip()
-    except (OSError, UnicodeDecodeError):
-        pass
-    return None
-
-
 def _go_package_dir(filepath: str) -> str:
     """Return the directory of a Go file (its package directory)."""
     return os.path.dirname(filepath)
@@ -604,7 +586,7 @@ def find_dead_go_packages(
     """
     project_dir = os.path.realpath(project_dir)
 
-    module_path = _read_go_module_path(project_dir)
+    module_path = read_go_module_path(project_dir)
     if module_path is None:
         return []
 
