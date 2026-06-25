@@ -5,7 +5,7 @@ releasable-level config has ``"targets": ["pypi"]``, the per-package empty
 list silently replaces the releasable-level targets because ``merge_config``
 does shallow-replace for lists.  The releasable's target definition is lost.
 
-Similarly, ``_collect_releasable_targets`` unions member-level targets, so
+Similarly, ``collect_releasable_targets`` unions member-level targets, so
 when every member has ``targets: []``, the result is empty even though the
 releasable config declares targets.
 
@@ -66,7 +66,7 @@ class TestDetectTargetsReadsFromReleasableConfig:
 
 
 class TestCollectReleasableTargetsReadsReleasableConfig:
-    """_collect_releasable_targets should find targets declared at the
+    """collect_releasable_targets should find targets declared at the
     releasable config level, not just union member-level targets."""
 
     def test_collect_releasable_targets_reads_releasable_config(self, tmp_path):
@@ -76,7 +76,7 @@ class TestCollectReleasableTargetsReadsReleasableConfig:
         Current behavior (buggy): unions member targets (all empty) -> [].
         Expected behavior: releasable-level targets are discovered.
         """
-        from rlsbl.commands.monorepo.batch_release_init import _collect_releasable_targets
+        from rlsbl.targets import collect_releasable_targets
         from rlsbl.workspace import get_releasable_dir
 
         workspace_root = str(tmp_path)
@@ -108,7 +108,7 @@ class TestCollectReleasableTargetsReadsReleasableConfig:
             {"path": "pkg-b", "name": "pkg-b", "releasable": "core"},
         ]
 
-        target_names = _collect_releasable_targets(
+        target_names = collect_releasable_targets(
             "core", member_projects, workspace_root
         )
 

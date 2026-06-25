@@ -228,3 +228,37 @@ def detect_targets(dir_path=".", releasable_config_dir=None):
     raise ConfigError(
         f"Config exists but no \"targets\" key in merged config for {dir_path}. {suggestion}"
     )
+
+
+def collect_releasable_targets(releasable_name, member_projects, workspace_root):
+    """Collect targets for a releasable, preferring the releasable config.
+
+    If the releasable's config.json has a ``targets`` key, returns those
+    directly (the releasable is the source of truth for targets in explicit
+    mode).  Falls back to unioning member-level detected targets for
+    backward compatibility with releasables that haven't set targets yet.
+
+    Returns a deduplicated list of target names.
+    """
+    # Try the releasable config first
+    rel_config_path = os.path.join(
+        workspace_root, ".rlsbl-monorepo", "releasables",
+        releasable_name, "config.json",
+    )
+    rel_config = read_json_config(rel_config_path)
+    rel_targets = rel_config.get("targets")
+    if rel_targets is not None and isinstance(rel_targets, list):
+        return list(rel_targets)
+
+    # Fallback: union member-level targets (backward compat)
+    seen = set()
+    result = []
+    for proj in member_projects:
+        project_dir = os.path.join(workspace_root, proj["path"])
+        rel_dir = resolve_releasable_config_dir(proj, workspace_root)
+        entries = detect_targets(project_dir, releasable_config_dir=rel_dir)
+        for e in entries:
+            if e.name not in seen:
+                seen.add(e.name)
+                result.append(e.name)
+    return result

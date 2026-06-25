@@ -17,7 +17,6 @@ from ..workspace import WorkspaceProject, members_of, project_is_dev_only
 from ._common import (
     RLSBL_CONFIG,
     _build_dep_import_cache,
-    _sibling_exclude_dirs,
 )
 from . import PROJECT_MANIFESTS
 
@@ -56,8 +55,7 @@ def register_workspace_checks(app):
     @app.check("workspace-targets")
     def check_workspace_targets(ctx):
         """Every project must have at least one detectable target."""
-        from ..commands.monorepo.batch_release_init import _collect_releasable_targets
-        from ..targets import detect_targets, resolve_releasable_config_dir
+        from ..targets import collect_releasable_targets, detect_targets, resolve_releasable_config_dir
 
         def _is_releasable_false(proj):
             if isinstance(proj, WorkspaceProject):
@@ -83,7 +81,7 @@ def register_workspace_checks(app):
         missing_releasables = []
         for rel in ctx.releasables:
             member_projs = members_of(rel.name, ctx.projects)
-            target_names = _collect_releasable_targets(rel.name, member_projs, str(ctx.workspace_root))
+            target_names = collect_releasable_targets(rel.name, member_projs, str(ctx.workspace_root))
             if not target_names:
                 missing_releasables.append(rel.name)
 

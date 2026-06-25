@@ -1,14 +1,13 @@
 """Scaffold a batch release file for all workspace projects, auto-detecting targets and commenting out packages with no unreleased commits."""
 
 import os
-import re
 import subprocess
 import sys
 
 import tomlkit
 
 from ...release_file import get_batch_release_file_path
-from ...targets import detect_targets, resolve_releasable_config_dir, TARGETS
+from ...targets import collect_releasable_targets, detect_targets, resolve_releasable_config_dir, TARGETS
 from ...workspace import find_workspace_root, load_workspace
 
 
@@ -124,39 +123,13 @@ def _render_commented_section(name, target_names, reason, section_key="packages"
 
 
 def _collect_releasable_targets(releasable_name, member_projects, workspace_root):
-    """Collect targets for a releasable, preferring the releasable config.
+    """Collect targets for a releasable.
 
-    If the releasable's config.json has a ``targets`` key, returns those
-    directly (the releasable is the source of truth for targets in explicit
-    mode).  Falls back to unioning member-level detected targets for
-    backward compatibility with releasables that haven't set targets yet.
-
-    Returns a deduplicated list of target names.
+    Delegates to ``collect_releasable_targets`` in ``rlsbl.targets``.
+    Kept as a thin wrapper for backward compatibility with existing callers
+    that import this private name.
     """
-    from ...config import read_json_config
-
-    # Try the releasable config first
-    rel_config_path = os.path.join(
-        workspace_root, ".rlsbl-monorepo", "releasables",
-        releasable_name, "config.json",
-    )
-    rel_config = read_json_config(rel_config_path)
-    rel_targets = rel_config.get("targets")
-    if rel_targets is not None and isinstance(rel_targets, list):
-        return list(rel_targets)
-
-    # Fallback: union member-level targets (backward compat)
-    seen = set()
-    result = []
-    for proj in member_projects:
-        project_dir = os.path.join(workspace_root, proj["path"])
-        rel_dir = resolve_releasable_config_dir(proj, workspace_root)
-        entries = detect_targets(project_dir, releasable_config_dir=rel_dir)
-        for e in entries:
-            if e.name not in seen:
-                seen.add(e.name)
-                result.append(e.name)
-    return result
+    return collect_releasable_targets(releasable_name, member_projects, workspace_root)
 
 
 def _cmd_batch_release_init(project_root, packages=None):
@@ -179,7 +152,7 @@ def _cmd_batch_release_init(project_root, packages=None):
             In explicit mode these are releasable names; in implicit mode,
             package names.
     """
-    from ...workspace import is_explicit_mode, load_releasables, members_of
+    from ...workspace import is_explicit_mode
 
     start = str(project_root)
     workspace_root = find_workspace_root(start)
