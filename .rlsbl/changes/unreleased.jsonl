@@ -6,3 +6,4 @@
 {"commits":["8bc7cc29c084d45ac13aa4995ab416e026f078ee","7b5b07d9a8d67d69f992478b3769804de82cf146","0d363cb573b9aa24d5dd2d2d1476842c0c0da905"],"user_facing":true,"description":"**New feature.** New `dunder-version-missing` project check detects pypi targets where `__init__.py` has a version-like constant (e.g., `VERSION = \"1.0.0\"`) but no `__version__`.","type":"feature"}
 {"commits":["c6e0e258ef68b2f71acef644da94185c161ca9c1","e8d22807f0a619bdc67ce36d3da19abfefae5b08","49dbba57459e2301e58a015de560250a326b2594","3dc0a7a7b6fd8bb4ef769cb29718d237d1cd2b8b","9b6a5fde43c38ed6dc0ced6880a6d1bfe3ce18b2"],"user_facing":false}
 {"commits":["1221a0abb752ef2696aecdb2be78e28658db3f82"],"user_facing":false}
+{"commits":["8a315822a857e55dc88e195c18af9ef2ca386ce8"],"user_facing":false}
