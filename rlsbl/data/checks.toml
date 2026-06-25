@@ -348,6 +348,14 @@ pure = true
 needs_network = false
 depends_on = []
 
+[checks.ruff-lint]
+tags = ["quality"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
 # ---------------------------------------------------------------------------
 # Phase 12 project checks
 # ---------------------------------------------------------------------------

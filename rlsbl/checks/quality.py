@@ -43,6 +43,38 @@ def register_quality_checks(app):
             return CheckResult("warn", f"{total_warnings} warning(s)")
         return CheckResult("pass", "all library projects clean")
 
+    @app.check("ruff-lint")
+    def check_ruff_lint(ctx):
+        """Project must pass ruff lint checks."""
+        import subprocess as _sp
+
+        from ..utils import require_tool
+
+        if not require_tool("ruff", fatal=False):
+            return CheckResult("skip", "ruff not installed")
+
+        try:
+            result = _sp.run(
+                ["ruff", "check", str(ctx.project_root), "--quiet"],
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+        except (OSError, _sp.TimeoutExpired) as exc:
+            return CheckResult("fail", f"ruff failed to run: {exc}")
+
+        if result.returncode == 0:
+            return CheckResult("pass", "ruff clean")
+
+        output = (result.stdout or result.stderr or "").strip()
+        # Count lines as a proxy for issue count
+        lines = [ln for ln in output.splitlines() if ln.strip()]
+        return CheckResult(
+            "fail",
+            f"ruff reported {len(lines)} issue(s)",
+            details=lines[:50],
+        )
+
     @app.check("dead-modules")
     def check_dead_modules(ctx):
         """Unreferenced Python modules, Go internal packages, npm or Dart source files."""

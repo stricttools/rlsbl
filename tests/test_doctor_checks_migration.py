@@ -61,6 +61,7 @@ EXPECTED_CHECKS = [
     "deps-dev-in-lib",
     "dead-modules",
     "scaffold-unreplaced-vars",
+    "ruff-lint",
     "dead-workspace-packages",
     "subtree-remote-reachable",
     "workspace-unbuildable",
@@ -143,7 +144,7 @@ class TestCheckTags:
 
     @pytest.mark.parametrize("name", [
         "library-lint", "deps-runtime-test-only", "deps-dev-in-lib",
-        "dead-modules", "scaffold-unreplaced-vars",
+        "dead-modules", "scaffold-unreplaced-vars", "ruff-lint",
     ])
     def test_quality_tag(self, name):
         assert "quality" in app._check_defs[name].tags
@@ -821,3 +822,35 @@ class TestLibraryLintCheck:
         result = scope_adapter(ctx, "workspace:library")
         assert result.status == "skip"
         assert "not a monorepo" in result.message
+
+
+# ---------------------------------------------------------------------------
+# Functional tests: ruff-lint check
+# ---------------------------------------------------------------------------
+
+class TestRuffLintCheck:
+    """The ruff-lint check runs ruff against the project."""
+
+    def test_ruff_lint_pass_clean_project(self, mock_git_repo):
+        """Clean Python file -> pass."""
+        (mock_git_repo / "clean.py").write_text("x = 1\n")
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
+        result = app._check_defs["ruff-lint"].impl(ctx)
+        assert result.status == "pass"
+        assert "clean" in result.message
+
+    def test_ruff_lint_fail_unused_import(self, mock_git_repo):
+        """File with unused import -> fail."""
+        (mock_git_repo / "bad.py").write_text("import os\n")
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
+        result = app._check_defs["ruff-lint"].impl(ctx)
+        assert result.status == "fail"
+        assert "issue" in result.message
+
+    def test_ruff_lint_skip_when_not_installed(self, mock_git_repo):
+        """ruff not on PATH -> skip."""
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
+        with patch("rlsbl.utils.require_tool", return_value=None):
+            result = app._check_defs["ruff-lint"].impl(ctx)
+        assert result.status == "skip"
+        assert "not installed" in result.message
