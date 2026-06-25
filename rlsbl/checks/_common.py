@@ -231,8 +231,9 @@ def _build_dep_import_cache(ctx):
     if cached is not None:
         return cached
 
-    from ..dep_validation import _get_imported_workspace_packages, _read_go_module_path
+    from ..dep_validation import _get_imported_workspace_packages
     from ..import_scanners import build_jvm_package_map, build_namespace_map
+    from ..utils import read_go_module_path
 
     root = str(ctx.workspace_root)
     workspace_names = {p["name"] for p in ctx.projects}
@@ -241,7 +242,7 @@ def _build_dep_import_cache(ctx):
     module_path_map: dict[str, str] = {}
     for proj in ctx.projects:
         project_dir = os.path.join(root, proj["path"])
-        mod_path = _read_go_module_path(project_dir)
+        mod_path = read_go_module_path(project_dir)
         if mod_path is not None:
             module_path_map[proj["name"]] = mod_path
 
