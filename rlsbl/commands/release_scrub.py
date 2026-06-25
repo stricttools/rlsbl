@@ -17,7 +17,7 @@ from ..utils import (
     get_current_branch,
     get_push_timeout,
 )
-from ..workspace import find_workspace_root, load_workspace
+from ..workspace import load_workspace
 
 
 def _save_step(path, data, step_name):

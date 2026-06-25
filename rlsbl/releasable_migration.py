@@ -14,21 +14,18 @@ import os
 import subprocess
 
 from .changelog.files import get_changes_dir, read_unreleased, list_versioned_files
-from .changelog.schema import ChangelogEntry, serialize_entry, parse_jsonl
+from .changelog.schema import ChangelogEntry, serialize_entry
 from .config import read_json_config
 from .errors import WorkspaceError
 from .git_util import get_commit_files, file_matches_project
 from .targets import detect_targets, TARGETS
 from .workspace import (
-    Releasable,
-    WorkspaceProject,
     get_releasable_changes_dir,
     get_releasable_dir,
     is_explicit_mode,
     load_releasables,
     load_workspace,
     members_of,
-    read_releasable_version,
     write_releasable_version,
 )
 

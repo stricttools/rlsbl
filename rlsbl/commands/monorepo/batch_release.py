@@ -19,7 +19,6 @@ import sys
 import time
 
 from ...release_file import (
-    BatchReleaseConfig,
     get_batch_release_file_path,
     read_batch_release_file,
 )

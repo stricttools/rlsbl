@@ -9,7 +9,7 @@ import os
 
 from strictcli import CheckResult
 
-from ._common import _resolve_version_and_tag, _get_changelog_context, _get_all_changelog_contexts
+from ._common import _resolve_version_and_tag, _get_all_changelog_contexts
 
 
 def register_changelog_checks(app):

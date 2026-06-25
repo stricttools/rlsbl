@@ -7,7 +7,6 @@ import re
 from .base import BaseTarget, TemplateVars
 from .utils import _get_git_author
 from ..errors import VersionError
-from ..utils import run
 
 
 class DenoTarget(BaseTarget):

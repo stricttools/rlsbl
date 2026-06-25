@@ -11,8 +11,7 @@ from ruamel.yaml.scalarstring import LiteralScalarString
 from ...action_versions import format_action
 from ...commands.init_cmd import check_unreplaced_vars, process_template
 from ...context import create_context
-from ...errors import ConfigError
-from ...utils import commit_files, commit_files_if_changed
+from ...utils import commit_files_if_changed
 from ...workspace import find_workspace_root, load_workspace
 from ...targets import detect_targets, resolve_releasable_config_dir, TARGETS
 

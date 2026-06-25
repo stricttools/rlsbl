@@ -7,7 +7,6 @@ import tomlkit
 
 from .base import BaseTarget, TemplateVars
 from ..errors import VersionError
-from ..utils import run
 
 
 class CargoTarget(BaseTarget):

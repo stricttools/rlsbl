@@ -25,7 +25,8 @@ class HookError(Exception):
 from ...release_file import VALID_BUMP_TYPES
 
 
-def validate_release_targets(release_config, project_root):
+def validate_release_targets(release_config, project_root, *,
+                             member_dirs=None, releasable_config_dir=None):
     """Validate include/exclude targets in the release config.
 
     Checks:
@@ -33,10 +34,17 @@ def validate_release_targets(release_config, project_root):
     - all named targets are known
     - include + exclude exhaustively covers detected targets
 
+    When ``member_dirs`` is provided (releasable mode), detected targets
+    are the union of targets across all member directories instead of
+    the single project root.  If ``releasable_config_dir`` is also set,
+    its ``config.json`` ``targets`` key takes precedence (the releasable
+    is the source of truth in explicit mode).
+
     Returns the primary registry name (first item in include).
     Raises ReleaseValidationError on failure.
     """
     from . import TARGETS, detect_targets
+    from ...config import read_json_config
 
     if not release_config.include:
         raise ReleaseValidationError(
@@ -51,7 +59,24 @@ def validate_release_targets(release_config, project_root):
                 f"Valid: {', '.join(TARGETS.keys())}"
             )
 
-    detected = {entry.name for entry in detect_targets(str(project_root))}
+    if member_dirs is not None:
+        # Releasable mode: union targets across all member directories.
+        # Check releasable-level config first (authoritative in explicit mode).
+        detected = set()
+        if releasable_config_dir is not None:
+            rel_config_path = os.path.join(str(releasable_config_dir), "config.json")
+            rel_config = read_json_config(rel_config_path)
+            rel_targets = rel_config.get("targets")
+            if rel_targets is not None and isinstance(rel_targets, list):
+                detected = set(rel_targets)
+        if not detected:
+            for d in member_dirs:
+                entries = detect_targets(str(d), releasable_config_dir=releasable_config_dir)
+                for e in entries:
+                    detected.add(e.name)
+    else:
+        detected = {entry.name for entry in detect_targets(str(project_root))}
+
     declared = set(release_config.include) | set(release_config.exclude)
     missing = detected - declared
     extra = declared - detected

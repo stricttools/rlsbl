@@ -3,7 +3,6 @@
 import os
 
 from .base import BaseTarget, TemplateVars
-from ..utils import run
 
 VERSION_FILE = "VERSION"
 

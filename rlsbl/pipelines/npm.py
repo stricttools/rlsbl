@@ -1,7 +1,6 @@
 """npm pipeline implementation that publishes packages to the npm registry, authenticating via NPM_TOKEN and handling scoped package access."""
 
 import os
-import re
 import subprocess
 
 from .base import TokenPipeline

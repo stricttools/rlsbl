@@ -11,19 +11,15 @@ import json
 import os
 import shutil
 import subprocess
-import tempfile
 
 from ...changelog.files import get_changes_dir, read_unreleased, list_versioned_files
-from ...changelog.schema import ChangelogEntry, parse_jsonl, serialize_entry
-from ...errors import RlsblError, WorkspaceError
+from ...changelog.schema import parse_jsonl, serialize_entry
+from ...errors import RlsblError
 from ...workspace import (
-    find_workspace_root,
     load_workspace,
     load_releasables,
     members_of,
     save_workspace,
-    WORKSPACE_DIR,
-    WORKSPACE_FILE,
 )
 
 

@@ -1563,7 +1563,6 @@ def _generate_merged_publish(targets, template_vars, target_paths=None):
     - ``packages-dir`` rewritten for PyPI publish actions
     - version-file inputs prefixed for setup actions
     """
-    from copy import deepcopy
     from io import StringIO
 
     from ruamel.yaml import YAML
@@ -1691,8 +1690,6 @@ def _generate_merged_publish(targets, template_vars, target_paths=None):
     yml.indent(mapping=2, sequence=4, offset=2)
 
     # Use flow style for short lists (e.g., types: [published])
-    from ruamel.yaml.representer import RoundTripRepresenter
-
     def _str_representer(representer, data):
         if "\n" in data:
             return representer.represent_scalar(

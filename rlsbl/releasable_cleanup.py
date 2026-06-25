@@ -19,7 +19,6 @@ from .workspace import (
     is_explicit_mode,
     load_releasables,
     load_workspace,
-    members_of,
 )
 
 

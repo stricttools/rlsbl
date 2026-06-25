@@ -8,7 +8,6 @@ instead of depending on target classes.
 
 import glob
 import os
-import re
 import shutil
 import subprocess
 

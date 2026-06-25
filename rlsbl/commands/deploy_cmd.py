@@ -3,7 +3,6 @@
 import sys
 
 from ..config import read_deploy_config
-from ..context import ProjectContext
 from ..deploy import deploy_target
 from ..utils import get_current_branch
 

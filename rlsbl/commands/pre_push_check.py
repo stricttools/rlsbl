@@ -9,10 +9,9 @@ import os
 import subprocess
 import sys
 
-from ..changelog import changes_dir_exists, get_changes_dir, list_versioned_files, parse_jsonl, read_unreleased, resolve_hashes
+from ..changelog import get_changes_dir, list_versioned_files, parse_jsonl, read_unreleased, resolve_hashes
 from ..errors import ConfigError
 from ..changelog.validate import filter_exempt_commits
-from ..git_util import detect_manual_push_branches
 
 
 DEFAULT_RELEASE_BRANCHES = ["main", "master"]

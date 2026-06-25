@@ -2,7 +2,6 @@
 
 import dataclasses
 import os
-import sys
 import tomllib
 
 import tree_sitter_python

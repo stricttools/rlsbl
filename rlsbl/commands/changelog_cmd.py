@@ -9,9 +9,7 @@ import tempfile
 from ..changelog.files import (
     append_entry,
     append_entry_to_version,
-    changes_dir_exists,
     get_changes_dir,
-    is_read_only,
     list_versioned_files,
     read_unreleased,
     writable_jsonl,

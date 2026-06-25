@@ -7,7 +7,6 @@ import traceback
 
 from ..changelog.files import get_changes_dir, unfinalize_version
 from ..changelog.generate import generate_changelog
-from ..context import ProjectContext
 from ..release_file import unfinalize_release_file
 from ..targets import TARGETS, detect_targets
 from ..utils import run, check_gh_installed, check_gh_auth, get_push_timeout, get_current_branch, push_if_needed, is_clean_tree

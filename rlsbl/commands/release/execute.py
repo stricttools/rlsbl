@@ -483,7 +483,6 @@ def _run_release_mutating(state: ReleaseState):
         get_hook_timeout,
         get_current_branch,
         should_tag,
-        subprocess,
         TARGETS,
         load_pipelines,
         load_workspace,
@@ -503,7 +502,6 @@ def _run_release_mutating(state: ReleaseState):
         parse_porcelain_paths,
         ReleaseValidationError,
         HookError,
-        _read_release_metadata,
         _read_release_metadata_full,
     )
 

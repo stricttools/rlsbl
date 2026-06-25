@@ -4,7 +4,6 @@ import os
 import re
 
 from .base import BaseTarget, TemplateVars
-from ..utils import run
 
 VERSION_FILE = "VERSION"
 

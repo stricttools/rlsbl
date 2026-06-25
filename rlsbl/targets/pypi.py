@@ -301,7 +301,7 @@ class PypiTarget(BaseTarget):
         pyproject.toml so the working tree is never modified.  Otherwise runs
         ``uv build`` in place.
         """
-        from ..dep_rewrite import build_rewrite_map, detect_path_deps, rewrite_pyproject_deps
+        from ..dep_rewrite import build_rewrite_map, detect_path_deps
         from ..workspace import find_workspace_root, load_workspace
         from ..workspace_graph import WorkspaceGraph
 

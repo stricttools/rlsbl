@@ -11,7 +11,7 @@ from ..npm_wrapper import (
     load_platform_config,
     npm_wrapper_template_mappings,
 )
-from ..utils import read_go_module_path, run
+from ..utils import read_go_module_path
 
 VERSION_FILE = "VERSION"
 

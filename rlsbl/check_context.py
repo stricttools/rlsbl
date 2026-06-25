@@ -1,12 +1,8 @@
 """Check context types for the strictcli check system."""
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 
 from .context import ProjectContext
-
-if TYPE_CHECKING:
-    from .workspace import Releasable
 
 
 @dataclass
