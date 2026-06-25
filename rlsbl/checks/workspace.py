@@ -590,6 +590,7 @@ def register_workspace_checks(app):
             passed = run_project_tests(
                 target_name,
                 project_dir=project_dir,
+                workspace_root=str(ctx.workspace_root),
                 skip_sync=True,
             )
             if passed:
