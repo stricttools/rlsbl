@@ -16,13 +16,12 @@ def detect_python_package_root(project_dir: str) -> str | None:
     3. Filesystem: ``src/{underscored}/`` directory
     4. Filesystem: ``{underscored}/`` directory (flat layout)
     5. Filesystem: ``{raw_name}/`` directory
-    6. Fallback to underscored project name convention (may not exist on disk)
-
     Raises VersionError if both ``{underscored}/`` and ``src/{underscored}/``
     exist on disk and no config (hatch or uv) declares the canonical location.
 
     Returns the relative path from project_dir to the package root directory,
-    or None if pyproject.toml is missing or the project name cannot be read.
+    or None if pyproject.toml is missing, the project name cannot be read,
+    or no package directory exists on disk.
     """
     pyproject_path = os.path.join(project_dir, "pyproject.toml")
     if not os.path.isfile(pyproject_path):
@@ -73,8 +72,8 @@ def detect_python_package_root(project_dir: str) -> str | None:
     if os.path.isdir(os.path.join(project_dir, name)):
         return name
 
-    # 6) Fallback to underscored convention (may not exist on disk).
-    return underscored
+    # 6) No package directory found.
+    return None
 
 
 def normalize_npm(name):

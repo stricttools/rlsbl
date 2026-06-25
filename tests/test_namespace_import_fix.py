@@ -56,12 +56,12 @@ class TestDetectPythonPackageRoot:
         assert result == "mylib"
 
     def test_convention_fallback(self, tmp_path):
-        """Falls back to underscored convention when no directory exists."""
+        """Returns None when no package directory exists on disk."""
         (tmp_path / "pyproject.toml").write_text(
             '[project]\nname = "my-lib"\n'
         )
         result = detect_python_package_root(str(tmp_path))
-        assert result == "my_lib"
+        assert result is None
 
     def test_no_pyproject(self, tmp_path):
         """Returns None when pyproject.toml is missing."""
