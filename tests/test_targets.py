@@ -208,6 +208,78 @@ class TestPypiWriteVersionDunderVersion:
                 content = f.read()
             assert content == original
 
+    def test_typed_annotation_dunder_version(self):
+        """__version__: str = '1.0.0' (typed annotation) is updated."""
+        target = PypiTarget()
+        with tempfile.TemporaryDirectory() as d:
+            toml_path = os.path.join(d, "pyproject.toml")
+            with open(toml_path, "w") as f:
+                f.write('[project]\nname = "my-pkg"\nversion = "1.0.0"\n')
+            pkg_dir = os.path.join(d, "my_pkg")
+            os.makedirs(pkg_dir)
+            init_path = os.path.join(pkg_dir, "__init__.py")
+            with open(init_path, "w") as f:
+                f.write('__version__: str = "1.0.0"\n')
+            result = target.write_version(d, "2.0.0", ctx=_ctx())
+            with open(init_path) as f:
+                content = f.read()
+            assert '__version__: str = "2.0.0"' in content
+            assert os.path.join("my_pkg", "__init__.py") in result
+
+    def test_prerelease_dunder_version(self):
+        """__version__ = '1.0.0rc1' (pre-release) is updated."""
+        target = PypiTarget()
+        with tempfile.TemporaryDirectory() as d:
+            toml_path = os.path.join(d, "pyproject.toml")
+            with open(toml_path, "w") as f:
+                f.write('[project]\nname = "my-pkg"\nversion = "1.0.0rc1"\n')
+            pkg_dir = os.path.join(d, "my_pkg")
+            os.makedirs(pkg_dir)
+            init_path = os.path.join(pkg_dir, "__init__.py")
+            with open(init_path, "w") as f:
+                f.write('__version__ = "1.0.0rc1"\n')
+            result = target.write_version(d, "1.0.1", ctx=_ctx())
+            with open(init_path) as f:
+                content = f.read()
+            assert '__version__ = "1.0.1"' in content
+            assert os.path.join("my_pkg", "__init__.py") in result
+
+    def test_dynamic_dunder_version_skipped(self):
+        """__version__ = _detect_version() (dynamic) is not modified."""
+        target = PypiTarget()
+        with tempfile.TemporaryDirectory() as d:
+            toml_path = os.path.join(d, "pyproject.toml")
+            with open(toml_path, "w") as f:
+                f.write('[project]\nname = "my-pkg"\nversion = "1.0.0"\n')
+            pkg_dir = os.path.join(d, "my_pkg")
+            os.makedirs(pkg_dir)
+            init_path = os.path.join(pkg_dir, "__init__.py")
+            with open(init_path, "w") as f:
+                f.write('__version__ = _detect_version()\n')
+            result = target.write_version(d, "2.0.0", ctx=_ctx())
+            assert result == ["pyproject.toml"]
+            with open(init_path) as f:
+                content = f.read()
+            assert content == '__version__ = _detect_version()\n'
+
+    def test_imported_dunder_version_skipped(self):
+        """from ._version import __version__ is not modified."""
+        target = PypiTarget()
+        with tempfile.TemporaryDirectory() as d:
+            toml_path = os.path.join(d, "pyproject.toml")
+            with open(toml_path, "w") as f:
+                f.write('[project]\nname = "my-pkg"\nversion = "1.0.0"\n')
+            pkg_dir = os.path.join(d, "my_pkg")
+            os.makedirs(pkg_dir)
+            init_path = os.path.join(pkg_dir, "__init__.py")
+            with open(init_path, "w") as f:
+                f.write('from ._version import __version__\n')
+            result = target.write_version(d, "2.0.0", ctx=_ctx())
+            assert result == ["pyproject.toml"]
+            with open(init_path) as f:
+                content = f.read()
+            assert content == 'from ._version import __version__\n'
+
 
 class TestGoTarget:
     def test_is_release_target(self):
