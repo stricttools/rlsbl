@@ -9,11 +9,13 @@ import re
 import sys
 from dataclasses import dataclass
 
+from .errors import VersionError
 from .lint.go_ast import scan_imports as _go_scan_imports
 from .lint.npm_ast import NpmAstLinter
 from .lint.python_ast import PythonAstLinter
 from .lint.utils import walk_source_files
 from .targets.utils import detect_python_package_root, normalize_pypi
+from .utils import read_go_module_path
 
 # Python 3.10+ provides this; used to exclude stdlib imports.
 _STDLIB_MODULES: frozenset[str] = frozenset(sys.stdlib_module_names)
@@ -120,7 +122,10 @@ def build_namespace_map(projects, workspace_root: str) -> dict[str, str]:
         proj_path = proj["path"] if isinstance(proj, dict) else proj.path
         project_dir = os.path.join(workspace_root, proj_path)
 
-        pkg_root = detect_python_package_root(project_dir)
+        try:
+            pkg_root = detect_python_package_root(project_dir)
+        except VersionError:
+            continue
         if not pkg_root:
             continue
 
@@ -494,7 +499,7 @@ class GoImportScanner:
             return []
 
         # Read this project's own module path to exclude self-imports
-        own_module_path = self._read_module_path(project_path)
+        own_module_path = read_go_module_path(project_path)
 
         # Build reverse lookup: module_path -> workspace_name
         # Only include other projects (not self)
@@ -529,22 +534,6 @@ class GoImportScanner:
                     ))
 
         return results
-
-    @staticmethod
-    def _read_module_path(project_path: str) -> str | None:
-        """Read the module path from go.mod."""
-        go_mod = os.path.join(project_path, "go.mod")
-        if not os.path.isfile(go_mod):
-            return None
-        try:
-            with open(go_mod, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if line.startswith("module "):
-                        return line[len("module "):].strip()
-        except (OSError, UnicodeDecodeError):
-            pass
-        return None
 
     @staticmethod
     def _match_workspace_import(
