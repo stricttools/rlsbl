@@ -30,7 +30,7 @@ def find_dunder_version_node(content: str) -> "ast.Constant | None":
     except SyntaxError:
         return None
 
-    for node in ast.walk(tree):
+    for node in tree.body:
         if isinstance(node, ast.Assign):
             if (
                 len(node.targets) == 1
@@ -66,7 +66,7 @@ def has_any_dunder_version(content: str) -> bool:
     except SyntaxError:
         return False
 
-    for node in ast.walk(tree):
+    for node in tree.body:
         if isinstance(node, ast.Assign):
             for target in node.targets:
                 if isinstance(target, ast.Name) and target.id == "__version__":

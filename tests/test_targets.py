@@ -316,6 +316,16 @@ class TestFindDunderVersionNode:
         node = find_dunder_version_node('def foo(\n')
         assert node is None
 
+    def test_nested_in_function_returns_none(self):
+        from rlsbl.targets.pypi import find_dunder_version_node
+        node = find_dunder_version_node('def f():\n    __version__ = "1.0.0"\n')
+        assert node is None
+
+    def test_nested_in_if_block_returns_none(self):
+        from rlsbl.targets.pypi import find_dunder_version_node
+        node = find_dunder_version_node('if True:\n    __version__ = "1.0.0"\n')
+        assert node is None
+
 
 class TestHasAnyDunderVersion:
     """Tests for has_any_dunder_version() AST helper."""
@@ -339,6 +349,14 @@ class TestHasAnyDunderVersion:
     def test_syntax_error_false(self):
         from rlsbl.targets.pypi import has_any_dunder_version
         assert has_any_dunder_version('def foo(\n') is False
+
+    def test_nested_in_function_false(self):
+        from rlsbl.targets.pypi import has_any_dunder_version
+        assert has_any_dunder_version('def f():\n    __version__ = "1.0.0"\n') is False
+
+    def test_nested_in_if_block_false(self):
+        from rlsbl.targets.pypi import has_any_dunder_version
+        assert has_any_dunder_version('if True:\n    __version__ = "1.0.0"\n') is False
 
 
 class TestGoTarget:
