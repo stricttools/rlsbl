@@ -11,7 +11,7 @@ from ..npm_wrapper import (
     load_platform_config,
     npm_wrapper_template_mappings,
 )
-from ..utils import run
+from ..utils import read_go_module_path, run
 
 VERSION_FILE = "VERSION"
 
@@ -53,24 +53,14 @@ class GoTarget(BaseTarget):
 
     def read_name(self, dir_path, ctx):
         """Read the last segment of the module path from go.mod."""
-        module_path = self._read_module_path(dir_path)
-        if not module_path:
+        module_path = read_go_module_path(dir_path)
+        if module_path is None:
             return None
         return module_path.rsplit("/", 1)[-1] if "/" in module_path else module_path
 
     def read_metadata(self, dir_path):
         """Go modules have no license/description in go.mod."""
         return {}
-
-    def _read_module_path(self, dir_path):
-        """Extract the module path from go.mod, or empty string if unavailable."""
-        mod_path = os.path.join(dir_path, "go.mod")
-        if not os.path.exists(mod_path):
-            return ""
-        with open(mod_path, encoding="utf-8") as f:
-            content = f.read()
-        match = re.search(r"^module\s+(\S+)", content, re.MULTILINE)
-        return match.group(1) if match else ""
 
     def _is_library(self, dir_path):
         """Return True if the project has no `package main` in root .go files or cmd/ layout."""
@@ -182,7 +172,9 @@ class GoTarget(BaseTarget):
     def template_vars(self, dir_path, ctx):
         """Extract template variables from go.mod and .rlsbl/config.json."""
         config = ctx.config if ctx else {}
-        name = self._read_module_path(dir_path)
+        name = read_go_module_path(dir_path)
+        if name is None:
+            return TemplateVars(self.name, {})
 
         # Derive short name from module path (last segment)
         short_name = name.rsplit("/", 1)[-1] if "/" in name else name
