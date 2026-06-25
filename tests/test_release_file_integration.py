@@ -281,7 +281,11 @@ class TestTargetExhaustivenessValidation:
         captured = capsys.readouterr()
         assert "Dry run" in captured.out
 
-    def test_unknown_target_in_release_file(self, tmp_project, capsys):
+    @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
+    @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
+    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
+    @patch("rlsbl.commands.release.get_current_branch", return_value="main")
+    def test_unknown_target_in_release_file(self, _branch, _clean, _gh_inst, _gh_auth, tmp_project, capsys):
         """Error when release file references a target unknown to TARGETS."""
         _setup_npm_project(tmp_project)
 
@@ -344,7 +348,11 @@ class TestTargetExhaustivenessValidation:
         # Release still proceeds
         assert "Dry run" in captured.out
 
-    def test_empty_include_errors(self, tmp_project, capsys):
+    @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
+    @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
+    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
+    @patch("rlsbl.commands.release.get_current_branch", return_value="main")
+    def test_empty_include_errors(self, _branch, _clean, _gh_inst, _gh_auth, tmp_project, capsys):
         """Error when include list is empty."""
         _setup_npm_project(tmp_project)
 

@@ -120,7 +120,8 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             print(msg)
 
     # --- Validate inputs and environment ---
-    registry = validate_release_targets(release_config, project_root)
+    # Target validation is deferred until after releasable context is resolved
+    # so that member_dirs can be passed for releasable target union.
     validate_ota_mode(release_config, project_root, config)
     validate_config_integrity(config)
 
@@ -163,6 +164,21 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             member_projs = members_of(releasable_name, ws_projects)
             member_package_paths = [p["path"] for p in member_projs]
             log(f"Releasable: {releasable_name} ({len(member_package_paths)} member(s))")
+
+    # Validate release targets (deferred to here so releasable context is available)
+    if member_package_paths is not None and monorepo_root:
+        from ...workspace import get_releasable_dir
+        _member_abs_dirs = [
+            os.path.join(str(monorepo_root), p) for p in member_package_paths
+        ]
+        _rel_cfg_dir = get_releasable_dir(str(monorepo_root), releasable_name)
+        registry = validate_release_targets(
+            release_config, project_root,
+            member_dirs=_member_abs_dirs,
+            releasable_config_dir=_rel_cfg_dir,
+        )
+    else:
+        registry = validate_release_targets(release_config, project_root)
 
     project_dir = str(project_root)
 
