@@ -1,0 +1,16 @@
+# Version bump type: patch, minor, major, or hotfix
+bump = "minor"
+# Short description of this release (required)
+description = "Ruff integration, unreachable-code detection, non-workspace test runner, and validate_release_targets union fix"
+# Optional context explaining why these changes were made
+context = """
+Added ruff as a dev dependency with ruff-lint quality check. Built custom unreachable-code detection
+in the Python AST linter using tree-sitter. Restructured the pypi test runner to probe where pytest
+is declared and build the correct uv run invocation per project (workspace member vs standalone).
+validate_release_targets now validates against the union of all releasable member targets.
+Removed silent error swallowing in member version sync and dead-code convention fallback.
+"""
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["npm", "pypi"]
+exclude = []
