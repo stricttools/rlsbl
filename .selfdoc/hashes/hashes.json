@@ -109,7 +109,7 @@
     "source_docstring": "4fff13535641ef3e9f7c8663fb4854a94edccb3e370b2f4d2721a69393f06594"
   },
   "en/checks.md": {
-    "content": "d3d617a9a46270f0abe26b0a17b7c0c1bf8f3d729a6f6a957d4e1fe2692be4bf",
+    "content": "4a45821acd792388d8cefafbd33eb643fff752f75f6928508a377da6dea31fde",
     "description": "c030c06b0e78e90fc477396dc5bed6fad3972e0928ce2085b1c181b4d1784fa7"
   },
   "en/ci-customization.md": {
@@ -157,7 +157,7 @@
     "description": "92c829699be90c4ea09e05c6e0ff3830b755bdd05be47a9427e51074cedcb831"
   },
   "en/cli-index.md": {
-    "content": "65b95a8ce95df10a355b4f0c3b64b0dada72405ad75948251d641690f7f2a5c7",
+    "content": "bcc9573909ec90bec7cec9e95a7bf714010f872a1bf6a0f87d8d68f13e072dd4",
     "description": "0f01533cb10562a220aa70ea5e33e2500c0c1e4aa8e16b2f80c532449a68b7ea"
   },
   "en/cli-migrate.md": {
@@ -420,7 +420,7 @@
     "source_docstring": "f185ae8bfaf0e243398083af20895461185566bb50df9500d32b8e517e731fa2"
   },
   "en/rlsbl-commands-monorepo-batch_release_init.md": {
-    "content": "75b669a159fdcfd1d547591361f20da36bda5f2ef301c44a9b3cb69cbafce58f",
+    "content": "bc62c553b09fbe793e55b54ef1b1d1ffcdac12c0620a5e64b218985d741c8c84",
     "description": "df4a591ae00cd76835155976e417a75c53b72841ea92e33523c79f0368e3d0a7",
     "source_docstring": "df4a591ae00cd76835155976e417a75c53b72841ea92e33523c79f0368e3d0a7"
   },
@@ -509,7 +509,7 @@
     "source_docstring": "b3b63796b7aeacfe4406215e72f33590559da9a1235e3f6f2e4a750324f06e34"
   },
   "en/rlsbl-commands-release-validate.md": {
-    "content": "43277f4aa340fbc402e31bbc31cb1328a8dd62656017a018ffaac8d46f87aa21",
+    "content": "84afe8df75b9923fd45d89332d3827b32fb0067bea983153268f99934e068a41",
     "description": "fca18fe43099dd48d8b07fe362f861b15f83a811c20361629f339ef469a001b3",
     "source_docstring": "d99ffc94e10754e831d7c8f081924603d855acb554f3d141a05789d45aec4cc6"
   },
@@ -653,7 +653,7 @@
     "source_docstring": "89e04b1f8e7e57eb31a7e9d0540939ff64ed9c1c4ae004eac9e405654d3d930c"
   },
   "en/rlsbl-lint-python_ast.md": {
-    "content": "9438c5c44c9967022f23a3b6d85a1852083bc6ad20216404ed3d5281d75f0715",
+    "content": "4b21aae91e66356c30c30eb74d9f48995c81dd527d3d83177359d8307d51be43",
     "description": "82c06318401e12178fff543b24fc34fd8388ac15f4e4d6d9e5af16733f663768",
     "source_docstring": "82c06318401e12178fff543b24fc34fd8388ac15f4e4d6d9e5af16733f663768"
   },
@@ -910,7 +910,7 @@
     "source_docstring": "8ed5ea6efc94661a60570314c16634163e5332e19c9cf0e1cc1ec4060dab1fd1"
   },
   "en/rlsbl-targets-utils.md": {
-    "content": "e57e7ffe2059609766a1fbbc6fb64fc57487af4a8bf83460c6dbd3d97d38ae61",
+    "content": "a9aa9dc700aa409829fbb31ceecdade519b86137d348557fcdee8dec996afda5",
     "description": "26f603f36164038522eb9654ef5c9472ad0dbe0b58ef374ac6efb1cb642a4e5a",
     "source_docstring": "26f603f36164038522eb9654ef5c9472ad0dbe0b58ef374ac6efb1cb642a4e5a"
   },
@@ -925,17 +925,17 @@
     "source_docstring": "3da524265324ae10ccba4f769cf57514c3169620e926cab2817c2c7e6ec9fbe8"
   },
   "en/rlsbl-targets.md": {
-    "content": "c732dc23d01011c85dd6949f31f884dcde1df244a7658ec8d50f90b5cdf93479",
+    "content": "f2ce7f5e7b07706740283f8e9bc716aa9bb1b31e10200cd98dc5215a362babd9",
     "description": "6d898a2fb962c167fd120f6dc4813cb0eb717e9ae2a146ab42ac820b9a0f6bb3",
     "source_docstring": "84ffe8ab96512b8b63ae0f39738b022caf5582252511bee872e568616cad781e"
   },
   "en/rlsbl-testing.md": {
-    "content": "b2d59186e09383072131f6db951708df460feb5bc440579fa7b13ada6060e8db",
+    "content": "ec1f53f524f8a348005e929c7a0e2a57eb075073f3c7257d70905dcaf8883f83",
     "description": "a99f416a85f26c68c500e3f02aadfdb37adb8cc1131ca03aca8c65c09c824538",
     "source_docstring": "832bd4a6a4e17081aa955b5cd23dca00e16c8807676827c44402f4f27d76fe93"
   },
   "en/rlsbl-utils.md": {
-    "content": "6d130741a5539be63b1e8ce6a6c6976541c99062354a70b558447bdea4b1a0bd",
+    "content": "cac97b52f7ae8e7a851e4f869df2deaf2d561d4df80f9d820a4831252c07ec40",
     "description": "792fe47ae6871b00df2974a48b8915720f762635cbeb8b6c18cf43451966abe8",
     "source_docstring": "42d9cf2bc7400397bd0711f5f758dad6f285ed1a2aaf911fec9c690666011cfb"
   },
