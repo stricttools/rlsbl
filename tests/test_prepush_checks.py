@@ -516,7 +516,7 @@ class TestWorkspaceTestSuiteRunsAffectedProjects:
         mock_sync.assert_called_once_with(str(repo))
         # Per-project test runs with skip_sync=True
         mock_tests.assert_called_once_with(
-            "pypi", project_dir=str(pkg), skip_sync=True,
+            "pypi", project_dir=str(pkg), workspace_root=str(repo), skip_sync=True,
         )
 
 
