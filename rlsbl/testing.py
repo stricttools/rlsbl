@@ -8,6 +8,7 @@ import json
 import os
 import subprocess
 import sys
+import tomllib
 
 from .utils import require_tool
 
@@ -35,6 +36,50 @@ def sync_workspace(workspace_root: str, *, verbose: bool = False) -> bool:
         print("Error: uv sync failed.", file=sys.stderr)
         return False
     return True
+
+
+def _probe_pytest_location(project_dir: str) -> tuple[str, str] | None:
+    """Detect where pytest is declared in a project's pyproject.toml.
+
+    Checks in order:
+    1. [dependency-groups].* -- any group containing a pytest entry
+    2. [project.optional-dependencies].* -- any extra containing pytest
+    3. [tool.uv].dev-dependencies -- uv legacy dev deps
+
+    Returns (source_type, group_name) on match, or None if not found.
+    source_type is one of "dependency-group", "optional-dep", "uv-dev".
+    """
+    pyproject_path = os.path.join(project_dir, "pyproject.toml")
+    if not os.path.isfile(pyproject_path):
+        return None
+
+    try:
+        with open(pyproject_path, "rb") as f:
+            data = tomllib.load(f)
+    except (OSError, tomllib.TOMLDecodeError):
+        return None
+
+    # 1. [dependency-groups]
+    dep_groups = data.get("dependency-groups", {})
+    for group_name, entries in dep_groups.items():
+        for entry in entries:
+            if isinstance(entry, str) and "pytest" in entry.lower():
+                return ("dependency-group", group_name)
+
+    # 2. [project.optional-dependencies]
+    opt_deps = data.get("project", {}).get("optional-dependencies", {})
+    for extra_name, entries in opt_deps.items():
+        for entry in entries:
+            if isinstance(entry, str) and "pytest" in entry.lower():
+                return ("optional-dep", extra_name)
+
+    # 3. [tool.uv].dev-dependencies
+    uv_dev_deps = data.get("tool", {}).get("uv", {}).get("dev-dependencies", [])
+    for entry in uv_dev_deps:
+        if isinstance(entry, str) and "pytest" in entry.lower():
+            return ("uv-dev", "dev")
+
+    return None
 
 
 def run_project_tests(

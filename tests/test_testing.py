@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from rlsbl.testing import run_project_tests, sync_workspace
+from rlsbl.testing import _probe_pytest_location, run_project_tests, sync_workspace
 
 
 # ---------------------------------------------------------------------------
@@ -390,3 +390,91 @@ class TestSyncWorkspace:
             result = sync_workspace(str(tmp_project))
 
             assert result is True
+
+
+# ---------------------------------------------------------------------------
+# _probe_pytest_location
+# ---------------------------------------------------------------------------
+
+class TestProbePytestLocation:
+    """Tests for _probe_pytest_location."""
+
+    def test_dependency_group_dev(self, tmp_project):
+        """Finds pytest in [dependency-groups].dev."""
+        (tmp_project / "pyproject.toml").write_text(
+            '[project]\nname = "pkg"\nversion = "0.1.0"\n\n'
+            '[dependency-groups]\ndev = ["pytest>=8.0", "ruff"]\n'
+        )
+        result = _probe_pytest_location(str(tmp_project))
+        assert result == ("dependency-group", "dev")
+
+    def test_dependency_group_named(self, tmp_project):
+        """Finds pytest in a named dependency group (not dev)."""
+        (tmp_project / "pyproject.toml").write_text(
+            '[project]\nname = "pkg"\nversion = "0.1.0"\n\n'
+            '[dependency-groups]\ntest = ["pytest", "coverage"]\n'
+        )
+        result = _probe_pytest_location(str(tmp_project))
+        assert result == ("dependency-group", "test")
+
+    def test_optional_dependencies(self, tmp_project):
+        """Finds pytest in [project.optional-dependencies]."""
+        (tmp_project / "pyproject.toml").write_text(
+            '[project]\nname = "pkg"\nversion = "0.1.0"\n\n'
+            '[project.optional-dependencies]\ntest = ["pytest>=7.0", "hypothesis"]\n'
+        )
+        result = _probe_pytest_location(str(tmp_project))
+        assert result == ("optional-dep", "test")
+
+    def test_uv_dev_dependencies(self, tmp_project):
+        """Finds pytest in [tool.uv].dev-dependencies."""
+        (tmp_project / "pyproject.toml").write_text(
+            '[project]\nname = "pkg"\nversion = "0.1.0"\n\n'
+            '[tool.uv]\ndev-dependencies = ["pytest>=8.0"]\n'
+        )
+        result = _probe_pytest_location(str(tmp_project))
+        assert result == ("uv-dev", "dev")
+
+    def test_not_found(self, tmp_project):
+        """Returns None when pytest is not declared anywhere."""
+        (tmp_project / "pyproject.toml").write_text(
+            '[project]\nname = "pkg"\nversion = "0.1.0"\n\n'
+            '[dependency-groups]\ndev = ["ruff", "mypy"]\n'
+        )
+        result = _probe_pytest_location(str(tmp_project))
+        assert result is None
+
+    def test_no_pyproject(self, tmp_project):
+        """Returns None when pyproject.toml does not exist."""
+        result = _probe_pytest_location(str(tmp_project))
+        assert result is None
+
+    def test_priority_order(self, tmp_project):
+        """dependency-groups takes priority over optional-dependencies."""
+        (tmp_project / "pyproject.toml").write_text(
+            '[project]\nname = "pkg"\nversion = "0.1.0"\n\n'
+            '[dependency-groups]\nci = ["pytest"]\n\n'
+            '[project.optional-dependencies]\ntest = ["pytest"]\n'
+        )
+        result = _probe_pytest_location(str(tmp_project))
+        assert result == ("dependency-group", "ci")
+
+    def test_dict_entries_skipped(self, tmp_project):
+        """Dict entries (include groups) in dependency groups are skipped."""
+        (tmp_project / "pyproject.toml").write_text(
+            '[project]\nname = "pkg"\nversion = "0.1.0"\n\n'
+            '[[dependency-groups.dev]]\ninclude-group = "test"\n\n'
+            '[dependency-groups]\ntest = ["pytest"]\n'
+        )
+        # The include-group dict entry should be skipped; "test" group has pytest
+        result = _probe_pytest_location(str(tmp_project))
+        assert result is not None
+
+    def test_case_insensitive(self, tmp_project):
+        """Matches pytest case-insensitively."""
+        (tmp_project / "pyproject.toml").write_text(
+            '[project]\nname = "pkg"\nversion = "0.1.0"\n\n'
+            '[dependency-groups]\ndev = ["Pytest>=8.0"]\n'
+        )
+        result = _probe_pytest_location(str(tmp_project))
+        assert result == ("dependency-group", "dev")
