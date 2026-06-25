@@ -35,10 +35,14 @@ class TestPypiTarget:
     """Tests for run_project_tests with pypi target."""
 
     def test_pypi_runs_pytest(self, tmp_project):
-        """pypi target runs uv sync + uv run pytest when uv is available."""
-        (tmp_project / "pyproject.toml").write_text("[project]\nname = 'test'\nversion = '0.1.0'\n")
+        """pypi standalone target runs uv run pytest when uv is available."""
+        (tmp_project / "pyproject.toml").write_text(
+            "[project]\nname = 'test'\nversion = '0.1.0'\n\n"
+            "[dependency-groups]\ndev = ['pytest>=8.0']\n"
+        )
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
             patch("rlsbl.testing.subprocess.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
@@ -47,17 +51,43 @@ class TestPypiTarget:
             result = run_project_tests("pypi", project_dir=str(tmp_project))
 
             assert result is True
+            # Standalone: no sync, just uv run pytest
+            assert mock_run.call_count == 1
+            assert mock_run.call_args_list[0][0][0] == ["uv", "run", "pytest"]
+
+    def test_pypi_workspace_member_syncs_and_runs(self, tmp_project):
+        """pypi workspace member runs uv sync + uv run pytest."""
+        ws_root = tmp_project / "workspace"
+        ws_root.mkdir()
+        (ws_root / "pyproject.toml").write_text("[project]\nname = 'ws'\nversion = '0.1.0'\n")
+        with (
+            patch("rlsbl.testing.require_tool") as mock_tool,
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=str(ws_root)),
+            patch("rlsbl.testing.subprocess.run") as mock_run,
+        ):
+            mock_tool.return_value = "/usr/bin/uv"
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+
+            result = run_project_tests(
+                "pypi", project_dir=str(tmp_project), workspace_root=str(ws_root)
+            )
+
+            assert result is True
             assert mock_run.call_count == 2
-            # First call: uv sync --all-packages --quiet
+            # First call: uv sync --all-packages --quiet at workspace root
             assert mock_run.call_args_list[0][0][0] == ["uv", "sync", "--all-packages", "--quiet"]
-            # Second call: uv run pytest
+            assert mock_run.call_args_list[0].kwargs.get("cwd") == str(ws_root)
+            # Second call: uv run pytest at project dir
             assert mock_run.call_args_list[1][0][0] == ["uv", "run", "pytest"]
 
     def test_pypi_uv_sync_verbose(self, tmp_project):
-        """When uv_sync_verbose is set, uv sync runs without --quiet."""
-        (tmp_project / "pyproject.toml").write_text("[project]\nname = 'test'\nversion = '0.1.0'\n")
+        """When uv_sync_verbose is set, uv sync runs without --quiet (workspace member)."""
+        ws_root = tmp_project / "workspace"
+        ws_root.mkdir()
+        (ws_root / "pyproject.toml").write_text("[project]\nname = 'ws'\nversion = '0.1.0'\n")
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=str(ws_root)),
             patch("rlsbl.testing.subprocess.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
@@ -66,6 +96,7 @@ class TestPypiTarget:
             result = run_project_tests(
                 "pypi",
                 project_dir=str(tmp_project),
+                workspace_root=str(ws_root),
                 config={"uv_sync_verbose": True},
             )
 
@@ -74,16 +105,21 @@ class TestPypiTarget:
             assert sync_call == ["uv", "sync", "--all-packages"]  # no --quiet
 
     def test_pypi_uv_sync_failure_returns_false(self, tmp_project):
-        """When uv sync fails, returns False immediately."""
-        (tmp_project / "pyproject.toml").write_text("[project]\nname = 'test'\nversion = '0.1.0'\n")
+        """When uv sync fails (workspace member), returns False immediately."""
+        ws_root = tmp_project / "workspace"
+        ws_root.mkdir()
+        (ws_root / "pyproject.toml").write_text("[project]\nname = 'ws'\nversion = '0.1.0'\n")
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=str(ws_root)),
             patch("rlsbl.testing.subprocess.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=1)
 
-            result = run_project_tests("pypi", project_dir=str(tmp_project))
+            result = run_project_tests(
+                "pypi", project_dir=str(tmp_project), workspace_root=str(ws_root)
+            )
 
             assert result is False
             # Only uv sync should have been called (not pytest)
@@ -258,7 +294,7 @@ class TestWorkspaceRoot:
     """Tests for workspace_root parameter: uv sync runs at workspace root."""
 
     def test_pypi_workspace_syncs_at_workspace_root(self, tmp_project):
-        """When workspace_root is set, uv sync runs at workspace_root, pytest at project_dir."""
+        """When workspace_root is set and project is a workspace member, uv sync runs at workspace_root."""
         workspace = tmp_project / "workspace"
         workspace.mkdir()
         (workspace / "pyproject.toml").write_text("[project]\nname = 'ws'\nversion = '0.1.0'\n")
@@ -267,6 +303,7 @@ class TestWorkspaceRoot:
 
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=workspace),
             patch("rlsbl.testing.subprocess.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
@@ -288,18 +325,20 @@ class TestWorkspaceRoot:
             assert pytest_call.kwargs.get("cwd") == project
 
     def test_pypi_workspace_skip_sync(self, tmp_project):
-        """When skip_sync is True, uv sync is skipped but pytest still runs."""
+        """When skip_sync is True, uv sync is skipped but pytest still runs (workspace member)."""
         project = str(tmp_project / "pkg-a")
 
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=str(tmp_project)),
             patch("rlsbl.testing.subprocess.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
 
             result = run_project_tests(
-                "pypi", project_dir=project, skip_sync=True
+                "pypi", project_dir=project, workspace_root=str(tmp_project),
+                skip_sync=True,
             )
 
             assert result is True
@@ -308,13 +347,17 @@ class TestWorkspaceRoot:
             assert mock_run.call_args[0][0] == ["uv", "run", "pytest"]
             assert mock_run.call_args.kwargs.get("cwd") == project
 
-    def test_pypi_without_workspace_root_syncs_at_project_dir(self, tmp_project):
-        """Without workspace_root, uv sync runs at project_dir (existing behavior)."""
-        (tmp_project / "pyproject.toml").write_text("[project]\nname = 'test'\nversion = '0.1.0'\n")
+    def test_pypi_standalone_no_sync(self, tmp_project):
+        """Standalone project does not run uv sync (uv run handles deps)."""
+        (tmp_project / "pyproject.toml").write_text(
+            "[project]\nname = 'test'\nversion = '0.1.0'\n\n"
+            "[dependency-groups]\ndev = ['pytest']\n"
+        )
         project = str(tmp_project)
 
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
             patch("rlsbl.testing.subprocess.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
@@ -323,10 +366,10 @@ class TestWorkspaceRoot:
             result = run_project_tests("pypi", project_dir=project)
 
             assert result is True
-            assert mock_run.call_count == 2
-            # Both calls use project_dir
-            assert mock_run.call_args_list[0].kwargs.get("cwd") == project
-            assert mock_run.call_args_list[1].kwargs.get("cwd") == project
+            # No sync call -- only pytest
+            assert mock_run.call_count == 1
+            assert mock_run.call_args[0][0] == ["uv", "run", "pytest"]
+            assert mock_run.call_args.kwargs.get("cwd") == project
 
 
 # ---------------------------------------------------------------------------

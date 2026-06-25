@@ -170,17 +170,36 @@ def _run_pypi_tests(
     skip_sync: bool = False,
     config: dict,
 ) -> bool:
-    """Run Python tests via uv or bare pytest."""
+    """Run Python tests via uv or bare pytest.
+
+    For workspace members: syncs at workspace root, then runs ``uv run pytest``.
+    For standalone projects: skips sync (``uv run`` handles it),
+    uses ``_resolve_pytest_invocation`` to build the correct command.
+    Falls back to bare ``pytest`` when uv is not installed.
+    """
     uv_verbose = config.get("uv_sync_verbose", False)
+    effective_dir = project_dir or "."
+
     if require_tool("uv", fatal=False):
-        if not skip_sync:
-            sync_cwd = workspace_root if workspace_root else project_dir
-            if not sync_workspace(sync_cwd, verbose=uv_verbose):
-                return False
+        is_workspace_member = (
+            workspace_root is not None
+            and detect_uv_workspace_root(effective_dir) is not None
+        )
+
+        if is_workspace_member:
+            # Workspace member: sync at workspace root, run plain uv run pytest
+            if not skip_sync:
+                if not sync_workspace(workspace_root, verbose=uv_verbose):
+                    return False
+            cmd = ["uv", "run", "pytest"]
+        else:
+            # Standalone: uv run handles sync; resolve the right invocation
+            cmd = _resolve_pytest_invocation(effective_dir, workspace_root)
+
         try:
-            result = subprocess.run(["uv", "run", "pytest"], cwd=project_dir, timeout=120)
+            result = subprocess.run(cmd, cwd=project_dir, timeout=120)
         except subprocess.TimeoutExpired:
-            print("Error: command timed out after 120s: ['uv', 'run', 'pytest']", file=sys.stderr)
+            print(f"Error: command timed out after 120s: {cmd}", file=sys.stderr)
             return False
     elif require_tool("pytest", fatal=False):
         try:
