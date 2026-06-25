@@ -366,10 +366,7 @@ def _sync_member_package_versions(
             continue
 
         # Load config through the inheritance-aware path
-        try:
-            pkg_config = read_project_config(abs_pkg, releasable_config_dir=releasable_config_dir)
-        except Exception:
-            continue
+        pkg_config = read_project_config(abs_pkg, releasable_config_dir=releasable_config_dir)
 
         # Skip private packages (default True when unset)
         if pkg_config.get("private", True):
