@@ -94,17 +94,8 @@ def _run_pypi_tests(
     uv_verbose = config.get("uv_sync_verbose", False)
     if require_tool("uv", fatal=False):
         if not skip_sync:
-            sync_cmd = ["uv", "sync", "--all-packages"]
-            if not uv_verbose:
-                sync_cmd.append("--quiet")
             sync_cwd = workspace_root if workspace_root else project_dir
-            try:
-                result = subprocess.run(sync_cmd, cwd=sync_cwd, timeout=120)
-            except subprocess.TimeoutExpired:
-                print(f"Error: command timed out after 120s: {sync_cmd}", file=sys.stderr)
-                return False
-            if result.returncode != 0:
-                print("Error: uv sync failed.", file=sys.stderr)
+            if not sync_workspace(sync_cwd, verbose=uv_verbose):
                 return False
         try:
             result = subprocess.run(["uv", "run", "pytest"], cwd=project_dir, timeout=120)

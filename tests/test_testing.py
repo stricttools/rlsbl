@@ -30,6 +30,7 @@ class TestPypiTarget:
 
     def test_pypi_runs_pytest(self, tmp_project):
         """pypi target runs uv sync + uv run pytest when uv is available."""
+        (tmp_project / "pyproject.toml").write_text("[project]\nname = 'test'\nversion = '0.1.0'\n")
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
             patch("rlsbl.testing.subprocess.run") as mock_run,
@@ -48,6 +49,7 @@ class TestPypiTarget:
 
     def test_pypi_uv_sync_verbose(self, tmp_project):
         """When uv_sync_verbose is set, uv sync runs without --quiet."""
+        (tmp_project / "pyproject.toml").write_text("[project]\nname = 'test'\nversion = '0.1.0'\n")
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
             patch("rlsbl.testing.subprocess.run") as mock_run,
@@ -67,6 +69,7 @@ class TestPypiTarget:
 
     def test_pypi_uv_sync_failure_returns_false(self, tmp_project):
         """When uv sync fails, returns False immediately."""
+        (tmp_project / "pyproject.toml").write_text("[project]\nname = 'test'\nversion = '0.1.0'\n")
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
             patch("rlsbl.testing.subprocess.run") as mock_run,
@@ -250,8 +253,11 @@ class TestWorkspaceRoot:
 
     def test_pypi_workspace_syncs_at_workspace_root(self, tmp_project):
         """When workspace_root is set, uv sync runs at workspace_root, pytest at project_dir."""
-        workspace = str(tmp_project / "workspace")
-        project = str(tmp_project / "workspace" / "pkg-a")
+        workspace = tmp_project / "workspace"
+        workspace.mkdir()
+        (workspace / "pyproject.toml").write_text("[project]\nname = 'ws'\nversion = '0.1.0'\n")
+        project = str(workspace / "pkg-a")
+        workspace = str(workspace)
 
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
@@ -298,6 +304,7 @@ class TestWorkspaceRoot:
 
     def test_pypi_without_workspace_root_syncs_at_project_dir(self, tmp_project):
         """Without workspace_root, uv sync runs at project_dir (existing behavior)."""
+        (tmp_project / "pyproject.toml").write_text("[project]\nname = 'test'\nversion = '0.1.0'\n")
         project = str(tmp_project)
 
         with (
