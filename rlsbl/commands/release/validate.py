@@ -548,6 +548,7 @@ def _run_builtin_tests(registry, flags, *, project_dir=None, ctx):
     success = run_project_tests(
         registry,
         project_dir=project_dir,
+        workspace_root=str(ctx.workspace_root) if ctx.workspace_root else None,
         config=ctx.config,
         dry_run=flags.get("dry-run", False),
     )

@@ -289,7 +289,10 @@ def register_quality_checks(app):
             return CheckResult("skip", "no recognized test target (pypi, go, npm, maven)")
 
         passed = run_project_tests(
-            target_name, project_dir=str(ctx.project_root), config=ctx.config
+            target_name,
+            project_dir=str(ctx.project_root),
+            workspace_root=str(ctx.workspace_root) if ctx.workspace_root else None,
+            config=ctx.config,
         )
         if passed:
             return CheckResult("pass", f"{target_name} tests passed")
