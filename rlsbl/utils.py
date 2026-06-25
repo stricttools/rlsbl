@@ -402,3 +402,22 @@ def is_private_repo():
             return data.get("private", False)
     except Exception:
         return None
+
+
+def read_go_module_path(project_dir: str) -> str | None:
+    """Read the module path from go.mod.
+
+    Returns None if go.mod does not exist or cannot be parsed.
+    """
+    go_mod = os.path.join(project_dir, "go.mod")
+    if not os.path.isfile(go_mod):
+        return None
+    try:
+        with open(go_mod, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("module "):
+                    return line[len("module "):].strip()
+    except (OSError, UnicodeDecodeError):
+        pass
+    return None
