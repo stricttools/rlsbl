@@ -1,5 +1,6 @@
 """PyPI release target that manages version tracking in pyproject.toml and scaffolds CI workflows for OIDC-based publishing to the PyPI index."""
 
+import ast
 import os
 import re
 import shutil
@@ -14,6 +15,42 @@ from ..errors import VersionError
 from ..utils import run
 
 _MIN_VERSION_RE = re.compile(r">=\s*(\d+\.\d+(?:\.\d+)?)")
+
+
+def find_dunder_version_node(content: str) -> "ast.Constant | None":
+    """Find an __version__ assignment with a static string literal via AST.
+
+    Handles both plain assignments (``__version__ = "1.0.0"``) and typed
+    annotations (``__version__: str = "1.0.0"``).  Returns the
+    ``ast.Constant`` node for the string value, or None if not found or
+    the file has a syntax error.
+    """
+    try:
+        tree = ast.parse(content)
+    except SyntaxError:
+        return None
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            if (
+                len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name)
+                and node.targets[0].id == "__version__"
+                and isinstance(node.value, ast.Constant)
+                and isinstance(node.value.value, str)
+            ):
+                return node.value
+        elif isinstance(node, ast.AnnAssign):
+            if (
+                isinstance(node.target, ast.Name)
+                and node.target.id == "__version__"
+                and node.value is not None
+                and isinstance(node.value, ast.Constant)
+                and isinstance(node.value.value, str)
+            ):
+                return node.value
+
+    return None
 
 
 class PypiTarget(BaseTarget):
@@ -92,36 +129,56 @@ class PypiTarget(BaseTarget):
     def _update_dunder_version(self, dir_path, doc, version):
         """Update __version__ in the package's __init__.py if present.
 
+        Uses AST parsing to find __version__ assignments with static string
+        literals, handling plain assignments and typed annotations.
+
         Returns the relative path (relative to dir_path) of the file that
         was modified, or None if no file was updated.
         """
-        _VERSION_RE = re.compile(r'(__version__\s*=\s*["\'])[\d.]+(["\'])')
+        from .utils import detect_python_package_root
 
         name = doc.get("project", {}).get("name")
         if not name:
             return None
 
-        pkg_name = name.replace("-", "_")
-        candidates = [
-            (os.path.join(dir_path, pkg_name, "__init__.py"),
-             os.path.join(pkg_name, "__init__.py")),
-            (os.path.join(dir_path, "src", pkg_name, "__init__.py"),
-             os.path.join("src", pkg_name, "__init__.py")),
-        ]
+        pkg_root = detect_python_package_root(dir_path)
+        if pkg_root is None:
+            return None
 
-        for init_path, rel_path in candidates:
-            if not os.path.isfile(init_path):
-                continue
-            with open(init_path, "r", encoding="utf-8") as f:
-                content = f.read()
-            new_content = _VERSION_RE.sub(rf'\g<1>{version}\g<2>', content)
-            if new_content != content:
-                tmp = init_path + ".tmp"
-                with open(tmp, "w", encoding="utf-8") as f:
-                    f.write(new_content)
-                os.replace(tmp, init_path)
-                return rel_path
-            break
+        init_rel = os.path.join(pkg_root, "__init__.py")
+        init_path = os.path.join(dir_path, init_rel)
+        if not os.path.isfile(init_path):
+            return None
+
+        with open(init_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        node = find_dunder_version_node(content)
+        if node is None:
+            return None
+
+        # Read the original quote character from source to preserve style.
+        line = content.splitlines()[node.lineno - 1]
+        quote_char = line[node.col_offset]
+
+        # Build the replacement literal and splice it into the source.
+        new_literal = f"{quote_char}{version}{quote_char}"
+        lines = content.splitlines(keepends=True)
+        target_line = lines[node.lineno - 1]
+        lines[node.lineno - 1] = (
+            target_line[:node.col_offset]
+            + new_literal
+            + target_line[node.end_col_offset:]
+        )
+        new_content = "".join(lines)
+
+        if new_content != content:
+            tmp = init_path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                f.write(new_content)
+            os.replace(tmp, init_path)
+            return init_rel
+
         return None
 
     def version_file(self, dir_path=None):
