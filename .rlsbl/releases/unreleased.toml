@@ -1,0 +1,16 @@
+# Version bump type: patch, minor, major, or hotfix
+bump = "minor"
+# Short description of this release (required)
+description = "AST-based __version__ bumping, dunder-version-missing check, and releasable test runner fix"
+# Optional context explaining why these changes were made
+context = """
+The __version__ bumping system was rewritten from regex to AST parsing, eliminating an entire class of
+missed version bumps (typed annotations, pre-release strings). A new dunder-version-missing check
+catches the pgdesign bug class where a version constant exists under the wrong name.
+detect_python_package_root gained uv build-backend and src/ layout support.
+The releasable test runner now dispatches the correct test command per member target type.
+"""
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["npm", "pypi"]
+exclude = []
