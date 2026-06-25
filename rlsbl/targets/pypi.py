@@ -53,6 +53,36 @@ def find_dunder_version_node(content: str) -> "ast.Constant | None":
     return None
 
 
+def has_any_dunder_version(content: str) -> bool:
+    """Check whether the source contains any form of __version__ definition.
+
+    Returns True if the content contains any assignment, annotated
+    assignment, or import of ``__version__`` -- regardless of whether the
+    value is a static literal.  Returns False on SyntaxError or if no
+    ``__version__`` definition is found.
+    """
+    try:
+        tree = ast.parse(content)
+    except SyntaxError:
+        return False
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == "__version__":
+                    return True
+        elif isinstance(node, ast.AnnAssign):
+            if isinstance(node.target, ast.Name) and node.target.id == "__version__":
+                return True
+        elif isinstance(node, ast.ImportFrom):
+            if node.names and any(
+                alias.name == "__version__" for alias in node.names
+            ):
+                return True
+
+    return False
+
+
 class PypiTarget(BaseTarget):
     """Release target for Python projects (pyproject.toml)."""
 

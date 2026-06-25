@@ -281,6 +281,66 @@ class TestPypiWriteVersionDunderVersion:
             assert content == 'from ._version import __version__\n'
 
 
+class TestFindDunderVersionNode:
+    """Tests for find_dunder_version_node() AST helper."""
+
+    def test_static_literal_returns_node(self):
+        from rlsbl.targets.pypi import find_dunder_version_node
+        node = find_dunder_version_node('__version__ = "1.0.0"\n')
+        assert node is not None
+        assert node.value == "1.0.0"
+
+    def test_typed_annotation_returns_node(self):
+        from rlsbl.targets.pypi import find_dunder_version_node
+        node = find_dunder_version_node('__version__: str = "2.5.0"\n')
+        assert node is not None
+        assert node.value == "2.5.0"
+
+    def test_dynamic_call_returns_none(self):
+        from rlsbl.targets.pypi import find_dunder_version_node
+        node = find_dunder_version_node('__version__ = _detect_version()\n')
+        assert node is None
+
+    def test_import_returns_none(self):
+        from rlsbl.targets.pypi import find_dunder_version_node
+        node = find_dunder_version_node('from ._version import __version__\n')
+        assert node is None
+
+    def test_no_dunder_version_returns_none(self):
+        from rlsbl.targets.pypi import find_dunder_version_node
+        node = find_dunder_version_node('x = 42\n')
+        assert node is None
+
+    def test_syntax_error_returns_none(self):
+        from rlsbl.targets.pypi import find_dunder_version_node
+        node = find_dunder_version_node('def foo(\n')
+        assert node is None
+
+
+class TestHasAnyDunderVersion:
+    """Tests for has_any_dunder_version() AST helper."""
+
+    def test_static_literal_true(self):
+        from rlsbl.targets.pypi import has_any_dunder_version
+        assert has_any_dunder_version('__version__ = "1.0.0"\n') is True
+
+    def test_dynamic_call_true(self):
+        from rlsbl.targets.pypi import has_any_dunder_version
+        assert has_any_dunder_version('__version__ = _detect_version()\n') is True
+
+    def test_import_true(self):
+        from rlsbl.targets.pypi import has_any_dunder_version
+        assert has_any_dunder_version('from ._version import __version__\n') is True
+
+    def test_no_dunder_version_false(self):
+        from rlsbl.targets.pypi import has_any_dunder_version
+        assert has_any_dunder_version('x = 42\n') is False
+
+    def test_syntax_error_false(self):
+        from rlsbl.targets.pypi import has_any_dunder_version
+        assert has_any_dunder_version('def foo(\n') is False
+
+
 class TestGoTarget:
     def test_is_release_target(self):
         target = GoTarget()
