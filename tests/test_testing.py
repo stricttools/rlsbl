@@ -591,3 +591,115 @@ class TestResolvePytestInvocation:
         with patch("rlsbl.testing.detect_uv_workspace_root", return_value=None):
             with pytest.raises(ConfigError, match="pytest is not declared"):
                 _resolve_pytest_invocation(str(tmp_project), None)
+
+
+# ---------------------------------------------------------------------------
+# Integration tests: run_project_tests end-to-end flow
+# ---------------------------------------------------------------------------
+
+class TestPypiIntegration:
+    """Integration tests exercising run_project_tests through _run_pypi_tests."""
+
+    def test_workspace_member_preserves_behavior(self, tmp_project):
+        """Workspace member: syncs at workspace root, runs uv run pytest."""
+        ws_root = tmp_project / "ws"
+        ws_root.mkdir()
+        (ws_root / "pyproject.toml").write_text("[project]\nname = 'ws'\nversion = '0.1.0'\n")
+        pkg = tmp_project / "ws" / "pkg"
+        pkg.mkdir()
+
+        with (
+            patch("rlsbl.testing.require_tool") as mock_tool,
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=str(ws_root)),
+            patch("rlsbl.testing.subprocess.run") as mock_run,
+        ):
+            mock_tool.return_value = "/usr/bin/uv"
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+
+            result = run_project_tests(
+                "pypi", project_dir=str(pkg), workspace_root=str(ws_root)
+            )
+
+            assert result is True
+            assert mock_run.call_count == 2
+            sync_cmd = mock_run.call_args_list[0][0][0]
+            assert sync_cmd == ["uv", "sync", "--all-packages", "--quiet"]
+            assert mock_run.call_args_list[0].kwargs["cwd"] == str(ws_root)
+            pytest_cmd = mock_run.call_args_list[1][0][0]
+            assert pytest_cmd == ["uv", "run", "pytest"]
+            assert mock_run.call_args_list[1].kwargs["cwd"] == str(pkg)
+
+    def test_standalone_optional_dep_test(self, tmp_project):
+        """Non-workspace, pytest in [project.optional-dependencies].test: uv run --extra test pytest."""
+        (tmp_project / "pyproject.toml").write_text(
+            '[project]\nname = "pkg"\nversion = "0.1.0"\n\n'
+            '[project.optional-dependencies]\ntest = ["pytest>=8.0"]\n'
+        )
+        with (
+            patch("rlsbl.testing.require_tool") as mock_tool,
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.testing.subprocess.run") as mock_run,
+        ):
+            mock_tool.return_value = "/usr/bin/uv"
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+
+            result = run_project_tests("pypi", project_dir=str(tmp_project))
+
+            assert result is True
+            assert mock_run.call_count == 1
+            assert mock_run.call_args[0][0] == ["uv", "run", "--extra", "test", "pytest"]
+
+    def test_standalone_dev_group_default(self, tmp_project):
+        """Non-workspace, pytest in [dependency-groups].dev: uv run pytest (default dev)."""
+        (tmp_project / "pyproject.toml").write_text(
+            '[project]\nname = "pkg"\nversion = "0.1.0"\n\n'
+            '[dependency-groups]\ndev = ["pytest>=8.0", "ruff"]\n'
+        )
+        with (
+            patch("rlsbl.testing.require_tool") as mock_tool,
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.testing.subprocess.run") as mock_run,
+        ):
+            mock_tool.return_value = "/usr/bin/uv"
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+
+            result = run_project_tests("pypi", project_dir=str(tmp_project))
+
+            assert result is True
+            assert mock_run.call_count == 1
+            assert mock_run.call_args[0][0] == ["uv", "run", "pytest"]
+
+    def test_standalone_not_declared_raises(self, tmp_project):
+        """Non-workspace, pytest not declared anywhere: raises ConfigError."""
+        (tmp_project / "pyproject.toml").write_text(
+            '[project]\nname = "pkg"\nversion = "0.1.0"\n\n'
+            '[dependency-groups]\ndev = ["ruff", "mypy"]\n'
+        )
+        with (
+            patch("rlsbl.testing.require_tool") as mock_tool,
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+        ):
+            mock_tool.return_value = "/usr/bin/uv"
+
+            with pytest.raises(ConfigError, match="pytest is not declared"):
+                run_project_tests("pypi", project_dir=str(tmp_project))
+
+    def test_standalone_named_group(self, tmp_project):
+        """Non-workspace, pytest in named dependency group: uv run --group <name> pytest."""
+        (tmp_project / "pyproject.toml").write_text(
+            '[project]\nname = "pkg"\nversion = "0.1.0"\n\n'
+            '[dependency-groups]\ntesting = ["pytest>=8.0"]\n'
+        )
+        with (
+            patch("rlsbl.testing.require_tool") as mock_tool,
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.testing.subprocess.run") as mock_run,
+        ):
+            mock_tool.return_value = "/usr/bin/uv"
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+
+            result = run_project_tests("pypi", project_dir=str(tmp_project))
+
+            assert result is True
+            assert mock_run.call_count == 1
+            assert mock_run.call_args[0][0] == ["uv", "run", "--group", "testing", "pytest"]
