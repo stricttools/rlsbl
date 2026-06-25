@@ -6,7 +6,13 @@ from unittest.mock import patch
 
 import pytest
 
-from rlsbl.testing import _probe_pytest_location, run_project_tests, sync_workspace
+from rlsbl.errors import ConfigError
+from rlsbl.testing import (
+    _probe_pytest_location,
+    _resolve_pytest_invocation,
+    run_project_tests,
+    sync_workspace,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -478,3 +484,67 @@ class TestProbePytestLocation:
         )
         result = _probe_pytest_location(str(tmp_project))
         assert result == ("dependency-group", "dev")
+
+
+# ---------------------------------------------------------------------------
+# _resolve_pytest_invocation
+# ---------------------------------------------------------------------------
+
+class TestResolvePytestInvocation:
+    """Tests for _resolve_pytest_invocation."""
+
+    def test_workspace_member(self, tmp_project):
+        """Workspace members get plain uv run pytest."""
+        with patch("rlsbl.testing.detect_uv_workspace_root", return_value="/ws"):
+            result = _resolve_pytest_invocation(str(tmp_project), "/ws")
+        assert result == ["uv", "run", "pytest"]
+
+    def test_standalone_dev_group(self, tmp_project):
+        """Standalone with pytest in [dependency-groups].dev gets uv run pytest."""
+        (tmp_project / "pyproject.toml").write_text(
+            '[project]\nname = "pkg"\nversion = "0.1.0"\n\n'
+            '[dependency-groups]\ndev = ["pytest>=8.0"]\n'
+        )
+        with patch("rlsbl.testing.detect_uv_workspace_root", return_value=None):
+            result = _resolve_pytest_invocation(str(tmp_project), None)
+        assert result == ["uv", "run", "pytest"]
+
+    def test_standalone_named_group(self, tmp_project):
+        """Standalone with pytest in a named group gets --group flag."""
+        (tmp_project / "pyproject.toml").write_text(
+            '[project]\nname = "pkg"\nversion = "0.1.0"\n\n'
+            '[dependency-groups]\ntest = ["pytest"]\n'
+        )
+        with patch("rlsbl.testing.detect_uv_workspace_root", return_value=None):
+            result = _resolve_pytest_invocation(str(tmp_project), None)
+        assert result == ["uv", "run", "--group", "test", "pytest"]
+
+    def test_standalone_optional_dep(self, tmp_project):
+        """Standalone with pytest in optional-dependencies gets --extra flag."""
+        (tmp_project / "pyproject.toml").write_text(
+            '[project]\nname = "pkg"\nversion = "0.1.0"\n\n'
+            '[project.optional-dependencies]\ntest = ["pytest>=7.0"]\n'
+        )
+        with patch("rlsbl.testing.detect_uv_workspace_root", return_value=None):
+            result = _resolve_pytest_invocation(str(tmp_project), None)
+        assert result == ["uv", "run", "--extra", "test", "pytest"]
+
+    def test_standalone_uv_dev(self, tmp_project):
+        """Standalone with pytest in [tool.uv].dev-dependencies gets uv run pytest."""
+        (tmp_project / "pyproject.toml").write_text(
+            '[project]\nname = "pkg"\nversion = "0.1.0"\n\n'
+            '[tool.uv]\ndev-dependencies = ["pytest"]\n'
+        )
+        with patch("rlsbl.testing.detect_uv_workspace_root", return_value=None):
+            result = _resolve_pytest_invocation(str(tmp_project), None)
+        assert result == ["uv", "run", "pytest"]
+
+    def test_standalone_not_declared_raises(self, tmp_project):
+        """Standalone with no pytest declaration raises ConfigError."""
+        (tmp_project / "pyproject.toml").write_text(
+            '[project]\nname = "pkg"\nversion = "0.1.0"\n\n'
+            '[dependency-groups]\ndev = ["ruff"]\n'
+        )
+        with patch("rlsbl.testing.detect_uv_workspace_root", return_value=None):
+            with pytest.raises(ConfigError, match="pytest is not declared"):
+                _resolve_pytest_invocation(str(tmp_project), None)

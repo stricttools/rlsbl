@@ -10,7 +10,8 @@ import subprocess
 import sys
 import tomllib
 
-from .utils import require_tool
+from .errors import ConfigError
+from .utils import detect_uv_workspace_root, require_tool
 
 
 def sync_workspace(workspace_root: str, *, verbose: bool = False) -> bool:
@@ -80,6 +81,40 @@ def _probe_pytest_location(project_dir: str) -> tuple[str, str] | None:
             return ("uv-dev", "dev")
 
     return None
+
+
+def _resolve_pytest_invocation(
+    project_dir: str, workspace_root: str | None
+) -> list[str]:
+    """Build the pytest command for a project based on its environment.
+
+    For workspace members, returns plain ``uv run pytest`` (the workspace
+    venv has everything). For standalone projects, probes pyproject.toml
+    to determine the correct uv flags.
+
+    Raises ConfigError if pytest is not declared anywhere in pyproject.toml.
+    """
+    uv_ws_root = detect_uv_workspace_root(project_dir)
+    if uv_ws_root is not None:
+        return ["uv", "run", "pytest"]
+
+    location = _probe_pytest_location(project_dir)
+    if location is None:
+        raise ConfigError(
+            f"pytest is not declared in {project_dir}/pyproject.toml. "
+            "Add it to [dependency-groups].dev or [project.optional-dependencies].test."
+        )
+
+    source_type, name = location
+    if source_type == "dependency-group":
+        if name == "dev":
+            return ["uv", "run", "pytest"]
+        return ["uv", "run", "--group", name, "pytest"]
+    elif source_type == "optional-dep":
+        return ["uv", "run", "--extra", name, "pytest"]
+    else:
+        # uv-dev: uv syncs dev deps by default
+        return ["uv", "run", "pytest"]
 
 
 def run_project_tests(
