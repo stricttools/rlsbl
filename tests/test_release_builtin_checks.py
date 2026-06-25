@@ -50,9 +50,10 @@ def _setup_npm_project(tmp_path, test_script=None):
 
 
 def _setup_pypi_project(tmp_path):
-    """Create a minimal pypi project in tmp_path."""
+    """Create a minimal pypi project in tmp_path with pytest declared."""
     (tmp_path / "pyproject.toml").write_text(
-        '[project]\nname = "test-pkg"\nversion = "1.0.0"\n'
+        '[project]\nname = "test-pkg"\nversion = "1.0.0"\n\n'
+        '[dependency-groups]\ndev = ["pytest>=8.0"]\n'
     )
     (tmp_path / "CHANGELOG.md").write_text(
         "# Changelog\n\n## 1.0.1\n\nPatch release with improvements.\n"
@@ -78,11 +79,12 @@ class TestBuiltinTestRunner:
     """Tests for _run_builtin_tests()."""
 
     def test_python_tests_run_with_uv(self, tmp_project):
-        """When registry is pypi and uv is available, run uv sync + uv run pytest."""
+        """When registry is pypi and uv is available, run uv run pytest (standalone)."""
         _setup_pypi_project(tmp_project)
 
         with (
             patch("rlsbl.testing.require_tool") as mock_which,
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
             patch("rlsbl.testing.subprocess.run") as mock_run,
         ):
             mock_which.return_value = "/usr/bin/uv"
@@ -91,11 +93,9 @@ class TestBuiltinTestRunner:
             result = _run_builtin_tests("pypi", {}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={}))
 
             assert result is True
-            # Should have called uv sync --quiet then uv run pytest
-            assert mock_run.call_count == 2
-            sync_call = mock_run.call_args_list[0]
-            assert sync_call[0][0] == ["uv", "sync", "--all-packages", "--quiet"]
-            pytest_call = mock_run.call_args_list[1]
+            # Standalone: no sync, just uv run pytest
+            assert mock_run.call_count == 1
+            pytest_call = mock_run.call_args_list[0]
             assert pytest_call[0][0] == ["uv", "run", "pytest"]
 
     def test_python_tests_without_uv_falls_back_to_pytest(self, tmp_project):
@@ -196,6 +196,7 @@ class TestBuiltinTestRunnerCwd:
 
         with (
             patch("rlsbl.testing.require_tool") as mock_which,
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
             patch("rlsbl.testing.subprocess.run") as mock_run,
         ):
             mock_which.return_value = "/usr/bin/uv"
@@ -207,22 +208,26 @@ class TestBuiltinTestRunnerCwd:
                 assert c.kwargs.get("cwd") is None
 
     def test_pypi_cwd_monorepo(self, tmp_project):
-        """In monorepo mode, subprocess.run gets cwd=project_dir."""
+        """In monorepo mode (workspace member), subprocess.run gets correct cwd."""
         _setup_pypi_project(tmp_project)
         project_dir = str(tmp_project / "libs" / "mylib")
+        ws_root = str(tmp_project)
 
         with (
             patch("rlsbl.testing.require_tool") as mock_which,
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=ws_root),
             patch("rlsbl.testing.subprocess.run") as mock_run,
         ):
             mock_which.return_value = "/usr/bin/uv"
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
 
-            _run_builtin_tests("pypi", {}, project_dir=project_dir, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={}))
+            _run_builtin_tests("pypi", {}, project_dir=project_dir, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=Path(ws_root), config={}))
 
             assert mock_run.call_count == 2
-            for c in mock_run.call_args_list:
-                assert c.kwargs.get("cwd") == project_dir
+            # sync runs at workspace root
+            assert mock_run.call_args_list[0].kwargs.get("cwd") == ws_root
+            # pytest runs at project_dir
+            assert mock_run.call_args_list[1].kwargs.get("cwd") == project_dir
 
     def test_pypi_fallback_pytest_cwd_monorepo(self, tmp_project):
         """Fallback pytest call also gets cwd=project_dir in monorepo mode."""

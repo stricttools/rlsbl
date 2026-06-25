@@ -101,16 +101,20 @@ class TestPypiTestsTimeout:
 
     def test_pypi_pytest_timeout_returns_false(self, tmp_path):
         """When uv run pytest times out, run_project_tests returns False."""
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "pkg"\nversion = "0.1.0"\n\n'
+            '[dependency-groups]\ndev = ["pytest>=8.0"]\n'
+        )
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
             patch(
                 "rlsbl.testing.subprocess.run",
             ) as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
-            # First call (uv sync) succeeds, second call (uv run pytest) times out
+            # Standalone: single call (uv run pytest) times out
             mock_run.side_effect = [
-                subprocess.CompletedProcess(args=[], returncode=0),
                 subprocess.TimeoutExpired(
                     cmd=["uv", "run", "pytest"], timeout=120
                 ),
