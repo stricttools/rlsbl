@@ -333,7 +333,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         if hook_is_customized:
             log("Skipping built-in tests (releasable pre-release hook handles testing)")
         else:
-            run_releasable_tests(_member_tuples, registry, flags, ctx=ctx, log=log)
+            run_releasable_tests(_member_tuples, flags, ctx=ctx, log=log, releasable_config_dir=_rel_cfg_dir)
 
         if hook_is_customized:
             log("Skipping built-in lint (releasable pre-release hook handles linting)")

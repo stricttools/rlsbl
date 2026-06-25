@@ -543,13 +543,17 @@ class TestReleasableTestAggregation:
         def mock_builtin_tests(registry, flags, *, project_dir=None, ctx):
             tested_packages.append(os.path.basename(project_dir))
 
-        with patch("rlsbl.commands.release.validate._run_builtin_tests", side_effect=mock_builtin_tests):
+        from rlsbl.targets import TargetEntry
+        mock_targets = [TargetEntry(name="pypi", path=".")]
+
+        with patch("rlsbl.targets.detect_targets", return_value=mock_targets), \
+             patch("rlsbl.commands.release.validate._run_builtin_tests", side_effect=mock_builtin_tests):
             run_releasable_tests(
                 [("beta", str(beta_dir)), ("alpha", str(alpha_dir))],
-                "pypi",
                 {},
                 ctx=MagicMock(),
                 log=print,
+                releasable_config_dir=None,
             )
 
         # Alphabetical order
@@ -570,17 +574,48 @@ class TestReleasableTestAggregation:
             if "alpha" in project_dir:
                 raise HookError("Tests failed")
 
-        with patch("rlsbl.commands.release.validate._run_builtin_tests", side_effect=mock_builtin_tests):
+        from rlsbl.targets import TargetEntry
+        mock_targets = [TargetEntry(name="pypi", path=".")]
+
+        with patch("rlsbl.targets.detect_targets", return_value=mock_targets), \
+             patch("rlsbl.commands.release.validate._run_builtin_tests", side_effect=mock_builtin_tests):
             with pytest.raises(HookError, match="Tests failed"):
                 run_releasable_tests(
                     [("alpha", str(alpha_dir)), ("beta", str(beta_dir))],
-                    "pypi",
                     {},
                     ctx=MagicMock(),
                     log=print,
+                    releasable_config_dir=None,
                 )
 
         assert call_count == 1
+
+    def test_detects_target_per_member(self, tmp_path):
+        """Each member gets its own target type detected, not the releasable-level registry."""
+        pypi_dir = tmp_path / "pypi_pkg"
+        go_dir = tmp_path / "go_pkg"
+        pypi_dir.mkdir()
+        go_dir.mkdir()
+
+        # Create project files so detect_targets can identify targets
+        (pypi_dir / "pyproject.toml").write_text('[project]\nname = "pypi_pkg"\nversion = "0.1.0"\n')
+        (go_dir / "go.mod").write_text("module example.com/go_pkg\n\ngo 1.21\n")
+
+        registries_per_call = []
+
+        def mock_builtin_tests(registry, flags, *, project_dir=None, ctx):
+            registries_per_call.append((os.path.basename(project_dir), registry))
+
+        with patch("rlsbl.commands.release.validate._run_builtin_tests", side_effect=mock_builtin_tests):
+            run_releasable_tests(
+                [("go_pkg", str(go_dir)), ("pypi_pkg", str(pypi_dir))],
+                {},
+                ctx=MagicMock(),
+                log=print,
+            )
+
+        # Sorted alphabetically, go_pkg comes first
+        assert registries_per_call == [("go_pkg", "go"), ("pypi_pkg", "pypi")]
 
 
 class TestReleasableLintAggregation:

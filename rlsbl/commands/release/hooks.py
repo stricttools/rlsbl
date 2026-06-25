@@ -557,24 +557,32 @@ def _run_per_package_hooks(hook_name, hook_file, sorted_members, hook_env,
             )
 
 
-def run_releasable_tests(member_packages, registry, flags, *, ctx, log):
+def run_releasable_tests(member_packages, flags, *, ctx, log, releasable_config_dir=None):
     """Run built-in tests for each member package of a releasable.
 
-    Iterates members alphabetically. Any failure raises HookError.
+    Detects the target type per member and runs the appropriate test
+    command.  Iterates members alphabetically. Any failure raises HookError.
 
     Args:
         member_packages: list of (package_name, package_dir) tuples.
-        registry: target/registry identifier (e.g. ``"pypi"``).
         flags: release flags dict.
         ctx: ProjectContext.
         log: callable for logging messages.
+        releasable_config_dir: optional path to the releasable's state
+            directory for target detection config inheritance.
 
     Raises:
         HookError if any member's tests fail.
     """
     from .validate import _run_builtin_tests
+    from rlsbl.targets import detect_targets
 
     for pkg_name, pkg_dir in sorted(member_packages, key=lambda p: p[0]):
+        targets = detect_targets(str(pkg_dir), releasable_config_dir=releasable_config_dir)
+        if not targets:
+            log(f"No targets detected for {pkg_name}, skipping tests")
+            continue
+        registry = targets[0].name
         log(f"Running tests for package {pkg_name}...")
         _run_builtin_tests(registry, flags, project_dir=str(pkg_dir), ctx=ctx)
 
