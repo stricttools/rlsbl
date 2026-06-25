@@ -748,7 +748,6 @@ def _get_generated_files(project_path: str) -> list[str]:
     except (subprocess.CalledProcessError, FileNotFoundError):
         return []
 
-    changes_dir = get_changes_dir(project_path)
     files = []
     for line in result.stdout.splitlines():
         if len(line) < 4:

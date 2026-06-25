@@ -500,12 +500,10 @@ class MavenScanner:
         # Find all <dependency> elements (both in <dependencies> and
         # <dependencyManagement><dependencies>)
         for dep_elem in root.iter(f"{prefix}dependency"):
-            group_elem = dep_elem.find(f"{prefix}groupId")
             artifact_elem = dep_elem.find(f"{prefix}artifactId")
             version_elem = dep_elem.find(f"{prefix}version")
             scope_elem = dep_elem.find(f"{prefix}scope")
 
-            group_id = group_elem.text.strip() if group_elem is not None and group_elem.text else ""
             artifact_id = artifact_elem.text.strip() if artifact_elem is not None and artifact_elem.text else ""
             version = version_elem.text.strip() if version_elem is not None and version_elem.text else ""
             maven_scope = scope_elem.text.strip() if scope_elem is not None and scope_elem.text else "compile"

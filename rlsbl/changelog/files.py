@@ -200,8 +200,7 @@ def finalize_version(
     os.chmod(dst, 0o444)
 
     # Create a new empty unreleased.jsonl
-    with open(src, "w", encoding="utf-8") as f:
-        pass  # empty file
+    open(src, "w", encoding="utf-8").close()
 
 
 def unfinalize_version(changes_dir: str, version: str) -> list[str]:

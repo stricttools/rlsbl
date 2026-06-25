@@ -595,7 +595,7 @@ def create_migration_tag(workspace_root, releasable_name, tag_format,
             capture_output=True,
             text=True,
         )
-    except subprocess.CalledProcessError as e:
+    except subprocess.CalledProcessError:
         return {
             "status": "error",
             "tag": new_tag,

@@ -65,12 +65,6 @@ def _scaffold_retry_file(retry_path, project_dir, target, monorepo_name, monorep
     raw_version = tgt.read_version(primary.path)
     version = raw_version.lstrip("v")
 
-    # Build tag
-    if monorepo_name:
-        tag = tgt.monorepo_tag_format(monorepo_name, version, path=monorepo_project_path)
-    else:
-        tag = tgt.tag_format(version)
-
     # Auto-detect dispatchable workflows
     dispatch = _find_dispatch_workflows()
 
