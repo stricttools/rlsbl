@@ -323,6 +323,113 @@ def _check_entry_points(project_path, config):
     return results
 
 
+_TERMINATOR_TYPES = frozenset({
+    "return_statement", "raise_statement", "break_statement", "continue_statement",
+})
+
+
+def _always_terminates(node):
+    """Return True if the given node unconditionally terminates its enclosing block.
+
+    A node always terminates if:
+    - It is a return, raise, break, or continue statement.
+    - It is a block whose last child always terminates.
+    - It is an if_statement with an else_clause where the if body, all elif
+      bodies, and the else body all always terminate.
+    """
+    if node.type in _TERMINATOR_TYPES:
+        return True
+
+    if node.type == "block":
+        children = [c for c in node.children if c.is_named]
+        return bool(children) and _always_terminates(children[-1])
+
+    if node.type == "if_statement":
+        has_else = False
+        # Collect the if body and all elif/else clause bodies
+        bodies = []
+        for child in node.children:
+            if child.type == "block":
+                # The if branch body
+                bodies.append(child)
+            elif child.type == "elif_clause":
+                for ec_child in child.children:
+                    if ec_child.type == "block":
+                        bodies.append(ec_child)
+            elif child.type == "else_clause":
+                has_else = True
+                for ec_child in child.children:
+                    if ec_child.type == "block":
+                        bodies.append(ec_child)
+
+        if not has_else:
+            return False
+
+        return all(_always_terminates(body) for body in bodies)
+
+    return False
+
+
+def _terminator_label(node):
+    """Return a human-readable label for the terminating construct."""
+    if node.type == "return_statement":
+        return "return"
+    if node.type == "raise_statement":
+        return "raise"
+    if node.type == "break_statement":
+        return "break"
+    if node.type == "continue_statement":
+        return "continue"
+    if node.type == "if_statement":
+        return "if/else"
+    return node.type
+
+
+def _check_unreachable_code(tree, filepath):
+    """Detect unreachable statements in block nodes.
+
+    Walks all block nodes in the tree. Within each block, if a child statement
+    unconditionally terminates (return, raise, break, continue, or exhaustive
+    if/else with all branches terminating), any subsequent sibling statements
+    are flagged as unreachable.
+
+    Skips nested function and class definitions -- a return inside a nested
+    function does not make the outer code unreachable.
+    """
+    results = []
+
+    def _walk_blocks(node):
+        if node.type == "block":
+            named_children = [c for c in node.children if c.is_named]
+            found_terminator = None
+            for child in named_children:
+                if found_terminator is not None:
+                    results.append(LintResult(
+                        file=filepath,
+                        line=_node_line(child),
+                        rule="unreachable-code",
+                        severity="error",
+                        message=f"unreachable code after {_terminator_label(found_terminator)}",
+                    ))
+                elif _always_terminates(child):
+                    found_terminator = child
+
+        # Recurse into children, but skip nested function/class definitions
+        # to avoid false positives (a return in an inner function does not
+        # terminate the outer block)
+        for child in node.children:
+            if child.type in ("function_definition", "class_definition"):
+                # Still walk inside the function/class to find unreachable
+                # code within those scopes
+                for grandchild in child.children:
+                    _walk_blocks(grandchild)
+            else:
+                _walk_blocks(child)
+
+    _walk_blocks(tree.root_node)
+    return results
+
+
 class PythonAstLinter:
     """Python linter using tree-sitter AST analysis."""
 
@@ -351,6 +458,7 @@ class PythonAstLinter:
             results.extend(_check_forbidden_imports(tree, filepath, config))
             if config.stdout_enabled:
                 results.extend(_check_stdout(tree, filepath, config))
+            results.extend(_check_unreachable_code(tree, filepath))
 
         return results
 
