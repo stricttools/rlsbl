@@ -1,11 +1,13 @@
 """Shared utilities: subprocess runner, git helpers, version bumping, changelog extraction, commit tooling, and GitHub API queries."""
 
+import glob
 import json
 import os
 import re
 import shutil
 import subprocess
 import sys
+import tomllib
 import urllib.request
 
 from .errors import ConfigError, GitError, VersionError
@@ -61,6 +63,56 @@ def find_project_root(start=None):
             return current
         if os.path.isdir(os.path.join(current, ".rlsbl-monorepo")):
             return current
+        parent = os.path.dirname(current)
+        if parent == current:
+            return None
+        current = parent
+
+
+def detect_uv_workspace_root(project_dir: str) -> str | None:
+    """Walk up from project_dir to find a uv workspace root that includes it as a member.
+
+    Checks each ancestor for a pyproject.toml with [tool.uv.workspace.members].
+    If found, expands member globs and excludes, then checks if project_dir
+    is in the resolved member set.
+
+    Returns the workspace root directory, or None if project_dir is not a
+    member of any uv workspace.
+    """
+    abs_project = os.path.abspath(project_dir)
+    current = abs_project
+    while True:
+        pyproject_path = os.path.join(current, "pyproject.toml")
+        if os.path.isfile(pyproject_path):
+            try:
+                with open(pyproject_path, "rb") as f:
+                    data = tomllib.load(f)
+            except (OSError, tomllib.TOMLDecodeError):
+                pass
+            else:
+                members_patterns = (
+                    data.get("tool", {}).get("uv", {}).get("workspace", {}).get("members")
+                )
+                if members_patterns is not None:
+                    # Expand member globs
+                    member_dirs: set[str] = set()
+                    for pattern in members_patterns:
+                        for match in glob.glob(os.path.join(current, pattern)):
+                            if os.path.isdir(match):
+                                member_dirs.add(os.path.abspath(match))
+
+                    # Expand and remove exclude globs
+                    exclude_patterns = (
+                        data.get("tool", {}).get("uv", {}).get("workspace", {}).get("exclude", [])
+                    )
+                    for pattern in exclude_patterns:
+                        for match in glob.glob(os.path.join(current, pattern)):
+                            abs_match = os.path.abspath(match)
+                            member_dirs.discard(abs_match)
+
+                    if abs_project in member_dirs:
+                        return current
+
         parent = os.path.dirname(current)
         if parent == current:
             return None
