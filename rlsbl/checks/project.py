@@ -3,7 +3,7 @@
 Checks: lock, version-consistency, name-consistency, license-consistency,
 description-consistency, private-hook-stale, config-schema, license-file,
 private-publish-workflow, npm-private-mismatch, target-version-readable,
-selfdoc-version-drift, scaffold-conflicts.
+dunder-version-missing, selfdoc-version-drift, scaffold-conflicts.
 """
 
 import json
@@ -515,6 +515,73 @@ def register_project_checks(app):
             "pass",
             f"all {len(target_entries)} target(s) version readable",
         )
+
+    @app.check("dunder-version-missing")
+    def check_dunder_version_missing(ctx):
+        """PyPI targets with a version constant must use __version__."""
+        import ast
+        import re as _re
+
+        from ..targets import detect_targets, resolve_releasable_config_dir_for_ctx
+        from ..targets.utils import detect_python_package_root
+        from ..targets.pypi import has_any_dunder_version
+        from ..errors import VersionError
+
+        rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
+        target_entries = detect_targets(str(ctx.project_root), releasable_config_dir=rel_dir)
+
+        # Step 3: skip if no pypi target
+        if not any(name == "pypi" for name, _path in target_entries):
+            return CheckResult("skip", "no pypi target")
+
+        # Step 4: detect package root
+        root_str = str(ctx.project_root)
+        try:
+            pkg_root = detect_python_package_root(root_str)
+        except VersionError as e:
+            return CheckResult("fail", str(e))
+
+        if pkg_root is None:
+            return CheckResult("pass", "cannot determine package root")
+
+        # Step 5: check __init__.py existence
+        init_path = os.path.join(root_str, pkg_root, "__init__.py")
+        if not os.path.exists(init_path):
+            return CheckResult("pass", "no __init__.py (namespace package)")
+
+        # Step 6: read file content
+        with open(init_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        # Step 7: check for __version__
+        if has_any_dunder_version(content):
+            return CheckResult("pass", "__version__ defined")
+
+        # Step 8: scan AST for version-like constants without __version__
+        rel_path = os.path.relpath(init_path, root_str)
+        try:
+            tree = ast.parse(content)
+        except SyntaxError:
+            return CheckResult("pass", "cannot parse __init__.py")
+
+        for node in ast.iter_child_nodes(tree):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if (
+                        isinstance(target, ast.Name)
+                        and "version" in target.id.lower()
+                        and isinstance(node.value, ast.Constant)
+                        and isinstance(node.value.value, str)
+                        and _re.search(r"\d+\.\d+", node.value.value)
+                    ):
+                        return CheckResult(
+                            "fail",
+                            f'{target.id} = "{node.value.value}" found in '
+                            f"{rel_path} but no __version__; rename to __version__",
+                        )
+
+        # Step 9: no version constant at all -- pure re-export module
+        return CheckResult("pass", "no version constant in __init__.py")
 
     @app.check("selfdoc-version-drift")
     def check_selfdoc_version_drift(ctx):
