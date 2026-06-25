@@ -6,7 +6,7 @@ import re
 import subprocess
 
 from .base import BasePipeline
-from ..utils import require_tool, run
+from ..utils import read_go_module_path, require_tool, run
 
 
 class GoPipeline(BasePipeline):
@@ -36,8 +36,8 @@ class GoPipeline(BasePipeline):
             print(f"  Skipping pipeline '{self.name}' local publish (config: local=false)")
             return
 
-        module_path = self._read_module_path(dir_path)
-        if not module_path:
+        module_path = read_go_module_path(dir_path)
+        if module_path is None:
             print("Warning: could not read module path from go.mod, skipping proxy notification")
             return
 
@@ -69,16 +69,6 @@ class GoPipeline(BasePipeline):
     def required_env_vars(self) -> list[str]:
         # Go uses GITHUB_TOKEN which is always available in CI
         return []
-
-    def _read_module_path(self, dir_path: str) -> str:
-        """Extract the module path from go.mod."""
-        mod_path = os.path.join(dir_path, "go.mod")
-        if not os.path.exists(mod_path):
-            return ""
-        with open(mod_path, encoding="utf-8") as f:
-            content = f.read()
-        match = re.search(r"^module\s+(\S+)", content, re.MULTILINE)
-        return match.group(1) if match else ""
 
     def _detect_install_path(self, dir_path: str) -> str | None:
         """Determine the go install path for CLI projects."""
