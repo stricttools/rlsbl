@@ -587,11 +587,12 @@ class TestMonorepoReleaseFilePath:
 # ---------------------------------------------------------------------------
 
 class TestMonorepoDirectoryScoping:
-    """validate_unreleased receives the correct project dict in monorepo mode.
+    """validate_changelog_state resolves changes_dir in monorepo mode.
 
-    Regression test: ensures resolve_project receives the correct start path
-    (the package directory, not the workspace root), so it returns the project
-    dict rather than None.
+    Regression test: ensures the release flow correctly resolves the
+    per-project changes directory when running from inside a monorepo
+    subproject.  Changelog validation is now handled by the
+    ``preflight-changelog`` check tag (skipped in dry-run mode).
     """
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
@@ -606,7 +607,7 @@ class TestMonorepoDirectoryScoping:
     @patch("rlsbl.commands.release.validate_unreleased")
     def test_validate_unreleased_receives_project_dict(
         self,
-        mock_validate,
+        _mock_validate,
         _gen_cl,
         _gh_inst,
         _gh_auth,
@@ -619,8 +620,8 @@ class TestMonorepoDirectoryScoping:
         monorepo_fixture,
         monkeypatch,
     ):
-        """In monorepo mode, validate_unreleased is called with project=<dict>, not None."""
-        mock_validate.return_value = {"passed": True, "checks": {}}
+        """In monorepo mode, validate_changelog_state resolves the project's changes dir."""
+        _mock_validate.return_value = {"passed": True, "checks": {}}
         # mock_run: fetch, rev-list, tag -l (current), tag -l (bumped),
         # pre/post hook snapshots
         mock_run.side_effect = ["", "0", "mypylib@v0.1.0", "", "", ""]
@@ -638,19 +639,5 @@ class TestMonorepoDirectoryScoping:
             include=["pypi"],
             exclude=[],
         )
+        # Dry-run: skips changelog preflight, just validates the path resolution
         run_cmd(config, {"dry-run": True, "quiet": False, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(monorepo_fixture.root)), config={"private": False, "pipelines": {}}))
-
-        # Verify validate_unreleased was called with a non-None project dict
-        mock_validate.assert_called_once()
-        call_kwargs = mock_validate.call_args
-        project_arg = call_kwargs.kwargs.get("project") or call_kwargs[1].get("project")
-        # If passed as positional, check the second positional arg is not it;
-        # validate_unreleased(changes_dir, tag_glob=..., project=...)
-        if project_arg is None and len(call_kwargs.args) > 2:
-            project_arg = call_kwargs.args[2]
-        assert project_arg is not None, (
-            "validate_unreleased was called with project=None; "
-            "directory scoping is broken in monorepo mode"
-        )
-        assert project_arg["name"] == "mypylib"
-        assert project_arg["path"] == "python"

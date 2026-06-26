@@ -170,52 +170,39 @@ class TestReleasableChangelogScope:
 
 
 class TestReleaseFlowPassesMemberProjs:
-    """Verify the release __init__.py code path sets monorepo_project
-    to the member project list when releasing a releasable."""
+    """Verify validate_changelog_state resolves the correct changes_dir.
 
-    def test_releasable_mode_passes_member_list(self, tmp_path, monkeypatch):
-        """In releasable mode, monorepo_project is set to member_projs list."""
-        # This tests the logic in _run_cmd_inner by checking that
-        # validate_changelog_state receives a list of WorkspaceProject
-        # as monorepo_project.
+    After the preflight-changelog migration, validate_changelog_state is a
+    thin wrapper around resolve_changes_dir.  Changelog validation is now
+    handled by the ``preflight-changelog`` check tag in the release flow.
+    """
+
+    def test_releasable_mode_returns_releasable_changes_dir(self, tmp_path):
+        """In releasable mode, validate_changelog_state returns the
+        releasable-level changes directory."""
         from rlsbl.commands.release.validate import validate_changelog_state
 
         ws_root = str(tmp_path)
         releasable_name = "myrel"
 
         # Create releasable changes dir
-        changes_dir = get_releasable_changes_dir(ws_root, releasable_name)
-        os.makedirs(changes_dir, exist_ok=True)
-        Path(os.path.join(changes_dir, "unreleased.jsonl")).write_text("")
+        expected_dir = get_releasable_changes_dir(ws_root, releasable_name)
+        os.makedirs(expected_dir, exist_ok=True)
+        Path(os.path.join(expected_dir, "unreleased.jsonl")).write_text("")
 
-        member_projs = [
-            WorkspaceProject({"name": "p1", "path": "pkg1", "releasable": "myrel"}),
-            WorkspaceProject({"name": "p2", "path": "pkg2", "releasable": "myrel"}),
-        ]
+        result = validate_changelog_state(
+            "/some/project", MagicMock(), "myrel-mono", "pkg1",
+            {}, monorepo_project=None,
+            releasable_name="myrel",
+            releasable_tag_fmt="{name}@v{version}",
+            workspace_root=ws_root,
+        )
 
-        # Patch validate_unreleased to capture the project argument
-        captured = {}
-        with patch("rlsbl.commands.release.validate_unreleased") as mock_validate:
-            mock_validate.return_value = {"passed": True, "checks": {}}
+        assert result == expected_dir
 
-            validate_changelog_state(
-                "/some/project", MagicMock(), "myrel-mono", "pkg1",
-                {}, monorepo_project=member_projs,
-                releasable_name="myrel",
-                releasable_tag_fmt="{name}@v{version}",
-                workspace_root=ws_root,
-            )
-
-        # Verify validate_unreleased was called with project=member_projs
-        call_kwargs = mock_validate.call_args
-        assert call_kwargs[1].get("project") is member_projs
-        # Confirm it's a list (triggers the releasable path in _filter_commits_for_scope)
-        assert isinstance(call_kwargs[1]["project"], list)
-        assert len(call_kwargs[1]["project"]) == 2
-
-    def test_implicit_monorepo_still_uses_single_project(self, tmp_path):
-        """Without releasable_name, monorepo_project is a single project
-        (the existing behavior is preserved)."""
+    def test_implicit_monorepo_returns_project_changes_dir(self, tmp_path):
+        """Without releasable_name, validate_changelog_state returns the
+        per-project .rlsbl/changes/ directory."""
         from rlsbl.commands.release.validate import validate_changelog_state
 
         project_dir = str(tmp_path)
@@ -223,17 +210,9 @@ class TestReleaseFlowPassesMemberProjs:
         os.makedirs(changes_dir, exist_ok=True)
         Path(os.path.join(changes_dir, "unreleased.jsonl")).write_text("")
 
-        single_proj = WorkspaceProject({"name": "p1", "path": "pkg1"})
+        result = validate_changelog_state(
+            project_dir, MagicMock(), "mono", "pkg1",
+            {}, monorepo_project=None,
+        )
 
-        with patch("rlsbl.commands.release.validate_unreleased") as mock_validate:
-            mock_validate.return_value = {"passed": True, "checks": {}}
-
-            validate_changelog_state(
-                project_dir, MagicMock(), "mono", "pkg1",
-                {}, monorepo_project=single_proj,
-            )
-
-        call_kwargs = mock_validate.call_args
-        assert call_kwargs[1].get("project") is single_proj
-        # Single project, not a list
-        assert not isinstance(call_kwargs[1]["project"], list)
+        assert result == changes_dir

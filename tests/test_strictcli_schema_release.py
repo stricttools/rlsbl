@@ -157,11 +157,13 @@ class TestStrictcliSchemaOrdering:
         )
 
     def test_schema_dump_before_preflight(self):
-        """Schema dump must run before preflight checks."""
+        """Schema dump must run before test/lint preflight checks."""
         source = inspect.getsource(_run_cmd_inner)
         schema_pos = source.index("_run_strictcli_schema_dump(")
-        preflight_pos = source.index("run_checks(")
+        # Find the test/lint preflight (tag_expr="preflight"), not the
+        # changelog preflight (tag_expr="preflight-changelog")
+        preflight_pos = source.index('tag_expr="preflight"')
 
         assert schema_pos < preflight_pos, (
-            "_run_strictcli_schema_dump must appear before app.run_checks"
+            "_run_strictcli_schema_dump must appear before test/lint preflight"
         )

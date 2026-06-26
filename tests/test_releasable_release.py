@@ -347,7 +347,7 @@ class TestComputeReleaseVersionReleasable:
 class TestValidateChangelogStateReleasable:
 
     def test_uses_releasable_changes_dir(self, tmp_path):
-        """In explicit mode, validates from releasable's changes dir."""
+        """In explicit mode, resolves the releasable's changes dir."""
         from rlsbl.commands.release.validate import validate_changelog_state
 
         ws_root = str(tmp_path)
@@ -359,22 +359,16 @@ class TestValidateChangelogStateReleasable:
         with open(os.path.join(changes_dir, "unreleased.jsonl"), "w") as f:
             pass
 
-        # validate_unreleased is imported via `from . import validate_unreleased`
-        # inside the function, which resolves to rlsbl.commands.release.validate_unreleased
-        with patch("rlsbl.commands.release.validate_unreleased") as mock_validate:
-            mock_validate.return_value = {"passed": True, "checks": {}}
-
-            result = validate_changelog_state(
-                "/some/project", MagicMock(), "www-app", "www-app",
-                {}, releasable_name="www",
-                releasable_tag_fmt="{name}@v{version}",
-                workspace_root=ws_root,
-            )
+        # validate_changelog_state now just resolves the changes dir path
+        # (changelog validation moved to preflight-changelog checks)
+        result = validate_changelog_state(
+            "/some/project", MagicMock(), "www-app", "www-app",
+            {}, releasable_name="www",
+            releasable_tag_fmt="{name}@v{version}",
+            workspace_root=ws_root,
+        )
 
         assert result == changes_dir
-        # Verify validate_unreleased was called with the releasable tag glob
-        call_kwargs = mock_validate.call_args
-        assert call_kwargs[1]["tag_glob"] == "www@v*"
 
     def test_missing_releasable_changes_dir_error(self, tmp_path):
         """Missing releasable changes dir raises ReleaseValidationError."""
@@ -403,12 +397,10 @@ class TestValidateChangelogStateReleasable:
         with open(os.path.join(changes_dir, "unreleased.jsonl"), "w") as f:
             pass
 
-        with patch("rlsbl.commands.release.validate_unreleased") as mock_validate:
-            mock_validate.return_value = {"passed": True, "checks": {}}
-
-            result = validate_changelog_state(
-                project_dir, MagicMock(), None, None, {},
-            )
+        # validate_changelog_state now just resolves the changes dir path
+        result = validate_changelog_state(
+            project_dir, MagicMock(), None, None, {},
+        )
 
         assert result == changes_dir
 

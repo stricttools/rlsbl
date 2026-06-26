@@ -219,6 +219,74 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         bump_type=bump_type,
     )
 
+    # Changelog preflight: run preflight-changelog checks via the check system
+    if not flags.get("dry-run", False):
+        from rlsbl import app as _rlsbl_app
+        from pathlib import Path as _Path
+
+        if releasable_name and monorepo_root:
+            from ...check_context import WorkspaceCheckContext as _WsCtx
+            _changelog_ctx = _WsCtx(
+                project_root=_Path(project_dir),
+                workspace_root=_Path(str(monorepo_root)),
+                config=config,
+                projects=list(ws_projects) if ws_projects else [],
+                graph=None,
+                releasables=[releasable_obj] if releasable_obj else [],
+            )
+        elif monorepo_root:
+            from ...check_context import WorkspaceCheckContext as _WsCtx
+            _mono_projects = load_workspace(monorepo_root) if monorepo_root else []
+            _changelog_ctx = _WsCtx(
+                project_root=_Path(project_dir),
+                workspace_root=_Path(str(monorepo_root)),
+                config=config,
+                projects=list(_mono_projects),
+                graph=None,
+                releasables=[],
+            )
+        else:
+            from ...context import ProjectContext as _ProjCtx
+            _changelog_ctx = _ProjCtx(
+                project_root=_Path(project_dir),
+                workspace_root=None,
+                config=config,
+            )
+
+        # For hotfix releases, ignore warnings (the user-facing check
+        # produces a warning when no user-facing entries exist, which
+        # is expected for hotfix).
+        _cl_ignore_warn = (bump_type == "hotfix")
+        _cl_results, _cl_exit = _rlsbl_app.run_checks(
+            _changelog_ctx, tag_expr="preflight-changelog",
+            ignore_warnings=_cl_ignore_warn,
+        )
+        if _cl_exit != 0:
+            # When warnings are treated as errors, include them in the report
+            _cl_error_statuses = {"fail"} if _cl_ignore_warn else {"fail", "warn"}
+            _cl_failed = [
+                f"{r.name}: {r.result.message}"
+                for r in _cl_results
+                if r.result.status in _cl_error_statuses
+            ]
+            for msg in _cl_failed:
+                print(f"  FAIL  {msg}", file=sys.stderr)
+            raise HookError(
+                f"Changelog preflight checks failed ({len(_cl_failed)} failure(s))"
+            )
+
+        # Hotfix releases must not have user-facing changelog entries.
+        # The preflight-changelog checks above validate structural integrity;
+        # this is a semantic constraint specific to the hotfix bump type.
+        if bump_type == "hotfix":
+            from ...changelog.files import read_unreleased as _read_unreleased
+            _hotfix_entries = _read_unreleased(changes_dir)
+            if any(e.user_facing for e in _hotfix_entries):
+                raise ReleaseValidationError(
+                    "hotfix releases must not have user-facing changelog entries "
+                    "— use patch, minor, or major instead"
+                )
+
     # Validate blog body file if blog is enabled
     _blog_body_path, blog_warning = validate_blog_body(project_dir, release_config.blog)
     if blog_warning:

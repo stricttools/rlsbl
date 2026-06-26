@@ -383,15 +383,20 @@ class TestTwoHookModel:
 
         mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
 
-        with patch("rlsbl.app.run_checks") as mock_checks:
+        with patch("rlsbl.app.run_checks", return_value=([], 0)) as mock_checks:
             from rlsbl.commands.release import run_cmd
 
             with pytest.raises(SystemExit) as exc_info:
                 run_cmd(_rc(), {"quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"private": False, "pipelines": {}}))
 
             assert exc_info.value.code == 1
-            # Preflight checks should NOT have been called
-            mock_checks.assert_not_called()
+            # Changelog preflight runs before pre-checks hook, but
+            # the test/lint preflight should NOT have been called.
+            preflight_calls = [
+                c for c in mock_checks.call_args_list
+                if c.kwargs.get("tag_expr") == "preflight"
+            ]
+            assert len(preflight_calls) == 0, "test/lint preflight should not run after pre-checks hook failure"
 
 
 # ---------------------------------------------------------------------------
@@ -487,7 +492,10 @@ class TestFullFlowOrder:
         (hooks_dir / "pre-release.sh").chmod(0o755)
 
         def tracking_run_checks(ctx, *, tag_expr=None, **kwargs):
-            execution_order.append("preflight")
+            if tag_expr == "preflight-changelog":
+                execution_order.append("preflight-changelog")
+            else:
+                execution_order.append("preflight")
             return ([], 0)
 
         # Wrap subprocess.run to record hook invocations by name.
@@ -509,5 +517,5 @@ class TestFullFlowOrder:
 
             run_cmd(_rc(), {"quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"private": False, "pipelines": {}}))
 
-        # Full execution order: pre-checks -> preflight -> pre-release
-        assert execution_order == ["pre-checks", "preflight", "pre-release"]
+        # Full execution order: preflight-changelog -> pre-checks -> preflight -> pre-release
+        assert execution_order == ["preflight-changelog", "pre-checks", "preflight", "pre-release"]

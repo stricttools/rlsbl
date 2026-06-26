@@ -1487,7 +1487,8 @@ class TestReleaseRollbackOnPushFailure:
            return_value={"passed": True, "checks": {}})
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
-    def test_rollback_on_push_failure(self, _gh_inst, _gh_auth, _validate,
+    @patch("rlsbl.app.run_checks", return_value=([], 0))
+    def test_rollback_on_push_failure(self, _run_checks, _gh_inst, _gh_auth, _validate,
                                       _gen_cl, _extract, _tag, _deploy, _push):
         """When git push fails, local commits and tag from the release must be undone."""
         from rlsbl.commands.release import run_cmd

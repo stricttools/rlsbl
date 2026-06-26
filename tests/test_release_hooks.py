@@ -114,8 +114,10 @@ class TestPreReleaseHookOutput:
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
+    @patch("rlsbl.app.run_checks", return_value=([], 0))
     def test_hook_exit_code_in_error_message(
         self,
+        _run_checks,
         _validate,
         _gen_cl,
         _gh_inst,
@@ -371,8 +373,10 @@ class TestHookTimeout:
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
+    @patch("rlsbl.app.run_checks", return_value=([], 0))
     def test_pre_release_timeout_message_includes_seconds(
         self,
+        _run_checks,
         _validate,
         _gen_cl,
         _gh_inst,

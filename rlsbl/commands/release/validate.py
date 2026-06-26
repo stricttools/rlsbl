@@ -490,45 +490,20 @@ def validate_changelog_state(project_dir, target, monorepo_name,
                              monorepo_project_path, config, monorepo_project=None,
                              releasable_name=None, releasable_tag_fmt=None,
                              workspace_root=None, bump_type=None):
-    """Validate JSONL changelog is set up and passes validation.
+    """Resolve the JSONL changelog changes directory path.
 
-    In explicit releasable mode (when ``releasable_name`` is provided along
-    with ``workspace_root``), the changes dir is resolved at the releasable
-    level and the tag glob uses the releasable's tag format.
+    Thin wrapper around :func:`resolve_changes_dir` that preserves the
+    existing call signature for backward compatibility.  Changelog
+    validation is now handled by the ``preflight-changelog`` check tag
+    in the release flow.
 
     Returns the changes_dir path.
-    Raises ReleaseValidationError on failure.
+    Raises ReleaseValidationError if the directory does not exist.
     """
-    from . import validate_unreleased
-
-    changes_dir = resolve_changes_dir(
+    return resolve_changes_dir(
         project_dir, releasable_name=releasable_name,
         workspace_root=workspace_root,
     )
-
-    # Resolve tag glob
-    if releasable_name and releasable_tag_fmt:
-        tag_glob = _releasable_tag_glob(releasable_tag_fmt, releasable_name)
-    elif monorepo_name:
-        tag_glob = target.monorepo_tag_glob(monorepo_name, path=monorepo_project_path)
-    else:
-        tag_glob = None
-
-    validation = validate_unreleased(
-        changes_dir, tag_glob=tag_glob, project=monorepo_project, config=config,
-        bump_type=bump_type,
-    )
-    if not validation["passed"]:
-        lines = []
-        for check_name, (passed, details) in validation["checks"].items():
-            if not passed:
-                for detail in details:
-                    lines.append(f"  {check_name}: {detail}")
-        raise ReleaseValidationError(
-            "JSONL changelog validation failed:\n" + "\n".join(lines)
-        )
-
-    return changes_dir
 
 
 def print_dry_run_summary(log, registry, monorepo_name, monorepo_project_path,
