@@ -9,7 +9,7 @@ import urllib.error
 
 import tomlkit
 
-from .utils import extract_github_repo_from_remote, gh_env, run
+from .utils import extract_github_repo_from_remote, run, run_gh
 
 
 def ensure_npm_keyword(dir_path=".", quiet=False, *, project_root):
@@ -96,7 +96,7 @@ def ensure_github_topic(quiet=False):
     # Detect repo name
     repo_name = None
     try:
-        repo_name = run("gh", ["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"], env=gh_env())
+        repo_name = run_gh(["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"])
     except (subprocess.CalledProcessError, FileNotFoundError):
         pass
 
