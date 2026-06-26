@@ -1,12 +1,9 @@
 """Tests for pre-release hook override of built-in tests and lint."""
 
 import json
-import os
 import subprocess
 from pathlib import Path
 from unittest.mock import patch
-
-import pytest
 
 from rlsbl.commands.release import (
     _compute_content_hash,
@@ -179,12 +176,8 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
-    @patch("rlsbl.commands.release._run_builtin_lint", return_value=True)
-    @patch("rlsbl.commands.release._run_builtin_tests", return_value=True)
     def test_skips_tests_and_lint_when_hook_customized(
         self,
-        mock_tests,
-        mock_lint,
         _validate,
         _gen_cl,
         _gh_inst,
@@ -198,7 +191,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         tmp_project,
         capsys,
     ):
-        """When the pre-release hook is customized, built-in tests and lint
+        """When the pre-release hook is customized, preflight checks
         are skipped."""
         _setup_project(
             tmp_project,
@@ -206,7 +199,8 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         )
         mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
 
-        with patch("rlsbl.commands.release.subprocess") as mock_sp:
+        with patch("rlsbl.commands.release.subprocess") as mock_sp, \
+             patch("rlsbl.app.run_checks", return_value=([], 0)) as mock_checks:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
@@ -221,12 +215,10 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
                 ),
             )
 
-        mock_tests.assert_not_called()
-        mock_lint.assert_not_called()
+        mock_checks.assert_not_called()
 
         captured = capsys.readouterr()
-        assert "Skipping built-in tests (pre-release hook handles testing)" in captured.out
-        assert "Skipping built-in lint (pre-release hook handles linting)" in captured.out
+        assert "Skipping built-in checks (pre-release hook handles testing/linting)" in captured.out
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
@@ -238,12 +230,8 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
-    @patch("rlsbl.commands.release._run_builtin_lint", return_value=True)
-    @patch("rlsbl.commands.release._run_builtin_tests", return_value=True)
-    def test_runs_tests_and_lint_when_hook_is_template(
+    def test_skips_preflight_in_dry_run_when_hook_is_template(
         self,
-        mock_tests,
-        mock_lint,
         _validate,
         _gen_cl,
         _gh_inst,
@@ -258,11 +246,12 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         capsys,
     ):
         """When the pre-release hook is the unmodified scaffold template,
-        built-in tests and lint run normally."""
+        preflight checks are skipped in dry-run mode."""
         _setup_project(tmp_project, hook_body=_V1_TEMPLATE)
         mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
 
-        with patch("rlsbl.commands.release.subprocess") as mock_sp:
+        with patch("rlsbl.commands.release.subprocess") as mock_sp, \
+             patch("rlsbl.app.run_checks", return_value=([], 0)) as mock_checks:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
@@ -277,12 +266,11 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
                 ),
             )
 
-        mock_tests.assert_called_once()
-        mock_lint.assert_called_once()
+        # In dry-run mode, preflight checks are skipped
+        mock_checks.assert_not_called()
 
         captured = capsys.readouterr()
-        assert "Skipping built-in tests" not in captured.out
-        assert "Skipping built-in lint" not in captured.out
+        assert "Skipping preflight checks (dry-run)" in captured.out
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
@@ -294,12 +282,8 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
-    @patch("rlsbl.commands.release._run_builtin_lint", return_value=True)
-    @patch("rlsbl.commands.release._run_builtin_tests", return_value=True)
-    def test_runs_tests_and_lint_when_hook_missing(
+    def test_skips_preflight_in_dry_run_when_hook_missing(
         self,
-        mock_tests,
-        mock_lint,
         _validate,
         _gen_cl,
         _gh_inst,
@@ -311,13 +295,14 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         _push,
         _remote_exists,
         tmp_project,
-        capsys,
     ):
-        """When no pre-release hook exists, built-in tests and lint run."""
+        """When no pre-release hook exists, preflight checks are still
+        skipped in dry-run mode."""
         _setup_project(tmp_project, hook_body=None)  # no hook
         mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
 
-        with patch("rlsbl.commands.release.subprocess") as mock_sp:
+        with patch("rlsbl.commands.release.subprocess") as mock_sp, \
+             patch("rlsbl.app.run_checks", return_value=([], 0)) as mock_checks:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
@@ -332,8 +317,8 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
                 ),
             )
 
-        mock_tests.assert_called_once()
-        mock_lint.assert_called_once()
+        # In dry-run mode, preflight checks are skipped
+        mock_checks.assert_not_called()
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
@@ -345,12 +330,8 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
-    @patch("rlsbl.commands.release._run_builtin_lint", return_value=True)
-    @patch("rlsbl.commands.release._run_builtin_tests", return_value=True)
     def test_hook_still_runs_when_customized(
         self,
-        mock_tests,
-        mock_lint,
         _validate,
         _gen_cl,
         _gh_inst,
@@ -363,7 +344,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         _remote_exists,
         tmp_project,
     ):
-        """Even when tests/lint are skipped, the pre-release hook itself
+        """Even when preflight checks are skipped, the pre-release hook itself
         still executes."""
         _setup_project(
             tmp_project,
@@ -371,7 +352,8 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         )
         mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
 
-        with patch("rlsbl.commands.release.subprocess") as mock_sp:
+        with patch("rlsbl.commands.release.subprocess") as mock_sp, \
+             patch("rlsbl.app.run_checks", return_value=([], 0)) as mock_checks:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
@@ -386,9 +368,8 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
                 ),
             )
 
-        # Built-in tests/lint skipped
-        mock_tests.assert_not_called()
-        mock_lint.assert_not_called()
+        # Preflight checks skipped (hook is customized)
+        mock_checks.assert_not_called()
 
         # The pre-release hook was still called via subprocess.run
         assert mock_sp.run.call_count >= 1
