@@ -26,7 +26,6 @@ from ...targets import TARGETS, detect_targets, _parse_target_entry
 from ...tagging import ensure_github_topic, ensure_npm_keyword, ensure_pypi_keyword
 from ...strictcli_detect import detect_strictcli
 from ...workspace import load_workspace, resolve_project
-from ...testing import run_project_tests
 from ...utils import (
     bump_version,
     check_gh_auth,
@@ -38,7 +37,6 @@ from ...utils import (
     extract_github_repo_from_remote,
     gh_env,
     get_current_branch,
-    get_check_timeout,
     get_hook_timeout,
     get_push_timeout,
     has_staged_or_modified,
@@ -51,7 +49,7 @@ from ...utils import (
 from .rollback import _cleanup_release_artifacts
 from .publish import _run_selfdoc_post_generate, _print_stale_dep_advisory, upload_release_assets
 from .validate import (
-    parse_porcelain_paths, _run_builtin_tests, _run_builtin_lint,
+    parse_porcelain_paths,
     _run_selfdoc_gen, _run_selfdoc_check, _abort_on_scaffold_conflicts,
     _run_strictcli_schema_dump, validate_blog_body,
     ReleaseValidationError, HookError, _SCHEMA_DUMP_TIMEOUT,
@@ -69,7 +67,6 @@ from .hooks import (
     normalize_hook_entry, run_config_hooks, _get_config_hooks,
     get_releasable_hook_path, get_package_hook_path,
     build_hook_env, run_releasable_hooks,
-    run_releasable_tests, run_releasable_lint,
     is_releasable_hook_customized,
     warn_if_hook_needs_migration,
 )
@@ -350,16 +347,47 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         # Check if releasable-level pre-release hook is customized
         hook_is_customized = is_releasable_hook_customized(str(monorepo_root), releasable_name, config=_releasable_config)
 
-        # 3. Built-in tests and lint (skipped when releasable pre-release hook is customized)
+        # 3. Built-in tests and lint via check system (skipped when releasable pre-release hook is customized)
         if hook_is_customized:
-            log("Skipping built-in tests (releasable pre-release hook handles testing)")
+            log("Skipping built-in checks (releasable pre-release hook handles testing/linting)")
+        elif flags.get("dry-run", False):
+            log("Skipping preflight checks (dry-run)")
         else:
-            run_releasable_tests(_member_tuples, flags, ctx=ctx, log=log, releasable_config_dir=_rel_cfg_dir)
+            from rlsbl import app as _rlsbl_app
+            from ...check_context import WorkspaceCheckContext
+            from pathlib import Path as _Path
 
-        if hook_is_customized:
-            log("Skipping built-in lint (releasable pre-release hook handles linting)")
-        else:
-            run_releasable_lint(_member_tuples, flags, ws_projects=_ws_projects, log=log, check_timeout=get_check_timeout(config))
+            all_failed = []
+            for pkg_name, pkg_dir in sorted(_member_tuples):
+                member_proj = next(
+                    (p for p in _ws_projects if p.name == pkg_name),
+                    None,
+                )
+                if member_proj is None:
+                    continue
+                member_ctx = WorkspaceCheckContext(
+                    project_root=_Path(str(pkg_dir)),
+                    workspace_root=_Path(str(monorepo_root)),
+                    config=ctx.config,
+                    projects=[member_proj],
+                    graph=None,
+                    releasables=[],
+                )
+                results, exit_code = _rlsbl_app.run_checks(
+                    member_ctx, tag_expr="preflight",
+                )
+                if exit_code != 0:
+                    for r in results:
+                        if r.result.status == "fail":
+                            all_failed.append(
+                                f"{pkg_name}: {r.name}: {r.result.message}"
+                            )
+            if all_failed:
+                for msg in all_failed:
+                    print(f"  FAIL  {msg}", file=sys.stderr)
+                raise HookError(
+                    f"Preflight checks failed ({len(all_failed)} failure(s))"
+                )
 
         # 4+5. Pre-release: per-package first, then releasable
         run_releasable_hooks(
@@ -380,14 +408,33 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         hook_is_customized = is_hook_customized(config, pre_release_script)
 
         if hook_is_customized:
-            log("Skipping built-in tests (pre-release hook handles testing)")
+            log("Skipping built-in checks (pre-release hook handles testing/linting)")
+        elif flags.get("dry-run", False):
+            log("Skipping preflight checks (dry-run)")
         else:
-            _run_builtin_tests(registry, flags, project_dir=project_dir, ctx=ctx)
+            from rlsbl import app as _rlsbl_app
+            from ...context import ProjectContext as _ProjectContext
+            from pathlib import Path as _Path
 
-        if hook_is_customized:
-            log("Skipping built-in lint (pre-release hook handles linting)")
-        else:
-            _run_builtin_lint(flags, is_library=is_library, project_dir=project_dir, check_timeout=get_check_timeout(config))
+            standalone_ctx = _ProjectContext(
+                project_root=_Path(project_dir),
+                workspace_root=_Path(str(monorepo_root)) if monorepo_root else None,
+                config=config,
+            )
+            results, exit_code = _rlsbl_app.run_checks(
+                standalone_ctx, tag_expr="preflight",
+            )
+            if exit_code != 0:
+                failed = [
+                    f"{r.name}: {r.result.message}"
+                    for r in results
+                    if r.result.status == "fail"
+                ]
+                for msg in failed:
+                    print(f"  FAIL  {msg}", file=sys.stderr)
+                raise HookError(
+                    f"Preflight checks failed ({len(failed)} failure(s))"
+                )
 
         # Run pre-release hook
         pre_release_script = os.path.join(project_dir, ".rlsbl", "hooks", "pre-release.sh")
