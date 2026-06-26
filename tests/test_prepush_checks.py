@@ -513,7 +513,7 @@ class TestWorkspaceTestSuiteRunsAffectedProjects:
 
         assert result.status == "pass"
         # Upfront uv sync runs at workspace root
-        mock_sync.assert_called_once_with(str(repo))
+        mock_sync.assert_called_once_with(str(repo), check_timeout=120)
         # Per-project test runs with skip_sync=True
         mock_tests.assert_called_once_with(
             "pypi", project_dir=str(pkg), workspace_root=str(repo), skip_sync=True,
