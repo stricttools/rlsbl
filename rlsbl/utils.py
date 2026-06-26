@@ -469,11 +469,9 @@ def is_private_repo():
     """
     try:
         remote = run("git", ["remote", "get-url", "origin"])
-        # Extract owner/repo from git@github.com:owner/repo or https://github.com/owner/repo
-        match = re.search(r"github\.com[/:]([^/]+/[^/.]+)", remote)
-        if not match:
+        repo_name = extract_github_repo_from_remote(remote)
+        if not repo_name:
             return None
-        repo_name = match.group(1).removesuffix(".git")
         owner, repo = repo_name.split("/", 1)
 
         token = run("gh", ["auth", "token"])
