@@ -658,6 +658,32 @@ class TestReleasableLintAggregation:
         # Only library members, in alphabetical order
         assert linted == ["alpha", "gamma"]
 
+    def test_lint_allow_passed_to_builtin_lint(self, tmp_path):
+        """run_releasable_lint passes lint_allow from workspace projects as allowed_imports."""
+        alpha_dir = tmp_path / "alpha"
+        alpha_dir.mkdir()
+
+        captured_calls = []
+
+        def mock_builtin_lint(flags, is_library=False, project_dir=None, check_timeout=None, allowed_imports=None):
+            captured_calls.append({"project_dir": project_dir, "allowed_imports": allowed_imports})
+
+        from rlsbl.workspace import WorkspaceProject
+        ws_projects = [
+            WorkspaceProject({"name": "alpha", "path": "alpha", "library": True, "releasable": "www", "lint_allow": ["net/http"]}),
+        ]
+
+        with patch("rlsbl.commands.release.validate._run_builtin_lint", side_effect=mock_builtin_lint):
+            run_releasable_lint(
+                [("alpha", str(alpha_dir))],
+                {},
+                ws_projects=ws_projects,
+                log=print,
+            )
+
+        assert len(captured_calls) == 1
+        assert captured_calls[0]["allowed_imports"] == ["net/http"]
+
 
 # ---------------------------------------------------------------------------
 # 7.3: Effectively empty hook check at releasable level
