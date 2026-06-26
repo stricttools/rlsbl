@@ -10,6 +10,7 @@ from ..changelog.generate import generate_changelog
 from ..lock import acquire_lock, release_lock
 from ..utils import (
     run,
+    run_gh,
     require_tool,
     check_gh_installed,
     check_gh_auth,
@@ -309,14 +310,14 @@ def run_cmd(flags, *, ctx):
 
                     # Check if a GitHub Release exists for this tag
                     try:
-                        run("gh", ["release", "view", tag_name, "--json", "body"])
+                        run_gh(["release", "view", tag_name, "--json", "body"], config=ctx.config)
                     except Exception:
                         # No release exists for this tag -- skip
                         continue
 
                     # Delete existing release
                     try:
-                        run("gh", ["release", "delete", tag_name, "--yes"])
+                        run_gh(["release", "delete", tag_name, "--yes"], config=ctx.config)
                     except Exception as e:
                         print(f"Warning: failed to delete release {tag_name}: {e}", file=sys.stderr)
                         continue
@@ -372,9 +373,9 @@ def run_cmd(flags, *, ctx):
 
                     # Create new release
                     try:
-                        run("gh", ["release", "create", tag_name,
-                                   "--title", tag_name,
-                                   "--notes", changelog_notes])
+                        run_gh(["release", "create", tag_name,
+                                      "--title", tag_name,
+                                      "--notes", changelog_notes], config=ctx.config)
                     except Exception as e:
                         print(f"Warning: failed to recreate release {tag_name}: {e}", file=sys.stderr)
 
