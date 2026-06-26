@@ -340,7 +340,7 @@ def _always_terminates(node):
         return True
 
     if node.type == "block":
-        children = [c for c in node.children if c.is_named]
+        children = [c for c in node.children if c.is_named and c.type != "comment"]
         return bool(children) and _always_terminates(children[-1])
 
     if node.type == "if_statement":
@@ -399,7 +399,7 @@ def _check_unreachable_code(tree, filepath):
 
     def _walk_blocks(node):
         if node.type == "block":
-            named_children = [c for c in node.children if c.is_named]
+            named_children = [c for c in node.children if c.is_named and c.type != "comment"]
             found_terminator = None
             for child in named_children:
                 if found_terminator is not None:
