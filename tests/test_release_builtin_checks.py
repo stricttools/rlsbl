@@ -1,17 +1,15 @@
 """Tests for built-in pre-release checks (tests, lint) and the two-hook model."""
 
 import json
-import os
 import subprocess
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import patch
 
 import pytest
 
 from pathlib import Path
 
-from rlsbl.commands.release import _run_builtin_lint, _run_builtin_tests, _run_selfdoc_check, _run_selfdoc_gen, HookError, ReleaseValidationError
+from rlsbl.commands.release import _run_selfdoc_check, _run_selfdoc_gen, HookError
 from rlsbl.context import ProjectContext
-from rlsbl.lint.result import LintResult
 from rlsbl.release_file import ReleaseConfig
 
 
@@ -69,343 +67,6 @@ def _setup_go_project(tmp_path):
     (tmp_path / "CHANGELOG.md").write_text(
         "# Changelog\n\n## 1.0.1\n\nPatch release with improvements.\n"
     )
-
-
-# ---------------------------------------------------------------------------
-# Built-in test runner tests
-# ---------------------------------------------------------------------------
-
-class TestBuiltinTestRunner:
-    """Tests for _run_builtin_tests()."""
-
-    def test_python_tests_run_with_uv(self, tmp_project):
-        """When registry is pypi and uv is available, run uv run pytest (standalone)."""
-        _setup_pypi_project(tmp_project)
-
-        with (
-            patch("rlsbl.testing.require_tool") as mock_which,
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
-            patch("rlsbl.testing.subprocess.run") as mock_run,
-        ):
-            mock_which.return_value = "/usr/bin/uv"
-            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
-
-            result = _run_builtin_tests("pypi", {}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={}))
-
-            assert result is True
-            # Standalone: no sync, just uv run pytest
-            assert mock_run.call_count == 1
-            pytest_call = mock_run.call_args_list[0]
-            assert pytest_call[0][0] == ["uv", "run", "pytest"]
-
-    def test_python_tests_without_uv_falls_back_to_pytest(self, tmp_project):
-        """When uv is not available but pytest is, fall back to bare pytest."""
-        _setup_pypi_project(tmp_project)
-
-        with (
-            patch("rlsbl.testing.require_tool") as mock_which,
-            patch("rlsbl.testing.subprocess.run") as mock_run,
-        ):
-            def which_side_effect(name, *args, **kwargs):
-                if name == "uv":
-                    return None
-                if name == "pytest":
-                    return "/usr/bin/pytest"
-                return None
-
-            mock_which.side_effect = which_side_effect
-            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
-
-            result = _run_builtin_tests("pypi", {}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={}))
-
-            assert result is True
-            assert mock_run.call_count == 1
-            assert mock_run.call_args[0][0] == ["pytest"]
-
-    def test_go_tests_run(self, tmp_project):
-        """When registry is go, run go test ./... -race -short -count=1."""
-        _setup_go_project(tmp_project)
-
-        with patch("rlsbl.testing.subprocess.run") as mock_run:
-            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
-
-            result = _run_builtin_tests("go", {}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={}))
-
-            assert result is True
-            assert mock_run.call_count == 1
-            assert mock_run.call_args[0][0] == [
-                "go", "test", "./...", "-race", "-short", "-count=1"
-            ]
-
-    def test_npm_tests_run(self, tmp_project):
-        """When registry is npm and package.json has a test script, run npm test."""
-        _setup_npm_project(tmp_project, test_script="jest")
-
-        with patch("rlsbl.testing.subprocess.run") as mock_run:
-            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
-
-            result = _run_builtin_tests("npm", {}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={}))
-
-            assert result is True
-            assert mock_run.call_count == 1
-            assert mock_run.call_args[0][0] == ["npm", "test"]
-
-    def test_npm_no_test_script_skips(self, tmp_project):
-        """When npm package.json has no test script, skip tests."""
-        _setup_npm_project(tmp_project, test_script=None)
-
-        with patch("rlsbl.testing.subprocess.run") as mock_run:
-            result = _run_builtin_tests("npm", {}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={}))
-
-            assert result is True
-            mock_run.assert_not_called()
-
-    def test_test_failure_aborts(self, tmp_project):
-        """When test command returns non-zero, sys.exit(1) is called."""
-        _setup_npm_project(tmp_project, test_script="jest")
-
-        with patch("rlsbl.testing.subprocess.run") as mock_run:
-            mock_run.return_value = subprocess.CompletedProcess(
-                args=[], returncode=1
-            )
-
-            with pytest.raises(HookError, match="Tests failed"):
-                _run_builtin_tests("npm", {}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={}))
-
-    def test_dry_run_skips_tests(self, tmp_project):
-        """--dry-run flag prevents any test command from running."""
-        _setup_npm_project(tmp_project, test_script="jest")
-
-        with patch("rlsbl.testing.subprocess.run") as mock_run:
-            result = _run_builtin_tests("npm", {"dry-run": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={}))
-
-            assert result is True
-            mock_run.assert_not_called()
-
-
-# ---------------------------------------------------------------------------
-# Monorepo CWD tests for built-in test runner
-# ---------------------------------------------------------------------------
-
-class TestBuiltinTestRunnerCwd:
-    """Tests that _run_builtin_tests passes project_dir as cwd to subprocess."""
-
-    def test_pypi_cwd_standalone(self, tmp_project):
-        """In standalone mode (project_dir=None), subprocess.run gets cwd=None."""
-        _setup_pypi_project(tmp_project)
-
-        with (
-            patch("rlsbl.testing.require_tool") as mock_which,
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
-            patch("rlsbl.testing.subprocess.run") as mock_run,
-        ):
-            mock_which.return_value = "/usr/bin/uv"
-            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
-
-            _run_builtin_tests("pypi", {}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={}))
-
-            for c in mock_run.call_args_list:
-                assert c.kwargs.get("cwd") is None
-
-    def test_pypi_cwd_monorepo(self, tmp_project):
-        """In monorepo mode (workspace member), subprocess.run gets correct cwd."""
-        _setup_pypi_project(tmp_project)
-        project_dir = str(tmp_project / "libs" / "mylib")
-        ws_root = str(tmp_project)
-
-        with (
-            patch("rlsbl.testing.require_tool") as mock_which,
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=ws_root),
-            patch("rlsbl.testing.subprocess.run") as mock_run,
-        ):
-            mock_which.return_value = "/usr/bin/uv"
-            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
-
-            _run_builtin_tests("pypi", {}, project_dir=project_dir, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=Path(ws_root), config={}))
-
-            assert mock_run.call_count == 2
-            # sync runs at workspace root
-            assert mock_run.call_args_list[0].kwargs.get("cwd") == ws_root
-            # pytest runs at project_dir
-            assert mock_run.call_args_list[1].kwargs.get("cwd") == project_dir
-
-    def test_pypi_fallback_pytest_cwd_monorepo(self, tmp_project):
-        """Fallback pytest call also gets cwd=project_dir in monorepo mode."""
-        _setup_pypi_project(tmp_project)
-        project_dir = str(tmp_project / "libs" / "mylib")
-
-        with (
-            patch("rlsbl.testing.require_tool") as mock_which,
-            patch("rlsbl.testing.subprocess.run") as mock_run,
-        ):
-            def which_side_effect(name, *args, **kwargs):
-                if name == "uv":
-                    return None
-                if name == "pytest":
-                    return "/usr/bin/pytest"
-                return None
-
-            mock_which.side_effect = which_side_effect
-            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
-
-            _run_builtin_tests("pypi", {}, project_dir=project_dir, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={}))
-
-            assert mock_run.call_count == 1
-            assert mock_run.call_args.kwargs.get("cwd") == project_dir
-
-    def test_go_cwd_monorepo(self, tmp_project):
-        """Go test command gets cwd=project_dir in monorepo mode."""
-        _setup_go_project(tmp_project)
-        project_dir = str(tmp_project / "libs" / "mygolib")
-
-        with patch("rlsbl.testing.subprocess.run") as mock_run:
-            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
-
-            _run_builtin_tests("go", {}, project_dir=project_dir, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={}))
-
-            assert mock_run.call_count == 1
-            assert mock_run.call_args.kwargs.get("cwd") == project_dir
-
-    def test_go_cwd_standalone(self, tmp_project):
-        """Go test command gets cwd=None in standalone mode."""
-        _setup_go_project(tmp_project)
-
-        with patch("rlsbl.testing.subprocess.run") as mock_run:
-            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
-
-            _run_builtin_tests("go", {}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={}))
-
-            assert mock_run.call_count == 1
-            assert mock_run.call_args.kwargs.get("cwd") is None
-
-    def test_npm_cwd_monorepo(self, tmp_project):
-        """npm test command gets cwd=project_dir in monorepo mode."""
-        project_dir = tmp_project / "libs" / "mynpmlib"
-        project_dir.mkdir(parents=True)
-        pkg = {"name": "test-pkg", "version": "1.0.0", "scripts": {"test": "jest"}}
-        (project_dir / "package.json").write_text(json.dumps(pkg) + "\n")
-
-        with patch("rlsbl.testing.subprocess.run") as mock_run:
-            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
-
-            _run_builtin_tests("npm", {}, project_dir=str(project_dir), ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={}))
-
-            assert mock_run.call_count == 1
-            assert mock_run.call_args.kwargs.get("cwd") == str(project_dir)
-
-    def test_npm_cwd_standalone(self, tmp_project):
-        """npm test command gets cwd=None in standalone mode."""
-        _setup_npm_project(tmp_project, test_script="jest")
-
-        with patch("rlsbl.testing.subprocess.run") as mock_run:
-            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
-
-            _run_builtin_tests("npm", {}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={}))
-
-            assert mock_run.call_count == 1
-            assert mock_run.call_args.kwargs.get("cwd") is None
-
-    def test_npm_package_json_resolved_in_project_dir(self, tmp_project):
-        """npm checks package.json in project_dir, not cwd."""
-        # The cwd (tmp_project) has no package.json, but project_dir does
-        project_dir = tmp_project / "libs" / "mynpmlib"
-        project_dir.mkdir(parents=True)
-        pkg = {"name": "test-pkg", "version": "1.0.0", "scripts": {"test": "jest"}}
-        (project_dir / "package.json").write_text(json.dumps(pkg) + "\n")
-
-        with patch("rlsbl.testing.subprocess.run") as mock_run:
-            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
-
-            result = _run_builtin_tests("npm", {}, project_dir=str(project_dir), ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={}))
-
-            assert result is True
-            assert mock_run.call_count == 1
-            assert mock_run.call_args[0][0] == ["npm", "test"]
-
-
-# ---------------------------------------------------------------------------
-# Built-in lint runner tests
-# ---------------------------------------------------------------------------
-
-class TestBuiltinLintRunner:
-    """Tests for _run_builtin_lint()."""
-
-    def test_lint_skipped_for_non_library(self, tmp_project, capsys):
-        """When is_library is False (default), lint is skipped."""
-        with patch("rlsbl.lint.lint_library") as mock_lint:
-            result = _run_builtin_lint({})
-
-            assert result is True
-            mock_lint.assert_not_called()
-            captured = capsys.readouterr()
-            assert "Skipping lint (not a library project)" in captured.out
-
-    def test_lint_passes_with_no_results(self, tmp_project):
-        """When lint_library returns empty list, lint passes."""
-        with patch("rlsbl.lint.lint_library", return_value=[]) as mock_lint:
-            result = _run_builtin_lint({}, is_library=True)
-
-            assert result is True
-            mock_lint.assert_called_once_with(".", allowed_imports=None, check_timeout=None)
-
-    def test_lint_fails_on_errors(self, tmp_project):
-        """When lint_library returns errors, sys.exit(1) is called."""
-        errors = [
-            LintResult(
-                file="src/main.py", line=10, rule="no-internal-import",
-                severity="error", message="Internal import exposed"
-            ),
-        ]
-
-        with patch("rlsbl.lint.lint_library", return_value=errors):
-            with pytest.raises(HookError, match="Lint errors found"):
-                _run_builtin_lint({}, is_library=True)
-
-    def test_lint_warnings_are_non_blocking(self, tmp_project):
-        """When lint_library returns only warnings, lint passes without exit."""
-        warnings = [
-            LintResult(
-                file="src/util.py", line=5, rule="unused-export",
-                severity="warning", message="Export not used externally"
-            ),
-        ]
-
-        with patch("rlsbl.lint.lint_library", return_value=warnings):
-            result = _run_builtin_lint({}, is_library=True)
-
-            assert result is True
-
-    def test_dry_run_skips_lint(self, tmp_project):
-        """--dry-run flag prevents lint_library from being called."""
-        with patch("rlsbl.lint.lint_library") as mock_lint:
-            result = _run_builtin_lint({"dry-run": True})
-
-            assert result is True
-            mock_lint.assert_not_called()
-
-
-# ---------------------------------------------------------------------------
-# Monorepo CWD tests for built-in lint runner
-# ---------------------------------------------------------------------------
-
-class TestBuiltinLintRunnerCwd:
-    """Tests that _run_builtin_lint passes project_dir to lint_library."""
-
-    def test_lint_standalone_uses_dot(self, tmp_project):
-        """In standalone mode (project_dir=None), lint_library gets '.'."""
-        with patch("rlsbl.lint.lint_library", return_value=[]) as mock_lint:
-            _run_builtin_lint({}, is_library=True)
-
-            mock_lint.assert_called_once_with(".", allowed_imports=None, check_timeout=None)
-
-    def test_lint_monorepo_uses_project_dir(self, tmp_project):
-        """In monorepo mode, lint_library gets the project_dir path."""
-        project_dir = "/repo/root/libs/mylib"
-
-        with patch("rlsbl.lint.lint_library", return_value=[]) as mock_lint:
-            _run_builtin_lint({}, is_library=True, project_dir=project_dir)
-
-            mock_lint.assert_called_once_with(project_dir, allowed_imports=None, check_timeout=None)
 
 
 # ---------------------------------------------------------------------------
@@ -611,7 +272,7 @@ class TestTwoHookModel:
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
-    def test_pre_checks_hook_runs_before_tests(
+    def test_pre_checks_hook_runs_before_preflight(
         self,
         _validate,
         _gen_cl,
@@ -625,7 +286,7 @@ class TestTwoHookModel:
         _remote_exists,
         tmp_project,
     ):
-        """pre-checks.sh runs before built-in tests."""
+        """pre-checks.sh runs before preflight checks (which are skipped in dry-run)."""
         _setup_npm_project(tmp_project, test_script="jest")
         hooks_dir = tmp_project / ".rlsbl" / "hooks"
         hooks_dir.mkdir(parents=True)
@@ -637,23 +298,12 @@ class TestTwoHookModel:
 
         mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
 
-        with (
-            patch("rlsbl.commands.release._run_builtin_tests") as mock_tests,
-            patch("rlsbl.commands.release._run_builtin_lint") as mock_lint,
-        ):
-            # Let the real subprocess.run execute the hook script
-            mock_tests.return_value = True
-            mock_lint.return_value = True
+        from rlsbl.commands.release import run_cmd
 
-            from rlsbl.commands.release import run_cmd
+        run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"private": False, "pipelines": {}}))
 
-            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"private": False, "pipelines": {}}))
-
-            # The hook should have actually run and created the marker
-            assert marker.exists(), "pre-checks.sh should have created the marker file"
-            # Tests and lint should have been called (mocked)
-            mock_tests.assert_called_once()
-            mock_lint.assert_called_once()
+        # The hook should have actually run and created the marker
+        assert marker.exists(), "pre-checks.sh should have created the marker file"
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
@@ -665,7 +315,7 @@ class TestTwoHookModel:
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
-    def test_pre_release_hook_runs_after_builtin_checks(
+    def test_pre_release_hook_runs_after_preflight(
         self,
         _validate,
         _gen_cl,
@@ -679,7 +329,7 @@ class TestTwoHookModel:
         _remote_exists,
         tmp_project,
     ):
-        """pre-release.sh runs after built-in tests and lint."""
+        """pre-release.sh runs after preflight checks."""
         _setup_npm_project(tmp_project, test_script=None)
         hooks_dir = tmp_project / ".rlsbl" / "hooks"
         hooks_dir.mkdir(parents=True)
@@ -691,22 +341,14 @@ class TestTwoHookModel:
 
         mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
 
-        with (
-            patch("rlsbl.commands.release._run_builtin_tests") as mock_tests,
-            patch("rlsbl.commands.release._run_builtin_lint") as mock_lint,
-        ):
-            mock_tests.return_value = True
-            mock_lint.return_value = True
+        from rlsbl.commands.release import run_cmd
 
-            from rlsbl.commands.release import run_cmd
+        run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"private": False, "pipelines": {}}))
 
-            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"private": False, "pipelines": {}}))
-
-            # pre-release hook runs after tests/lint but is still executed for dry-run
-            # (based on the code, pre-release hook runs before dry-run return)
-            assert pre_release_marker.exists(), (
-                "pre-release.sh should have run after built-in checks"
-            )
+        # pre-release hook still executes in dry-run mode
+        assert pre_release_marker.exists(), (
+            "pre-release.sh should have run after preflight checks"
+        )
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
@@ -718,7 +360,7 @@ class TestTwoHookModel:
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
-    def test_pre_checks_hook_failure_aborts_before_tests(
+    def test_pre_checks_hook_failure_aborts_before_preflight(
         self,
         _validate,
         _gen_cl,
@@ -732,7 +374,7 @@ class TestTwoHookModel:
         _remote_exists,
         tmp_project,
     ):
-        """A failing pre-checks.sh aborts the release before running tests."""
+        """A failing pre-checks.sh aborts the release before running preflight checks."""
         _setup_npm_project(tmp_project, test_script="jest")
         hooks_dir = tmp_project / ".rlsbl" / "hooks"
         hooks_dir.mkdir(parents=True)
@@ -741,19 +383,15 @@ class TestTwoHookModel:
 
         mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
 
-        with (
-            patch("rlsbl.commands.release._run_builtin_tests") as mock_tests,
-            patch("rlsbl.commands.release._run_builtin_lint") as mock_lint,
-        ):
+        with patch("rlsbl.app.run_checks") as mock_checks:
             from rlsbl.commands.release import run_cmd
 
             with pytest.raises(SystemExit) as exc_info:
                 run_cmd(_rc(), {"quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"private": False, "pipelines": {}}))
 
             assert exc_info.value.code == 1
-            # Tests and lint should NOT have been called
-            mock_tests.assert_not_called()
-            mock_lint.assert_not_called()
+            # Preflight checks should NOT have been called
+            mock_checks.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -787,10 +425,10 @@ class TestFullFlowOrder:
         _remote_exists,
         tmp_project,
     ):
-        """Verify order: pre-checks hook -> tests -> lint -> pre-release hook.
+        """Verify order: pre-checks hook -> preflight checks -> pre-release hook.
 
         The pre-release hook must contain the scaffold template content so
-        that _is_hook_effectively_empty() returns True and built-in tests/lint
+        that _is_hook_effectively_empty() returns True and preflight checks
         are not skipped by the hooks-override behavior.
         """
         _setup_npm_project(tmp_project, test_script=None)
@@ -807,7 +445,7 @@ class TestFullFlowOrder:
         (hooks_dir / "pre-checks.sh").chmod(0o755)
 
         # pre-release hook: must match a known scaffold template hash so it
-        # is treated as "effectively empty" (built-in tests/lint still run).
+        # is treated as "effectively empty" (preflight checks still run).
         _V1_TEMPLATE = (
             "#!/usr/bin/env bash\n"
             "set -euo pipefail\n"
@@ -823,13 +461,9 @@ class TestFullFlowOrder:
 
         mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
 
-        def tracking_tests(registry, flags, *, project_dir=None, ctx):
-            execution_order.append("tests")
-            return True
-
-        def tracking_lint(flags, is_library=False, project_dir=None, check_timeout=None, allowed_imports=None):
-            execution_order.append("lint")
-            return True
+        def tracking_run_checks(ctx, *, tag_expr=None, **kwargs):
+            execution_order.append("preflight")
+            return ([], 0)
 
         # Wrap subprocess.run to record hook invocations by name.
         original_subprocess_run = subprocess.run
@@ -843,13 +477,12 @@ class TestFullFlowOrder:
             return original_subprocess_run(*args, **kwargs)
 
         with (
-            patch("rlsbl.commands.release._run_builtin_tests", side_effect=tracking_tests),
-            patch("rlsbl.commands.release._run_builtin_lint", side_effect=tracking_lint),
+            patch("rlsbl.app.run_checks", side_effect=tracking_run_checks),
             patch("subprocess.run", side_effect=tracking_subprocess_run),
         ):
             from rlsbl.commands.release import run_cmd
 
-            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"private": False, "pipelines": {}}))
+            run_cmd(_rc(), {"quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"private": False, "pipelines": {}}))
 
-        # Full execution order: pre-checks -> tests -> lint -> pre-release
-        assert execution_order == ["pre-checks", "tests", "lint", "pre-release"]
+        # Full execution order: pre-checks -> preflight -> pre-release
+        assert execution_order == ["pre-checks", "preflight", "pre-release"]
