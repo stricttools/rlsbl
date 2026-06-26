@@ -455,22 +455,19 @@ def compute_release_version(target, primary_path, bump_arg, monorepo_name,
     return current_version, new_version, bump_type, tag
 
 
-def validate_changelog_state(project_dir, target, monorepo_name,
-                             monorepo_project_path, config, monorepo_project=None,
-                             releasable_name=None, releasable_tag_fmt=None,
-                             workspace_root=None, bump_type=None):
-    """Validate JSONL changelog is set up and passes validation.
+def resolve_changes_dir(project_dir, releasable_name=None, workspace_root=None):
+    """Resolve the JSONL changelog changes directory path.
 
-    In explicit releasable mode (when ``releasable_name`` is provided along
-    with ``workspace_root``), the changes dir is resolved at the releasable
-    level and the tag glob uses the releasable's tag format.
+    In explicit releasable mode (when both ``releasable_name`` and
+    ``workspace_root`` are provided), returns the releasable-level changes
+    directory.  Otherwise returns the per-project ``.rlsbl/changes/``
+    directory.
 
     Returns the changes_dir path.
-    Raises ReleaseValidationError on failure.
+    Raises ReleaseValidationError if the directory does not exist.
     """
-    from . import changes_dir_exists, get_changes_dir, validate_unreleased
+    from . import changes_dir_exists, get_changes_dir
 
-    # Resolve changes dir: releasable level or per-project
     if releasable_name and workspace_root:
         from ...workspace import get_releasable_changes_dir
         changes_dir = get_releasable_changes_dir(str(workspace_root), releasable_name)
@@ -485,6 +482,29 @@ def validate_changelog_state(project_dir, target, monorepo_name,
                 "JSONL changelog not set up. Run 'rlsbl scaffold' to create .rlsbl/changes/"
             )
         changes_dir = get_changes_dir(project_dir)
+
+    return changes_dir
+
+
+def validate_changelog_state(project_dir, target, monorepo_name,
+                             monorepo_project_path, config, monorepo_project=None,
+                             releasable_name=None, releasable_tag_fmt=None,
+                             workspace_root=None, bump_type=None):
+    """Validate JSONL changelog is set up and passes validation.
+
+    In explicit releasable mode (when ``releasable_name`` is provided along
+    with ``workspace_root``), the changes dir is resolved at the releasable
+    level and the tag glob uses the releasable's tag format.
+
+    Returns the changes_dir path.
+    Raises ReleaseValidationError on failure.
+    """
+    from . import validate_unreleased
+
+    changes_dir = resolve_changes_dir(
+        project_dir, releasable_name=releasable_name,
+        workspace_root=workspace_root,
+    )
 
     # Resolve tag glob
     if releasable_name and releasable_tag_fmt:

@@ -201,3 +201,53 @@ class TestReleasableWithMemberDirs:
         captured = capsys.readouterr()
         assert "not detected in project" in captured.err
         assert "go" in captured.err
+
+
+# ---------------------------------------------------------------------------
+# resolve_changes_dir
+# ---------------------------------------------------------------------------
+
+class TestResolveChangesDir:
+    """Tests for resolve_changes_dir path resolution."""
+
+    def test_returns_changes_dir_for_standalone_project(self, tmp_path):
+        """Standalone project with .rlsbl/changes/ returns the correct path."""
+        from rlsbl.commands.release.validate import resolve_changes_dir
+
+        changes = tmp_path / ".rlsbl" / "changes"
+        changes.mkdir(parents=True)
+
+        result = resolve_changes_dir(str(tmp_path))
+        assert result == str(changes)
+
+    def test_raises_when_changes_dir_missing(self, tmp_path):
+        """Raises ReleaseValidationError when .rlsbl/changes/ does not exist."""
+        from rlsbl.commands.release.validate import resolve_changes_dir
+
+        with pytest.raises(ReleaseValidationError, match="JSONL changelog not set up"):
+            resolve_changes_dir(str(tmp_path))
+
+    def test_returns_releasable_changes_dir(self, tmp_path):
+        """In explicit releasable mode, returns the releasable-level changes dir."""
+        from rlsbl.commands.release.validate import resolve_changes_dir
+
+        rel_changes = tmp_path / ".rlsbl-monorepo" / "releasables" / "core" / "changes"
+        rel_changes.mkdir(parents=True)
+
+        result = resolve_changes_dir(
+            str(tmp_path / "packages" / "core"),
+            releasable_name="core",
+            workspace_root=str(tmp_path),
+        )
+        assert result == str(rel_changes)
+
+    def test_raises_when_releasable_changes_dir_missing(self, tmp_path):
+        """Raises ReleaseValidationError when releasable changes dir is missing."""
+        from rlsbl.commands.release.validate import resolve_changes_dir
+
+        with pytest.raises(ReleaseValidationError, match="not set up for releasable"):
+            resolve_changes_dir(
+                str(tmp_path / "packages" / "core"),
+                releasable_name="core",
+                workspace_root=str(tmp_path),
+            )
