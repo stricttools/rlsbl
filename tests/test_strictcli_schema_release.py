@@ -156,12 +156,12 @@ class TestStrictcliSchemaOrdering:
             "_run_strictcli_schema_dump must appear before _run_selfdoc_check"
         )
 
-    def test_schema_dump_before_tests(self):
-        """Schema dump must run before tests."""
+    def test_schema_dump_before_preflight(self):
+        """Schema dump must run before preflight checks."""
         source = inspect.getsource(_run_cmd_inner)
         schema_pos = source.index("_run_strictcli_schema_dump(")
-        tests_pos = source.index("_run_builtin_tests(")
+        preflight_pos = source.index("run_checks(")
 
-        assert schema_pos < tests_pos, (
-            "_run_strictcli_schema_dump must appear before _run_builtin_tests"
+        assert schema_pos < preflight_pos, (
+            "_run_strictcli_schema_dump must appear before app.run_checks"
         )

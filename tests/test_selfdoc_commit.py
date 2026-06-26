@@ -54,8 +54,6 @@ _BASE_PATCHES = {
     "build_hook_env": {},
     "get_hook_timeout": 30,
     "is_hook_customized": False,
-    "_run_builtin_tests": None,
-    "_run_builtin_lint": None,
     "_run_strictcli_schema_dump": None,
     "_run_selfdoc_gen": None,
     "_run_selfdoc_check": None,
@@ -108,6 +106,11 @@ class _PatchContext:
                 p = patch(f"{_MODULE}.{name}", return_value=value)
             self.mocks[name] = p.start()
             self._stack.append(p)
+
+        # Patch app.run_checks (preflight checks) which uses a deferred import
+        p = patch("rlsbl.app.run_checks", return_value=([], 0))
+        self.mocks["app.run_checks"] = p.start()
+        self._stack.append(p)
 
         return self.mocks
 

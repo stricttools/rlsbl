@@ -5,30 +5,26 @@ import os
 import subprocess
 from unittest.mock import MagicMock, patch
 
-from rlsbl.commands.release import _refresh_selfdoc_hashes, _run_selfdoc_gen, run_cmd
+from rlsbl.commands.release import _refresh_selfdoc_hashes
 from rlsbl.commands.release import _run_cmd_inner
 
 
 class TestSelfdocBeforeTestsAndLint:
-    """Verify the ordering: selfdoc check -> tests -> lint."""
+    """Verify the ordering: selfdoc check -> preflight checks."""
 
-    def test_selfdoc_failure_prevents_tests_and_lint(self):
-        """When selfdoc check fails, tests and lint should not run.
+    def test_selfdoc_failure_prevents_preflight(self):
+        """When selfdoc check fails, preflight checks should not run.
 
         We verify the ordering by reading the source and checking that
-        _run_selfdoc_check appears before _run_builtin_tests and
-        _run_builtin_lint in the release function.
+        _run_selfdoc_check appears before app.run_checks (preflight)
+        in the release function.
         """
         source = inspect.getsource(_run_cmd_inner)
         selfdoc_pos = source.index("_run_selfdoc_check(")
-        tests_pos = source.index("_run_builtin_tests(")
-        lint_pos = source.index("_run_builtin_lint(")
+        preflight_pos = source.index("run_checks(")
 
-        assert selfdoc_pos < tests_pos, (
-            "_run_selfdoc_check must appear before _run_builtin_tests"
-        )
-        assert selfdoc_pos < lint_pos, (
-            "_run_selfdoc_check must appear before _run_builtin_lint"
+        assert selfdoc_pos < preflight_pos, (
+            "_run_selfdoc_check must appear before app.run_checks"
         )
 
     def test_selfdoc_still_before_pre_release_hook(self):
@@ -41,17 +37,15 @@ class TestSelfdocBeforeTestsAndLint:
             "_run_selfdoc_check must appear before pre-release hook"
         )
 
-    def test_ordering_selfdoc_tests_lint(self):
-        """The full ordering must be: selfdoc, tests, lint."""
+    def test_ordering_selfdoc_then_preflight(self):
+        """The ordering must be: selfdoc check, then preflight checks."""
         source = inspect.getsource(_run_cmd_inner)
 
         selfdoc_pos = source.index("_run_selfdoc_check(")
-        tests_pos = source.index("_run_builtin_tests(")
-        lint_pos = source.index("_run_builtin_lint(")
+        preflight_pos = source.index("run_checks(")
 
-        assert selfdoc_pos < tests_pos < lint_pos, (
-            f"Expected ordering selfdoc ({selfdoc_pos}) < tests ({tests_pos}) "
-            f"< lint ({lint_pos})"
+        assert selfdoc_pos < preflight_pos, (
+            f"Expected ordering selfdoc ({selfdoc_pos}) < preflight ({preflight_pos})"
         )
 
     def test_selfdoc_after_pre_checks_hook(self):
@@ -84,14 +78,14 @@ class TestSelfdocBeforeTestsAndLint:
             "_run_strictcli_schema_dump must appear before _run_selfdoc_gen"
         )
 
-    def test_selfdoc_gen_before_tests(self):
-        """Selfdoc gen must run before tests."""
+    def test_selfdoc_gen_before_preflight(self):
+        """Selfdoc gen must run before preflight checks."""
         source = inspect.getsource(_run_cmd_inner)
         gen_pos = source.index("_run_selfdoc_gen(")
-        tests_pos = source.index("_run_builtin_tests(")
+        preflight_pos = source.index("run_checks(")
 
-        assert gen_pos < tests_pos, (
-            "_run_selfdoc_gen must appear before _run_builtin_tests"
+        assert gen_pos < preflight_pos, (
+            "_run_selfdoc_gen must appear before app.run_checks"
         )
 
 
