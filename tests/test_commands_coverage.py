@@ -993,11 +993,16 @@ def _scrub_simple(tmp_path, run_side_effect, flags, **extra_patches):
     return mock_run
 
 
-def _scrub_full(tmp_path, run_side_effect, flags, *, gh_auth=False, gh_installed=False, extra_patches=None):
-    """Run scrub with full pipeline patches (lock, changelog, push)."""
+def _scrub_full(tmp_path, run_side_effect, flags, *, gh_auth=False, gh_installed=False, extra_patches=None, run_gh_side_effect=None):
+    """Run scrub with full pipeline patches (lock, changelog, push).
+
+    Returns (mock_run, mock_run_gh) when run_gh_side_effect is provided,
+    otherwise returns mock_run for backward compatibility.
+    """
     from rlsbl.commands.release_scrub import run_cmd
 
     mock_run = MagicMock(side_effect=run_side_effect)
+    mock_run_gh = None
     patches = {
         f"{MOD_SCRUB}.release_lock": MagicMock(),
         f"{MOD_SCRUB}.acquire_lock": MagicMock(),
@@ -1009,6 +1014,9 @@ def _scrub_full(tmp_path, run_side_effect, flags, *, gh_auth=False, gh_installed
         f"{MOD_SCRUB}.require_tool": MagicMock(),
         f"{MOD_SCRUB}.run": mock_run,
     }
+    if run_gh_side_effect is not None:
+        mock_run_gh = MagicMock(side_effect=run_gh_side_effect)
+        patches[f"{MOD_SCRUB}.run_gh"] = mock_run_gh
     if extra_patches:
         patches.update(extra_patches)
     import contextlib
@@ -1016,6 +1024,8 @@ def _scrub_full(tmp_path, run_side_effect, flags, *, gh_auth=False, gh_installed
         for target, val in patches.items():
             stack.enter_context(patch(target, val))
         run_cmd(flags, ctx=_ctx(str(tmp_path)))
+    if mock_run_gh is not None:
+        return mock_run, mock_run_gh
     return mock_run
 
 
@@ -1144,8 +1154,10 @@ class TestScrubReleaseDeleteFails:
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True, "yes": True}
-        # Calls: version, scrub, branch_push, tag_push, gh_view, gh_delete(fail)
-        _scrub_full(tmp_path, ["safegit 0.18.0", safegit_result, "", "", '{"body": "old"}', Exception("delete failed")], flags, gh_auth=True, gh_installed=True)
+        # Calls: version, scrub, branch_push, tag_push (run); gh_view, gh_delete(fail) (run_gh)
+        _scrub_full(tmp_path, ["safegit 0.18.0", safegit_result, "", ""], flags,
+                    gh_auth=True, gh_installed=True,
+                    run_gh_side_effect=['{"body": "old"}', Exception("delete failed")])
         assert "delete failed" in capsys.readouterr().err
 
 
@@ -1155,8 +1167,10 @@ class TestScrubVersionExtractFails:
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/not-a-version"}], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True, "yes": True}
-        # Calls: version, scrub, branch_push, tag_push, gh_view, gh_delete
-        _scrub_full(tmp_path, ["safegit 0.18.0", safegit_result, "", "", '{"body": "old"}', ""], flags, gh_auth=True, gh_installed=True)
+        # Calls: version, scrub, branch_push, tag_push (run); gh_view, gh_delete (run_gh)
+        _scrub_full(tmp_path, ["safegit 0.18.0", safegit_result, "", ""], flags,
+                    gh_auth=True, gh_installed=True,
+                    run_gh_side_effect=['{"body": "old"}', ""])
         assert "cannot extract version" in capsys.readouterr().err
 
 
@@ -1167,8 +1181,10 @@ class TestScrubGhReleaseCreateFails:
         safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True, "yes": True}
         ep = {f"{MOD_SCRUB}.extract_changelog_entry": MagicMock(return_value="notes")}
-        # Calls: version, scrub, branch_push, tag_push, gh_view, gh_delete, gh_create(fail)
-        _scrub_full(tmp_path, ["safegit 0.18.0", safegit_result, "", "", '{"body": "old"}', "", Exception("create failed")], flags, gh_auth=True, gh_installed=True, extra_patches=ep)
+        # Calls: version, scrub, branch_push, tag_push (run); gh_view, gh_delete, gh_create(fail) (run_gh)
+        _scrub_full(tmp_path, ["safegit 0.18.0", safegit_result, "", ""], flags,
+                    gh_auth=True, gh_installed=True, extra_patches=ep,
+                    run_gh_side_effect=['{"body": "old"}', "", Exception("create failed")])
         assert "create failed" in capsys.readouterr().err
 
 
@@ -1180,10 +1196,13 @@ class TestScrubFallbackNotes:
         safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True, "yes": True}
         ep = {f"{MOD_SCRUB}.extract_changelog_entry": MagicMock(return_value=None)}
-        # With CHANGELOG.md: commit IS attempted. Calls: version, scrub, commit, branch_push, tag_push, gh_view, gh_delete, gh_create
-        mock_run = _scrub_full(tmp_path, ["safegit 0.18.0", safegit_result, "", "", "", '{"body": "old"}', "", ""], flags, gh_auth=True, gh_installed=True, extra_patches=ep)
-        create_call = mock_run.call_args_list[-1]
-        assert "Release 1.0.0" in create_call[0][1]
+        # With CHANGELOG.md: commit IS attempted. Calls: version, scrub, commit, branch_push, tag_push (run); gh_view, gh_delete, gh_create (run_gh)
+        mock_run, mock_run_gh = _scrub_full(tmp_path, ["safegit 0.18.0", safegit_result, "", "", ""], flags,
+                               gh_auth=True, gh_installed=True, extra_patches=ep,
+                               run_gh_side_effect=['{"body": "old"}', "", ""])
+        # gh_create is the last run_gh call -- check "Release 1.0.0" in the args list
+        create_call = mock_run_gh.call_args_list[-1]
+        assert any("Release 1.0.0" in str(arg) for arg in create_call[0][0])
 
 
 class TestScrubNoReleaseForTag:
@@ -1192,9 +1211,12 @@ class TestScrubNoReleaseForTag:
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True, "yes": True}
-        # Calls: version, scrub, branch_push, tag_push, gh_view(fail)
-        mock_run = _scrub_full(tmp_path, ["safegit 0.18.0", safegit_result, "", "", Exception("not found")], flags, gh_auth=True, gh_installed=True)
-        assert mock_run.call_count == 5
+        # Calls: version, scrub, branch_push, tag_push (run); gh_view(fail) (run_gh)
+        mock_run, mock_run_gh = _scrub_full(tmp_path, ["safegit 0.18.0", safegit_result, "", ""], flags,
+                    gh_auth=True, gh_installed=True,
+                    run_gh_side_effect=[Exception("not found")])
+        assert mock_run.call_count == 4
+        assert mock_run_gh.call_count == 1
 
 
 class TestScrubNoRefname:
