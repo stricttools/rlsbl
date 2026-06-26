@@ -2,6 +2,14 @@
 
 # Changelog
 
+## 0.88.1
+
+Fix release lint to respect lint_allow from workspace.toml
+
+### Fixes
+
+- **Bug fix.** Release lint now respects lint_allow from workspace.toml, matching the behavior of rlsbl check --tag quality.
+
 ## 0.88.0
 
 Configurable check timeout, centralized GitHub repo resolution with SSH alias support, push-access verification, library lint exceptions, and stderr surfacing for failed commands
