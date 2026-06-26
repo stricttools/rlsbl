@@ -204,6 +204,61 @@ def validate_gh_cli():
         )
 
 
+def validate_gh_push_access(config=None):
+    """Validate that the authenticated gh user has push access to the repo.
+
+    Uses the GitHub API to check push permissions. If push access is denied,
+    raises ReleaseValidationError with a diagnostic message that includes the
+    authenticated user, repo slug, and a suggestion to unset GH_TOKEN/GITHUB_TOKEN
+    if either is set in the environment.
+
+    Gracefully skips (warning only) on network/API errors.
+    Silently returns if the repo cannot be determined.
+    """
+    from ...utils import get_github_repo, run_gh
+
+    repo = get_github_repo(config)
+    if repo is None:
+        return
+
+    try:
+        result = run_gh(
+            ["api", f"repos/{repo}", "--jq", ".permissions.push"],
+            config=config,
+        )
+    except Exception:
+        print(
+            "Warning: could not check push access (GitHub API unreachable). "
+            "Skipping push access check.",
+            file=sys.stderr,
+        )
+        return
+
+    if result.strip() == "true":
+        return
+
+    # Push access denied -- gather diagnostics
+    try:
+        user = run_gh(["api", "user", "--jq", ".login"], config=config)
+    except Exception:
+        user = "(unknown)"
+
+    token_var = None
+    if "GH_TOKEN" in os.environ:
+        token_var = "GH_TOKEN"
+    elif "GITHUB_TOKEN" in os.environ:
+        token_var = "GITHUB_TOKEN"
+
+    msg = f'authenticated user "{user.strip()}" does not have push access to {repo}.'
+    if token_var:
+        msg += (
+            f"\nA {token_var} environment variable is set -- it may override "
+            f"your gh CLI credentials.\n"
+            f"Try: unset {token_var}"
+        )
+    raise ReleaseValidationError(msg)
+
+
 def validate_clean_tree(flags):
     """Validate working tree is clean (or record pre-existing dirty files).
 

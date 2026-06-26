@@ -32,6 +32,7 @@ from ..release.validate import (
     validate_branch_and_remote,
     validate_clean_tree,
     validate_gh_cli,
+    validate_gh_push_access,
 )
 
 
@@ -94,6 +95,7 @@ def _cmd_batch_release(flags, project_root):
     # Upfront validation: fail before releasing anything
     try:
         validate_gh_cli()
+        validate_gh_push_access()
         validate_clean_tree(flags)
         validate_branch_and_remote(flags)
     except ReleaseValidationError as e:

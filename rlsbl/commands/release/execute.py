@@ -908,7 +908,7 @@ def _run_release_mutating(state: ReleaseState):
             file=sys.stderr,
         )
         raise
-    except Exception:
+    except Exception as e:
         # Roll back local mutations: delete tag (may not exist yet) and
         # reset commits so the working tree looks like it did before the
         # release attempt.
@@ -924,6 +924,8 @@ def _run_release_mutating(state: ReleaseState):
                 pass
         run("git", ["reset", "--hard", pre_release_sha])
         _cleanup_release_artifacts(project_dir, new_version)
+        if hasattr(e, 'stderr') and e.stderr:
+            print(f"Command error: {e.stderr.strip()}", file=sys.stderr)
         print(
             f"Error: release failed. Local state has been rolled back to {pre_release_sha[:10]}.",
             file=sys.stderr,
@@ -958,7 +960,9 @@ def _run_release_mutating(state: ReleaseState):
                 gh_release_succeeded = True
                 log(f"Created GitHub Release: {tag}")
                 break
-            except Exception:
+            except Exception as e:
+                if hasattr(e, 'stderr') and e.stderr:
+                    print(f"Command error: {e.stderr.strip()}", file=sys.stderr)
                 # Check if the release was created despite the error (race condition)
                 try:
                     run("gh", ["release", "view", tag], env=gh_env(ctx.config))

@@ -56,7 +56,8 @@ from .validate import (
     _run_strictcli_schema_dump, validate_blog_body,
     ReleaseValidationError, HookError, _SCHEMA_DUMP_TIMEOUT,
     validate_release_targets, validate_ota_mode, validate_config_integrity,
-    validate_pipeline_config, validate_gh_cli, validate_clean_tree,
+    validate_pipeline_config, validate_gh_cli, validate_gh_push_access,
+    validate_clean_tree,
     validate_branch_and_remote, resolve_monorepo_context,
     compute_release_version, validate_changelog_state,
     print_dry_run_summary,
@@ -145,6 +146,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         branch = get_current_branch()
     else:
         validate_gh_cli()
+        validate_gh_push_access(config)
         pre_existing_dirty = validate_clean_tree(flags)
         branch = validate_branch_and_remote(flags)
 
