@@ -1,0 +1,1 @@
+{"commits":["b9505ece5316e71235ccec47feb7870e44f55641","37922a56f14779c7b7b7d95802d097afae506bba"],"user_facing":true,"description":"**Configurable check timeout.** `RLSBL_CHECK_TIMEOUT` env var and `check_timeout` config key let you control test and lint timeouts (default remains 120s).","type":"feature"}
