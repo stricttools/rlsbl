@@ -1,0 +1,17 @@
+# Version bump type: patch, minor, major, or hotfix
+bump = "minor"
+# Short description of this release (required)
+description = "Configurable check timeout, centralized GitHub repo resolution with SSH alias support, push-access verification, library lint exceptions, and stderr surfacing for failed commands"
+# Optional context explaining why these changes were made
+context = """
+This release consolidates several reliability and usability improvements. The run_gh() migration
+replaces scattered remote-URL parsing across all commands with a single utility that handles SSH
+aliases and the github_repo config key. Push-access verification catches GH_TOKEN mismatches before
+the release flow runs. Library lint exceptions (lint_allow) support per-package overrides for
+forbidden-import checks. Configurable check timeout lets projects with slow test suites raise the
+default 120s limit.
+"""
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["npm", "pypi"]
+exclude = []
