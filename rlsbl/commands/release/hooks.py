@@ -604,16 +604,16 @@ def run_releasable_lint(member_packages, flags, *, ws_projects, log, check_timeo
     """
     from .validate import _run_builtin_lint
 
-    # Build a lookup from name to library flag
+    # Build a lookup from name to (library, lint_allow)
     lib_lookup = {}
     for proj in ws_projects:
-        lib_lookup[proj.name] = proj.library
+        lib_lookup[proj.name] = (proj.library, proj.get("lint_allow"))
 
     for pkg_name, pkg_dir in sorted(member_packages, key=lambda p: p[0]):
-        is_library = lib_lookup.get(pkg_name, False)
+        is_library, lint_allow = lib_lookup.get(pkg_name, (False, None))
         if is_library:
             log(f"Running lint for library package {pkg_name}...")
-            _run_builtin_lint(flags, is_library=True, project_dir=str(pkg_dir), allowed_imports=None, check_timeout=check_timeout)
+            _run_builtin_lint(flags, is_library=True, project_dir=str(pkg_dir), allowed_imports=lint_allow, check_timeout=check_timeout)
 
 
 def is_releasable_hook_customized(workspace_root, releasable_name, config=None):
