@@ -64,15 +64,13 @@ class TestSkipLockInRunCmdInner:
     @patch("rlsbl.commands.release.build_hook_env", return_value={})
     @patch("rlsbl.commands.release.get_hook_timeout", return_value=30)
     @patch("rlsbl.commands.release.is_hook_customized", return_value=False)
-    @patch("rlsbl.commands.release._run_builtin_tests")
-    @patch("rlsbl.commands.release._run_builtin_lint")
     @patch("rlsbl.commands.release._run_strictcli_schema_dump")
     @patch("rlsbl.commands.release._run_selfdoc_gen")
     @patch("rlsbl.commands.release._run_selfdoc_check")
     @patch("rlsbl.commands.release._run_selfdoc_post_generate")
     def test_skip_lock_true_skips_acquire(
         self, _selfdoc_post, _selfdoc_check, _selfdoc_gen, _schema_dump,
-        _lint, _tests, _hook_empty, _hook_timeout, _hook_env,
+        _hook_empty, _hook_timeout, _hook_env,
         _porcelain, _run, _extract, _compute, _resolve_targets,
         _scaffold, _validate_targets_top, _validate_ota, _validate_config,
         _validate_gh, _validate_pipeline, _validate_clean, _validate_branch,
@@ -118,15 +116,14 @@ class TestSkipLockInRunCmdInner:
     @patch("rlsbl.commands.release.build_hook_env", return_value={})
     @patch("rlsbl.commands.release.get_hook_timeout", return_value=30)
     @patch("rlsbl.commands.release.is_hook_customized", return_value=False)
-    @patch("rlsbl.commands.release._run_builtin_tests")
-    @patch("rlsbl.commands.release._run_builtin_lint")
+    @patch("rlsbl.app.run_checks", return_value=([], 0))
     @patch("rlsbl.commands.release._run_strictcli_schema_dump")
     @patch("rlsbl.commands.release._run_selfdoc_gen")
     @patch("rlsbl.commands.release._run_selfdoc_check")
     @patch("rlsbl.commands.release._run_selfdoc_post_generate")
     def test_without_skip_lock_calls_acquire(
         self, _selfdoc_post, _selfdoc_check, _selfdoc_gen, _schema_dump,
-        _lint, _tests, _hook_empty, _hook_timeout, _hook_env,
+        _run_checks, _hook_empty, _hook_timeout, _hook_env,
         _porcelain, _run, _extract, _compute, _resolve_targets,
         _scaffold, _validate_targets_top, _validate_ota, _validate_config,
         _validate_gh, _validate_pipeline, _validate_clean, _validate_branch,
