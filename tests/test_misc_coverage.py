@@ -1604,7 +1604,7 @@ class TestMirrorCmdPushFailure:
 class TestEditReleaseMonorepoTagFormat:
     """Tests for edit_release monorepo tag format path."""
 
-    @patch("rlsbl.commands.edit_release.run")
+    @patch("rlsbl.commands.edit_release.run_gh")
     @patch("rlsbl.commands.edit_release.extract_changelog_entry", return_value="- Fixed bug")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.edit_release.detect_targets")
@@ -1612,7 +1612,7 @@ class TestEditReleaseMonorepoTagFormat:
     @patch("rlsbl.commands.edit_release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.edit_release.check_gh_installed", return_value=True)
     def test_monorepo_tag_format_used(self, _gh_inst, _gh_auth, mock_targets_dict,
-                                       mock_detect, _exists, mock_extract, mock_run):
+                                       mock_detect, _exists, mock_extract, mock_run_gh):
         """In monorepo context without explicit releasable, uses monorepo_tag_format."""
         target = MagicMock()
         target.read_version.return_value = "1.0.0"
@@ -1641,4 +1641,4 @@ class TestEditReleaseMonorepoTagFormat:
         target.monorepo_tag_format.assert_called_once_with(
             "my-pkg", "1.0.0", path="packages/my-pkg"
         )
-        assert any(c[0] == ("gh", ["release", "view", "my-pkg@v1.0.0"]) for c in mock_run.call_args_list)
+        assert any(c[0] == (["release", "view", "my-pkg@v1.0.0"],) for c in mock_run_gh.call_args_list)
