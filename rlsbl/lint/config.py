@@ -28,6 +28,7 @@ _DEFAULT_FORBIDDEN = {
 @dataclass
 class LanguageLintConfig:
     forbidden_imports: list[str] = field(default_factory=list)
+    allowed_imports: list[str] = field(default_factory=list)
     stdout_enabled: bool = True
     stdout_ignore: list[str] = field(default_factory=list)
     entry_point_enabled: bool = True
@@ -51,6 +52,7 @@ def load_language_config(project_path: str, language: str) -> LanguageLintConfig
 
     fi_section = data.get("forbidden-imports", {})
     forbidden = fi_section.get("modules", list(defaults))
+    allowed = fi_section.get("allow", [])
 
     stdout_section = data.get("stdout", {})
     stdout_enabled = stdout_section.get("enabled", True)
@@ -65,6 +67,7 @@ def load_language_config(project_path: str, language: str) -> LanguageLintConfig
 
     return LanguageLintConfig(
         forbidden_imports=forbidden,
+        allowed_imports=allowed,
         stdout_enabled=stdout_enabled,
         stdout_ignore=stdout_ignore,
         entry_point_enabled=ep_enabled,
