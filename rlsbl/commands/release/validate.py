@@ -558,7 +558,7 @@ def _run_builtin_tests(registry, flags, *, project_dir=None, ctx):
     return True
 
 
-def _run_builtin_lint(flags, is_library=False, project_dir=None):
+def _run_builtin_lint(flags, is_library=False, project_dir=None, allowed_imports=None):
     """Run built-in library lint.
 
     Counts errors and warnings from lint results. Raises HookError on errors.
@@ -576,7 +576,7 @@ def _run_builtin_lint(flags, is_library=False, project_dir=None):
 
     from ...lint import lint_library
 
-    results = lint_library(project_dir if project_dir else ".")
+    results = lint_library(project_dir if project_dir else ".", allowed_imports=allowed_imports)
 
     errors = [r for r in results if r.severity == "error"]
     warnings = [r for r in results if r.severity == "warning"]

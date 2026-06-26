@@ -9,6 +9,7 @@ import os
 from strictcli import CheckResult
 
 from ..check_context import WorkspaceCheckContext
+from ..utils import get_check_timeout
 from ._common import _sibling_exclude_dirs
 
 
@@ -30,7 +31,7 @@ def register_quality_checks(app):
         total_warnings = 0
         for proj in ctx.projects:
             proj_path = os.path.join(ws_root, proj["path"])
-            results = lint_library(proj_path)
+            results = lint_library(proj_path, allowed_imports=proj.get("lint_allow"))
             for r in results:
                 if r.severity == "error":
                     total_errors += 1
@@ -53,12 +54,13 @@ def register_quality_checks(app):
         if not require_tool("ruff", fatal=False):
             return CheckResult("skip", "ruff not installed")
 
+        timeout = get_check_timeout(ctx.config)
         try:
             result = _sp.run(
                 ["ruff", "check", str(ctx.project_root), "--quiet"],
                 capture_output=True,
                 text=True,
-                timeout=120,
+                timeout=timeout,
             )
         except (OSError, _sp.TimeoutExpired) as exc:
             return CheckResult("fail", f"ruff failed to run: {exc}")

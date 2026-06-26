@@ -612,7 +612,7 @@ def run_releasable_lint(member_packages, flags, *, ws_projects, log):
         is_library = lib_lookup.get(pkg_name, False)
         if is_library:
             log(f"Running lint for library package {pkg_name}...")
-            _run_builtin_lint(flags, is_library=True, project_dir=str(pkg_dir))
+            _run_builtin_lint(flags, is_library=True, project_dir=str(pkg_dir), allowed_imports=None)
 
 
 def is_releasable_hook_customized(workspace_root, releasable_name, config=None):

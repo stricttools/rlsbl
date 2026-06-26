@@ -85,7 +85,11 @@ def _create_import_scanner(language: str):
     return None
 
 
-def lint_library(project_path: str) -> list[LintResult]:
+def lint_library(
+    project_path: str,
+    *,
+    allowed_imports: list[str] | None = None,
+) -> list[LintResult]:
     """Analyze a project for library boundary violations.
 
     Detects languages present in the project, loads per-language config,
@@ -93,6 +97,9 @@ def lint_library(project_path: str) -> list[LintResult]:
 
     Args:
         project_path: path to the project root directory.
+        allowed_imports: optional list of imports to allow (merged with
+            per-project TOML allow-list). Typically from workspace.toml
+            ``lint_allow``.
 
     Returns a list of LintResult namedtuples.
     """
@@ -106,6 +113,9 @@ def lint_library(project_path: str) -> list[LintResult]:
     results: list[LintResult] = []
     for language in languages:
         config = load_language_config(project_path, language)
+        # Merge workspace-level allowed imports with per-project TOML allow-list
+        if allowed_imports:
+            config.allowed_imports = list(set(config.allowed_imports) | set(allowed_imports))
         # Subtract allowed imports from forbidden imports
         if config.allowed_imports:
             allowed_set = set(config.allowed_imports)
