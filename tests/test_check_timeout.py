@@ -1,9 +1,9 @@
-"""Tests for get_check_timeout() -- env var > config dict > default 120."""
+"""Tests for get_check_timeout() and get_push_timeout() -- env var > config dict > default 120."""
 
 import pytest
 
 from rlsbl.errors import ConfigError
-from rlsbl.utils import get_check_timeout
+from rlsbl.utils import get_check_timeout, get_push_timeout
 
 
 class TestGetCheckTimeout:
@@ -50,3 +50,17 @@ class TestGetCheckTimeout:
     def test_config_none_with_env_returns_env(self, monkeypatch):
         monkeypatch.setenv("RLSBL_CHECK_TIMEOUT", "30")
         assert get_check_timeout(None) == 30
+
+
+class TestGetPushTimeout:
+    """Tests for get_push_timeout() -- env var > config dict > default 120."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, monkeypatch):
+        monkeypatch.delenv("RLSBL_PUSH_TIMEOUT", raising=False)
+
+    def test_config_none_returns_120(self):
+        assert get_push_timeout(None) == 120
+
+    def test_default_no_args_returns_120(self):
+        assert get_push_timeout() == 120

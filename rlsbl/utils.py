@@ -168,13 +168,13 @@ def get_current_branch():
     return result
 
 
-def get_push_timeout(config):
+def get_push_timeout(config=None):
     """Return the push timeout in seconds.
 
     Precedence: RLSBL_PUSH_TIMEOUT env var > config dict push_timeout
     > default 120 (the documented contract).
 
-    ``config`` is the project config dict (already loaded).
+    ``config`` may be None (env > default only).
     """
     raw = os.environ.get("RLSBL_PUSH_TIMEOUT")
     if raw is not None:
@@ -188,14 +188,15 @@ def get_push_timeout(config):
                 f'Invalid RLSBL_PUSH_TIMEOUT="{raw}". Must be a positive integer.'
             )
 
-    config_val = config.get("push_timeout")
-    if config_val is not None:
-        if not isinstance(config_val, int) or config_val <= 0:
-            raise ConfigError(
-                f'Invalid push_timeout in .rlsbl/config.json: {config_val!r}. '
-                f'Must be a positive integer.'
-            )
-        return config_val
+    if config is not None:
+        config_val = config.get("push_timeout")
+        if config_val is not None:
+            if not isinstance(config_val, int) or config_val <= 0:
+                raise ConfigError(
+                    f'Invalid push_timeout in .rlsbl/config.json: {config_val!r}. '
+                    f'Must be a positive integer.'
+                )
+            return config_val
 
     return 120
 
