@@ -1216,6 +1216,7 @@ class TestReleaseRetryQuietMode:
     """Tests for release_retry quiet mode."""
 
     @patch("rlsbl.commands.release_retry._cleanup_retry_file")
+    @patch("rlsbl.commands.release_retry.run_gh")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.release_retry.detect_targets")
@@ -1225,7 +1226,8 @@ class TestReleaseRetryQuietMode:
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
     def test_quiet_suppresses_output(self, _gh_inst, _gh_auth, _ws_root,
                                       mock_targets_dict, mock_detect,
-                                      _exists, mock_run, mock_cleanup, capsys):
+                                      _exists, mock_run, mock_run_gh,
+                                      mock_cleanup, capsys):
         target = MagicMock()
         target.read_version.return_value = "1.0.0"
         target.tag_format.side_effect = lambda v: f"v{v}"
@@ -1235,19 +1237,23 @@ class TestReleaseRetryQuietMode:
         mock_detect.return_value = [entry]
         mock_targets_dict.__getitem__ = lambda self, key: target
 
-        def run_effect(*args, **kwargs):
-            cmd, cmd_args = args[0], args[1] if len(args) > 1 else []
-            if cmd == "gh" and cmd_args[:2] == ["release", "view"]:
-                return ""
-            if cmd == "gh" and cmd_args[:2] == ["workflow", "run"]:
-                return ""
-            if cmd == "gh" and cmd_args[:2] == ["run", "list"]:
-                return "[]"
-            if cmd == "git" and cmd_args[:2] == ["rev-list", "-1"]:
+        def run_effect(cmd, args=None, **kwargs):
+            if cmd == "git" and args and args[:2] == ["rev-list", "-1"]:
                 return "a" * 40
             return ""
 
         mock_run.side_effect = run_effect
+
+        def run_gh_effect(args, **kwargs):
+            if args[:2] == ["release", "view"]:
+                return ""
+            if args[:2] == ["workflow", "run"]:
+                return ""
+            if args[:2] == ["run", "list"]:
+                return "[]"
+            return ""
+
+        mock_run_gh.side_effect = run_gh_effect
         config = RetryConfig(version="1.0.0", dispatch=["ci.yml"], ref="v1.0.0")
 
         with patch("rlsbl.commands.release_retry.time.sleep"):
