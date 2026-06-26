@@ -389,15 +389,15 @@ class TestRunIdPath:
     @patch("rlsbl.commands.watch._print_workflow_audit", return_value=False)
     @patch("rlsbl.commands.watch._watch_runs")
     @patch("rlsbl.commands.watch._resolve_run_ids")
-    @patch("rlsbl.commands.watch.run")
+    @patch("rlsbl.commands.watch.run_gh")
     def test_run_id_path_watches_resolved_runs(
-        self, mock_run, mock_resolve, mock_watch, mock_audit, mock_notify, capsys
+        self, mock_run_gh, mock_resolve, mock_watch, mock_audit, mock_notify, capsys
     ):
         """--run-id resolves IDs and watches them, skipping SHA logic."""
         mock_resolve.return_value = [
             {"databaseId": 100, "name": "CI", "status": "in_progress"},
         ]
-        mock_run.return_value = json.dumps(
+        mock_run_gh.return_value = json.dumps(
             {"nameWithOwner": "user/repo", "name": "repo"}
         )
         mock_watch.return_value = [{"name": "CI", "passed": True}]
@@ -414,15 +414,15 @@ class TestRunIdPath:
     @patch("rlsbl.commands.watch._print_workflow_audit", return_value=False)
     @patch("rlsbl.commands.watch._watch_runs")
     @patch("rlsbl.commands.watch._resolve_run_ids")
-    @patch("rlsbl.commands.watch.run")
+    @patch("rlsbl.commands.watch.run_gh")
     def test_run_id_path_failure_exits_1(
-        self, mock_run, mock_resolve, mock_watch, mock_audit, mock_notify
+        self, mock_run_gh, mock_resolve, mock_watch, mock_audit, mock_notify
     ):
         """When a watched run fails, exit code is 1."""
         mock_resolve.return_value = [
             {"databaseId": 100, "name": "CI", "status": "in_progress"},
         ]
-        mock_run.return_value = json.dumps(
+        mock_run_gh.return_value = json.dumps(
             {"nameWithOwner": "user/repo", "name": "repo"}
         )
         mock_watch.return_value = [{"name": "CI", "passed": False}]
@@ -436,16 +436,16 @@ class TestRunIdPath:
     @patch("rlsbl.commands.watch._print_workflow_audit", return_value=False)
     @patch("rlsbl.commands.watch._watch_runs")
     @patch("rlsbl.commands.watch._resolve_run_ids")
-    @patch("rlsbl.commands.watch.run")
+    @patch("rlsbl.commands.watch.run_gh")
     def test_run_id_path_multiple_ids(
-        self, mock_run, mock_resolve, mock_watch, mock_audit, mock_notify, capsys
+        self, mock_run_gh, mock_resolve, mock_watch, mock_audit, mock_notify, capsys
     ):
         """Multiple --run-id values are all resolved and watched."""
         mock_resolve.return_value = [
             {"databaseId": 100, "name": "CI", "status": "in_progress"},
             {"databaseId": 200, "name": "Publish", "status": "in_progress"},
         ]
-        mock_run.return_value = json.dumps(
+        mock_run_gh.return_value = json.dumps(
             {"nameWithOwner": "user/repo", "name": "repo"}
         )
         mock_watch.return_value = [
@@ -689,15 +689,15 @@ class TestNotifyUrl:
 class TestReleaseUrl:
     """Tests for _release_url helper."""
 
-    @patch("rlsbl.commands.watch.run")
-    def test_returns_url_for_latest_tag(self, mock_run):
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_returns_url_for_latest_tag(self, mock_run_gh):
         """Returns a release URL when gh release list succeeds."""
-        mock_run.return_value = "v1.2.3"
+        mock_run_gh.return_value = "v1.2.3"
         url = _release_url("user/repo")
         assert url == "https://github.com/user/repo/releases/tag/v1.2.3"
 
-    @patch("rlsbl.commands.watch.run", side_effect=Exception("no releases"))
-    def test_returns_none_on_failure(self, mock_run):
+    @patch("rlsbl.commands.watch.run_gh", side_effect=Exception("no releases"))
+    def test_returns_none_on_failure(self, mock_run_gh):
         """Returns None when gh release list fails."""
         url = _release_url("user/repo")
         assert url is None
@@ -721,9 +721,10 @@ class TestNotifyUrlInRunCmd:
     @patch("rlsbl.commands.watch._watch_runs")
     @patch("rlsbl.commands.watch.poll_runs")
     @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.run_gh")
     @patch("rlsbl.commands.watch.run")
     def test_failure_notification_passes_actions_url(
-        self, mock_run, mock_time, mock_poll, mock_watch, mock_audit, mock_notify
+        self, mock_run, mock_run_gh, mock_time, mock_poll, mock_watch, mock_audit, mock_notify
     ):
         """On failure, _notify is called with the failed run's Actions URL."""
         ci_run = {"databaseId": 100, "name": "CI", "status": "in_progress"}
@@ -733,9 +734,9 @@ class TestNotifyUrlInRunCmd:
         ]
         mock_run.side_effect = [
             "abc123full",
-            json.dumps({"nameWithOwner": "user/repo", "name": "repo"}),
             "v1.0.0",
         ]
+        mock_run_gh.return_value = json.dumps({"nameWithOwner": "user/repo", "name": "repo"})
         mock_watch.return_value = [{"name": "CI", "passed": False, "run_id": "100"}]
 
         with pytest.raises(SystemExit) as exc_info:
@@ -750,9 +751,10 @@ class TestNotifyUrlInRunCmd:
     @patch("rlsbl.commands.watch._watch_runs")
     @patch("rlsbl.commands.watch.poll_runs")
     @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.run_gh")
     @patch("rlsbl.commands.watch.run")
     def test_success_notification_passes_release_url_with_tag(
-        self, mock_run, mock_time, mock_poll, mock_watch, mock_audit, mock_notify
+        self, mock_run, mock_run_gh, mock_time, mock_poll, mock_watch, mock_audit, mock_notify
     ):
         """On success with a tag, _notify is called with the release page URL."""
         ci_run = {"databaseId": 100, "name": "CI", "status": "in_progress"}
@@ -762,9 +764,9 @@ class TestNotifyUrlInRunCmd:
         ]
         mock_run.side_effect = [
             "abc123full",
-            json.dumps({"nameWithOwner": "user/repo", "name": "repo"}),
             "v2.0.0",  # tag found
         ]
+        mock_run_gh.return_value = json.dumps({"nameWithOwner": "user/repo", "name": "repo"})
         mock_watch.return_value = [{"name": "CI", "passed": True, "run_id": "100"}]
 
         with pytest.raises(SystemExit) as exc_info:
