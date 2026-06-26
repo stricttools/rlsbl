@@ -1,0 +1,10 @@
+# Version bump type: patch, minor, major, or hotfix
+bump = "minor"
+# Short description of this release (required)
+description = "Preflight check integration and unreachable-code false positive fix"
+# Optional context explaining why these changes were made
+context = """Release flow now delegates test and lint validation to the check system via app.run_checks(tag_expr="preflight"), eliminating duplicate wrapper functions that historically diverged and caused release failures. Unreachable-code lint rule no longer treats inline comments as statements."""
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["npm", "pypi"]
+exclude = []
