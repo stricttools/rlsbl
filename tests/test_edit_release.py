@@ -62,7 +62,7 @@ class TestEditRelease(unittest.TestCase):
                 run_cmd(["0.23.0"], {}, project_root=".")
 
         # Verify gh release view was called to check existence
-        mock_run.assert_any_call("gh", ["release", "view", "v0.23.0"])
+        assert any(c[0] == ("gh", ["release", "view", "v0.23.0"]) for c in mock_run.call_args_list)
         # Verify gh release edit was called with --notes-file
         edit_call = [c for c in mock_run.call_args_list
                      if c[0][1][:3] == ["release", "edit", "v0.23.0"]]
@@ -121,7 +121,7 @@ class TestEditRelease(unittest.TestCase):
 
         # read_version should NOT be called when version is explicit
         target.read_version.assert_not_called()
-        mock_run.assert_any_call("gh", ["release", "view", "v0.23.0"])
+        assert any(c[0] == ("gh", ["release", "view", "v0.23.0"]) for c in mock_run.call_args_list)
 
     @patch("rlsbl.commands.edit_release.run")
     @patch("rlsbl.commands.edit_release.extract_changelog_entry", return_value="- Fixed bug")
@@ -148,7 +148,7 @@ class TestEditRelease(unittest.TestCase):
         mock_extract.assert_called_once()
         self.assertEqual(mock_extract.call_args[0][1], "0.23.0")
         # Tag should be "v0.23.0"
-        mock_run.assert_any_call("gh", ["release", "view", "v0.23.0"])
+        assert any(c[0] == ("gh", ["release", "view", "v0.23.0"]) for c in mock_run.call_args_list)
 
     @patch("rlsbl.commands.edit_release.extract_changelog_entry", return_value=None)
     @patch("os.path.exists", return_value=True)
@@ -219,7 +219,7 @@ class TestEditRelease(unittest.TestCase):
         self.assertIn("v0.23.0", output)
 
         # gh release view should still be called (to check existence)
-        mock_run.assert_any_call("gh", ["release", "view", "v0.23.0"])
+        assert any(c[0] == ("gh", ["release", "view", "v0.23.0"]) for c in mock_run.call_args_list)
         # gh release edit should NOT be called
         edit_calls = [c for c in mock_run.call_args_list
                       if len(c[0]) >= 2 and "edit" in c[0][1]]

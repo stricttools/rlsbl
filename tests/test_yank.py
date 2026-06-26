@@ -98,7 +98,7 @@ class TestHardYank(unittest.TestCase):
         self.assertIn("Deleted GitHub Release v0.9.1", output)
 
         # Verify gh release delete was called
-        mock_run.assert_any_call("gh", ["release", "delete", "v0.9.1", "--yes"])
+        assert any(c[0] == ("gh", ["release", "delete", "v0.9.1", "--yes"]) for c in mock_run.call_args_list)
 
 
 class TestDryRun(unittest.TestCase):
@@ -211,8 +211,8 @@ class TestVersionNormalization(unittest.TestCase):
         with patch("sys.stdout", new_callable=StringIO):
             run_cmd(["0.9.1"], {"hard": True, "yes": True}, project_root=".")
 
-        mock_run.assert_any_call("gh", ["release", "view", "v0.9.1"])
-        mock_run.assert_any_call("gh", ["release", "delete", "v0.9.1", "--yes"])
+        assert any(c[0] == ("gh", ["release", "view", "v0.9.1"]) for c in mock_run.call_args_list)
+        assert any(c[0] == ("gh", ["release", "delete", "v0.9.1", "--yes"]) for c in mock_run.call_args_list)
 
     @patch("rlsbl.commands.yank.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.yank.check_gh_installed", return_value=True)
@@ -230,8 +230,8 @@ class TestVersionNormalization(unittest.TestCase):
         with patch("sys.stdout", new_callable=StringIO):
             run_cmd(["v0.9.1"], {"hard": True, "yes": True}, project_root=".")
 
-        mock_run.assert_any_call("gh", ["release", "view", "v0.9.1"])
-        mock_run.assert_any_call("gh", ["release", "delete", "v0.9.1", "--yes"])
+        assert any(c[0] == ("gh", ["release", "view", "v0.9.1"]) for c in mock_run.call_args_list)
+        assert any(c[0] == ("gh", ["release", "delete", "v0.9.1", "--yes"]) for c in mock_run.call_args_list)
 
 
 class TestBuildNotice(unittest.TestCase):

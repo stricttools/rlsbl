@@ -46,7 +46,7 @@ def register_release_checks(app):
     @app.check("github-release")
     def check_github_release(ctx):
         """GitHub Release must exist for the current version tag."""
-        from ..utils import check_gh_auth, check_gh_installed, run, run_gh
+        from ..utils import check_gh_auth, check_gh_installed, gh_env, run
 
         _version, tag = _resolve_version_and_tag(ctx)
         if not tag:
@@ -58,7 +58,7 @@ def register_release_checks(app):
             return CheckResult("fail", "gh CLI is not authenticated")
 
         try:
-            run_gh(["release", "view", tag], config=ctx.config, cwd=str(ctx.project_root))
+            run("gh", ["release", "view", tag], env=gh_env(ctx.config), cwd=str(ctx.project_root))
             return CheckResult("pass", f"{tag} exists")
         except subprocess.CalledProcessError:
             return CheckResult("warn", f"{tag} not found on GitHub")

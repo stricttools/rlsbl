@@ -22,7 +22,7 @@ from ..errors import ReleaseFileError
 
 from ..release_file import get_retry_file_path, read_retry_file
 from ..targets import TARGETS, detect_targets
-from ..utils import check_gh_auth, check_gh_installed, run, run_gh
+from ..utils import check_gh_auth, check_gh_installed, gh_env, run
 from ..workspace import find_workspace_root, resolve_project
 from .watch import run_cmd as watch_run_cmd
 
@@ -221,7 +221,7 @@ def run_cmd(retry_config, flags, project_root):
 
     # Verify the GitHub Release exists
     try:
-        run_gh(["release", "view", tag])
+        run("gh", ["release", "view", tag], env=gh_env())
     except Exception:
         print(f"Error: no GitHub Release found for {tag}.", file=sys.stderr)
         sys.exit(1)
@@ -253,7 +253,7 @@ def run_cmd(retry_config, flags, project_root):
     collected_run_ids = []
     for filename in dispatch:
         try:
-            output = run_gh(["workflow", "run", filename, "--ref", retry_config.ref])
+            output = run("gh", ["workflow", "run", filename, "--ref", retry_config.ref], env=gh_env())
             log(f"  Dispatched: {filename}")
             # gh workflow run may return a URL like https://github.com/owner/repo/actions/runs/12345
             match = re.search(r'/actions/runs/(\d+)', output)
@@ -263,7 +263,7 @@ def run_cmd(retry_config, flags, project_root):
                 # Fallback: poll for the most recent run of this workflow
                 time.sleep(2)  # brief delay for GitHub to register the run
                 try:
-                    poll_output = run_gh(["run", "list", "--workflow", filename, "--limit", "1", "--json", "databaseId"])
+                    poll_output = run("gh", ["run", "list", "--workflow", filename, "--limit", "1", "--json", "databaseId"], env=gh_env())
                     poll_data = json.loads(poll_output)
                     if poll_data:
                         collected_run_ids.append(str(poll_data[0]["databaseId"]))

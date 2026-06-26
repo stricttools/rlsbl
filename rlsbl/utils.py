@@ -554,6 +554,22 @@ def get_github_repo(config: dict | None = None) -> str | None:
     return get_origin_repo()
 
 
+def gh_env(config: dict | None = None) -> dict | None:
+    """Build an env dict with GH_REPO set for ``gh`` CLI calls.
+
+    Resolves the repo slug via get_github_repo(config) and, if found,
+    returns a new env dict (copy of os.environ + GH_REPO).  Returns
+    ``None`` when the repo cannot be resolved, which makes
+    ``subprocess.run(env=None)`` inherit the parent environment.
+
+    Thread-safe: returns a fresh dict each time, never mutates os.environ.
+    """
+    repo = get_github_repo(config)
+    if repo is not None:
+        return {**os.environ, "GH_REPO": repo}
+    return None
+
+
 def run_gh(args: list, config: dict | None = None, **kwargs) -> str:
     """Run a ``gh`` CLI command with automatic GH_REPO resolution.
 
@@ -566,8 +582,8 @@ def run_gh(args: list, config: dict | None = None, **kwargs) -> str:
     """
     repo = get_github_repo(config)
     if repo is not None:
-        env = {**(kwargs.pop("env", None) or os.environ), "GH_REPO": repo}
-        return run("gh", args, env=env, **kwargs)
+        base = kwargs.pop("env", None) or os.environ
+        kwargs["env"] = {**base, "GH_REPO": repo}
     return run("gh", args, **kwargs)
 
 

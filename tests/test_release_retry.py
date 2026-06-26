@@ -77,7 +77,7 @@ class TestReleaseRetry(unittest.TestCase):
                 run_cmd(config, {"yes": True}, project_root=".")
 
         # gh release view was called to verify existence
-        mock_run.assert_any_call("gh", ["release", "view", "v0.41.7"])
+        assert any(c[0] == ("gh", ["release", "view", "v0.41.7"]) for c in mock_run.call_args_list)
 
         # gh workflow run was called for each workflow in config.dispatch
         dispatch_calls = [c for c in mock_run.call_args_list
@@ -226,7 +226,7 @@ class TestReleaseRetry(unittest.TestCase):
         self.assertIn("v0.41.7", output)
 
         # gh release view should be called (to verify existence)
-        mock_run.assert_any_call("gh", ["release", "view", "v0.41.7"])
+        assert any(c[0] == ("gh", ["release", "view", "v0.41.7"]) for c in mock_run.call_args_list)
 
         # gh workflow run should NOT be called in dry-run
         dispatch_calls = [c for c in mock_run.call_args_list
@@ -307,7 +307,7 @@ class TestReleaseRetry(unittest.TestCase):
         target.monorepo_tag_format.assert_called_once_with("my-pkg", "0.41.7", path="packages/my-pkg")
 
         # gh release view should use the monorepo tag
-        mock_run.assert_any_call("gh", ["release", "view", "my-pkg@v0.41.7"])
+        assert any(c[0] == ("gh", ["release", "view", "my-pkg@v0.41.7"]) for c in mock_run.call_args_list)
 
         # Dispatch should use the ref from config
         dispatch_calls = [c for c in mock_run.call_args_list

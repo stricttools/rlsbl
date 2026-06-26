@@ -8,18 +8,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from ..utils import get_github_repo, require_tool, run, run_gh
-
-
-def _gh_env():
-    """Build an env dict with GH_REPO set (if resolvable).
-
-    Thread-safe: returns a fresh dict each time, never mutates os.environ.
-    """
-    repo = get_github_repo(None)
-    if repo is not None:
-        return {**os.environ, "GH_REPO": repo}
-    return None
+from ..utils import gh_env, require_tool, run
 
 
 def _open_url(url):
@@ -38,7 +27,7 @@ def _release_url(repo_slug):
     if not repo_slug:
         return None
     try:
-        raw = run_gh(["release", "list", "--limit", "1", "--json", "tagName", "-q", ".[0].tagName"])
+        raw = run("gh", ["release", "list", "--limit", "1", "--json", "tagName", "-q", ".[0].tagName"], env=gh_env())
         if raw:
             return f"https://github.com/{repo_slug}/releases/tag/{raw}"
     except Exception:
@@ -79,7 +68,7 @@ def _retry_workflow(workflow_name, branch, repo_slug, label):
     try:
         subprocess.run(
             ["gh", "workflow", "run", workflow_name, "--ref", branch],
-            capture_output=True, text=True, timeout=30, check=True, env=_gh_env(),
+            capture_output=True, text=True, timeout=30, check=True, env=gh_env(),
         )
     except Exception as exc:
         print(f"rlsbl: {label}: [{workflow_name}] retry trigger failed: {exc}", file=sys.stderr)
@@ -90,11 +79,11 @@ def _retry_workflow(workflow_name, branch, repo_slug, label):
     for _ in range(15):
         time.sleep(2)
         try:
-            raw = run_gh(["run", "list",
+            raw = run("gh", ["run", "list",
                              f"--workflow={workflow_name}",
                              f"--branch={branch}",
                              "--json", "databaseId,name,status,createdAt",
-                             "--limit", "1"])
+                             "--limit", "1"], env=gh_env())
             parsed = json.loads(raw)
             if parsed:
                 retry_run = parsed[0]
@@ -112,7 +101,7 @@ def _retry_workflow(workflow_name, branch, repo_slug, label):
     try:
         subprocess.run(
             ["gh", "run", "watch", retry_id, "--exit-status"],
-            capture_output=True, text=True, timeout=3600, check=True, env=_gh_env(),
+            capture_output=True, text=True, timeout=3600, check=True, env=gh_env(),
         )
         print(f"rlsbl: {label}: [{workflow_name}] retry passed", file=sys.stderr)
         return {"name": workflow_name, "passed": True, "run_id": retry_id}
@@ -146,7 +135,7 @@ def _watch_single_run(ci_run, label, repo_slug, retried_lock=None, retried_workf
         # CalledProcessError so we can distinguish pass from fail
         subprocess.run(
             ["gh", "run", "watch", run_id, "--exit-status"],
-            capture_output=True, text=True, timeout=3600, check=True, env=_gh_env(),
+            capture_output=True, text=True, timeout=3600, check=True, env=gh_env(),
         )
         msg = f"rlsbl: {label}: [{workflow_name}] passed"
         print(msg, file=sys.stderr)
@@ -264,7 +253,7 @@ def _resolve_run_ids(run_ids):
     runs = []
     for rid in run_ids:
         try:
-            output = run_gh(["run", "view", str(rid), "--json", "databaseId,name,status,headBranch,workflowName"])
+            output = run("gh", ["run", "view", str(rid), "--json", "databaseId,name,status,headBranch,workflowName"], env=gh_env())
             info = json.loads(output)
             runs.append(info)
         except Exception as e:
@@ -281,8 +270,8 @@ def poll_runs(commit_sha, max_attempts=30, interval=4):
     """
     for _ in range(max_attempts):
         try:
-            raw = run_gh(["run", "list", "--commit", commit_sha,
-                             "--json", "databaseId,name,status,headBranch,workflowName"])
+            raw = run("gh", ["run", "list", "--commit", commit_sha,
+                             "--json", "databaseId,name,status,headBranch,workflowName"], env=gh_env())
             parsed = json.loads(raw)
             if parsed:
                 return parsed
@@ -309,7 +298,7 @@ def run_cmd(registry, args, flags):
 
             # Get repo info for display
             try:
-                repo_info = json.loads(run_gh(["repo", "view", "--json", "nameWithOwner,name"]))
+                repo_info = json.loads(run("gh", ["repo", "view", "--json", "nameWithOwner,name"], env=gh_env()))
                 repo_slug = repo_info.get("nameWithOwner", "")
             except Exception:
                 print("Error: could not get repo info. Is gh installed and authenticated?", file=sys.stderr)
@@ -357,7 +346,7 @@ def run_cmd(registry, args, flags):
 
         # Get repo info for display and URLs
         try:
-            repo_info = run_gh(["repo", "view", "--json", "nameWithOwner,name"])
+            repo_info = run("gh", ["repo", "view", "--json", "nameWithOwner,name"], env=gh_env())
             info = json.loads(repo_info)
             repo_slug = info.get("nameWithOwner", "")
             repo_name = info.get("name", "")
@@ -387,7 +376,7 @@ def run_cmd(registry, args, flags):
             try:
                 release_tag = run("git", ["describe", "--tags", "--exact-match", commit_sha])
                 try:
-                    run_gh(["release", "view", release_tag])
+                    run("gh", ["release", "view", release_tag], env=gh_env())
                     print(
                         f"rlsbl: hint: GitHub Release {release_tag} exists but "
                         "no workflows ran. Try: rlsbl release retry",

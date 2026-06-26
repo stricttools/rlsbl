@@ -522,7 +522,8 @@ class TestPrsRunCmd:
     def test_prints_count_when_prs_exist(self, monkeypatch, capsys):
         monkeypatch.setattr("rlsbl.commands.prs.check_gh_installed", lambda: True)
         monkeypatch.setattr("rlsbl.commands.prs.check_gh_auth", lambda: True)
-        monkeypatch.setattr("rlsbl.commands.prs.run", lambda cmd, args: "3")
+        monkeypatch.setattr("rlsbl.commands.prs.run", lambda cmd, args, **kw: "3")
+        monkeypatch.setattr("rlsbl.commands.prs.gh_env", lambda *a, **kw: None)
         monkeypatch.setattr("subprocess.run", MagicMock())
 
         with pytest.raises(SystemExit) as exc_info:
@@ -534,7 +535,8 @@ class TestPrsRunCmd:
     def test_no_output_when_zero_prs(self, monkeypatch, capsys):
         monkeypatch.setattr("rlsbl.commands.prs.check_gh_installed", lambda: True)
         monkeypatch.setattr("rlsbl.commands.prs.check_gh_auth", lambda: True)
-        monkeypatch.setattr("rlsbl.commands.prs.run", lambda cmd, args: "0")
+        monkeypatch.setattr("rlsbl.commands.prs.run", lambda cmd, args, **kw: "0")
+        monkeypatch.setattr("rlsbl.commands.prs.gh_env", lambda *a, **kw: None)
 
         with pytest.raises(SystemExit) as exc_info:
             prs_run_cmd(None, [], {})
@@ -1647,4 +1649,4 @@ class TestEditReleaseMonorepoTagFormat:
         target.monorepo_tag_format.assert_called_once_with(
             "my-pkg", "1.0.0", path="packages/my-pkg"
         )
-        mock_run.assert_any_call("gh", ["release", "view", "my-pkg@v1.0.0"])
+        assert any(c[0] == ("gh", ["release", "view", "my-pkg@v1.0.0"]) for c in mock_run.call_args_list)
