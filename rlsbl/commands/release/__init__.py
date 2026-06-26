@@ -36,6 +36,7 @@ from ...utils import (
     extract_changelog_entry,
     extract_changelog_entry_from_text,
     get_current_branch,
+    get_check_timeout,
     get_hook_timeout,
     get_push_timeout,
     has_staged_or_modified,
@@ -44,6 +45,7 @@ from ...utils import (
     remote_branch_exists,
     require_tool,
     run,
+    run_gh,
 )
 from .rollback import _cleanup_release_artifacts
 from .publish import _run_selfdoc_post_generate, _print_stale_dep_advisory, upload_release_assets
@@ -382,7 +384,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         if hook_is_customized:
             log("Skipping built-in lint (pre-release hook handles linting)")
         else:
-            _run_builtin_lint(flags, is_library=is_library, project_dir=project_dir)
+            _run_builtin_lint(flags, is_library=is_library, project_dir=project_dir, check_timeout=get_check_timeout(config))
 
         # Run pre-release hook
         pre_release_script = os.path.join(project_dir, ".rlsbl", "hooks", "pre-release.sh")

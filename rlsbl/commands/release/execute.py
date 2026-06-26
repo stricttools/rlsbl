@@ -475,6 +475,7 @@ def _run_release_mutating(state: ReleaseState):
     # mock.patch("rlsbl.commands.release.X") is picked up at call time.
     from . import (
         run,
+        run_gh,
         push_if_needed,
         commit_files,
         commit_files_if_changed,
@@ -953,14 +954,14 @@ def _run_release_mutating(state: ReleaseState):
         gh_release_succeeded = False
         for attempt in range(2):
             try:
-                run("gh", ["release", "create", tag, "--title", tag, "--notes-file", notes_file])
+                run_gh(["release", "create", tag, "--title", tag, "--notes-file", notes_file], config=ctx.config)
                 gh_release_succeeded = True
                 log(f"Created GitHub Release: {tag}")
                 break
             except Exception:
                 # Check if the release was created despite the error (race condition)
                 try:
-                    run("gh", ["release", "view", tag])
+                    run_gh(["release", "view", tag], config=ctx.config)
                     gh_release_succeeded = True
                     log(f"GitHub Release created (confirmed via view): {tag}")
                     break
