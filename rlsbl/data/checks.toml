@@ -118,7 +118,7 @@ scope = "workspace:library"
 # ---------------------------------------------------------------------------
 
 [checks.changelog-hashes]
-tags = ["changelog"]
+tags = ["changelog", "preflight-changelog"]
 severity = "error"
 fast = true
 pure = false
@@ -126,7 +126,7 @@ needs_network = false
 depends_on = []
 
 [checks.changelog-range]
-tags = ["changelog"]
+tags = ["changelog", "preflight-changelog"]
 severity = "error"
 fast = true
 pure = false
@@ -134,7 +134,7 @@ needs_network = false
 depends_on = ["changelog-hashes"]
 
 [checks.changelog-coverage]
-tags = ["changelog"]
+tags = ["changelog", "preflight-changelog"]
 severity = "error"
 fast = true
 pure = false
@@ -142,7 +142,7 @@ needs_network = false
 depends_on = ["changelog-hashes"]
 
 [checks.changelog-orphans]
-tags = ["changelog"]
+tags = ["changelog", "preflight-changelog"]
 severity = "error"
 fast = true
 pure = false
@@ -150,7 +150,7 @@ needs_network = false
 depends_on = []
 
 [checks.changelog-schema]
-tags = ["changelog"]
+tags = ["changelog", "preflight-changelog"]
 severity = "error"
 fast = true
 pure = true
@@ -158,7 +158,7 @@ needs_network = false
 depends_on = []
 
 [checks.changelog-user-facing]
-tags = ["changelog"]
+tags = ["changelog", "preflight-changelog"]
 severity = "warn"
 fast = true
 pure = true
@@ -166,7 +166,7 @@ needs_network = false
 depends_on = []
 
 [checks.changelog-batch-commits]
-tags = ["changelog"]
+tags = ["changelog", "preflight-changelog"]
 severity = "error"
 fast = true
 pure = true
@@ -174,7 +174,7 @@ needs_network = false
 depends_on = []
 
 [checks.changelog-batch-entries]
-tags = ["changelog"]
+tags = ["changelog", "preflight-changelog"]
 severity = "error"
 fast = true
 pure = true
