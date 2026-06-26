@@ -5,7 +5,7 @@ import sys
 import time
 
 from ..targets import TARGETS, detect_targets
-from ..utils import run, run_gh, check_gh_installed, check_gh_auth
+from ..utils import run_gh, check_gh_installed, check_gh_auth
 from ..workspace import find_workspace_root, resolve_project
 
 

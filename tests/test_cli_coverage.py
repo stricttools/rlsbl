@@ -1183,7 +1183,7 @@ class TestYankMonorepoContext:
     @patch(f"{MOD_YANK}.detect_targets", return_value=[])
     @patch(f"{MOD_YANK}.check_gh_installed", return_value=True)
     @patch(f"{MOD_YANK}.check_gh_auth", return_value=True)
-    @patch(f"{MOD_YANK}.run")
+    @patch(f"{MOD_YANK}.run_gh")
     def test_monorepo_plain_tag(self, mock_run, _auth, _inst, _targets, mock_resolve, _ws):
         """Monorepo without releasable uses target.monorepo_tag_format."""
         proj = {"name": "mylib", "path": "packages/mylib"}
@@ -1226,7 +1226,7 @@ class TestYankLatestRefused:
     @patch(f"{MOD_YANK}.detect_targets", return_value=[])
     @patch(f"{MOD_YANK}.check_gh_installed", return_value=True)
     @patch(f"{MOD_YANK}.check_gh_auth", return_value=True)
-    @patch(f"{MOD_YANK}.run")
+    @patch(f"{MOD_YANK}.run_gh")
     def test_refuses_latest(self, mock_run, *_):
         mock_run.side_effect = [
             "",  # gh release view (exists)
@@ -1241,7 +1241,7 @@ class TestYankLatestRefused:
     @patch(f"{MOD_YANK}.detect_targets", return_value=[])
     @patch(f"{MOD_YANK}.check_gh_installed", return_value=True)
     @patch(f"{MOD_YANK}.check_gh_auth", return_value=True)
-    @patch(f"{MOD_YANK}.run")
+    @patch(f"{MOD_YANK}.run_gh")
     def test_latest_check_failure_exits(self, mock_run, *_):
         mock_run.side_effect = [
             "",  # gh release view (exists)
@@ -1260,7 +1260,7 @@ class TestYankConfirmation:
     @patch(f"{MOD_YANK}.detect_targets", return_value=[])
     @patch(f"{MOD_YANK}.check_gh_installed", return_value=True)
     @patch(f"{MOD_YANK}.check_gh_auth", return_value=True)
-    @patch(f"{MOD_YANK}.run")
+    @patch(f"{MOD_YANK}.run_gh")
     def test_hard_yank_prompt_declined(self, mock_run, *_):
         mock_run.side_effect = [
             "",  # gh release view
@@ -1276,7 +1276,7 @@ class TestYankConfirmation:
     @patch(f"{MOD_YANK}.detect_targets", return_value=[])
     @patch(f"{MOD_YANK}.check_gh_installed", return_value=True)
     @patch(f"{MOD_YANK}.check_gh_auth", return_value=True)
-    @patch(f"{MOD_YANK}.run")
+    @patch(f"{MOD_YANK}.run_gh")
     def test_soft_yank_prompt_eof(self, mock_run, *_):
         mock_run.side_effect = [
             "",  # gh release view
@@ -1296,7 +1296,7 @@ class TestYankSoftYank:
     @patch(f"{MOD_YANK}.detect_targets", return_value=[])
     @patch(f"{MOD_YANK}.check_gh_installed", return_value=True)
     @patch(f"{MOD_YANK}.check_gh_auth", return_value=True)
-    @patch(f"{MOD_YANK}.run")
+    @patch(f"{MOD_YANK}.run_gh")
     def test_soft_yank_succeeds(self, mock_run, _auth, _inst, _targets, _ws, capsys):
         mock_run.side_effect = [
             "",  # gh release view
@@ -1316,7 +1316,7 @@ class TestYankHardYank:
     @patch(f"{MOD_YANK}.detect_targets", return_value=[])
     @patch(f"{MOD_YANK}.check_gh_installed", return_value=True)
     @patch(f"{MOD_YANK}.check_gh_auth", return_value=True)
-    @patch(f"{MOD_YANK}.run")
+    @patch(f"{MOD_YANK}.run_gh")
     def test_hard_yank_dry_run(self, mock_run, _auth, _inst, _targets, _ws, capsys):
         mock_run.side_effect = [
             "",  # gh release view
@@ -1378,15 +1378,16 @@ class TestWatchNotifyException:
 class TestWatchRetryTimeout:
     """Cover retry timeout path (lines 114-116)."""
 
-    @patch(f"{MOD_WATCH}.run")
+    @patch(f"{MOD_WATCH}._gh_env", return_value=None)
+    @patch(f"{MOD_WATCH}.run_gh")
     @patch(f"{MOD_WATCH}.time")
     @patch(f"{MOD_WATCH}.subprocess.run")
-    def test_retry_watch_timeout(self, mock_subproc, mock_time, mock_run, capsys):
+    def test_retry_watch_timeout(self, mock_subproc, mock_time, mock_run_gh, _gh_env, capsys):
         mock_subproc.side_effect = [
             MagicMock(returncode=0),  # gh workflow run trigger
             subprocess.TimeoutExpired("gh", 3600),  # retry watch times out
         ]
-        mock_run.return_value = json.dumps(
+        mock_run_gh.return_value = json.dumps(
             [{"databaseId": 300, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]
         )
         from rlsbl.commands.watch import _retry_workflow
@@ -1399,15 +1400,16 @@ class TestWatchRetryTimeout:
 class TestWatchRetryGenericException:
     """Cover retry generic exception path (lines 117-119)."""
 
-    @patch(f"{MOD_WATCH}.run")
+    @patch(f"{MOD_WATCH}._gh_env", return_value=None)
+    @patch(f"{MOD_WATCH}.run_gh")
     @patch(f"{MOD_WATCH}.time")
     @patch(f"{MOD_WATCH}.subprocess.run")
-    def test_retry_watch_generic_error(self, mock_subproc, mock_time, mock_run, capsys):
+    def test_retry_watch_generic_error(self, mock_subproc, mock_time, mock_run_gh, _gh_env, capsys):
         mock_subproc.side_effect = [
             MagicMock(returncode=0),  # gh workflow run trigger
             RuntimeError("unexpected"),  # retry watch fails
         ]
-        mock_run.return_value = json.dumps(
+        mock_run_gh.return_value = json.dumps(
             [{"databaseId": 300, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]
         )
         from rlsbl.commands.watch import _retry_workflow
@@ -1420,8 +1422,9 @@ class TestWatchRetryGenericException:
 class TestWatchSingleRunTimeout:
     """Cover _watch_single_run timeout path (lines 164-167)."""
 
+    @patch(f"{MOD_WATCH}._gh_env", return_value=None)
     @patch(f"{MOD_WATCH}.subprocess.run", side_effect=subprocess.TimeoutExpired("gh", 3600))
-    def test_timeout(self, _, capsys):
+    def test_timeout(self, _subproc, _env, capsys):
         from rlsbl.commands.watch import _watch_single_run
         ci_run = {"databaseId": 100, "name": "CI"}
         result = _watch_single_run(ci_run, "test", "user/repo")
@@ -1432,8 +1435,9 @@ class TestWatchSingleRunTimeout:
 class TestWatchSingleRunGenericException:
     """Cover _watch_single_run generic exception path (lines 168-171)."""
 
+    @patch(f"{MOD_WATCH}._gh_env", return_value=None)
     @patch(f"{MOD_WATCH}.subprocess.run", side_effect=RuntimeError("unexpected"))
-    def test_generic_error(self, _, capsys):
+    def test_generic_error(self, _subproc, _env, capsys):
         from rlsbl.commands.watch import _watch_single_run
         ci_run = {"databaseId": 100, "name": "CI"}
         result = _watch_single_run(ci_run, "test", "user/repo")
@@ -1444,8 +1448,9 @@ class TestWatchSingleRunGenericException:
 class TestWatchSingleRunPassed:
     """Cover _watch_single_run pass path (lines 140-142)."""
 
+    @patch(f"{MOD_WATCH}._gh_env", return_value=None)
     @patch(f"{MOD_WATCH}.subprocess.run")
-    def test_passed(self, mock_run, capsys):
+    def test_passed(self, mock_run, _env, capsys):
         mock_run.return_value = MagicMock(returncode=0)
         from rlsbl.commands.watch import _watch_single_run
         ci_run = {"databaseId": 100, "name": "CI"}
@@ -1488,7 +1493,7 @@ class TestWatchRunCmdRunIdRepoError:
     """Cover run_cmd --run-id repo info error (lines 303-305)."""
 
     @patch(f"{MOD_WATCH}._resolve_run_ids")
-    @patch(f"{MOD_WATCH}.run", side_effect=Exception("no repo"))
+    @patch(f"{MOD_WATCH}.run_gh", side_effect=Exception("no repo"))
     def test_repo_info_failure(self, _, mock_resolve, capsys):
         mock_resolve.return_value = [{"databaseId": 100, "name": "CI"}]
         from rlsbl.commands.watch import run_cmd
@@ -1497,7 +1502,7 @@ class TestWatchRunCmdRunIdRepoError:
         assert exc.value.code == 1
 
     @patch(f"{MOD_WATCH}._resolve_run_ids")
-    @patch(f"{MOD_WATCH}.run")
+    @patch(f"{MOD_WATCH}.run_gh")
     @patch(f"{MOD_WATCH}._watch_runs")
     @patch(f"{MOD_WATCH}._print_workflow_audit")
     @patch(f"{MOD_WATCH}._notify")
@@ -1512,12 +1517,9 @@ class TestWatchRunCmdRunIdRepoError:
 class TestWatchRunCmdShaRepoError:
     """Cover run_cmd SHA path repo info error (lines 353-355)."""
 
-    @patch(f"{MOD_WATCH}.run")
-    def test_sha_path_repo_error(self, mock_run, capsys):
-        mock_run.side_effect = [
-            "abc123full",  # git rev-parse
-            Exception("no repo"),  # gh repo view fails
-        ]
+    @patch(f"{MOD_WATCH}.run_gh", side_effect=Exception("no repo"))
+    @patch(f"{MOD_WATCH}.run", return_value="abc123full")
+    def test_sha_path_repo_error(self, mock_run, mock_run_gh, capsys):
         from rlsbl.commands.watch import run_cmd
         with pytest.raises(SystemExit) as exc:
             run_cmd(None, ["abc123"], {})
@@ -1543,9 +1545,10 @@ class TestWatchRunCmdFallbackReleaseUrl:
     @patch(f"{MOD_WATCH}._watch_runs")
     @patch(f"{MOD_WATCH}.poll_runs")
     @patch(f"{MOD_WATCH}.time")
+    @patch(f"{MOD_WATCH}.run_gh")
     @patch(f"{MOD_WATCH}.run")
     def test_success_url_fallback_to_release_url(
-        self, mock_run, mock_time, mock_poll, mock_watch, mock_audit, mock_notify,
+        self, mock_run, mock_run_gh, mock_time, mock_poll, mock_watch, mock_audit, mock_notify,
     ):
         """When tag is a truncated SHA, falls back to _release_url."""
         ci_run = {"databaseId": 100, "name": "CI", "status": "in_progress"}
@@ -1555,9 +1558,9 @@ class TestWatchRunCmdFallbackReleaseUrl:
         ]
         mock_run.side_effect = [
             "abc123fullhash" + "0" * 26,  # git rev-parse
-            json.dumps({"nameWithOwner": "user/repo", "name": "repo"}),  # gh repo view
             Exception("no tag"),  # git describe fails -> tag = abc123fullha
         ]
+        mock_run_gh.return_value = json.dumps({"nameWithOwner": "user/repo", "name": "repo"})
         mock_watch.return_value = [{"name": "CI", "passed": True, "run_id": "100"}]
 
         with pytest.raises(SystemExit) as exc:
