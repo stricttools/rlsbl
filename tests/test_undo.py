@@ -49,8 +49,8 @@ class TestUndoHappyPath(unittest.TestCase):
         # Verify all expected subprocess commands were issued
         expected_calls = [
             call("git", ["describe", "--tags", "--abbrev=0", "--match", "v*"]),
-            call("gh", ["release", "view", "v1.0.0"]),
-            call("gh", ["release", "delete", "v1.0.0", "--yes"]),
+            call("gh", ["release", "view", "v1.0.0"], env=ANY),
+            call("gh", ["release", "delete", "v1.0.0", "--yes"], env=ANY),
             call("git", ["push", "origin", ":v1.0.0"], timeout=120, env=ANY),
             call("git", ["tag", "-d", "v1.0.0"]),
             call("git", ["log", "-1", "--format=%s"]),
@@ -95,8 +95,8 @@ class TestUndoMonorepo(unittest.TestCase):
         # Verify tag discovery uses project-scoped match pattern
         expected_calls = [
             call("git", ["describe", "--tags", "--abbrev=0", "--match", "mylib@v*"]),
-            call("gh", ["release", "view", "mylib@v2.1.0"]),
-            call("gh", ["release", "delete", "mylib@v2.1.0", "--yes"]),
+            call("gh", ["release", "view", "mylib@v2.1.0"], env=ANY),
+            call("gh", ["release", "delete", "mylib@v2.1.0", "--yes"], env=ANY),
             call("git", ["push", "origin", ":mylib@v2.1.0"], timeout=120, env=ANY),
             call("git", ["tag", "-d", "mylib@v2.1.0"]),
             call("git", ["log", "-1", "--format=%s"]),
@@ -234,8 +234,8 @@ class TestUndoTwoCommitPattern(unittest.TestCase):
         # then changelog restoration commits
         expected_calls = [
             call("git", ["describe", "--tags", "--abbrev=0", "--match", "v*"]),
-            call("gh", ["release", "view", "v1.0.0"]),
-            call("gh", ["release", "delete", "v1.0.0", "--yes"]),
+            call("gh", ["release", "view", "v1.0.0"], env=ANY),
+            call("gh", ["release", "delete", "v1.0.0", "--yes"], env=ANY),
             call("git", ["push", "origin", ":v1.0.0"], timeout=120, env=ANY),
             call("git", ["tag", "-d", "v1.0.0"]),
             call("git", ["log", "-1", "--format=%s"]),
@@ -367,7 +367,7 @@ class TestUndoNoGitHubRelease(unittest.TestCase):
         # Verify the call order: view (failed), then skip delete, continue with rest
         expected_calls = [
             call("git", ["describe", "--tags", "--abbrev=0", "--match", "v*"]),
-            call("gh", ["release", "view", "v1.0.0"]),
+            call("gh", ["release", "view", "v1.0.0"], env=ANY),
             # No "gh release delete" call since view failed
             call("git", ["push", "origin", ":v1.0.0"], timeout=120, env=ANY),
             call("git", ["tag", "-d", "v1.0.0"]),

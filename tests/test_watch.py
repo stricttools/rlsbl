@@ -340,8 +340,9 @@ class TestRePoll:
 class TestResolveRunIds:
     """Tests for _resolve_run_ids that resolves run IDs via gh run view."""
 
+    @patch("rlsbl.commands.watch.gh_env", return_value=None)
     @patch("rlsbl.commands.watch.run")
-    def test_resolves_single_run_id(self, mock_run):
+    def test_resolves_single_run_id(self, mock_run, _gh_env):
         """A single run ID is resolved to a run info dict."""
         mock_run.return_value = json.dumps(
             {"databaseId": 12345, "name": "CI", "status": "completed"}
@@ -350,9 +351,8 @@ class TestResolveRunIds:
         assert len(result) == 1
         assert result[0]["databaseId"] == 12345
         assert result[0]["name"] == "CI"
-        mock_run.assert_called_once_with(
-            "gh", ["run", "view", "12345", "--json", "databaseId,name,status,headBranch,workflowName"]
-        )
+        assert mock_run.call_count == 1
+        assert mock_run.call_args[0] == ("gh", ["run", "view", "12345", "--json", "databaseId,name,status,headBranch,workflowName"])
 
     @patch("rlsbl.commands.watch.run")
     def test_resolves_multiple_run_ids(self, mock_run):
@@ -490,10 +490,11 @@ class TestMutualExclusivity:
 class TestAutoRetry:
     """Tests for auto-retry logic when a CI workflow fails."""
 
+    @patch("rlsbl.commands.watch.gh_env", return_value=None)
     @patch("rlsbl.commands.watch.run")
     @patch("rlsbl.commands.watch.time")
     @patch("rlsbl.commands.watch.subprocess.run")
-    def test_retry_attempted_on_first_failure(self, mock_subproc, mock_time, mock_run, capsys):
+    def test_retry_attempted_on_first_failure(self, mock_subproc, mock_time, mock_run, _gh_env, capsys):
         """When a workflow fails, _watch_single_run triggers a retry."""
         ci_run = {"databaseId": 100, "name": "CI", "headBranch": "main"}
 
@@ -518,10 +519,11 @@ class TestAutoRetry:
         assert "CI failed, retrying once..." in err
         assert "retry passed" in err
 
+    @patch("rlsbl.commands.watch.gh_env", return_value=None)
     @patch("rlsbl.commands.watch.run")
     @patch("rlsbl.commands.watch.time")
     @patch("rlsbl.commands.watch.subprocess.run")
-    def test_retry_success_reports_overall_success(self, mock_subproc, mock_time, mock_run, capsys):
+    def test_retry_success_reports_overall_success(self, mock_subproc, mock_time, mock_run, _gh_env, capsys):
         """When the retry passes, the overall result is success."""
         ci_run = {"databaseId": 100, "name": "CI", "headBranch": "main"}
 
@@ -538,10 +540,11 @@ class TestAutoRetry:
         assert result["passed"] is True
         assert result["run_id"] == "200"
 
+    @patch("rlsbl.commands.watch.gh_env", return_value=None)
     @patch("rlsbl.commands.watch.run")
     @patch("rlsbl.commands.watch.time")
     @patch("rlsbl.commands.watch.subprocess.run")
-    def test_double_failure_reports_failure(self, mock_subproc, mock_time, mock_run, capsys):
+    def test_double_failure_reports_failure(self, mock_subproc, mock_time, mock_run, _gh_env, capsys):
         """When both original and retry fail, the result is failure."""
         ci_run = {"databaseId": 100, "name": "CI", "headBranch": "main"}
 
@@ -597,10 +600,11 @@ class TestAutoRetry:
 class TestRetryWorkflow:
     """Unit tests for _retry_workflow."""
 
+    @patch("rlsbl.commands.watch.gh_env", return_value=None)
     @patch("rlsbl.commands.watch.run")
     @patch("rlsbl.commands.watch.time")
     @patch("rlsbl.commands.watch.subprocess.run")
-    def test_retry_passes(self, mock_subproc, mock_time, mock_run, capsys):
+    def test_retry_passes(self, mock_subproc, mock_time, mock_run, _gh_env, capsys):
         """Successful retry returns passed=True."""
         mock_subproc.side_effect = [
             MagicMock(returncode=0),  # gh workflow run
@@ -615,10 +619,11 @@ class TestRetryWorkflow:
         assert result["passed"] is True
         assert result["run_id"] == "300"
 
+    @patch("rlsbl.commands.watch.gh_env", return_value=None)
     @patch("rlsbl.commands.watch.run")
     @patch("rlsbl.commands.watch.time")
     @patch("rlsbl.commands.watch.subprocess.run")
-    def test_retry_run_not_found(self, mock_subproc, mock_time, mock_run, capsys):
+    def test_retry_run_not_found(self, mock_subproc, mock_time, mock_run, _gh_env, capsys):
         """When the retry run never appears, returns None."""
         mock_subproc.return_value = MagicMock(returncode=0)  # gh workflow run trigger
         mock_run.side_effect = Exception("not found")  # all poll attempts fail
@@ -792,10 +797,11 @@ class TestRetryDedup:
     already present and skip).
     """
 
+    @patch("rlsbl.commands.watch.gh_env", return_value=None)
     @patch("rlsbl.commands.watch.run")
     @patch("rlsbl.commands.watch.time")
     @patch("rlsbl.commands.watch.subprocess.run")
-    def test_multiple_runs_same_workflow_retry_once(self, mock_subproc, mock_time, mock_run, capsys):
+    def test_multiple_runs_same_workflow_retry_once(self, mock_subproc, mock_time, mock_run, _gh_env, capsys):
         """Three CI runs fail concurrently but only one retry is dispatched."""
         runs = [
             {"databaseId": 100, "name": "CI", "headBranch": "main"},
