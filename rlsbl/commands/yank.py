@@ -5,7 +5,7 @@ import sys
 import time
 
 from ..targets import TARGETS, detect_targets
-from ..utils import run, gh_env, check_gh_installed, check_gh_auth
+from ..utils import run_gh, check_gh_installed, check_gh_auth
 from ..workspace import find_workspace_root, resolve_project
 
 
@@ -84,14 +84,14 @@ def run_cmd(args, flags, project_root):
 
     # Verify the GitHub Release exists
     try:
-        run("gh", ["release", "view", tag], env=gh_env())
+        run_gh(["release", "view", tag])
     except Exception:
         print(f"Error: GitHub Release for {tag} not found.", file=sys.stderr)
         sys.exit(1)
 
     # Refuse to yank the latest release -- suggest rlsbl release undo instead
     try:
-        latest_line = run("gh", ["release", "list", "--limit", "1", "--json", "tagName", "--jq", ".[0].tagName"], env=gh_env())
+        latest_line = run_gh(["release", "list", "--limit", "1", "--json", "tagName", "--jq", ".[0].tagName"])
         if latest_line == tag:
             print(
                 f"Error: {tag} is the latest release. Use 'rlsbl release undo' to revert it instead.",
@@ -130,7 +130,7 @@ def _hard_yank(tag, dry_run):
         print(f"Would delete GitHub Release {tag}")
         return
 
-    run("gh", ["release", "delete", tag, "--yes"], env=gh_env())
+    run_gh(["release", "delete", tag, "--yes"])
     print(f"Deleted GitHub Release {tag}")
 
 
@@ -141,7 +141,7 @@ def _soft_yank(tag, reason, use, dry_run):
 
     # Get current release body
     try:
-        current_body = run("gh", ["release", "view", tag, "--json", "body", "--jq", ".body"], env=gh_env())
+        current_body = run_gh(["release", "view", tag, "--json", "body", "--jq", ".body"])
     except Exception:
         current_body = ""
 
@@ -159,7 +159,7 @@ def _soft_yank(tag, reason, use, dry_run):
         with open(writing_file, "w", encoding="utf-8") as f:
             f.write(new_body)
         os.rename(writing_file, notes_file)
-        run("gh", ["release", "edit", tag, "--prerelease", "--notes-file", notes_file], env=gh_env())
+        run_gh(["release", "edit", tag, "--prerelease", "--notes-file", notes_file])
     finally:
         for tmp in (notes_file, writing_file):
             if os.path.exists(tmp):
