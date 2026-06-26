@@ -1,0 +1,1 @@
+{"commits":["487914f201da91686f7c381a107a94090ab18cda"],"user_facing":true,"description":"**Bug fix.** Release lint now respects lint_allow from workspace.toml, matching the behavior of rlsbl check --tag quality.","type":"fix"}
