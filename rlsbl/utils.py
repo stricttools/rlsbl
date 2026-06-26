@@ -200,6 +200,39 @@ def get_push_timeout(config):
     return 120
 
 
+def get_check_timeout(config=None):
+    """Return the check timeout in seconds.
+
+    Precedence: RLSBL_CHECK_TIMEOUT env var > config dict check_timeout
+    > default 120.
+
+    ``config`` may be None (env > default only).
+    """
+    raw = os.environ.get("RLSBL_CHECK_TIMEOUT")
+    if raw is not None:
+        try:
+            val = int(raw)
+            if val <= 0:
+                raise ValueError
+            return val
+        except ValueError:
+            raise ConfigError(
+                f'Invalid RLSBL_CHECK_TIMEOUT="{raw}". Must be a positive integer.'
+            )
+
+    if config is not None:
+        config_val = config.get("check_timeout")
+        if config_val is not None:
+            if not isinstance(config_val, int) or config_val <= 0:
+                raise ConfigError(
+                    f'Invalid check_timeout in .rlsbl/config.json: {config_val!r}. '
+                    f'Must be a positive integer.'
+                )
+            return config_val
+
+    return 120
+
+
 def get_hook_timeout():
     """Return the hook timeout in seconds, from RLSBL_HOOK_TIMEOUT or default None.
 
@@ -454,6 +487,90 @@ def is_private_repo():
             return data.get("private", False)
     except Exception:
         return None
+
+
+def extract_github_repo_from_remote(remote_url: str) -> str | None:
+    """Extract owner/repo from a git remote URL.
+
+    Supports:
+    - SCP-style: git@github.com:owner/repo.git, git@gw:owner/repo.git, gp:owner/repo.git
+    - HTTPS: https://github.com/owner/repo.git
+
+    Returns "owner/repo" or None if the URL doesn't match.
+    """
+    if not remote_url:
+        return None
+
+    # HTTPS: https://host/owner/repo[.git] -- checked first because the
+    # SCP regex would match "https:" as host:path.
+    https_match = re.match(r'^https?://[^/]+/(.+/.+)$', remote_url)
+    if https_match:
+        path = https_match.group(1).removesuffix('.git')
+        # Take the last two segments
+        parts = path.rstrip('/').split('/')
+        if len(parts) >= 2:
+            owner = parts[-2]
+            repo = parts[-1]
+            if owner and repo:
+                return f'{owner}/{repo}'
+        return None
+
+    # SCP-style: [user@]host:owner/repo[.git]
+    scp_match = re.match(r'^(?:[^@/:]+@)?[^@/:]+:(.+/.+)$', remote_url)
+    if scp_match:
+        path = scp_match.group(1).removesuffix('.git')
+        # Validate it looks like owner/repo (exactly two segments)
+        parts = path.split('/')
+        if len(parts) == 2 and parts[0] and parts[1]:
+            return path
+        return None
+
+    return None
+
+
+def get_origin_repo() -> str | None:
+    """Get owner/repo for the origin remote of the current git repo.
+
+    Returns None on any error (no remote, not a git repo, unparseable URL).
+    """
+    try:
+        url = run("git", ["remote", "get-url", "origin"])
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+    return extract_github_repo_from_remote(url)
+
+
+def get_github_repo(config: dict | None = None) -> str | None:
+    """Resolve the GitHub owner/repo slug from config or the git remote.
+
+    Precedence:
+    1. config["github_repo"] if config is provided and the key is set.
+    2. get_origin_repo() to parse the origin remote URL.
+
+    Returns "owner/repo" or None if neither source provides a slug.
+    """
+    if config is not None:
+        repo = config.get("github_repo")
+        if repo:
+            return repo
+    return get_origin_repo()
+
+
+def run_gh(args: list, config: dict | None = None, **kwargs) -> str:
+    """Run a ``gh`` CLI command with automatic GH_REPO resolution.
+
+    Resolves the repo slug via get_github_repo(config) and, if found,
+    sets GH_REPO in a per-call env dict so ``gh`` targets the correct
+    repository.  Does NOT mutate os.environ (critical for thread-safety
+    in watch.py's ThreadPoolExecutor).
+
+    All extra kwargs are forwarded to run().
+    """
+    repo = get_github_repo(config)
+    if repo is not None:
+        env = {**(kwargs.pop("env", None) or os.environ), "GH_REPO": repo}
+        return run("gh", args, env=env, **kwargs)
+    return run("gh", args, **kwargs)
 
 
 def read_go_module_path(project_dir: str) -> str | None:
