@@ -573,12 +573,8 @@ class TestHookCwdMonorepo:
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
-    @patch("rlsbl.commands.release._run_builtin_tests", return_value=True)
-    @patch("rlsbl.commands.release._run_builtin_lint", return_value=True)
     def test_pre_checks_hook_cwd_monorepo(
         self,
-        _lint,
-        _tests,
         _validate,
         _gen_cl,
         _gh_inst,
@@ -640,12 +636,8 @@ class TestHookCwdMonorepo:
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
-    @patch("rlsbl.commands.release._run_builtin_tests", return_value=True)
-    @patch("rlsbl.commands.release._run_builtin_lint", return_value=True)
     def test_pre_release_hook_cwd_monorepo(
         self,
-        _lint,
-        _tests,
         _validate,
         _gen_cl,
         _gh_inst,
@@ -704,12 +696,10 @@ class TestHookCwdMonorepo:
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
-    @patch("rlsbl.commands.release._run_builtin_tests", return_value=True)
-    @patch("rlsbl.commands.release._run_builtin_lint", return_value=True)
+    @patch("rlsbl.app.run_checks", return_value=([], 0))
     def test_post_release_hook_cwd_monorepo(
         self,
-        _lint,
-        _tests,
+        _run_checks,
         _validate,
         _gen_cl,
         _gh_inst,
