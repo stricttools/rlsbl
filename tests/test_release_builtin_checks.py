@@ -346,7 +346,7 @@ class TestBuiltinLintRunner:
             result = _run_builtin_lint({}, is_library=True)
 
             assert result is True
-            mock_lint.assert_called_once_with(".")
+            mock_lint.assert_called_once_with(".", allowed_imports=None, check_timeout=None)
 
     def test_lint_fails_on_errors(self, tmp_project):
         """When lint_library returns errors, sys.exit(1) is called."""
