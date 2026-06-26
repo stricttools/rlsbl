@@ -401,28 +401,53 @@ class TestTwoHookModel:
 class TestFullFlowOrder:
     """Tests verifying the execution order of all pre-release components."""
 
-    @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
-    @patch("rlsbl.commands.release.push_if_needed")
-    @patch("rlsbl.commands.release.run")
+    @patch("rlsbl.commands.release._run_release_mutating")
+    @patch("rlsbl.commands.release.resolve_release_targets", return_value=[])
+    @patch("rlsbl.commands.release.run", return_value="")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
-    @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
-    @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
-    @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
+    @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
+    @patch("rlsbl.commands.release.validate_pipeline_config")
+    @patch("rlsbl.commands.release.validate_config_integrity")
+    @patch("rlsbl.commands.release.validate_ota_mode")
+    @patch("rlsbl.commands.release.validate_gh_cli")
+    @patch("rlsbl.commands.release.validate_gh_push_access")
+    @patch("rlsbl.commands.release.validate_clean_tree", return_value=set())
+    @patch("rlsbl.commands.release.validate_branch_and_remote", return_value="main")
+    @patch("rlsbl.commands.release.resolve_monorepo_context", return_value=(None, None, False, False, None))
+    @patch("rlsbl.commands.release.validate_changelog_state", return_value=None)
+    @patch("rlsbl.commands.release.validate_blog_body", return_value=(None, None))
+    @patch("rlsbl.commands.release._abort_on_scaffold_conflicts")
+    @patch("rlsbl.commands.release.resolve_target_paths", return_value={})
+    @patch("rlsbl.commands.release.compute_release_version", return_value=("1.0.0", "1.0.1", "patch", "v1.0.1"))
+    @patch("rlsbl.commands.release.extract_changelog_entry_from_text", return_value="- test")
+    @patch("rlsbl.commands.release.parse_porcelain_paths", return_value=set())
+    @patch("rlsbl.commands.release.build_hook_env", return_value={})
+    @patch("rlsbl.commands.release.get_hook_timeout", return_value=30)
+    @patch("rlsbl.commands.release.is_hook_customized", return_value=False)
+    @patch("rlsbl.commands.release._run_strictcli_schema_dump")
+    @patch("rlsbl.commands.release._run_selfdoc_gen")
+    @patch("rlsbl.commands.release._run_selfdoc_check")
+    @patch("rlsbl.commands.release._run_selfdoc_post_generate")
+    @patch("rlsbl.commands.release.commit_files_if_changed")
     def test_execution_order(
         self,
+        _commit_if_changed,
+        _selfdoc_post, _selfdoc_check, _selfdoc_gen, _schema_dump,
+        _hook_customized,
+        _hook_timeout, _hook_env, _porcelain,
+        _extract, _compute, _resolve_targets, _scaffold,
+        _validate_blog, _validate_changelog, _resolve_mono,
+        _validate_branch, _validate_clean, _validate_push_access, _validate_gh,
+        _validate_ota, _validate_config, _validate_pipeline,
+        _validate_targets,
         _validate,
         _gen_cl,
-        _gh_inst,
-        _gh_auth,
-        _clean,
-        _branch,
         _commit_files,
         mock_run,
-        _push,
-        _remote_exists,
+        _resolve_release_targets,
+        _mutating,
         tmp_project,
     ):
         """Verify order: pre-checks hook -> preflight checks -> pre-release hook.
@@ -430,6 +455,8 @@ class TestFullFlowOrder:
         The pre-release hook must contain the scaffold template content so
         that _is_hook_effectively_empty() returns True and preflight checks
         are not skipped by the hooks-override behavior.
+
+        Uses non-dry-run to exercise the preflight code path via app.run_checks().
         """
         _setup_npm_project(tmp_project, test_script=None)
         hooks_dir = tmp_project / ".rlsbl" / "hooks"
@@ -458,8 +485,6 @@ class TestFullFlowOrder:
         )
         (hooks_dir / "pre-release.sh").write_text(_V1_TEMPLATE)
         (hooks_dir / "pre-release.sh").chmod(0o755)
-
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
 
         def tracking_run_checks(ctx, *, tag_expr=None, **kwargs):
             execution_order.append("preflight")
