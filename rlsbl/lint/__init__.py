@@ -89,6 +89,7 @@ def lint_library(
     project_path: str,
     *,
     allowed_imports: list[str] | None = None,
+    check_timeout: int | None = None,
 ) -> list[LintResult]:
     """Analyze a project for library boundary violations.
 
@@ -100,6 +101,9 @@ def lint_library(
         allowed_imports: optional list of imports to allow (merged with
             per-project TOML allow-list). Typically from workspace.toml
             ``lint_allow``.
+        check_timeout: optional subprocess timeout in seconds. Passed to
+            linters that shell out (e.g. MavenLinter). Defaults to 120
+            when None.
 
     Returns a list of LintResult namedtuples.
     """
@@ -126,7 +130,10 @@ def lint_library(
         config.exclude_patterns = merged
         linter = _create_linter(language, parser_type)
         if linter is not None:
-            results.extend(linter.lint(project_path, config))
+            if check_timeout is not None and hasattr(linter, "parser_type") and linter.parser_type == "subprocess":
+                results.extend(linter.lint(project_path, config, check_timeout=check_timeout))
+            else:
+                results.extend(linter.lint(project_path, config))
 
     return results
 

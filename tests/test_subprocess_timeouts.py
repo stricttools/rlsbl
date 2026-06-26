@@ -47,8 +47,8 @@ class TestMavenLinterTimeout:
         assert r.severity == "error"
         assert "timed out" in r.message.lower()
 
-    def test_subprocess_run_called_with_timeout(self, tmp_path):
-        """subprocess.run is called with timeout=120."""
+    def test_subprocess_run_called_with_default_timeout(self, tmp_path):
+        """subprocess.run is called with timeout=120 by default."""
         linter = MavenLinter()
         config = LanguageLintConfig()
 
@@ -68,6 +68,28 @@ class TestMavenLinterTimeout:
             linter.lint(str(tmp_path), config)
 
         assert mock_run.call_args.kwargs.get("timeout") == 120
+
+    def test_subprocess_run_called_with_custom_timeout(self, tmp_path):
+        """subprocess.run uses the check_timeout kwarg when provided."""
+        linter = MavenLinter()
+        config = LanguageLintConfig()
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+
+        with (
+            patch(
+                "rlsbl.targets.maven.MavenTarget.detect_lint_command",
+                return_value=["./gradlew", "detekt"],
+            ),
+            patch(
+                "rlsbl.lint.maven.subprocess.run",
+                return_value=mock_result,
+            ) as mock_run,
+        ):
+            linter.lint(str(tmp_path), config, check_timeout=300)
+
+        assert mock_run.call_args.kwargs.get("timeout") == 300
 
 
 # ---------------------------------------------------------------------------
@@ -94,6 +116,26 @@ class TestMavenTestsTimeout:
             result = run_project_tests("maven", project_dir=str(tmp_path))
 
         assert result is False
+
+    def test_maven_uses_config_timeout(self, tmp_path):
+        """run_project_tests passes config-driven timeout to subprocess.run."""
+        gradlew = tmp_path / "gradlew"
+        gradlew.write_text("#!/bin/sh\n")
+        os.chmod(str(gradlew), 0o755)
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+
+        with patch(
+            "rlsbl.testing.subprocess.run",
+            return_value=mock_result,
+        ) as mock_run:
+            run_project_tests(
+                "maven", project_dir=str(tmp_path),
+                config={"check_timeout": 300},
+            )
+
+        assert mock_run.call_args.kwargs.get("timeout") == 300
 
 
 class TestPypiTestsTimeout:
@@ -124,6 +166,31 @@ class TestPypiTestsTimeout:
 
         assert result is False
 
+    def test_pypi_uses_config_timeout(self, tmp_path):
+        """run_project_tests passes config-driven timeout to subprocess.run."""
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "pkg"\nversion = "0.1.0"\n\n'
+            '[dependency-groups]\ndev = ["pytest>=8.0"]\n'
+        )
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+
+        with (
+            patch("rlsbl.testing.require_tool") as mock_tool,
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch(
+                "rlsbl.testing.subprocess.run",
+                return_value=mock_result,
+            ) as mock_run,
+        ):
+            mock_tool.return_value = "/usr/bin/uv"
+            run_project_tests(
+                "pypi", project_dir=str(tmp_path),
+                config={"check_timeout": 600},
+            )
+
+        assert mock_run.call_args.kwargs.get("timeout") == 600
+
 
 class TestGoTestsTimeout:
     """_run_go_tests handles subprocess.TimeoutExpired."""
@@ -140,3 +207,19 @@ class TestGoTestsTimeout:
             result = run_project_tests("go", project_dir=str(tmp_path))
 
         assert result is False
+
+    def test_go_uses_config_timeout(self, tmp_path):
+        """run_project_tests passes config-driven timeout to subprocess.run."""
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+
+        with patch(
+            "rlsbl.testing.subprocess.run",
+            return_value=mock_result,
+        ) as mock_run:
+            run_project_tests(
+                "go", project_dir=str(tmp_path),
+                config={"check_timeout": 450},
+            )
+
+        assert mock_run.call_args.kwargs.get("timeout") == 450

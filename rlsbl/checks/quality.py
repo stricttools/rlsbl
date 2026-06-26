@@ -27,11 +27,12 @@ def register_quality_checks(app):
             return CheckResult("pass", "no library projects configured")
 
         ws_root = str(ctx.workspace_root)
+        timeout = get_check_timeout(ctx.config)
         total_errors = 0
         total_warnings = 0
         for proj in ctx.projects:
             proj_path = os.path.join(ws_root, proj["path"])
-            results = lint_library(proj_path, allowed_imports=proj.get("lint_allow"))
+            results = lint_library(proj_path, allowed_imports=proj.get("lint_allow"), check_timeout=timeout)
             for r in results:
                 if r.severity == "error":
                     total_errors += 1

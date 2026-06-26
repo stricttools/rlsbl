@@ -13,6 +13,7 @@ import subprocess
 
 from strictcli import CheckResult
 
+from ..utils import get_check_timeout
 from ..workspace import WorkspaceProject, members_of, project_is_dev_only
 from ._common import (
     RLSBL_CONFIG,
@@ -312,18 +313,19 @@ def register_workspace_checks(app):
         if not has_pypi:
             return CheckResult("skip", "no pypi-target projects in workspace")
 
+        timeout = get_check_timeout(ctx.config)
         try:
             result = subprocess.run(
                 ["uv", "sync", "--all-packages", "--dry-run"],
                 cwd=root,
                 capture_output=True,
                 text=True,
-                timeout=120,
+                timeout=timeout,
             )
         except FileNotFoundError:
             return CheckResult("skip", "uv not installed")
         except subprocess.TimeoutExpired:
-            return CheckResult("fail", "uv sync --all-packages --dry-run timed out after 120s")
+            return CheckResult("fail", f"uv sync --all-packages --dry-run timed out after {timeout}s")
 
         if result.returncode == 0:
             return CheckResult("pass", "all workspace members buildable")
@@ -579,7 +581,8 @@ def register_workspace_checks(app):
 
         # Run uv sync once at workspace root for all pypi sub-projects
         if has_pypi:
-            if not sync_workspace(str(ctx.workspace_root)):
+            timeout = get_check_timeout(ctx.config)
+            if not sync_workspace(str(ctx.workspace_root), check_timeout=timeout):
                 return CheckResult("fail", "uv sync --all-packages failed at workspace root")
 
         for proj, project_dir, target_name in project_targets:

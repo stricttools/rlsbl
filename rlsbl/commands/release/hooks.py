@@ -587,7 +587,7 @@ def run_releasable_tests(member_packages, flags, *, ctx, log, releasable_config_
         _run_builtin_tests(registry, flags, project_dir=str(pkg_dir), ctx=ctx)
 
 
-def run_releasable_lint(member_packages, flags, *, ws_projects, log):
+def run_releasable_lint(member_packages, flags, *, ws_projects, log, check_timeout=None):
     """Run built-in lint for library members of a releasable.
 
     Only runs on members with ``library = true``.
@@ -597,6 +597,7 @@ def run_releasable_lint(member_packages, flags, *, ws_projects, log):
         flags: release flags dict.
         ws_projects: list of WorkspaceProject instances (to check library flag).
         log: callable for logging messages.
+        check_timeout: optional subprocess timeout in seconds for lint commands.
 
     Raises:
         HookError if any member's lint fails.
@@ -612,7 +613,7 @@ def run_releasable_lint(member_packages, flags, *, ws_projects, log):
         is_library = lib_lookup.get(pkg_name, False)
         if is_library:
             log(f"Running lint for library package {pkg_name}...")
-            _run_builtin_lint(flags, is_library=True, project_dir=str(pkg_dir), allowed_imports=None)
+            _run_builtin_lint(flags, is_library=True, project_dir=str(pkg_dir), allowed_imports=None, check_timeout=check_timeout)
 
 
 def is_releasable_hook_customized(workspace_root, releasable_name, config=None):

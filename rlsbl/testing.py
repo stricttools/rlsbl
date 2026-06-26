@@ -11,10 +11,12 @@ import sys
 import tomllib
 
 from .errors import ConfigError
-from .utils import detect_uv_workspace_root, require_tool
+from .utils import detect_uv_workspace_root, get_check_timeout, require_tool
 
 
-def sync_workspace(workspace_root: str, *, verbose: bool = False) -> bool:
+def sync_workspace(
+    workspace_root: str, *, verbose: bool = False, check_timeout: int = 120
+) -> bool:
     """Run uv sync --all-packages at the workspace root.
 
     Returns True on success, False on failure.
@@ -29,9 +31,9 @@ def sync_workspace(workspace_root: str, *, verbose: bool = False) -> bool:
     if not verbose:
         sync_cmd.append("--quiet")
     try:
-        result = subprocess.run(sync_cmd, cwd=workspace_root, timeout=120)
+        result = subprocess.run(sync_cmd, cwd=workspace_root, timeout=check_timeout)
     except subprocess.TimeoutExpired:
-        print(f"Error: command timed out after 120s: {sync_cmd}", file=sys.stderr)
+        print(f"Error: command timed out after {check_timeout}s: {sync_cmd}", file=sys.stderr)
         return False
     if result.returncode != 0:
         print("Error: uv sync failed.", file=sys.stderr)
@@ -145,19 +147,22 @@ def run_project_tests(
 
     print("Running tests...")
 
+    timeout = get_check_timeout(config)
+
     if target_name == "pypi":
         return _run_pypi_tests(
             project_dir=project_dir,
             workspace_root=workspace_root,
             skip_sync=skip_sync,
             config=config or {},
+            check_timeout=timeout,
         )
     elif target_name == "go":
-        return _run_go_tests(project_dir=project_dir)
+        return _run_go_tests(project_dir=project_dir, check_timeout=timeout)
     elif target_name == "npm":
-        return _run_npm_tests(project_dir=project_dir)
+        return _run_npm_tests(project_dir=project_dir, check_timeout=timeout)
     elif target_name == "maven":
-        return _run_maven_tests(project_dir=project_dir)
+        return _run_maven_tests(project_dir=project_dir, check_timeout=timeout)
     else:
         # Unknown target, skip tests
         return True
@@ -169,6 +174,7 @@ def _run_pypi_tests(
     workspace_root: str | None = None,
     skip_sync: bool = False,
     config: dict,
+    check_timeout: int = 120,
 ) -> bool:
     """Run Python tests via uv or bare pytest.
 
@@ -189,7 +195,9 @@ def _run_pypi_tests(
         if is_workspace_member:
             # Workspace member: sync at workspace root, run plain uv run pytest
             if not skip_sync:
-                if not sync_workspace(workspace_root, verbose=uv_verbose):
+                if not sync_workspace(
+                    workspace_root, verbose=uv_verbose, check_timeout=check_timeout
+                ):
                     return False
             cmd = ["uv", "run", "pytest"]
         else:
@@ -197,15 +205,15 @@ def _run_pypi_tests(
             cmd = _resolve_pytest_invocation(effective_dir, workspace_root)
 
         try:
-            result = subprocess.run(cmd, cwd=project_dir, timeout=120)
+            result = subprocess.run(cmd, cwd=project_dir, timeout=check_timeout)
         except subprocess.TimeoutExpired:
-            print(f"Error: command timed out after 120s: {cmd}", file=sys.stderr)
+            print(f"Error: command timed out after {check_timeout}s: {cmd}", file=sys.stderr)
             return False
     elif require_tool("pytest", fatal=False):
         try:
-            result = subprocess.run(["pytest"], cwd=project_dir, timeout=120)
+            result = subprocess.run(["pytest"], cwd=project_dir, timeout=check_timeout)
         except subprocess.TimeoutExpired:
-            print("Error: command timed out after 120s: ['pytest']", file=sys.stderr)
+            print(f"Error: command timed out after {check_timeout}s: ['pytest']", file=sys.stderr)
             return False
     else:
         print("Warning: neither uv nor pytest found, skipping tests.", file=sys.stderr)
@@ -214,18 +222,18 @@ def _run_pypi_tests(
     return result.returncode == 0
 
 
-def _run_go_tests(*, project_dir: str | None) -> bool:
+def _run_go_tests(*, project_dir: str | None, check_timeout: int = 120) -> bool:
     """Run Go tests."""
     cmd = ["go", "test", "./...", "-race", "-short", "-count=1"]
     try:
-        result = subprocess.run(cmd, cwd=project_dir, timeout=120)
+        result = subprocess.run(cmd, cwd=project_dir, timeout=check_timeout)
     except subprocess.TimeoutExpired:
-        print(f"Error: command timed out after 120s: {cmd}", file=sys.stderr)
+        print(f"Error: command timed out after {check_timeout}s: {cmd}", file=sys.stderr)
         return False
     return result.returncode == 0
 
 
-def _run_maven_tests(*, project_dir: str | None) -> bool:
+def _run_maven_tests(*, project_dir: str | None, check_timeout: int = 120) -> bool:
     """Run Maven/Gradle tests.
 
     Prefers ./gradlew test if gradlew exists, otherwise falls back to mvn test
@@ -236,9 +244,9 @@ def _run_maven_tests(*, project_dir: str | None) -> bool:
     if os.path.exists(gradlew):
         cmd = ["./gradlew", "test"]
         try:
-            result = subprocess.run(cmd, cwd=project_dir, timeout=120)
+            result = subprocess.run(cmd, cwd=project_dir, timeout=check_timeout)
         except subprocess.TimeoutExpired:
-            print(f"Error: command timed out after 120s: {cmd}", file=sys.stderr)
+            print(f"Error: command timed out after {check_timeout}s: {cmd}", file=sys.stderr)
             return False
         return result.returncode == 0
 
@@ -246,9 +254,9 @@ def _run_maven_tests(*, project_dir: str | None) -> bool:
     if os.path.exists(pom_path):
         cmd = ["mvn", "test"]
         try:
-            result = subprocess.run(cmd, cwd=project_dir, timeout=120)
+            result = subprocess.run(cmd, cwd=project_dir, timeout=check_timeout)
         except subprocess.TimeoutExpired:
-            print(f"Error: command timed out after 120s: {cmd}", file=sys.stderr)
+            print(f"Error: command timed out after {check_timeout}s: {cmd}", file=sys.stderr)
             return False
         return result.returncode == 0
 
@@ -256,7 +264,7 @@ def _run_maven_tests(*, project_dir: str | None) -> bool:
     return True
 
 
-def _run_npm_tests(*, project_dir: str | None) -> bool:
+def _run_npm_tests(*, project_dir: str | None, check_timeout: int = 120) -> bool:
     """Run npm tests if a test script is defined in package.json."""
     pkg_path = os.path.join(project_dir, "package.json") if project_dir else "package.json"
     if os.path.exists(pkg_path):
@@ -265,9 +273,9 @@ def _run_npm_tests(*, project_dir: str | None) -> bool:
                 pkg = json.load(f)
             if pkg.get("scripts", {}).get("test"):
                 try:
-                    result = subprocess.run(["npm", "test"], cwd=project_dir, timeout=120)
+                    result = subprocess.run(["npm", "test"], cwd=project_dir, timeout=check_timeout)
                 except subprocess.TimeoutExpired:
-                    print("Error: command timed out after 120s: ['npm', 'test']", file=sys.stderr)
+                    print(f"Error: command timed out after {check_timeout}s: ['npm', 'test']", file=sys.stderr)
                     return False
                 return result.returncode == 0
             else:

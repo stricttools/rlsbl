@@ -18,7 +18,13 @@ class MavenLinter:
     language = "maven"
     parser_type = "subprocess"
 
-    def lint(self, project_path: str, config: LanguageLintConfig) -> list[LintResult]:
+    def lint(
+        self,
+        project_path: str,
+        config: LanguageLintConfig,
+        *,
+        check_timeout: int = 120,
+    ) -> list[LintResult]:
         from ..targets.maven import MavenTarget
 
         cmd = MavenTarget.detect_lint_command(project_path)
@@ -31,7 +37,7 @@ class MavenLinter:
                 cwd=project_path,
                 capture_output=True,
                 text=True,
-                timeout=120,
+                timeout=check_timeout,
             )
         except subprocess.TimeoutExpired:
             return [
@@ -40,7 +46,7 @@ class MavenLinter:
                     line=0,
                     rule="maven-lint",
                     severity="error",
-                    message=f"Lint command timed out after 120s: {cmd}",
+                    message=f"Lint command timed out after {check_timeout}s: {cmd}",
                 )
             ]
 
