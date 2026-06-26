@@ -163,18 +163,21 @@ class TestUndoGhDeleteFails:
     @patch(f"{MOD_UNDO}.is_clean_tree", return_value=True)
     @patch(f"{MOD_UNDO}.check_gh_auth", return_value=True)
     @patch(f"{MOD_UNDO}.check_gh_installed", return_value=True)
+    @patch(f"{MOD_UNDO}.run_gh")
     @patch(f"{MOD_UNDO}.run")
-    def test_gh_delete_failure_shows_summary(self, mock_run, *_):
+    def test_gh_delete_failure_shows_summary(self, mock_run, mock_run_gh, *_):
         from rlsbl.commands.undo import run_cmd
 
         mock_run.side_effect = [
             "v1.0.0",                               # git describe
-            "",                                      # gh release view -> OK
-            Exception("delete failed"),              # gh release delete -> FAILS
             "",                                      # git push origin :v1.0.0
             "",                                      # git tag -d v1.0.0
             "v1.0.0",                               # git log -1 --format=%s
             "",                                      # git revert
+        ]
+        mock_run_gh.side_effect = [
+            "",                                      # gh release view -> OK
+            Exception("delete failed"),              # gh release delete -> FAILS
         ]
         with patch("sys.stdout", new_callable=StringIO) as out:
             with patch("sys.stderr", new_callable=StringIO):
@@ -193,14 +196,13 @@ class TestUndoRemoteTagDeleteFails:
     @patch(f"{MOD_UNDO}.is_clean_tree", return_value=True)
     @patch(f"{MOD_UNDO}.check_gh_auth", return_value=True)
     @patch(f"{MOD_UNDO}.check_gh_installed", return_value=True)
+    @patch(f"{MOD_UNDO}.run_gh", return_value="")
     @patch(f"{MOD_UNDO}.run")
-    def test_remote_tag_delete_failure(self, mock_run, *_):
+    def test_remote_tag_delete_failure(self, mock_run, _run_gh, *_):
         from rlsbl.commands.undo import run_cmd
 
         mock_run.side_effect = [
             "v1.0.0",
-            "",                               # gh release view
-            "",                               # gh release delete
             Exception("push failed"),         # git push origin :v1.0.0 -> FAILS
             "",                               # git tag -d
             "v1.0.0",                        # git log
@@ -222,14 +224,13 @@ class TestUndoLocalTagDeleteFails:
     @patch(f"{MOD_UNDO}.is_clean_tree", return_value=True)
     @patch(f"{MOD_UNDO}.check_gh_auth", return_value=True)
     @patch(f"{MOD_UNDO}.check_gh_installed", return_value=True)
+    @patch(f"{MOD_UNDO}.run_gh", return_value="")
     @patch(f"{MOD_UNDO}.run")
-    def test_local_tag_delete_failure(self, mock_run, *_):
+    def test_local_tag_delete_failure(self, mock_run, _run_gh, *_):
         from rlsbl.commands.undo import run_cmd
 
         mock_run.side_effect = [
             "v1.0.0",
-            "",                              # gh release view
-            "",                              # gh release delete
             "",                              # git push origin :v1.0.0
             Exception("tag -d failed"),      # git tag -d -> FAILS
             "v1.0.0",                       # git log
@@ -249,14 +250,13 @@ class TestUndoRevertException:
     @patch(f"{MOD_UNDO}.is_clean_tree", return_value=True)
     @patch(f"{MOD_UNDO}.check_gh_auth", return_value=True)
     @patch(f"{MOD_UNDO}.check_gh_installed", return_value=True)
+    @patch(f"{MOD_UNDO}.run_gh", return_value="")
     @patch(f"{MOD_UNDO}.run")
-    def test_revert_exception(self, mock_run, *_):
+    def test_revert_exception(self, mock_run, _run_gh, *_):
         from rlsbl.commands.undo import run_cmd
 
         mock_run.side_effect = [
             "v1.0.0",
-            "",                                # gh release view
-            "",                                # gh release delete
             "",                                # git push origin :v1.0.0
             "",                                # git tag -d
             "v1.0.0",                         # git log
@@ -281,14 +281,13 @@ class TestUndoChangelogRestoreFails:
     @patch(f"{MOD_UNDO}.is_clean_tree", return_value=True)
     @patch(f"{MOD_UNDO}.check_gh_auth", return_value=True)
     @patch(f"{MOD_UNDO}.check_gh_installed", return_value=True)
+    @patch(f"{MOD_UNDO}.run_gh", return_value="")
     @patch(f"{MOD_UNDO}.run")
-    def test_changelog_restore_failure_in_summary(self, mock_run, *_):
+    def test_changelog_restore_failure_in_summary(self, mock_run, _run_gh, *_):
         from rlsbl.commands.undo import run_cmd
 
         mock_run.side_effect = [
             "v1.0.0",
-            "",                                           # gh release view
-            "",                                           # gh release delete
             "",                                           # git push origin :v1.0.0
             "",                                           # git tag -d
             "chore: finalize changelog for 1.0.0",       # git log (finalize commit)
@@ -314,14 +313,13 @@ class TestUndoReleaseFileRestoreFails:
     @patch(f"{MOD_UNDO}.is_clean_tree", return_value=True)
     @patch(f"{MOD_UNDO}.check_gh_auth", return_value=True)
     @patch(f"{MOD_UNDO}.check_gh_installed", return_value=True)
+    @patch(f"{MOD_UNDO}.run_gh", return_value="")
     @patch(f"{MOD_UNDO}.run")
-    def test_release_file_restore_failure(self, mock_run, *_):
+    def test_release_file_restore_failure(self, mock_run, _run_gh, *_):
         from rlsbl.commands.undo import run_cmd
 
         mock_run.side_effect = [
             "v1.0.0",
-            "",         # gh release view
-            "",         # gh release delete
             "",         # git push origin :v1.0.0
             "",         # git tag -d
             "v1.0.0",   # git log
@@ -342,14 +340,13 @@ class TestUndoPushDeclined:
     @patch(f"{MOD_UNDO}.is_clean_tree", return_value=True)
     @patch(f"{MOD_UNDO}.check_gh_auth", return_value=True)
     @patch(f"{MOD_UNDO}.check_gh_installed", return_value=True)
+    @patch(f"{MOD_UNDO}.run_gh", return_value="")
     @patch(f"{MOD_UNDO}.run")
-    def test_push_declined_by_user(self, mock_run, *_):
+    def test_push_declined_by_user(self, mock_run, _run_gh, *_):
         from rlsbl.commands.undo import run_cmd
 
         mock_run.side_effect = [
             "v1.0.0",
-            "",         # gh release view
-            "",         # gh release delete
             "",         # git push origin :v1.0.0
             "",         # git tag -d
             "v1.0.0",   # git log
@@ -367,14 +364,13 @@ class TestUndoPushDeclined:
     @patch(f"{MOD_UNDO}.is_clean_tree", return_value=True)
     @patch(f"{MOD_UNDO}.check_gh_auth", return_value=True)
     @patch(f"{MOD_UNDO}.check_gh_installed", return_value=True)
+    @patch(f"{MOD_UNDO}.run_gh", return_value="")
     @patch(f"{MOD_UNDO}.run")
-    def test_push_eof_at_prompt(self, mock_run, *_):
+    def test_push_eof_at_prompt(self, mock_run, _run_gh, *_):
         from rlsbl.commands.undo import run_cmd
 
         mock_run.side_effect = [
             "v1.0.0",
-            "",         # gh release view
-            "",         # gh release delete
             "",         # git push origin :v1.0.0
             "",         # git tag -d
             "v1.0.0",   # git log
@@ -396,14 +392,13 @@ class TestUndoPushFails:
     @patch(f"{MOD_UNDO}.is_clean_tree", return_value=True)
     @patch(f"{MOD_UNDO}.check_gh_auth", return_value=True)
     @patch(f"{MOD_UNDO}.check_gh_installed", return_value=True)
+    @patch(f"{MOD_UNDO}.run_gh", return_value="")
     @patch(f"{MOD_UNDO}.run")
-    def test_push_fails_shows_failure(self, mock_run, *_):
+    def test_push_fails_shows_failure(self, mock_run, _run_gh, *_):
         from rlsbl.commands.undo import run_cmd
 
         mock_run.side_effect = [
             "v1.0.0",
-            "",         # gh release view
-            "",         # gh release delete
             "",         # git push origin :v1.0.0
             "",         # git tag -d
             "v1.0.0",   # git log
@@ -426,14 +421,13 @@ class TestUndoReleaseFileFinalize:
     @patch(f"{MOD_UNDO}.is_clean_tree", return_value=True)
     @patch(f"{MOD_UNDO}.check_gh_auth", return_value=True)
     @patch(f"{MOD_UNDO}.check_gh_installed", return_value=True)
+    @patch(f"{MOD_UNDO}.run_gh", return_value="")
     @patch(f"{MOD_UNDO}.run")
-    def test_release_file_finalize_at_head(self, mock_run, *_):
+    def test_release_file_finalize_at_head(self, mock_run, _run_gh, *_):
         from rlsbl.commands.undo import run_cmd
 
         mock_run.side_effect = [
             "v1.0.0",                                         # git describe
-            "",                                                # gh release view
-            "",                                                # gh release delete
             "",                                                # git push origin :v1.0.0
             "",                                                # git tag -d
             "chore: finalize release file for 1.0.0",         # git log (release-file finalize)
@@ -445,7 +439,7 @@ class TestUndoReleaseFileFinalize:
         ]
         with patch("sys.stdout", new_callable=StringIO):
             run_cmd("npm", [], {"yes": True}, ctx=_ctx())
-        assert mock_run.call_count == 11
+        assert mock_run.call_count == 9
 
 
 class TestUndoFinalizeOnlyReverted:
@@ -461,14 +455,13 @@ class TestUndoFinalizeOnlyReverted:
     @patch(f"{MOD_UNDO}.is_clean_tree", return_value=True)
     @patch(f"{MOD_UNDO}.check_gh_auth", return_value=True)
     @patch(f"{MOD_UNDO}.check_gh_installed", return_value=True)
+    @patch(f"{MOD_UNDO}.run_gh", return_value="")
     @patch(f"{MOD_UNDO}.run")
-    def test_finalize_reverted_but_no_version_bump(self, mock_run, *_):
+    def test_finalize_reverted_but_no_version_bump(self, mock_run, _run_gh, *_):
         from rlsbl.commands.undo import run_cmd
 
         mock_run.side_effect = [
             "v1.0.0",
-            "",                                           # gh release view
-            "",                                           # gh release delete
             "",                                           # git push origin :v1.0.0
             "",                                           # git tag -d
             "chore: finalize changelog for 1.0.0",       # git log (finalize)
