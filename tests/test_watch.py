@@ -340,24 +340,23 @@ class TestRePoll:
 class TestResolveRunIds:
     """Tests for _resolve_run_ids that resolves run IDs via gh run view."""
 
-    @patch("rlsbl.commands.watch.gh_env", return_value=None)
-    @patch("rlsbl.commands.watch.run")
-    def test_resolves_single_run_id(self, mock_run, _gh_env):
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_resolves_single_run_id(self, mock_run_gh):
         """A single run ID is resolved to a run info dict."""
-        mock_run.return_value = json.dumps(
+        mock_run_gh.return_value = json.dumps(
             {"databaseId": 12345, "name": "CI", "status": "completed"}
         )
         result = _resolve_run_ids(["12345"])
         assert len(result) == 1
         assert result[0]["databaseId"] == 12345
         assert result[0]["name"] == "CI"
-        assert mock_run.call_count == 1
-        assert mock_run.call_args[0] == ("gh", ["run", "view", "12345", "--json", "databaseId,name,status,headBranch,workflowName"])
+        assert mock_run_gh.call_count == 1
+        assert mock_run_gh.call_args[0] == (["run", "view", "12345", "--json", "databaseId,name,status,headBranch,workflowName"],)
 
-    @patch("rlsbl.commands.watch.run")
-    def test_resolves_multiple_run_ids(self, mock_run):
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_resolves_multiple_run_ids(self, mock_run_gh):
         """Multiple run IDs are each resolved to a run info dict."""
-        mock_run.side_effect = [
+        mock_run_gh.side_effect = [
             json.dumps({"databaseId": 111, "name": "CI", "status": "completed"}),
             json.dumps({"databaseId": 222, "name": "Publish", "status": "in_progress"}),
         ]
@@ -366,10 +365,10 @@ class TestResolveRunIds:
         assert result[0]["databaseId"] == 111
         assert result[1]["databaseId"] == 222
 
-    @patch("rlsbl.commands.watch.run")
-    def test_invalid_run_id_exits(self, mock_run):
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_invalid_run_id_exits(self, mock_run_gh):
         """An unresolvable run ID causes sys.exit(1)."""
-        mock_run.side_effect = Exception("not found")
+        mock_run_gh.side_effect = Exception("not found")
         with pytest.raises(SystemExit) as exc_info:
             _resolve_run_ids(["99999"])
         assert exc_info.value.code == 1
@@ -490,26 +489,19 @@ class TestMutualExclusivity:
 class TestAutoRetry:
     """Tests for auto-retry logic when a CI workflow fails."""
 
-    @patch("rlsbl.commands.watch.gh_env", return_value=None)
-    @patch("rlsbl.commands.watch.run")
     @patch("rlsbl.commands.watch.time")
-    @patch("rlsbl.commands.watch.subprocess.run")
-    def test_retry_attempted_on_first_failure(self, mock_subproc, mock_time, mock_run, _gh_env, capsys):
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_retry_attempted_on_first_failure(self, mock_run_gh, mock_time, capsys):
         """When a workflow fails, _watch_single_run triggers a retry."""
         ci_run = {"databaseId": 100, "name": "CI", "headBranch": "main"}
 
-        # First gh run watch fails (CalledProcessError)
-        # Then gh workflow run succeeds (retry trigger)
-        # Then gh run list returns the retry run
-        # Then gh run watch on retry succeeds
-        mock_subproc.side_effect = [
+        # run_gh calls: original watch, retry trigger, run list poll, retry watch
+        mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
-            MagicMock(returncode=0),  # gh workflow run succeeds
-            MagicMock(returncode=0),  # retry watch succeeds
+            "",  # gh workflow run succeeds
+            json.dumps([{"databaseId": 200, "name": "CI", "status": "in_progress", "createdAt": "2026-01-01"}]),  # gh run list
+            "",  # retry watch succeeds
         ]
-        mock_run.return_value = json.dumps(
-            [{"databaseId": 200, "name": "CI", "status": "in_progress", "createdAt": "2026-01-01"}]
-        )
 
         result = _watch_single_run(ci_run, "test-label", "user/repo")
 
@@ -519,43 +511,35 @@ class TestAutoRetry:
         assert "CI failed, retrying once..." in err
         assert "retry passed" in err
 
-    @patch("rlsbl.commands.watch.gh_env", return_value=None)
-    @patch("rlsbl.commands.watch.run")
     @patch("rlsbl.commands.watch.time")
-    @patch("rlsbl.commands.watch.subprocess.run")
-    def test_retry_success_reports_overall_success(self, mock_subproc, mock_time, mock_run, _gh_env, capsys):
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_retry_success_reports_overall_success(self, mock_run_gh, mock_time, capsys):
         """When the retry passes, the overall result is success."""
         ci_run = {"databaseId": 100, "name": "CI", "headBranch": "main"}
 
-        mock_subproc.side_effect = [
+        mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
-            MagicMock(returncode=0),  # gh workflow run trigger
-            MagicMock(returncode=0),  # retry watch succeeds
+            "",  # gh workflow run trigger
+            json.dumps([{"databaseId": 200, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]),  # gh run list
+            "",  # retry watch succeeds
         ]
-        mock_run.return_value = json.dumps(
-            [{"databaseId": 200, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]
-        )
 
         result = _watch_single_run(ci_run, "test-label", "user/repo")
         assert result["passed"] is True
         assert result["run_id"] == "200"
 
-    @patch("rlsbl.commands.watch.gh_env", return_value=None)
-    @patch("rlsbl.commands.watch.run")
     @patch("rlsbl.commands.watch.time")
-    @patch("rlsbl.commands.watch.subprocess.run")
-    def test_double_failure_reports_failure(self, mock_subproc, mock_time, mock_run, _gh_env, capsys):
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_double_failure_reports_failure(self, mock_run_gh, mock_time, capsys):
         """When both original and retry fail, the result is failure."""
         ci_run = {"databaseId": 100, "name": "CI", "headBranch": "main"}
 
-        mock_subproc.side_effect = [
+        mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
-            MagicMock(returncode=0),  # gh workflow run trigger
+            "",  # gh workflow run trigger
+            json.dumps([{"databaseId": 200, "name": "CI", "status": "in_progress", "createdAt": "2026-01-01"}]),  # gh run list
             subprocess.CalledProcessError(1, "gh"),  # retry watch also fails
         ]
-        mock_run.return_value = json.dumps(
-            [{"databaseId": 200, "name": "CI", "status": "in_progress", "createdAt": "2026-01-01"}]
-        )
 
         result = _watch_single_run(ci_run, "test-label", "user/repo")
 
@@ -564,12 +548,12 @@ class TestAutoRetry:
         err = capsys.readouterr().err
         assert "retry also failed" in err
 
-    @patch("rlsbl.commands.watch.subprocess.run")
-    def test_no_retry_without_branch(self, mock_subproc, capsys):
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_no_retry_without_branch(self, mock_run_gh, capsys):
         """When headBranch is missing, no retry is attempted."""
         ci_run = {"databaseId": 100, "name": "CI"}  # no headBranch
 
-        mock_subproc.side_effect = [
+        mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
         ]
 
@@ -578,14 +562,13 @@ class TestAutoRetry:
         err = capsys.readouterr().err
         assert "retrying" not in err
 
-    @patch("rlsbl.commands.watch.run")
     @patch("rlsbl.commands.watch.time")
-    @patch("rlsbl.commands.watch.subprocess.run")
-    def test_retry_trigger_failure_returns_original_failure(self, mock_subproc, mock_time, mock_run, capsys):
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_retry_trigger_failure_returns_original_failure(self, mock_run_gh, mock_time, capsys):
         """When the retry trigger itself fails, the original failure is returned."""
         ci_run = {"databaseId": 100, "name": "CI", "headBranch": "main"}
 
-        mock_subproc.side_effect = [
+        mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
             subprocess.CalledProcessError(1, "gh"),  # gh workflow run trigger fails
         ]
@@ -600,33 +583,29 @@ class TestAutoRetry:
 class TestRetryWorkflow:
     """Unit tests for _retry_workflow."""
 
-    @patch("rlsbl.commands.watch.gh_env", return_value=None)
-    @patch("rlsbl.commands.watch.run")
     @patch("rlsbl.commands.watch.time")
-    @patch("rlsbl.commands.watch.subprocess.run")
-    def test_retry_passes(self, mock_subproc, mock_time, mock_run, _gh_env, capsys):
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_retry_passes(self, mock_run_gh, mock_time, capsys):
         """Successful retry returns passed=True."""
-        mock_subproc.side_effect = [
-            MagicMock(returncode=0),  # gh workflow run
-            MagicMock(returncode=0),  # gh run watch
+        mock_run_gh.side_effect = [
+            "",  # gh workflow run trigger
+            json.dumps([{"databaseId": 300, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]),  # gh run list
+            "",  # retry watch succeeds
         ]
-        mock_run.return_value = json.dumps(
-            [{"databaseId": 300, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]
-        )
 
         result = _retry_workflow("CI", "main", "user/repo", "test-label")
         assert result is not None
         assert result["passed"] is True
         assert result["run_id"] == "300"
 
-    @patch("rlsbl.commands.watch.gh_env", return_value=None)
-    @patch("rlsbl.commands.watch.run")
     @patch("rlsbl.commands.watch.time")
-    @patch("rlsbl.commands.watch.subprocess.run")
-    def test_retry_run_not_found(self, mock_subproc, mock_time, mock_run, _gh_env, capsys):
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_retry_run_not_found(self, mock_run_gh, mock_time, capsys):
         """When the retry run never appears, returns None."""
-        mock_subproc.return_value = MagicMock(returncode=0)  # gh workflow run trigger
-        mock_run.side_effect = Exception("not found")  # all poll attempts fail
+        # First call succeeds (trigger), remaining calls fail (all polls)
+        mock_run_gh.side_effect = [
+            "",  # gh workflow run trigger
+        ] + [Exception("not found")] * 15  # all poll attempts fail
 
         result = _retry_workflow("CI", "main", "user/repo", "test-label")
         assert result is None
@@ -797,11 +776,9 @@ class TestRetryDedup:
     already present and skip).
     """
 
-    @patch("rlsbl.commands.watch.gh_env", return_value=None)
-    @patch("rlsbl.commands.watch.run")
     @patch("rlsbl.commands.watch.time")
-    @patch("rlsbl.commands.watch.subprocess.run")
-    def test_multiple_runs_same_workflow_retry_once(self, mock_subproc, mock_time, mock_run, _gh_env, capsys):
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_multiple_runs_same_workflow_retry_once(self, mock_run_gh, mock_time, capsys):
         """Three CI runs fail concurrently but only one retry is dispatched."""
         runs = [
             {"databaseId": 100, "name": "CI", "headBranch": "main"},
@@ -809,42 +786,31 @@ class TestRetryDedup:
             {"databaseId": 300, "name": "CI", "headBranch": "main"},
         ]
 
-        # Track which subprocess commands are called to assert retry count.
-        # We need careful ordering: each thread calls `gh run watch <id>`
-        # which fails, then only ONE thread calls `gh workflow run CI`,
-        # then that thread watches the retry run.
-        #
-        # subprocess.run is called with:
-        #   ["gh", "run", "watch", "<id>", "--exit-status"] -- 3 times, all fail
-        #   ["gh", "workflow", "run", "CI", "--ref", "main"] -- 1 time (retry trigger)
-        #   ["gh", "run", "watch", "<retry_id>", "--exit-status"] -- 1 time (retry watch)
-        #
-        # Since threads run concurrently, we can't predict exact call order,
-        # so we use side_effect as a function that inspects the command.
+        # All gh calls now go through run_gh(args, ...) where args is the
+        # list without "gh".  Since threads run concurrently, we use
+        # side_effect as a function that inspects the args.
 
         workflow_run_call_count = 0
 
-        def subproc_side_effect(cmd, **kwargs):
+        def run_gh_side_effect(args, **kwargs):
             nonlocal workflow_run_call_count
-            if cmd[:3] == ["gh", "run", "watch"]:
-                run_id = cmd[3]
+            if args[:2] == ["run", "watch"]:
+                run_id = args[2]
                 # Original watches (IDs 100, 200, 300) all fail
                 if run_id in ("100", "200", "300"):
                     raise subprocess.CalledProcessError(1, "gh")
                 # Retry watch (ID 400) succeeds
-                return MagicMock(returncode=0)
-            elif cmd[:3] == ["gh", "workflow", "run"]:
+                return ""
+            elif args[:2] == ["workflow", "run"]:
                 workflow_run_call_count += 1
-                return MagicMock(returncode=0)
-            return MagicMock(returncode=0)
+                return ""
+            elif args[:2] == ["run", "list"]:
+                return json.dumps(
+                    [{"databaseId": 400, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]
+                )
+            return ""
 
-        mock_subproc.side_effect = subproc_side_effect
-
-        # Mock rlsbl.commands.watch.run for the `gh run list` call in _retry_workflow
-        # that polls for the new retry run
-        mock_run.return_value = json.dumps(
-            [{"databaseId": 400, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]
-        )
+        mock_run_gh.side_effect = run_gh_side_effect
 
         results = _watch_runs(runs, "test-label", "user/repo")
 

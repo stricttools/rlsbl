@@ -522,8 +522,8 @@ class TestPrsRunCmd:
     def test_prints_count_when_prs_exist(self, monkeypatch, capsys):
         monkeypatch.setattr("rlsbl.commands.prs.check_gh_installed", lambda: True)
         monkeypatch.setattr("rlsbl.commands.prs.check_gh_auth", lambda: True)
-        monkeypatch.setattr("rlsbl.commands.prs.run", lambda cmd, args, **kw: "3")
-        monkeypatch.setattr("rlsbl.commands.prs.gh_env", lambda *a, **kw: None)
+        monkeypatch.setattr("rlsbl.commands.prs.run_gh", lambda args, **kw: "3")
+        monkeypatch.setattr("rlsbl.commands.prs.get_github_repo", lambda *a, **kw: None)
         monkeypatch.setattr("subprocess.run", MagicMock())
 
         with pytest.raises(SystemExit) as exc_info:
@@ -535,8 +535,7 @@ class TestPrsRunCmd:
     def test_no_output_when_zero_prs(self, monkeypatch, capsys):
         monkeypatch.setattr("rlsbl.commands.prs.check_gh_installed", lambda: True)
         monkeypatch.setattr("rlsbl.commands.prs.check_gh_auth", lambda: True)
-        monkeypatch.setattr("rlsbl.commands.prs.run", lambda cmd, args, **kw: "0")
-        monkeypatch.setattr("rlsbl.commands.prs.gh_env", lambda *a, **kw: None)
+        monkeypatch.setattr("rlsbl.commands.prs.run_gh", lambda args, **kw: "0")
 
         with pytest.raises(SystemExit) as exc_info:
             prs_run_cmd(None, [], {})
@@ -547,7 +546,7 @@ class TestPrsRunCmd:
     def test_handles_exception_gracefully(self, monkeypatch, capsys):
         monkeypatch.setattr("rlsbl.commands.prs.check_gh_installed", lambda: True)
         monkeypatch.setattr("rlsbl.commands.prs.check_gh_auth", lambda: True)
-        monkeypatch.setattr("rlsbl.commands.prs.run", MagicMock(side_effect=RuntimeError("network down")))
+        monkeypatch.setattr("rlsbl.commands.prs.run_gh", MagicMock(side_effect=RuntimeError("network down")))
 
         with pytest.raises(SystemExit) as exc_info:
             prs_run_cmd(None, [], {})
