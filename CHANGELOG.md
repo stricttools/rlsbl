@@ -2,6 +2,35 @@
 
 # Changelog
 
+## 0.88.0
+
+Configurable check timeout, centralized GitHub repo resolution with SSH alias support, push-access verification, library lint exceptions, and stderr surfacing for failed commands
+
+<details>
+<summary>Context</summary>
+
+This release consolidates several reliability and usability improvements. The run_gh() migration
+replaces scattered remote-URL parsing across all commands with a single utility that handles SSH
+aliases and the github_repo config key. Push-access verification catches GH_TOKEN mismatches before
+the release flow runs. Library lint exceptions (lint_allow) support per-package overrides for
+forbidden-import checks. Configurable check timeout lets projects with slow test suites raise the
+default 120s limit.
+
+</details>
+
+### Features
+
+- **Configurable check timeout.** `RLSBL_CHECK_TIMEOUT` env var and `check_timeout` config key let you control test and lint timeouts (default remains 120s).
+- **Centralized GitHub repo resolution.** New `github_repo` config key and automatic SSH alias handling for all `gh` commands, replacing scattered remote-URL parsing with a single `run_gh()` utility.
+- **Centralized GitHub repo resolution.** Migrated yank, undo, release-retry, watch, PR, and check commands to `run_gh()`.
+- **Centralized GitHub repo resolution.** Migrated checks, tagging, and private-repo detection to `run_gh()`.
+- **Push access verification.** `validate_gh_push_access` checks the authenticated user has push access before releasing, with a hard error and actionable message on mismatch.
+- **Library lint exceptions.** `lint_allow` field in `workspace.toml` for per-package forbidden-import exceptions (e.g., allowing a library to import its own test utilities).
+
+### Fixes
+
+- **Stderr surfacing.** Push and GitHub Release creation failures now show the actual error message from `gh`/`git push` instead of a generic failure.
+
 ## 0.87.0
 
 Ruff integration, unreachable-code detection, non-workspace test runner, and validate_release_targets union fix
