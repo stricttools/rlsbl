@@ -557,65 +557,6 @@ def _run_per_package_hooks(hook_name, hook_file, sorted_members, hook_env,
             )
 
 
-def run_releasable_tests(member_packages, flags, *, ctx, log, releasable_config_dir=None):
-    """Run built-in tests for each member package of a releasable.
-
-    Detects the target type per member and runs the appropriate test
-    command.  Iterates members alphabetically. Any failure raises HookError.
-
-    Args:
-        member_packages: list of (package_name, package_dir) tuples.
-        flags: release flags dict.
-        ctx: ProjectContext.
-        log: callable for logging messages.
-        releasable_config_dir: optional path to the releasable's state
-            directory for target detection config inheritance.
-
-    Raises:
-        HookError if any member's tests fail.
-    """
-    from .validate import _run_builtin_tests
-    from rlsbl.targets import detect_targets
-
-    for pkg_name, pkg_dir in sorted(member_packages, key=lambda p: p[0]):
-        targets = detect_targets(str(pkg_dir), releasable_config_dir=releasable_config_dir)
-        if not targets:
-            log(f"No targets detected for {pkg_name}, skipping tests")
-            continue
-        registry = targets[0].name
-        log(f"Running tests for package {pkg_name}...")
-        _run_builtin_tests(registry, flags, project_dir=str(pkg_dir), ctx=ctx)
-
-
-def run_releasable_lint(member_packages, flags, *, ws_projects, log, check_timeout=None):
-    """Run built-in lint for library members of a releasable.
-
-    Only runs on members with ``library = true``.
-
-    Args:
-        member_packages: list of (package_name, package_dir) tuples.
-        flags: release flags dict.
-        ws_projects: list of WorkspaceProject instances (to check library flag).
-        log: callable for logging messages.
-        check_timeout: optional subprocess timeout in seconds for lint commands.
-
-    Raises:
-        HookError if any member's lint fails.
-    """
-    from .validate import _run_builtin_lint
-
-    # Build a lookup from name to (library, lint_allow)
-    lib_lookup = {}
-    for proj in ws_projects:
-        lib_lookup[proj.name] = (proj.library, proj.get("lint_allow"))
-
-    for pkg_name, pkg_dir in sorted(member_packages, key=lambda p: p[0]):
-        is_library, lint_allow = lib_lookup.get(pkg_name, (False, None))
-        if is_library:
-            log(f"Running lint for library package {pkg_name}...")
-            _run_builtin_lint(flags, is_library=True, project_dir=str(pkg_dir), allowed_imports=lint_allow, check_timeout=check_timeout)
-
-
 def is_releasable_hook_customized(workspace_root, releasable_name, config=None):
     """Check if a releasable's pre-release hook is customized (not scaffold boilerplate).
 

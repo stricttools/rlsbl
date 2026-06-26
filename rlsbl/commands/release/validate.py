@@ -9,7 +9,6 @@ import os
 import sys
 
 from ...strictcli_detect import detect_strictcli
-from ...testing import run_project_tests
 
 
 class ReleaseValidationError(Exception):
@@ -591,69 +590,6 @@ def parse_porcelain_paths(porcelain_output):
         file_path = parts[1].split(" -> ")[-1]
         dirty_files.add(file_path)
     return dirty_files
-
-
-def _run_builtin_tests(registry, flags, *, project_dir=None, ctx):
-    """Run built-in tests for the detected project type.
-
-    Delegates to run_project_tests() for the actual test execution.
-    Raises HookError on failure.
-    Returns True if tests pass.
-    """
-    success = run_project_tests(
-        registry,
-        project_dir=project_dir,
-        workspace_root=str(ctx.workspace_root) if ctx.workspace_root else None,
-        config=ctx.config,
-        dry_run=flags.get("dry-run", False),
-    )
-    if not success:
-        print("Error: tests failed.", file=sys.stderr)
-        raise HookError("Tests failed")
-    return True
-
-
-def _run_builtin_lint(flags, is_library=False, project_dir=None, allowed_imports=None, check_timeout=None):
-    """Run built-in library lint.
-
-    Counts errors and warnings from lint results. Raises HookError on errors.
-    Only runs on library projects (monorepo projects with library = true).
-    When project_dir is set (monorepo mode), lint runs against that directory.
-    """
-    if flags.get("dry-run"):
-        return True
-
-    if not is_library:
-        print("Skipping lint (not a library project)")
-        return True
-
-    print("Running lint...")
-
-    from ...lint import lint_library
-
-    results = lint_library(
-        project_dir if project_dir else ".",
-        allowed_imports=allowed_imports,
-        check_timeout=check_timeout,
-    )
-
-    errors = [r for r in results if r.severity == "error"]
-    warnings = [r for r in results if r.severity == "warning"]
-
-    if errors:
-        for r in errors:
-            print(f"  {r.file}:{r.line}: {r.rule}: {r.message}", file=sys.stderr)
-        print(f"Error: library lint found {len(errors)} error(s).", file=sys.stderr)
-        raise HookError("Lint errors found")
-
-    if warnings:
-        for r in warnings:
-            print(f"  {r.file}:{r.line}: {r.rule}: {r.message}", file=sys.stderr)
-        print(f"Library lint: {len(warnings)} warning(s).")
-    else:
-        print("Library lint: clean.")
-
-    return True
 
 
 def _run_selfdoc_gen(flags, project_dir=None):
