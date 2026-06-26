@@ -5,7 +5,7 @@ import sys
 import time
 
 from ..targets import TARGETS, detect_targets
-from ..utils import check_gh_auth, check_gh_installed, extract_changelog_entry, run
+from ..utils import check_gh_auth, check_gh_installed, extract_changelog_entry, run, run_gh
 from ..workspace import find_workspace_root, resolve_project
 
 
@@ -112,7 +112,7 @@ def run_cmd(args, flags, project_root):
 
     # Check that the GitHub Release exists
     try:
-        run("gh", ["release", "view", tag])
+        run_gh(["release", "view", tag])
     except Exception:
         print(f"Error: GitHub Release for {tag} not found.", file=sys.stderr)
         sys.exit(1)
@@ -129,7 +129,7 @@ def run_cmd(args, flags, project_root):
         with open(writing_file, "w", encoding="utf-8") as f:
             f.write(changelog_entry)
         os.rename(writing_file, notes_file)
-        run("gh", ["release", "edit", tag, "--notes-file", notes_file])
+        run_gh(["release", "edit", tag, "--notes-file", notes_file])
     finally:
         for tmp in (notes_file, writing_file):
             if os.path.exists(tmp):
