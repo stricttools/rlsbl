@@ -632,7 +632,7 @@ class TestReleasableLintAggregation:
 
         linted = []
 
-        def mock_builtin_lint(flags, is_library=False, project_dir=None):
+        def mock_builtin_lint(flags, is_library=False, project_dir=None, check_timeout=None, allowed_imports=None):
             linted.append(os.path.basename(project_dir))
 
         # Create mock workspace projects
