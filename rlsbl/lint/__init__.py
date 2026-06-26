@@ -106,6 +106,10 @@ def lint_library(project_path: str) -> list[LintResult]:
     results: list[LintResult] = []
     for language in languages:
         config = load_language_config(project_path, language)
+        # Subtract allowed imports from forbidden imports
+        if config.allowed_imports:
+            allowed_set = set(config.allowed_imports)
+            config.forbidden_imports = [m for m in config.forbidden_imports if m not in allowed_set]
         # Merge default test/example exclusions with user-configured ones
         defaults = _DEFAULT_EXCLUDE_PATTERNS.get(language, [])
         merged = list(dict.fromkeys(defaults + config.exclude_patterns))
