@@ -35,7 +35,6 @@ from ...utils import (
     extract_changelog_entry,
     extract_changelog_entry_from_text,
     extract_github_repo_from_remote,
-    gh_env,
     get_current_branch,
     get_hook_timeout,
     get_push_timeout,
@@ -45,6 +44,7 @@ from ...utils import (
     remote_branch_exists,
     require_tool,
     run,
+    run_gh,
 )
 from .rollback import _cleanup_release_artifacts
 from .publish import _run_selfdoc_post_generate, _print_stale_dep_advisory, upload_release_assets

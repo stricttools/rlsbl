@@ -170,7 +170,7 @@ def upload_release_assets(tag, new_version, log, flags, *, ctx):
 
     ctx: ProjectContext carrying project_root, monorepo_root, and config.
     """
-    from . import gh_env, load_pipelines, run
+    from . import load_pipelines, run_gh
 
     project_dir = str(ctx.project_root)
     config = ctx.config
@@ -241,7 +241,7 @@ def upload_release_assets(tag, new_version, log, flags, *, ctx):
 
         # Upload
         try:
-            run("gh", ["release", "upload", tag] + artifacts + ["--clobber"], env=gh_env(config))
+            run_gh(["release", "upload", tag] + artifacts + ["--clobber"], config=config)
             log(f"Uploaded {len(artifacts)} asset(s) for pipeline '{name}'")
         except Exception as e:
             print(f"Warning: asset upload failed for pipeline '{name}': {e}", file=sys.stderr)
