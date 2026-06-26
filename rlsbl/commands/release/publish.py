@@ -2,7 +2,6 @@
 
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -28,7 +27,7 @@ def _run_selfdoc_post_generate(flags, *, project_dir=None, release_config=None,
     hook-generated-files mechanism (dirty snapshot diff) and included
     in the release commit.
     """
-    from . import require_tool, run
+    from . import extract_github_repo_from_remote, require_tool, run
 
     check_dir = project_dir if project_dir else "."
 
@@ -91,9 +90,8 @@ def _run_selfdoc_post_generate(flags, *, project_dir=None, release_config=None,
         # Release URL (GitHub release URL pattern)
         try:
             remote = run("git", ["remote", "get-url", "origin"])
-            match = re.search(r"github\.com[/:]([^/]+/[^/.]+)", remote)
-            if match:
-                repo_path = match.group(1).removesuffix(".git")
+            repo_path = extract_github_repo_from_remote(remote)
+            if repo_path:
                 release_url = f"https://github.com/{repo_path}/releases/tag/{tag or ''}"
                 cmd.extend(["--release-url", release_url])
         except Exception:
@@ -172,7 +170,7 @@ def upload_release_assets(tag, new_version, log, flags, *, ctx):
 
     ctx: ProjectContext carrying project_root, monorepo_root, and config.
     """
-    from . import load_pipelines, run
+    from . import load_pipelines, run, run_gh
 
     project_dir = str(ctx.project_root)
     config = ctx.config
@@ -243,7 +241,7 @@ def upload_release_assets(tag, new_version, log, flags, *, ctx):
 
         # Upload
         try:
-            run("gh", ["release", "upload", tag] + artifacts + ["--clobber"])
+            run_gh(["release", "upload", tag] + artifacts + ["--clobber"], config=config)
             log(f"Uploaded {len(artifacts)} asset(s) for pipeline '{name}'")
         except Exception as e:
             print(f"Warning: asset upload failed for pipeline '{name}': {e}", file=sys.stderr)

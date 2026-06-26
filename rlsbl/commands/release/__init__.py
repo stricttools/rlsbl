@@ -35,6 +35,7 @@ from ...utils import (
     commit_files_if_changed,
     extract_changelog_entry,
     extract_changelog_entry_from_text,
+    extract_github_repo_from_remote,
     get_current_branch,
     get_check_timeout,
     get_hook_timeout,
@@ -356,7 +357,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         if hook_is_customized:
             log("Skipping built-in lint (releasable pre-release hook handles linting)")
         else:
-            run_releasable_lint(_member_tuples, flags, ws_projects=_ws_projects, log=log)
+            run_releasable_lint(_member_tuples, flags, ws_projects=_ws_projects, log=log, check_timeout=get_check_timeout(config))
 
         # 4+5. Pre-release: per-package first, then releasable
         run_releasable_hooks(
