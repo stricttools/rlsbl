@@ -827,7 +827,7 @@ class TestFullFlowOrder:
             execution_order.append("tests")
             return True
 
-        def tracking_lint(flags, is_library=False, project_dir=None):
+        def tracking_lint(flags, is_library=False, project_dir=None, check_timeout=None, allowed_imports=None):
             execution_order.append("lint")
             return True
 
