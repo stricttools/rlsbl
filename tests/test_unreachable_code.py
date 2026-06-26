@@ -227,6 +227,41 @@ class TestBreakContinue:
         assert results[0].line == 4
 
 
+class TestCommentsNotFlagged:
+    """Comments should not be flagged as unreachable code."""
+
+    def test_inline_comment_after_return_not_flagged(self):
+        """An inline comment after return is NOT unreachable code."""
+        results = _check("""\
+            def f():
+                return None  # this is a comment
+        """)
+        assert len(results) == 0
+
+    def test_exhaustive_if_else_with_comments(self):
+        """Comments in branches don't break exhaustive-termination detection.
+
+        The comments inside the if/else branches must not prevent
+        _always_terminates from seeing the returns. Also, comment lines
+        after the if/else must not be flagged, but real code must be.
+        """
+        results = _check("""\
+            def f(x):
+                if x:
+                    return 1  # comment
+                else:
+                    return 2  # comment
+                y = 3  # this IS unreachable
+        """)
+        # The comment lines should NOT appear in results
+        comment_results = [r for r in results if "comment" in (r.message or "").lower()]
+        assert len(comment_results) == 0, f"Comments were flagged: {comment_results}"
+        # y = 3 DOES appear as unreachable (line 6)
+        unreachable = [r for r in results if r.line == 6]
+        assert len(unreachable) == 1, f"Expected y=3 flagged at line 6, got results: {results}"
+        assert "if/else" in unreachable[0].message
+
+
 class TestExhaustiveIfWithRaise:
     """Exhaustive if/else where branches terminate with raise."""
 
