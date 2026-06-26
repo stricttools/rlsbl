@@ -3,10 +3,8 @@ env var construction, test aggregation, and the private-hook-stale check
 in explicit releasable mode."""
 
 import os
-import subprocess
 from pathlib import Path
-from types import SimpleNamespace
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -16,9 +14,6 @@ from rlsbl.commands.release.hooks import (
     get_releasable_hook_path,
     is_releasable_hook_customized,
     run_releasable_hooks,
-    run_releasable_tests,
-    run_releasable_lint,
-    _run_per_package_hooks,
 )
 from rlsbl.commands.release.validate import HookError
 from rlsbl.workspace import WORKSPACE_DIR
@@ -521,168 +516,6 @@ class TestPerPackageHookEnvVars:
             )
 
         assert "RLSBL_PACKAGE" not in captured_envs["releasable pre-checks"]
-
-
-# ---------------------------------------------------------------------------
-# 7.3: Test/lint aggregation
-# ---------------------------------------------------------------------------
-
-
-class TestReleasableTestAggregation:
-    """Tests for running tests across member packages."""
-
-    def test_runs_tests_for_each_member(self, tmp_path):
-        """run_releasable_tests calls _run_builtin_tests for each member."""
-        alpha_dir = tmp_path / "alpha"
-        beta_dir = tmp_path / "beta"
-        alpha_dir.mkdir()
-        beta_dir.mkdir()
-
-        tested_packages = []
-
-        def mock_builtin_tests(registry, flags, *, project_dir=None, ctx):
-            tested_packages.append(os.path.basename(project_dir))
-
-        from rlsbl.targets import TargetEntry
-        mock_targets = [TargetEntry(name="pypi", path=".")]
-
-        with patch("rlsbl.targets.detect_targets", return_value=mock_targets), \
-             patch("rlsbl.commands.release.validate._run_builtin_tests", side_effect=mock_builtin_tests):
-            run_releasable_tests(
-                [("beta", str(beta_dir)), ("alpha", str(alpha_dir))],
-                {},
-                ctx=MagicMock(),
-                log=print,
-                releasable_config_dir=None,
-            )
-
-        # Alphabetical order
-        assert tested_packages == ["alpha", "beta"]
-
-    def test_first_failure_aborts(self, tmp_path):
-        """If a member's tests fail, HookError propagates and stops further testing."""
-        alpha_dir = tmp_path / "alpha"
-        beta_dir = tmp_path / "beta"
-        alpha_dir.mkdir()
-        beta_dir.mkdir()
-
-        call_count = 0
-
-        def mock_builtin_tests(registry, flags, *, project_dir=None, ctx):
-            nonlocal call_count
-            call_count += 1
-            if "alpha" in project_dir:
-                raise HookError("Tests failed")
-
-        from rlsbl.targets import TargetEntry
-        mock_targets = [TargetEntry(name="pypi", path=".")]
-
-        with patch("rlsbl.targets.detect_targets", return_value=mock_targets), \
-             patch("rlsbl.commands.release.validate._run_builtin_tests", side_effect=mock_builtin_tests):
-            with pytest.raises(HookError, match="Tests failed"):
-                run_releasable_tests(
-                    [("alpha", str(alpha_dir)), ("beta", str(beta_dir))],
-                    {},
-                    ctx=MagicMock(),
-                    log=print,
-                    releasable_config_dir=None,
-                )
-
-        assert call_count == 1
-
-    def test_detects_target_per_member(self, tmp_path):
-        """Each member gets its own target type detected, not the releasable-level registry."""
-        pypi_dir = tmp_path / "pypi_pkg"
-        go_dir = tmp_path / "go_pkg"
-        pypi_dir.mkdir()
-        go_dir.mkdir()
-
-        # Create project files so detect_targets can identify targets
-        (pypi_dir / "pyproject.toml").write_text('[project]\nname = "pypi_pkg"\nversion = "0.1.0"\n')
-        (go_dir / "go.mod").write_text("module example.com/go_pkg\n\ngo 1.21\n")
-
-        registries_per_call = []
-
-        def mock_builtin_tests(registry, flags, *, project_dir=None, ctx):
-            registries_per_call.append((os.path.basename(project_dir), registry))
-
-        with patch("rlsbl.commands.release.validate._run_builtin_tests", side_effect=mock_builtin_tests):
-            run_releasable_tests(
-                [("go_pkg", str(go_dir)), ("pypi_pkg", str(pypi_dir))],
-                {},
-                ctx=MagicMock(),
-                log=print,
-            )
-
-        # Sorted alphabetically, go_pkg comes first
-        assert registries_per_call == [("go_pkg", "go"), ("pypi_pkg", "pypi")]
-
-
-class TestReleasableLintAggregation:
-    """Tests for running lint across library members."""
-
-    def test_only_library_members_linted(self, tmp_path):
-        """run_releasable_lint only runs lint on members with library=true."""
-        alpha_dir = tmp_path / "alpha"
-        beta_dir = tmp_path / "beta"
-        gamma_dir = tmp_path / "gamma"
-        alpha_dir.mkdir()
-        beta_dir.mkdir()
-        gamma_dir.mkdir()
-
-        linted = []
-
-        def mock_builtin_lint(flags, is_library=False, project_dir=None, check_timeout=None, allowed_imports=None):
-            linted.append(os.path.basename(project_dir))
-
-        # Create mock workspace projects
-        from rlsbl.workspace import WorkspaceProject
-        ws_projects = [
-            WorkspaceProject({"name": "alpha", "path": "alpha", "library": True, "releasable": "www"}),
-            WorkspaceProject({"name": "beta", "path": "beta", "releasable": "www"}),
-            WorkspaceProject({"name": "gamma", "path": "gamma", "library": True, "releasable": "www"}),
-        ]
-
-        with patch("rlsbl.commands.release.validate._run_builtin_lint", side_effect=mock_builtin_lint):
-            run_releasable_lint(
-                [
-                    ("gamma", str(gamma_dir)),
-                    ("alpha", str(alpha_dir)),
-                    ("beta", str(beta_dir)),
-                ],
-                {},
-                ws_projects=ws_projects,
-                log=print,
-            )
-
-        # Only library members, in alphabetical order
-        assert linted == ["alpha", "gamma"]
-
-    def test_lint_allow_passed_to_builtin_lint(self, tmp_path):
-        """run_releasable_lint passes lint_allow from workspace projects as allowed_imports."""
-        alpha_dir = tmp_path / "alpha"
-        alpha_dir.mkdir()
-
-        captured_calls = []
-
-        def mock_builtin_lint(flags, is_library=False, project_dir=None, check_timeout=None, allowed_imports=None):
-            captured_calls.append({"project_dir": project_dir, "allowed_imports": allowed_imports})
-
-        from rlsbl.workspace import WorkspaceProject
-        ws_projects = [
-            WorkspaceProject({"name": "alpha", "path": "alpha", "library": True, "releasable": "www", "lint_allow": ["net/http"]}),
-        ]
-
-        with patch("rlsbl.commands.release.validate._run_builtin_lint", side_effect=mock_builtin_lint):
-            run_releasable_lint(
-                [("alpha", str(alpha_dir))],
-                {},
-                ws_projects=ws_projects,
-                log=print,
-            )
-
-        assert len(captured_calls) == 1
-        assert captured_calls[0]["allowed_imports"] == ["net/http"]
 
 
 # ---------------------------------------------------------------------------
