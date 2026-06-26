@@ -9,7 +9,7 @@ from ..changelog.files import get_changes_dir, unfinalize_version
 from ..changelog.generate import generate_changelog
 from ..release_file import unfinalize_release_file
 from ..targets import TARGETS, detect_targets
-from ..utils import run, check_gh_installed, check_gh_auth, get_push_timeout, get_current_branch, push_if_needed, is_clean_tree
+from ..utils import run, run_gh, check_gh_installed, check_gh_auth, get_push_timeout, get_current_branch, push_if_needed, is_clean_tree
 from ..workspace import find_workspace_root, resolve_project
 
 # Status constants for step results
@@ -107,12 +107,12 @@ def run_cmd(registry, args, flags, *, ctx):
 
     # Delete GitHub Release
     try:
-        run("gh", ["release", "view", tag])
+        run_gh(["release", "view", tag], config=ctx.config)
     except Exception:
         results.append(("Delete GitHub Release", SKIPPED, "no GitHub Release found"))
     else:
         try:
-            run("gh", ["release", "delete", tag, "--yes"])
+            run_gh(["release", "delete", tag, "--yes"], config=ctx.config)
             results.append(("Delete GitHub Release", OK, "-"))
         except Exception:
             traceback.print_exc()
