@@ -1183,7 +1183,7 @@ class TestYankMonorepoContext:
     @patch(f"{MOD_YANK}.detect_targets", return_value=[])
     @patch(f"{MOD_YANK}.check_gh_installed", return_value=True)
     @patch(f"{MOD_YANK}.check_gh_auth", return_value=True)
-    @patch(f"{MOD_YANK}.run")
+    @patch(f"{MOD_YANK}.run_gh")
     def test_monorepo_plain_tag(self, mock_run, _auth, _inst, _targets, mock_resolve, _ws):
         """Monorepo without releasable uses target.monorepo_tag_format."""
         proj = {"name": "mylib", "path": "packages/mylib"}
@@ -1226,7 +1226,7 @@ class TestYankLatestRefused:
     @patch(f"{MOD_YANK}.detect_targets", return_value=[])
     @patch(f"{MOD_YANK}.check_gh_installed", return_value=True)
     @patch(f"{MOD_YANK}.check_gh_auth", return_value=True)
-    @patch(f"{MOD_YANK}.run")
+    @patch(f"{MOD_YANK}.run_gh")
     def test_refuses_latest(self, mock_run, *_):
         mock_run.side_effect = [
             "",  # gh release view (exists)
@@ -1241,7 +1241,7 @@ class TestYankLatestRefused:
     @patch(f"{MOD_YANK}.detect_targets", return_value=[])
     @patch(f"{MOD_YANK}.check_gh_installed", return_value=True)
     @patch(f"{MOD_YANK}.check_gh_auth", return_value=True)
-    @patch(f"{MOD_YANK}.run")
+    @patch(f"{MOD_YANK}.run_gh")
     def test_latest_check_failure_exits(self, mock_run, *_):
         mock_run.side_effect = [
             "",  # gh release view (exists)
@@ -1260,7 +1260,7 @@ class TestYankConfirmation:
     @patch(f"{MOD_YANK}.detect_targets", return_value=[])
     @patch(f"{MOD_YANK}.check_gh_installed", return_value=True)
     @patch(f"{MOD_YANK}.check_gh_auth", return_value=True)
-    @patch(f"{MOD_YANK}.run")
+    @patch(f"{MOD_YANK}.run_gh")
     def test_hard_yank_prompt_declined(self, mock_run, *_):
         mock_run.side_effect = [
             "",  # gh release view
@@ -1276,7 +1276,7 @@ class TestYankConfirmation:
     @patch(f"{MOD_YANK}.detect_targets", return_value=[])
     @patch(f"{MOD_YANK}.check_gh_installed", return_value=True)
     @patch(f"{MOD_YANK}.check_gh_auth", return_value=True)
-    @patch(f"{MOD_YANK}.run")
+    @patch(f"{MOD_YANK}.run_gh")
     def test_soft_yank_prompt_eof(self, mock_run, *_):
         mock_run.side_effect = [
             "",  # gh release view
@@ -1296,7 +1296,7 @@ class TestYankSoftYank:
     @patch(f"{MOD_YANK}.detect_targets", return_value=[])
     @patch(f"{MOD_YANK}.check_gh_installed", return_value=True)
     @patch(f"{MOD_YANK}.check_gh_auth", return_value=True)
-    @patch(f"{MOD_YANK}.run")
+    @patch(f"{MOD_YANK}.run_gh")
     def test_soft_yank_succeeds(self, mock_run, _auth, _inst, _targets, _ws, capsys):
         mock_run.side_effect = [
             "",  # gh release view
@@ -1316,7 +1316,7 @@ class TestYankHardYank:
     @patch(f"{MOD_YANK}.detect_targets", return_value=[])
     @patch(f"{MOD_YANK}.check_gh_installed", return_value=True)
     @patch(f"{MOD_YANK}.check_gh_auth", return_value=True)
-    @patch(f"{MOD_YANK}.run")
+    @patch(f"{MOD_YANK}.run_gh")
     def test_hard_yank_dry_run(self, mock_run, _auth, _inst, _targets, _ws, capsys):
         mock_run.side_effect = [
             "",  # gh release view
