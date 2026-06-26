@@ -1378,18 +1378,14 @@ class TestWatchNotifyException:
 class TestWatchRetryTimeout:
     """Cover retry timeout path (lines 114-116)."""
 
-    @patch(f"{MOD_WATCH}.gh_env", return_value=None)
-    @patch(f"{MOD_WATCH}.run")
     @patch(f"{MOD_WATCH}.time")
-    @patch(f"{MOD_WATCH}.subprocess.run")
-    def test_retry_watch_timeout(self, mock_subproc, mock_time, mock_run, _gh_env, capsys):
-        mock_subproc.side_effect = [
-            MagicMock(returncode=0),  # gh workflow run trigger
+    @patch(f"{MOD_WATCH}.run_gh")
+    def test_retry_watch_timeout(self, mock_run_gh, mock_time, capsys):
+        mock_run_gh.side_effect = [
+            "",  # gh workflow run trigger
+            json.dumps([{"databaseId": 300, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]),  # gh run list (poll)
             subprocess.TimeoutExpired("gh", 3600),  # retry watch times out
         ]
-        mock_run.return_value = json.dumps(
-            [{"databaseId": 300, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]
-        )
         from rlsbl.commands.watch import _retry_workflow
         result = _retry_workflow("CI", "main", "user/repo", "test")
         assert result is not None
@@ -1400,18 +1396,14 @@ class TestWatchRetryTimeout:
 class TestWatchRetryGenericException:
     """Cover retry generic exception path (lines 117-119)."""
 
-    @patch(f"{MOD_WATCH}.gh_env", return_value=None)
-    @patch(f"{MOD_WATCH}.run")
     @patch(f"{MOD_WATCH}.time")
-    @patch(f"{MOD_WATCH}.subprocess.run")
-    def test_retry_watch_generic_error(self, mock_subproc, mock_time, mock_run, _gh_env, capsys):
-        mock_subproc.side_effect = [
-            MagicMock(returncode=0),  # gh workflow run trigger
+    @patch(f"{MOD_WATCH}.run_gh")
+    def test_retry_watch_generic_error(self, mock_run_gh, mock_time, capsys):
+        mock_run_gh.side_effect = [
+            "",  # gh workflow run trigger
+            json.dumps([{"databaseId": 300, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]),  # gh run list (poll)
             RuntimeError("unexpected"),  # retry watch fails
         ]
-        mock_run.return_value = json.dumps(
-            [{"databaseId": 300, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]
-        )
         from rlsbl.commands.watch import _retry_workflow
         result = _retry_workflow("CI", "main", "user/repo", "test")
         assert result is not None
@@ -1422,9 +1414,8 @@ class TestWatchRetryGenericException:
 class TestWatchSingleRunTimeout:
     """Cover _watch_single_run timeout path (lines 164-167)."""
 
-    @patch(f"{MOD_WATCH}.gh_env", return_value=None)
-    @patch(f"{MOD_WATCH}.subprocess.run", side_effect=subprocess.TimeoutExpired("gh", 3600))
-    def test_timeout(self, _subproc, _env, capsys):
+    @patch(f"{MOD_WATCH}.run_gh", side_effect=subprocess.TimeoutExpired("gh", 3600))
+    def test_timeout(self, _run_gh, capsys):
         from rlsbl.commands.watch import _watch_single_run
         ci_run = {"databaseId": 100, "name": "CI"}
         result = _watch_single_run(ci_run, "test", "user/repo")
@@ -1435,9 +1426,8 @@ class TestWatchSingleRunTimeout:
 class TestWatchSingleRunGenericException:
     """Cover _watch_single_run generic exception path (lines 168-171)."""
 
-    @patch(f"{MOD_WATCH}.gh_env", return_value=None)
-    @patch(f"{MOD_WATCH}.subprocess.run", side_effect=RuntimeError("unexpected"))
-    def test_generic_error(self, _subproc, _env, capsys):
+    @patch(f"{MOD_WATCH}.run_gh", side_effect=RuntimeError("unexpected"))
+    def test_generic_error(self, _run_gh, capsys):
         from rlsbl.commands.watch import _watch_single_run
         ci_run = {"databaseId": 100, "name": "CI"}
         result = _watch_single_run(ci_run, "test", "user/repo")
@@ -1448,10 +1438,8 @@ class TestWatchSingleRunGenericException:
 class TestWatchSingleRunPassed:
     """Cover _watch_single_run pass path (lines 140-142)."""
 
-    @patch(f"{MOD_WATCH}.gh_env", return_value=None)
-    @patch(f"{MOD_WATCH}.subprocess.run")
-    def test_passed(self, mock_run, _env, capsys):
-        mock_run.return_value = MagicMock(returncode=0)
+    @patch(f"{MOD_WATCH}.run_gh", return_value="")
+    def test_passed(self, _run_gh, capsys):
         from rlsbl.commands.watch import _watch_single_run
         ci_run = {"databaseId": 100, "name": "CI"}
         result = _watch_single_run(ci_run, "test", "user/repo")
