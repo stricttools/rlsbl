@@ -154,14 +154,17 @@ class TestNoRunsHint:
     """Tests for the release-retry hint when no CI runs are found."""
 
     @patch("rlsbl.commands.watch.poll_runs", return_value=[])
+    @patch("rlsbl.commands.watch.run_gh")
     @patch("rlsbl.commands.watch.run")
-    def test_hint_printed_when_tag_and_release_exist(self, mock_run, mock_poll, capsys):
+    def test_hint_printed_when_tag_and_release_exist(self, mock_run, mock_run_gh, mock_poll, capsys):
         """When no runs, commit has a tag, and GitHub Release exists, hint is printed."""
         mock_run.side_effect = [
             "abc123full",  # git rev-parse (resolve arg)
-            json.dumps({"nameWithOwner": "user/repo", "name": "repo"}),  # gh repo view
             "v1.2.0",  # git describe --tags --exact-match (label)
             "v1.2.0",  # git describe --tags --exact-match (hint check)
+        ]
+        mock_run_gh.side_effect = [
+            json.dumps({"nameWithOwner": "user/repo", "name": "repo"}),  # gh repo view
             "Release v1.2.0\n...",  # gh release view
         ]
 
@@ -175,14 +178,17 @@ class TestNoRunsHint:
         assert "rlsbl release retry" in err
 
     @patch("rlsbl.commands.watch.poll_runs", return_value=[])
+    @patch("rlsbl.commands.watch.run_gh")
     @patch("rlsbl.commands.watch.run")
-    def test_no_hint_when_tag_exists_but_no_release(self, mock_run, mock_poll, capsys):
+    def test_no_hint_when_tag_exists_but_no_release(self, mock_run, mock_run_gh, mock_poll, capsys):
         """When no runs, commit has a tag, but no GitHub Release, no hint."""
         mock_run.side_effect = [
             "abc123full",  # git rev-parse
-            json.dumps({"nameWithOwner": "user/repo", "name": "repo"}),  # gh repo view
             "v1.2.0",  # git describe --tags --exact-match (label)
             "v1.2.0",  # git describe --tags --exact-match (hint check)
+        ]
+        mock_run_gh.side_effect = [
+            json.dumps({"nameWithOwner": "user/repo", "name": "repo"}),  # gh repo view
             Exception("release not found"),  # gh release view fails
         ]
 
@@ -195,15 +201,16 @@ class TestNoRunsHint:
         assert "hint:" not in err
 
     @patch("rlsbl.commands.watch.poll_runs", return_value=[])
+    @patch("rlsbl.commands.watch.run_gh")
     @patch("rlsbl.commands.watch.run")
-    def test_no_hint_when_no_tag(self, mock_run, mock_poll, capsys):
+    def test_no_hint_when_no_tag(self, mock_run, mock_run_gh, mock_poll, capsys):
         """When no runs and commit has no tag, no hint."""
         mock_run.side_effect = [
             "abc123full",  # git rev-parse
-            json.dumps({"nameWithOwner": "user/repo", "name": "repo"}),  # gh repo view
             Exception("no tag"),  # git describe --tags --exact-match (label) fails
             Exception("no tag"),  # git describe --tags --exact-match (hint check) fails
         ]
+        mock_run_gh.return_value = json.dumps({"nameWithOwner": "user/repo", "name": "repo"})  # gh repo view
 
         with pytest.raises(SystemExit) as exc_info:
             run_cmd(None, ["abc123"], {})
@@ -218,9 +225,10 @@ class TestNoRunsHint:
     @patch("rlsbl.commands.watch._watch_runs")
     @patch("rlsbl.commands.watch.poll_runs")
     @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.run_gh")
     @patch("rlsbl.commands.watch.run")
     def test_hint_not_reached_when_runs_found(
-        self, mock_run, mock_time, mock_poll, mock_watch, mock_audit, mock_notify, capsys
+        self, mock_run, mock_run_gh, mock_time, mock_poll, mock_watch, mock_audit, mock_notify, capsys
     ):
         """When CI runs are found, the hint logic is never reached."""
         ci_run = {"databaseId": 100, "name": "CI", "status": "in_progress"}
@@ -230,9 +238,9 @@ class TestNoRunsHint:
         ]
         mock_run.side_effect = [
             "abc123full",  # git rev-parse
-            json.dumps({"nameWithOwner": "user/repo", "name": "repo"}),  # gh repo view
             "v1.2.0",  # git describe
         ]
+        mock_run_gh.return_value = json.dumps({"nameWithOwner": "user/repo", "name": "repo"})  # gh repo view
         mock_watch.return_value = [{"name": "CI", "passed": True}]
 
         with pytest.raises(SystemExit) as exc_info:

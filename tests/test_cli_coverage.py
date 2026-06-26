@@ -1481,7 +1481,7 @@ class TestWatchRunCmdRunIdRepoError:
     """Cover run_cmd --run-id repo info error (lines 303-305)."""
 
     @patch(f"{MOD_WATCH}._resolve_run_ids")
-    @patch(f"{MOD_WATCH}.run", side_effect=Exception("no repo"))
+    @patch(f"{MOD_WATCH}.run_gh", side_effect=Exception("no repo"))
     def test_repo_info_failure(self, _, mock_resolve, capsys):
         mock_resolve.return_value = [{"databaseId": 100, "name": "CI"}]
         from rlsbl.commands.watch import run_cmd
@@ -1505,12 +1505,9 @@ class TestWatchRunCmdRunIdRepoError:
 class TestWatchRunCmdShaRepoError:
     """Cover run_cmd SHA path repo info error (lines 353-355)."""
 
-    @patch(f"{MOD_WATCH}.run")
-    def test_sha_path_repo_error(self, mock_run, capsys):
-        mock_run.side_effect = [
-            "abc123full",  # git rev-parse
-            Exception("no repo"),  # gh repo view fails
-        ]
+    @patch(f"{MOD_WATCH}.run_gh", side_effect=Exception("no repo"))
+    @patch(f"{MOD_WATCH}.run", return_value="abc123full")
+    def test_sha_path_repo_error(self, mock_run, mock_run_gh, capsys):
         from rlsbl.commands.watch import run_cmd
         with pytest.raises(SystemExit) as exc:
             run_cmd(None, ["abc123"], {})
@@ -1536,9 +1533,10 @@ class TestWatchRunCmdFallbackReleaseUrl:
     @patch(f"{MOD_WATCH}._watch_runs")
     @patch(f"{MOD_WATCH}.poll_runs")
     @patch(f"{MOD_WATCH}.time")
+    @patch(f"{MOD_WATCH}.run_gh")
     @patch(f"{MOD_WATCH}.run")
     def test_success_url_fallback_to_release_url(
-        self, mock_run, mock_time, mock_poll, mock_watch, mock_audit, mock_notify,
+        self, mock_run, mock_run_gh, mock_time, mock_poll, mock_watch, mock_audit, mock_notify,
     ):
         """When tag is a truncated SHA, falls back to _release_url."""
         ci_run = {"databaseId": 100, "name": "CI", "status": "in_progress"}
@@ -1548,9 +1546,9 @@ class TestWatchRunCmdFallbackReleaseUrl:
         ]
         mock_run.side_effect = [
             "abc123fullhash" + "0" * 26,  # git rev-parse
-            json.dumps({"nameWithOwner": "user/repo", "name": "repo"}),  # gh repo view
             Exception("no tag"),  # git describe fails -> tag = abc123fullha
         ]
+        mock_run_gh.return_value = json.dumps({"nameWithOwner": "user/repo", "name": "repo"})  # gh repo view (+ _release_url)
         mock_watch.return_value = [{"name": "CI", "passed": True, "run_id": "100"}]
 
         with pytest.raises(SystemExit) as exc:
