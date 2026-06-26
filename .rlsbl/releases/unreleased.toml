@@ -1,0 +1,10 @@
+# Version bump type: patch, minor, major, or hotfix
+bump = "patch"
+# Short description of this release (required)
+description = "Fix release lint to respect lint_allow from workspace.toml"
+# Optional context explaining why these changes were made
+context = ""
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["npm", "pypi"]
+exclude = []
