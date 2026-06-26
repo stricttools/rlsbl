@@ -396,7 +396,7 @@ class TestBuiltinLintRunnerCwd:
         with patch("rlsbl.lint.lint_library", return_value=[]) as mock_lint:
             _run_builtin_lint({}, is_library=True)
 
-            mock_lint.assert_called_once_with(".")
+            mock_lint.assert_called_once_with(".", allowed_imports=None, check_timeout=None)
 
     def test_lint_monorepo_uses_project_dir(self, tmp_project):
         """In monorepo mode, lint_library gets the project_dir path."""
@@ -405,7 +405,7 @@ class TestBuiltinLintRunnerCwd:
         with patch("rlsbl.lint.lint_library", return_value=[]) as mock_lint:
             _run_builtin_lint({}, is_library=True, project_dir=project_dir)
 
-            mock_lint.assert_called_once_with(project_dir)
+            mock_lint.assert_called_once_with(project_dir, allowed_imports=None, check_timeout=None)
 
 
 # ---------------------------------------------------------------------------
