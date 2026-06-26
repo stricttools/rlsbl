@@ -105,7 +105,7 @@ needs_network = false
 depends_on = ["version-consistency"]
 
 [checks.library-lint]
-tags = ["quality"]
+tags = ["quality", "preflight"]
 severity = "error"
 fast = false
 pure = true
@@ -437,7 +437,7 @@ needs_network = false
 depends_on = []
 
 [checks.test-suite]
-tags = ["prepush", "quality"]
+tags = ["prepush", "quality", "preflight"]
 severity = "error"
 fast = false
 pure = false
