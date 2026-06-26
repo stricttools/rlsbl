@@ -1254,8 +1254,11 @@ class TestScrubMonorepoFallbackScan:
             "new_head": "abc",
         })
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True, "yes": True}
-        run_side = ["safegit 0.18.0", safegit_result, "", "", "", '{"body": "old"}', "", ""]
+        # git calls: version, scrub, commit, branch_push, tag_push
+        run_side = ["safegit 0.18.0", safegit_result, "", "", ""]
         mock_run = MagicMock(side_effect=run_side)
+        # gh calls: view, delete, create
+        mock_run_gh = MagicMock(side_effect=['{"body": "old"}', "", ""])
 
         import contextlib
         with contextlib.ExitStack() as stack:
@@ -1269,6 +1272,7 @@ class TestScrubMonorepoFallbackScan:
                 f"{MOD_SCRUB}.generate_changelog": MagicMock(),
                 f"{MOD_SCRUB}.require_tool": MagicMock(),
                 f"{MOD_SCRUB}.run": mock_run,
+                f"{MOD_SCRUB}.run_gh": mock_run_gh,
                 f"{MOD_SCRUB}.load_workspace": MagicMock(return_value=workspace_projects),
                 f"{MOD_SCRUB}.extract_changelog_entry": MagicMock(return_value="- found it"),
             }.items():
