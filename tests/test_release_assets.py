@@ -130,18 +130,17 @@ class TestAssetBuildAndUpload:
             "pipelines": {"npm": {"type": "npm", "local": False, "assets": True, "max_asset_size_mb": 50}},
         })
         with patch("rlsbl.commands.release.load_pipelines", return_value={"npm": mock_pipeline}):
-            with patch("rlsbl.commands.release.run_gh", return_value=""), \
-             patch("rlsbl.commands.release.run") as mock_run:
+            with patch("rlsbl.commands.release.run_gh") as mock_run_gh, \
+             patch("rlsbl.commands.release.run"):
                 upload_release_assets("v1.0.0", "1.0.0", log, {}, ctx=ctx)
 
-                # gh release upload should be called with --clobber
-                mock_run.assert_called_once()
-                call_args = mock_run.call_args
-                assert call_args[0][0] == "gh"
-                assert "release" in call_args[0][1]
-                assert "upload" in call_args[0][1]
-                assert "v1.0.0" in call_args[0][1]
-                assert "--clobber" in call_args[0][1]
+                # gh release upload should be called via run_gh with --clobber
+                mock_run_gh.assert_called_once()
+                call_args = mock_run_gh.call_args
+                assert "release" in call_args[0][0]
+                assert "upload" in call_args[0][0]
+                assert "v1.0.0" in call_args[0][0]
+                assert "--clobber" in call_args[0][0]
 
         assert any("Uploaded" in m for m in messages)
 
