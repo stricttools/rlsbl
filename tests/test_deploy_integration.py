@@ -78,6 +78,7 @@ class TestReleaseWithDeployTargets:
             return ""
 
         monkeypatch.setattr("rlsbl.commands.release.run", mock_run)
+        monkeypatch.setattr("rlsbl.commands.release.run_gh", lambda args, **kw: "")
         monkeypatch.setattr("rlsbl.commands.release.commit_files", lambda msg, files, **kw: True)
         monkeypatch.setattr("rlsbl.commands.release.push_if_needed", lambda b, **kw: None)
         monkeypatch.setattr("rlsbl.commands.release.get_push_timeout", lambda *a, **kw: 120)
@@ -141,6 +142,7 @@ class TestReleaseDeployFailureContinues:
             return ""
 
         monkeypatch.setattr("rlsbl.commands.release.run", mock_run)
+        monkeypatch.setattr("rlsbl.commands.release.run_gh", lambda args, **kw: "")
         monkeypatch.setattr("rlsbl.commands.release.commit_files", lambda msg, files, **kw: True)
         monkeypatch.setattr("rlsbl.commands.release.push_if_needed", lambda b, **kw: None)
         monkeypatch.setattr("rlsbl.commands.release.get_push_timeout", lambda *a, **kw: 120)
@@ -233,6 +235,7 @@ class TestReleaseNoDeployConfig:
             return ""
 
         monkeypatch.setattr("rlsbl.commands.release.run", mock_run)
+        monkeypatch.setattr("rlsbl.commands.release.run_gh", lambda args, **kw: "")
         monkeypatch.setattr("rlsbl.commands.release.commit_files", lambda msg, files, **kw: True)
         monkeypatch.setattr("rlsbl.commands.release.push_if_needed", lambda b, **kw: None)
         monkeypatch.setattr("rlsbl.commands.release.get_push_timeout", lambda *a, **kw: 120)
@@ -299,6 +302,7 @@ class TestReleaseDeployConfigErrors:
             return ""
 
         monkeypatch.setattr("rlsbl.commands.release.run", mock_run)
+        monkeypatch.setattr("rlsbl.commands.release.run_gh", lambda args, **kw: "")
         monkeypatch.setattr("rlsbl.commands.release.commit_files", lambda msg, files, **kw: True)
         monkeypatch.setattr("rlsbl.commands.release.push_if_needed", lambda b, **kw: None)
         monkeypatch.setattr("rlsbl.commands.release.get_push_timeout", lambda *a, **kw: 120)
@@ -368,6 +372,7 @@ class TestReleaseStopsAtFirstDeployFailure:
             return ""
 
         monkeypatch.setattr("rlsbl.commands.release.run", mock_run)
+        monkeypatch.setattr("rlsbl.commands.release.run_gh", lambda args, **kw: "")
         monkeypatch.setattr("rlsbl.commands.release.commit_files", lambda msg, files, **kw: True)
         monkeypatch.setattr("rlsbl.commands.release.push_if_needed", lambda b, **kw: None)
         monkeypatch.setattr("rlsbl.commands.release.get_push_timeout", lambda *a, **kw: 120)
