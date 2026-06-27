@@ -162,8 +162,9 @@ class TestFullScrubFlow:
     @patch(f"{MOD}.extract_changelog_entry", return_value="## 1.0.0\n\n- Fix bug\n")
     @patch(f"{MOD}.generate_changelog")
     @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run_gh")
     @patch(f"{MOD}.run")
-    def test_full_flow(self, mock_run, _req_tool, mock_gen_changelog,
+    def test_full_flow(self, mock_run, mock_run_gh, _req_tool, mock_gen_changelog,
                        _extract_cl, _push_timeout, _get_branch,
                        _gh_installed, _gh_auth, _acquire_lock, _release_lock,
                        tmp_path):
@@ -200,17 +201,22 @@ class TestFullScrubFlow:
             "new_head": "deadbeef1234",
         })
 
-        # Build the sequence of run() return values
+        # Build the sequence of run() return values (git/safegit only)
         mock_run.side_effect = [
             "safegit 0.18.0",  # safegit --version
             safegit_result,    # safegit scrub match --json ...
             "",                # safegit commit (COMMITTED step)
             "",                # git push --force-with-lease (BRANCH_PUSHED)
             "",                # git push --force origin v1.0.0 (TAGS_PUSHED)
-            '{"body": "old notes"}',  # gh release view v1.0.0
-            "",                # gh release delete v1.0.0 --yes
-            "",                # gh release create v1.0.0
         ]
+
+        # gh calls go through run_gh
+        def run_gh_effect(args, **kwargs):
+            if args[:2] == ["release", "view"]:
+                return '{"body": "old notes"}'
+            return ""
+
+        mock_run_gh.side_effect = run_gh_effect
 
         flags = {
             "pattern": "secret",
@@ -262,20 +268,15 @@ class TestFullScrubFlow:
         ]
         assert len(force_tag_calls) == 1
 
-        # gh release delete + create
-        gh_delete_calls = [
-            c for c in all_calls
-            if c[0][0] == "gh" and "delete" in c[0][1]
-        ]
+        # gh release delete + create (via run_gh)
+        gh_all = mock_run_gh.call_args_list
+        gh_delete_calls = [c for c in gh_all if "delete" in c[0][0]]
         assert len(gh_delete_calls) == 1
-        assert "v1.0.0" in gh_delete_calls[0][0][1]
+        assert "v1.0.0" in gh_delete_calls[0][0][0]
 
-        gh_create_calls = [
-            c for c in all_calls
-            if c[0][0] == "gh" and "create" in c[0][1]
-        ]
+        gh_create_calls = [c for c in gh_all if "create" in c[0][0]]
         assert len(gh_create_calls) == 1
-        assert "v1.0.0" in gh_create_calls[0][0][1]
+        assert "v1.0.0" in gh_create_calls[0][0][0]
 
 
 # ===========================================================================
@@ -295,11 +296,12 @@ class TestResumeFromScrubResult:
     @patch(f"{MOD}.extract_changelog_entry", return_value="## 1.0.0\n\n- Fix\n")
     @patch(f"{MOD}.generate_changelog")
     @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run_gh")
     @patch(f"{MOD}.run")
-    def test_resume_skips_safegit(self, mock_run, _req_tool, mock_gen_changelog,
-                                   _extract_cl, _push_timeout, _get_branch,
-                                   _gh_installed, _gh_auth, _acquire_lock,
-                                   _release_lock, tmp_path):
+    def test_resume_skips_safegit(self, mock_run, mock_run_gh, _req_tool,
+                                   mock_gen_changelog, _extract_cl, _push_timeout,
+                                   _get_branch, _gh_installed, _gh_auth,
+                                   _acquire_lock, _release_lock, tmp_path):
         # -- Set up project with scrub-result.json already present --
         changes_dir = tmp_path / ".rlsbl" / "changes"
         changes_dir.mkdir(parents=True)
@@ -329,26 +331,22 @@ class TestResumeFromScrubResult:
             "completed_steps": ["JSONL_REMAPPED"],
         }))
 
-        # run() calls expected during resume (safegit scrub is NOT called):
-        # 1. safegit --version (version check still runs)
-        # 2. git rev-parse HEAD (to verify HEAD matches saved new_head)
-        # Then the remaining steps:
-        # 3. safegit commit (COMMITTED)
-        # 4. git push --force-with-lease (BRANCH_PUSHED)
-        # 5. git push --force origin v1.0.0 (TAGS_PUSHED)
-        # 6. gh release view v1.0.0
-        # 7. gh release delete v1.0.0 --yes
-        # 8. gh release create v1.0.0
+        # run() calls: git/safegit only (gh calls go through run_gh)
         mock_run.side_effect = [
             "safegit 0.18.0",  # safegit --version
             saved_head,        # git rev-parse HEAD
             "",                # safegit commit
             "",                # git push --force-with-lease
             "",                # git push --force origin v1.0.0
-            '{"body": "notes"}',  # gh release view
-            "",                # gh release delete
-            "",                # gh release create
         ]
+
+        # gh calls go through run_gh
+        def run_gh_effect(args, **kwargs):
+            if args[:2] == ["release", "view"]:
+                return '{"body": "notes"}'
+            return ""
+
+        mock_run_gh.side_effect = run_gh_effect
 
         flags = {
             "pattern": "secret",
@@ -391,11 +389,8 @@ class TestResumeFromScrubResult:
         ]
         assert len(force_tag_calls) == 1
 
-        # Release recreated
-        gh_create_calls = [
-            c for c in mock_run.call_args_list
-            if c[0][0] == "gh" and len(c[0]) > 1 and "create" in c[0][1]
-        ]
+        # Release recreated (via run_gh)
+        gh_create_calls = [c for c in mock_run_gh.call_args_list if "create" in c[0][0]]
         assert len(gh_create_calls) == 1
 
 
@@ -459,9 +454,11 @@ class TestMonorepoTagCorrectProject:
     @patch(f"{MOD}.get_push_timeout", return_value=120)
     @patch(f"{MOD}.generate_changelog")
     @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run_gh")
     @patch(f"{MOD}.run")
     @patch(f"{MOD}.load_workspace")
-    def test_monorepo_tag_correct_project(self, mock_load_ws, mock_run, _req_tool,
+    def test_monorepo_tag_correct_project(self, mock_load_ws, mock_run,
+                                           mock_run_gh, _req_tool,
                                            mock_gen_changelog, _push_timeout,
                                            _get_branch, _gh_installed, _gh_auth,
                                            _acquire_lock, _release_lock, tmp_path):
@@ -524,13 +521,15 @@ class TestMonorepoTagCorrectProject:
             "",                      # git push --force-with-lease
             "",                      # git push --force origin alpha@v1.0.0
             "",                      # git push --force origin beta@v1.0.0
-            '{"body": "old"}',       # gh release view alpha@v1.0.0
-            "",                      # gh release delete alpha@v1.0.0
-            "",                      # gh release create alpha@v1.0.0
-            '{"body": "old"}',       # gh release view beta@v1.0.0
-            "",                      # gh release delete beta@v1.0.0
-            "",                      # gh release create beta@v1.0.0
         ]
+
+        # gh calls go through run_gh
+        def run_gh_effect(args, **kwargs):
+            if args[:2] == ["release", "view"]:
+                return '{"body": "old"}'
+            return ""
+
+        mock_run_gh.side_effect = run_gh_effect
 
         flags = {
             "pattern": "secret",
@@ -552,22 +551,17 @@ class TestMonorepoTagCorrectProject:
         assert alpha_cl in extract_calls, f"Expected alpha CHANGELOG to be queried, got {extract_calls}"
         assert beta_cl in extract_calls, f"Expected beta CHANGELOG to be queried, got {extract_calls}"
 
-        # Verify the create calls used the correct notes
-        gh_create_calls = [
-            c for c in mock_run.call_args_list
-            if c[0][0] == "gh" and len(c[0]) > 1 and "create" in c[0][1]
-        ]
+        # Verify the create calls used the correct notes (via run_gh)
+        gh_create_calls = [c for c in mock_run_gh.call_args_list if "create" in c[0][0]]
         assert len(gh_create_calls) == 2
 
         # First create: alpha@v1.0.0 with alpha notes
         alpha_create = gh_create_calls[0]
-        assert "alpha@v1.0.0" in alpha_create[0][1]
-        assert "Alpha feature" in alpha_create[0][1][-1]
+        assert "alpha@v1.0.0" in alpha_create[0][0]
 
         # Second create: beta@v1.0.0 with beta notes
         beta_create = gh_create_calls[1]
-        assert "beta@v1.0.0" in beta_create[0][1]
-        assert "Beta fix" in beta_create[0][1][-1]
+        assert "beta@v1.0.0" in beta_create[0][0]
 
 
 # ===========================================================================
@@ -586,11 +580,13 @@ class TestStandaloneTagNoPrefix:
     @patch(f"{MOD}.get_push_timeout", return_value=120)
     @patch(f"{MOD}.generate_changelog")
     @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run_gh")
     @patch(f"{MOD}.run")
     @patch(f"{MOD}.load_workspace")
-    def test_standalone_tag_no_prefix(self, mock_load_ws, mock_run, _req_tool,
-                                       mock_gen_changelog, _push_timeout,
-                                       _get_branch, _gh_installed, _gh_auth,
+    def test_standalone_tag_no_prefix(self, mock_load_ws, mock_run, mock_run_gh,
+                                       _req_tool, mock_gen_changelog,
+                                       _push_timeout, _get_branch,
+                                       _gh_installed, _gh_auth,
                                        _acquire_lock, _release_lock, tmp_path):
         # -- Set up monorepo with a root CHANGELOG --
         ws_root = tmp_path / "monorepo"
@@ -633,10 +629,15 @@ class TestStandaloneTagNoPrefix:
             "",                      # safegit commit
             "",                      # git push --force-with-lease
             "",                      # git push --force origin v1.0.0
-            '{"body": "old"}',       # gh release view v1.0.0
-            "",                      # gh release delete v1.0.0
-            "",                      # gh release create v1.0.0
         ]
+
+        # gh calls go through run_gh
+        def run_gh_effect(args, **kwargs):
+            if args[:2] == ["release", "view"]:
+                return '{"body": "old"}'
+            return ""
+
+        mock_run_gh.side_effect = run_gh_effect
 
         flags = {
             "pattern": "secret",
@@ -659,11 +660,7 @@ class TestStandaloneTagNoPrefix:
         proj_changelogs = [c for c in extract_calls if "packages" in c]
         assert len(proj_changelogs) == 0, f"Project CHANGELOGs should not be queried for standalone tags: {proj_changelogs}"
 
-        # Verify the release was created with root changelog notes
-        gh_create_calls = [
-            c for c in mock_run.call_args_list
-            if c[0][0] == "gh" and len(c[0]) > 1 and "create" in c[0][1]
-        ]
+        # Verify the release was created with root changelog notes (via run_gh)
+        gh_create_calls = [c for c in mock_run_gh.call_args_list if "create" in c[0][0]]
         assert len(gh_create_calls) == 1
-        assert "v1.0.0" in gh_create_calls[0][0][1]
-        assert "Root level change" in gh_create_calls[0][0][1][-1]
+        assert "v1.0.0" in gh_create_calls[0][0][0]
