@@ -3,26 +3,7 @@
   "env_file": "~/Projects/.env",
   "push_timeout": 120,
   "batch_limits": {
-    "exclusions": [
-      {
-        "reason": "**New: `run_gh()` centralized GitHub CLI wrapper.** All 33 repo-scoped `gh` invocations now go through `run_gh()`, replacing the old `gh_env()` pattern with a cleaner API.",
-        "entries": [
-          {
-            "version": "unreleased",
-            "line": 1
-          }
-        ]
-      },
-      {
-        "reason": "non-user-facing batch",
-        "entries": [
-          {
-            "version": "unreleased",
-            "line": 7
-          }
-        ]
-      }
-    ]
+    "exclusions": []
   },
   "targets": [
     "npm",
