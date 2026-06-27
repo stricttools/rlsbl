@@ -1,0 +1,10 @@
+# Version bump type: patch, minor, major, or hotfix
+bump = "patch"
+# Short description of this release (required)
+description = "Fix tagging test for Python 3.14 compatibility"
+# Optional context explaining why these changes were made
+context = "ensure_github_topic migrated from run() to run_gh() but the test mocks still targeted run()"
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["npm", "pypi"]
+exclude = []
