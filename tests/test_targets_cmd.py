@@ -128,34 +128,18 @@ class TestMultiTargetRelease:
     @patch("rlsbl.commands.release.get_changes_dir", return_value=".rlsbl/changes")
     @patch("rlsbl.commands.release._run_selfdoc_check", return_value=True)
     @patch("rlsbl.commands.release._run_selfdoc_gen", return_value=True)
+    @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
+    @patch("rlsbl.app.run_checks", return_value=([], 0))
     def test_secondary_targets_called_when_detected(
-        self, _selfdoc_gen, _selfdoc_check, _changes_dir, _extract, _finalize, _gen_ver_file, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, _commit_files, mock_run, _push, _remote_exists, monkeypatch
+        self, _run_checks, _vrt, _selfdoc_gen, _selfdoc_check, _changes_dir, _extract, _finalize, _gen_ver_file, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, _commit_files, mock_run, _run_gh, _push, _remote_exists, monkeypatch
     ):
         """When a secondary target (spec) is detected, its build is called."""
         # Create version.json so spec target is detected
         with open("version.json", "w") as f:
             json.dump({"version": "1.0.0"}, f)
 
-        # Mock run() responses:
-        # 1. git fetch origin --quiet (remote-ahead check)
-        # 2. git rev-list --count HEAD..origin/main (0 commits behind)
-        # 3. tag -l (current tag exists) -> "v1.0.0"
-        # 4. tag -l (new tag doesn't exist) -> ""
-        # 5. git status --porcelain (pre-hook snapshot) -> ""
-        # 6. git status --porcelain (pre-selfdoc snapshot) -> ""
-        # 7. git status --porcelain (post-selfdoc snapshot) -> ""
-        # 8. git status --porcelain (post-hook snapshot) -> ""
-        # 9. git status --porcelain (baseline snapshot) -> ""
-        # 10. git rev-parse --show-toplevel (for vpath) -> "/tmp/fake-repo"
-        # 11. git status --porcelain (re-check guard) -> ""
-        # 12. git rev-parse HEAD (pre_release_sha capture) -> "pre123"
-        # commit_files is mocked separately (no git add/commit calls here)
-        # 13. git status --porcelain (backfilled .md detection) -> ""
-        # 14. git tag -> ""
-        # 15. git push origin tag -> ""
-        # 16. git rev-parse HEAD (pushed_sha) -> ""
-        # 17. gh release create -> "abc123"
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", "", "", "", "/tmp/fake-repo", "", "pre123", "", "", "", "", "abc123"]
+        # Mock run() responses (gh release create goes through run_gh):
+        mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", "", "", "", "/tmp/fake-repo", "", "pre123", "", "", "", ""]
 
         # Mock the spec target's build to track calls
         from rlsbl.targets import TARGETS
@@ -187,23 +171,18 @@ class TestMultiTargetRelease:
     @patch("rlsbl.commands.release.get_changes_dir", return_value=".rlsbl/changes")
     @patch("rlsbl.commands.release._run_selfdoc_check", return_value=True)
     @patch("rlsbl.commands.release._run_selfdoc_gen", return_value=True)
+    @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
+    @patch("rlsbl.app.run_checks", return_value=([], 0))
     def test_secondary_target_failure_is_non_fatal(
-        self, _selfdoc_gen, _selfdoc_check, _changes_dir, _extract, _finalize, _gen_ver_file, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, _commit_files, mock_run, _push, _remote_exists, monkeypatch
+        self, _run_checks, _vrt, _selfdoc_gen, _selfdoc_check, _changes_dir, _extract, _finalize, _gen_ver_file, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, _commit_files, mock_run, _run_gh, _push, _remote_exists, monkeypatch
     ):
         """If a secondary target's build raises, release still completes."""
         # Create version.json so spec target is detected
         with open("version.json", "w") as f:
             json.dump({"version": "1.0.0"}, f)
 
-        # Same mock sequence as test_secondary_targets_called_when_detected:
-        # 1. git fetch  2. git rev-list  3-4. tag -l x2
-        # 5. pre-hook snapshot  6. pre-selfdoc snapshot
-        # 7. post-selfdoc snapshot  8. post-hook snapshot
-        # 9. baseline  10. rev-parse --show-toplevel
-        # 11. re-check guard  12. pre_release_sha  13. backfilled .md detection
-        # 14. git tag  15. git push origin tag
-        # 16. pushed_sha  17. gh release create
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", "", "", "", "/tmp/fake-repo", "", "pre123", "", "", "", "", "abc123"]
+        # Mock run() responses (gh release create goes through run_gh):
+        mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", "", "", "", "/tmp/fake-repo", "", "pre123", "", "", "", ""]
 
         from rlsbl.targets import TARGETS
         monkeypatch.setattr(TARGETS["spec"], "build", MagicMock(side_effect=RuntimeError("build failed")))

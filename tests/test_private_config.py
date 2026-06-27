@@ -179,10 +179,13 @@ class TestPrivatePublishGuardrail:
     @patch("rlsbl.commands.release.finalize_version")
     @patch("rlsbl.commands.release.extract_changelog_entry", return_value="- Bugfix")
     @patch("rlsbl.commands.release.get_changes_dir", return_value=".rlsbl/changes")
+    @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
+    @patch("rlsbl.app.run_checks", return_value=([], 0))
     def test_private_true_skips_publish(
-        self, _changes_dir, _extract, _finalize, _gen_ver_file,
+        self, _run_checks, _vrt,
+        _changes_dir, _extract, _finalize, _gen_ver_file,
         _validate, _gen_cl, _deploy, _tag, _gh_inst, _gh_auth,
-        _clean, _branch, _commit_files, mock_run, _push, _lock, _unlock,
+        _clean, _branch, _commit_files, mock_run, _run_gh, _push, _lock, _unlock,
         _remote_exists, capsys,
     ):
         """When private=true, pipeline.publish() is not called."""
@@ -209,7 +212,6 @@ class TestPrivatePublishGuardrail:
             "",                 # git tag v1.0.1
             "",                 # git push origin v1.0.1
             "def456",           # git rev-parse HEAD (pushed_sha)
-            "",                 # gh release create ...
         ]
 
         with patch("rlsbl.pipelines.npm.NpmPipeline.publish") as mock_publish:
@@ -237,11 +239,13 @@ class TestPrivatePublishGuardrail:
     @patch("rlsbl.commands.release.extract_changelog_entry", return_value="- Bugfix")
     @patch("rlsbl.commands.release.get_changes_dir", return_value=".rlsbl/changes")
     @patch("rlsbl.commands.release.upload_release_assets")
+    @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
+    @patch("rlsbl.app.run_checks", return_value=([], 0))
     def test_private_true_with_assets_still_uploads(
-        self, mock_upload_assets,
+        self, _run_checks, _vrt, mock_upload_assets,
         _changes_dir, _extract, _finalize, _gen_ver_file,
         _validate, _gen_cl, _deploy, _tag, _gh_inst, _gh_auth,
-        _clean, _branch, _commit_files, mock_run, _push, _lock, _unlock,
+        _clean, _branch, _commit_files, mock_run, _run_gh, _push, _lock, _unlock,
         _remote_exists, capsys,
     ):
         """When private=true with assets: true, asset upload still runs."""
@@ -272,7 +276,6 @@ class TestPrivatePublishGuardrail:
             "",                 # git tag v1.0.1
             "",                 # git push origin v1.0.1
             "def456",           # git rev-parse HEAD (pushed_sha)
-            "",                 # gh release create ...
         ]
 
         run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": True, "pipelines": {"npm": {"type": "npm", "local": False, "assets": True, "max_asset_size_mb": 50}}}))

@@ -297,14 +297,12 @@ class TestReleaseGhReleaseCreateFailure:
     def test_gh_release_create_failure_continues_and_exits_1(self, mock_git_repo, capsys):
         _setup_releasable_npm_project(mock_git_repo)
 
-        call_log = []
-
-        def failing_gh_run(cmd, args=None, timeout=120, env=None, cwd=None):
-            call_log.append((cmd, args))
-            if cmd == "gh" and args and args[0] == "release" and args[1] in ("create", "view"):
+        def failing_run_gh(args, **kwargs):
+            if args and args[0] == "release" and args[1] in ("create", "view"):
                 raise subprocess.CalledProcessError(1, f"gh release {args[1]}")
-            if cmd == "gh":
-                return ""
+            return ""
+
+        def intercepting_run(cmd, args=None, timeout=120, env=None, cwd=None):
             if cmd == "git" and args and args[0] == "push":
                 return ""
             if cmd == "git" and args and args[0] == "fetch":
@@ -318,8 +316,8 @@ class TestReleaseGhReleaseCreateFailure:
                 patch("rlsbl.commands.release.check_gh_installed", return_value=True),
                 patch("rlsbl.commands.release.check_gh_auth", return_value=True),
                 patch("rlsbl.commands.release.push_if_needed"),
-                patch("rlsbl.commands.release.run_gh", return_value=""),
-            patch("rlsbl.commands.release.run", side_effect=failing_gh_run),
+                patch("rlsbl.commands.release.run_gh", side_effect=failing_run_gh),
+                patch("rlsbl.commands.release.run", side_effect=intercepting_run),
                 patch("rlsbl.commands.release.upload_release_assets") as mock_upload,
                 patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
             ):
@@ -353,14 +351,14 @@ class TestReleaseGhReleaseCreateFailure:
 
         gh_calls = []
 
-        def failing_gh_run(cmd, args=None, timeout=120, env=None, cwd=None):
-            if cmd == "gh" and args and args[0] == "release":
+        def failing_run_gh(args, **kwargs):
+            if args and args[0] == "release":
                 gh_calls.append(args)
                 if args[1] in ("create", "view"):
                     raise subprocess.CalledProcessError(1, f"gh release {args[1]}")
-                return ""
-            if cmd == "gh":
-                return ""
+            return ""
+
+        def intercepting_run(cmd, args=None, timeout=120, env=None, cwd=None):
             if cmd == "git" and args and args[0] == "push":
                 return ""
             if cmd == "git" and args and args[0] == "fetch":
@@ -374,8 +372,8 @@ class TestReleaseGhReleaseCreateFailure:
                 patch("rlsbl.commands.release.check_gh_installed", return_value=True),
                 patch("rlsbl.commands.release.check_gh_auth", return_value=True),
                 patch("rlsbl.commands.release.push_if_needed"),
-                patch("rlsbl.commands.release.run_gh", return_value=""),
-            patch("rlsbl.commands.release.run", side_effect=failing_gh_run),
+                patch("rlsbl.commands.release.run_gh", side_effect=failing_run_gh),
+                patch("rlsbl.commands.release.run", side_effect=intercepting_run),
                 patch("rlsbl.commands.release.upload_release_assets"),
                 patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
             ):
