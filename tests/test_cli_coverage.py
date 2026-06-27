@@ -147,6 +147,7 @@ class TestCmdReleaseRun:
             rlsbl.cmd_release_run(
                 dry_run=False, yes=True, quiet=False,
                 allow_dirty=False, watch=False, no_watch=False,
+                bump="", description="",
             )
         assert exc.value.code == 1
 
@@ -160,6 +161,7 @@ class TestCmdReleaseRun:
             rlsbl.cmd_release_run(
                 dry_run=False, yes=True, quiet=False,
                 allow_dirty=False, watch=False, no_watch=False,
+                bump="", description="",
             )
         assert exc.value.code == 1
 
@@ -174,6 +176,7 @@ class TestCmdReleaseRun:
             rlsbl.cmd_release_run(
                 dry_run=False, yes=True, quiet=False,
                 allow_dirty=False, watch=False, no_watch=False,
+                bump="", description="",
             )
         assert exc.value.code == 1
 
@@ -189,6 +192,7 @@ class TestCmdReleaseRun:
         rlsbl.cmd_release_run(
             dry_run=True, yes=True, quiet=False,
             allow_dirty=True, watch=True, no_watch=False,
+            bump="", description="",
         )
         mock_run.assert_called_once()
         call_args = mock_run.call_args

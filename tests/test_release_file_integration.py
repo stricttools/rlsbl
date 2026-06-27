@@ -391,6 +391,8 @@ class TestCmdReleaseMissingFile:
                 allow_dirty=False,
                 watch=False,
                 no_watch=True,
+                bump="",
+                description="",
             )
 
         assert exc_info.value.code == 1
@@ -421,6 +423,8 @@ class TestCmdReleaseInvalidFile:
                 allow_dirty=False,
                 watch=False,
                 no_watch=True,
+                bump="",
+                description="",
             )
 
         assert exc_info.value.code == 1
