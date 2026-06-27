@@ -68,8 +68,10 @@ class TestPreReleaseHookOutput:
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
+    @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
     def test_hook_streams_output(
         self,
+        _vrt,
         _validate,
         _gen_cl,
         _gh_inst,
@@ -78,6 +80,7 @@ class TestPreReleaseHookOutput:
         _branch,
         _commit_files,
         mock_run,
+        _run_gh,
         _push,
         _remote_exists,
         tmp_project,
@@ -117,8 +120,10 @@ class TestPreReleaseHookOutput:
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     @patch("rlsbl.app.run_checks", return_value=([], 0))
+    @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
     def test_hook_exit_code_in_error_message(
         self,
+        _vrt,
         _run_checks,
         _validate,
         _gen_cl,
@@ -128,6 +133,7 @@ class TestPreReleaseHookOutput:
         _branch,
         _commit_files,
         mock_run,
+        _run_gh,
         _push,
         _remote_exists,
         tmp_project,
@@ -205,8 +211,12 @@ class TestPostReleaseHookOutput:
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
+    @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
+    @patch("rlsbl.app.run_checks", return_value=([], 0))
     def test_failed_hook_is_non_fatal(
         self,
+        _run_checks,
+        _vrt,
         _validate,
         _gen_cl,
         _gh_inst,
@@ -280,8 +290,12 @@ class TestWatchSHABeforePostHook:
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
+    @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
+    @patch("rlsbl.app.run_checks", return_value=([], 0))
     def test_watch_sha_is_pre_hook_commit(
         self,
+        _run_checks,
+        _vrt,
         _validate,
         _gen_cl,
         _gh_inst,
@@ -380,8 +394,10 @@ class TestHookTimeout:
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     @patch("rlsbl.app.run_checks", return_value=([], 0))
+    @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
     def test_pre_release_timeout_message_includes_seconds(
         self,
+        _vrt,
         _run_checks,
         _validate,
         _gen_cl,
@@ -391,6 +407,7 @@ class TestHookTimeout:
         _branch,
         _commit_files,
         mock_run,
+        _run_gh,
         _push,
         _remote_exists,
         tmp_project,
@@ -431,8 +448,10 @@ class TestHookCwdStandalone:
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
+    @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
     def test_pre_checks_hook_cwd_none_standalone(
         self,
+        _vrt,
         _validate,
         _gen_cl,
         _gh_inst,
@@ -441,6 +460,7 @@ class TestHookCwdStandalone:
         _branch,
         _commit_files,
         mock_run,
+        _run_gh,
         _push,
         _remote_exists,
         tmp_project,
@@ -474,8 +494,10 @@ class TestHookCwdStandalone:
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
+    @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
     def test_pre_release_hook_cwd_none_standalone(
         self,
+        _vrt,
         _validate,
         _gen_cl,
         _gh_inst,
@@ -484,6 +506,7 @@ class TestHookCwdStandalone:
         _branch,
         _commit_files,
         mock_run,
+        _run_gh,
         _push,
         _remote_exists,
         tmp_project,
@@ -516,8 +539,12 @@ class TestHookCwdStandalone:
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
+    @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
+    @patch("rlsbl.app.run_checks", return_value=([], 0))
     def test_post_release_hook_cwd_none_standalone(
         self,
+        _run_checks,
+        _vrt,
         _validate,
         _gen_cl,
         _gh_inst,
@@ -587,8 +614,10 @@ class TestHookCwdMonorepo:
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
+    @patch("rlsbl.commands.release.validate_release_targets", return_value="pypi")
     def test_pre_checks_hook_cwd_monorepo(
         self,
+        _vrt,
         _validate,
         _gen_cl,
         _gh_inst,
@@ -597,6 +626,7 @@ class TestHookCwdMonorepo:
         _branch,
         _commit_files,
         mock_run,
+        _run_gh,
         _push,
         _remote_exists,
         monorepo_fixture,
@@ -651,8 +681,10 @@ class TestHookCwdMonorepo:
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
+    @patch("rlsbl.commands.release.validate_release_targets", return_value="pypi")
     def test_pre_release_hook_cwd_monorepo(
         self,
+        _vrt,
         _validate,
         _gen_cl,
         _gh_inst,
@@ -661,6 +693,7 @@ class TestHookCwdMonorepo:
         _branch,
         _commit_files,
         mock_run,
+        _run_gh,
         _push,
         _remote_exists,
         monorepo_fixture,
@@ -712,8 +745,10 @@ class TestHookCwdMonorepo:
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     @patch("rlsbl.app.run_checks", return_value=([], 0))
+    @patch("rlsbl.commands.release.validate_release_targets", return_value="pypi")
     def test_post_release_hook_cwd_monorepo(
         self,
+        _vrt,
         _run_checks,
         _validate,
         _gen_cl,
@@ -746,8 +781,8 @@ class TestHookCwdMonorepo:
             if "rev-list" in joined:
                 return "0"
             if "tag" in joined and "-l" in joined:
-                if "mypylib@v0.1.0" in joined:
-                    return "mypylib@v0.1.0"
+                if "v0.1.0" in joined:
+                    return "v0.1.0"
                 return ""
             if "rev-parse" in joined:
                 return "abc123"
@@ -769,7 +804,7 @@ class TestHookCwdMonorepo:
 
             from rlsbl.commands.release import run_cmd
 
-            run_cmd(_rc(include=["pypi"]), {"quiet": True, "yes": True}, ctx=ProjectContext(project_root=ns.python_dir, workspace_root=Path(str(ns.root)), config={"private": False, "pipelines": {}}))
+            run_cmd(_rc(include=["pypi"]), {"quiet": True, "yes": True}, ctx=ProjectContext(project_root=ns.python_dir, workspace_root=None, config={"private": False, "pipelines": {}}))
 
             # Find the post-release hook call
             post_release_calls = [
