@@ -39,7 +39,7 @@ class TestEditRelease(unittest.TestCase):
         entry.path = path
         return entry
 
-    @patch("rlsbl.commands.edit_release.run")
+    @patch("rlsbl.commands.edit_release.run_gh")
     @patch("rlsbl.commands.edit_release.extract_changelog_entry", return_value="- Added new feature X\n- Fixed bug Y")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.edit_release.detect_targets")
@@ -62,18 +62,18 @@ class TestEditRelease(unittest.TestCase):
                 run_cmd(["0.23.0"], {}, project_root=".")
 
         # Verify gh release view was called to check existence
-        assert any(c[0] == ("gh", ["release", "view", "v0.23.0"]) for c in mock_run.call_args_list)
+        assert any(c[0] == (["release", "view", "v0.23.0"],) for c in mock_run.call_args_list)
         # Verify gh release edit was called with --notes-file
         edit_call = [c for c in mock_run.call_args_list
-                     if c[0][1][:3] == ["release", "edit", "v0.23.0"]]
+                     if c[0][0][:3] == ["release", "edit", "v0.23.0"]]
         self.assertEqual(len(edit_call), 1)
-        self.assertIn("--notes-file", edit_call[0][0][1])
+        self.assertIn("--notes-file", edit_call[0][0][0])
 
         # Verify changelog was extracted for the right version
         mock_extract.assert_called_once()
         self.assertEqual(mock_extract.call_args[0][1], "0.23.0")
 
-    @patch("rlsbl.commands.edit_release.run")
+    @patch("rlsbl.commands.edit_release.run_gh")
     @patch("rlsbl.commands.edit_release.extract_changelog_entry", return_value="- Added new feature X")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.edit_release.detect_targets")
@@ -98,7 +98,7 @@ class TestEditRelease(unittest.TestCase):
         mock_extract.assert_called_once()
         self.assertEqual(mock_extract.call_args[0][1], "0.23.0")
 
-    @patch("rlsbl.commands.edit_release.run")
+    @patch("rlsbl.commands.edit_release.run_gh")
     @patch("rlsbl.commands.edit_release.extract_changelog_entry", return_value="- Fixed bug")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.edit_release.detect_targets")
@@ -121,9 +121,9 @@ class TestEditRelease(unittest.TestCase):
 
         # read_version should NOT be called when version is explicit
         target.read_version.assert_not_called()
-        assert any(c[0] == ("gh", ["release", "view", "v0.23.0"]) for c in mock_run.call_args_list)
+        assert any(c[0] == (["release", "view", "v0.23.0"],) for c in mock_run.call_args_list)
 
-    @patch("rlsbl.commands.edit_release.run")
+    @patch("rlsbl.commands.edit_release.run_gh")
     @patch("rlsbl.commands.edit_release.extract_changelog_entry", return_value="- Fixed bug")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.edit_release.detect_targets")
@@ -148,7 +148,7 @@ class TestEditRelease(unittest.TestCase):
         mock_extract.assert_called_once()
         self.assertEqual(mock_extract.call_args[0][1], "0.23.0")
         # Tag should be "v0.23.0"
-        assert any(c[0] == ("gh", ["release", "view", "v0.23.0"]) for c in mock_run.call_args_list)
+        assert any(c[0] == (["release", "view", "v0.23.0"],) for c in mock_run.call_args_list)
 
     @patch("rlsbl.commands.edit_release.extract_changelog_entry", return_value=None)
     @patch("os.path.exists", return_value=True)
@@ -171,7 +171,7 @@ class TestEditRelease(unittest.TestCase):
         self.assertEqual(ctx.exception.code, 1)
         self.assertIn("no changelog entry found", mock_stderr.getvalue())
 
-    @patch("rlsbl.commands.edit_release.run")
+    @patch("rlsbl.commands.edit_release.run_gh")
     @patch("rlsbl.commands.edit_release.extract_changelog_entry", return_value="- Some changes")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.edit_release.detect_targets")
@@ -196,7 +196,7 @@ class TestEditRelease(unittest.TestCase):
         self.assertEqual(ctx.exception.code, 1)
         self.assertIn("not found", mock_stderr.getvalue())
 
-    @patch("rlsbl.commands.edit_release.run")
+    @patch("rlsbl.commands.edit_release.run_gh")
     @patch("rlsbl.commands.edit_release.extract_changelog_entry", return_value="- Added new feature X")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.edit_release.detect_targets")
@@ -219,10 +219,10 @@ class TestEditRelease(unittest.TestCase):
         self.assertIn("v0.23.0", output)
 
         # gh release view should still be called (to check existence)
-        assert any(c[0] == ("gh", ["release", "view", "v0.23.0"]) for c in mock_run.call_args_list)
+        assert any(c[0] == (["release", "view", "v0.23.0"],) for c in mock_run.call_args_list)
         # gh release edit should NOT be called
         edit_calls = [c for c in mock_run.call_args_list
-                      if len(c[0]) >= 2 and "edit" in c[0][1]]
+                      if c[0][0] and "edit" in c[0][0]]
         self.assertEqual(len(edit_calls), 0)
 
 
