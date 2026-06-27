@@ -591,8 +591,8 @@ class TestReleaseRetry(unittest.TestCase):
                 f.write("dummy")
 
             with patch("rlsbl.commands.release_retry.get_retry_file_path", return_value=retry_path), \
-                 patch("rlsbl.commands.release_retry.run_gh", return_value=""),
-            patch("rlsbl.commands.release_retry.run") as mock_run, \
+                 patch("rlsbl.commands.release_retry.run_gh", return_value=""), \
+                 patch("rlsbl.commands.release_retry.run") as mock_run, \
                  patch("os.path.exists", return_value=True), \
                  patch("rlsbl.commands.release_retry._cleanup_retry_file"), \
                  patch("rlsbl.commands.release_retry.time.sleep"):
