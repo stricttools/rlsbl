@@ -1,0 +1,20 @@
+# Version bump type: patch, minor, major, or hotfix
+bump = "minor"
+# Short description of this release (required)
+description = "Quick bump shortcut, run_gh centralization, changelog preflight unification"
+# Optional context explaining why these changes were made
+context = """
+Three major improvements in this release:
+
+1. Quick bump shortcut: `rlsbl release run --bump patch --description "Fix X"` allows simple releases without creating a release file first. The release file ceremony remains available for complex releases.
+
+2. run_gh centralization: All 33 repo-scoped `gh` CLI invocations now go through a single `run_gh()` function, replacing the old `gh_env()` pattern. This provides a cleaner API with consistent error handling and environment setup.
+
+3. Changelog preflight unification: Changelog validation is now unified into the preflight check system via `app.run_checks(tag_expr="preflight-changelog")`, eliminating duplicate validation logic between the release flow and the check system.
+
+Also includes fixes for `get_push_timeout` crashing with `config=None`, `uv.lock` tracking, and a `load_workspace` scoping bug.
+"""
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["npm", "pypi"]
+exclude = []
