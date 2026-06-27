@@ -65,8 +65,9 @@ class TestReleaseAllowDirty:
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
-    def test_allow_dirty_skips_clean_tree_check(self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean,
-                                                 _branch, _commit_files, mock_run, _push,
+    @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
+    def test_allow_dirty_skips_clean_tree_check(self, _vrt, _validate, _gen_cl, _gh_inst, _gh_auth, _clean,
+                                                 _branch, _commit_files, mock_run, _run_gh, _push,
                                                  _remote_exists):
         """With --allow-dirty, a dirty tree should not block the release (dry-run)."""
         from rlsbl.commands.release import run_cmd
@@ -109,11 +110,14 @@ class TestReleaseAllowDirty:
     @patch("rlsbl.commands.release.finalize_version")
     @patch("rlsbl.commands.release.extract_changelog_entry", return_value="- Bugfix")
     @patch("rlsbl.commands.release.get_changes_dir", return_value=".rlsbl/changes")
-    def test_allow_dirty_non_dry_run_passes_recheck(self, _changes_dir, _extract, _finalize,
+    @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
+    @patch("rlsbl.app.run_checks", return_value=([], 0))
+    def test_allow_dirty_non_dry_run_passes_recheck(self, _run_checks, _vrt,
+                                                     _changes_dir, _extract, _finalize,
                                                      _gen_ver_file, _validate, _gen_cl,
                                                      _deploy, _tag, _gh_inst,
                                                      _gh_auth, _clean, _branch,
-                                                     _commit_files, mock_run, _push,
+                                                     _commit_files, mock_run, _run_gh, _push,
                                                      _lock, _unlock, _remote_exists):
         """With --allow-dirty (non-dry-run), pre-existing dirty files pass the re-check guard."""
         from rlsbl.commands.release import run_cmd
@@ -146,7 +150,6 @@ class TestReleaseAllowDirty:
             "M package.json",   # git tag v1.0.1
             "",                 # git push origin v1.0.1
             "",                 # git rev-parse HEAD (pushed_sha)
-            "",                 # gh release create ...
             "abc123def",        # (unconsumed -- side_effect has one extra entry)
         ]
 
@@ -176,12 +179,15 @@ class TestReleaseAllowDirty:
     @patch("rlsbl.commands.release.read_deploy_config", return_value=([], []))
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
-    def test_allow_dirty_still_catches_new_unexpected_files(self, _validate, _gen_cl,
+    @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
+    @patch("rlsbl.app.run_checks", return_value=([], 0))
+    def test_allow_dirty_still_catches_new_unexpected_files(self, _run_checks, _vrt,
+                                                             _validate, _gen_cl,
                                                              _deploy, _tag,
                                                              _gh_inst, _gh_auth,
                                                              _clean, _branch,
                                                              _commit_files, mock_run,
-                                                             _push, _lock, _unlock,
+                                                             _run_gh, _push, _lock, _unlock,
                                                              _remote_exists):
         """With --allow-dirty, genuinely new unexpected files still abort the release."""
         from rlsbl.commands.release import run_cmd
