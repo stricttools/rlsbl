@@ -145,8 +145,8 @@ class TestEnsureGithubTopic:
 
     def test_adds_topic_via_api(self, monkeypatch):
         monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
-        # Mock run() for repo detection
-        monkeypatch.setattr("rlsbl.tagging.run", lambda cmd, args, **kw: "owner/repo")
+        # Mock run_gh() for repo detection (ensure_github_topic uses run_gh, not run)
+        monkeypatch.setattr("rlsbl.tagging.run_gh", lambda args, **kw: "owner/repo")
 
         # Track urlopen calls
         calls = []
@@ -172,7 +172,7 @@ class TestEnsureGithubTopic:
 
     def test_returns_false_if_topic_already_present(self, monkeypatch):
         monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
-        monkeypatch.setattr("rlsbl.tagging.run", lambda cmd, args, **kw: "owner/repo")
+        monkeypatch.setattr("rlsbl.tagging.run_gh", lambda args, **kw: "owner/repo")
 
         def fake_urlopen(req, timeout=None):
             # GET returns topics that already include rlsbl
