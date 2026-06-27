@@ -194,6 +194,7 @@ class TestReleaseFullFlowRealGit:
             patch("rlsbl.commands.release.check_gh_installed", return_value=True),
             patch("rlsbl.commands.release.check_gh_auth", return_value=True),
             patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.run_gh", return_value=""),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
             patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
         ):
@@ -263,6 +264,7 @@ class TestReleaseVpathRelativePaths:
             patch("rlsbl.commands.release.check_gh_installed", return_value=True),
             patch("rlsbl.commands.release.check_gh_auth", return_value=True),
             patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.run_gh", return_value=""),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
             patch("rlsbl.commands.release.commit_files", side_effect=capturing_commit_files),
             patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
@@ -316,7 +318,8 @@ class TestReleaseGhReleaseCreateFailure:
                 patch("rlsbl.commands.release.check_gh_installed", return_value=True),
                 patch("rlsbl.commands.release.check_gh_auth", return_value=True),
                 patch("rlsbl.commands.release.push_if_needed"),
-                patch("rlsbl.commands.release.run", side_effect=failing_gh_run),
+                patch("rlsbl.commands.release.run_gh", return_value=""),
+            patch("rlsbl.commands.release.run", side_effect=failing_gh_run),
                 patch("rlsbl.commands.release.upload_release_assets") as mock_upload,
                 patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
             ):
@@ -371,7 +374,8 @@ class TestReleaseGhReleaseCreateFailure:
                 patch("rlsbl.commands.release.check_gh_installed", return_value=True),
                 patch("rlsbl.commands.release.check_gh_auth", return_value=True),
                 patch("rlsbl.commands.release.push_if_needed"),
-                patch("rlsbl.commands.release.run", side_effect=failing_gh_run),
+                patch("rlsbl.commands.release.run_gh", return_value=""),
+            patch("rlsbl.commands.release.run", side_effect=failing_gh_run),
                 patch("rlsbl.commands.release.upload_release_assets"),
                 patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
             ):

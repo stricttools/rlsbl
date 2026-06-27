@@ -158,6 +158,7 @@ class TestReleaseUnexpectedFiles:
             patch("rlsbl.commands.release.check_gh_installed", return_value=True),
             patch("rlsbl.commands.release.check_gh_auth", return_value=True),
             patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.run_gh", return_value=""),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
         ):
             # Should complete without aborting on "unexpected modified files"
@@ -219,6 +220,7 @@ class TestReleaseUnexpectedFiles:
             patch("rlsbl.commands.release.check_gh_installed", return_value=True),
             patch("rlsbl.commands.release.check_gh_auth", return_value=True),
             patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.run_gh", return_value=""),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
             patch.object(NpmTarget, "write_version", rogue_write_version),
         ):

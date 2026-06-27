@@ -53,6 +53,7 @@ class TestReleaseRetry(unittest.TestCase):
         return ""
 
     @patch("rlsbl.commands.release_retry._cleanup_retry_file")
+    @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.release_retry.detect_targets")
@@ -94,6 +95,7 @@ class TestReleaseRetry(unittest.TestCase):
         self.assertIn("Watch CI:", output)
 
     @patch("rlsbl.commands.release_retry._cleanup_retry_file")
+    @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.release_retry.detect_targets")
@@ -133,6 +135,7 @@ class TestReleaseRetry(unittest.TestCase):
         self.assertEqual(dispatch_calls[1][0][1], ["workflow", "run", "ci.yml", "--ref", "v0.41.7"])
 
     @patch("rlsbl.commands.release_retry._cleanup_retry_file")
+    @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.release_retry.detect_targets")
@@ -171,6 +174,7 @@ class TestReleaseRetry(unittest.TestCase):
         for call in dispatch_calls:
             self.assertEqual(call[0][1][3:], ["--ref", "v0.41.7"])
 
+    @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.release_retry.detect_targets")
@@ -199,6 +203,7 @@ class TestReleaseRetry(unittest.TestCase):
         self.assertEqual(ctx.exception.code, 1)
         self.assertIn("no GitHub Release found", mock_stderr.getvalue())
 
+    @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.release_retry.detect_targets")
@@ -234,6 +239,7 @@ class TestReleaseRetry(unittest.TestCase):
         self.assertEqual(len(dispatch_calls), 0)
 
     @patch("rlsbl.commands.release_retry._cleanup_retry_file")
+    @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.release_retry.detect_targets")
@@ -267,6 +273,7 @@ class TestReleaseRetry(unittest.TestCase):
         self.assertGreater(len(dispatch_calls), 0)
 
     @patch("rlsbl.commands.release_retry._cleanup_retry_file")
+    @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.release_retry.detect_targets")
@@ -317,6 +324,7 @@ class TestReleaseRetry(unittest.TestCase):
             self.assertEqual(call[0][1][3:], ["--ref", "v0.41.7"])
 
     @patch("rlsbl.commands.release_retry._cleanup_retry_file")
+    @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.release_retry.detect_targets")
@@ -358,6 +366,7 @@ class TestReleaseRetry(unittest.TestCase):
                 output = mock_stdout.getvalue()
                 self.assertNotIn("Watch CI:", output)
 
+    @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.release_retry.detect_targets")
@@ -415,6 +424,7 @@ class TestReleaseRetry(unittest.TestCase):
             self.assertIn("gh CLI is not authenticated", mock_stderr.getvalue())
 
     @patch("rlsbl.commands.release_retry._cleanup_retry_file")
+    @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.release_retry.detect_targets")
@@ -454,6 +464,7 @@ class TestReleaseRetry(unittest.TestCase):
         # _scaffold_retry_file was called
         mock_scaffold.assert_called_once()
 
+    @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.release_retry.detect_targets")
@@ -510,6 +521,7 @@ class TestReleaseRetry(unittest.TestCase):
             self.assertIn("ref must be set", stderr_output)
             self.assertIn("rlsbl release run", stderr_output)
 
+    @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("rlsbl.commands.release_retry.detect_targets")
     @patch("rlsbl.commands.release_retry.TARGETS")
@@ -579,7 +591,8 @@ class TestReleaseRetry(unittest.TestCase):
                 f.write("dummy")
 
             with patch("rlsbl.commands.release_retry.get_retry_file_path", return_value=retry_path), \
-                 patch("rlsbl.commands.release_retry.run") as mock_run, \
+                 patch("rlsbl.commands.release_retry.run_gh", return_value=""),
+            patch("rlsbl.commands.release_retry.run") as mock_run, \
                  patch("os.path.exists", return_value=True), \
                  patch("rlsbl.commands.release_retry._cleanup_retry_file"), \
                  patch("rlsbl.commands.release_retry.time.sleep"):
@@ -592,6 +605,7 @@ class TestReleaseRetry(unittest.TestCase):
             mock_read_retry.assert_called_once_with(retry_path)
 
     @patch("rlsbl.commands.release_retry._cleanup_retry_file")
+    @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.release_retry.detect_targets")
@@ -796,6 +810,7 @@ class TestRunIdCapture(unittest.TestCase):
         return entry
 
     @patch("rlsbl.commands.release_retry._cleanup_retry_file")
+    @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.release_retry.detect_targets")
@@ -832,6 +847,7 @@ class TestRunIdCapture(unittest.TestCase):
             mock_watch.assert_called_once_with(None, [], {"run-id": ["98765"]})
 
     @patch("rlsbl.commands.release_retry._cleanup_retry_file")
+    @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.release_retry.detect_targets")
@@ -871,6 +887,7 @@ class TestRunIdCapture(unittest.TestCase):
                 mock_watch.assert_called_once_with(None, [], {"run-id": ["55555"]})
 
     @patch("rlsbl.commands.release_retry._cleanup_retry_file")
+    @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.release_retry.detect_targets")
@@ -915,6 +932,7 @@ class TestRunIdCapture(unittest.TestCase):
                 )
 
     @patch("rlsbl.commands.release_retry._cleanup_retry_file")
+    @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.release_retry.detect_targets")
@@ -955,6 +973,7 @@ class TestRunIdCapture(unittest.TestCase):
         self.assertIn("Watch CI: rlsbl watch --run-id 111 --run-id 222", output)
 
     @patch("rlsbl.commands.release_retry._cleanup_retry_file")
+    @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.release_retry.detect_targets")
@@ -995,6 +1014,7 @@ class TestRunIdCapture(unittest.TestCase):
         self.assertNotIn("--run-id", output)
 
     @patch("rlsbl.commands.release_retry._cleanup_retry_file")
+    @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.commands.release_retry.detect_targets")

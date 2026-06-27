@@ -19,6 +19,7 @@ class TestUndoHappyPath(unittest.TestCase):
     @patch("rlsbl.commands.undo.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.undo.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.undo.check_gh_installed", return_value=True)
+    @patch("rlsbl.commands.undo.run_gh", return_value="")
     @patch("rlsbl.commands.undo.run")
     def test_full_undo_flow(self, mock_run, _gh_inst, _gh_auth, _clean,
                             mock_branch, mock_push, _ws_root):
@@ -73,6 +74,7 @@ class TestUndoMonorepo(unittest.TestCase):
     @patch("rlsbl.commands.undo.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.undo.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.undo.check_gh_installed", return_value=True)
+    @patch("rlsbl.commands.undo.run_gh", return_value="")
     @patch("rlsbl.commands.undo.run")
     def test_monorepo_finds_scoped_tag(self, mock_run, _gh_inst,
                                        _gh_auth, _clean, mock_branch,
@@ -113,6 +115,7 @@ class TestUndoMonorepo(unittest.TestCase):
     @patch("rlsbl.commands.undo.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.undo.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.undo.check_gh_installed", return_value=True)
+    @patch("rlsbl.commands.undo.run_gh", return_value="")
     @patch("rlsbl.commands.undo.run")
     def test_monorepo_skips_revert_on_mismatch(self, mock_run,
                                                 _gh_inst, _gh_auth, _clean,
@@ -158,6 +161,7 @@ class TestUndoMonorepo(unittest.TestCase):
     @patch("rlsbl.commands.undo.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.undo.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.undo.check_gh_installed", return_value=True)
+    @patch("rlsbl.commands.undo.run_gh", return_value="")
     @patch("rlsbl.commands.undo.run")
     def test_standalone_skips_revert_on_mismatch(self, mock_run, _gh_inst,
                                                   _gh_auth, _clean,
@@ -195,6 +199,7 @@ class TestUndoTwoCommitPattern(unittest.TestCase):
     @patch("rlsbl.commands.undo.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.undo.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.undo.check_gh_installed", return_value=True)
+    @patch("rlsbl.commands.undo.run_gh", return_value="")
     @patch("rlsbl.commands.undo.run")
     def test_undo_handles_finalize_commit_at_head(self, mock_run, _gh_inst,
                                                    _gh_auth, _clean,
@@ -266,6 +271,7 @@ class TestUndoReleaseFileRestore(unittest.TestCase):
     @patch("rlsbl.commands.undo.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.undo.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.undo.check_gh_installed", return_value=True)
+    @patch("rlsbl.commands.undo.run_gh", return_value="")
     @patch("rlsbl.commands.undo.run")
     def test_commits_restored_release_file(self, mock_run, _gh_inst,
                                            _gh_auth, _clean, mock_branch,
@@ -303,6 +309,7 @@ class TestUndoReleaseFileRestore(unittest.TestCase):
     @patch("rlsbl.commands.undo.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.undo.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.undo.check_gh_installed", return_value=True)
+    @patch("rlsbl.commands.undo.run_gh", return_value="")
     @patch("rlsbl.commands.undo.run")
     def test_no_commit_when_nothing_to_restore(self, mock_run, _gh_inst,
                                                _gh_auth, _clean, mock_branch,
@@ -336,6 +343,7 @@ class TestUndoNoGitHubRelease(unittest.TestCase):
     @patch("rlsbl.commands.undo.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.undo.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.undo.check_gh_installed", return_value=True)
+    @patch("rlsbl.commands.undo.run_gh", return_value="")
     @patch("rlsbl.commands.undo.run")
     def test_skips_delete_when_release_does_not_exist(self, mock_run, _gh_inst,
                                                        _gh_auth, _clean,

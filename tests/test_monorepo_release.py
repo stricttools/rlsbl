@@ -87,6 +87,7 @@ class TestMonorepoRelease:
         return proj_dir
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
+    @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
     @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
@@ -117,6 +118,7 @@ class TestMonorepoRelease:
         assert "Tag:" in output
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
+    @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
     @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
@@ -143,6 +145,7 @@ class TestMonorepoRelease:
         assert "Commit:" in output
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
+    @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
     @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
@@ -175,6 +178,7 @@ class TestMonorepoRelease:
         assert "tooling: release v1.0.1" in output
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
+    @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
     @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
@@ -198,6 +202,7 @@ class TestMonorepoRelease:
         output = mock_out.getvalue()
         assert "Project:   tooling (tooling)" in output
 
+    @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
     @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
@@ -237,6 +242,7 @@ class TestMonorepoRelease:
         assert exc_info.value.code == 1
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
+    @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
     @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
@@ -284,6 +290,7 @@ class TestMonorepoRelease:
         assert "Project:" not in output
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
+    @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
     @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
@@ -321,6 +328,7 @@ class TestMonorepoRelease:
         assert "Current version: 1.0.0" in output
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
+    @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
     @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
@@ -400,6 +408,7 @@ class TestSubtreePublish:
         return proj_dir
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
+    @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
     @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
@@ -430,6 +439,7 @@ class TestSubtreePublish:
         assert "v1.0.0" in output
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
+    @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
     @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
@@ -458,6 +468,7 @@ class TestSubtreePublish:
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
+    @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
     @patch("rlsbl.commands.release.is_clean_tree", return_value=True)

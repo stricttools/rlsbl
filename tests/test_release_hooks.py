@@ -59,6 +59,7 @@ class TestPreReleaseHookOutput:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -106,6 +107,7 @@ class TestPreReleaseHookOutput:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -168,6 +170,7 @@ class TestPreReleaseHookOutput:
         with (
             patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
             patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.run_gh", return_value=""),
             patch("rlsbl.commands.release.run") as mock_run,
             patch("rlsbl.commands.release.commit_files", return_value=True),
             patch("rlsbl.commands.release.get_current_branch", return_value="main"),
@@ -247,6 +250,7 @@ class TestPostReleaseHookOutput:
 
         with (
             patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
+            patch("rlsbl.commands.release.run_gh", return_value=""),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
             patch("rlsbl.commands.release.subprocess") as mock_sp,
         ):
@@ -329,6 +333,7 @@ class TestWatchSHABeforePostHook:
 
         with (
             patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
+            patch("rlsbl.commands.release.run_gh", return_value=""),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
             patch("rlsbl.commands.release.subprocess") as mock_sp,
         ):
@@ -365,6 +370,7 @@ class TestHookTimeout:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -416,6 +422,7 @@ class TestHookCwdStandalone:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -458,6 +465,7 @@ class TestHookCwdStandalone:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -544,6 +552,7 @@ class TestHookCwdStandalone:
 
         with (
             patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
+            patch("rlsbl.commands.release.run_gh", return_value=""),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
             patch("rlsbl.commands.release.subprocess") as mock_sp,
         ):
@@ -569,6 +578,7 @@ class TestHookCwdMonorepo:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -632,6 +642,7 @@ class TestHookCwdMonorepo:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -748,6 +759,7 @@ class TestHookCwdMonorepo:
 
         with (
             patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
+            patch("rlsbl.commands.release.run_gh", return_value=""),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
             patch("rlsbl.commands.release.subprocess") as mock_sp,
         ):
@@ -913,6 +925,7 @@ class TestHookGeneratedFiles:
             patch("rlsbl.commands.release.check_gh_installed", return_value=True),
             patch("rlsbl.commands.release.check_gh_auth", return_value=True),
             patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.run_gh", return_value=""),
             patch("rlsbl.commands.release.run", side_effect=_fake_run_intercepting_remote),
         ):
             run_cmd(_rc(), {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
@@ -957,6 +970,7 @@ class TestHookGeneratedFiles:
             patch("rlsbl.commands.release.check_gh_installed", return_value=True),
             patch("rlsbl.commands.release.check_gh_auth", return_value=True),
             patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.run_gh", return_value=""),
             patch("rlsbl.commands.release.run", side_effect=_fake_run_intercepting_remote),
         ):
             run_cmd(_rc(), {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
@@ -1030,6 +1044,7 @@ class TestHookGeneratedFiles:
             patch("rlsbl.commands.release.check_gh_installed", return_value=True),
             patch("rlsbl.commands.release.check_gh_auth", return_value=True),
             patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.run_gh", return_value=""),
             patch("rlsbl.commands.release.run", side_effect=_fake_run_intercepting_remote),
         ):
             run_cmd(_rc(), {"yes": True, "quiet": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
@@ -1090,6 +1105,7 @@ class TestHookGeneratedFiles:
             patch("rlsbl.commands.release.check_gh_installed", return_value=True),
             patch("rlsbl.commands.release.check_gh_auth", return_value=True),
             patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.run_gh", return_value=""),
             patch("rlsbl.commands.release.run", side_effect=_fake_run_intercepting_remote),
         ):
             run_cmd(
