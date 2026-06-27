@@ -260,9 +260,10 @@ class TestRePoll:
     @patch("rlsbl.commands.watch._watch_runs")
     @patch("rlsbl.commands.watch.poll_runs")
     @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.run_gh")
     @patch("rlsbl.commands.watch.run")
     def test_late_run_discovered_on_repoll(
-        self, mock_run, mock_time, mock_poll, mock_watch, mock_audit, mock_notify
+        self, mock_run, mock_run_gh, mock_time, mock_poll, mock_watch, mock_audit, mock_notify
     ):
         """A run that appears only on the re-poll (not initial discovery) is still watched."""
         ci_run = {"databaseId": 100, "name": "CI", "status": "in_progress"}
@@ -277,9 +278,9 @@ class TestRePoll:
 
         mock_run.side_effect = [
             "abc123full",  # git rev-parse
-            json.dumps({"nameWithOwner": "user/repo", "name": "repo"}),  # gh repo view
             "v1.0.0",  # git describe
         ]
+        mock_run_gh.return_value = json.dumps({"nameWithOwner": "user/repo", "name": "repo"})  # gh repo view
 
         mock_watch.side_effect = [
             [{"name": "CI", "passed": True}],       # initial watch
@@ -315,9 +316,10 @@ class TestRePoll:
     @patch("rlsbl.commands.watch._watch_runs")
     @patch("rlsbl.commands.watch.poll_runs")
     @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.run_gh")
     @patch("rlsbl.commands.watch.run")
     def test_no_late_runs_skips_second_watch(
-        self, mock_run, mock_time, mock_poll, mock_watch, mock_audit, mock_notify
+        self, mock_run, mock_run_gh, mock_time, mock_poll, mock_watch, mock_audit, mock_notify
     ):
         """When the re-poll finds no new runs, _watch_runs is called only once."""
         ci_run = {"databaseId": 100, "name": "CI", "status": "in_progress"}
@@ -330,9 +332,9 @@ class TestRePoll:
 
         mock_run.side_effect = [
             "abc123full",
-            json.dumps({"nameWithOwner": "user/repo", "name": "repo"}),
             "v1.0.0",
         ]
+        mock_run_gh.return_value = json.dumps({"nameWithOwner": "user/repo", "name": "repo"})
 
         mock_watch.return_value = [{"name": "CI", "passed": True}]
         mock_audit.return_value = False
