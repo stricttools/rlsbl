@@ -112,8 +112,10 @@ class TestNoWatchPrintsHint:
         "rlsbl.commands.release.validate_unreleased",
         return_value={"passed": True, "checks": {}},
     )
+    @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
     def test_no_watch_shows_hint_in_dry_run(
         self,
+        _vrt,
         _validate,
         _gen_cl,
         _gh_inst,
@@ -122,6 +124,7 @@ class TestNoWatchPrintsHint:
         _branch,
         _commit_files,
         mock_run,
+        _run_gh,
         _push,
         _remote_exists,
         tmp_project,
@@ -165,8 +168,10 @@ class TestWatchInvokesWatchCmd:
         "rlsbl.commands.release.validate_unreleased",
         return_value={"passed": True, "checks": {}},
     )
+    @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
     def test_watch_flag_in_dry_run(
         self,
+        _vrt,
         _validate,
         _gen_cl,
         _gh_inst,
@@ -175,6 +180,7 @@ class TestWatchInvokesWatchCmd:
         _branch,
         _commit_files,
         mock_run,
+        _run_gh,
         _push,
         _remote_exists,
         tmp_project,
@@ -220,8 +226,10 @@ class TestWatchInvokedAfterRelease:
     @patch("rlsbl.commands.release.should_tag", return_value=False)
     @patch("rlsbl.commands.release.upload_release_assets")
     @patch("rlsbl.app.run_checks", return_value=([], 0))
+    @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
     def test_watch_flag_invokes_watch_run_cmd(
         self,
+        _vrt,
         _run_checks,
         _upload,
         _tag,
@@ -238,6 +246,7 @@ class TestWatchInvokedAfterRelease:
         _commit_if,
         _commit_files,
         mock_run,
+        _run_gh,
         _push,
         _remote_exists,
         tmp_project,
@@ -260,7 +269,8 @@ class TestWatchInvokedAfterRelease:
         # status --porcelain (baseline), status --porcelain (re-check),
         # rev-parse HEAD (pre-release sha), status --porcelain (backfilled
         # .md detection), tag, push tag,
-        # rev-parse HEAD (pushed sha), gh release create
+        # rev-parse HEAD (pushed sha)
+        # (gh release create goes through run_gh, not run)
         mock_run.side_effect = [
             "",       # fetch
             "0",      # rev-list (not behind)
@@ -278,7 +288,6 @@ class TestWatchInvokedAfterRelease:
             "",       # git tag
             "",       # git push origin tag
             fake_sha, # rev-parse HEAD (pushed sha)
-            "",       # gh release create
         ]
 
         with patch("rlsbl.commands.release.acquire_lock"), \
@@ -316,8 +325,10 @@ class TestWatchInvokedAfterRelease:
     @patch("rlsbl.commands.release.should_tag", return_value=False)
     @patch("rlsbl.commands.release.upload_release_assets")
     @patch("rlsbl.app.run_checks", return_value=([], 0))
+    @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
     def test_no_watch_flag_prints_hint(
         self,
+        _vrt,
         _run_checks,
         _upload,
         _tag,
@@ -334,6 +345,7 @@ class TestWatchInvokedAfterRelease:
         _commit_if,
         _commit_files,
         mock_run,
+        _run_gh,
         _push,
         _remote_exists,
         tmp_project,
@@ -366,7 +378,6 @@ class TestWatchInvokedAfterRelease:
             "",       # git tag
             "",       # git push origin tag
             fake_sha, # rev-parse HEAD (pushed sha)
-            "",       # gh release create
         ]
 
         with patch("rlsbl.commands.release.acquire_lock"), \
