@@ -21,44 +21,38 @@ class TestUndoHappyPath(unittest.TestCase):
     @patch("rlsbl.commands.undo.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.undo.run_gh", return_value="")
     @patch("rlsbl.commands.undo.run")
-    def test_full_undo_flow(self, mock_run, _gh_inst, _gh_auth, _clean,
-                            mock_branch, mock_push, _ws_root):
+    def test_full_undo_flow(self, mock_run, mock_run_gh, _gh_inst, _gh_auth,
+                            _clean, mock_branch, mock_push, _ws_root):
         """Happy path: all steps succeed, exits cleanly with no exception."""
 
-        # Map each run() call to its expected return value.
-        # The undo command calls run() in this order:
-        #   1. git describe --tags --abbrev=0 --match v* -> tag name
-        #   2. gh release delete <tag> --yes -> success (return value ignored)
-        #   3. git push origin :<tag> -> success
-        #   4. git tag -d <tag> -> success
-        #   5. git log -1 --format=%s -> HEAD commit message (matches tag)
-        #   6. git revert --no-edit HEAD -> success
+        # run() handles git commands; run_gh() handles gh commands.
         mock_run.side_effect = [
             "v1.0.0",   # git describe --tags --abbrev=0 --match v*
-            "",         # gh release view v1.0.0
-            "",         # gh release delete v1.0.0 --yes
             "",         # git push origin :v1.0.0
             "",         # git tag -d v1.0.0
             "v1.0.0",  # git log -1 --format=%s
             "",         # git revert --no-edit HEAD
         ]
+        # run_gh handles: gh release view, gh release delete (return_value="" covers both)
 
         # Run with --yes to skip interactive prompts; suppress stdout
         with patch("sys.stdout", new_callable=StringIO):
             run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
 
-        # Verify all expected subprocess commands were issued
-        expected_calls = [
+        # Verify git subprocess commands were issued via run()
+        expected_run_calls = [
             call("git", ["describe", "--tags", "--abbrev=0", "--match", "v*"]),
-            call("gh", ["release", "view", "v1.0.0"], env=ANY),
-            call("gh", ["release", "delete", "v1.0.0", "--yes"], env=ANY),
             call("git", ["push", "origin", ":v1.0.0"], timeout=120, env=ANY),
             call("git", ["tag", "-d", "v1.0.0"]),
             call("git", ["log", "-1", "--format=%s"]),
             call("git", ["revert", "--no-edit", "HEAD"]),
         ]
-        mock_run.assert_has_calls(expected_calls, any_order=False)
-        self.assertEqual(mock_run.call_count, 7)
+        mock_run.assert_has_calls(expected_run_calls, any_order=False)
+        self.assertEqual(mock_run.call_count, 5)
+
+        # Verify gh commands went through run_gh
+        mock_run_gh.assert_any_call(["release", "view", "v1.0.0"], config={})
+        mock_run_gh.assert_any_call(["release", "delete", "v1.0.0", "--yes"], config={})
 
         # Verify push_if_needed was called with the current branch
         mock_push.assert_called_once_with("main", env=ANY, config={})
@@ -76,15 +70,14 @@ class TestUndoMonorepo(unittest.TestCase):
     @patch("rlsbl.commands.undo.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.undo.run_gh", return_value="")
     @patch("rlsbl.commands.undo.run")
-    def test_monorepo_finds_scoped_tag(self, mock_run, _gh_inst,
-                                       _gh_auth, _clean, mock_branch,
-                                       mock_push, _resolve, _ws_root):
+    def test_monorepo_finds_scoped_tag(self, mock_run, mock_run_gh,
+                                       _gh_inst, _gh_auth, _clean,
+                                       mock_branch, mock_push, _resolve,
+                                       _ws_root):
         """In monorepo mode, undo uses --match '<project>@v*' to find the tag."""
 
         mock_run.side_effect = [
             "mylib@v2.1.0",              # git describe --tags --abbrev=0 --match mylib@v*
-            "",                           # gh release view mylib@v2.1.0
-            "",                           # gh release delete mylib@v2.1.0 --yes
             "",                           # git push origin :mylib@v2.1.0
             "",                           # git tag -d mylib@v2.1.0
             "mylib: release v2.1.0",     # git log -1 --format=%s (matches expected)
@@ -95,17 +88,19 @@ class TestUndoMonorepo(unittest.TestCase):
             run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
 
         # Verify tag discovery uses project-scoped match pattern
-        expected_calls = [
+        expected_run_calls = [
             call("git", ["describe", "--tags", "--abbrev=0", "--match", "mylib@v*"]),
-            call("gh", ["release", "view", "mylib@v2.1.0"], env=ANY),
-            call("gh", ["release", "delete", "mylib@v2.1.0", "--yes"], env=ANY),
             call("git", ["push", "origin", ":mylib@v2.1.0"], timeout=120, env=ANY),
             call("git", ["tag", "-d", "mylib@v2.1.0"]),
             call("git", ["log", "-1", "--format=%s"]),
             call("git", ["revert", "--no-edit", "HEAD"]),
         ]
-        mock_run.assert_has_calls(expected_calls, any_order=False)
-        self.assertEqual(mock_run.call_count, 7)
+        mock_run.assert_has_calls(expected_run_calls, any_order=False)
+        self.assertEqual(mock_run.call_count, 5)
+
+        # Verify gh commands went through run_gh
+        mock_run_gh.assert_any_call(["release", "view", "mylib@v2.1.0"], config={})
+        mock_run_gh.assert_any_call(["release", "delete", "mylib@v2.1.0", "--yes"], config={})
         mock_push.assert_called_once_with("main", env=ANY, config={})
 
     @patch("rlsbl.commands.undo.find_workspace_root", return_value="/fake/monorepo")
@@ -117,7 +112,7 @@ class TestUndoMonorepo(unittest.TestCase):
     @patch("rlsbl.commands.undo.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.undo.run_gh", return_value="")
     @patch("rlsbl.commands.undo.run")
-    def test_monorepo_skips_revert_on_mismatch(self, mock_run,
+    def test_monorepo_skips_revert_on_mismatch(self, mock_run, _run_gh,
                                                 _gh_inst, _gh_auth, _clean,
                                                 mock_branch, mock_push,
                                                 _resolve, _ws_root):
@@ -125,8 +120,6 @@ class TestUndoMonorepo(unittest.TestCase):
 
         mock_run.side_effect = [
             "mylib@v2.1.0",        # git describe --tags --abbrev=0 --match mylib@v*
-            "",                     # gh release view mylib@v2.1.0
-            "",                     # gh release delete mylib@v2.1.0 --yes
             "",                     # git push origin :mylib@v2.1.0
             "",                     # git tag -d mylib@v2.1.0
             "some other commit",   # git log -1 --format=%s (does NOT match)
@@ -135,8 +128,8 @@ class TestUndoMonorepo(unittest.TestCase):
         with patch("sys.stdout", new_callable=StringIO):
             run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
 
-        # Only 6 calls: no revert issued
-        self.assertEqual(mock_run.call_count, 6)
+        # Only 4 git calls: no revert issued (gh calls go through run_gh)
+        self.assertEqual(mock_run.call_count, 4)
         mock_push.assert_not_called()
 
     @patch("rlsbl.commands.undo.find_workspace_root", return_value="/fake/monorepo")
@@ -163,16 +156,14 @@ class TestUndoMonorepo(unittest.TestCase):
     @patch("rlsbl.commands.undo.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.undo.run_gh", return_value="")
     @patch("rlsbl.commands.undo.run")
-    def test_standalone_skips_revert_on_mismatch(self, mock_run, _gh_inst,
-                                                  _gh_auth, _clean,
+    def test_standalone_skips_revert_on_mismatch(self, mock_run, _run_gh,
+                                                  _gh_inst, _gh_auth, _clean,
                                                   mock_branch, mock_push,
                                                   _ws_root):
         """In standalone mode, revert is skipped if HEAD doesn't match the tag."""
 
         mock_run.side_effect = [
             "v1.0.0",              # git describe --tags --abbrev=0 --match v*
-            "",                     # gh release view v1.0.0
-            "",                     # gh release delete v1.0.0 --yes
             "",                     # git push origin :v1.0.0
             "",                     # git tag -d v1.0.0
             "some other commit",   # git log -1 --format=%s (does NOT match)
@@ -181,8 +172,8 @@ class TestUndoMonorepo(unittest.TestCase):
         with patch("sys.stdout", new_callable=StringIO):
             run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
 
-        # Only 6 calls: no revert issued
-        self.assertEqual(mock_run.call_count, 6)
+        # Only 4 git calls: no revert issued (gh calls go through run_gh)
+        self.assertEqual(mock_run.call_count, 4)
         mock_push.assert_not_called()
 
 
@@ -201,8 +192,8 @@ class TestUndoTwoCommitPattern(unittest.TestCase):
     @patch("rlsbl.commands.undo.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.undo.run_gh", return_value="")
     @patch("rlsbl.commands.undo.run")
-    def test_undo_handles_finalize_commit_at_head(self, mock_run, _gh_inst,
-                                                   _gh_auth, _clean,
+    def test_undo_handles_finalize_commit_at_head(self, mock_run, _run_gh,
+                                                   _gh_inst, _gh_auth, _clean,
                                                    mock_branch, mock_push,
                                                    _ws_root, _changes_dir,
                                                    mock_unfinalize,
@@ -211,17 +202,8 @@ class TestUndoTwoCommitPattern(unittest.TestCase):
         and HEAD~1 is the version-bump commit (vX.Y.Z), undo should revert
         both commits and restore changelog state."""
 
-        # Scenario:
-        #   HEAD   -> "chore: finalize changelog for 1.0.0"  (finalize commit)
-        #   HEAD~1 -> "v1.0.0"                               (version-bump commit)
-        #   Tag v1.0.0 points at HEAD
-        #
-        # After undo, both commits should be reverted, and changelog should be restored.
-
         mock_run.side_effect = [
             "v1.0.0",                                      # git describe --tags --abbrev=0 --match v*
-            "",                                             # gh release view v1.0.0
-            "",                                             # gh release delete v1.0.0 --yes
             "",                                             # git push origin :v1.0.0
             "",                                             # git tag -d v1.0.0
             "chore: finalize changelog for 1.0.0",         # git log -1 --format=%s (HEAD — finalize commit)
@@ -235,12 +217,8 @@ class TestUndoTwoCommitPattern(unittest.TestCase):
         with patch("sys.stdout", new_callable=StringIO):
             run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
 
-        # Both the finalize commit and the version-bump commit should be reverted,
-        # then changelog restoration commits
-        expected_calls = [
+        expected_run_calls = [
             call("git", ["describe", "--tags", "--abbrev=0", "--match", "v*"]),
-            call("gh", ["release", "view", "v1.0.0"], env=ANY),
-            call("gh", ["release", "delete", "v1.0.0", "--yes"], env=ANY),
             call("git", ["push", "origin", ":v1.0.0"], timeout=120, env=ANY),
             call("git", ["tag", "-d", "v1.0.0"]),
             call("git", ["log", "-1", "--format=%s"]),
@@ -248,9 +226,9 @@ class TestUndoTwoCommitPattern(unittest.TestCase):
             call("git", ["log", "-1", "--format=%s"]),
             call("git", ["revert", "--no-edit", "HEAD"]),
         ]
-        mock_run.assert_has_calls(expected_calls, any_order=False)
-        # 9 original calls + 2 for changelog restoration (git add + git commit)
-        self.assertEqual(mock_run.call_count, 11)
+        mock_run.assert_has_calls(expected_run_calls, any_order=False)
+        # 7 git calls + 2 for changelog restoration (git add + git commit)
+        self.assertEqual(mock_run.call_count, 9)
 
         # Verify changelog restoration was called
         mock_unfinalize.assert_called_once_with("/fake/.rlsbl/changes", "1.0.0")
@@ -273,16 +251,14 @@ class TestUndoReleaseFileRestore(unittest.TestCase):
     @patch("rlsbl.commands.undo.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.undo.run_gh", return_value="")
     @patch("rlsbl.commands.undo.run")
-    def test_commits_restored_release_file(self, mock_run, _gh_inst,
-                                           _gh_auth, _clean, mock_branch,
-                                           mock_push, _ws_root,
+    def test_commits_restored_release_file(self, mock_run, _run_gh,
+                                           _gh_inst, _gh_auth, _clean,
+                                           mock_branch, mock_push, _ws_root,
                                            mock_unfinalize):
         """When unfinalize_release_file restores files, undo commits them."""
 
         mock_run.side_effect = [
             "v1.0.0",   # git describe --tags --abbrev=0 --match v*
-            "",         # gh release view v1.0.0
-            "",         # gh release delete v1.0.0 --yes
             "",         # git push origin :v1.0.0
             "",         # git tag -d v1.0.0
             "v1.0.0",   # git log -1 --format=%s (version-bump at HEAD)
@@ -300,7 +276,7 @@ class TestUndoReleaseFileRestore(unittest.TestCase):
             call("git", ["add", releases_dir]),
             call("git", ["commit", "-m", "chore: restore release file after undo of v1.0.0"]),
         ], any_order=False)
-        self.assertEqual(mock_run.call_count, 9)
+        self.assertEqual(mock_run.call_count, 7)
 
     @patch("rlsbl.commands.undo.unfinalize_release_file", return_value=[])
     @patch("rlsbl.commands.undo.find_workspace_root", return_value=None)
@@ -311,16 +287,14 @@ class TestUndoReleaseFileRestore(unittest.TestCase):
     @patch("rlsbl.commands.undo.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.undo.run_gh", return_value="")
     @patch("rlsbl.commands.undo.run")
-    def test_no_commit_when_nothing_to_restore(self, mock_run, _gh_inst,
-                                               _gh_auth, _clean, mock_branch,
-                                               mock_push, _ws_root,
-                                               mock_unfinalize):
+    def test_no_commit_when_nothing_to_restore(self, mock_run, _run_gh,
+                                               _gh_inst, _gh_auth, _clean,
+                                               mock_branch, mock_push,
+                                               _ws_root, mock_unfinalize):
         """When the release file needs no repair, no extra commit is made."""
 
         mock_run.side_effect = [
             "v1.0.0",   # git describe --tags --abbrev=0 --match v*
-            "",         # gh release view v1.0.0
-            "",         # gh release delete v1.0.0 --yes
             "",         # git push origin :v1.0.0
             "",         # git tag -d v1.0.0
             "v1.0.0",   # git log -1 --format=%s
@@ -331,7 +305,7 @@ class TestUndoReleaseFileRestore(unittest.TestCase):
             run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
 
         mock_unfinalize.assert_called_once()
-        self.assertEqual(mock_run.call_count, 7)
+        self.assertEqual(mock_run.call_count, 5)
 
 
 class TestUndoNoGitHubRelease(unittest.TestCase):
@@ -345,7 +319,8 @@ class TestUndoNoGitHubRelease(unittest.TestCase):
     @patch("rlsbl.commands.undo.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.undo.run_gh", return_value="")
     @patch("rlsbl.commands.undo.run")
-    def test_skips_delete_when_release_does_not_exist(self, mock_run, _gh_inst,
+    def test_skips_delete_when_release_does_not_exist(self, mock_run,
+                                                       mock_run_gh, _gh_inst,
                                                        _gh_auth, _clean,
                                                        mock_branch, mock_push,
                                                        _ws_root):
@@ -353,14 +328,16 @@ class TestUndoNoGitHubRelease(unittest.TestCase):
         and the rest of undo proceeds normally."""
         import subprocess as sp
 
-        # gh release view fails (release doesn't exist), but everything else works
+        # run_gh raises on gh release view (release doesn't exist)
+        mock_run_gh.side_effect = sp.CalledProcessError(1, "gh release view")
+
+        # git commands only (gh calls go through run_gh)
         mock_run.side_effect = [
-            "v1.0.0",                                      # git describe --tags --abbrev=0 --match v*
-            sp.CalledProcessError(1, "gh release view"),    # gh release view v1.0.0 -> FAILS
-            "",                                             # git push origin :v1.0.0
-            "",                                             # git tag -d v1.0.0
-            "v1.0.0",                                       # git log -1 --format=%s
-            "",                                             # git revert --no-edit HEAD
+            "v1.0.0",   # git describe --tags --abbrev=0 --match v*
+            "",          # git push origin :v1.0.0
+            "",          # git tag -d v1.0.0
+            "v1.0.0",   # git log -1 --format=%s
+            "",          # git revert --no-edit HEAD
         ]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
@@ -368,23 +345,22 @@ class TestUndoNoGitHubRelease(unittest.TestCase):
 
         output = mock_stdout.getvalue()
 
-        # The step should be SKIPPED, not FAILED, so the summary table
-        # should NOT be printed (summary only prints on failure)
+        # The step should be SKIPPED, not FAILED
         assert "FAILED" not in output, f"Expected no FAILED steps, got:\n{output}"
 
-        # Verify the call order: view (failed), then skip delete, continue with rest
-        expected_calls = [
+        # Verify git commands via run()
+        expected_run_calls = [
             call("git", ["describe", "--tags", "--abbrev=0", "--match", "v*"]),
-            call("gh", ["release", "view", "v1.0.0"], env=ANY),
-            # No "gh release delete" call since view failed
             call("git", ["push", "origin", ":v1.0.0"], timeout=120, env=ANY),
             call("git", ["tag", "-d", "v1.0.0"]),
             call("git", ["log", "-1", "--format=%s"]),
             call("git", ["revert", "--no-edit", "HEAD"]),
         ]
-        mock_run.assert_has_calls(expected_calls, any_order=False)
-        # 6 calls total (no gh release delete)
-        self.assertEqual(mock_run.call_count, 6)
+        mock_run.assert_has_calls(expected_run_calls, any_order=False)
+        self.assertEqual(mock_run.call_count, 5)
+
+        # run_gh was called once for view, which failed (no delete follows)
+        self.assertEqual(mock_run_gh.call_count, 1)
 
         # Push should still happen (undo completed successfully)
         mock_push.assert_called_once_with("main", env=ANY, config={})
