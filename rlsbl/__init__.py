@@ -221,7 +221,9 @@ release_group = app.group("release", help="Release orchestration commands. Provi
     ],
 )
 @strictcli.flag(name="allow-dirty", type=bool, help="Skip the clean working tree check and allow releasing with uncommitted changes")
-def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, no_watch, **_kwargs):
+@strictcli.flag(name="bump", type=str, help="Bump type: patch, minor, major, hotfix. Skips the release file.", default="")
+@strictcli.flag(name="description", type=str, help="Release description (required with --bump)", default="")
+def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, no_watch, bump, description, **_kwargs):
     root = _require_sub_project_root()
 
     from .release_file import read_release_file, get_release_file_path
