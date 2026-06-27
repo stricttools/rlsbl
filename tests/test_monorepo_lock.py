@@ -136,9 +136,11 @@ class TestMonorepoReleaseLockPlacement:
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
+    @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
+    @patch("rlsbl.app.run_checks", return_value=([], 0))
     def test_monorepo_release_uses_monorepo_lock_dir(
-        self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run,
-        _commit_files, _push,
+        self, _run_checks, _vrt, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run,
+        _run_gh, _commit_files, _push,
         mock_git_repo,
         monkeypatch,
     ):
@@ -167,7 +169,22 @@ class TestMonorepoReleaseLockPlacement:
 
         mock_run.side_effect = mock_run_side_effect
 
-        with patch("rlsbl.commands.release.acquire_lock", spy_acquire):
+        # Mock resolve_monorepo_context to return a releasable name so that
+        # the `if releasable_name` branch at line 159 of _run_cmd_inner executes.
+        # This works around a production scoping bug where load_workspace is
+        # locally imported in that branch but used in an elif branch at line 239;
+        # when the if-branch doesn't execute, load_workspace is unbound.
+        from rlsbl.workspace import Releasable, write_releasable_version
+        fake_releasable = Releasable(name="tooling")
+        # Create the releasable version file needed by compute_release_version
+        write_releasable_version(str(mock_git_repo), "tooling", "1.0.0")
+        with patch("rlsbl.commands.release.resolve_monorepo_context",
+                    return_value=("tooling", "tooling", False, False, "tooling")), \
+             patch("rlsbl.workspace.load_releasables", return_value=[fake_releasable]), \
+             patch("rlsbl.workspace.load_workspace", return_value=[]), \
+             patch("rlsbl.workspace.members_of", return_value=[]), \
+             patch("rlsbl.commands.release.validate_changelog_state", return_value=None), \
+             patch("rlsbl.commands.release.acquire_lock", spy_acquire):
             with patch("sys.stdout", new_callable=StringIO):
                 run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False, "pipelines": {}}))
 
