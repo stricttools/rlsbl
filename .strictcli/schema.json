@@ -48,7 +48,7 @@
   },
   "project_id": "rlsbl",
   "name": "rlsbl",
-  "version": "0.88.1",
+  "version": "0.89.0",
   "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 32 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
   "global_flags": [
     {
@@ -388,6 +388,18 @@
               "help": "Skip the clean working tree check and allow releasing with uncommitted changes",
               "default": false,
               "negatable": true
+            },
+            {
+              "name": "bump",
+              "type": "str",
+              "help": "Bump type: patch, minor, major, hotfix. Skips the release file.",
+              "default": ""
+            },
+            {
+              "name": "description",
+              "type": "str",
+              "help": "Release description (required with --bump)",
+              "default": ""
             },
             {
               "name": "watch",
@@ -1279,7 +1291,8 @@
     },
     "changelog-hashes": {
       "tags": [
-        "changelog"
+        "changelog",
+        "preflight-changelog"
       ],
       "severity": "error",
       "fast": true,
@@ -1289,7 +1302,8 @@
     },
     "changelog-range": {
       "tags": [
-        "changelog"
+        "changelog",
+        "preflight-changelog"
       ],
       "severity": "error",
       "fast": true,
@@ -1301,7 +1315,8 @@
     },
     "changelog-coverage": {
       "tags": [
-        "changelog"
+        "changelog",
+        "preflight-changelog"
       ],
       "severity": "error",
       "fast": true,
@@ -1313,7 +1328,8 @@
     },
     "changelog-orphans": {
       "tags": [
-        "changelog"
+        "changelog",
+        "preflight-changelog"
       ],
       "severity": "error",
       "fast": true,
@@ -1323,7 +1339,8 @@
     },
     "changelog-schema": {
       "tags": [
-        "changelog"
+        "changelog",
+        "preflight-changelog"
       ],
       "severity": "error",
       "fast": true,
@@ -1333,7 +1350,8 @@
     },
     "changelog-user-facing": {
       "tags": [
-        "changelog"
+        "changelog",
+        "preflight-changelog"
       ],
       "severity": "warn",
       "fast": true,
@@ -1343,7 +1361,8 @@
     },
     "changelog-batch-commits": {
       "tags": [
-        "changelog"
+        "changelog",
+        "preflight-changelog"
       ],
       "severity": "error",
       "fast": true,
@@ -1353,7 +1372,8 @@
     },
     "changelog-batch-entries": {
       "tags": [
-        "changelog"
+        "changelog",
+        "preflight-changelog"
       ],
       "severity": "error",
       "fast": true,

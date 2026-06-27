@@ -2,6 +2,37 @@
 
 # Changelog
 
+## 0.90.0
+
+Quick bump shortcut, run_gh centralization, changelog preflight unification
+
+<details>
+<summary>Context</summary>
+
+Three major improvements in this release:
+
+1. Quick bump shortcut: `rlsbl release run --bump patch --description "Fix X"` allows simple releases without creating a release file first. The release file ceremony remains available for complex releases.
+
+2. run_gh centralization: All 33 repo-scoped `gh` CLI invocations now go through a single `run_gh()` function, replacing the old `gh_env()` pattern. This provides a cleaner API with consistent error handling and environment setup.
+
+3. Changelog preflight unification: Changelog validation is now unified into the preflight check system via `app.run_checks(tag_expr="preflight-changelog")`, eliminating duplicate validation logic between the release flow and the check system.
+
+Also includes fixes for `get_push_timeout` crashing with `config=None`, `uv.lock` tracking, and a `load_workspace` scoping bug.
+
+</details>
+
+### Features
+
+- **New: `run_gh()` centralized GitHub CLI wrapper.** All 33 repo-scoped `gh` invocations now go through `run_gh()`, replacing the old `gh_env()` pattern with a cleaner API.
+- **New: Changelog validation unified into preflight check system.** `app.run_checks(tag_expr="preflight-changelog")` eliminates duplicate validation between release flow and check system.
+- **New: Quick bump shortcut.** `rlsbl release run --bump patch --description "Fix X"` bypasses the release file ceremony for simple releases.
+
+### Fixes
+
+- **Fix:** `get_push_timeout` no longer crashes when `config=None`.
+- **Fix:** `uv.lock` is now tracked in git (was incorrectly gitignored).
+- **Fix:** `load_workspace` scoping bug in release flow — local imports no longer shadow module-level import.
+
 ## 0.89.0
 
 Preflight check integration and unreachable-code false positive fix
