@@ -157,7 +157,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     member_package_paths = None
     member_projs = None
     if releasable_name and monorepo_root:
-        from ...workspace import load_releasables, load_workspace, members_of
+        from ...workspace import load_releasables, members_of
         ws_projects = load_workspace(monorepo_root)
         releasables = load_releasables(monorepo_root, ws_projects)
         releasable_obj = next((r for r in releasables if r.name == releasable_name), None)
@@ -342,7 +342,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     if _use_releasable_hooks:
         # Build (name, dir) tuples for member packages
         _member_tuples = []
-        from ...workspace import load_workspace, members_of, get_releasable_dir
+        from ...workspace import members_of, get_releasable_dir
         _ws_projects = load_workspace(str(monorepo_root))
         _member_projs = members_of(releasable_name, _ws_projects)
         for mp in _member_projs:
