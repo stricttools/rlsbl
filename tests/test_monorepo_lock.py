@@ -141,7 +141,8 @@ class TestMonorepoReleaseLockPlacement:
         _commit_files, _push,
         mock_git_repo,
         monkeypatch,
-    ):
+    , _run_gh):
+
         """Monorepo release puts lock in .rlsbl-monorepo/, not .rlsbl/ at repo root."""
         from rlsbl.commands.release import run_cmd
 

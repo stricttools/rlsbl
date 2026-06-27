@@ -22,7 +22,8 @@ class TestUndoHappyPath(unittest.TestCase):
     @patch("rlsbl.commands.undo.run_gh", return_value="")
     @patch("rlsbl.commands.undo.run")
     def test_full_undo_flow(self, mock_run, _gh_inst, _gh_auth, _clean,
-                            mock_branch, mock_push, _ws_root):
+                            mock_branch, mock_push, _ws_root, _run_gh):
+
         """Happy path: all steps succeed, exits cleanly with no exception."""
 
         # Map each run() call to its expected return value.
@@ -78,7 +79,8 @@ class TestUndoMonorepo(unittest.TestCase):
     @patch("rlsbl.commands.undo.run")
     def test_monorepo_finds_scoped_tag(self, mock_run, _gh_inst,
                                        _gh_auth, _clean, mock_branch,
-                                       mock_push, _resolve, _ws_root):
+                                       mock_push, _resolve, _ws_root, _run_gh):
+
         """In monorepo mode, undo uses --match '<project>@v*' to find the tag."""
 
         mock_run.side_effect = [
@@ -120,7 +122,8 @@ class TestUndoMonorepo(unittest.TestCase):
     def test_monorepo_skips_revert_on_mismatch(self, mock_run,
                                                 _gh_inst, _gh_auth, _clean,
                                                 mock_branch, mock_push,
-                                                _resolve, _ws_root):
+                                                _resolve, _ws_root, _run_gh):
+
         """In monorepo mode, revert is skipped if HEAD doesn't match the expected commit message format."""
 
         mock_run.side_effect = [
@@ -166,7 +169,8 @@ class TestUndoMonorepo(unittest.TestCase):
     def test_standalone_skips_revert_on_mismatch(self, mock_run, _gh_inst,
                                                   _gh_auth, _clean,
                                                   mock_branch, mock_push,
-                                                  _ws_root):
+                                                  _ws_root, _run_gh):
+
         """In standalone mode, revert is skipped if HEAD doesn't match the tag."""
 
         mock_run.side_effect = [
@@ -206,7 +210,8 @@ class TestUndoTwoCommitPattern(unittest.TestCase):
                                                    mock_branch, mock_push,
                                                    _ws_root, _changes_dir,
                                                    mock_unfinalize,
-                                                   mock_generate):
+                                                   mock_generate, _run_gh):
+
         """When HEAD is a finalize commit (chore: finalize changelog for X.Y.Z)
         and HEAD~1 is the version-bump commit (vX.Y.Z), undo should revert
         both commits and restore changelog state."""
@@ -276,7 +281,8 @@ class TestUndoReleaseFileRestore(unittest.TestCase):
     def test_commits_restored_release_file(self, mock_run, _gh_inst,
                                            _gh_auth, _clean, mock_branch,
                                            mock_push, _ws_root,
-                                           mock_unfinalize):
+                                           mock_unfinalize, _run_gh):
+
         """When unfinalize_release_file restores files, undo commits them."""
 
         mock_run.side_effect = [
@@ -314,7 +320,8 @@ class TestUndoReleaseFileRestore(unittest.TestCase):
     def test_no_commit_when_nothing_to_restore(self, mock_run, _gh_inst,
                                                _gh_auth, _clean, mock_branch,
                                                mock_push, _ws_root,
-                                               mock_unfinalize):
+                                               mock_unfinalize, _run_gh):
+
         """When the release file needs no repair, no extra commit is made."""
 
         mock_run.side_effect = [
@@ -348,7 +355,8 @@ class TestUndoNoGitHubRelease(unittest.TestCase):
     def test_skips_delete_when_release_does_not_exist(self, mock_run, _gh_inst,
                                                        _gh_auth, _clean,
                                                        mock_branch, mock_push,
-                                                       _ws_root):
+                                                       _ws_root, _run_gh):
+
         """When gh release view fails, the step is SKIPPED (not FAILED)
         and the rest of undo proceeds normally."""
         import subprocess as sp

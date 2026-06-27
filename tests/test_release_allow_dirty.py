@@ -67,7 +67,8 @@ class TestReleaseAllowDirty:
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_allow_dirty_skips_clean_tree_check(self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean,
                                                  _branch, _commit_files, mock_run, _push,
-                                                 _remote_exists):
+                                                 _remote_exists, _run_gh):
+
         """With --allow-dirty, a dirty tree should not block the release (dry-run)."""
         from rlsbl.commands.release import run_cmd
 
@@ -114,7 +115,8 @@ class TestReleaseAllowDirty:
                                                      _deploy, _tag, _gh_inst,
                                                      _gh_auth, _clean, _branch,
                                                      _commit_files, mock_run, _push,
-                                                     _lock, _unlock, _remote_exists):
+                                                     _lock, _unlock, _remote_exists, _run_gh):
+
         """With --allow-dirty (non-dry-run), pre-existing dirty files pass the re-check guard."""
         from rlsbl.commands.release import run_cmd
 
@@ -182,7 +184,8 @@ class TestReleaseAllowDirty:
                                                              _clean, _branch,
                                                              _commit_files, mock_run,
                                                              _push, _lock, _unlock,
-                                                             _remote_exists):
+                                                             _remote_exists, _run_gh):
+
         """With --allow-dirty, genuinely new unexpected files still abort the release."""
         from rlsbl.commands.release import run_cmd
 

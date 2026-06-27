@@ -105,7 +105,8 @@ class TestPrivateConfigRequired:
     def test_release_proceeds_when_private_true_no_local_pipeline(
         self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch,
         _commit_files, mock_run, _push, _remote_exists, capsys,
-    ):
+    , _run_gh):
+
         """Release does not abort when private=true and no local pipeline config."""
         _write_config(self.tmp_dir, {"private": True, "targets": ["npm"], "pipelines": {}})
 
@@ -130,7 +131,8 @@ class TestPrivateConfigRequired:
     def test_release_proceeds_when_private_false(
         self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch,
         _commit_files, mock_run, _push, _remote_exists, capsys,
-    ):
+    , _run_gh):
+
         """Release does not abort when private=false (normal public repo)."""
         _write_config(self.tmp_dir, {"private": False, "targets": ["npm"], "pipelines": {}})
 
@@ -184,7 +186,8 @@ class TestPrivatePublishGuardrail:
         _validate, _gen_cl, _deploy, _tag, _gh_inst, _gh_auth,
         _clean, _branch, _commit_files, mock_run, _push, _lock, _unlock,
         _remote_exists, capsys,
-    ):
+    , _run_gh):
+
         """When private=true, pipeline.publish() is not called."""
         _write_config(self.tmp_dir, {"private": True, "targets": ["npm"], "pipelines": {"npm": {"type": "npm", "local": False}}})
 
@@ -243,7 +246,8 @@ class TestPrivatePublishGuardrail:
         _validate, _gen_cl, _deploy, _tag, _gh_inst, _gh_auth,
         _clean, _branch, _commit_files, mock_run, _push, _lock, _unlock,
         _remote_exists, capsys,
-    ):
+    , _run_gh):
+
         """When private=true with assets: true, asset upload still runs."""
         _write_config(self.tmp_dir, {
             "private": True,

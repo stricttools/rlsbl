@@ -63,7 +63,8 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
     def test_happy_path_with_retry_config(self, _gh_inst, _gh_auth, _ws_root,
                                            mock_targets_dict, mock_detect,
-                                           _exists, mock_run, mock_cleanup):
+                                           _exists, mock_run, mock_cleanup, _run_gh):
+
         """Happy path: dispatch workflows, verify release exists, watch hint."""
         target = self._make_mock_target("0.41.7")
         entry = self._make_mock_entry()
@@ -105,7 +106,8 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
     def test_retry_config_uses_dispatch_and_ref(self, _gh_inst, _gh_auth, _ws_root,
                                                   mock_targets_dict, mock_detect,
-                                                  _exists, mock_run, mock_cleanup):
+                                                  _exists, mock_run, mock_cleanup, _run_gh):
+
         """RetryConfig dispatch and ref fields are used for workflow dispatch."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
@@ -145,7 +147,8 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
     def test_all_workflows_dispatched_unconditionally(self, _gh_inst, _gh_auth, _ws_root,
                                                        mock_targets_dict, mock_detect,
-                                                       _exists, mock_run, mock_cleanup):
+                                                       _exists, mock_run, mock_cleanup, _run_gh):
+
         """All workflows in dispatch list are dispatched unconditionally."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
@@ -184,7 +187,8 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
     def test_no_github_release_exits_error(self, _gh_inst, _gh_auth, _ws_root,
                                             mock_targets_dict, mock_detect,
-                                            _exists, mock_run):
+                                            _exists, mock_run, _run_gh):
+
         """No GitHub Release exists for the tag -- exits with error."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
@@ -213,7 +217,8 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
     def test_dry_run_prints_plan_no_mutations(self, _gh_inst, _gh_auth, _ws_root,
                                                mock_targets_dict, mock_detect,
-                                               _exists, mock_run):
+                                               _exists, mock_run, _run_gh):
+
         """--dry-run prints what would dispatch without actually dispatching."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
@@ -249,7 +254,8 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
     def test_yes_skips_confirmation(self, _gh_inst, _gh_auth, _ws_root,
                                      mock_targets_dict, mock_detect,
-                                     _exists, mock_run, mock_cleanup):
+                                     _exists, mock_run, mock_cleanup, _run_gh):
+
         """--yes flag skips the interactive confirmation prompt."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
@@ -284,7 +290,8 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
     def test_monorepo_tag_format(self, _gh_inst, _gh_auth, _ws_root,
                                   mock_resolve, mock_targets_dict, mock_detect,
-                                  _exists, mock_run, mock_cleanup):
+                                  _exists, mock_run, mock_cleanup, _run_gh):
+
         """In monorepo context, uses monorepo_tag_format for the tag and dispatch ref."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
@@ -336,7 +343,8 @@ class TestReleaseRetry(unittest.TestCase):
                                              mock_targets_dict, mock_detect,
                                              _exists, mock_run, mock_cleanup,
                                              project_root=".",
-):
+, _run_gh):
+
         """--watch flag calls watch.run_cmd after dispatch instead of printing a hint.
 
         When no run IDs are captured (dispatch returns no URL, fallback polling
@@ -376,7 +384,8 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
     def test_confirmation_prompt_abort(self, _gh_inst, _gh_auth, _ws_root,
                                         mock_targets_dict, mock_detect,
-                                        _exists, mock_run):
+                                        _exists, mock_run, _run_gh):
+
         """User says 'n' at 'Will dispatch' prompt -- aborts without dispatching."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
@@ -434,7 +443,8 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
     def test_auto_scaffold_when_no_retry_file(self, _gh_inst, _gh_auth, _ws_root,
                                                 mock_targets_dict, mock_detect,
-                                                _exists, mock_run, mock_cleanup):
+                                                _exists, mock_run, mock_cleanup, _run_gh):
+
         """When retry_config is None and retry.toml doesn't exist, auto-scaffolds then exits
         because ref is empty and must be set by the user."""
         target = self._make_mock_target("0.41.7")
@@ -474,7 +484,8 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
     def test_auto_scaffold_cleans_up_file_on_validation_error(self, _gh_inst, _gh_auth, _ws_root,
                                                                 mock_targets_dict, mock_detect,
-                                                                _exists, mock_run):
+                                                                _exists, mock_run, _run_gh):
+
         """When auto-scaffold fails validation (empty ref), retry.toml is deleted and
         error message suggests `rlsbl release run`."""
         import tempfile
@@ -530,7 +541,8 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
     def test_existing_invalid_retry_toml_cleaned_up(self, _gh_inst, _gh_auth, _ws_root,
                                                      mock_targets_dict, mock_detect,
-                                                     mock_run):
+                                                     mock_run, _run_gh):
+
         """When retry_config is None but retry.toml exists with invalid content,
         run_cmd deletes the file and shows the hint message."""
         import tempfile
@@ -615,7 +627,8 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
     def test_retry_file_deleted_after_success(self, _gh_inst, _gh_auth, _ws_root,
                                                 mock_targets_dict, mock_detect,
-                                                _exists, mock_run, mock_cleanup):
+                                                _exists, mock_run, mock_cleanup, _run_gh):
+
         """retry.toml is deleted via saferm after successful retry."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
@@ -820,7 +833,8 @@ class TestRunIdCapture(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
     def test_run_id_captured_from_dispatch_url(self, _gh_inst, _gh_auth, _ws_root,
                                                 mock_targets_dict, mock_detect,
-                                                _exists, mock_run, mock_cleanup):
+                                                _exists, mock_run, mock_cleanup, _run_gh):
+
         """When gh workflow run returns a URL with a run ID, it is captured."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
@@ -857,7 +871,8 @@ class TestRunIdCapture(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
     def test_fallback_polling_when_no_url(self, _gh_inst, _gh_auth, _ws_root,
                                            mock_targets_dict, mock_detect,
-                                           _exists, mock_run, mock_cleanup):
+                                           _exists, mock_run, mock_cleanup, _run_gh):
+
         """When gh workflow run returns no URL, falls back to polling gh run list."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
@@ -897,7 +912,8 @@ class TestRunIdCapture(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
     def test_sha_fallback_when_no_run_ids(self, _gh_inst, _gh_auth, _ws_root,
                                             mock_targets_dict, mock_detect,
-                                            _exists, mock_run, mock_cleanup):
+                                            _exists, mock_run, mock_cleanup, _run_gh):
+
         """When no run IDs are captured (dispatch returns nothing, polling fails), falls back to SHA-based watching."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
@@ -942,7 +958,8 @@ class TestRunIdCapture(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
     def test_hint_output_with_run_ids(self, _gh_inst, _gh_auth, _ws_root,
                                        mock_targets_dict, mock_detect,
-                                       _exists, mock_run, mock_cleanup):
+                                       _exists, mock_run, mock_cleanup, _run_gh):
+
         """When not watching and run IDs are captured, hint includes --run-id flags."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
@@ -983,7 +1000,8 @@ class TestRunIdCapture(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
     def test_hint_output_sha_fallback(self, _gh_inst, _gh_auth, _ws_root,
                                        mock_targets_dict, mock_detect,
-                                       _exists, mock_run, mock_cleanup):
+                                       _exists, mock_run, mock_cleanup, _run_gh):
+
         """When not watching and no run IDs captured, hint shows SHA."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
@@ -1024,7 +1042,8 @@ class TestRunIdCapture(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
     def test_multiple_workflows_collect_multiple_run_ids(self, _gh_inst, _gh_auth, _ws_root,
                                                           mock_targets_dict, mock_detect,
-                                                          _exists, mock_run, mock_cleanup):
+                                                          _exists, mock_run, mock_cleanup, _run_gh):
+
         """Multiple dispatched workflows each return a run ID -- all are collected."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()

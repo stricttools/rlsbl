@@ -81,7 +81,8 @@ class TestPreReleaseHookOutput:
         _push,
         _remote_exists,
         tmp_project,
-    ):
+    , _run_gh):
+
         """A successful hook is called via subprocess.run without capture_output."""
         _setup_project(tmp_project, "pre-release.sh", "#!/bin/bash\necho hello\n")
         # mock_run side effects: fetch, rev-list, tag -l current, tag -l bumped
@@ -132,7 +133,8 @@ class TestPreReleaseHookOutput:
         _remote_exists,
         tmp_project,
         capsys,
-    ):
+    , _run_gh):
+
         """A hook exiting with code 2 produces an error mentioning 'exited with code 2'."""
         _setup_project(tmp_project, "pre-release.sh", "#!/bin/bash\nexit 2\n")
         mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", ""]
@@ -396,7 +398,8 @@ class TestHookTimeout:
         tmp_project,
         monkeypatch,
         capsys,
-    ):
+    , _run_gh):
+
         """When a pre-release hook times out, the error message includes the configured seconds."""
         monkeypatch.setenv("RLSBL_HOOK_TIMEOUT", "45")
         _setup_project(tmp_project, "pre-release.sh", "#!/bin/bash\nsleep 999\n")
@@ -444,7 +447,8 @@ class TestHookCwdStandalone:
         _push,
         _remote_exists,
         tmp_project,
-    ):
+    , _run_gh):
+
         """In standalone mode, pre-checks hook subprocess.run gets cwd=project_dir."""
         _setup_project(tmp_project, "pre-checks.sh", "#!/bin/bash\necho ok\n")
         mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
@@ -487,7 +491,8 @@ class TestHookCwdStandalone:
         _push,
         _remote_exists,
         tmp_project,
-    ):
+    , _run_gh):
+
         """In standalone mode, pre-release hook subprocess.run gets cwd=project_dir."""
         _setup_project(tmp_project, "pre-release.sh", "#!/bin/bash\necho ok\n")
         mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
@@ -601,7 +606,8 @@ class TestHookCwdMonorepo:
         _remote_exists,
         monorepo_fixture,
         monkeypatch,
-    ):
+    , _run_gh):
+
         """In monorepo mode, pre-checks hook subprocess.run gets cwd=project_dir."""
         ns = monorepo_fixture
         # Create pre-checks hook in the python subproject
@@ -665,7 +671,8 @@ class TestHookCwdMonorepo:
         _remote_exists,
         monorepo_fixture,
         monkeypatch,
-    ):
+    , _run_gh):
+
         """In monorepo mode, pre-release hook subprocess.run gets cwd=project_dir."""
         ns = monorepo_fixture
         hooks_dir = ns.python_dir / ".rlsbl" / "hooks"
