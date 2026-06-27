@@ -20,6 +20,8 @@ Bump version, validate the JSONL changelog, run tests and lint, commit, tag, pus
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--allow-dirty` |  | bool |  |  | Skip the clean working tree check and allow releasing with uncommitted changes |
+| `--bump` |  | str |  |  | Bump type: patch, minor, major, hotfix. Skips the release file. |
+| `--description` |  | str |  |  | Release description (required with --bump) |
 | `--watch` |  | bool |  |  | After release, automatically watch CI runs to completion |
 | `--no-watch` |  | bool |  |  | After release, print the watch command hint without watching |
 
