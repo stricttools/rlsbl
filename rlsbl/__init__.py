@@ -226,7 +226,7 @@ release_group = app.group("release", help="Release orchestration commands. Provi
 def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, no_watch, bump, description, **_kwargs):
     root = _require_sub_project_root()
 
-    from .release_file import read_release_file, get_release_file_path
+    from .release_file import read_release_file, get_release_file_path, ReleaseConfig, VALID_BUMP_TYPES
     from .workspace import find_workspace_root, resolve_project
 
     # In monorepo mode, the release file lives in the package's directory
@@ -245,6 +245,60 @@ def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, no_watch, bump, des
             sys.exit(1)
         project_dir = os.path.join(monorepo_root, project["path"])
 
+    # --- Quick bump mode: --bump + --description bypass the release file ---
+    if bump and not description:
+        print("Error: --description is required when --bump is used", file=sys.stderr)
+        sys.exit(1)
+    if description and not bump:
+        print("Error: --bump is required when --description is used", file=sys.stderr)
+        sys.exit(1)
+    if bump and description:
+        if bump not in VALID_BUMP_TYPES:
+            print(
+                f"Error: invalid bump type {bump!r} (must be one of {VALID_BUMP_TYPES})",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        release_path = get_release_file_path(project_dir)
+        if os.path.exists(release_path):
+            print(
+                "Error: release file exists — use `rlsbl release run` without --bump, "
+                "or delete the file first.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        from .targets import detect_targets
+        from .errors import ConfigError
+        try:
+            targets = detect_targets(project_dir)
+        except ConfigError:
+            print(
+                "Error: cannot auto-detect targets — use `rlsbl release init` "
+                "for projects with custom target config",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        target_names = [t.name for t in targets]
+        if "flutter" in target_names:
+            print(
+                "Error: Flutter projects require a release file for the mode "
+                "setting — use `rlsbl release init`",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        release_config = ReleaseConfig(
+            bump=bump,
+            include=target_names,
+            exclude=[],
+            description=description,
+        )
+        from .commands.release.shared import build_release_flags
+        flags = build_release_flags(dry_run, yes, quiet, allow_dirty, watch=watch)
+        from .commands.release import run_cmd
+        run_cmd(release_config, flags, ctx=ctx)
+        return
+
+    # --- File-based flow ---
     release_path = get_release_file_path(project_dir)
     if not os.path.exists(release_path):
         print(
