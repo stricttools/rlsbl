@@ -98,8 +98,7 @@ class TestMonorepoRelease:
     def test_dry_run_shows_monorepo_tag(
         self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run, _remote_exists,
         mock_git_repo, monkeypatch, capsys,
-    , _run_gh):
-
+    ):
         """Dry-run in a monorepo project shows prefixed tag."""
         proj_dir = self._setup_monorepo(mock_git_repo, "tooling", "tooling")
         monkeypatch.chdir(str(proj_dir))
@@ -130,8 +129,7 @@ class TestMonorepoRelease:
     def test_dry_run_shows_monorepo_commit_message(
         self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run, _remote_exists,
         mock_git_repo, monkeypatch, capsys,
-    , _run_gh):
-
+    ):
         """Commit message uses 'name: release v...' format in monorepo mode."""
         proj_dir = self._setup_monorepo(mock_git_repo, "tooling", "tooling")
         monkeypatch.chdir(str(proj_dir))
@@ -158,8 +156,7 @@ class TestMonorepoRelease:
     def test_dry_run_bump_shows_monorepo_tag(
         self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run, _remote_exists,
         mock_git_repo, monkeypatch, capsys,
-    , _run_gh):
-
+    ):
         """When bumping an existing version in monorepo, tag is name@vX.Y.Z."""
         proj_dir = self._setup_monorepo(
             mock_git_repo, "tooling", "tooling", changelog_version="1.0.1",
@@ -192,8 +189,7 @@ class TestMonorepoRelease:
     def test_dry_run_shows_project_info(
         self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run, _remote_exists,
         mock_git_repo, monkeypatch, capsys,
-    , _run_gh):
-
+    ):
         """Dry-run output includes project name and path."""
         proj_dir = self._setup_monorepo(mock_git_repo, "tooling", "tooling")
         monkeypatch.chdir(str(proj_dir))
@@ -217,8 +213,7 @@ class TestMonorepoRelease:
     def test_error_when_in_monorepo_root_not_project(
         self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run,
         mock_git_repo, capsys,
-    , _run_gh):
-
+    ):
         """Error when running release from monorepo root (not inside a project)."""
         # Create workspace but stay at the repo root (not inside any project)
         ws_dir = mock_git_repo / ".rlsbl-monorepo"
@@ -258,8 +253,7 @@ class TestMonorepoRelease:
     def test_standalone_release_unchanged(
         self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run, _remote_exists,
         mock_git_repo, capsys,
-    , _run_gh):
-
+    ):
         """Non-monorepo release still uses plain tag format."""
         # Create a standalone project (no workspace)
         (mock_git_repo / "package.json").write_text(
@@ -307,8 +301,7 @@ class TestMonorepoRelease:
     def test_monorepo_reads_version_from_project_subdir(
         self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run, _remote_exists,
         mock_git_repo, monkeypatch, capsys,
-    , _run_gh):
-
+    ):
         """Version is read from the project subdirectory, not the repo root."""
         # Create workspace with project at "libs/core"
         proj_dir = self._setup_monorepo(mock_git_repo, "core", "libs/core")
@@ -346,8 +339,7 @@ class TestMonorepoRelease:
     def test_monorepo_reads_changelog_from_project_subdir(
         self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run, _remote_exists,
         mock_git_repo, monkeypatch, capsys,
-    , _run_gh):
-
+    ):
         """Changelog is read from the project subdirectory."""
         proj_dir = self._setup_monorepo(mock_git_repo, "core", "core")
 
@@ -427,8 +419,7 @@ class TestSubtreePublish:
     def test_release_calls_subtree_push(
         self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run, _remote_exists,
         mock_git_repo, monkeypatch, capsys,
-    , _run_gh):
-
+    ):
         """Dry-run with subtree_remote shows subtree info in output."""
         proj_dir = self._setup_monorepo_with_subtree(
             mock_git_repo, "tooling", "tooling",
@@ -459,8 +450,7 @@ class TestSubtreePublish:
     def test_release_skips_subtree_without_config(
         self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run, _remote_exists,
         mock_git_repo, monkeypatch, capsys,
-    , _run_gh):
-
+    ):
         """Dry-run without subtree_remote does not show subtree info."""
         proj_dir = self._setup_monorepo_with_subtree(
             mock_git_repo, "tooling", "tooling",
@@ -490,8 +480,7 @@ class TestSubtreePublish:
         self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run,
         _commit_files, _push, _remote_exists,
         mock_git_repo, monkeypatch, capsys,
-    , _run_gh):
-
+    ):
         """Subtree push failure does not abort the release."""
         proj_dir = self._setup_monorepo_with_subtree(
             mock_git_repo, "tooling", "tooling",

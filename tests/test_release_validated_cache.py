@@ -76,8 +76,7 @@ class TestReleaseValidatedCache:
                                                     _deploy, _tag, _gh_inst,
                                                     _gh_auth, _clean, _branch,
                                                     _commit_files, mock_run, _push,
-                                                    _lock, _unlock, _remote_exists, _run_gh):
-
+                                                    _lock, _unlock, _remote_exists):
         """The .validated file modified by validation must not trigger the dirty-tree abort."""
         from rlsbl.commands.release import run_cmd
 
@@ -137,8 +136,7 @@ class TestReleaseValidatedCache:
                                                           _deploy, _tag, _gh_inst,
                                                           _gh_auth, _clean, _branch,
                                                           _commit_files, mock_run, _push,
-                                                          _lock, _unlock, _remote_exists, _run_gh):
-
+                                                          _lock, _unlock, _remote_exists):
         """An unexpected file (not .validated, not package.json) still aborts the release."""
         from rlsbl.commands.release import run_cmd
 

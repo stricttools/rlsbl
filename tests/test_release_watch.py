@@ -126,8 +126,7 @@ class TestNoWatchPrintsHint:
         _remote_exists,
         tmp_project,
         capsys,
-    , _run_gh):
-
+    ):
         """In dry-run mode with --no-watch, the watch hint is printed."""
         _setup_npm_project(tmp_project)
         mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
@@ -180,8 +179,7 @@ class TestWatchInvokesWatchCmd:
         _remote_exists,
         tmp_project,
         capsys,
-    , _run_gh):
-
+    ):
         """In dry-run mode, --watch doesn't invoke watch (dry-run exits early)."""
         _setup_npm_project(tmp_project)
         mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
@@ -244,8 +242,7 @@ class TestWatchInvokedAfterRelease:
         _remote_exists,
         tmp_project,
         capsys,
-    , _run_gh):
-
+    ):
         """After a successful release with --watch, watch.run_cmd is called."""
         _setup_npm_project(tmp_project)
 
@@ -341,8 +338,7 @@ class TestWatchInvokedAfterRelease:
         _remote_exists,
         tmp_project,
         capsys,
-    , _run_gh):
-
+    ):
         """After a successful release with --no-watch, the hint is printed."""
         _setup_npm_project(tmp_project)
 

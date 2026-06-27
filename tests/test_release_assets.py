@@ -48,8 +48,8 @@ class TestNoAssetsConfigured:
         messages = []
         log = lambda msg: messages.append(msg)
 
-        with patch("rlsbl.commands.release.run_gh", return_value=""), \
-             patch("rlsbl.commands.release.run") as mock_run:
+        with patch("rlsbl.commands.release.run_gh", return_value=""),
+            patch("rlsbl.commands.release.run") as mock_run:
             ctx = ProjectContext(project_root=Path("."), workspace_root=None, config={
                 "targets": ["npm"],
                 "pipelines": {"npm": {"type": "npm", "local": False}},
@@ -67,8 +67,8 @@ class TestNoAssetsConfigured:
         with open("package.json", "w") as f:
             json.dump({"name": "test", "version": "1.0.0"}, f)
 
-        with patch("rlsbl.commands.release.run_gh", return_value=""), \
-             patch("rlsbl.commands.release.run") as mock_run:
+        with patch("rlsbl.commands.release.run_gh", return_value=""),
+            patch("rlsbl.commands.release.run") as mock_run:
             ctx = ProjectContext(project_root=Path("."), workspace_root=None, config={"targets": ["npm"]})
             upload_release_assets("v1.0.0", "1.0.0", lambda m: None, {}, ctx=ctx)
             mock_run.assert_not_called()
@@ -82,8 +82,8 @@ class TestNoAssetsConfigured:
         with open("package.json", "w") as f:
             json.dump({"name": "test", "version": "1.0.0"}, f)
 
-        with patch("rlsbl.commands.release.run_gh", return_value=""), \
-             patch("rlsbl.commands.release.run") as mock_run:
+        with patch("rlsbl.commands.release.run_gh", return_value=""),
+            patch("rlsbl.commands.release.run") as mock_run:
             ctx = ProjectContext(project_root=Path("."), workspace_root=None, config={
                 "targets": ["npm"],
                 "pipelines": {"npm": {"type": "npm", "local": False, "assets": False}},
@@ -130,8 +130,8 @@ class TestAssetBuildAndUpload:
             "pipelines": {"npm": {"type": "npm", "local": False, "assets": True, "max_asset_size_mb": 50}},
         })
         with patch("rlsbl.commands.release.load_pipelines", return_value={"npm": mock_pipeline}):
-            with patch("rlsbl.commands.release.run_gh", return_value=""), \
-             patch("rlsbl.commands.release.run") as mock_run:
+            with patch("rlsbl.commands.release.run_gh", return_value=""),
+            patch("rlsbl.commands.release.run") as mock_run:
                 upload_release_assets("v1.0.0", "1.0.0", log, {}, ctx=ctx)
 
                 # gh release upload should be called with --clobber
@@ -165,8 +165,8 @@ class TestAssetBuildAndUpload:
             "pipelines": {"npm": {"type": "npm", "local": False, "assets": True, "max_asset_size_mb": 50}},
         })
         with patch("rlsbl.commands.release.load_pipelines", return_value={"npm": mock_pipeline}):
-            with patch("rlsbl.commands.release.run_gh", return_value=""), \
-             patch("rlsbl.commands.release.run") as mock_run:
+            with patch("rlsbl.commands.release.run_gh", return_value=""),
+            patch("rlsbl.commands.release.run") as mock_run:
                 upload_release_assets("v1.0.0", "1.0.0", log, {}, ctx=ctx)
                 mock_run.assert_not_called()
 
@@ -207,8 +207,8 @@ class TestAssetSizeExceeded:
             "pipelines": {"pypi": {"type": "pypi", "local": False, "assets": True, "max_asset_size_mb": 1}},
         })
         with patch("rlsbl.commands.release.load_pipelines", return_value={"pypi": mock_pipeline}):
-            with patch("rlsbl.commands.release.run_gh", return_value=""), \
-             patch("rlsbl.commands.release.run"):
+            with patch("rlsbl.commands.release.run_gh", return_value=""),
+            patch("rlsbl.commands.release.run"):
                 with pytest.raises(ReleaseValidationError, match="exceeds max_asset_size_mb"):
                     upload_release_assets("v1.0.0", "1.0.0", lambda m: None, {}, ctx=ctx)
 
@@ -238,8 +238,8 @@ class TestDryRun:
             "pipelines": {"npm": {"type": "npm", "local": False, "assets": True, "max_asset_size_mb": 50}},
         })
         with patch("rlsbl.commands.release.load_pipelines") as mock_load:
-            with patch("rlsbl.commands.release.run_gh", return_value=""), \
-             patch("rlsbl.commands.release.run") as mock_run:
+            with patch("rlsbl.commands.release.run_gh", return_value=""),
+            patch("rlsbl.commands.release.run") as mock_run:
                 upload_release_assets("v1.0.0", "1.0.0", log, {"dry-run": True}, ctx=ctx)
                 # load_pipelines is called but no build or upload
                 mock_run.assert_not_called()
