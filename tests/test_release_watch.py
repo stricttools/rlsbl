@@ -266,9 +266,16 @@ class TestWatchInvokedAfterRelease:
         # mock_run calls: fetch, rev-list, tag-l (current tag exists),
         # tag-l (new tag), pre-hook status, post-selfdoc status,
         # post-hook status,
-        # status --porcelain (baseline), status --porcelain (re-check),
-        # rev-parse HEAD (pre-release sha), status --porcelain (backfilled
-        # .md detection), tag, push tag,
+        # status --porcelain (baseline),
+        # rev-parse --show-toplevel, re-check dirty snapshot,
+        # rev-parse HEAD (pre-release sha),
+        # git log -1 (COMMITTED guard),
+        # status --porcelain (backfilled .md detection),
+        # tag -l (TAGGED guard), git tag, git tag (push tag),
+        # rev-parse HEAD (PUSHED guard _local_head),
+        # rev-parse origin/main (PUSHED guard _remote_head),
+        # ls-remote (PUSHED guard tag check),
+        # git push origin tag,
         # rev-parse HEAD (pushed sha)
         # (gh release create goes through run_gh, not run)
         mock_run.side_effect = [
@@ -284,8 +291,13 @@ class TestWatchInvokedAfterRelease:
             "/tmp/fake-repo",  # git rev-parse --show-toplevel (for vpath)
             "",       # re-check dirty snapshot
             "pre123", # rev-parse HEAD (pre-release)
+            "",       # git log -1 (COMMITTED guard)
             "",       # status --porcelain (backfilled .md detection)
-            "",       # git tag
+            "",       # tag -l (TAGGED guard -- tag doesn't exist yet)
+            "",       # git tag (create tag)
+            "pre123", # rev-parse HEAD (PUSHED guard _local_head)
+            "pre123", # rev-parse origin/main (PUSHED guard _remote_head)
+            "",       # ls-remote (PUSHED guard tag check)
             "",       # git push origin tag
             fake_sha, # rev-parse HEAD (pushed sha)
         ]
@@ -374,8 +386,13 @@ class TestWatchInvokedAfterRelease:
             "/tmp/fake-repo",  # git rev-parse --show-toplevel (for vpath)
             "",       # re-check dirty status
             "pre123", # rev-parse HEAD (pre-release)
+            "",       # git log -1 (COMMITTED guard)
             "",       # status --porcelain (backfilled .md detection)
-            "",       # git tag
+            "",       # tag -l (TAGGED guard -- tag doesn't exist yet)
+            "",       # git tag (create tag)
+            "pre123", # rev-parse HEAD (PUSHED guard _local_head)
+            "pre123", # rev-parse origin/main (PUSHED guard _remote_head)
+            "",       # ls-remote (PUSHED guard tag check)
             "",       # git push origin tag
             fake_sha, # rev-parse HEAD (pushed sha)
         ]
@@ -386,7 +403,7 @@ class TestWatchInvokedAfterRelease:
             run_cmd(
                 _rc(),
                 {"yes": True, "quiet": False, "watch": False},
-            
+
                 ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}),
 )
             mock_watch.assert_not_called()

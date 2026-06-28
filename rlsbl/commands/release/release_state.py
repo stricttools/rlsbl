@@ -57,8 +57,17 @@ def save_step(state_path: str, step_name: str) -> None:
 
 
 def clear_release_state(state_path: str) -> None:
-    """Delete the state file (no-op if already absent)."""
+    """Delete the state file and its parent dir if empty (no-op if already absent)."""
     try:
         os.unlink(state_path)
     except FileNotFoundError:
+        pass
+    # Remove parent directory if it's now empty (best-effort).
+    # The state file may have created .rlsbl/releases/ which would be
+    # left as an untracked directory after git reset --hard.
+    try:
+        parent = os.path.dirname(state_path)
+        if parent and os.path.isdir(parent) and not os.listdir(parent):
+            os.rmdir(parent)
+    except OSError:
         pass

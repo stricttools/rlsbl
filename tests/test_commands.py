@@ -914,12 +914,19 @@ class TestReleaseCommitTrailers:
             "",               # git status --porcelain (post-hook snapshot)
             "",               # git status --porcelain (baseline_dirty in _run_release_mutating)
             "/tmp/fake-repo", # git rev-parse --show-toplevel (for vpath)
+            "",               # git rev-parse HEAD (pre_release_sha)
             "",               # git status --porcelain (re-check guard)
             "package.json",   # git diff --name-only -- package.json
             "M package.json", # git status --porcelain -- package.json
+            "",               # git log -1 --format=%s (COMMITTED guard)
+            "",               # status --porcelain (backfilled .md detection)
+            "",               # git tag -l (TAGGED guard)
             "",               # git tag v1.0.1
+            "",               # rev-parse HEAD (PUSHED guard _local_head)
+            "",               # rev-parse origin/main (PUSHED guard _remote_head)
+            "",               # ls-remote (PUSHED guard tag check)
             "",               # git push origin v1.0.1
-            "abc123def",      # git rev-parse HEAD
+            "abc123def",      # git rev-parse HEAD (pushed sha)
         ]
 
         with patch("sys.stdout", new_callable=StringIO):
@@ -971,12 +978,19 @@ class TestReleaseCommitTrailers:
             "",               # git status --porcelain (post-hook snapshot)
             "",               # git status --porcelain (baseline_dirty in _run_release_mutating)
             "/tmp/fake-repo", # git rev-parse --show-toplevel (for vpath)
+            "",               # git rev-parse HEAD (pre_release_sha)
             "",               # git status --porcelain (re-check guard)
             "package.json",   # git diff --name-only -- package.json
             "M package.json", # git status --porcelain -- package.json
+            "",               # git log -1 --format=%s (COMMITTED guard)
+            "",               # status --porcelain (backfilled .md detection)
+            "",               # git tag -l (TAGGED guard)
             "",               # git tag v1.0.1
+            "",               # rev-parse HEAD (PUSHED guard _local_head)
+            "",               # rev-parse origin/main (PUSHED guard _remote_head)
+            "",               # ls-remote (PUSHED guard tag check)
             "",               # git push origin v1.0.1
-            "abc123def",      # git rev-parse HEAD
+            "abc123def",      # git rev-parse HEAD (pushed sha)
         ]
 
         with patch("sys.stdout", new_callable=StringIO):

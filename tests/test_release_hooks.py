@@ -326,14 +326,24 @@ class TestWatchSHABeforePostHook:
                 if "v1.0.0" in joined:
                     return "v1.0.0"
                 return ""
+            if "ls-remote" in joined:
+                return ""
             if "rev-parse" in joined and "--show-toplevel" in joined:
                 return "/tmp/fake-repo"
+            if "rev-parse" in joined and "origin/" in joined:
+                # Remote branch rev-parse (PUSHED guard check)
+                return pre_hook_sha
+            if "log" in joined and "--format=%s" in joined:
+                # COMMITTED guard check
+                return ""
             if "rev-parse" in joined:
-                # 1st call: pre_release_sha capture (before mutations)
-                # 2nd call: pushed_sha capture (after push, before post-release hook)
+                # rev-parse HEAD calls:
+                # 1st: pre_release_sha capture (before mutations)
+                # 2nd: PUSHED guard _local_head check
+                # 3rd: pushed_sha capture (after push, before post-release hook)
                 # Any subsequent call would return post-hook SHA
                 rev_parse_call_count += 1
-                if rev_parse_call_count <= 2:
+                if rev_parse_call_count <= 3:
                     return pre_hook_sha
                 return post_hook_sha
             if "status --porcelain" in joined:
@@ -362,7 +372,11 @@ class TestWatchSHABeforePostHook:
         captured = capsys.readouterr()
         # The watch message must use the SHA captured before the post-release hook
         assert f"rlsbl watch {pre_hook_sha}" in captured.out
-        assert post_hook_sha not in captured.out
+        # post_hook_sha may appear in PUSHED guard's rev-parse, but should
+        # NOT appear in the "Watch CI:" line itself
+        watch_line = [l for l in captured.out.splitlines() if "Watch CI:" in l]
+        assert watch_line, "Expected 'Watch CI:' line in output"
+        assert post_hook_sha not in watch_line[0]
 
 
 class TestHookTimeout:

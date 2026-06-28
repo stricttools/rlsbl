@@ -139,7 +139,29 @@ class TestMultiTargetRelease:
             json.dump({"version": "1.0.0"}, f)
 
         # Mock run() responses (gh release create goes through run_gh):
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", "", "", "", "/tmp/fake-repo", "", "pre123", "", "", "", ""]
+        mock_run.side_effect = [
+            "",               # fetch
+            "0",              # rev-list
+            "v1.0.0",         # tag -l current
+            "",               # tag -l new
+            "",               # pre-hook snapshot
+            "",               # pre-selfdoc snapshot
+            "",               # post-selfdoc snapshot
+            "",               # post-hook snapshot
+            "",               # baseline snapshot
+            "/tmp/fake-repo", # show-toplevel
+            "pre123",         # rev-parse HEAD (pre_release_sha)
+            "",               # re-check dirty
+            "",               # git log -1 (COMMITTED guard)
+            "",               # status --porcelain (backfilled .md)
+            "",               # tag -l (TAGGED guard)
+            "",               # git tag
+            "pre123",         # rev-parse HEAD (PUSHED guard)
+            "pre123",         # rev-parse origin/main (PUSHED guard)
+            "",               # ls-remote (PUSHED guard)
+            "",               # git push tag
+            "pre123",         # rev-parse HEAD (pushed sha)
+        ]
 
         # Mock the spec target's build to track calls
         from rlsbl.targets import TARGETS
@@ -182,7 +204,29 @@ class TestMultiTargetRelease:
             json.dump({"version": "1.0.0"}, f)
 
         # Mock run() responses (gh release create goes through run_gh):
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", "", "", "", "/tmp/fake-repo", "", "pre123", "", "", "", ""]
+        mock_run.side_effect = [
+            "",               # fetch
+            "0",              # rev-list
+            "v1.0.0",         # tag -l current
+            "",               # tag -l new
+            "",               # pre-hook snapshot
+            "",               # pre-selfdoc snapshot
+            "",               # post-selfdoc snapshot
+            "",               # post-hook snapshot
+            "",               # baseline snapshot
+            "/tmp/fake-repo", # show-toplevel
+            "pre123",         # rev-parse HEAD (pre_release_sha)
+            "",               # re-check dirty
+            "",               # git log -1 (COMMITTED guard)
+            "",               # status --porcelain (backfilled .md)
+            "",               # tag -l (TAGGED guard)
+            "",               # git tag
+            "pre123",         # rev-parse HEAD (PUSHED guard)
+            "pre123",         # rev-parse origin/main (PUSHED guard)
+            "",               # ls-remote (PUSHED guard)
+            "",               # git push tag
+            "pre123",         # rev-parse HEAD (pushed sha)
+        ]
 
         from rlsbl.targets import TARGETS
         monkeypatch.setattr(TARGETS["spec"], "build", MagicMock(side_effect=RuntimeError("build failed")))

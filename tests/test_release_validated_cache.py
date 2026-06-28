@@ -104,10 +104,15 @@ class TestReleaseValidatedCache:
             porcelain_recheck,  # git status --porcelain (re-check guard)
             # new_version != current_version, so has_staged_or_modified is short-circuited
             # commit_files is mocked separately
-            "M package.json",   # git tag v1.0.1
+            "",                 # git log -1 --format=%s (COMMITTED guard)
+            "M package.json",   # status --porcelain (backfilled .md detection)
+            "",                 # git tag -l (TAGGED guard)
+            "",                 # git tag v1.0.1
+            "abc123def456",     # rev-parse HEAD (PUSHED guard _local_head)
+            "abc123def456",     # rev-parse origin/main (PUSHED guard _remote_head)
+            "",                 # ls-remote (PUSHED guard tag check)
             "",                 # git push origin v1.0.1
             "",                 # git rev-parse HEAD (pushed_sha)
-            "abc123def",        # (unconsumed -- side_effect has one extra entry)
         ]
 
         with patch("sys.stdout", new_callable=StringIO):

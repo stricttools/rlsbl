@@ -782,6 +782,16 @@ def _run_release_mutating(state: ReleaseState):
                 for f in files_to_commit
             }
             expected_files.add(vpath(os.path.join(lock_dir, "lock")))
+            # The release state file (in-progress.json) is written by this
+            # function and should not trigger the unexpected-files guard.
+            # Also add the parent directory with trailing slash since git
+            # status --porcelain may show newly-created directories as e.g.
+            # "?? .rlsbl/releases/" instead of listing individual files.
+            _state_abs = os.path.abspath(_state_path)
+            _state_rel = os.path.relpath(_state_abs, _git_root)
+            expected_files.add(_state_rel)
+            _state_dir_rel = os.path.relpath(os.path.dirname(_state_abs), _git_root)
+            expected_files.add(_state_dir_rel + "/")
             # The .validated cache is written by changelog validation earlier in the
             # release flow.  It may be tracked (dirty) or gitignored (invisible to
             # git status).  Either way it is not a concurrent-change signal.
@@ -927,10 +937,24 @@ def _run_release_mutating(state: ReleaseState):
                 log(f"Cleaned {removed} stale batch exclusion(s) from config.json")
 
         # Finalize release file: rename unreleased.toml to vX.Y.Z.toml
-        # Only if the release file exists (backward compat with legacy path)
+        # RELEASE_FILE_FINALIZED guard: skip if vX.Y.Z.toml exists and
+        # unreleased.toml doesn't (indicating finalization already ran).
         from ...release_file import get_release_file_path
         release_file_path = get_release_file_path(project_dir)
-        if os.path.exists(release_file_path):
+        _release_file_already_finalized = False
+        if "RELEASE_FILE_FINALIZED" in _completed:
+            _release_file_already_finalized = True
+            log("Skipping release file finalization (already done)")
+        else:
+            releases_dir_rf = os.path.dirname(release_file_path)
+            versioned_release_check = os.path.join(releases_dir_rf, f"v{new_version}.toml")
+            if os.path.exists(versioned_release_check) and not os.path.exists(release_file_path):
+                _release_file_already_finalized = True
+                save_step(_state_path, "RELEASE_FILE_FINALIZED")
+                _completed.add("RELEASE_FILE_FINALIZED")
+                log("Skipping release file finalization (already archived)")
+
+        if not _release_file_already_finalized and os.path.exists(release_file_path):
             releases_dir = os.path.dirname(release_file_path)
             versioned_release = os.path.join(releases_dir, f"v{new_version}.toml")
             os.rename(release_file_path, versioned_release)
@@ -966,36 +990,96 @@ def _run_release_mutating(state: ReleaseState):
                         [md_regen_rel],
                         cwd=_git_root,
                     )
+            save_step(_state_path, "RELEASE_FILE_FINALIZED")
+            _completed.add("RELEASE_FILE_FINALIZED")
 
-        # Create local git tag
-        run("git", ["tag", tag])
-        log(f"Tagged: {tag}")
+        # TAGGED guard: skip if the tag already exists and points to HEAD
+        _tag_already_exists = False
+        if "TAGGED" in _completed:
+            _tag_already_exists = True
+            log("Skipping tag creation (already done)")
+        else:
+            _existing_tag = run("git", ["tag", "-l", tag]).strip()
+            if _existing_tag:
+                # Tag exists -- verify it points to HEAD
+                _tag_sha = run("git", ["rev-parse", f"refs/tags/{tag}^{{}}"]).strip()
+                _head_sha = run("git", ["rev-parse", "HEAD"]).strip()
+                if _tag_sha == _head_sha:
+                    _tag_already_exists = True
+                    save_step(_state_path, "TAGGED")
+                    _completed.add("TAGGED")
+                    log("Skipping tag creation (tag already exists at HEAD)")
 
-        # Create companion tags (e.g. Go module proxy tags in releasable mode)
-        if member_package_paths is not None:
-            _companion_list = collect_companion_tags(
-                member_package_paths, monorepo_root, new_version, tag,
-            )
-            for ctag in _companion_list:
-                run("git", ["tag", ctag])
-                state.companion_tags.append(ctag)
-                log(f"Created Go companion tag: {ctag}")
+        if not _tag_already_exists:
+            # Create local git tag
+            run("git", ["tag", tag])
+            log(f"Tagged: {tag}")
 
-        # Push commits and tag (including companions for atomic push)
+            # Create companion tags (e.g. Go module proxy tags in releasable mode)
+            if member_package_paths is not None:
+                _companion_list = collect_companion_tags(
+                    member_package_paths, monorepo_root, new_version, tag,
+                )
+                for ctag in _companion_list:
+                    run("git", ["tag", ctag])
+                    state.companion_tags.append(ctag)
+                    log(f"Created Go companion tag: {ctag}")
+
+            save_step(_state_path, "TAGGED")
+            _completed.add("TAGGED")
+
+        # PUSHED guard: skip branch push if remote matches local HEAD,
+        # skip tag push if remote tag already exists.
         push_timeout = get_push_timeout(ctx.config)
         if push_timeout != 120:
             log(f"Push timeout: {push_timeout}s (from RLSBL_PUSH_TIMEOUT)")
         # Mark pushes as release-authorized so the pre-push hook skips its
         # "manual push" warning. The hook still runs JSONL coverage checks.
         push_env = {**os.environ, "RLSBL_RELEASE_PUSH": "1"}
-        push_if_needed(branch, env=push_env, config=ctx.config)
-        branch_pushed = True
-        run("git", ["push", "origin", tag] + state.companion_tags, timeout=push_timeout, env=push_env)
-        log(f"Pushed to origin/{branch}")
+
+        _push_already_done = False
+        if "PUSHED" in _completed:
+            _push_already_done = True
+            branch_pushed = True
+            log("Skipping push (already done)")
+        else:
+            # Check if branch push is needed
+            _local_head = run("git", ["rev-parse", "HEAD"]).strip()
+            _branch_needs_push = True
+            try:
+                _remote_head = run("git", ["rev-parse", f"origin/{branch}"]).strip()
+                if _local_head == _remote_head:
+                    _branch_needs_push = False
+                    branch_pushed = True
+                    log("Skipping branch push (remote already at local HEAD)")
+            except Exception:
+                pass  # Remote branch might not exist yet
+
+            if _branch_needs_push:
+                push_if_needed(branch, env=push_env, config=ctx.config)
+                branch_pushed = True
+
+            # Check if tag push is needed
+            _tag_needs_push = True
+            try:
+                _remote_tag_check = run("git", ["ls-remote", "--tags", "origin", tag]).strip()
+                if _remote_tag_check:
+                    _tag_needs_push = False
+                    log("Skipping tag push (remote tag already exists)")
+            except Exception:
+                pass
+
+            if _tag_needs_push:
+                run("git", ["push", "origin", tag] + state.companion_tags, timeout=push_timeout, env=push_env)
+
+            log(f"Pushed to origin/{branch}")
+            save_step(_state_path, "PUSHED")
+            _completed.add("PUSHED")
     except ReleaseAbortError as e:
         if branch_pushed:
             # Commits are already on the remote. Do NOT roll back locally --
-            # that would create divergent local/remote state.
+            # that would create divergent local/remote state. State file
+            # is preserved for future resume.
             # Retry tag push before giving up.
             _tag_recovered = False
             for _attempt in range(2):
@@ -1018,8 +1102,10 @@ def _run_release_mutating(state: ReleaseState):
                 )
             raise
         # Branch was not pushed yet -- safe to roll back locally.
+        # State file is useless after local rollback -- clean it up.
         run("git", ["reset", "--hard", pre_release_sha])
         _cleanup_release_artifacts(project_dir, new_version)
+        clear_release_state(_state_path)
         print(str(e), file=sys.stderr)
         print(
             f"Local state has been rolled back to {pre_release_sha[:10]}.",
@@ -1029,7 +1115,8 @@ def _run_release_mutating(state: ReleaseState):
     except Exception as e:
         if branch_pushed:
             # Commits are already on the remote. Do NOT roll back locally --
-            # that would create divergent local/remote state.
+            # that would create divergent local/remote state. State file
+            # is preserved for future resume.
             # Retry tag push before giving up.
             _tag_recovered = False
             for _attempt in range(2):
@@ -1057,6 +1144,7 @@ def _run_release_mutating(state: ReleaseState):
         # Branch was not pushed yet -- safe to roll back locally.
         # Delete tag (may not exist yet) and reset commits so the working
         # tree looks like it did before the release attempt.
+        # State file is useless after local rollback -- clean it up.
         try:
             run("git", ["tag", "-d", tag])
         except Exception:
@@ -1069,6 +1157,7 @@ def _run_release_mutating(state: ReleaseState):
                 pass
         run("git", ["reset", "--hard", pre_release_sha])
         _cleanup_release_artifacts(project_dir, new_version)
+        clear_release_state(_state_path)
         if hasattr(e, 'stderr') and e.stderr:
             print(f"Command error: {e.stderr.strip()}", file=sys.stderr)
         print(
@@ -1086,51 +1175,70 @@ def _run_release_mutating(state: ReleaseState):
     # might create new commits and move HEAD past the release commit.
     pushed_sha = run("git", ["rev-parse", "HEAD"])
 
+    # GITHUB_RELEASE guard: skip if the release already exists
     # Create GitHub Release using a temp notes file
     # Notes file cleanup is deferred until after subtree publishing (which reuses it)
     notes_file = f".rlsbl-notes-{int(time.time() * 1000)}.tmp"
     writing_file = notes_file + ".writing"
     release_created = True
-    try:
-        with open(writing_file, "w", encoding="utf-8") as f:
-            f.write(changelog_entry or "")
-        os.rename(writing_file, notes_file)
-        # Retry gh release create with race-condition detection.
-        # GitHub API can return an error even when the release was actually created,
-        # so after each failure we check whether the release exists before retrying.
-        gh_release_args = ["release", "create", tag, "--title", tag, "--notes-file", notes_file]
-        # Mark pre-release versions as GitHub pre-releases
-        if "-" in new_version:
-            gh_release_args.append("--prerelease")
-        gh_release_succeeded = False
-        for attempt in range(2):
-            try:
-                run_gh(gh_release_args, config=ctx.config)
-                gh_release_succeeded = True
-                log(f"Created GitHub Release: {tag}")
-                break
-            except Exception as e:
-                if hasattr(e, 'stderr') and e.stderr:
-                    print(f"Command error: {e.stderr.strip()}", file=sys.stderr)
-                # Check if the release was created despite the error (race condition)
-                try:
-                    run_gh(["release", "view", tag], config=ctx.config)
-                    gh_release_succeeded = True
-                    log(f"GitHub Release created (confirmed via view): {tag}")
-                    break
-                except Exception:
-                    pass  # Release truly doesn't exist; retry or fail
+    _gh_release_already_exists = False
+    if "GITHUB_RELEASE" in _completed:
+        _gh_release_already_exists = True
+        log("Skipping GitHub Release creation (already done)")
+    else:
+        try:
+            run_gh(["release", "view", tag], config=ctx.config)
+            _gh_release_already_exists = True
+            save_step(_state_path, "GITHUB_RELEASE")
+            _completed.add("GITHUB_RELEASE")
+            log(f"Skipping GitHub Release creation (release {tag} already exists)")
+        except Exception:
+            pass  # Release doesn't exist yet -- proceed with creation
 
-        if not gh_release_succeeded:
-            release_created = False
-            notes_path = f".rlsbl/changes/{new_version}.md"
-            print(
-                f"Error: GitHub Release creation failed for {tag}. "
-                f"The tag and commit are on the remote.\n"
-                f"  To create the release: gh release create {tag} --title {tag} --notes-file {notes_path}\n"
-                f"  To roll back: rlsbl release undo",
-                file=sys.stderr,
-            )
+    try:
+        if not _gh_release_already_exists:
+            with open(writing_file, "w", encoding="utf-8") as f:
+                f.write(changelog_entry or "")
+            os.rename(writing_file, notes_file)
+            # Retry gh release create with race-condition detection.
+            # GitHub API can return an error even when the release was actually created,
+            # so after each failure we check whether the release exists before retrying.
+            gh_release_args = ["release", "create", tag, "--title", tag, "--notes-file", notes_file]
+            # Mark pre-release versions as GitHub pre-releases
+            if "-" in new_version:
+                gh_release_args.append("--prerelease")
+            gh_release_succeeded = False
+            for attempt in range(2):
+                try:
+                    run_gh(gh_release_args, config=ctx.config)
+                    gh_release_succeeded = True
+                    log(f"Created GitHub Release: {tag}")
+                    break
+                except Exception as e:
+                    if hasattr(e, 'stderr') and e.stderr:
+                        print(f"Command error: {e.stderr.strip()}", file=sys.stderr)
+                    # Check if the release was created despite the error (race condition)
+                    try:
+                        run_gh(["release", "view", tag], config=ctx.config)
+                        gh_release_succeeded = True
+                        log(f"GitHub Release created (confirmed via view): {tag}")
+                        break
+                    except Exception:
+                        pass  # Release truly doesn't exist; retry or fail
+
+            if gh_release_succeeded:
+                save_step(_state_path, "GITHUB_RELEASE")
+                _completed.add("GITHUB_RELEASE")
+            else:
+                release_created = False
+                notes_path = f".rlsbl/changes/{new_version}.md"
+                print(
+                    f"Error: GitHub Release creation failed for {tag}. "
+                    f"The tag and commit are on the remote.\n"
+                    f"  To create the release: gh release create {tag} --title {tag} --notes-file {notes_path}\n"
+                    f"  To roll back: rlsbl release undo",
+                    file=sys.stderr,
+                )
 
         # Subtree publishing for monorepo projects with subtree_remote configured
         if release_created and monorepo_name and monorepo_project_path:
@@ -1334,6 +1442,9 @@ def _run_release_mutating(state: ReleaseState):
             watch_run_cmd(None, [pushed_sha], {})
         else:
             log(f"Watch CI: rlsbl watch {pushed_sha}")
+
+    # Success epilogue: clear the state file now that all steps completed.
+    clear_release_state(_state_path)
 
     log(f"\nRelease {new_version} complete!")
 

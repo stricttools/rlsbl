@@ -410,6 +410,8 @@ class TestReleaseGhReleaseCreateFailure:
         assert len(create_calls) == 2, (
             f"Expected 2 gh release create attempts, got {len(create_calls)}: {create_calls}"
         )
-        assert len(view_calls) == 2, (
-            f"Expected 2 gh release view checks, got {len(view_calls)}: {view_calls}"
+        # 3 view calls: 1 from the GITHUB_RELEASE guard (pre-check) +
+        # 2 from the retry loop's race-condition detection
+        assert len(view_calls) == 3, (
+            f"Expected 3 gh release view checks, got {len(view_calls)}: {view_calls}"
         )

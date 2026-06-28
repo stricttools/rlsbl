@@ -206,10 +206,15 @@ class TestPrivatePublishGuardrail:
             # _run_release_mutating phase:
             "",                 # git status --porcelain (baseline snapshot)
             "/tmp/fake-repo",   # git rev-parse --show-toplevel (for vpath)
-            "",                 # git status --porcelain (re-check guard)
             "abc123",           # git rev-parse HEAD (pre_release_sha)
+            "",                 # git status --porcelain (re-check guard)
+            "",                 # git log -1 --format=%s (COMMITTED guard)
             "",                 # git status --porcelain (backfilled .md detection)
+            "",                 # git tag -l (TAGGED guard)
             "",                 # git tag v1.0.1
+            "abc123",           # rev-parse HEAD (PUSHED guard _local_head)
+            "abc123",           # rev-parse origin/main (PUSHED guard _remote_head)
+            "",                 # ls-remote (PUSHED guard tag check)
             "",                 # git push origin v1.0.1
             "def456",           # git rev-parse HEAD (pushed_sha)
         ]
@@ -270,10 +275,15 @@ class TestPrivatePublishGuardrail:
             # _run_release_mutating phase:
             "",                 # git status --porcelain (baseline snapshot)
             "/tmp/fake-repo",   # git rev-parse --show-toplevel (for vpath)
-            "",                 # git status --porcelain (re-check guard)
             "abc123",           # git rev-parse HEAD (pre_release_sha)
+            "",                 # git status --porcelain (re-check guard)
+            "",                 # git log -1 --format=%s (COMMITTED guard)
             "",                 # git status --porcelain (backfilled .md detection)
+            "",                 # git tag -l (TAGGED guard)
             "",                 # git tag v1.0.1
+            "abc123",           # rev-parse HEAD (PUSHED guard _local_head)
+            "abc123",           # rev-parse origin/main (PUSHED guard _remote_head)
+            "",                 # ls-remote (PUSHED guard tag check)
             "",                 # git push origin v1.0.1
             "def456",           # git rev-parse HEAD (pushed_sha)
         ]
