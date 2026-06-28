@@ -157,7 +157,7 @@
     "description": "92c829699be90c4ea09e05c6e0ff3830b755bdd05be47a9427e51074cedcb831"
   },
   "en/cli-index.md": {
-    "content": "3f648e7e88302387367152ad954a9b089397cfd5d6e0be8b8bb8bd8292f32d8f",
+    "content": "db407067fffd0ca3702e7fca9feae0fe38f02254a276fa4f613f006462c3bb2b",
     "description": "0f01533cb10562a220aa70ea5e33e2500c0c1e4aa8e16b2f80c532449a68b7ea"
   },
   "en/cli-migrate.md": {
@@ -185,7 +185,7 @@
     "description": "728d53ed39a7f216758061237899c35db9b081c75e29c38d44b9d136c412b691"
   },
   "en/cli-release.md": {
-    "content": "aafe36dfc191dfd1d3bc39da5337ab6c558b2980633c4f479355d2b603ae5e24",
+    "content": "76f233e2ed08a3b8d6975c6bc001709200c065584d2315c85f291421960b0da8",
     "description": "4437506314b7ca982c6cd8ae65c5f2be7e3f33143fc5f3f6aed9e64077bba20f"
   },
   "en/cli-scaffold.md": {
@@ -193,7 +193,7 @@
     "description": "31acd7c7109c3c875b03d8e9de68bd48c636fff5abb1297a5f5d2e9000de6547"
   },
   "en/cli-status.md": {
-    "content": "1973e1b668ec5bdc90bad4971e6d08e99bd24ad86e95bd644a3828eb1ca5d2ce",
+    "content": "f9c2fce80b1d83724895e6cb2f535791486e1491685e681874122ddfc65ce0b0",
     "description": "6d56e3197676d791b3d403c8059ebb9df4f4cf12b1a1142889062088fa42c247"
   },
   "en/cli-targets.md": {
@@ -217,7 +217,7 @@
     "description": "f934ebcc70f1b9dc3c86b2020fcfac4db46bd2cd252d78e4d5989f59cc429886"
   },
   "en/configuration.md": {
-    "content": "7a2d2d3437d36cfbd972b6a629839603d4564a7e9336129ceddb6b9f3c8741bf",
+    "content": "d7d02727e26181eb4cd594deed565424313a2744afd4d7bf555142d53dc5512e",
     "description": "2b299140b2d961d153c7d61904667008c1a2e33081bb58950272063a9eb3c519",
     "source_docstring": "684f5504ecd819cd27ef806b518e4558c7e77aeb73785c25f6610c47fe0dc9bb"
   },
@@ -236,7 +236,7 @@
     "description": "8909eda4fd51ca2ffd6ded1b7ec9ab0dce01924c31e9cd097b6fe8281a0e9e7d"
   },
   "en/gen-index.md": {
-    "content": "398fac6160e16246b91344bbe4f967007de3f6cf243b04add0687ffd9048161a",
+    "content": "8998601bb0a551b98fdb17362e43073527acb6306fffbb787523d71e1ec0e7ff",
     "description": "bb3cd9d34f014c0674a9285c25ee14b5b4abc5cf941f0d83594c301405e8f3b6"
   },
   "en/import-scanning.md": {
@@ -266,7 +266,7 @@
     "description": "e4917a2539e1ecd39d47407fd8ef61030e1269ba0bd03dd093af4826acb1dd7c"
   },
   "en/release-workflow.md": {
-    "content": "98f438a3c888f54112948679aca8bc26a2be61fe8977bb5c167326c8e224290c",
+    "content": "c50b806fc71598b043266e0e47120dae37865d4581f56874b65c4e734975561f",
     "description": "3cf2e2019db7ea6e42a449401b41677c8398866bfd4663f6199b0310aacd5311",
     "source_docstring": "0998f186e8a9850589e938859db694b132aaeacda3864775a912477466446a4b"
   },
@@ -286,12 +286,12 @@
     "source_docstring": "149c763229ae226fccb32642eeb0805e3a0f3f402266c7c7bd7853898d91e146"
   },
   "en/rlsbl-changelog-files.md": {
-    "content": "c41f50c186d09de19fc2f18a237e01bc51d30178fbff3f9f06c48e7d723a5f12",
+    "content": "755692c126fe36620b3dcea2711fc8bb6ffa93c93cef4e5f94452ec1be1c8a4a",
     "description": "8d3cfe9c468a10b7815f7219fb98a25538a495d453ad2545e3535b6d76ca63aa",
     "source_docstring": "44ad18e6afec236b6f7cc4f55547ea7ecee71ba0ce56746e7db420a071725319"
   },
   "en/rlsbl-changelog-generate.md": {
-    "content": "a3c45a6e95afa7ab31c2db1a4a2a0d5418ebb49b376447f1ac0717052751fee0",
+    "content": "6028d29128415b9d3e8271d27aeb184d4887ec2bf5b4874460b5a9d0a86f9fe4",
     "description": "b0a96bc409fcada3dfb38ea5f8c03ef6e99ff8ea4c8ca333db5e8b008d443f69",
     "source_docstring": "b0a96bc409fcada3dfb38ea5f8c03ef6e99ff8ea4c8ca333db5e8b008d443f69"
   },
@@ -370,7 +370,7 @@
     "source_docstring": "0418827b7c648a71434cfc3fe4485cdb44a02d3daf5ba599733592cccf2d9774"
   },
   "en/rlsbl-commands-check.md": {
-    "content": "4bdcd5e89d05e96d49d8bcd23c69b40f79087767609fbd40dd23272398b247fc",
+    "content": "67633aa599e56100fb4e2a57103770d3c79e4258beed76372d5dfa688a16cea1",
     "description": "1fcfae4ee247730d055ff6a61ddc9688f6e10d888512cea974fc2242bf0427b7",
     "source_docstring": "ab1d51835ebada8632a1bc93237d28c9f8bde4fd60b8a4e046acdf63082821c2"
   },
@@ -405,7 +405,7 @@
     "source_docstring": "77349d50382ca6c0faf97553b8abf8c24bb360c895f32005f7de62abdf1bbe75"
   },
   "en/rlsbl-commands-init_cmd.md": {
-    "content": "3b787d7fca88c84ea368db80e869a0a6b841e34941c5269fc108fa42a18fb370",
+    "content": "d6011b46e3f3f3db6ebfb2d8c146870a91f43d75d120a64680a20bf91b8112c0",
     "description": "b4a7db2e3882de4af592870ee977b98522a4635188b12262d78e7441b533611c",
     "source_docstring": "ac73a657ec7256d7c0c8c1f7b1ad359d3673262242500bdb32944a51dddafb30"
   },
@@ -484,7 +484,7 @@
     "source_docstring": "c7776d190150330f960501da40b144d7eaa95549b77ddb022210aa638d70f571"
   },
   "en/rlsbl-commands-release-execute.md": {
-    "content": "4f1fcb619c9bea6d3ffd7a5d3a7f488245d7c0621f2134fe57991da4eb27a582",
+    "content": "9772dcbcf892482df2f7bc85436828e0388b7151130a791764a59c23e1566ded",
     "description": "43908d8a970c339ebd38bdf4bc113757a0cdbbce406773da79c249fbfa9aa5de",
     "source_docstring": "43908d8a970c339ebd38bdf4bc113757a0cdbbce406773da79c249fbfa9aa5de"
   },
@@ -498,6 +498,11 @@
     "description": "0be2366468e25e2f0f51716a0bafda3ca14d67d9b6c0086c27edbbb0cde3738e",
     "source_docstring": "0be2366468e25e2f0f51716a0bafda3ca14d67d9b6c0086c27edbbb0cde3738e"
   },
+  "en/rlsbl-commands-release-release_state.md": {
+    "content": "f009fbdb1adfe962aaf69cb44bdd75689115cd229fef088587984f89e552d33c",
+    "description": "f2bcf3f21d859fc8df87d22e4484a3ab69bf300e11a1f3490084a124f1a14142",
+    "source_docstring": "ce297b716179cf11b00ca1ed070a7dd958bd930bb533a7d5cd42a57f22eb772a"
+  },
   "en/rlsbl-commands-release-rollback.md": {
     "content": "3cdcd2c5df0f5a26606219fe9f0a3ecb3ffd4704250ce47dbc88a7c17957aa2f",
     "description": "87d73c89a26adc7033ddbcebf9c426eec96d238b7287f9dc00aaf3c98619649a",
@@ -509,12 +514,12 @@
     "source_docstring": "b3b63796b7aeacfe4406215e72f33590559da9a1235e3f6f2e4a750324f06e34"
   },
   "en/rlsbl-commands-release-validate.md": {
-    "content": "68965544177e2b276ff0bbce6d9db9a4befebd2f9b686dc712fdb207143c25c9",
+    "content": "6f5b6d8ae0f0dd1ef13bcf2229033fc1bf1edf3aa27a4dda96dfa61f4390dc78",
     "description": "fca18fe43099dd48d8b07fe362f861b15f83a811c20361629f339ef469a001b3",
     "source_docstring": "d99ffc94e10754e831d7c8f081924603d855acb554f3d141a05789d45aec4cc6"
   },
   "en/rlsbl-commands-release.md": {
-    "content": "b8d370bb4ad8c38accf4841b0d94d01683351d328fe22dc49e78815053b5f9dc",
+    "content": "31cab64401f2a6c570cefc6b266e1d63a6c4f143eae6d38bb1e351dafd631ff2",
     "description": "510751c25eb305660274f92ac76b49dc04cf49e9453da1fb929fe0e91c479ad1",
     "source_docstring": "0998f186e8a9850589e938859db694b132aaeacda3864775a912477466446a4b"
   },
@@ -534,7 +539,7 @@
     "source_docstring": "d7ad7d10555f83bd472c5bdbc0abcbe10eed7ee25207c39e62ce748f184916b2"
   },
   "en/rlsbl-commands-status.md": {
-    "content": "2fe3f41dc58f0882c1f3bc1ef4b51f924d89358b2b1459cb45e6f9086ab4268f",
+    "content": "5b99b93967bc3f21b40abbcaf3c54baa11baca6d74fe5b4b4257e53dbe976782",
     "description": "c23557c2863d76b3297bb189d60f59c73fe96fff779b9d05eacc2d22f882bd49",
     "source_docstring": "c23557c2863d76b3297bb189d60f59c73fe96fff779b9d05eacc2d22f882bd49"
   },
@@ -544,7 +549,7 @@
     "source_docstring": "3efd4a1d5114e17fadbe0943257e5d3ce4dab251c71971e38b85a485ea113fa8"
   },
   "en/rlsbl-commands-undo.md": {
-    "content": "ce7c60864aff7771f0e739eba9e9c46558bebf7a5b82164e79ec3e1ebb5e5f3f",
+    "content": "77b7bf91204dbf1709d62d7ed79627a474245418dc71ef4fb733b397baf95e5a",
     "description": "abec7736556bcf624bc090a64c7215664093c26282d16d0c0f1ad526af49fd66",
     "source_docstring": "abec7736556bcf624bc090a64c7215664093c26282d16d0c0f1ad526af49fd66"
   },
@@ -568,7 +573,7 @@
     "description": "7e4f7b1452f4dc1eacb72af1bee63dd0cbb9a504dcf50cccbff952354eae2e16"
   },
   "en/rlsbl-config.md": {
-    "content": "0749535329c97bb3439f4d2b1f40b45dadeeb79795bd23dff60535f5e4b5f306",
+    "content": "192de43a5dd688253fef90d397d5594b821deba711c2dda09647f8f11cd6e508",
     "description": "09bb58e98cc226d9c0a15ae7af665bf640be1023b91758076240843500b1607e",
     "source_docstring": "684f5504ecd819cd27ef806b518e4558c7e77aeb73785c25f6610c47fe0dc9bb"
   },
@@ -762,6 +767,11 @@
     "description": "2225ee334d41366a06dbb2cd963c1661ffdb47a6c388658bc96b9d112f89db2a",
     "source_docstring": "2225ee334d41366a06dbb2cd963c1661ffdb47a6c388658bc96b9d112f89db2a"
   },
+  "en/rlsbl-registry.md": {
+    "content": "3dbef22b2d773d4c005d8b7e4d23159bfd56ccf3ccd2baf18a010b44cca62348",
+    "description": "05629b56c56cb273243d4ded3f8f26041a1dbc9b69c015466422eb8c23d518ea",
+    "source_docstring": "05629b56c56cb273243d4ded3f8f26041a1dbc9b69c015466422eb8c23d518ea"
+  },
   "en/rlsbl-releasable_cleanup.md": {
     "content": "ff5214a8937a7c633f931769484fb0e086ffc4a04885a6156028561f33a36a6a",
     "description": "9455270e7d73888efde51e103acabaa1bc74de18ad8427c11fd279f9002bc457",
@@ -773,7 +783,7 @@
     "source_docstring": "ff02f45d8b2c6fedbab0c8d8b52e39ddf947797db408531199fc15ff1f7466fe"
   },
   "en/rlsbl-release_file.md": {
-    "content": "92acd548ab5e42c0c2d970527db991460ccea15b4367d09ed0e3e7749dc374d3",
+    "content": "2cb261895de011170b81b8dbccb9857be682d926b42c25d23a1f2e9cdfe9f2c3",
     "description": "074713a166f4628674713dc9e58a7db9829cc4d8259c5986ef855f3957ff0e40",
     "source_docstring": "5b8c33d80d4af70a52f926a26aec418d3121be319b5c3af29f9e802f30a4652e"
   },
@@ -793,7 +803,7 @@
     "source_docstring": "1dab5473e391e8bb1f1cad9802c9de83079fd1461e8ce00a68091cfa332a2b31"
   },
   "en/rlsbl-targets-base.md": {
-    "content": "04543cb293699a880093c834ded92ef2125d02b0c1a0489c2ad07a201e661158",
+    "content": "f1e4de76d4fecfe1b4f6e4521be0e44b9be082f9e18f5c1af20efeb6d2669d72",
     "description": "9c45f2d173069765b86d5b12cc6ace11871012cf64a449c29879627cba6d68d1",
     "source_docstring": "d3cef465ea6650eb83544c087112b90d4df665ffeb56fd88a740fb2dfa85df92"
   },
@@ -890,7 +900,7 @@
     "source_docstring": "2bab8fa460830afeb86fab5e45a53cf1d0ad9f94294d4539dffa9ea72081eb59"
   },
   "en/rlsbl-targets-pypi.md": {
-    "content": "b4d44c1403eb50df318456d9152294f6782584622b26f24e063d1fae80c95472",
+    "content": "9a58f3eb91c0b10a2b28301bad421bb6b244bbd00b17885a54d7b14dd5dd7130",
     "description": "08730d9c6f4b56924c278f9df4f1739470c2b2edc610266ec247ea3658fee261",
     "source_docstring": "aaef0b2eac70168d6c923388d01dfbfd45f4a52b9a961cc9677260f957e160fc"
   },
@@ -935,7 +945,7 @@
     "source_docstring": "832bd4a6a4e17081aa955b5cd23dca00e16c8807676827c44402f4f27d76fe93"
   },
   "en/rlsbl-utils.md": {
-    "content": "d8a0462f28716669e0034dcb5fc1231ecbcfbea0668141697611a80be19eba79",
+    "content": "a1ffaeefce0ae1f2f194b4d66eabf23a77357d6f3b7fa52166b936cd3d3e4bc0",
     "description": "792fe47ae6871b00df2974a48b8915720f762635cbeb8b6c18cf43451966abe8",
     "source_docstring": "42d9cf2bc7400397bd0711f5f758dad6f285ed1a2aaf911fec9c690666011cfb"
   },
@@ -950,7 +960,7 @@
     "source_docstring": "cbc6efd4505a9d5f40720a9c4b6607789053bc8eb9137163a99e5e3ca41e240e"
   },
   "en/rlsbl.md": {
-    "content": "909e595ec1772756cfc575a66196e0aa2d2637583e443c34bd5f5304f9609292",
+    "content": "a4343bbf4ca2499f209097c6cbe03a7a7a69e804cf5fd535bd538f2f3cfd1ad7",
     "description": "846d7106c20777b824e0116e8e62127eb6c86ab277fe4904e1cbecc2e9839d43",
     "source_docstring": "68bb1a67dac6f4a7650d2caa71eb15eba57ae3de312ab26eba869806b91420cd"
   },
@@ -959,7 +969,7 @@
     "description": "598d83250a3323ab6a05742ec023189563bed4b49139f3240533da2bf63afe11"
   },
   "en/targets.md": {
-    "content": "f2dd578772990e2ee296b8282ef6f66931124c0c73109deca57561f91937b9d7",
+    "content": "9a8fb30c8ad555e7786779f7170c25cc4503161f4c158b66f1066be980a56627",
     "description": "b95797e13fbcdab0b3128fc7d664c84ffd9042fbd600266b57c5e9569f7d5a05",
     "source_docstring": "c56d3fd8faeccc73911eabfe28f4f825c8b563105a8f969351411cbc6784f2fc"
   },
