@@ -393,6 +393,7 @@ class TestCmdReleaseMissingFile:
                 no_watch=True,
                 bump="",
                 description="",
+                preid="",
             )
 
         assert exc_info.value.code == 1
@@ -425,6 +426,7 @@ class TestCmdReleaseInvalidFile:
                 no_watch=True,
                 bump="",
                 description="",
+                preid="",
             )
 
         assert exc_info.value.code == 1
