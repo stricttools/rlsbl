@@ -1,0 +1,12 @@
+# Version bump type: patch, minor, major, hotfix, or prerelease
+bump = "minor"
+# Short description of this release (required)
+description = "Pre-release channels, PR-based release flow, idempotent release resume, registry version detection, and remote release dispatch."
+# Optional context explaining why these changes were made
+context = "This release adds three major capabilities: (1) pre-release channel support with PEP 440 translation and npm dist-tags, (2) PR-based release flow as an alternative to direct push, and (3) idempotent release resume for recovering from mid-release failures. Also adds registry version drift detection and a workflow_dispatch template for remote release triggers."
+# Pre-release identifier: alpha, beta, rc, or stable
+# preid = ""
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["npm", "pypi"]
+exclude = []
