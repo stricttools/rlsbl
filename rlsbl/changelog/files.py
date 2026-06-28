@@ -14,7 +14,16 @@ import tempfile
 from .schema import ChangelogEntry, parse_entry, parse_jsonl, serialize_entry
 from ..errors import ChangelogError
 
-_VERSION_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)\.jsonl$")
+_VERSION_RE = re.compile(
+    r"^(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta|rc)\.(\d+))?\.jsonl$"
+)
+
+# Maps pre-release identifiers to sort rank.  Stable versions use
+# is_stable=1 which sorts after all pre-releases (is_stable=0).
+_PREID_RANK = {"alpha": 0, "beta": 1, "rc": 2}
+
+# Sort key type: (major, minor, patch, is_stable, preid_rank, counter)
+_SemverKey = tuple[int, int, int, int, int, int]
 
 
 @dataclass
@@ -25,12 +34,23 @@ class RemapResult:
     hashes_remapped: int
 
 
-def _parse_semver(filename: str) -> tuple[int, int, int] | None:
-    """Extract (major, minor, patch) from a versioned filename, or None."""
+def _parse_semver(filename: str) -> _SemverKey | None:
+    """Extract a sort key from a versioned filename, or None.
+
+    Returns ``(major, minor, patch, is_stable, preid_rank, counter)``
+    where ``is_stable`` is 1 for stable versions (so they sort after
+    pre-releases) and ``preid_rank`` maps alpha=0, beta=1, rc=2.
+    """
     m = _VERSION_RE.match(filename)
     if not m:
         return None
-    return (int(m.group(1)), int(m.group(2)), int(m.group(3)))
+    major, minor, patch = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    preid = m.group(4)
+    if preid is None:
+        # Stable version — sorts after all pre-releases of the same base.
+        return (major, minor, patch, 1, 0, 0)
+    counter = int(m.group(5))
+    return (major, minor, patch, 0, _PREID_RANK[preid], counter)
 
 
 def get_changes_dir(project_path: str) -> str:
@@ -44,18 +64,22 @@ def changes_dir_exists(project_path: str) -> bool:
 
 
 def list_versioned_files(changes_dir: str) -> list[tuple[str, str]]:
-    """List all x.y.z.jsonl files, sorted by semver (newest first).
+    """List all versioned JSONL files, sorted by semver (newest first).
+
+    Matches both stable (``x.y.z.jsonl``) and pre-release
+    (``x.y.z-preid.N.jsonl``) filenames.
 
     Returns (version_string, filepath) pairs.
     """
-    results: list[tuple[tuple[int, int, int], str, str]] = []
+    results: list[tuple[_SemverKey, str, str]] = []
     if not os.path.isdir(changes_dir):
         return []
     for name in os.listdir(changes_dir):
-        semver = _parse_semver(name)
-        if semver is not None:
-            version_str = f"{semver[0]}.{semver[1]}.{semver[2]}"
-            results.append((semver, version_str, os.path.join(changes_dir, name)))
+        sort_key = _parse_semver(name)
+        if sort_key is not None:
+            # Strip the .jsonl suffix to recover the version string.
+            version_str = name[: -len(".jsonl")]
+            results.append((sort_key, version_str, os.path.join(changes_dir, name)))
     # Sort by semver tuple descending (newest first)
     results.sort(key=lambda x: x[0], reverse=True)
     return [(ver, path) for _, ver, path in results]
