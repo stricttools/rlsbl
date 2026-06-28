@@ -7,6 +7,7 @@ import traceback
 
 from ..changelog.files import get_changes_dir, unfinalize_version
 from ..changelog.generate import generate_changelog
+from ..config import get_release_mode, validate_release_mode
 from ..release_file import unfinalize_release_file
 from ..targets import TARGETS, detect_targets
 from ..utils import run, run_gh, check_gh_installed, check_gh_auth, get_push_timeout, get_current_branch, push_if_needed, is_clean_tree
@@ -29,6 +30,147 @@ def _print_summary(results):
     print("-" * len(header))
     for step_name, status, remediation in results:
         print(f"{step_name:<{step_width}}  {status:<{status_width}}  {remediation}")
+
+
+def _detect_pr_state(release_branch, config):
+    """Detect the state of a PR-mode release branch.
+
+    Returns:
+        "open"   -- branch exists and PR is not merged (can be undone by closing PR)
+        "merged" -- PR was merged (fall through to imperative undo)
+        "none"   -- no release branch found (fall through to imperative undo)
+    """
+    # Check if the branch exists locally
+    local_exists = False
+    try:
+        run("git", ["rev-parse", "--verify", f"refs/heads/{release_branch}"])
+        local_exists = True
+    except Exception:
+        pass
+
+    # Check if the branch exists on remote
+    remote_exists = False
+    try:
+        result = run("git", ["ls-remote", "--heads", "origin", release_branch])
+        if result.strip():
+            remote_exists = True
+    except Exception:
+        pass
+
+    if not local_exists and not remote_exists:
+        # Branch doesn't exist at all -- either never created or already merged/deleted
+        # Try to check if a PR was merged
+        try:
+            pr_state = run_gh(
+                ["pr", "view", release_branch, "--json", "state", "--jq", ".state"],
+                config=config,
+            )
+            if pr_state.strip().upper() == "MERGED":
+                return "merged"
+        except Exception:
+            pass
+        return "none"
+
+    # Branch exists -- check PR state
+    try:
+        pr_state = run_gh(
+            ["pr", "view", release_branch, "--json", "state", "--jq", ".state"],
+            config=config,
+        )
+        if pr_state.strip().upper() == "MERGED":
+            return "merged"
+    except Exception:
+        pass  # No PR found, but branch exists -- treat as open (branch cleanup needed)
+
+    return "open"
+
+
+def _undo_pr_release(tag, release_branch, bare_version, flags,
+                     monorepo_name, monorepo_project_path, ws_root, ctx):
+    """Undo a PR-mode release by closing the PR and cleaning up the branch.
+
+    Called when the release PR is still open (not merged). Closes the PR,
+    deletes the remote and local release branch, and restores the release
+    file and changelog state.
+    """
+    print(f"This will undo PR-mode release {tag}:")
+    print(f"  - Close the release PR for branch {release_branch}")
+    print(f"  - Delete release branch {release_branch} (local + remote)")
+    print(f"  - Restore release file and changelog state")
+
+    if not flags.get("yes"):
+        try:
+            answer = input("\nThis is destructive. Proceed? [y/N] ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print("\nAborted.")
+            sys.exit(1)
+        if answer != "y":
+            print("Aborted.")
+            sys.exit(0)
+
+    results = []
+
+    # Close the PR
+    try:
+        run_gh(["pr", "close", release_branch], config=ctx.config)
+        results.append(("Close PR", OK, "-"))
+    except Exception:
+        # PR may not exist (branch was created but PR wasn't)
+        results.append(("Close PR", SKIPPED, "no open PR found"))
+
+    # Delete remote branch
+    try:
+        undo_push_env = {**os.environ, "RLSBL_RELEASE_PUSH": "1"}
+        run("git", ["push", "origin", "--delete", release_branch],
+            timeout=get_push_timeout(ctx.config), env=undo_push_env)
+        results.append(("Delete remote branch", OK, "-"))
+    except Exception:
+        traceback.print_exc()
+        results.append(("Delete remote branch", FAILED,
+                         f"git push origin --delete {release_branch}"))
+
+    # Delete local branch
+    try:
+        run("git", ["branch", "-D", release_branch])
+        results.append(("Delete local branch", OK, "-"))
+    except Exception:
+        # Local branch may not exist (e.g., on a different machine)
+        results.append(("Delete local branch", SKIPPED, "branch not found locally"))
+
+    # Restore changelog state (unfinalize if needed)
+    project_path = os.path.join(ws_root, monorepo_project_path) if monorepo_name else str(ctx.project_root or ".")
+    try:
+        changes_dir = get_changes_dir(project_path)
+        restored = unfinalize_version(changes_dir, bare_version)
+        if restored:
+            generate_changelog(project_path)
+            run("git", ["add", changes_dir, os.path.join(project_path, "CHANGELOG.md")])
+            run("git", ["commit", "-m", f"chore: restore changelog after undo of {tag}"])
+            results.append(("Restore changelog", OK, "-"))
+    except Exception:
+        traceback.print_exc()
+        results.append(("Restore changelog", FAILED,
+                         "manually restore .rlsbl/changes/ and regenerate CHANGELOG.md"))
+
+    # Restore the release file
+    try:
+        releases_dir = os.path.join(project_path, ".rlsbl", "releases")
+        release_file_changed = unfinalize_release_file(releases_dir, bare_version)
+        if release_file_changed:
+            run("git", ["add", releases_dir])
+            run("git", ["commit", "-m", f"chore: restore release file after undo of {tag}"])
+            results.append(("Restore release file", OK, "-"))
+    except Exception:
+        traceback.print_exc()
+        results.append(("Restore release file", FAILED,
+                         f"manually restore .rlsbl/releases/unreleased.toml from v{bare_version}.toml"))
+
+    # Print summary
+    has_failure = any(status == FAILED for _, status, _ in results)
+    if has_failure:
+        _print_summary(results)
+    else:
+        print("\nRelease PR closed and branch deleted.")
 
 
 def run_cmd(registry, args, flags, *, ctx):
@@ -86,6 +228,27 @@ def run_cmd(registry, args, flags, *, ctx):
     except Exception:
         print("Error: no tags found. Nothing to undo.", file=sys.stderr)
         sys.exit(1)
+
+    # Detect release mode (imperative or pr)
+    validate_release_mode(ctx.config)
+    release_mode = get_release_mode(ctx.config)
+
+    # Extract version for PR branch name detection
+    _ver_match_for_branch = re.search(r"v(\d+\.\d+\.\d+(?:-[a-z]+\.\d+)?)$", tag)
+    _version_for_branch = _ver_match_for_branch.group(1) if _ver_match_for_branch else tag.lstrip("v")
+    release_branch = f"release/v{_version_for_branch}"
+
+    # PR mode: check if this is an unmerged PR release
+    if release_mode == "pr":
+        pr_state = _detect_pr_state(release_branch, ctx.config)
+        if pr_state == "open":
+            _undo_pr_release(
+                tag, release_branch, _version_for_branch, flags,
+                monorepo_name, monorepo_project_path, ws_root,
+                ctx,
+            )
+            return
+        # pr_state is "merged" or "none" -- fall through to imperative undo
 
     print(f"This will undo release {tag}:")
     print(f"  - Delete git tag {tag} (local + remote)")
