@@ -432,17 +432,63 @@ def commit_files_if_changed(
     return True
 
 
-def bump_version(version, bump_type):
-    """Bump a semver version string by the given type (patch, minor, major, hotfix).
+PREID_ORDER = ("alpha", "beta", "rc", "stable")
 
-    Handles pre-release suffixes (e.g. "1.0.0-beta.1"): the suffix is stripped
-    and the bump is applied to the base version.
 
-    Returns the new version string (always clean, no pre-release suffix).
+def _parse_prerelease_suffix(version):
+    """Parse the pre-release suffix from a semver version string.
+
+    Returns (preid, counter) if the version has a suffix like "-alpha.0",
+    or (None, None) if no suffix is present.
+
+    Raises VersionError if the suffix format is invalid.
     """
-    # Strip pre-release suffix (everything after the first hyphen)
-    base_version = version.split("-", 1)[0]
+    if "-" not in version:
+        return None, None
+    _, suffix = version.split("-", 1)
+    parts = suffix.rsplit(".", 1)
+    if len(parts) != 2:
+        raise VersionError(
+            f'Invalid pre-release suffix in "{version}": '
+            f'expected format "preid.N" (e.g. "alpha.0")'
+        )
+    preid, counter_str = parts
+    try:
+        counter = int(counter_str)
+    except ValueError:
+        raise VersionError(
+            f'Invalid pre-release counter in "{version}": '
+            f'"{counter_str}" is not an integer'
+        )
+    return preid, counter
 
+
+def bump_version(version, bump_type, preid=""):
+    """Bump a semver version string by the given type.
+
+    Supported bump types: patch, minor, major, hotfix, prerelease.
+
+    When preid is set with a standard bump (patch/minor/major), the bumped
+    base version gets a pre-release suffix appended: e.g. minor + alpha
+    on "0.42.0" produces "0.43.0-alpha.0".
+
+    When bump_type is "prerelease":
+    - The current version must have a pre-release suffix.
+    - If preid is empty or matches the current preid: increment the counter.
+    - If preid is "stable": strip the suffix, return the base version.
+    - If preid is higher in the ordering (alpha < beta < rc < stable): promote.
+    - If preid is lower: error (cannot demote).
+
+    Hotfix with preid is a hard error.
+
+    Without preid, the existing behavior is preserved: strip any pre-release
+    suffix and bump the base version normally.
+    """
+    if bump_type == "hotfix" and preid:
+        raise VersionError("hotfix releases cannot be pre-releases")
+
+    # Parse base version
+    base_version = version.split("-", 1)[0]
     parts = base_version.split(".")
     if len(parts) != 3:
         raise VersionError(f'Invalid semver version: "{version}"')
@@ -451,16 +497,60 @@ def bump_version(version, bump_type):
     except ValueError:
         raise VersionError(f'Invalid semver version: "{version}"')
 
+    if bump_type == "prerelease":
+        current_preid, current_counter = _parse_prerelease_suffix(version)
+        if current_preid is None:
+            raise VersionError(
+                f'Cannot bump prerelease on stable version "{version}": '
+                f'no pre-release suffix found'
+            )
+
+        if not preid or preid == current_preid:
+            # Increment counter
+            return f"{major}.{minor}.{patch}-{current_preid}.{current_counter + 1}"
+
+        if preid == "stable":
+            return f"{major}.{minor}.{patch}"
+
+        # Validate preid ordering
+        if preid not in PREID_ORDER:
+            raise VersionError(
+                f'Unknown preid "{preid}". '
+                f"Must be one of: {', '.join(PREID_ORDER)}"
+            )
+        current_rank = PREID_ORDER.index(current_preid) if current_preid in PREID_ORDER else -1
+        new_rank = PREID_ORDER.index(preid)
+        if new_rank <= current_rank:
+            raise VersionError(
+                f'Cannot demote pre-release from "{current_preid}" to "{preid}"'
+            )
+        # Promote to new preid
+        return f"{major}.{minor}.{patch}-{preid}.0"
+
+    # Standard bumps: patch, minor, major, hotfix
     if bump_type == "major":
-        return f"{major + 1}.0.0"
+        new_base = f"{major + 1}.0.0"
     elif bump_type == "minor":
-        return f"{major}.{minor + 1}.0"
+        new_base = f"{major}.{minor + 1}.0"
     elif bump_type == "patch":
-        return f"{major}.{minor}.{patch + 1}"
+        new_base = f"{major}.{minor}.{patch + 1}"
     elif bump_type == "hotfix":
-        return f"{major}.{minor}.{patch + 1}"
+        new_base = f"{major}.{minor}.{patch + 1}"
     else:
-        raise VersionError(f'Invalid bump type: "{bump_type}". Use patch, minor, major, or hotfix.')
+        raise VersionError(
+            f'Invalid bump type: "{bump_type}". '
+            f'Use patch, minor, major, hotfix, or prerelease.'
+        )
+
+    if preid:
+        if preid not in PREID_ORDER:
+            raise VersionError(
+                f'Unknown preid "{preid}". '
+                f"Must be one of: {', '.join(PREID_ORDER)}"
+            )
+        return f"{new_base}-{preid}.0"
+
+    return new_base
 
 
 def is_private_repo():
