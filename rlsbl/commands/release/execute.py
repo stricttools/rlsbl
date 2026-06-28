@@ -577,6 +577,11 @@ def _run_release_mutating(state: ReleaseState):
     # the uncommitted version-bumped files if the release aborts.
     pre_release_sha = run("git", ["rev-parse", "HEAD"])
 
+    # Track whether the branch push succeeded. Once commits are on the
+    # remote, a local `git reset --hard` would create divergent state.
+    # Set to True after push_if_needed() returns successfully.
+    branch_pushed = False
+
     # Everything from version-bump writes through commit/tag/push is wrapped
     # in a single try block so that any failure (including ReleaseAbortError
     # from the unexpected-files check) triggers rollback of version-bumped
@@ -895,11 +900,35 @@ def _run_release_mutating(state: ReleaseState):
         # "manual push" warning. The hook still runs JSONL coverage checks.
         push_env = {**os.environ, "RLSBL_RELEASE_PUSH": "1"}
         push_if_needed(branch, env=push_env, config=ctx.config)
+        branch_pushed = True
         run("git", ["push", "origin", tag] + state.companion_tags, timeout=push_timeout, env=push_env)
         log(f"Pushed to origin/{branch}")
     except ReleaseAbortError as e:
-        # Release was explicitly aborted (e.g., unexpected dirty files).
-        # Roll back version-bumped files so the working tree is clean.
+        if branch_pushed:
+            # Commits are already on the remote. Do NOT roll back locally --
+            # that would create divergent local/remote state.
+            # Retry tag push before giving up.
+            _tag_recovered = False
+            for _attempt in range(2):
+                time.sleep(1)
+                try:
+                    run("git", ["push", "origin", tag] + state.companion_tags, timeout=push_timeout, env=push_env)
+                    _tag_recovered = True
+                    log(f"Tag push succeeded on retry {_attempt + 1}")
+                    break
+                except Exception:
+                    pass
+            if not _tag_recovered:
+                all_tags = [tag] + list(state.companion_tags)
+                tag_list = " ".join(all_tags)
+                print(
+                    f"Commits pushed successfully but tag push failed.\n"
+                    f"To complete the release manually:\n"
+                    f"  git push origin {tag_list}",
+                    file=sys.stderr,
+                )
+            raise
+        # Branch was not pushed yet -- safe to roll back locally.
         run("git", ["reset", "--hard", pre_release_sha])
         _cleanup_release_artifacts(project_dir, new_version)
         print(str(e), file=sys.stderr)
@@ -909,9 +938,36 @@ def _run_release_mutating(state: ReleaseState):
         )
         raise
     except Exception as e:
-        # Roll back local mutations: delete tag (may not exist yet) and
-        # reset commits so the working tree looks like it did before the
-        # release attempt.
+        if branch_pushed:
+            # Commits are already on the remote. Do NOT roll back locally --
+            # that would create divergent local/remote state.
+            # Retry tag push before giving up.
+            _tag_recovered = False
+            for _attempt in range(2):
+                time.sleep(1)
+                try:
+                    run("git", ["push", "origin", tag] + state.companion_tags, timeout=push_timeout, env=push_env)
+                    _tag_recovered = True
+                    log(f"Tag push succeeded on retry {_attempt + 1}")
+                    break
+                except Exception:
+                    pass
+            if not _tag_recovered:
+                all_tags = [tag] + list(state.companion_tags)
+                tag_list = " ".join(all_tags)
+                if hasattr(e, 'stderr') and e.stderr:
+                    print(f"Command error: {e.stderr.strip()}", file=sys.stderr)
+                print(
+                    f"Commits pushed successfully but tag push failed.\n"
+                    f"To complete the release manually:\n"
+                    f"  git push origin {tag_list}",
+                    file=sys.stderr,
+                )
+            # Do NOT delete the local tag -- it's needed for manual recovery
+            raise
+        # Branch was not pushed yet -- safe to roll back locally.
+        # Delete tag (may not exist yet) and reset commits so the working
+        # tree looks like it did before the release attempt.
         try:
             run("git", ["tag", "-d", tag])
         except Exception:
