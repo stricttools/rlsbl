@@ -161,6 +161,18 @@ class BaseTarget:
         """
         return []
 
+    def format_version(self, version):
+        """Format a semver version for this target's ecosystem.
+
+        The default implementation returns the version unchanged (identity).
+        This is correct for npm, Go, Cargo, Deno, plain, and most targets
+        where semver is used directly.
+
+        Targets with different version conventions (e.g. PyPI's PEP 440)
+        override this to translate from semver to the ecosystem format.
+        """
+        return version
+
     def dev_install_command(self, project_dir):
         """Specs for local install via `rlsbl dev install`, keyed by mode.
 

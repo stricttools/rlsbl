@@ -16,6 +16,15 @@ from ..utils import run
 
 _MIN_VERSION_RE = re.compile(r">=\s*(\d+\.\d+(?:\.\d+)?)")
 
+# Semver pre-release preid -> PEP 440 pre-release tag
+_SEMVER_TO_PEP440 = {"alpha": "a", "beta": "b", "rc": "rc"}
+# PEP 440 pre-release tag -> semver preid
+_PEP440_TO_SEMVER = {v: k for k, v in _SEMVER_TO_PEP440.items()}
+
+# Matches a PEP 440 pre-release suffix at the end of a version string:
+# e.g. "1.2.3a0", "1.2.3b1", "1.2.3rc2"
+_PEP440_PRE_RE = re.compile(r"^(\d+\.\d+\.\d+)(a|b|rc)(\d+)$")
+
 
 def find_dunder_version_node(content: str) -> "ast.Constant | None":
     """Find an __version__ assignment with a static string literal via AST.
@@ -125,33 +134,81 @@ class PypiTarget(BaseTarget):
             result["description"] = description
         return result
 
+    def format_version(self, version):
+        """Translate semver pre-release to PEP 440 format.
+
+        - ``1.2.3-alpha.0`` -> ``1.2.3a0``
+        - ``1.2.3-beta.1``  -> ``1.2.3b1``
+        - ``1.2.3-rc.2``    -> ``1.2.3rc2``
+        - Stable versions pass through unchanged.
+        """
+        if "-" not in version:
+            return version
+        base, suffix = version.split("-", 1)
+        parts = suffix.rsplit(".", 1)
+        if len(parts) != 2:
+            return version
+        preid, counter = parts[0], parts[1]
+        pep440_tag = _SEMVER_TO_PEP440.get(preid)
+        if pep440_tag is None:
+            return version
+        return f"{base}{pep440_tag}{counter}"
+
+    @staticmethod
+    def _pep440_to_semver(version):
+        """Translate PEP 440 pre-release back to semver format.
+
+        - ``1.2.3a0``  -> ``1.2.3-alpha.0``
+        - ``1.2.3b1``  -> ``1.2.3-beta.1``
+        - ``1.2.3rc2`` -> ``1.2.3-rc.2``
+        - Stable versions pass through unchanged.
+        """
+        m = _PEP440_PRE_RE.match(version)
+        if not m:
+            return version
+        base, tag, counter = m.group(1), m.group(2), m.group(3)
+        preid = _PEP440_TO_SEMVER.get(tag)
+        if preid is None:
+            return version
+        return f"{base}-{preid}.{counter}"
+
     def read_version(self, dir_path):
-        """Read the version from pyproject.toml in the given directory."""
+        """Read the version from pyproject.toml in the given directory.
+
+        If the version is in PEP 440 pre-release format (e.g. ``1.2.3a0``),
+        it is converted back to semver format (``1.2.3-alpha.0``) so that
+        all internal version handling uses a consistent semver representation.
+        """
         toml_path = os.path.join(dir_path, "pyproject.toml")
         with open(toml_path, "rb") as f:
             data = tomllib.load(f)
         try:
-            return data["project"]["version"]
+            raw = data["project"]["version"]
         except KeyError:
             raise VersionError(f"No [project].version in {toml_path}")
+        return self._pep440_to_semver(raw)
 
     def write_version(self, dir_path, version, ctx):
         """Write a new version to pyproject.toml and __version__ in package source.
 
+        Translates semver pre-release versions to PEP 440 format before
+        writing (e.g. ``1.2.3-alpha.0`` -> ``1.2.3a0``).
+
         Returns a list of relative file paths (relative to dir_path) that
         were modified.
         """
+        pep440_version = self.format_version(version)
         path = os.path.join(dir_path, "pyproject.toml")
         with open(path, "r", encoding="utf-8") as f:
             doc = tomlkit.parse(f.read())
-        doc["project"]["version"] = version
+        doc["project"]["version"] = pep440_version
         tmp_path = path + ".tmp"
         with open(tmp_path, "w", encoding="utf-8") as f:
             f.write(tomlkit.dumps(doc))
         os.replace(tmp_path, path)
 
         modified = ["pyproject.toml"]
-        dunder_path = self._update_dunder_version(dir_path, doc, version)
+        dunder_path = self._update_dunder_version(dir_path, doc, pep440_version)
         if dunder_path:
             modified.append(dunder_path)
         return modified
