@@ -437,12 +437,20 @@ class ReleaseState:
     hook_generated: set | None = None
     secondary_targets: dict | None = None
     companion_tags: list[str] = dataclasses.field(default_factory=list)
+    completed_steps: list[str] = dataclasses.field(default_factory=list)
+
+    # Release config fields (persisted in state file for resume)
+    include: list[str] = dataclasses.field(default_factory=list)
+    exclude: list[str] = dataclasses.field(default_factory=list)
+    preid: str = ""
+    blog: bool = False
 
     # Control
     flags: dict = dataclasses.field(default_factory=dict)
     quiet: bool = False
     log: object = None  # callable
     ctx: object = None  # ProjectContext
+    release_mode: str = "imperative"  # "imperative" or "pr"
 
 
 def _run_release_mutating(state: ReleaseState):
@@ -595,16 +603,21 @@ def _run_release_mutating(state: ReleaseState):
         "pre_release_sha": pre_release_sha,
         "bump_type": bump_type,
         "registry": registry,
-        "completed_steps": [],
+        "completed_steps": list(state.completed_steps),
         "companion_tags": [],
         "monorepo_name": monorepo_name,
         "releasable_name": releasable_name,
         "commit_msg": commit_msg,
+        "description": description,
+        "context": context,
+        "include": list(state.include),
+        "exclude": list(state.exclude),
+        "preid": state.preid,
+        "blog": state.blog,
     }
     save_release_state(_state_path, _state_dict)
     # Load completed_steps to check which steps are already done (empty on
-    # fresh start; populated if resuming from a prior failed attempt whose
-    # state file was loaded by the caller).
+    # fresh start; populated when resuming from a prior failed attempt).
     _completed = set(_state_dict.get("completed_steps", []))
 
     # Track whether the branch push succeeded. Once commits are on the

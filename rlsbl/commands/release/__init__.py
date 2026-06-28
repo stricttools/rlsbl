@@ -136,6 +136,11 @@ def _run_cmd_inner(release_config, flags, *, ctx):
 
     validate_pipeline_config(config)
 
+    # Validate and resolve release mode (imperative or pr)
+    from ...config import validate_release_mode, get_release_mode
+    validate_release_mode(config)
+    release_mode = get_release_mode(config)
+
     # In batch mode the batch orchestrator already validated gh CLI,
     # clean tree, and branch/remote upfront -- skip redundant checks.
     if flags.get("batch-mode", False):
@@ -145,7 +150,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         validate_gh_cli()
         validate_gh_push_access(config)
         pre_existing_dirty = validate_clean_tree(flags)
-        branch = validate_branch_and_remote(flags)
+        branch = validate_branch_and_remote(flags, release_mode=release_mode)
 
     # --- Resolve context ---
     monorepo_name, monorepo_project_path, is_library, is_non_releasable, releasable_name = resolve_monorepo_context(
@@ -577,6 +582,10 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             pre_existing_dirty=pre_existing_dirty,
             hook_generated=hook_generated,
             secondary_targets=secondary_targets,
+            include=list(release_config.include),
+            exclude=list(release_config.exclude),
+            preid=release_config.preid,
+            blog=release_config.blog,
             flags=flags,
             quiet=quiet,
             log=log,
