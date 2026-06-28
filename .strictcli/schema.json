@@ -48,7 +48,7 @@
   },
   "project_id": "rlsbl",
   "name": "rlsbl",
-  "version": "0.90.1",
+  "version": "0.90.2",
   "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 32 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
   "global_flags": [
     {
@@ -142,6 +142,13 @@
           "name": "json",
           "type": "bool",
           "help": "Output version, branch, tag, and coverage as machine-readable JSON",
+          "default": false,
+          "negatable": true
+        },
+        {
+          "name": "registry",
+          "type": "bool",
+          "help": "Query the package registry for the latest published version",
           "default": false,
           "negatable": true
         }
@@ -392,7 +399,7 @@
             {
               "name": "bump",
               "type": "str",
-              "help": "Bump type: patch, minor, major, hotfix. Skips the release file.",
+              "help": "Bump type: patch, minor, major, hotfix, prerelease. Skips the release file.",
               "default": ""
             },
             {
@@ -401,6 +408,41 @@
               "help": "Release description (required with --bump)",
               "default": ""
             },
+            {
+              "name": "preid",
+              "type": "str",
+              "help": "Pre-release identifier: alpha, beta, rc, stable. Only valid with --bump.",
+              "default": ""
+            },
+            {
+              "name": "watch",
+              "type": "bool",
+              "help": "After release, automatically watch CI runs to completion",
+              "default": false,
+              "negatable": false
+            },
+            {
+              "name": "no-watch",
+              "type": "bool",
+              "help": "After release, print the watch command hint without watching",
+              "default": false,
+              "negatable": false
+            }
+          ],
+          "constraints": [
+            {
+              "type": "mutex",
+              "flags": [
+                "watch",
+                "no-watch"
+              ]
+            }
+          ]
+        },
+        "resume": {
+          "name": "resume",
+          "help": "Resume a previously failed release from where it left off. Reads the in-progress state file (.rlsbl/releases/in-progress.json), validates that the current branch matches the saved state, and re-enters the release flow, skipping already-completed steps.",
+          "flags": [
             {
               "name": "watch",
               "type": "bool",
