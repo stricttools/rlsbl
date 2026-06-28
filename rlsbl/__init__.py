@@ -221,9 +221,10 @@ release_group = app.group("release", help="Release orchestration commands. Provi
     ],
 )
 @strictcli.flag(name="allow-dirty", type=bool, help="Skip the clean working tree check and allow releasing with uncommitted changes")
-@strictcli.flag(name="bump", type=str, help="Bump type: patch, minor, major, hotfix. Skips the release file.", default="")
+@strictcli.flag(name="bump", type=str, help="Bump type: patch, minor, major, hotfix, prerelease. Skips the release file.", default="")
 @strictcli.flag(name="description", type=str, help="Release description (required with --bump)", default="")
-def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, no_watch, bump, description, **_kwargs):
+@strictcli.flag(name="preid", type=str, help="Pre-release identifier: alpha, beta, rc, stable. Only valid with --bump.", default="")
+def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, no_watch, bump, description, preid, **_kwargs):
     root = _require_sub_project_root()
 
     from .release_file import read_release_file, get_release_file_path, ReleaseConfig, VALID_BUMP_TYPES
@@ -246,6 +247,9 @@ def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, no_watch, bump, des
         project_dir = os.path.join(monorepo_root, project["path"])
 
     # --- Quick bump mode: --bump + --description bypass the release file ---
+    if preid and not bump:
+        print("Error: --preid requires --bump", file=sys.stderr)
+        sys.exit(1)
     if bump and not description:
         print("Error: --description is required when --bump is used", file=sys.stderr)
         sys.exit(1)
@@ -259,6 +263,14 @@ def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, no_watch, bump, des
                 file=sys.stderr,
             )
             sys.exit(1)
+        if preid:
+            from .release_file import VALID_PREIDS
+            if preid not in VALID_PREIDS:
+                print(
+                    f"Error: invalid preid {preid!r} (must be one of {VALID_PREIDS})",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
         release_path = get_release_file_path(project_dir)
         if os.path.exists(release_path):
             print(
@@ -291,6 +303,7 @@ def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, no_watch, bump, des
             include=target_names,
             exclude=[],
             description=description,
+            preid=preid,
         )
         from .commands.release.shared import build_release_flags
         flags = build_release_flags(dry_run, yes, quiet, allow_dirty, watch=watch)
@@ -377,15 +390,16 @@ def cmd_release_retry(dry_run, yes, quiet, watch, no_watch, **_kwargs):
 @app.command(name="status", help="Display the current project version, branch, last release tag, unreleased commit count, and changelog coverage. Outputs plain text by default or structured JSON with the --json flag.")
 @strictcli.flag(name="target", type=str, help="Target a specific registry (auto-detected if omitted)", default="")
 @strictcli.flag(name="json", type=bool, help="Output version, branch, tag, and coverage as machine-readable JSON")
-def cmd_status(target, json, **_kwargs):
+@strictcli.flag(name="registry", type=bool, help="Query the package registry for the latest published version", default=False)
+def cmd_status(target, json, registry, **_kwargs):
     root = _require_sub_project_root()
     from .workspace import find_workspace_root
     ws_root = find_workspace_root(str(root))
     ctx = create_context(root, workspace_root=Path(ws_root) if ws_root else None)
-    registry = _resolve_target(target or None)
-    flags = {"json": json}
+    target_name = _resolve_target(target or None)
+    flags = {"json": json, "registry": registry}
     from .commands.status import run_cmd
-    run_cmd(registry, [], flags, ctx=ctx)
+    run_cmd(target_name, [], flags, ctx=ctx)
 
 
 # ---------------------------------------------------------------------------
