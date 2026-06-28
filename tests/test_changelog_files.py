@@ -8,6 +8,7 @@ import pytest
 
 from conftest import run_git as _run_git, git_head as _git_head, make_commit as _make_commit
 from rlsbl.changelog.files import (
+    _parse_semver,
     append_entry,
     changes_dir_exists,
     finalize_version,
@@ -324,3 +325,206 @@ class TestIsReadOnly:
         f.write_text("hello")
         os.chmod(str(f), 0o444)
         assert is_read_only(str(f)) is True
+
+
+class TestParseSemverPrerelease:
+    """Tests for _parse_semver with pre-release filenames."""
+
+    def test_stable_version(self):
+        result = _parse_semver("1.2.3.jsonl")
+        assert result == (1, 2, 3, 1, 0, 0)
+
+    def test_alpha_version(self):
+        result = _parse_semver("0.43.0-alpha.0.jsonl")
+        assert result == (0, 43, 0, 0, 0, 0)
+
+    def test_beta_version(self):
+        result = _parse_semver("1.0.0-beta.3.jsonl")
+        assert result == (1, 0, 0, 0, 1, 3)
+
+    def test_rc_version(self):
+        result = _parse_semver("2.1.0-rc.7.jsonl")
+        assert result == (2, 1, 0, 0, 2, 7)
+
+    def test_non_versioned_returns_none(self):
+        assert _parse_semver("unreleased.jsonl") is None
+
+    def test_unknown_preid_returns_none(self):
+        assert _parse_semver("1.0.0-gamma.0.jsonl") is None
+
+    def test_no_extension_returns_none(self):
+        assert _parse_semver("1.0.0") is None
+
+    def test_sort_order_prerelease_before_stable(self):
+        """Pre-releases of the same base version sort before the stable release."""
+        alpha = _parse_semver("0.43.0-alpha.0.jsonl")
+        stable = _parse_semver("0.43.0.jsonl")
+        assert alpha < stable
+
+    def test_sort_order_alpha_before_beta(self):
+        alpha = _parse_semver("0.43.0-alpha.0.jsonl")
+        beta = _parse_semver("0.43.0-beta.0.jsonl")
+        assert alpha < beta
+
+    def test_sort_order_beta_before_rc(self):
+        beta = _parse_semver("0.43.0-beta.0.jsonl")
+        rc = _parse_semver("0.43.0-rc.0.jsonl")
+        assert beta < rc
+
+    def test_sort_order_rc_before_stable(self):
+        rc = _parse_semver("0.43.0-rc.0.jsonl")
+        stable = _parse_semver("0.43.0.jsonl")
+        assert rc < stable
+
+    def test_sort_order_alpha_counter_increment(self):
+        a0 = _parse_semver("0.43.0-alpha.0.jsonl")
+        a1 = _parse_semver("0.43.0-alpha.1.jsonl")
+        a5 = _parse_semver("0.43.0-alpha.5.jsonl")
+        assert a0 < a1 < a5
+
+    def test_sort_order_full_prerelease_cycle(self):
+        """Full sort order: alpha.0 < alpha.1 < beta.0 < rc.0 < stable."""
+        keys = [
+            _parse_semver("0.43.0-alpha.0.jsonl"),
+            _parse_semver("0.43.0-alpha.1.jsonl"),
+            _parse_semver("0.43.0-beta.0.jsonl"),
+            _parse_semver("0.43.0-rc.0.jsonl"),
+            _parse_semver("0.43.0.jsonl"),
+        ]
+        assert keys == sorted(keys)
+
+    def test_different_base_versions_still_sort_correctly(self):
+        """Pre-release of a higher base version sorts after stable of a lower."""
+        stable_low = _parse_semver("0.42.0.jsonl")
+        alpha_high = _parse_semver("0.43.0-alpha.0.jsonl")
+        assert stable_low < alpha_high
+
+
+class TestListVersionedFilesPrerelease:
+    """Tests for list_versioned_files with pre-release filenames."""
+
+    def test_includes_prerelease_files(self, tmp_path):
+        changes = tmp_path / "changes"
+        changes.mkdir()
+        for name in ["0.43.0-alpha.0.jsonl", "0.43.0.jsonl", "0.42.0.jsonl"]:
+            (changes / name).write_text("")
+
+        result = list_versioned_files(str(changes))
+        versions = [ver for ver, _ in result]
+        assert "0.43.0-alpha.0" in versions
+        assert "0.43.0" in versions
+        assert "0.42.0" in versions
+
+    def test_sorts_prerelease_before_stable(self, tmp_path):
+        changes = tmp_path / "changes"
+        changes.mkdir()
+        for name in [
+            "0.43.0.jsonl",
+            "0.43.0-alpha.0.jsonl",
+            "0.43.0-beta.0.jsonl",
+            "0.43.0-rc.0.jsonl",
+        ]:
+            (changes / name).write_text("")
+
+        result = list_versioned_files(str(changes))
+        versions = [ver for ver, _ in result]
+        # Newest first (descending), so stable first, then rc, beta, alpha
+        assert versions == [
+            "0.43.0",
+            "0.43.0-rc.0",
+            "0.43.0-beta.0",
+            "0.43.0-alpha.0",
+        ]
+
+    def test_mixed_stable_and_prerelease_sort(self, tmp_path):
+        changes = tmp_path / "changes"
+        changes.mkdir()
+        for name in [
+            "0.42.0.jsonl",
+            "0.43.0-alpha.0.jsonl",
+            "0.43.0-alpha.1.jsonl",
+            "0.43.0-beta.0.jsonl",
+            "0.43.0.jsonl",
+            "1.0.0-rc.0.jsonl",
+        ]:
+            (changes / name).write_text("")
+
+        result = list_versioned_files(str(changes))
+        versions = [ver for ver, _ in result]
+        assert versions == [
+            "1.0.0-rc.0",
+            "0.43.0",
+            "0.43.0-beta.0",
+            "0.43.0-alpha.1",
+            "0.43.0-alpha.0",
+            "0.42.0",
+        ]
+
+    def test_ignores_unknown_preid_files(self, tmp_path):
+        """Files with unknown preids (e.g. gamma) are silently ignored."""
+        changes = tmp_path / "changes"
+        changes.mkdir()
+        (changes / "1.0.0.jsonl").write_text("")
+        (changes / "1.0.0-gamma.0.jsonl").write_text("")
+
+        result = list_versioned_files(str(changes))
+        versions = [ver for ver, _ in result]
+        assert versions == ["1.0.0"]
+
+    def test_returns_full_paths_for_prerelease(self, tmp_path):
+        changes = tmp_path / "changes"
+        changes.mkdir()
+        (changes / "0.43.0-alpha.0.jsonl").write_text("")
+
+        result = list_versioned_files(str(changes))
+        assert result[0][1] == str(changes / "0.43.0-alpha.0.jsonl")
+
+
+class TestFinalizeVersionPrerelease:
+    """Tests for finalize_version with pre-release versions."""
+
+    def test_finalize_prerelease_version(self, tmp_path):
+        changes = tmp_path / "changes"
+        changes.mkdir()
+        unreleased = changes / "unreleased.jsonl"
+        unreleased.write_text(
+            json.dumps({"commits": ["abc"], "user_facing": False}) + "\n"
+        )
+
+        finalize_version(str(changes), "0.43.0-alpha.0")
+
+        versioned = changes / "0.43.0-alpha.0.jsonl"
+        assert versioned.exists()
+        assert not unreleased.read_text().strip()
+        entries = parse_jsonl(str(versioned))
+        assert len(entries) == 1
+        assert entries[0].commits == ["abc"]
+
+    def test_finalize_prerelease_is_read_only(self, tmp_path):
+        changes = tmp_path / "changes"
+        changes.mkdir()
+        (changes / "unreleased.jsonl").write_text(
+            json.dumps({"commits": ["abc"], "user_facing": False}) + "\n"
+        )
+
+        finalize_version(str(changes), "1.0.0-beta.3")
+
+        versioned = changes / "1.0.0-beta.3.jsonl"
+        mode = os.stat(str(versioned)).st_mode
+        assert not (mode & stat.S_IWUSR)
+        assert not (mode & stat.S_IWGRP)
+        assert not (mode & stat.S_IWOTH)
+
+    def test_finalize_prerelease_shows_up_in_list(self, tmp_path):
+        """A finalized pre-release file is discoverable by list_versioned_files."""
+        changes = tmp_path / "changes"
+        changes.mkdir()
+        (changes / "unreleased.jsonl").write_text(
+            json.dumps({"commits": ["abc"], "user_facing": False}) + "\n"
+        )
+
+        finalize_version(str(changes), "0.43.0-alpha.0")
+
+        result = list_versioned_files(str(changes))
+        versions = [ver for ver, _ in result]
+        assert "0.43.0-alpha.0" in versions
