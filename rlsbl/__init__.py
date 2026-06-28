@@ -246,24 +246,6 @@ def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, no_watch, bump, des
             sys.exit(1)
         project_dir = os.path.join(monorepo_root, project["path"])
 
-    # --- Check for in-progress release ---
-    from .commands.release.release_state import get_state_path, load_release_state
-    _in_progress_path = get_state_path(project_dir)
-    _in_progress = load_release_state(_in_progress_path)
-    if _in_progress is not None:
-        _ip_version = _in_progress.get("new_version", "unknown")
-        _ip_steps = _in_progress.get("completed_steps", [])
-        _ip_total = 6  # VERSION_BUMPED, COMMITTED, CHANGELOG_FINALIZED, RELEASE_FILE_FINALIZED, TAGGED, PUSHED + post-push
-        _ip_done = len(_ip_steps)
-        print(
-            f"Error: a previous release is in progress "
-            f"(v{_ip_version}, {_ip_done}/{_ip_total} steps completed). "
-            f"Run `rlsbl release resume` to continue or "
-            f"`rlsbl release undo` to roll back.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
     # --- Quick bump mode: --bump + --description bypass the release file ---
     if preid and not bump:
         print("Error: --preid requires --bump", file=sys.stderr)

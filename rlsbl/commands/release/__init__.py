@@ -270,6 +270,21 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         if not quiet:
             print(msg)
 
+    # Check for in-progress release -- must use resume instead
+    _ip_state_path = get_state_path(str(project_root))
+    _ip_state = load_release_state(_ip_state_path)
+    if _ip_state is not None:
+        _ip_version = _ip_state.get("new_version", "unknown")
+        _ip_steps = _ip_state.get("completed_steps", [])
+        _ip_total = 6
+        _ip_done = len(_ip_steps)
+        raise ReleaseValidationError(
+            f"a previous release is in progress "
+            f"(v{_ip_version}, {_ip_done}/{_ip_total} steps completed). "
+            f"Run `rlsbl release resume` to continue or "
+            f"`rlsbl release undo` to roll back."
+        )
+
     # --- Validate inputs and environment ---
     # Target validation is deferred until after releasable context is resolved
     # so that member_dirs can be passed for releasable target union.

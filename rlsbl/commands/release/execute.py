@@ -1593,11 +1593,13 @@ def _run_release_mutating(state: ReleaseState):
         else:
             log(f"Watch CI: rlsbl watch {pushed_sha}")
 
+    # If GitHub Release creation failed, preserve the state file for resume
+    # and raise PostReleaseError BEFORE clearing state.
+    if not release_created:
+        from ...errors import PostReleaseError
+        raise PostReleaseError(f"GitHub Release creation failed for {tag}")
+
     # Success epilogue: clear the state file now that all steps completed.
     clear_release_state(_state_path)
 
     log(f"\nRelease {new_version} complete!")
-
-    if not release_created:
-        from ...errors import PostReleaseError
-        raise PostReleaseError(f"GitHub Release creation failed for {tag}")
