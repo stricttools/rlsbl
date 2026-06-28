@@ -1188,6 +1188,17 @@ def _append_release_dispatch_if_configured(mappings, config):
     return mappings
 
 
+def _append_release_finalize_if_configured(mappings, config):
+    """Add release-finalize workflow template to mappings if release.mode is "pr"."""
+    if config.get("release", {}).get("mode") == "pr":
+        mappings = list(mappings)
+        mappings.append({
+            "template": ".github/workflows/release-finalize.yml.tpl",
+            "target": ".github/workflows/release-finalize.yml",
+        })
+    return mappings
+
+
 def _print_private_summary():
     """Print helpful output for private repository scaffold."""
     print("\nPrivate repository detected. Scaffold configured for private distribution.")
@@ -1346,6 +1357,7 @@ def run_cmd(registry, args, flags, ctx):
             shared_mappings = reg.shared_template_mappings(ctx)
             shared_mappings = _append_deploy_workflow_if_configured(shared_mappings, ctx.config)
             shared_mappings = _append_release_dispatch_if_configured(shared_mappings, ctx.config)
+            shared_mappings = _append_release_finalize_if_configured(shared_mappings, ctx.config)
 
             # Non-releasable projects and releasable members skip per-package
             # changelog infrastructure. Non-releasable projects have no
@@ -2005,6 +2017,7 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         shared_mappings = reg.shared_template_mappings(ctx)
         shared_mappings = _append_deploy_workflow_if_configured(shared_mappings, ctx.config)
         shared_mappings = _append_release_dispatch_if_configured(shared_mappings, ctx.config)
+        shared_mappings = _append_release_finalize_if_configured(shared_mappings, ctx.config)
 
         # Non-releasable projects and releasable members skip per-package
         # changelog infrastructure (see comment in run_cmd for rationale).
