@@ -17,3 +17,4 @@ Display the current project version, branch, last release tag, unreleased commit
 | --- | --- | --- | --- | --- | --- |
 | `--target` |  | str |  |  | Target a specific registry (auto-detected if omitted) |
 | `--json` |  | bool |  |  | Output version, branch, tag, and coverage as machine-readable JSON |
+| `--registry` |  | bool |  |  | Query the package registry for the latest published version |
