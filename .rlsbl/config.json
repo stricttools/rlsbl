@@ -3,17 +3,7 @@
   "env_file": "~/Projects/.env",
   "push_timeout": 120,
   "batch_limits": {
-    "exclusions": [
-      {
-        "reason": "**Pre-release channel support.** `preid` field in release TOML, `bump = \"prerelease\"` type, PEP 440 translation for PyPI, npm `--tag` dist-tags, Docker `:latest` skip, GitHub `--prerelease` flag, and changelog consolidation for stable releases.",
-        "entries": [
-          {
-            "version": "unreleased",
-            "line": 2
-          }
-        ]
-      }
-    ]
+    "exclusions": []
   },
   "targets": [
     "npm",
