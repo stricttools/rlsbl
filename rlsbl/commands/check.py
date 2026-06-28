@@ -20,7 +20,7 @@ from itertools import product  # noqa: E402
 from rlsbl.targets.utils import normalize_npm, normalize_pypi  # noqa: E402
 
 
-def _request_with_backoff(url, timeout=5, max_retries=3):
+def _request_with_backoff(url, timeout=5, max_retries=3, headers=None):
     """Wrap urllib.request.urlopen with retry logic for HTTP 429 responses.
 
     On HTTP 429 (Too Many Requests): reads the Retry-After header (seconds).
@@ -37,6 +37,9 @@ def _request_with_backoff(url, timeout=5, max_retries=3):
     # GitHub API requires a User-Agent header
     if "api.github.com" in url:
         req.add_header("User-Agent", "rlsbl-cli")
+    if headers:
+        for key, value in headers.items():
+            req.add_header(key, value)
 
     last_exc = None
     for attempt in range(max_retries):
