@@ -6,6 +6,9 @@ import os
 import pytest
 
 from rlsbl.changelog.generate import (
+    _base_version,
+    _deduplicate_entries,
+    _is_prerelease,
     _read_release_metadata,
     generate_changelog,
     generate_version_file,
@@ -729,3 +732,333 @@ class TestGenerateVersionFileWithMetadata:
         assert lines[0] == "## 1.0.0"
         assert lines[1] == ""
         assert lines[2] == "### Features"
+
+
+class TestBaseVersionHelper:
+    """Tests for _base_version."""
+
+    def test_stable_version(self):
+        assert _base_version("1.2.3") == "1.2.3"
+
+    def test_alpha_version(self):
+        assert _base_version("0.43.0-alpha.0") == "0.43.0"
+
+    def test_beta_version(self):
+        assert _base_version("1.0.0-beta.3") == "1.0.0"
+
+    def test_rc_version(self):
+        assert _base_version("2.1.0-rc.7") == "2.1.0"
+
+
+class TestIsPrereleaseHelper:
+    """Tests for _is_prerelease."""
+
+    def test_stable(self):
+        assert _is_prerelease("1.0.0") is False
+
+    def test_alpha(self):
+        assert _is_prerelease("1.0.0-alpha.0") is True
+
+    def test_beta(self):
+        assert _is_prerelease("1.0.0-beta.1") is True
+
+    def test_rc(self):
+        assert _is_prerelease("1.0.0-rc.0") is True
+
+
+class TestDeduplicateEntries:
+    """Tests for _deduplicate_entries."""
+
+    def test_no_duplicates(self):
+        entries = [
+            ChangelogEntry(commits=["a"], user_facing=True, description="A", type="feature"),
+            ChangelogEntry(commits=["b"], user_facing=True, description="B", type="fix"),
+        ]
+        result = _deduplicate_entries(entries)
+        assert len(result) == 2
+
+    def test_removes_exact_duplicate_commits(self):
+        entries = [
+            ChangelogEntry(commits=["a"], user_facing=True, description="A", type="feature"),
+            ChangelogEntry(commits=["a"], user_facing=True, description="A copy", type="feature"),
+        ]
+        result = _deduplicate_entries(entries)
+        assert len(result) == 1
+        assert result[0].description == "A"  # first wins
+
+    def test_multi_commit_set_dedup(self):
+        """Entries with the same set of commits (regardless of order) are deduplicated."""
+        entries = [
+            ChangelogEntry(commits=["a", "b"], user_facing=True, description="First", type="feature"),
+            ChangelogEntry(commits=["b", "a"], user_facing=True, description="Second", type="feature"),
+        ]
+        result = _deduplicate_entries(entries)
+        assert len(result) == 1
+        assert result[0].description == "First"
+
+    def test_different_commits_not_deduped(self):
+        entries = [
+            ChangelogEntry(commits=["a"], user_facing=True, description="A", type="feature"),
+            ChangelogEntry(commits=["b"], user_facing=True, description="B", type="feature"),
+        ]
+        result = _deduplicate_entries(entries)
+        assert len(result) == 2
+
+
+class TestConsolidatedChangelog:
+    """Tests for consolidated changelog generation with stable + pre-releases."""
+
+    def _setup_project(self, tmp_path, versions=None, unreleased_lines=None):
+        """Helper to set up a project with .rlsbl/changes/."""
+        changes = tmp_path / ".rlsbl" / "changes"
+        changes.mkdir(parents=True)
+
+        if versions:
+            for ver, lines in versions.items():
+                jsonl = changes / f"{ver}.jsonl"
+                jsonl.write_text("\n".join(lines) + "\n")
+
+        if unreleased_lines:
+            unreleased = changes / "unreleased.jsonl"
+            unreleased.write_text("\n".join(unreleased_lines) + "\n")
+
+        return tmp_path
+
+    def test_consolidated_stable_with_prereleases(self, tmp_path, monkeypatch):
+        """When a stable version has pre-release predecessors, entries are consolidated."""
+        monkeypatch.chdir(tmp_path)
+        self._setup_project(
+            tmp_path,
+            versions={
+                "0.43.0-alpha.0": [
+                    _jsonl_line(commits=["a"], user_facing=True, description="Alpha feature", type="feature"),
+                ],
+                "0.43.0-alpha.1": [
+                    _jsonl_line(commits=["b"], user_facing=True, description="Alpha fix", type="fix"),
+                ],
+                "0.43.0-beta.0": [
+                    _jsonl_line(commits=["c"], user_facing=True, description="Beta feature", type="feature"),
+                ],
+                "0.43.0": [
+                    _jsonl_line(commits=["d"], user_facing=True, description="Stable fix", type="fix"),
+                ],
+            },
+        )
+
+        content = generate_changelog(str(tmp_path), write_to_disk=False)
+
+        # Consolidated stable heading exists
+        assert "## 0.43.0" in content
+        # All entries appear under the stable heading
+        assert "Alpha feature" in content
+        assert "Alpha fix" in content
+        assert "Beta feature" in content
+        assert "Stable fix" in content
+        # Pre-release cycle note
+        assert "Pre-release cycle: 0.43.0-alpha.0, 0.43.0-alpha.1, 0.43.0-beta.0" in content
+        # Individual pre-release sub-headings (### level)
+        assert "### 0.43.0-alpha.0" in content
+        assert "### 0.43.0-alpha.1" in content
+        assert "### 0.43.0-beta.0" in content
+
+    def test_consolidated_deduplicates_entries(self, tmp_path, monkeypatch):
+        """Entries with the same commits are deduplicated in the consolidated view."""
+        monkeypatch.chdir(tmp_path)
+        self._setup_project(
+            tmp_path,
+            versions={
+                "1.0.0-alpha.0": [
+                    _jsonl_line(commits=["a"], user_facing=True, description="Alpha feature", type="feature"),
+                ],
+                "1.0.0": [
+                    # Same commit hash as in alpha -- should be deduplicated in consolidated view
+                    _jsonl_line(commits=["a"], user_facing=True, description="Final feature", type="feature"),
+                    _jsonl_line(commits=["b"], user_facing=True, description="New stable fix", type="fix"),
+                ],
+            },
+        )
+
+        content = generate_changelog(str(tmp_path), write_to_disk=False)
+
+        assert "New stable fix" in content
+
+        # In the consolidated ## 1.0.0 section, the entry with commit "a" appears
+        # only once (the first occurrence from the stable delta wins because
+        # group iteration is newest-first).
+        stable_section_start = content.index("## 1.0.0")
+        # Find the ### 1.0.0-alpha.0 sub-section start
+        alpha_section_start = content.index("### 1.0.0-alpha.0")
+        # The consolidated part is between ## 1.0.0 and ### 1.0.0-alpha.0
+        consolidated_part = content[stable_section_start:alpha_section_start]
+        # Only one feature entry should appear (not both "Alpha feature" and "Final feature")
+        assert consolidated_part.count("- ") == 2  # one feature + one fix
+        # The alpha sub-section has its own copy of the entry
+        alpha_part = content[alpha_section_start:]
+        assert "Alpha feature" in alpha_part
+
+    def test_prereleases_only_no_consolidation(self, tmp_path, monkeypatch):
+        """When only pre-releases exist (no stable), each gets its own ## heading."""
+        monkeypatch.chdir(tmp_path)
+        self._setup_project(
+            tmp_path,
+            versions={
+                "0.43.0-alpha.0": [
+                    _jsonl_line(commits=["a"], user_facing=True, description="Alpha feature", type="feature"),
+                ],
+                "0.43.0-alpha.1": [
+                    _jsonl_line(commits=["b"], user_facing=True, description="Alpha fix", type="fix"),
+                ],
+                "0.43.0-beta.0": [
+                    _jsonl_line(commits=["c"], user_facing=True, description="Beta feature", type="feature"),
+                ],
+            },
+        )
+
+        content = generate_changelog(str(tmp_path), write_to_disk=False)
+
+        # Each pre-release gets its own ## heading (not consolidated)
+        assert "## 0.43.0-beta.0" in content
+        assert "## 0.43.0-alpha.1" in content
+        assert "## 0.43.0-alpha.0" in content
+        # No consolidated stable heading
+        assert "## 0.43.0\n" not in content
+        # No consolidation note
+        assert "Pre-release cycle" not in content
+
+    def test_mixed_stable_and_prerelease_versions(self, tmp_path, monkeypatch):
+        """Mixed versions: some consolidated (stable + prereleases), some standalone."""
+        monkeypatch.chdir(tmp_path)
+        self._setup_project(
+            tmp_path,
+            versions={
+                # 0.42.0 is a standalone stable version
+                "0.42.0": [
+                    _jsonl_line(commits=["x"], user_facing=True, description="Old feature", type="feature"),
+                ],
+                # 0.43.0 has pre-releases and a stable
+                "0.43.0-alpha.0": [
+                    _jsonl_line(commits=["a"], user_facing=True, description="Alpha feat", type="feature"),
+                ],
+                "0.43.0": [
+                    _jsonl_line(commits=["b"], user_facing=True, description="Stable feat", type="feature"),
+                ],
+                # 0.44.0 has only pre-releases (no stable yet)
+                "0.44.0-rc.0": [
+                    _jsonl_line(commits=["c"], user_facing=True, description="RC feat", type="feature"),
+                ],
+            },
+        )
+
+        content = generate_changelog(str(tmp_path), write_to_disk=False)
+
+        # 0.44.0-rc.0 is standalone pre-release (## heading)
+        assert "## 0.44.0-rc.0" in content
+        # 0.43.0 is consolidated
+        assert "## 0.43.0" in content
+        assert "### 0.43.0-alpha.0" in content
+        assert "Pre-release cycle: 0.43.0-alpha.0" in content
+        # 0.42.0 is standalone stable
+        assert "## 0.42.0" in content
+        # Correct ordering: 0.44.0-rc.0 > 0.43.0 > 0.42.0
+        pos_44 = content.index("## 0.44.0-rc.0")
+        pos_43 = content.index("## 0.43.0")
+        pos_42 = content.index("## 0.42.0")
+        assert pos_44 < pos_43 < pos_42
+
+    def test_consolidated_per_version_md_files_still_created(self, tmp_path, monkeypatch):
+        """Per-version .md files are still created for each individual version."""
+        monkeypatch.chdir(tmp_path)
+        self._setup_project(
+            tmp_path,
+            versions={
+                "0.43.0-alpha.0": [
+                    _jsonl_line(commits=["a"], user_facing=True, description="Alpha feat", type="feature"),
+                ],
+                "0.43.0": [
+                    _jsonl_line(commits=["b"], user_facing=True, description="Stable feat", type="feature"),
+                ],
+            },
+        )
+
+        generate_changelog(str(tmp_path), write_to_disk=True)
+
+        changes = tmp_path / ".rlsbl" / "changes"
+        assert (changes / "0.43.0-alpha.0.md").exists()
+        assert (changes / "0.43.0.md").exists()
+
+    def test_consolidated_with_non_user_facing_prereleases(self, tmp_path, monkeypatch):
+        """Pre-releases with only non-user-facing entries show 'No user-facing changes.'"""
+        monkeypatch.chdir(tmp_path)
+        self._setup_project(
+            tmp_path,
+            versions={
+                "0.43.0-alpha.0": [
+                    _jsonl_line(commits=["a"], user_facing=False),
+                ],
+                "0.43.0": [
+                    _jsonl_line(commits=["b"], user_facing=True, description="The fix", type="fix"),
+                ],
+            },
+        )
+
+        content = generate_changelog(str(tmp_path), write_to_disk=False)
+
+        # Consolidated section exists
+        assert "## 0.43.0" in content
+        assert "### 0.43.0-alpha.0" in content
+        # The alpha sub-section shows no user-facing changes
+        alpha_pos = content.index("### 0.43.0-alpha.0")
+        after_alpha = content[alpha_pos:]
+        assert "No user-facing changes." in after_alpha
+
+    def test_consolidated_prerelease_cycle_note_ascending_order(self, tmp_path, monkeypatch):
+        """The pre-release cycle note lists versions in ascending order."""
+        monkeypatch.chdir(tmp_path)
+        self._setup_project(
+            tmp_path,
+            versions={
+                "1.0.0-alpha.0": [
+                    _jsonl_line(commits=["a"], user_facing=False),
+                ],
+                "1.0.0-alpha.1": [
+                    _jsonl_line(commits=["b"], user_facing=False),
+                ],
+                "1.0.0-beta.0": [
+                    _jsonl_line(commits=["c"], user_facing=False),
+                ],
+                "1.0.0-rc.0": [
+                    _jsonl_line(commits=["d"], user_facing=False),
+                ],
+                "1.0.0": [
+                    _jsonl_line(commits=["e"], user_facing=True, description="Final feature", type="feature"),
+                ],
+            },
+        )
+
+        content = generate_changelog(str(tmp_path), write_to_disk=False)
+
+        assert "Pre-release cycle: 1.0.0-alpha.0, 1.0.0-alpha.1, 1.0.0-beta.0, 1.0.0-rc.0" in content
+
+    def test_prerelease_sub_sections_have_type_groups(self, tmp_path, monkeypatch):
+        """Pre-release sub-sections use #### headers for type groups."""
+        monkeypatch.chdir(tmp_path)
+        self._setup_project(
+            tmp_path,
+            versions={
+                "0.43.0-alpha.0": [
+                    _jsonl_line(commits=["a"], user_facing=True, description="Breaking!", type="breaking"),
+                    _jsonl_line(commits=["b"], user_facing=True, description="New feat", type="feature"),
+                ],
+                "0.43.0": [
+                    _jsonl_line(commits=["c"], user_facing=True, description="A fix", type="fix"),
+                ],
+            },
+        )
+
+        content = generate_changelog(str(tmp_path), write_to_disk=False)
+
+        # Pre-release sub-section uses #### for type groups
+        alpha_pos = content.index("### 0.43.0-alpha.0")
+        after_alpha = content[alpha_pos:]
+        assert "#### Breaking" in after_alpha
+        assert "#### Features" in after_alpha
