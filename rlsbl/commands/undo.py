@@ -142,7 +142,7 @@ def run_cmd(registry, args, flags, *, ctx):
             from ..commands.release.execute import collect_companion_tags
             from ..workspace import load_workspace as _load_ws2, members_of as _members_of2
 
-            _version_for_companion = re.search(r"v(\d+\.\d+\.\d+)$", tag)
+            _version_for_companion = re.search(r"v(\d+\.\d+\.\d+(?:-[a-z]+\.\d+)?)$", tag)
             if _version_for_companion:
                 _ver = _version_for_companion.group(1)
                 _ws_projects2 = _load_ws2(ws_root)
@@ -170,12 +170,12 @@ def run_cmd(registry, args, flags, *, ctx):
     # In implicit monorepo mode, commit message is "<project>: release v<version>"
     # In standalone mode, commit message is the tag string (e.g., "v1.2.3")
     if releasable_name:
-        _version_match = re.search(r"v(\d+\.\d+\.\d+)$", tag)
+        _version_match = re.search(r"v(\d+\.\d+\.\d+(?:-[a-z]+\.\d+)?)$", tag)
         version_part = f"v{_version_match.group(1)}" if _version_match else tag
         expected_msg = f"{releasable_name}: release {version_part}"
     elif monorepo_name:
         # Extract version from tag: handles both name@v1.2.3 and path/v1.2.3
-        _version_match = re.search(r"v(\d+\.\d+\.\d+)$", tag)
+        _version_match = re.search(r"v(\d+\.\d+\.\d+(?:-[a-z]+\.\d+)?)$", tag)
         version_part = f"v{_version_match.group(1)}" if _version_match else tag
         expected_msg = f"{monorepo_name}: release {version_part}"
     else:

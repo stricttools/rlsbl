@@ -56,7 +56,13 @@ class NpmPipeline(TokenPipeline):
 
     def _publish_command(self, dir_path: str, version: str, token: str) -> None:
         try:
-            run("npm", ["publish", "--provenance", "--access", "public"], env={
+            args = ["publish", "--provenance", "--access", "public"]
+            # For pre-release versions, add --tag with the preid so npm
+            # doesn't update the "latest" dist-tag.
+            if "-" in version:
+                preid = version.split("-", 1)[1].rsplit(".", 1)[0]
+                args.extend(["--tag", preid])
+            run("npm", args, env={
                 **os.environ,
                 "NPM_TOKEN": token,
             })

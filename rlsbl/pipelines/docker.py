@@ -41,14 +41,18 @@ class DockerPipeline(CredentialPipeline):
         full_image = f"{registry}/{image}"
         versioned_tag = f"{full_image}:{version}"
         latest_tag = f"{full_image}:latest"
+        is_prerelease = "-" in version
 
         try:
             run("docker", ["build", "-t", versioned_tag,
                            "--build-arg", f"VERSION={version}", "."],
                 cwd=dir_path)
             run("docker", ["push", versioned_tag])
-            run("docker", ["tag", versioned_tag, latest_tag])
-            run("docker", ["push", latest_tag])
+            # Skip :latest tag for pre-release versions to avoid marking
+            # an unstable version as the default pull target.
+            if not is_prerelease:
+                run("docker", ["tag", versioned_tag, latest_tag])
+                run("docker", ["push", latest_tag])
             print(f"Published Docker image: {versioned_tag}")
         except subprocess.CalledProcessError as exc:
             raise RuntimeError(f"Docker publish failed: {exc}") from exc

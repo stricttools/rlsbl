@@ -6,6 +6,14 @@ import os
 import sys
 import time
 
+from .release_state import (
+    get_state_path,
+    save_release_state,
+    load_release_state,
+    save_step,
+    clear_release_state,
+)
+
 
 class ReleaseAbortError(Exception):
     """Raised when the release must abort (e.g., unexpected dirty files)."""
@@ -577,6 +585,28 @@ def _run_release_mutating(state: ReleaseState):
     # the uncommitted version-bumped files if the release aborts.
     pre_release_sha = run("git", ["rev-parse", "HEAD"])
 
+    # Write release state file at the start of the mutating phase.
+    # This persists if the release fails mid-way, enabling future resume.
+    _state_path = get_state_path(project_dir)
+    _state_dict = {
+        "new_version": new_version,
+        "tag": tag,
+        "branch": branch,
+        "pre_release_sha": pre_release_sha,
+        "bump_type": bump_type,
+        "registry": registry,
+        "completed_steps": [],
+        "companion_tags": [],
+        "monorepo_name": monorepo_name,
+        "releasable_name": releasable_name,
+        "commit_msg": commit_msg,
+    }
+    save_release_state(_state_path, _state_dict)
+    # Load completed_steps to check which steps are already done (empty on
+    # fresh start; populated if resuming from a prior failed attempt whose
+    # state file was loaded by the caller).
+    _completed = set(_state_dict.get("completed_steps", []))
+
     # Track whether the branch push succeeded. Once commits are on the
     # remote, a local `git reset --hard` would create divergent state.
     # Set to True after push_if_needed() returns successfully.
@@ -590,7 +620,24 @@ def _run_release_mutating(state: ReleaseState):
         # Write new version to version files (skip if version didn't change, e.g. first release)
         # Build files_to_commit from the paths actually modified by write_version().
         files_to_commit = []
-        if new_version != current_version:
+
+        # VERSION_BUMPED guard: skip if the primary target already has the new version
+        _version_already_bumped = False
+        if "VERSION_BUMPED" in _completed:
+            _version_already_bumped = True
+            log("Skipping version bump (already done)")
+        elif new_version != current_version:
+            try:
+                _on_disk_version = reg.read_version(primary_path)
+                if _on_disk_version == new_version:
+                    _version_already_bumped = True
+                    save_step(_state_path, "VERSION_BUMPED")
+                    _completed.add("VERSION_BUMPED")
+                    log("Skipping version bump (version already matches)")
+            except Exception:
+                pass  # read_version may fail if target has no manifest yet
+
+        if not _version_already_bumped and new_version != current_version:
             # In explicit releasable mode, write the releasable version file first
             if releasable_name and monorepo_root:
                 from ...workspace import write_releasable_version, get_releasable_version_path
@@ -639,6 +686,9 @@ def _run_release_mutating(state: ReleaseState):
                     files_to_commit.append(fpath)
             if selfdoc_modified:
                 log(f"Synced version to {', '.join(vpath(r) for r in selfdoc_modified)}")
+
+            save_step(_state_path, "VERSION_BUMPED")
+            _completed.add("VERSION_BUMPED")
 
         # Ecosystem tagging: add keyword to manifests if enabled
         if should_tag(flags, ctx.config):
@@ -758,16 +808,32 @@ def _run_release_mutating(state: ReleaseState):
                     f"Unexpected modified files detected (possible concurrent change): {unexpected_list}. Aborting release."
                 )
 
-        # Commit if any of the files we track actually have changes.
-        # Don't use is_clean_tree() as a proxy — the advisory lock file (.rlsbl/lock)
-        # makes the tree appear dirty even when no release-relevant files changed.
+        # COMMITTED guard: skip if HEAD commit message already matches
+        _commit_already_done = False
+        if "COMMITTED" in _completed:
+            _commit_already_done = True
+            log("Skipping commit (already done)")
+        else:
+            _head_msg = run("git", ["log", "-1", "--format=%s"]).strip()
+            if _head_msg == commit_msg:
+                _commit_already_done = True
+                save_step(_state_path, "COMMITTED")
+                _completed.add("COMMITTED")
+                log("Skipping commit (HEAD already matches)")
 
-        needs_commit = new_version != current_version or has_staged_or_modified(files_to_commit, cwd=_git_root)
-        if files_to_commit and needs_commit:
-            commit_files(commit_msg, files_to_commit, cwd=_git_root)
-            log(f"Committed: {commit_msg}")
-        elif not needs_commit:
-            log("No changes to commit")
+        if not _commit_already_done:
+            # Commit if any of the files we track actually have changes.
+            # Don't use is_clean_tree() as a proxy — the advisory lock file (.rlsbl/lock)
+            # makes the tree appear dirty even when no release-relevant files changed.
+
+            needs_commit = new_version != current_version or has_staged_or_modified(files_to_commit, cwd=_git_root)
+            if files_to_commit and needs_commit:
+                commit_files(commit_msg, files_to_commit, cwd=_git_root)
+                log(f"Committed: {commit_msg}")
+            elif not needs_commit:
+                log("No changes to commit")
+            save_step(_state_path, "COMMITTED")
+            _completed.add("COMMITTED")
 
         # Finalize JSONL changelog: rename unreleased.jsonl to x.y.z.jsonl.
         # CHANGELOG.md already has the correct "## X.Y.Z" heading because the
@@ -780,7 +846,28 @@ def _run_release_mutating(state: ReleaseState):
         changes_dir = state.changes_dir
         if changes_dir is None and changes_dir_exists(project_dir):
             changes_dir = get_changes_dir(project_dir)
-        if changes_dir and os.path.isdir(changes_dir):
+
+        # CHANGELOG_FINALIZED guard: skip if {version}.jsonl already exists
+        # and unreleased.jsonl is empty (indicating finalization already ran).
+        _changelog_already_finalized = False
+        if "CHANGELOG_FINALIZED" in _completed:
+            _changelog_already_finalized = True
+            log("Skipping changelog finalization (already done)")
+        elif changes_dir and os.path.isdir(changes_dir):
+            _versioned_jsonl = os.path.join(changes_dir, f"{new_version}.jsonl")
+            _unreleased_jsonl = os.path.join(changes_dir, "unreleased.jsonl")
+            if os.path.exists(_versioned_jsonl):
+                _unreleased_empty = (
+                    not os.path.exists(_unreleased_jsonl)
+                    or os.path.getsize(_unreleased_jsonl) == 0
+                )
+                if _unreleased_empty:
+                    _changelog_already_finalized = True
+                    save_step(_state_path, "CHANGELOG_FINALIZED")
+                    _completed.add("CHANGELOG_FINALIZED")
+                    log("Skipping changelog finalization (version JSONL already exists)")
+
+        if not _changelog_already_finalized and changes_dir and os.path.isdir(changes_dir):
             if releasable_name and releasable_tag_format_str:
                 from .validate import _releasable_tag_glob
                 tag_glob = _releasable_tag_glob(releasable_tag_format_str, releasable_name)
@@ -820,7 +907,9 @@ def _run_release_mutating(state: ReleaseState):
                         finalize_files.append(md_path)
             commit_files(f"chore: finalize changelog for {new_version}", finalize_files, cwd=_git_root)
             log(f"Committed finalized changelog files")
-        else:
+            save_step(_state_path, "CHANGELOG_FINALIZED")
+            _completed.add("CHANGELOG_FINALIZED")
+        elif not changes_dir or not os.path.isdir(changes_dir or ""):
             log("No .rlsbl/changes/ directory; skipping changelog finalization")
 
         # Clean stale batch_limits exclusions that referenced unreleased.jsonl
@@ -1009,10 +1098,14 @@ def _run_release_mutating(state: ReleaseState):
         # Retry gh release create with race-condition detection.
         # GitHub API can return an error even when the release was actually created,
         # so after each failure we check whether the release exists before retrying.
+        gh_release_args = ["release", "create", tag, "--title", tag, "--notes-file", notes_file]
+        # Mark pre-release versions as GitHub pre-releases
+        if "-" in new_version:
+            gh_release_args.append("--prerelease")
         gh_release_succeeded = False
         for attempt in range(2):
             try:
-                run_gh(["release", "create", tag, "--title", tag, "--notes-file", notes_file], config=ctx.config)
+                run_gh(gh_release_args, config=ctx.config)
                 gh_release_succeeded = True
                 log(f"Created GitHub Release: {tag}")
                 break
