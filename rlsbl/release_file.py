@@ -14,7 +14,9 @@ import tomlkit
 from .errors import ReleaseFileError
 
 
-VALID_BUMP_TYPES = ("patch", "minor", "major", "hotfix")
+VALID_BUMP_TYPES = ("patch", "minor", "major", "hotfix", "prerelease")
+
+VALID_PREIDS = ("alpha", "beta", "rc", "stable")
 
 VALID_TARGET_MODES = ("ota", "build")
 
@@ -24,12 +26,13 @@ VALID_TARGET_MODES = ("ota", "build")
 # name used in UI and documentation.
 @dataclass
 class ReleaseConfig:
-    bump: str  # "patch", "minor", "major", "hotfix"
+    bump: str  # "patch", "minor", "major", "hotfix", "prerelease"
     include: list[str]  # target names to release
     exclude: list[str]  # target names to skip
     targets: dict[str, dict] = field(default_factory=dict)  # per-target config
     description: str = ""  # short description of this release
     context: str = ""  # optional context explaining why these changes were made
+    preid: str = ""  # pre-release identifier: "alpha", "beta", "rc", or "stable"
     blog: bool = False
 
 
@@ -133,6 +136,25 @@ def _validate_release_config(data: dict, prefix: str = "") -> ReleaseConfig:
     if not isinstance(context, str):
         raise err("context must be a string")
 
+    # --- preid (optional) ---
+    preid = data.get("preid", "")
+    if not isinstance(preid, str):
+        raise err("preid must be a string")
+    preid = preid.strip()
+    if preid:
+        if preid not in VALID_PREIDS:
+            raise err(
+                f"invalid preid {preid!r} "
+                f"(must be one of {VALID_PREIDS} or empty)"
+            )
+        if bump == "hotfix":
+            raise err("hotfix releases cannot use preid (hotfix releases cannot be pre-releases)")
+        if preid == "stable" and bump != "prerelease":
+            raise err(
+                f'preid "stable" is only valid with bump = "prerelease" '
+                f'(got bump = {bump!r})'
+            )
+
     # --- blog (optional) ---
     blog = data.get("blog", False)
     if not isinstance(blog, bool):
@@ -145,6 +167,7 @@ def _validate_release_config(data: dict, prefix: str = "") -> ReleaseConfig:
         targets=targets,
         description=description.strip(),
         context=context.strip(),
+        preid=preid,
         blog=blog,
     )
 

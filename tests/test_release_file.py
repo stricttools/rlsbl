@@ -9,6 +9,7 @@ from rlsbl.errors import ReleaseFileError
 from rlsbl.release_file import (
     ReleaseConfig,
     VALID_BUMP_TYPES,
+    VALID_PREIDS,
     get_release_file_path,
     read_release_file,
     unfinalize_release_file,
@@ -351,3 +352,106 @@ class TestUnfinalizeReleaseFile:
         (releases_dir / "unreleased.toml").write_text("")
 
         assert unfinalize_release_file(str(releases_dir), "9.9.9") == []
+
+
+class TestValidBumpTypesIncludesPrerelease:
+    def test_prerelease_in_valid_bump_types(self):
+        assert "prerelease" in VALID_BUMP_TYPES
+
+    def test_valid_preids_tuple(self):
+        assert VALID_PREIDS == ("alpha", "beta", "rc", "stable")
+
+
+class TestReleaseFilePreid:
+    """Tests for preid field in release file validation."""
+
+    BASE = 'bump = "{bump}"\ninclude = []\nexclude = []\ndescription = "test"\n'
+
+    def test_preid_defaults_empty(self, tmp_path):
+        f = tmp_path / "release.toml"
+        f.write_text(self.BASE.format(bump="patch"))
+        cfg = read_release_file(str(f))
+        assert cfg.preid == ""
+
+    def test_preid_alpha(self, tmp_path):
+        f = tmp_path / "release.toml"
+        f.write_text(self.BASE.format(bump="minor") + 'preid = "alpha"\n')
+        cfg = read_release_file(str(f))
+        assert cfg.preid == "alpha"
+
+    def test_preid_beta(self, tmp_path):
+        f = tmp_path / "release.toml"
+        f.write_text(self.BASE.format(bump="minor") + 'preid = "beta"\n')
+        cfg = read_release_file(str(f))
+        assert cfg.preid == "beta"
+
+    def test_preid_rc(self, tmp_path):
+        f = tmp_path / "release.toml"
+        f.write_text(self.BASE.format(bump="minor") + 'preid = "rc"\n')
+        cfg = read_release_file(str(f))
+        assert cfg.preid == "rc"
+
+    def test_preid_stable_with_prerelease_bump(self, tmp_path):
+        f = tmp_path / "release.toml"
+        f.write_text(self.BASE.format(bump="prerelease") + 'preid = "stable"\n')
+        cfg = read_release_file(str(f))
+        assert cfg.preid == "stable"
+        assert cfg.bump == "prerelease"
+
+    def test_prerelease_bump_without_preid(self, tmp_path):
+        """prerelease bump with no preid is valid (increments current preid counter)."""
+        f = tmp_path / "release.toml"
+        f.write_text(self.BASE.format(bump="prerelease"))
+        cfg = read_release_file(str(f))
+        assert cfg.bump == "prerelease"
+        assert cfg.preid == ""
+
+    def test_invalid_preid_rejected(self, tmp_path):
+        f = tmp_path / "release.toml"
+        f.write_text(self.BASE.format(bump="minor") + 'preid = "gamma"\n')
+        with pytest.raises(ReleaseFileError, match="invalid preid"):
+            read_release_file(str(f))
+
+    def test_preid_not_string_rejected(self, tmp_path):
+        f = tmp_path / "release.toml"
+        f.write_text(self.BASE.format(bump="minor") + "preid = 42\n")
+        with pytest.raises(ReleaseFileError, match="preid must be a string"):
+            read_release_file(str(f))
+
+    def test_preid_with_hotfix_rejected(self, tmp_path):
+        f = tmp_path / "release.toml"
+        f.write_text(self.BASE.format(bump="hotfix") + 'preid = "alpha"\n')
+        with pytest.raises(ReleaseFileError, match="hotfix releases cannot"):
+            read_release_file(str(f))
+
+    def test_preid_stable_with_non_prerelease_bump_rejected(self, tmp_path):
+        """preid='stable' only makes sense with bump='prerelease'."""
+        f = tmp_path / "release.toml"
+        f.write_text(self.BASE.format(bump="minor") + 'preid = "stable"\n')
+        with pytest.raises(ReleaseFileError, match='preid "stable" is only valid'):
+            read_release_file(str(f))
+
+    def test_preid_stable_with_patch_rejected(self, tmp_path):
+        f = tmp_path / "release.toml"
+        f.write_text(self.BASE.format(bump="patch") + 'preid = "stable"\n')
+        with pytest.raises(ReleaseFileError, match='preid "stable" is only valid'):
+            read_release_file(str(f))
+
+    def test_preid_stable_with_major_rejected(self, tmp_path):
+        f = tmp_path / "release.toml"
+        f.write_text(self.BASE.format(bump="major") + 'preid = "stable"\n')
+        with pytest.raises(ReleaseFileError, match='preid "stable" is only valid'):
+            read_release_file(str(f))
+
+    def test_preid_stripped(self, tmp_path):
+        f = tmp_path / "release.toml"
+        f.write_text(self.BASE.format(bump="minor") + 'preid = "  alpha  "\n')
+        cfg = read_release_file(str(f))
+        assert cfg.preid == "alpha"
+
+    def test_empty_preid_string_ok(self, tmp_path):
+        """Explicitly setting preid = '' is the same as omitting it."""
+        f = tmp_path / "release.toml"
+        f.write_text(self.BASE.format(bump="patch") + 'preid = ""\n')
+        cfg = read_release_file(str(f))
+        assert cfg.preid == ""

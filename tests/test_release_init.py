@@ -51,7 +51,7 @@ class TestReleaseInitSingleTarget:
 
         # Verify the comment is present in the raw file
         raw = release_path.read_text()
-        assert "# Version bump type: patch, minor, major, or hotfix" in raw
+        assert "# Version bump type: patch, minor, major, hotfix, or prerelease" in raw
 
     def test_npm_target(self, tmp_path, monkeypatch):
         entries = [TargetEntry(name="npm", path=str(tmp_path))]

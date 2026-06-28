@@ -48,12 +48,14 @@ def run_cmd(project_root):
     target_names = [e.name for e in entries]
 
     doc = tomlkit.document()
-    doc.add(tomlkit.comment("Version bump type: patch, minor, major, or hotfix"))
+    doc.add(tomlkit.comment("Version bump type: patch, minor, major, hotfix, or prerelease"))
     doc.add("bump", "")
     doc.add(tomlkit.comment("Short description of this release (required)"))
     doc.add("description", "")
     doc.add(tomlkit.comment("Optional context explaining why these changes were made"))
     doc.add("context", "")
+    doc.add(tomlkit.comment("Pre-release identifier: alpha, beta, rc, or stable"))
+    doc.add(tomlkit.comment('preid = ""'))
     doc.add(tomlkit.comment("Set to true to generate a blog post for this release"))
     doc.add(tomlkit.comment("blog = false"))
     doc.add("include", target_names)

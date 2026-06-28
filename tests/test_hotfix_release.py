@@ -203,7 +203,7 @@ class TestReleaseInitTemplateIncludesHotfix:
         import inspect
 
         source = inspect.getsource(release_init)
-        assert "patch, minor, major, or hotfix" in source
+        assert "patch, minor, major, hotfix, or prerelease" in source
 
     def test_batch_release_init(self):
         """batch_release_init.py template includes 'hotfix' in the bump comment."""
@@ -211,4 +211,4 @@ class TestReleaseInitTemplateIncludesHotfix:
         import inspect
 
         source = inspect.getsource(batch_release_init)
-        assert "patch, minor, major, or hotfix" in source
+        assert "patch, minor, major, hotfix, or prerelease" in source
