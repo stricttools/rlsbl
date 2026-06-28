@@ -1231,7 +1231,7 @@ class TestStatusJson:
         expected_keys = {"name", "version", "target", "branch", "tag",
                          "clean", "changelog", "jsonl_coverage",
                          "commits_ahead", "commits_ahead_tag",
-                         "ci", "publish"}
+                         "ci", "publish", "registry_version", "drift"}
         assert set(data.keys()) == expected_keys
         assert data["name"] == "test-pkg"
         assert data["version"] == "0.1.0"

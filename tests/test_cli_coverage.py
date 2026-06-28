@@ -147,7 +147,7 @@ class TestCmdReleaseRun:
             rlsbl.cmd_release_run(
                 dry_run=False, yes=True, quiet=False,
                 allow_dirty=False, watch=False, no_watch=False,
-                bump="", description="",
+                bump="", description="", preid="",
             )
         assert exc.value.code == 1
 
@@ -161,7 +161,7 @@ class TestCmdReleaseRun:
             rlsbl.cmd_release_run(
                 dry_run=False, yes=True, quiet=False,
                 allow_dirty=False, watch=False, no_watch=False,
-                bump="", description="",
+                bump="", description="", preid="",
             )
         assert exc.value.code == 1
 
@@ -176,7 +176,7 @@ class TestCmdReleaseRun:
             rlsbl.cmd_release_run(
                 dry_run=False, yes=True, quiet=False,
                 allow_dirty=False, watch=False, no_watch=False,
-                bump="", description="",
+                bump="", description="", preid="",
             )
         assert exc.value.code == 1
 
@@ -192,7 +192,7 @@ class TestCmdReleaseRun:
         rlsbl.cmd_release_run(
             dry_run=True, yes=True, quiet=False,
             allow_dirty=True, watch=True, no_watch=False,
-            bump="", description="",
+            bump="", description="", preid="",
         )
         mock_run.assert_called_once()
         call_args = mock_run.call_args
@@ -263,9 +263,9 @@ class TestCmdStatus:
     @patch("rlsbl._resolve_target", return_value="npm")
     @patch("rlsbl.commands.status.run_cmd")
     def test_delegates(self, mock_run, *_):
-        rlsbl.cmd_status(target="npm", json=True)
+        rlsbl.cmd_status(target="npm", json=True, registry=False)
         mock_run.assert_called_once()
-        assert mock_run.call_args[0][2] == {"json": True}
+        assert mock_run.call_args[0][2] == {"json": True, "registry": False}
 
 
 # ============================================================================

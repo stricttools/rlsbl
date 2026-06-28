@@ -23,7 +23,28 @@ from ..utils import (
 from ..workspace import find_workspace_root, load_workspace, resolve_project
 
 
-def _collect_status(registry, target_path=".", *, tag_glob=None, ctx, project=None):
+def _compare_versions(local, remote):
+    """Compare two semver version strings.
+
+    Returns "AHEAD" if local > remote, "BEHIND" if local < remote,
+    "SAME" if equal, or "ERROR" if either version cannot be parsed.
+    """
+    import re
+    pattern = re.compile(r"^(\d+)\.(\d+)\.(\d+)")
+    m_local = pattern.match(local)
+    m_remote = pattern.match(remote)
+    if not m_local or not m_remote:
+        return "ERROR"
+    local_tuple = (int(m_local.group(1)), int(m_local.group(2)), int(m_local.group(3)))
+    remote_tuple = (int(m_remote.group(1)), int(m_remote.group(2)), int(m_remote.group(3)))
+    if local_tuple > remote_tuple:
+        return "AHEAD"
+    elif local_tuple < remote_tuple:
+        return "BEHIND"
+    return "SAME"
+
+
+def _collect_status(registry, target_path=".", *, tag_glob=None, ctx, project=None, flags=None):
     """Collect status data as a dict.
 
     When tag_glob is set (monorepo mode), it is forwarded to
@@ -33,8 +54,13 @@ def _collect_status(registry, target_path=".", *, tag_glob=None, ctx, project=No
     to only those touching the project's files (by path prefix or watch
     globs), so the count reflects actual project-specific changes.
 
+    When flags contains "registry": True, queries the package registry
+    for the latest published version and computes drift.
+
     Returns None and prints an error if the project does not exist.
     """
+    if flags is None:
+        flags = {}
     reg = TARGETS[registry]
 
     if not reg.check_project_exists(target_path):
@@ -154,6 +180,24 @@ def _collect_status(registry, target_path=".", *, tag_glob=None, ctx, project=No
         os.path.join(root_str, ".github", "workflows", "workflow.yml")
     )
 
+    # Registry version query (only when --registry flag is set)
+    registry_version = None
+    drift = None
+    if flags.get("registry"):
+        is_private = ctx.config.get("private", False)
+        if is_private:
+            drift = "PRIVATE"
+        else:
+            from ..registry import query_registry_version
+            result = query_registry_version(name, registry)
+            if result["status"] == "found":
+                registry_version = result["version"]
+                drift = _compare_versions(version, registry_version)
+            elif result["status"] == "not_found":
+                drift = "UNPUBLISHED"
+            else:
+                drift = "ERROR"
+
     return {
         "name": name,
         "version": version,
@@ -167,6 +211,8 @@ def _collect_status(registry, target_path=".", *, tag_glob=None, ctx, project=No
         "commits_ahead_tag": scoped_tag,
         "ci": ci,
         "publish": publish,
+        "registry_version": registry_version,
+        "drift": drift,
     }
 
 
@@ -227,7 +273,7 @@ def run_cmd(registry, args, flags, ctx):
         tag_glob = None
     data = _collect_status(
         registry, primary_path, tag_glob=tag_glob,
-        ctx=ctx, project=monorepo_project,
+        ctx=ctx, project=monorepo_project, flags=flags,
     )
 
     if flags.get("json"):
@@ -244,6 +290,19 @@ def run_cmd(registry, args, flags, ctx):
             file = r_mod.version_file() or "git tag"
             path_info = f", path={entry_path}" if entry_path != "." else ""
             print(f"Version:   {ver} ({entry_name}, {file}{path_info})")
+
+    # Registry version (only when --registry flag is set)
+    drift = data.get("drift")
+    if drift is not None:
+        reg_ver = data.get("registry_version")
+        if drift == "PRIVATE":
+            print("Registry:  (skipped, private project)")
+        elif drift == "UNPUBLISHED":
+            print(f"Registry:  (not found on {data['target']})")
+        elif drift == "ERROR":
+            print("Registry:  (query failed)")
+        elif reg_ver is not None:
+            print(f"Registry:  {reg_ver} ({data['target']}, {drift})")
 
     # Git info
     if data["branch"] is not None:
