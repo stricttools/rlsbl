@@ -170,6 +170,53 @@ def get_changelog_validation_config(config):
 
 
 
+VALID_RELEASE_MODES = ("imperative", "pr")
+
+
+def get_release_mode(config):
+    """Return the release mode from config, defaulting to ``"imperative"``.
+
+    Reads ``config["release"]["mode"]`` if present, otherwise returns
+    ``"imperative"``.  Does NOT validate -- call ``validate_release_mode``
+    for that.
+    """
+    release_section = config.get("release")
+    if not isinstance(release_section, dict):
+        return "imperative"
+    return release_section.get("mode", "imperative")
+
+
+def validate_release_mode(config):
+    """Validate the ``release.mode`` config key if present.
+
+    Valid values: ``"imperative"`` (default) and ``"pr"``.
+    Raises ``ConfigError`` if the value is invalid or the structure is wrong.
+    """
+    release_section = config.get("release")
+    if release_section is None:
+        return
+
+    if not isinstance(release_section, dict):
+        raise ConfigError(
+            f"release must be a dict, got {type(release_section).__name__}"
+        )
+
+    mode = release_section.get("mode")
+    if mode is None:
+        return
+
+    if not isinstance(mode, str):
+        raise ConfigError(
+            f"release.mode must be a string, got {type(mode).__name__}"
+        )
+
+    if mode not in VALID_RELEASE_MODES:
+        raise ConfigError(
+            f"release.mode '{mode}' is not valid. "
+            f"Must be one of: {', '.join(VALID_RELEASE_MODES)}"
+        )
+
+
 def validate_pipelines_config(config):
     """Validate the ``pipelines`` section of a project config.
 

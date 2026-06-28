@@ -590,6 +590,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             quiet=quiet,
             log=log,
             ctx=ctx,
+            release_mode=release_mode,
         ))
     except ReleaseAbortError:
         sys.exit(1)
