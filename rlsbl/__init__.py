@@ -246,6 +246,24 @@ def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, no_watch, bump, des
             sys.exit(1)
         project_dir = os.path.join(monorepo_root, project["path"])
 
+    # --- Check for in-progress release ---
+    from .commands.release.release_state import get_state_path, load_release_state
+    _in_progress_path = get_state_path(project_dir)
+    _in_progress = load_release_state(_in_progress_path)
+    if _in_progress is not None:
+        _ip_version = _in_progress.get("new_version", "unknown")
+        _ip_steps = _in_progress.get("completed_steps", [])
+        _ip_total = 6  # VERSION_BUMPED, COMMITTED, CHANGELOG_FINALIZED, RELEASE_FILE_FINALIZED, TAGGED, PUSHED + post-push
+        _ip_done = len(_ip_steps)
+        print(
+            f"Error: a previous release is in progress "
+            f"(v{_ip_version}, {_ip_done}/{_ip_total} steps completed). "
+            f"Run `rlsbl release resume` to continue or "
+            f"`rlsbl release undo` to roll back.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     # --- Quick bump mode: --bump + --description bypass the release file ---
     if preid and not bump:
         print("Error: --preid requires --bump", file=sys.stderr)
@@ -330,6 +348,95 @@ def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, no_watch, bump, des
     flags = build_release_flags(dry_run, yes, quiet, allow_dirty, watch=watch)
     from .commands.release import run_cmd
     run_cmd(release_config, flags, ctx=ctx)
+
+
+@release_group.command(
+    name="resume",
+    help="Resume a previously failed release from where it left off. Reads the in-progress state file (.rlsbl/releases/in-progress.json), validates that the current branch matches the saved state, and re-enters the release flow, skipping already-completed steps.",
+    mutex=[
+        strictcli.MutexGroup(flags=[
+            strictcli.Flag(name="watch", type=bool, negatable=False, help="After release, automatically watch CI runs to completion"),
+            strictcli.Flag(name="no-watch", type=bool, negatable=False, help="After release, print the watch command hint without watching"),
+        ]),
+    ],
+)
+def cmd_release_resume(dry_run, yes, quiet, watch, no_watch, **_kwargs):
+    root = _require_sub_project_root()
+
+    from .commands.release.release_state import get_state_path, load_release_state
+    from .workspace import find_workspace_root, resolve_project
+
+    # Resolve project directory (same logic as release run)
+    project_dir = "."
+    monorepo_root = find_workspace_root(str(root))
+    ctx = create_context(root, workspace_root=Path(monorepo_root) if monorepo_root else None)
+    if monorepo_root:
+        project = resolve_project(monorepo_root, ".")
+        if project is None:
+            print(
+                "Error: cannot resume from monorepo root. "
+                "cd to the package directory where the release was started.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        project_dir = os.path.join(monorepo_root, project["path"])
+
+    # Load in-progress state
+    state_path = get_state_path(project_dir)
+    saved = load_release_state(state_path)
+    if saved is None:
+        print(
+            "No release in progress. Use `rlsbl release run` to start a new release.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    # Validate: same branch
+    from .utils import get_current_branch, run as _run
+    current_branch = get_current_branch()
+    saved_branch = saved.get("branch", "")
+    if current_branch != saved_branch:
+        print(
+            f"Error: release was started on branch {saved_branch!r} "
+            f"but current branch is {current_branch!r}. "
+            f"Switch to {saved_branch!r} before resuming.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    # Validate: HEAD is descendant of saved pre_release_sha
+    pre_release_sha = saved.get("pre_release_sha", "").strip()
+    if pre_release_sha:
+        try:
+            result = subprocess.run(
+                ["git", "merge-base", "--is-ancestor", pre_release_sha, "HEAD"],
+                capture_output=True,
+            )
+            if result.returncode != 0:
+                print(
+                    f"Error: HEAD is not a descendant of the pre-release commit "
+                    f"({pre_release_sha[:10]}). The release state may be stale. "
+                    f"Use `rlsbl release undo` to roll back.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+        except Exception as e:
+            print(f"Error: could not verify commit ancestry: {e}", file=sys.stderr)
+            sys.exit(1)
+
+    completed_steps = saved.get("completed_steps", [])
+    ip_version = saved.get("new_version", "unknown")
+    ip_done = len(completed_steps)
+    if not quiet:
+        print(
+            f"Resuming release v{ip_version} "
+            f"({ip_done} step(s) completed: {', '.join(completed_steps) or 'none'})"
+        )
+
+    from .commands.release.shared import build_release_flags
+    flags = build_release_flags(dry_run, yes, quiet, allow_dirty=False, watch=watch)
+    from .commands.release import resume_cmd
+    resume_cmd(saved, flags, ctx=ctx)
 
 
 @release_group.command(name="init", help="Scaffold a .rlsbl/releases/unreleased.toml file by auto-detecting project targets. The generated file contains a default bump type (patch), an include list of all detected targets, and per-target configuration sections for Flutter targets.")

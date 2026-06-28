@@ -86,6 +86,7 @@ from .execute import (
 )
 
 from ...release_file import VALID_BUMP_TYPES
+from .release_state import get_state_path, load_release_state
 
 
 def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
@@ -104,6 +105,155 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
     except (ReleaseValidationError, HookError, ConfigError) as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
+
+
+def resume_cmd(saved_state: dict, flags: dict | None = None, *, ctx):
+    """Resume a previously failed release from the mutating phase.
+
+    Reads the saved state dict (from in-progress.json), resolves just enough
+    context to call _run_release_mutating directly, skipping all validation
+    and pre-release hooks (which already ran successfully in the original run).
+    """
+    try:
+        _resume_cmd_inner(saved_state, flags, ctx=ctx)
+    except PostReleaseError:
+        sys.exit(1)
+    except ReleaseAbortError:
+        sys.exit(1)
+    except (ReleaseValidationError, HookError, ConfigError) as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def _resume_cmd_inner(saved_state, flags, *, ctx):
+    """Inner implementation of resume_cmd."""
+    if flags is None:
+        flags = {}
+
+    project_root = ctx.project_root
+    monorepo_root = ctx.workspace_root
+    config = ctx.config
+    quiet = flags.get("quiet", False)
+
+    def log(msg):
+        if not quiet:
+            print(msg)
+
+    project_dir = str(project_root)
+
+    # Extract saved state fields
+    new_version = saved_state["new_version"]
+    tag = saved_state["tag"]
+    branch = saved_state["branch"]
+    bump_type = saved_state.get("bump_type")
+    registry = saved_state["registry"]
+    monorepo_name = saved_state.get("monorepo_name")
+    releasable_name = saved_state.get("releasable_name")
+    commit_msg = saved_state.get("commit_msg", tag)
+    description = saved_state.get("description", "")
+    context = saved_state.get("context", "")
+
+    # Resolve target and paths
+    target = TARGETS[registry]
+    target_paths = resolve_target_paths(project_dir)
+    primary_path = target_paths.get(registry, project_dir)
+
+    # Read current version from disk (the version bump may already be done)
+    try:
+        current_version = target.read_version(primary_path)
+    except Exception:
+        current_version = new_version  # If we can't read, assume already bumped
+
+    # Extract changelog entry from CHANGELOG.md (already generated in prior run)
+    changelog_path = os.path.join(project_dir, "CHANGELOG.md")
+    if os.path.exists(changelog_path):
+        changelog_entry = extract_changelog_entry(changelog_path, new_version)
+    else:
+        changelog_entry = None
+
+    # Resolve monorepo context for releasable mode
+    monorepo_project_path = None
+    member_package_paths = None
+    releasable_tag_fmt = None
+    if monorepo_name and monorepo_root:
+        project = resolve_project(monorepo_root, str(project_root))
+        if project:
+            monorepo_project_path = project.get("path") if hasattr(project, "get") else getattr(project, "path", None)
+
+    if releasable_name and monorepo_root:
+        from ...workspace import load_releasables, members_of
+        try:
+            ws_projects = load_workspace(monorepo_root)
+            releasables = load_releasables(monorepo_root, ws_projects)
+            releasable_obj = next((r for r in releasables if r.name == releasable_name), None)
+            if releasable_obj:
+                releasable_tag_fmt = releasable_obj.tag_format
+                member_projs = members_of(releasable_name, ws_projects)
+                member_package_paths = [p["path"] for p in member_projs]
+        except Exception:
+            pass  # Best-effort for resume
+
+    # Resolve changes_dir
+    changes_dir = None
+    if releasable_name and monorepo_root:
+        from ...workspace import get_releasable_dir
+        try:
+            rel_dir = get_releasable_dir(str(monorepo_root), releasable_name)
+            _rel_changes = os.path.join(rel_dir, "changes")
+            if os.path.isdir(_rel_changes):
+                changes_dir = _rel_changes
+        except Exception:
+            pass
+    if changes_dir is None and changes_dir_exists(project_dir):
+        changes_dir = get_changes_dir(project_dir)
+
+    secondary_targets = resolve_release_targets(registry, flags, project_dir=project_dir, config=config)
+
+    lock_dir = ".rlsbl-monorepo" if monorepo_name else ".rlsbl"
+    lock_root = monorepo_root if monorepo_name else project_root
+    skip_lock = flags.get("skip-lock", False)
+    if not skip_lock:
+        acquire_lock(lock_dir=lock_dir, project_root=lock_root)
+
+    try:
+        _run_release_mutating(ReleaseState(
+            registry=registry,
+            target=target,
+            new_version=new_version,
+            current_version=current_version,
+            bump_type=bump_type,
+            tag=tag,
+            branch=branch,
+            primary_path=primary_path,
+            target_paths=target_paths,
+            lock_dir=lock_dir,
+            changes_dir=changes_dir,
+            monorepo_name=monorepo_name,
+            monorepo_project_path=monorepo_project_path,
+            releasable_name=releasable_name,
+            member_package_paths=member_package_paths,
+            releasable_tag_format=releasable_tag_fmt,
+            changelog_entry=changelog_entry,
+            commit_msg=commit_msg,
+            description=description,
+            context=context,
+            pre_existing_dirty=set(),
+            hook_generated=set(),
+            secondary_targets=secondary_targets,
+            include=saved_state.get("include", []),
+            exclude=saved_state.get("exclude", []),
+            preid=saved_state.get("preid", ""),
+            blog=saved_state.get("blog", False),
+            flags=flags,
+            quiet=quiet,
+            log=log,
+            ctx=ctx,
+        ))
+    except (KeyboardInterrupt, SystemExit):
+        raise
+    finally:
+        if not skip_lock:
+            release_lock()
 
 
 def _run_cmd_inner(release_config, flags, *, ctx):
