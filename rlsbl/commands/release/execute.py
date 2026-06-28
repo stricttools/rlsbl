@@ -453,6 +453,93 @@ class ReleaseState:
     release_mode: str = "imperative"  # "imperative" or "pr"
 
 
+def _find_publish_workflows(project_dir="."):
+    """Scan .github/workflows/ for YAML files matching ``publish*.yml``.
+
+    Returns a list of filenames (not full paths) matching the pattern.
+    Used to populate the ``dispatch`` field in ``pending.json``.
+    """
+    workflow_dir = os.path.join(project_dir, ".github", "workflows")
+    if not os.path.isdir(workflow_dir):
+        return []
+    results = []
+    for filename in sorted(os.listdir(workflow_dir)):
+        if filename.startswith("publish") and (
+            filename.endswith(".yml") or filename.endswith(".yaml")
+        ):
+            results.append(filename)
+    return results
+
+
+def _run_pr_release(
+    state, run, run_gh, commit_files, log, *,
+    release_branch_name, project_dir, _git_root, _state_path, vpath,
+):
+    """Execute PR-mode release: write pending.json, push branch, create PR, switch back.
+
+    Called from ``_run_release_mutating`` after version bump, changelog
+    finalization, and release file finalization are complete on the release
+    branch. This replaces the imperative-mode tag+push+GitHub Release steps.
+    """
+    from .release_state import clear_release_state
+
+    new_version = state.new_version
+    tag = state.tag
+    branch = state.branch
+    changelog_entry = state.changelog_entry
+    description = state.description
+    context = state.context
+    releasable_name = state.releasable_name
+
+    # Write pending.json to .rlsbl/releases/pending.json
+    dispatch = _find_publish_workflows(project_dir)
+    pending = {
+        "version": new_version,
+        "tag": tag,
+        "dispatch": dispatch,
+        "changelog_entry": changelog_entry or "",
+        "description": description or "",
+        "context": context or "",
+        "companion_tags": list(state.companion_tags),
+        "releasable_name": releasable_name,
+    }
+    pending_path = os.path.join(project_dir, ".rlsbl", "releases", "pending.json")
+    os.makedirs(os.path.dirname(pending_path), exist_ok=True)
+    with open(pending_path, "w", encoding="utf-8") as f:
+        json.dump(pending, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+
+    pending_rel = _rel_to_git_root(pending_path, _git_root)
+    commit_files("chore: add release pending.json", [pending_rel], cwd=_git_root)
+    log(f"Wrote pending.json for v{new_version}")
+
+    # Push the release branch (not main)
+    push_env = {**os.environ, "RLSBL_RELEASE_PUSH": "1"}
+    run("git", ["push", "-u", "origin", release_branch_name], env=push_env)
+    log(f"Pushed release branch: {release_branch_name}")
+
+    # Create the PR
+    pr_title = f"Release v{new_version}"
+    pr_body = changelog_entry or f"Release v{new_version}"
+    run_gh([
+        "pr", "create",
+        "--title", pr_title,
+        "--body", pr_body,
+        "--base", branch,
+        "--head", release_branch_name,
+    ], config=state.ctx.config if state.ctx else None)
+    log(f"Created PR: {pr_title}")
+
+    # Switch back to the original branch
+    run("git", ["checkout", branch])
+    log(f"Switched back to {branch}")
+
+    # Clear the release state file
+    clear_release_state(_state_path)
+
+    log(f"\nRelease PR created. Merge the PR to trigger the finalize workflow.")
+
+
 def _run_release_mutating(state: ReleaseState):
     """Inner release logic that runs under the advisory lock (mutating phase)."""
     # Unpack frequently-used state into locals for readability and to preserve
@@ -593,9 +680,25 @@ def _run_release_mutating(state: ReleaseState):
     # the uncommitted version-bumped files if the release aborts.
     pre_release_sha = run("git", ["rev-parse", "HEAD"])
 
+    # PR mode: create a release branch before any mutations.
+    # All version bumps and changelog changes happen on this branch.
+    release_mode = state.release_mode
+    release_branch_name = f"release/v{new_version}"
+    if release_mode == "pr":
+        run("git", ["checkout", "-b", release_branch_name])
+        log(f"Created release branch: {release_branch_name}")
+
     # Write release state file at the start of the mutating phase.
     # This persists if the release fails mid-way, enabling future resume.
+    # On a resume, an existing state file may already contain completed_steps
+    # from a prior run. Preserve those so per-step guards can skip them.
     _state_path = get_state_path(project_dir)
+    _existing_state = load_release_state(_state_path)
+    _prior_completed = (
+        _existing_state.get("completed_steps", [])
+        if _existing_state is not None
+        else list(state.completed_steps)
+    )
     _state_dict = {
         "new_version": new_version,
         "tag": tag,
@@ -603,7 +706,7 @@ def _run_release_mutating(state: ReleaseState):
         "pre_release_sha": pre_release_sha,
         "bump_type": bump_type,
         "registry": registry,
-        "completed_steps": list(state.completed_steps),
+        "completed_steps": list(_prior_completed),
         "companion_tags": [],
         "monorepo_name": monorepo_name,
         "releasable_name": releasable_name,
@@ -1006,6 +1109,18 @@ def _run_release_mutating(state: ReleaseState):
             save_step(_state_path, "RELEASE_FILE_FINALIZED")
             _completed.add("RELEASE_FILE_FINALIZED")
 
+        # --- PR mode: write pending.json, push branch, create PR, return ---
+        if release_mode == "pr":
+            _run_pr_release(
+                state, run, run_gh, commit_files, log,
+                release_branch_name=release_branch_name,
+                project_dir=project_dir,
+                _git_root=_git_root,
+                _state_path=_state_path,
+                vpath=vpath,
+            )
+            return
+
         # TAGGED guard: skip if the tag already exists and points to HEAD
         _tag_already_exists = False
         if "TAGGED" in _completed:
@@ -1115,8 +1230,19 @@ def _run_release_mutating(state: ReleaseState):
                 )
             raise
         # Branch was not pushed yet -- safe to roll back locally.
+        # In PR mode, switch back to the original branch and delete the release branch.
+        if release_mode == "pr":
+            try:
+                run("git", ["checkout", branch])
+            except Exception:
+                pass
+            try:
+                run("git", ["branch", "-D", release_branch_name])
+            except Exception:
+                pass
+        else:
+            run("git", ["reset", "--hard", pre_release_sha])
         # State file is useless after local rollback -- clean it up.
-        run("git", ["reset", "--hard", pre_release_sha])
         _cleanup_release_artifacts(project_dir, new_version)
         clear_release_state(_state_path)
         print(str(e), file=sys.stderr)
@@ -1155,20 +1281,31 @@ def _run_release_mutating(state: ReleaseState):
             # Do NOT delete the local tag -- it's needed for manual recovery
             raise
         # Branch was not pushed yet -- safe to roll back locally.
-        # Delete tag (may not exist yet) and reset commits so the working
-        # tree looks like it did before the release attempt.
-        # State file is useless after local rollback -- clean it up.
-        try:
-            run("git", ["tag", "-d", tag])
-        except Exception:
-            pass
-        # Clean up companion tags (best-effort)
-        for ctag in state.companion_tags:
+        # In PR mode, switch back to the original branch and delete the release branch.
+        if release_mode == "pr":
             try:
-                run("git", ["tag", "-d", ctag])
+                run("git", ["checkout", branch])
             except Exception:
                 pass
-        run("git", ["reset", "--hard", pre_release_sha])
+            try:
+                run("git", ["branch", "-D", release_branch_name])
+            except Exception:
+                pass
+        else:
+            # Delete tag (may not exist yet) and reset commits so the working
+            # tree looks like it did before the release attempt.
+            try:
+                run("git", ["tag", "-d", tag])
+            except Exception:
+                pass
+            # Clean up companion tags (best-effort)
+            for ctag in state.companion_tags:
+                try:
+                    run("git", ["tag", "-d", ctag])
+                except Exception:
+                    pass
+            run("git", ["reset", "--hard", pre_release_sha])
+        # State file is useless after local rollback -- clean it up.
         _cleanup_release_artifacts(project_dir, new_version)
         clear_release_state(_state_path)
         if hasattr(e, 'stderr') and e.stderr:
