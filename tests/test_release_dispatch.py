@@ -36,6 +36,8 @@ class TestReleaseDispatchTemplate:
         assert "patch" in content
         assert "minor" in content
         assert "major" in content
+        assert "prerelease" in content
+        assert "hotfix" in content
 
     def test_template_has_description_input(self):
         tpl = SHARED_TEMPLATE_DIR / ".github" / "workflows" / "release-dispatch.yml.tpl"
@@ -61,12 +63,29 @@ class TestReleaseDispatchTemplate:
         assert "actions/checkout@" in rendered
         assert "astral-sh/setup-uv@" in rendered
 
+    def test_template_has_preid_input(self):
+        tpl = SHARED_TEMPLATE_DIR / ".github" / "workflows" / "release-dispatch.yml.tpl"
+        content = tpl.read_text()
+        assert "preid:" in content
+        assert "Pre-release identifier" in content
+        assert "- none" in content
+        assert "- alpha" in content
+        assert "- beta" in content
+        assert "- rc" in content
+        assert "- stable" in content
+
     def test_template_has_rlsbl_release_run(self):
         tpl = SHARED_TEMPLATE_DIR / ".github" / "workflows" / "release-dispatch.yml.tpl"
         content = tpl.read_text()
         assert "rlsbl release run" in content
         assert "--bump" in content
         assert "--description" in content
+
+    def test_template_has_conditional_preid_flag(self):
+        tpl = SHARED_TEMPLATE_DIR / ".github" / "workflows" / "release-dispatch.yml.tpl"
+        content = tpl.read_text()
+        assert "PREID_FLAG" in content
+        assert '--preid ${{ inputs.preid }}' in content
 
     def test_template_has_contents_write_permission(self):
         tpl = SHARED_TEMPLATE_DIR / ".github" / "workflows" / "release-dispatch.yml.tpl"

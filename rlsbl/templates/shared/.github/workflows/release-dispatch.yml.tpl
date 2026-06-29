@@ -11,10 +11,23 @@ on:
           - patch
           - minor
           - major
+          - prerelease
+          - hotfix
       description:
         description: 'Release description'
         required: true
         type: string
+      preid:
+        description: 'Pre-release identifier (none for stable release)'
+        required: true
+        type: choice
+        default: 'none'
+        options:
+          - none
+          - alpha
+          - beta
+          - rc
+          - stable
 
 permissions:
   contents: write
@@ -36,9 +49,14 @@ jobs:
 
       - name: Release
         run: |
+          PREID_FLAG=""
+          if [ "${{ inputs.preid }}" != "none" ]; then
+            PREID_FLAG="--preid ${{ inputs.preid }}"
+          fi
           rlsbl release run \
             --bump "${{ inputs.bump }}" \
             --description "${{ inputs.description }}" \
+            $PREID_FLAG \
             --yes --no-watch
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
