@@ -244,6 +244,7 @@ def _resume_cmd_inner(saved_state, flags, *, ctx):
             exclude=saved_state.get("exclude", []),
             preid=saved_state.get("preid", ""),
             blog=saved_state.get("blog", False),
+            release_mode=saved_state.get("release_mode", "imperative"),
             flags=flags,
             quiet=quiet,
             log=log,

@@ -717,6 +717,7 @@ def _run_release_mutating(state: ReleaseState):
         "exclude": list(state.exclude),
         "preid": state.preid,
         "blog": state.blog,
+        "release_mode": state.release_mode,
     }
     save_release_state(_state_path, _state_dict)
     # Load completed_steps to check which steps are already done (empty on

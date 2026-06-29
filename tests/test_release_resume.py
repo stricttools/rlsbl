@@ -9,6 +9,7 @@ from unittest.mock import patch
 import pytest
 
 from rlsbl.commands.release import resume_cmd, run_cmd
+from rlsbl.commands.release.execute import ReleaseState
 from rlsbl.commands.release.release_state import (
     get_state_path,
     load_release_state,
@@ -509,3 +510,123 @@ class TestResumeStepGuards:
         assert "Skipping commit (already done)" in captured.out
         assert "Skipping tag creation (already done)" in captured.out
         assert "Skipping push (already done)" in captured.out
+
+
+class TestResumePreservesReleaseMode:
+    """Resume restores release_mode from saved state."""
+
+    def test_release_mode_persisted_in_state_dict(self):
+        """ReleaseState with release_mode='pr' produces a state dict that includes it."""
+        # The state dict construction lives in execute.py; we verify by
+        # checking the dataclass field exists and defaults correctly.
+        st = ReleaseState()
+        assert st.release_mode == "imperative"
+
+        st_pr = ReleaseState(release_mode="pr")
+        assert st_pr.release_mode == "pr"
+
+    def test_resume_with_pr_mode(self, mock_git_repo):
+        """Resuming from in-progress.json with release_mode='pr' propagates it."""
+        _setup_releasable_npm_project(mock_git_repo)
+
+        # Simulate partial release with PR mode
+        pkg = json.loads((mock_git_repo / "package.json").read_text())
+        pkg["version"] = "1.0.1"
+        (mock_git_repo / "package.json").write_text(
+            json.dumps(pkg, indent=2) + "\n"
+        )
+        _git(mock_git_repo, "add", "package.json")
+        _git(mock_git_repo, "commit", "-q", "-m", "v1.0.1")
+        _git(mock_git_repo, "tag", "v1.0.1")
+
+        state_path = _make_in_progress_state(
+            mock_git_repo,
+            completed_steps=[
+                "VERSION_BUMPED", "COMMITTED", "CHANGELOG_FINALIZED",
+                "RELEASE_FILE_FINALIZED", "TAGGED", "PUSHED",
+            ],
+            extra={"release_mode": "pr"},
+        )
+
+        # Verify the saved state contains release_mode
+        saved = load_release_state(state_path)
+        assert saved["release_mode"] == "pr"
+
+        # Capture the ReleaseState passed to _run_release_mutating
+        captured_states = []
+        original_run_mutating = None
+
+        import rlsbl.commands.release as release_mod
+        original_run_mutating = release_mod._run_release_mutating
+
+        def capturing_run_mutating(state):
+            captured_states.append(state)
+            return original_run_mutating(state)
+
+        fake_run_ok = _fake_run_factory()
+        with (
+            patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.run_gh", return_value=""),
+            patch("rlsbl.commands.release.run", side_effect=fake_run_ok),
+            patch("rlsbl.commands.release._run_release_mutating",
+                  side_effect=capturing_run_mutating),
+        ):
+            resume_cmd(
+                saved,
+                {"yes": True, "quiet": True},
+                ctx=_make_ctx(mock_git_repo),
+            )
+
+        assert len(captured_states) == 1
+        assert captured_states[0].release_mode == "pr"
+
+    def test_resume_defaults_to_imperative(self, mock_git_repo):
+        """Resuming from old state without release_mode defaults to 'imperative'."""
+        _setup_releasable_npm_project(mock_git_repo)
+
+        pkg = json.loads((mock_git_repo / "package.json").read_text())
+        pkg["version"] = "1.0.1"
+        (mock_git_repo / "package.json").write_text(
+            json.dumps(pkg, indent=2) + "\n"
+        )
+        _git(mock_git_repo, "add", "package.json")
+        _git(mock_git_repo, "commit", "-q", "-m", "v1.0.1")
+        _git(mock_git_repo, "tag", "v1.0.1")
+
+        # Create state WITHOUT release_mode (simulates old state file)
+        state_path = _make_in_progress_state(
+            mock_git_repo,
+            completed_steps=[
+                "VERSION_BUMPED", "COMMITTED", "CHANGELOG_FINALIZED",
+                "RELEASE_FILE_FINALIZED", "TAGGED", "PUSHED",
+            ],
+        )
+
+        saved = load_release_state(state_path)
+        assert "release_mode" not in saved
+
+        captured_states = []
+
+        import rlsbl.commands.release as release_mod
+        original_run_mutating = release_mod._run_release_mutating
+
+        def capturing_run_mutating(state):
+            captured_states.append(state)
+            return original_run_mutating(state)
+
+        fake_run_ok = _fake_run_factory()
+        with (
+            patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.run_gh", return_value=""),
+            patch("rlsbl.commands.release.run", side_effect=fake_run_ok),
+            patch("rlsbl.commands.release._run_release_mutating",
+                  side_effect=capturing_run_mutating),
+        ):
+            resume_cmd(
+                saved,
+                {"yes": True, "quiet": True},
+                ctx=_make_ctx(mock_git_repo),
+            )
+
+        assert len(captured_states) == 1
+        assert captured_states[0].release_mode == "imperative"
