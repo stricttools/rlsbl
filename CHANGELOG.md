@@ -2,6 +2,16 @@
 
 # Changelog
 
+## 0.91.1
+
+Fix critical pre-release wiring bugs and CI template pre-release awareness
+
+### Fixes
+
+- **Fix.** `preid` now correctly wired through `compute_release_version` to `bump_version`. Pre-release versions (e.g., `0.43.0-alpha.0`) are now produced correctly during releases.
+- **Fix.** CI publish templates now handle pre-release versions. npm templates add `--tag {preid}` for pre-releases. Docker template skips `:latest` tag for pre-releases.
+- **Fix.** Release group help text updated to list all 8 subcommands including `resume` and `scrub`.
+
 ## 0.91.0
 
 Pre-release channels, PR-based release flow, idempotent release resume, registry version detection, and remote release dispatch.
