@@ -28,7 +28,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=semver,pattern=\{{version}}
-            type=raw,value=latest
+            type=raw,value=latest,enable=${{ !contains(github.event.release.tag_name, '-') }}
       - uses: {{action "docker/build-push-action"}}
         with:
           context: .

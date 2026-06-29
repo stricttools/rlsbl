@@ -28,7 +28,17 @@ jobs:
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "Already published: ${PKG_NAME}@${PKG_VERSION}"
           fi
-      - run: pnpm publish --provenance --access public
+      - name: Determine dist-tag
+        id: dist-tag
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if echo "$PKG_VERSION" | grep -q '-'; then
+            PREID=$(echo "$PKG_VERSION" | sed 's/[^-]*-//' | sed 's/\.[^.]*$//')
+            echo "tag=--tag $PREID" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=" >> "$GITHUB_OUTPUT"
+          fi
+      - run: pnpm publish --provenance --access public ${{ steps.dist-tag.outputs.tag }}
         if: steps.check-npm.outputs.skip != 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
