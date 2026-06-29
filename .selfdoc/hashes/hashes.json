@@ -157,7 +157,7 @@
     "description": "92c829699be90c4ea09e05c6e0ff3830b755bdd05be47a9427e51074cedcb831"
   },
   "en/cli-index.md": {
-    "content": "db407067fffd0ca3702e7fca9feae0fe38f02254a276fa4f613f006462c3bb2b",
+    "content": "fa38ec7201441936a5c83778c19ad0b4f38a614dd04261e4c8969b99d606096b",
     "description": "0f01533cb10562a220aa70ea5e33e2500c0c1e4aa8e16b2f80c532449a68b7ea"
   },
   "en/cli-migrate.md": {
@@ -185,7 +185,7 @@
     "description": "728d53ed39a7f216758061237899c35db9b081c75e29c38d44b9d136c412b691"
   },
   "en/cli-release.md": {
-    "content": "76f233e2ed08a3b8d6975c6bc001709200c065584d2315c85f291421960b0da8",
+    "content": "3cfba06ed124d99803ee3dd8ab2b0ec2abd958eff5ec7eac9f45776f0ece9624",
     "description": "4437506314b7ca982c6cd8ae65c5f2be7e3f33143fc5f3f6aed9e64077bba20f"
   },
   "en/cli-scaffold.md": {
@@ -514,7 +514,7 @@
     "source_docstring": "b3b63796b7aeacfe4406215e72f33590559da9a1235e3f6f2e4a750324f06e34"
   },
   "en/rlsbl-commands-release-validate.md": {
-    "content": "6f5b6d8ae0f0dd1ef13bcf2229033fc1bf1edf3aa27a4dda96dfa61f4390dc78",
+    "content": "67d0cd3c6c2cb36e068884118d3241f873090a9252d3fb41e14e69ab314f2aeb",
     "description": "fca18fe43099dd48d8b07fe362f861b15f83a811c20361629f339ef469a001b3",
     "source_docstring": "d99ffc94e10754e831d7c8f081924603d855acb554f3d141a05789d45aec4cc6"
   },
