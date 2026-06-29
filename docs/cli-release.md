@@ -9,7 +9,7 @@ nav_order: 14
 
 # rlsbl release
 
-Release orchestration commands. Provides 6 subcommands covering the full release lifecycle: run, init, retry, edit, undo, and yank.
+Release orchestration commands. Provides 8 subcommands covering the full release lifecycle: run, resume, init, retry, edit, undo, yank, and scrub.
 
 ## release run
 
