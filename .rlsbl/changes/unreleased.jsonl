@@ -1,4 +1,0 @@
-{"commits":["42a1352ee1ec7b8f1b6baf08fa3aab5702db7618"],"user_facing":true,"description":"**Dispatch workflow.** Release dispatch now supports all bump types (prerelease, hotfix) and pre-release identifiers (alpha, beta, rc, stable) as workflow_dispatch inputs.","type":"feature"}
-{"commits":["1ce974f075fae8d4b2bbf9ae09464a89536c2790","025f99163e60b6671cc9af7296d88c4ae739c174"],"user_facing":true,"description":"**PR-mode resume.** PR-mode release resume now correctly preserves release_mode in the state file, preventing PR-mode releases from resuming as imperative.","type":"fix"}
-{"commits":["74fd710193e3d2b1d3931ed67d533773cd71e3e1"],"user_facing":false}
-{"commits":["de375adf89ac7824523c41e2fdf1fe99b912ba39","9a77a00d8de5fd74a6ef981c93c7330317eaabe5"],"user_facing":false}
