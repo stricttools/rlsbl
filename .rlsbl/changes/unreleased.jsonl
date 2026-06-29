@@ -3,3 +3,4 @@
 {"commits":["9e71c8d181a57c2707bac61917c73a0e5da15975"],"user_facing":true,"description":"**Fix.** Release group help text updated to list all 8 subcommands including `resume` and `scrub`.","type":"fix"}
 {"commits":["72bddd1602ba139c974c9cc895da66e6142c92d6"],"user_facing":false}
 {"commits":["5ab36f2993282ab196dbe54a09be5c7613b7a2ff"],"user_facing":false}
+{"commits":["e3151643144b8918199d983e8aa760adbb17af4e"],"user_facing":false}
