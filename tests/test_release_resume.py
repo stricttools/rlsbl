@@ -519,10 +519,15 @@ class TestResumePreservesReleaseMode:
         """ReleaseState with release_mode='pr' produces a state dict that includes it."""
         # The state dict construction lives in execute.py; we verify by
         # checking the dataclass field exists and defaults correctly.
-        st = ReleaseState()
+        _required = dict(
+            registry="npm", target=None, new_version="1.0.0",
+            current_version="0.9.0", bump_type="patch", tag="v1.0.0",
+            branch="main",
+        )
+        st = ReleaseState(**_required)
         assert st.release_mode == "imperative"
 
-        st_pr = ReleaseState(release_mode="pr")
+        st_pr = ReleaseState(**_required, release_mode="pr")
         assert st_pr.release_mode == "pr"
 
     def test_resume_with_pr_mode(self, mock_git_repo):
