@@ -2,6 +2,18 @@
 
 # Changelog
 
+## 0.92.0
+
+Dispatch preid inputs, PR-mode resume fix, end-to-end pre-release integration test
+
+### Features
+
+- **Dispatch workflow.** Release dispatch now supports all bump types (prerelease, hotfix) and pre-release identifiers (alpha, beta, rc, stable) as workflow_dispatch inputs.
+
+### Fixes
+
+- **PR-mode resume.** PR-mode release resume now correctly preserves release_mode in the state file, preventing PR-mode releases from resuming as imperative.
+
 ## 0.91.1
 
 Fix critical pre-release wiring bugs and CI template pre-release awareness
