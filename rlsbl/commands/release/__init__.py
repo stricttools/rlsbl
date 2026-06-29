@@ -368,6 +368,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         workspace_root=monorepo_root if releasable_name else None,
         releasable_name=releasable_name,
         releasable_tag_fmt=releasable_tag_fmt,
+        preid=release_config.preid,
     )
 
     # --- Validate changelog ---

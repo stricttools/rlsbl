@@ -405,7 +405,7 @@ def _releasable_tag_glob(releasable_tag_format, releasable_name):
 def compute_release_version(target, primary_path, bump_arg, monorepo_name,
                             monorepo_project_path, log, *,
                             workspace_root=None, releasable_name=None,
-                            releasable_tag_fmt=None):
+                            releasable_tag_fmt=None, preid=""):
     """Compute current and new version, bump type, and tag.
 
     In explicit releasable mode (when ``workspace_root`` and ``releasable_name``
@@ -461,7 +461,7 @@ def compute_release_version(target, primary_path, bump_arg, monorepo_name,
             raise ReleaseValidationError(
                 f'invalid bump type "{bump_type}". Use: {", ".join(VALID_BUMP_TYPES)}'
             )
-        new_version = bump_version(current_version, bump_type)
+        new_version = bump_version(current_version, bump_type, preid=preid)
         tag = _make_tag(new_version)
         log(f"New version: {new_version} ({bump_type})")
 
