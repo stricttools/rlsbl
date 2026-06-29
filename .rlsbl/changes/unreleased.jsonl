@@ -1,6 +1,0 @@
-{"commits":["664e46780fc88bf2ad1f22c7567799d35c133ef8"],"user_facing":true,"description":"**Fix.** `preid` now correctly wired through `compute_release_version` to `bump_version`. Pre-release versions (e.g., `0.43.0-alpha.0`) are now produced correctly during releases.","type":"fix"}
-{"commits":["c5bf065aeef6e231aad96757b8a2b510b90b8376"],"user_facing":true,"description":"**Fix.** CI publish templates now handle pre-release versions. npm templates add `--tag {preid}` for pre-releases. Docker template skips `:latest` tag for pre-releases.","type":"fix"}
-{"commits":["9e71c8d181a57c2707bac61917c73a0e5da15975"],"user_facing":true,"description":"**Fix.** Release group help text updated to list all 8 subcommands including `resume` and `scrub`.","type":"fix"}
-{"commits":["72bddd1602ba139c974c9cc895da66e6142c92d6"],"user_facing":false}
-{"commits":["5ab36f2993282ab196dbe54a09be5c7613b7a2ff"],"user_facing":false}
-{"commits":["e3151643144b8918199d983e8aa760adbb17af4e"],"user_facing":false}
