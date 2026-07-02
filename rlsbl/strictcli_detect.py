@@ -6,8 +6,16 @@ import re
 
 import tomlkit
 
+from .errors import RlsblError
+
 
 _STRICTCLI_GO_MODULE = "github.com/smm-h/strictcli"
+
+
+class StrictcliDetectError(RlsblError):
+    """The project requires strictcli but its entry point cannot be
+    determined -- callers must treat this as a hard error, never as
+    'project does not use strictcli'."""
 
 
 def detect_strictcli(project_dir: str = ".") -> tuple[str, str] | None:
@@ -93,37 +101,56 @@ def _go_file_imports_strictcli(filepath: str) -> bool:
     return False
 
 
-def _detect_go_strictcli(project_dir: str) -> tuple[str, str] | None:
-    """Detect strictcli in a Go project via go.mod.
+def _go_package_imports_strictcli(project_dir: str, rel_dir: str) -> bool:
+    """Return True if any .go file in the package dir imports strictcli."""
+    pkg_dir = os.path.normpath(os.path.join(project_dir, rel_dir))
+    for go_file in glob.glob(os.path.join(pkg_dir, "*.go")):
+        if _go_file_imports_strictcli(go_file):
+            return True
+    return False
 
-    Detection order:
-    1. Root main.go that imports strictcli -> return (".", "go")
-    2. Single cmd/*/main.go -> return ("./cmd/<name>/", "go")
-    3. Multiple cmd/*/main.go -> scan each for strictcli imports,
-       return the one that imports it
+
+def _entry_point_path(rel_dir: str) -> str:
+    """Format a main-package rel_dir as a `go run` entry point path."""
+    return "." if rel_dir == "." else rel_dir + "/"
+
+
+def _detect_go_strictcli(project_dir: str) -> tuple[str, str] | None:
+    """Detect strictcli in a Go project via go.mod and go list.
+
+    Main packages are enumerated with the go toolchain (go_introspect),
+    which handles entry files not named main.go, _test.go files in
+    package main, and broken-root layouts.
+
+    Resolution:
+    1. Exactly one main package -> that's the entry point (the strictcli
+       import may be indirect via an internal package).
+    2. Multiple main packages -> the one whose dir directly imports
+       strictcli.
+    3. Anything else -> StrictcliDetectError: go.mod requires strictcli,
+       so failing to find the entry point is a hard error, never a
+       silent 'no strictcli here'.
     """
     if not _go_mod_has_strictcli(project_dir):
         return None
 
-    # Check root main.go
-    root_main = os.path.join(project_dir, "main.go")
-    if os.path.exists(root_main):
-        if _go_file_imports_strictcli(root_main):
-            return (".", "go")
+    from .go_introspect import list_main_packages
 
-    # Check cmd/*/main.go entries
-    cmd_mains = glob.glob(os.path.join(project_dir, "cmd", "*", "main.go"))
-    if not cmd_mains:
-        return None
+    mains = list_main_packages(project_dir)
+    if len(mains) == 1:
+        return (_entry_point_path(mains[0].rel_dir), "go")
 
-    if len(cmd_mains) == 1:
-        cmd_name = os.path.basename(os.path.dirname(cmd_mains[0]))
-        return (f"./cmd/{cmd_name}/", "go")
+    importing = [
+        p for p in mains
+        if _go_package_imports_strictcli(project_dir, p.rel_dir)
+    ]
+    if len(importing) == 1:
+        return (_entry_point_path(importing[0].rel_dir), "go")
 
-    # Multi-binary: scan each for direct strictcli imports (lazy import)
-    for main_go in cmd_mains:
-        if _go_file_imports_strictcli(main_go):
-            cmd_name = os.path.basename(os.path.dirname(main_go))
-            return (f"./cmd/{cmd_name}/", "go")
-
-    return None
+    detected = ", ".join(f'"{p.rel_dir}"' for p in mains) or "(none)"
+    raise StrictcliDetectError(
+        f"go.mod in {project_dir} requires strictcli, but the entry point "
+        f"could not be determined: main packages detected: {detected}; "
+        f"packages directly importing strictcli: {len(importing)}. "
+        "Fix the project layout so exactly one main package uses strictcli."
+    )

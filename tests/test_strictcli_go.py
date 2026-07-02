@@ -6,8 +6,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from rlsbl.strictcli_detect import detect_strictcli
+from rlsbl.strictcli_detect import StrictcliDetectError, detect_strictcli
 from rlsbl.commands.release.validate import (
+    ReleaseValidationError,
     _run_strictcli_schema_dump,
     _schema_dump_command,
 )
@@ -120,19 +121,55 @@ class TestGoDetection:
         result = detect_strictcli(str(tmp_path))
         assert result is None
 
-    def test_root_main_without_strictcli_import(self, tmp_path):
-        """Root main.go that does NOT import strictcli returns None."""
+    def test_root_main_without_direct_strictcli_import(self, tmp_path):
+        """A single main package is the entry point even when the entry file
+        doesn't import strictcli directly (the import may be indirect via an
+        internal package -- go.mod requiring strictcli is the signal)."""
         _write_go_mod(tmp_path)
         (tmp_path / "main.go").write_text(_GO_MAIN_WITHOUT_STRICTCLI)
         result = detect_strictcli(str(tmp_path))
-        assert result is None
+        assert result == (".", "go")
 
-    def test_go_mod_only_no_entry_points(self, tmp_path):
-        """go.mod with strictcli dep but no main.go anywhere returns None."""
+    def test_go_mod_only_no_entry_points_raises(self, tmp_path):
+        """go.mod requires strictcli but no main package exists anywhere:
+        hard error instead of a silent None (which silently skipped the
+        schema dump on every release)."""
         _write_go_mod(tmp_path)
         # No main.go at root, no cmd/ directory at all -- just go.mod
+        with pytest.raises(StrictcliDetectError, match="strictcli"):
+            detect_strictcli(str(tmp_path))
+
+    def test_cli_go_entry_file_detected(self, tmp_path):
+        """cmd/myapp/cli.go (entry file not named main.go) is detected --
+        the old main.go glob returned None and skipped the schema dump."""
+        _write_go_mod(tmp_path)
+        cmd_dir = tmp_path / "cmd" / "myapp"
+        cmd_dir.mkdir(parents=True)
+        (cmd_dir / "cli.go").write_text(_GO_CMD_WITH_STRICTCLI)
         result = detect_strictcli(str(tmp_path))
-        assert result is None
+        assert result == ("./cmd/myapp/", "go")
+
+    def test_broken_root_layout_picks_strictcli_main(self, tmp_path):
+        """Root package main (version.go without func main) plus a real
+        strictcli entry under cmd/ resolves to the cmd entry."""
+        _write_go_mod(tmp_path)
+        (tmp_path / "version.go").write_text("package main\n\nvar Version string\n")
+        cmd_dir = tmp_path / "cmd" / "myapp"
+        cmd_dir.mkdir(parents=True)
+        (cmd_dir / "cli.go").write_text(_GO_CMD_WITH_STRICTCLI)
+        result = detect_strictcli(str(tmp_path))
+        assert result == ("./cmd/myapp/", "go")
+
+    def test_multi_main_none_importing_strictcli_raises(self, tmp_path):
+        """Multiple main packages, none with a direct strictcli import:
+        ambiguous -- hard error instead of a silent None."""
+        _write_go_mod(tmp_path)
+        for name in ("server", "worker"):
+            cmd_dir = tmp_path / "cmd" / name
+            cmd_dir.mkdir(parents=True)
+            (cmd_dir / "main.go").write_text(_GO_CMD_WITHOUT_STRICTCLI)
+        with pytest.raises(StrictcliDetectError, match="strictcli"):
+            detect_strictcli(str(tmp_path))
 
 
 class TestSchemaDumpBranching:
@@ -213,3 +250,28 @@ class TestSchemaDumpBranching:
         assert len(messages) == 1
         assert "go run ./cmd/myapp/ --dump-schema" in messages[0]
         assert "uv" not in messages[0]
+
+    def test_detection_failure_is_release_validation_error(self, tmp_path, monkeypatch):
+        """A project that requires strictcli but whose entry point can't be
+        detected must abort release validation -- never silently skip the
+        schema dump."""
+        monkeypatch.setattr(
+            "rlsbl.commands.release.validate.detect_strictcli",
+            MagicMock(side_effect=StrictcliDetectError(
+                "go.mod requires strictcli but no entry point was found"
+            )),
+        )
+        with pytest.raises(ReleaseValidationError, match="strictcli"):
+            _run_strictcli_schema_dump({}, MagicMock(), project_dir=str(tmp_path))
+
+    def test_detection_failure_raises_in_dry_run_too(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            "rlsbl.commands.release.validate.detect_strictcli",
+            MagicMock(side_effect=StrictcliDetectError(
+                "go.mod requires strictcli but no entry point was found"
+            )),
+        )
+        with pytest.raises(ReleaseValidationError, match="strictcli"):
+            _run_strictcli_schema_dump(
+                {"dry-run": True}, MagicMock(), project_dir=str(tmp_path)
+            )

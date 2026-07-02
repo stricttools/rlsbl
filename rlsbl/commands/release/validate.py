@@ -718,21 +718,26 @@ def _run_strictcli_schema_dump(flags, log, project_dir="."):
     with --dump-schema, and logs the result. The generated file is picked up by
     the hook-generated file mechanism (pre/post hook dirty snapshots).
 
-    Non-fatal: a failing dump command prints a warning but does not abort.
+    A project that requires strictcli but whose entry point cannot be
+    detected aborts validation (ReleaseValidationError) -- a silent skip
+    would ship a stale schema. A failing dump command still only prints
+    a warning.
     """
     from . import subprocess as _subprocess
+    from ...strictcli_detect import StrictcliDetectError
+
+    try:
+        result = detect_strictcli(project_dir)
+    except StrictcliDetectError as e:
+        raise ReleaseValidationError(str(e)) from e
 
     if flags.get("dry-run"):
-        check_dir = project_dir
-        result = detect_strictcli(check_dir)
         if result:
             entry_point, lang = result
             cmd = _schema_dump_command(entry_point, lang)
             log(f"Would run: {' '.join(cmd)}")
         return
 
-    check_dir = project_dir
-    result = detect_strictcli(check_dir)
     if not result:
         return
 

@@ -1388,13 +1388,20 @@ def run_cmd(registry, args, flags, ctx):
         skipped = reg_skipped + pipe_skipped + shared_skipped
         warnings = reg_warnings + pipe_warnings + shared_warnings
 
-        # Warn if Go project has main in cmd/ but not at root
+        # Note when a Go project's main packages live under cmd/ only:
+        # `go install module@latest` targets the module root, so users
+        # install with the package-qualified path instead.
         if registry == "go":
-            if reg._has_cmd_main(".") and not reg._has_root_main("."):
+            from ..go_introspect import list_main_packages
+            go_mains = list_main_packages(".")
+            if go_mains and not any(p.rel_dir == "." for p in go_mains):
+                pkg_paths = ", ".join(
+                    f"'go install {p.import_path}@latest'" for p in go_mains
+                )
                 print(
-                    "Warning: Go project has main package in cmd/ but not at root.\n"
-                    "'go install module@latest' won't work. Consider moving main.go "
-                    "to the project root.",
+                    "Note: Go project's main package(s) live under cmd/, not "
+                    "at the module root. 'go install <module>@latest' won't "
+                    f"work; users install with {pkg_paths}.",
                     file=sys.stderr,
                 )
 
