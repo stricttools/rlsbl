@@ -24,3 +24,4 @@
 {"commits":["106bb6d70ce1458cc836a55135c964bf14fd83b2"],"user_facing":false}
 {"commits":["62804d16687614a7cf905cb9febf630f96514c2b"],"user_facing":false}
 {"commits":["ed9122a11322e0082e3c9763a3b25fc85b52ead9"],"user_facing":true,"description":"**Fix.** Releasing a monorepo releasable with a corrupt member `config.json` now aborts during Go companion-tag collection instead of silently releasing without that member's Go module proxy tag.","type":"fix"}
+{"commits":["6882cc07d604d292db6d32eab9f8af0f19ab42c8"],"user_facing":true,"description":"**Fix.** The `go-companion-tags` workspace check now fails loudly when a releasable's version file cannot be read, instead of silently skipping that releasable.","type":"fix"}
