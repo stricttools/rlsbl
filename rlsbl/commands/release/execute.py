@@ -1354,7 +1354,7 @@ def _run_release_mutating(state: ReleaseState):
         else:
             run("git", ["reset", "--hard", pre_release_sha])
         # State file is useless after local rollback -- clean it up.
-        _cleanup_release_artifacts(project_dir, new_version)
+        _cleanup_release_artifacts(project_dir, new_version, changes_dir=state.changes_dir)
         clear_release_state(_state_path)
         print(str(e), file=sys.stderr)
         print(
@@ -1417,7 +1417,7 @@ def _run_release_mutating(state: ReleaseState):
                     pass
             run("git", ["reset", "--hard", pre_release_sha])
         # State file is useless after local rollback -- clean it up.
-        _cleanup_release_artifacts(project_dir, new_version)
+        _cleanup_release_artifacts(project_dir, new_version, changes_dir=state.changes_dir)
         clear_release_state(_state_path)
         if hasattr(e, 'stderr') and e.stderr:
             print(f"Command error: {e.stderr.strip()}", file=sys.stderr)

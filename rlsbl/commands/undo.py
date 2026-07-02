@@ -19,6 +19,66 @@ FAILED = "FAILED"
 SKIPPED = "SKIPPED"
 
 
+def _resolve_undo_changelog_paths(project_path, ws_root, releasable_name):
+    """Resolve the changes dir, regenerate callable, and git-add paths for
+    changelog restoration -- releasable-aware.
+
+    In explicit releasable mode the finalized JSONL lives in the releasable's
+    changes dir and the canonical CHANGELOG.md in the releasable dir (plus
+    the combined root CHANGELOG.md); otherwise everything is per-project.
+    """
+    if releasable_name and ws_root:
+        from ..changelog.home import (
+            generate_workspace_changelog,
+            get_changelog_home,
+            get_workspace_changelog_path,
+        )
+        from ..workspace import get_releasable_changes_dir, get_releasable_dir
+
+        changes_dir = get_releasable_changes_dir(str(ws_root), releasable_name)
+        canonical = get_changelog_home(
+            project_path,
+            releasable_dir=get_releasable_dir(str(ws_root), releasable_name),
+        )
+
+        def regenerate():
+            generate_changelog(
+                project_path,
+                changes_dir_override=changes_dir,
+                changelog_output_path=canonical,
+            )
+            generate_workspace_changelog(str(ws_root))
+
+        add_paths = [
+            changes_dir, canonical, get_workspace_changelog_path(str(ws_root)),
+        ]
+        return changes_dir, regenerate, add_paths
+
+    changes_dir = get_changes_dir(project_path)
+
+    def regenerate():
+        generate_changelog(project_path)
+
+    add_paths = [changes_dir, os.path.join(project_path, "CHANGELOG.md")]
+    return changes_dir, regenerate, add_paths
+
+
+def _clear_release_state(project_path, ws_root):
+    """Clear any in-progress release state after a successful rollback.
+
+    A rolled-back release's preserved in-progress.json is meaningless and
+    would hard-block the next `rlsbl release run`.
+    """
+    from .release.release_state import (
+        clear_release_state,
+        get_state_path,
+        resolve_releasable_dir,
+    )
+
+    rel_dir = resolve_releasable_dir(project_path, ws_root) if ws_root else None
+    clear_release_state(get_state_path(project_path, releasable_dir=rel_dir))
+
+
 def _print_summary(results):
     """Print a summary table of step results. Only called when at least one step failed."""
     # Calculate column widths
@@ -86,7 +146,8 @@ def _detect_pr_state(release_branch, config):
 
 
 def _undo_pr_release(tag, release_branch, bare_version, flags,
-                     monorepo_name, monorepo_project_path, ws_root, ctx):
+                     monorepo_name, monorepo_project_path, ws_root, ctx,
+                     releasable_name=None):
     """Undo a PR-mode release by closing the PR and cleaning up the branch.
 
     Called when the release PR is still open (not merged). Closes the PR,
@@ -137,20 +198,22 @@ def _undo_pr_release(tag, release_branch, bare_version, flags,
         # Local branch may not exist (e.g., on a different machine)
         results.append(("Delete local branch", SKIPPED, "branch not found locally"))
 
-    # Restore changelog state (unfinalize if needed)
+    # Restore changelog state (unfinalize if needed; releasable-aware)
     project_path = os.path.join(ws_root, monorepo_project_path) if monorepo_name else str(ctx.project_root or ".")
     try:
-        changes_dir = get_changes_dir(project_path)
+        changes_dir, regenerate_changelog, changelog_add_paths = (
+            _resolve_undo_changelog_paths(project_path, ws_root, releasable_name)
+        )
         restored = unfinalize_version(changes_dir, bare_version)
         if restored:
-            generate_changelog(project_path)
-            run("git", ["add", changes_dir, os.path.join(project_path, "CHANGELOG.md")])
+            regenerate_changelog()
+            run("git", ["add", *changelog_add_paths])
             run("git", ["commit", "-m", f"chore: restore changelog after undo of {tag}"])
             results.append(("Restore changelog", OK, "-"))
     except Exception:
         traceback.print_exc()
         results.append(("Restore changelog", FAILED,
-                         "manually restore .rlsbl/changes/ and regenerate CHANGELOG.md"))
+                         "manually restore the changes dir and regenerate CHANGELOG.md"))
 
     # Restore the release file
     try:
@@ -167,6 +230,10 @@ def _undo_pr_release(tag, release_branch, bare_version, flags,
 
     # Print summary
     has_failure = any(status == FAILED for _, status, _ in results)
+    if not has_failure:
+        # Clear any preserved in-progress release state -- it would
+        # hard-block the next `rlsbl release run`.
+        _clear_release_state(project_path, ws_root)
     if has_failure:
         _print_summary(results)
     else:
@@ -246,6 +313,7 @@ def run_cmd(registry, args, flags, *, ctx):
                 tag, release_branch, _version_for_branch, flags,
                 monorepo_name, monorepo_project_path, ws_root,
                 ctx,
+                releasable_name=releasable_name,
             )
             return
         # pr_state is "merged" or "none" -- fall through to imperative undo
@@ -400,18 +468,22 @@ def run_cmd(registry, args, flags, *, ctx):
         results.append(("Revert commit", FAILED, "git revert --no-edit HEAD"))
 
     # Restore changelog state if we reverted a changelog finalize commit
+    # (releasable-aware: the finalized JSONL and canonical CHANGELOG.md live
+    # at the releasable level in explicit releasable mode)
     if changelog_finalize_reverted:
         try:
-            changes_dir = get_changes_dir(project_path)
+            changes_dir, regenerate_changelog, changelog_add_paths = (
+                _resolve_undo_changelog_paths(project_path, ws_root, releasable_name)
+            )
             unfinalize_version(changes_dir, bare_version)
-            generate_changelog(project_path)
+            regenerate_changelog()
             # Commit the restored changelog files
-            run("git", ["add", changes_dir, os.path.join(project_path, "CHANGELOG.md")])
+            run("git", ["add", *changelog_add_paths])
             run("git", ["commit", "-m", f"chore: restore changelog after undo of {tag}"])
             results.append(("Restore changelog", OK, "-"))
         except Exception:
             traceback.print_exc()
-            results.append(("Restore changelog", FAILED, "manually restore .rlsbl/changes/ and regenerate CHANGELOG.md"))
+            results.append(("Restore changelog", FAILED, "manually restore the changes dir and regenerate CHANGELOG.md"))
 
     # Restore the release file (inverse of release-file finalization). When
     # the finalize commit was reverted above, git already restored the files
@@ -454,6 +526,11 @@ def run_cmd(registry, args, flags, *, ctx):
 
     # Print summary: table only if something failed, otherwise a simple success message
     has_failure = any(status == FAILED for _, status, _ in results)
+    if not has_failure:
+        # Clear any preserved in-progress release state (e.g. from a
+        # fatal-failure release that was just undone) -- leaving it in
+        # place would hard-block the next `rlsbl release run`.
+        _clear_release_state(project_path, ws_root)
     if has_failure:
         _print_summary(results)
     else:
