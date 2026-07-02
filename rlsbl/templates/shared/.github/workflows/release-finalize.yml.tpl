@@ -24,12 +24,26 @@ jobs:
       - name: Read release metadata
         id: meta
         run: |
-          PENDING=".rlsbl/releases/pending.json"
-          if [ ! -f "$PENDING" ]; then
+          # pending.json lives in the release state dir: .rlsbl/releases/
+          # for standalone projects, or the releasable's releases dir in
+          # explicit monorepo mode. Glob both; exactly one may exist.
+          CANDIDATES=""
+          for f in .rlsbl/releases/pending.json .rlsbl-monorepo/releasables/*/releases/pending.json; do
+            [ -f "$f" ] && CANDIDATES="$CANDIDATES$f"$'\n'
+          done
+          COUNT=$(printf '%s' "$CANDIDATES" | grep -c . || true)
+          if [ "$COUNT" -eq 0 ]; then
             echo "No pending.json found, skipping"
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          if [ "$COUNT" -gt 1 ]; then
+            echo "Error: multiple pending.json files found:"
+            printf '%s' "$CANDIDATES"
+            exit 1
+          fi
+          PENDING=$(printf '%s' "$CANDIDATES" | head -n1)
+          echo "pending=$PENDING" >> "$GITHUB_OUTPUT"
           echo "version=$(jq -r .version "$PENDING")" >> "$GITHUB_OUTPUT"
           echo "tag=$(jq -r .tag "$PENDING")" >> "$GITHUB_OUTPUT"
           echo "skip=false" >> "$GITHUB_OUTPUT"
@@ -43,7 +57,7 @@ jobs:
       - name: Create companion tags
         if: steps.meta.outputs.skip != 'true'
         run: |
-          PENDING=".rlsbl/releases/pending.json"
+          PENDING="${{ steps.meta.outputs.pending }}"
           for ctag in $(jq -r '.companion_tags[]' "$PENDING" 2>/dev/null); do
             git tag "$ctag"
             git push origin "$ctag"
@@ -52,7 +66,7 @@ jobs:
       - name: Create GitHub Release
         if: steps.meta.outputs.skip != 'true'
         run: |
-          PENDING=".rlsbl/releases/pending.json"
+          PENDING="${{ steps.meta.outputs.pending }}"
           jq -r .changelog_entry "$PENDING" > /tmp/release-notes.md
           PRERELEASE_FLAG=""
           if echo "${{ steps.meta.outputs.version }}" | grep -qE "-(alpha|beta|rc)\."; then
@@ -68,7 +82,7 @@ jobs:
       - name: Dispatch publish workflows
         if: steps.meta.outputs.skip != 'true'
         run: |
-          PENDING=".rlsbl/releases/pending.json"
+          PENDING="${{ steps.meta.outputs.pending }}"
           TAG="${{ steps.meta.outputs.tag }}"
           for workflow in $(jq -r '.dispatch[]' "$PENDING"); do
             echo "Dispatching $workflow for $TAG"
@@ -80,7 +94,8 @@ jobs:
       - name: Clean up pending metadata
         if: steps.meta.outputs.skip != 'true'
         run: |
-          rm .rlsbl/releases/pending.json
-          git add .rlsbl/releases/pending.json
+          PENDING="${{ steps.meta.outputs.pending }}"
+          rm "$PENDING"
+          git add "$PENDING"
           git commit -m "chore: clean up release metadata for ${{ steps.meta.outputs.tag }}"
           git push

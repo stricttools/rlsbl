@@ -77,6 +77,31 @@ class TestReleaseFinalizeTemplate:
         content = tpl.read_text()
         assert "fetch-depth: 0" in content
 
+    def test_template_globs_releasable_pending_location(self):
+        """pending.json is located by globbing both the standalone location
+        and the releasable state dirs -- non-root representatives would
+        otherwise be broken by construction."""
+        tpl = SHARED_TEMPLATE_DIR / ".github" / "workflows" / "release-finalize.yml.tpl"
+        content = tpl.read_text()
+        assert ".rlsbl/releases/pending.json" in content
+        assert ".rlsbl-monorepo/releasables/*/releases/pending.json" in content
+
+    def test_template_errors_on_multiple_pending_files(self):
+        tpl = SHARED_TEMPLATE_DIR / ".github" / "workflows" / "release-finalize.yml.tpl"
+        content = tpl.read_text()
+        assert "multiple pending.json" in content
+        assert "exit 1" in content
+
+    def test_template_steps_use_resolved_pending_path(self):
+        """Later steps must reference the resolved pending path output, not
+        a hardcoded repo-root path."""
+        tpl = SHARED_TEMPLATE_DIR / ".github" / "workflows" / "release-finalize.yml.tpl"
+        content = tpl.read_text()
+        assert "steps.meta.outputs.pending" in content
+        # The only hardcoded .rlsbl/releases/pending.json occurrences are in
+        # the glob candidate list of the metadata step.
+        assert 'PENDING=".rlsbl/releases/pending.json"' not in content
+
 
 class TestAppendReleaseFinalizeIfConfigured:
     """_append_release_finalize_if_configured conditionally adds the mapping."""

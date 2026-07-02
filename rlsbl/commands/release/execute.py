@@ -513,8 +513,18 @@ def _run_pr_release(
     context = state.context
     releasable_name = state.releasable_name
 
-    # Write pending.json to .rlsbl/releases/pending.json
+    # Write pending.json into the release state dir (same resolver as
+    # in-progress.json: releasable state dir in releasable mode,
+    # .rlsbl/releases/ for standalone projects). The finalize workflow
+    # locates it by globbing both locations.
     dispatch = _find_publish_workflows(project_dir)
+    # In a monorepo, publish workflows live at the workspace root (monorepo
+    # sync merges them into <root>/.github/workflows/), so scan there too.
+    _ws_root = state.ctx.workspace_root if state.ctx else None
+    if _ws_root and os.path.realpath(str(_ws_root)) != os.path.realpath(project_dir):
+        for wf in _find_publish_workflows(str(_ws_root)):
+            if wf not in dispatch:
+                dispatch.append(wf)
     pending = {
         "version": new_version,
         "tag": tag,
@@ -525,7 +535,7 @@ def _run_pr_release(
         "companion_tags": list(state.companion_tags),
         "releasable_name": releasable_name,
     }
-    pending_path = os.path.join(project_dir, ".rlsbl", "releases", "pending.json")
+    pending_path = os.path.join(os.path.dirname(_state_path), "pending.json")
     os.makedirs(os.path.dirname(pending_path), exist_ok=True)
     with open(pending_path, "w", encoding="utf-8") as f:
         json.dump(pending, f, indent=2, ensure_ascii=False)
