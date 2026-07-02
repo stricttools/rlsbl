@@ -113,19 +113,20 @@ See [docs/ci-customization.md](docs/ci-customization.md) for an example.
 
 ## Check system
 
-rlsbl includes 56 checks across 9 tags.
+rlsbl includes 57 checks across 9 tags.
 
 | Tag | Checks | Description |
 |-----|--------|-------------|
-| `project` | 12 | Version, name, license, description consistency; config schema; private hook/workflow; npm mismatch; target readability; selfdoc drift |
-| `release` | 4 | Local/remote tag, GitHub Release, branch sync |
+| `project` | 14 | Version, name, license, description consistency; config schema; private hook/workflow; npm mismatch; target/dunder version readability; selfdoc drift; scaffold conflicts |
+| `release` | 5 | Local/remote tag, GitHub Release, branch sync, scaffold conflicts |
 | `changelog` | 9 | Hash resolution, range, coverage, orphans, schema, user-facing, batch limits, entry |
-| `workspace` | 9 | CI router, CI sync, targets, unregistered, stale entries, dev-node boundary, dead packages, subtree remote, layers |
-| `quality` | 8 | Dead modules, circular deps, library lint, deps unused/undeclared/runtime-test-only/dev-in-lib, scaffold checks, test suite |
-| (untagged) | 4 | Additional validation checks |
+| `workspace` | 14 | CI router, CI sync, targets, unregistered, stale entries, dev-only/unversioned boundaries, dead packages, subtree remote, buildability, gitignore, root conflict, Go companion tags, workspace tests |
+| `quality` | 9 | Dead modules, circular deps, library/ruff lint, deps runtime-test-only/dev-in-lib, scaffold vars, test suite, Maven Central metadata |
+| `prepush` | 6 | Changelog coverage, gitignore guard, manual-push warning, tests, scaffold conflicts |
+| (untagged) | 4 | Layers violations, deps unused/undeclared/stale |
 
 ```
-rlsbl check --all              # run all 50 checks
+rlsbl check --all              # run all checks
 rlsbl check --tag changelog    # run checks by tag
 rlsbl check --name lock        # run a single check
 ```
