@@ -576,6 +576,63 @@ class TestGoCompanionTagsCheck:
         assert "golib" in result.details[0]
         assert "config" in result.details[0].lower()
 
+    def test_fails_when_releasable_version_unreadable(self, tmp_path):
+        """A releasable whose version file cannot be read must produce a
+        check FAILURE naming the releasable, not a silent skip -- same
+        no-silent-skip rule as the member-config-error failure."""
+        from rlsbl.checks.workspace import register_workspace_checks
+        from rlsbl.workspace import Releasable, WorkspaceProject
+
+        app = MagicMock()
+        checks = {}
+
+        def fake_check(name):
+            def decorator(fn):
+                checks[name] = fn
+                return fn
+            return decorator
+        app.check = fake_check
+
+        register_workspace_checks(app)
+        check_fn = checks["go-companion-tags"]
+
+        repo = tmp_path / "workspace"
+        repo.mkdir()
+        _run_git(repo, "init")
+        _run_git(repo, "config", "user.name", "Test")
+        _run_git(repo, "config", "user.email", "test@test.com")
+
+        go_pkg = repo / "packages" / "golib"
+        go_pkg.mkdir(parents=True)
+        (go_pkg / "go.mod").write_text("module github.com/test/golib\n\ngo 1.21\n")
+        (go_pkg / ".rlsbl").mkdir()
+        (go_pkg / ".rlsbl" / "config.json").write_text(json.dumps({
+            "private": False,
+            "targets": ["go"],
+        }))
+
+        # Workspace exists but the releasable version file is never written.
+        ws_dir = repo / ".rlsbl-monorepo"
+        ws_dir.mkdir()
+        (ws_dir / "workspace.toml").write_text("")
+
+        (repo / "README.md").write_text("test\n")
+        _run_git(repo, "add", ".")
+        _run_git(repo, "commit", "-m", "initial")
+
+        proj = WorkspaceProject({
+            "name": "golib",
+            "path": "packages/golib",
+            "releasable": "myrel",
+        })
+        rel = Releasable(name="myrel")
+        ctx = self._make_check_ctx(str(repo), [proj], [rel])
+
+        result = check_fn(ctx)
+        assert result.status == "fail"
+        assert "myrel" in result.details[0]
+        assert "version" in result.details[0].lower()
+
     def test_fails_when_member_targets_unresolvable(self, tmp_path):
         """A member whose config exists but resolves no targets anywhere must
         produce a check FAILURE naming the member (not crash, not skip).

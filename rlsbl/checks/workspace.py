@@ -754,10 +754,15 @@ def register_workspace_checks(app):
             if not member_projs:
                 continue
 
-            # Read the releasable's current version
+            # Read the releasable's current version. An unreadable version
+            # is a check FAILURE naming the releasable, not a silent skip --
+            # same no-silent-skip rule as broken member configs below.
             try:
                 version = read_releasable_version(root, rel.name)
-            except Exception:
+            except Exception as e:
+                config_errors.append(
+                    f"{rel.name}: cannot read releasable version: {e}"
+                )
                 continue
 
             for proj in member_projs:
@@ -802,7 +807,7 @@ def register_workspace_checks(app):
         if config_errors:
             return CheckResult(
                 "fail",
-                f"{len(config_errors)} member config error(s)",
+                f"{len(config_errors)} releasable/member config error(s)",
                 details=config_errors,
             )
 
