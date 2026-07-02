@@ -137,8 +137,8 @@ class TestReleasableBatchLimitsInheritance:
             "commits": ",".join(shas),
             "description": "Big batch feature",
             "type": "feature",
-            "no-user-facing": False,
-            "no-commit": True,
+            "user-facing": True,
+            "auto-commit": False,
             "allow-batch": False,
         }
 
@@ -160,8 +160,8 @@ class TestReleasableBatchLimitsInheritance:
             "commits": ",".join(shas),
             "description": "Batch feature",
             "type": "feature",
-            "no-user-facing": False,
-            "no-commit": True,
+            "user-facing": True,
+            "auto-commit": False,
             "allow-batch": False,
         }
 
@@ -189,8 +189,8 @@ class TestReleasableExclusionWrites:
             "commits": ",".join(shas),
             "description": "Big batch feature",
             "type": "feature",
-            "no-user-facing": False,
-            "no-commit": True,
+            "user-facing": True,
+            "auto-commit": False,
             "allow-batch": True,
         }
         cmd_add(flags, project_root=proj_dir)
@@ -221,8 +221,8 @@ class TestReleasableExclusionWrites:
             "commits": ",".join(shas),
             "description": "Big batch feature",
             "type": "feature",
-            "no-user-facing": False,
-            "no-commit": True,
+            "user-facing": True,
+            "auto-commit": False,
             "allow-batch": True,
         }
         cmd_add(flags, project_root=proj_dir)
@@ -282,8 +282,8 @@ class TestStandaloneExclusionRegression:
             "commits": ",".join(shas),
             "description": "Big standalone batch",
             "type": "feature",
-            "no-user-facing": False,
-            "no-commit": True,
+            "user-facing": True,
+            "auto-commit": False,
             "allow-batch": True,
         }
         cmd_add(flags, project_root=repo)

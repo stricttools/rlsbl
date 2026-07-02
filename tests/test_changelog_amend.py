@@ -79,8 +79,8 @@ class TestCmdAmend:
             "commits": sha2[:12],
             "description": "New bugfix",
             "type": "fix",
-            "no-user-facing": False,
-            "no-resolve": False,
+            "user-facing": True,
+            "validate-hashes": True,
         }
         with mock.patch("rlsbl.commands.changelog_cmd.commit_files"):
             with mock.patch("rlsbl.commands.changelog_cmd._sync_github_release"):
@@ -109,8 +109,8 @@ class TestCmdAmend:
             "commits": "deadbeefdeadbeef",
             "description": "Old change",
             "type": "feature",
-            "no-user-facing": False,
-            "no-resolve": True,
+            "user-facing": True,
+            "validate-hashes": False,
         }
         with mock.patch("rlsbl.commands.changelog_cmd.commit_files"):
             with mock.patch("rlsbl.commands.changelog_cmd._sync_github_release"):
@@ -128,8 +128,8 @@ class TestCmdAmend:
             "commits": "abc123",
             "description": "Does not matter",
             "type": "fix",
-            "no-user-facing": False,
-            "no-resolve": True,
+            "user-facing": True,
+            "validate-hashes": False,
         }
         with pytest.raises(SystemExit) as exc_info:
             cmd_amend(flags, project_root=rlsbl_repo)
@@ -148,8 +148,8 @@ class TestCmdAmend:
             "commits": sha,
             "description": "Something",
             "type": "fix",
-            "no-user-facing": False,
-            "no-resolve": False,
+            "user-facing": True,
+            "validate-hashes": True,
         }
 
         with mock.patch(
@@ -175,8 +175,8 @@ class TestCmdAmend:
             "commits": sha2,
             "description": "Added bugfix",
             "type": "fix",
-            "no-user-facing": False,
-            "no-resolve": False,
+            "user-facing": True,
+            "validate-hashes": True,
         }
         with mock.patch("rlsbl.commands.changelog_cmd.commit_files"):
             with mock.patch("rlsbl.commands.changelog_cmd._sync_github_release"):
@@ -203,8 +203,8 @@ class TestCmdAmend:
             "commits": sha,
             "description": "Duplicate entry",
             "type": "fix",
-            "no-user-facing": False,
-            "no-resolve": False,
+            "user-facing": True,
+            "validate-hashes": True,
         }
         with mock.patch("rlsbl.commands.changelog_cmd.commit_files"):
             with mock.patch("rlsbl.commands.changelog_cmd._sync_github_release"):

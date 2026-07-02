@@ -112,7 +112,7 @@ class TestFinalizeScaffoldPurgesRemovedPaths:
         _finalize_scaffold(
             existing_hashes, [{}],
             [], [], warnings,
-            flags={"no-commit": True},
+            flags={"auto-commit": False},
             project_root=proj_dir,
             config={"targets": ["pypi"]},
             removed_paths=removed,
@@ -150,7 +150,7 @@ class TestFinalizeScaffoldPurgesRemovedPaths:
         _finalize_scaffold(
             existing_hashes, [{}],
             [], [], warnings,
-            flags={"no-commit": True},
+            flags={"auto-commit": False},
             project_root=proj_dir,
             config={"targets": ["pypi"]},
             removed_paths=removed,
@@ -170,7 +170,7 @@ class TestFinalizeScaffoldPurgesRemovedPaths:
         _finalize_scaffold(
             existing_hashes, [{}],
             [], [], [],
-            flags={"no-commit": True},
+            flags={"auto-commit": False},
             project_root=mock_git_repo,
             config={},
             removed_paths=[],
@@ -188,7 +188,7 @@ class TestFinalizeScaffoldPurgesRemovedPaths:
         _finalize_scaffold(
             existing_hashes, [{}],
             [], [], [],
-            flags={"no-commit": True},
+            flags={"auto-commit": False},
             project_root=mock_git_repo,
             config={},
             # removed_paths omitted, defaults to None
@@ -232,8 +232,8 @@ class TestCallSitesPassRemovedPaths:
 
         with patch("rlsbl.commands.init_cmd._finalize_scaffold", side_effect=tracking_finalize):
             run_cmd("plain", [], {
-                "no-commit": True,
-                "no-tag": True,
+                "auto-commit": False,
+                "auto-tag": False,
                 "skip-shared": False,
             }, ctx=ctx)
 
@@ -260,8 +260,8 @@ class TestCallSitesPassRemovedPaths:
 
         with patch("rlsbl.commands.init_cmd._finalize_scaffold", side_effect=tracking_finalize):
             run_cmd("plain", [], {
-                "no-commit": True,
-                "no-tag": True,
+                "auto-commit": False,
+                "auto-tag": False,
                 "skip-shared": False,
             }, ctx=ctx)
 

@@ -40,7 +40,7 @@ class TestHashesJson:
         from rlsbl.commands.init_cmd import run_cmd
 
         _make_npm_project(mock_git_repo)
-        run_cmd("npm", [], {"no-tag": True, "no-commit": True}, ctx=_ctx())
+        run_cmd("npm", [], {"auto-tag": False, "auto-commit": False}, ctx=_ctx())
 
         assert os.path.exists(HASHES_FILE)
         with open(HASHES_FILE) as f:
@@ -83,7 +83,7 @@ class TestManagedFilesJson:
         from rlsbl.commands.init_cmd import run_cmd
 
         _make_npm_project(mock_git_repo)
-        run_cmd("npm", [], {"no-tag": True, "no-commit": True}, ctx=_ctx())
+        run_cmd("npm", [], {"auto-tag": False, "auto-commit": False}, ctx=_ctx())
 
         assert os.path.exists(MANAGED_FILES)
         with open(MANAGED_FILES) as f:
@@ -124,7 +124,7 @@ class TestBothFilesCoexist:
         from rlsbl.commands.init_cmd import run_cmd
 
         _make_npm_project(mock_git_repo)
-        run_cmd("npm", [], {"no-tag": True, "no-commit": True}, ctx=_ctx())
+        run_cmd("npm", [], {"auto-tag": False, "auto-commit": False}, ctx=_ctx())
 
         assert os.path.exists(HASHES_FILE), "hashes.json should exist"
         assert os.path.exists(MANAGED_FILES), "managed-files.json should exist"
@@ -173,9 +173,9 @@ class TestOrphanDetection:
         from rlsbl.commands.init_cmd import _finalize_scaffold
 
         if flags is None:
-            flags = {"no-commit": True, "no-tag": True}
+            flags = {"auto-commit": False, "auto-tag": False}
         else:
-            flags = {**flags, "no-commit": True, "no-tag": True}
+            flags = {**flags, "auto-commit": False, "auto-tag": False}
 
         # Pre-populate managed-files.json if provided
         if managed_files is not None:

@@ -191,8 +191,8 @@ class TestConfigJsonSkip:
         ctx = create_context(proj_dir)
 
         run_cmd("plain", [], {
-            "no-commit": True,
-            "no-tag": True,
+            "auto-commit": False,
+            "auto-tag": False,
             "skip-shared": False,
         }, ctx=ctx)
 
@@ -269,8 +269,8 @@ class TestNonReleasableConfigPreserved:
         ctx = create_context(mock_git_repo)
 
         run_cmd("plain", [], {
-            "no-commit": True,
-            "no-tag": True,
+            "auto-commit": False,
+            "auto-tag": False,
             "skip-shared": False,
         }, ctx=ctx)
 
@@ -387,7 +387,7 @@ class TestSafermInvocation:
                 created=created,
                 skipped=[],
                 warnings=[],
-                flags={"no-commit": True, "no-tag": True, "skip-shared": False},
+                flags={"auto-commit": False, "auto-tag": False, "skip-shared": False},
                 project_root=str(mock_git_repo),
                 config=config,
             )

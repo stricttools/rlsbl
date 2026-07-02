@@ -64,8 +64,8 @@ class TestAllowBatch:
             "commits": ",".join(shas),
             "description": "Big batch feature",
             "type": "feature",
-            "no-user-facing": False,
-            "no-commit": True,
+            "user-facing": True,
+            "auto-commit": False,
             "allow-batch": False,
         }
         with pytest.raises(SystemExit) as exc_info:
@@ -83,8 +83,8 @@ class TestAllowBatch:
             "commits": ",".join(shas),
             "description": "Big batch feature",
             "type": "feature",
-            "no-user-facing": False,
-            "no-commit": True,
+            "user-facing": True,
+            "auto-commit": False,
             "allow-batch": True,
         }
         cmd_add(flags, project_root=batch_repo)
@@ -112,8 +112,8 @@ class TestAllowBatch:
             "commits": ",".join(shas),
             "description": "Small feature",
             "type": "feature",
-            "no-user-facing": False,
-            "no-commit": True,
+            "user-facing": True,
+            "auto-commit": False,
             "allow-batch": False,
         }
         cmd_add(flags, project_root=batch_repo)
@@ -135,8 +135,8 @@ class TestAllowBatch:
             "commits": ",".join(shas),
             "description": "Big batch feature",
             "type": "feature",
-            "no-user-facing": False,
-            "no-commit": True,
+            "user-facing": True,
+            "auto-commit": False,
             "allow-batch": True,
         }
         cmd_add(flags, project_root=batch_repo)

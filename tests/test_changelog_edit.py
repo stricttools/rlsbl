@@ -52,7 +52,8 @@ def _add_unreleased_entry(repo, sha, description="Feature", entry_type="feature"
         "commits": sha,
         "description": description if user_facing else "",
         "type": entry_type if user_facing else "",
-        "no-user-facing": not user_facing,
+        "user-facing": user_facing,
+        "auto-commit": False,
     }
     with mock.patch("rlsbl.commands.changelog_cmd.commit_files"):
         cmd_add(flags, project_root=repo)
@@ -89,9 +90,8 @@ class TestCmdEdit:
             "commits": sha,
             "type": "fix",
             "description": "",
-            "no-user-facing": False,
-            "user-facing": False,
-            "no-commit": True,
+            "user-facing": None,
+            "auto-commit": False,
         }
         cmd_edit(flags, project_root=rlsbl_repo)
 
@@ -111,9 +111,8 @@ class TestCmdEdit:
             "commits": sha,
             "type": "",
             "description": "New description",
-            "no-user-facing": False,
-            "user-facing": False,
-            "no-commit": True,
+            "user-facing": None,
+            "auto-commit": False,
         }
         cmd_edit(flags, project_root=rlsbl_repo)
 
@@ -132,9 +131,8 @@ class TestCmdEdit:
             "commits": sha,
             "type": "",
             "description": "",
-            "no-user-facing": True,
             "user-facing": False,
-            "no-commit": True,
+            "auto-commit": False,
         }
         cmd_edit(flags, project_root=rlsbl_repo)
 
@@ -154,9 +152,8 @@ class TestCmdEdit:
             "commits": sha,
             "type": "fix",
             "description": "Now visible",
-            "no-user-facing": False,
             "user-facing": True,
-            "no-commit": True,
+            "auto-commit": False,
         }
         cmd_edit(flags, project_root=rlsbl_repo)
 
@@ -176,9 +173,8 @@ class TestCmdEdit:
             "commits": sha,
             "type": "fix",
             "description": "",
-            "no-user-facing": False,
-            "user-facing": False,
-            "no-commit": True,
+            "user-facing": None,
+            "auto-commit": False,
         }
         with pytest.raises(SystemExit) as exc_info:
             cmd_edit(flags, project_root=rlsbl_repo)
@@ -194,9 +190,8 @@ class TestCmdEdit:
             "commits": sha,
             "type": "fix",
             "description": "Updated fix",
-            "no-user-facing": False,
-            "user-facing": False,
-            "no-commit": True,
+            "user-facing": None,
+            "auto-commit": False,
         }
         cmd_edit(flags, project_root=rlsbl_repo)
 
@@ -222,9 +217,8 @@ class TestCmdEdit:
             "commits": sha,
             "type": "",
             "description": "Ambiguous edit",
-            "no-user-facing": False,
-            "user-facing": False,
-            "no-commit": True,
+            "user-facing": None,
+            "auto-commit": False,
         }
         with pytest.raises(SystemExit) as exc_info:
             cmd_edit(flags, project_root=rlsbl_repo)
@@ -242,9 +236,8 @@ class TestCmdEdit:
             "commits": sha,
             "type": "fix",
             "description": "",
-            "no-user-facing": False,
-            "user-facing": False,
-            "no-commit": True,
+            "user-facing": None,
+            "auto-commit": False,
         }
         with mock.patch("rlsbl.commands.changelog_cmd.commit_files"):
             with mock.patch("rlsbl.commands.changelog_cmd._sync_github_release"):
@@ -267,9 +260,8 @@ class TestCmdEdit:
             "commits": sha,
             "type": "",
             "description": "Brand new description",
-            "no-user-facing": False,
-            "user-facing": False,
-            "no-commit": True,
+            "user-facing": None,
+            "auto-commit": False,
         }
         with mock.patch("rlsbl.commands.changelog_cmd.commit_files"):
             with mock.patch("rlsbl.commands.changelog_cmd._sync_github_release"):
@@ -292,9 +284,8 @@ class TestCmdEdit:
             "commits": sha,
             "type": "fix",
             "description": "",
-            "no-user-facing": False,
-            "user-facing": False,
-            "no-commit": True,
+            "user-facing": None,
+            "auto-commit": False,
         }
         with mock.patch("rlsbl.commands.changelog_cmd.commit_files"):
             with mock.patch("rlsbl.commands.changelog_cmd._sync_github_release") as mock_sync:
@@ -303,7 +294,7 @@ class TestCmdEdit:
         mock_sync.assert_called_once_with("1.0.0")
 
     def test_edit_auto_commits(self, rlsbl_repo):
-        """Editing without --no-commit auto-commits the changed file."""
+        """Editing with default auto-commit auto-commits the changed file."""
         sha = _make_commit(rlsbl_repo)
         _add_unreleased_entry(rlsbl_repo, sha, description="My feature", entry_type="feature")
 
@@ -311,9 +302,8 @@ class TestCmdEdit:
             "commits": sha,
             "type": "fix",
             "description": "",
-            "no-user-facing": False,
-            "user-facing": False,
-            # no-commit is NOT set (or False)
+            "user-facing": None,
+            # auto-commit defaults to True
         }
         with mock.patch("rlsbl.commands.changelog_cmd.commit_files") as mock_commit:
             cmd_edit(flags, project_root=rlsbl_repo)
@@ -328,7 +318,7 @@ class TestCmdEdit:
         assert unreleased_path in files_list
 
     def test_edit_no_commit_flag(self, rlsbl_repo):
-        """Editing with --no-commit does not commit."""
+        """Editing with --no-auto-commit does not commit."""
         sha = _make_commit(rlsbl_repo)
         _add_unreleased_entry(rlsbl_repo, sha, description="My feature", entry_type="feature")
 
@@ -336,9 +326,8 @@ class TestCmdEdit:
             "commits": sha,
             "type": "fix",
             "description": "",
-            "no-user-facing": False,
-            "user-facing": False,
-            "no-commit": True,
+            "user-facing": None,
+            "auto-commit": False,
         }
         with mock.patch("rlsbl.commands.changelog_cmd.commit_files") as mock_commit:
             cmd_edit(flags, project_root=rlsbl_repo)
@@ -363,9 +352,8 @@ class TestCmdEdit:
             "commits": sha_released,
             "type": "fix",
             "description": "",
-            "no-user-facing": False,
-            "user-facing": False,
-            "no-commit": True,
+            "user-facing": None,
+            "auto-commit": False,
         }
         with mock.patch("rlsbl.commands.changelog_cmd.commit_files"):
             with mock.patch("rlsbl.commands.changelog_cmd._sync_github_release"):
@@ -391,9 +379,8 @@ class TestCmdEdit:
             "commits": sha,
             "type": "",
             "description": "",
-            "no-user-facing": False,
-            "user-facing": False,
-            "no-commit": True,
+            "user-facing": None,
+            "auto-commit": False,
         }
         with pytest.raises(SystemExit) as exc_info:
             cmd_edit(flags, project_root=rlsbl_repo)

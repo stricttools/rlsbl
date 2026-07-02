@@ -81,8 +81,8 @@ class TestScaffoldPlainDevNode:
 
         # Run scaffold for the plain target
         run_cmd("plain", [], {
-            "no-commit": True,
-            "no-tag": True,
+            "auto-commit": False,
+            "auto-tag": False,
             "skip-shared": False,
         }, ctx=ctx)
 
@@ -111,8 +111,8 @@ class TestScaffoldPlainDevNode:
         ctx = create_context(proj_dir)
 
         run_cmd("plain", [], {
-            "no-commit": True,
-            "no-tag": True,
+            "auto-commit": False,
+            "auto-tag": False,
             "skip-shared": False,
         }, ctx=ctx)
 
@@ -149,7 +149,7 @@ class TestBareScaffoldPlainTarget:
 
         # Run bare scaffold (no --target flag) via app.test
         from rlsbl import app
-        app.test(["scaffold", "--no-tag"])
+        app.test(["scaffold", "--no-auto-tag"])
 
         # Verify .rlsbl/version was written (proves scaffold ran to completion)
         from rlsbl import __version__

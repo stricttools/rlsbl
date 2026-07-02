@@ -73,8 +73,8 @@ class TestChangelogAddValidatesProjectScope:
             "commits": sha[:12],
             "description": "Alpha feature",
             "type": "feature",
-            "no-user-facing": False,
-            "no-commit": True,
+            "user-facing": True,
+            "auto-commit": False,
         }
         # Should succeed without error
         cmd_add(flags, project_root=alpha_dir)
@@ -100,8 +100,8 @@ class TestChangelogAddRejectsOutOfScopeCommit:
             "commits": sha[:12],
             "description": "Should fail",
             "type": "feature",
-            "no-user-facing": False,
-            "no-commit": True,
+            "user-facing": True,
+            "auto-commit": False,
         }
         with pytest.raises(SystemExit) as exc_info:
             cmd_add(flags, project_root=alpha_dir)
@@ -120,8 +120,8 @@ class TestChangelogAddRejectsOutOfScopeCommit:
             "commits": sha[:12],
             "description": "Should fail",
             "type": "feature",
-            "no-user-facing": False,
-            "no-commit": True,
+            "user-facing": True,
+            "auto-commit": False,
         }
         with pytest.raises(SystemExit):
             cmd_add(flags, project_root=alpha_dir)
@@ -158,8 +158,8 @@ class TestChangelogAddSkipsValidationStandalone:
             "commits": sha[:12],
             "description": "Standalone feature",
             "type": "feature",
-            "no-user-facing": False,
-            "no-commit": True,
+            "user-facing": True,
+            "auto-commit": False,
         }
         # Should succeed -- no workspace means no scope validation
         cmd_add(flags, project_root=repo)

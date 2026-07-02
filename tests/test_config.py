@@ -19,7 +19,7 @@ class TestShouldTag:
 
     def test_returns_false_when_no_tag_flag_set(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        assert should_tag({"no-tag": True}, {}) is False
+        assert should_tag({"auto-tag": False}, {}) is False
 
     def test_reads_project_config_tag_false(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)

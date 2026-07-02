@@ -56,7 +56,7 @@ class TestCmdAdd:
             "commits": sha[:12],
             "description": "New feature",
             "type": "feature",
-            "no-user-facing": False,
+            "user-facing": True,
         }
         cmd_add(flags, project_root=rlsbl_repo)
 
@@ -74,7 +74,7 @@ class TestCmdAdd:
             "commits": sha,
             "description": "",
             "type": "",
-            "no-user-facing": True,
+            "user-facing": False,
         }
         cmd_add(flags, project_root=rlsbl_repo)
 
@@ -89,7 +89,7 @@ class TestCmdAdd:
             "commits": "deadbeefdeadbeef",
             "description": "Stuff",
             "type": "fix",
-            "no-user-facing": False,
+            "user-facing": True,
         }
         with pytest.raises(SystemExit) as exc_info:
             cmd_add(flags, project_root=rlsbl_repo)
@@ -100,7 +100,7 @@ class TestCmdAdd:
             "commits": "",
             "description": "Stuff",
             "type": "fix",
-            "no-user-facing": False,
+            "user-facing": True,
         }
         with pytest.raises(SystemExit) as exc_info:
             cmd_add(flags, project_root=rlsbl_repo)
@@ -112,7 +112,7 @@ class TestCmdAdd:
             "commits": sha,
             "description": "",
             "type": "fix",
-            "no-user-facing": False,
+            "user-facing": True,
         }
         with pytest.raises(SystemExit) as exc_info:
             cmd_add(flags, project_root=rlsbl_repo)
@@ -125,7 +125,7 @@ class TestCmdAdd:
             "commits": f"{sha1[:8]},{sha2[:8]}",
             "description": "Multi-commit change",
             "type": "feature",
-            "no-user-facing": False,
+            "user-facing": True,
         }
         cmd_add(flags, project_root=rlsbl_repo)
 
@@ -140,7 +140,7 @@ class TestCmdAdd:
             "commits": sha[:12],
             "description": "New feature",
             "type": "feature",
-            "no-user-facing": False,
+            "user-facing": True,
         }
         with mock.patch("rlsbl.commands.changelog_cmd.commit_files") as mock_commit:
             cmd_add(flags, project_root=rlsbl_repo)
@@ -158,7 +158,7 @@ class TestCmdAdd:
             "commits": sha[:12],
             "description": "New feature",
             "type": "feature",
-            "no-user-facing": False,
+            "user-facing": True,
         }
         with mock.patch("rlsbl.commands.changelog_cmd.commit_files") as mock_commit:
             cmd_add(flags, project_root=rlsbl_repo)
@@ -172,8 +172,8 @@ class TestCmdAdd:
             "commits": sha[:12],
             "description": "New feature",
             "type": "feature",
-            "no-user-facing": False,
-            "no-commit": True,
+            "user-facing": True,
+            "auto-commit": False,
         }
         with mock.patch("rlsbl.commands.changelog_cmd.commit_files") as mock_commit:
             cmd_add(flags, project_root=rlsbl_repo)
@@ -186,7 +186,7 @@ class TestCmdAdd:
             "commits": sha,
             "description": "",
             "type": "",
-            "no-user-facing": True,
+            "user-facing": False,
         }
         with mock.patch("rlsbl.commands.changelog_cmd.commit_files") as mock_commit:
             cmd_add(flags, project_root=rlsbl_repo)
@@ -200,8 +200,8 @@ class TestCmdAdd:
             "commits": sha[:12],
             "description": "First feature",
             "type": "feature",
-            "no-user-facing": False,
-            "no-commit": True,
+            "user-facing": True,
+            "auto-commit": False,
         }
         cmd_add(flags_first, project_root=rlsbl_repo)
 
@@ -209,8 +209,8 @@ class TestCmdAdd:
             "commits": sha[:12],
             "description": "Duplicate feature",
             "type": "feature",
-            "no-user-facing": False,
-            "no-commit": True,
+            "user-facing": True,
+            "auto-commit": False,
         }
         with pytest.raises(SystemExit) as exc_info:
             cmd_add(flags_second, project_root=rlsbl_repo)
@@ -226,8 +226,8 @@ class TestCmdAdd:
             "commits": sha[:12],
             "description": "Feature entry",
             "type": "feature",
-            "no-user-facing": False,
-            "no-commit": True,
+            "user-facing": True,
+            "auto-commit": False,
         }
         cmd_add(flags_first, project_root=rlsbl_repo)
 
@@ -235,8 +235,8 @@ class TestCmdAdd:
             "commits": sha[:12],
             "description": "Fix entry",
             "type": "fix",
-            "no-user-facing": False,
-            "no-commit": True,
+            "user-facing": True,
+            "auto-commit": False,
         }
         cmd_add(flags_second, project_root=rlsbl_repo)
 
@@ -250,8 +250,8 @@ class TestCmdAdd:
             "commits": sha,
             "description": "",
             "type": "",
-            "no-user-facing": True,
-            "no-commit": True,
+            "user-facing": False,
+            "auto-commit": False,
         }
         cmd_add(flags_first, project_root=rlsbl_repo)
 
@@ -259,8 +259,8 @@ class TestCmdAdd:
             "commits": sha,
             "description": "",
             "type": "",
-            "no-user-facing": True,
-            "no-commit": True,
+            "user-facing": False,
+            "auto-commit": False,
         }
         with pytest.raises(SystemExit) as exc_info:
             cmd_add(flags_second, project_root=rlsbl_repo)
@@ -273,8 +273,8 @@ class TestCmdAdd:
             "commits": sha[:12],
             "description": "A feature",
             "type": "feature",
-            "no-user-facing": False,
-            "no-commit": True,
+            "user-facing": True,
+            "auto-commit": False,
         }
         cmd_add(flags_first, project_root=rlsbl_repo)
 
@@ -282,8 +282,8 @@ class TestCmdAdd:
             "commits": sha[:12],
             "description": "",
             "type": "",
-            "no-user-facing": True,
-            "no-commit": True,
+            "user-facing": False,
+            "auto-commit": False,
         }
         cmd_add(flags_second, project_root=rlsbl_repo)
 
@@ -410,7 +410,7 @@ class TestCmdGenerate:
         )
 
         with mock.patch("rlsbl.commands.changelog_cmd.commit_files") as mock_commit:
-            cmd_generate({"dry-run": False, "no-commit": True}, project_root=rlsbl_repo)
+            cmd_generate({"dry-run": False, "auto-commit": False}, project_root=rlsbl_repo)
             mock_commit.assert_not_called()
 
     def test_dry_run_does_not_commit(self, rlsbl_repo, capsys):

@@ -81,7 +81,7 @@ class TestRunCmdWorkspaceRoot:
         ])
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd("pypi", [], {"no-commit": True, "no-tag": True}, ctx=_ctx())
+            run_cmd("pypi", [], {"auto-commit": False, "auto-tag": False}, ctx=_ctx())
 
         ci_yml = root / ".github" / "workflows" / "ci.yml"
         publish_yml = root / ".github" / "workflows" / "publish.yml"
@@ -108,7 +108,7 @@ class TestRunCmdWorkspaceRoot:
         ])
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd("pypi", [], {"no-commit": True, "no-tag": True}, ctx=_ctx())
+            run_cmd("pypi", [], {"auto-commit": False, "auto-tag": False}, ctx=_ctx())
 
         # Workspace roots are not packages -- scaffold returns early
         assert not (root / ".rlsbl").exists(), (
@@ -131,7 +131,7 @@ class TestRunCmdWorkspaceRoot:
         # No .rlsbl-monorepo -- this is a standalone project
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd("pypi", [], {"no-commit": True, "no-tag": True}, ctx=_ctx())
+            run_cmd("pypi", [], {"auto-commit": False, "auto-tag": False}, ctx=_ctx())
 
         ci_yml = root / ".github" / "workflows" / "ci.yml"
         assert ci_yml.exists(), (
@@ -160,7 +160,7 @@ class TestRunCmdMultiWorkspaceRoot:
         ])
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd_multi(["pypi", "go"], [], {"no-commit": True, "no-tag": True}, ctx=_ctx())
+            run_cmd_multi(["pypi", "go"], [], {"auto-commit": False, "auto-tag": False}, ctx=_ctx())
 
         ci_pypi = root / ".github" / "workflows" / "ci-pypi.yml"
         ci_go = root / ".github" / "workflows" / "ci-go.yml"
@@ -194,7 +194,7 @@ class TestRunCmdMultiWorkspaceRoot:
         ])
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd_multi(["pypi", "go"], [], {"no-commit": True, "no-tag": True}, ctx=_ctx())
+            run_cmd_multi(["pypi", "go"], [], {"auto-commit": False, "auto-tag": False}, ctx=_ctx())
 
         # Workspace roots are not packages -- scaffold returns early
         assert not (root / ".rlsbl").exists(), (

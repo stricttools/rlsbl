@@ -142,7 +142,7 @@ def test_conflict_tip_printed_for_ci_yml(mock_git_repo, capsys):
         skipped=[],
         warnings=[f"{ci_path}: merge conflicts detected, resolve manually"],
         registry=None,
-        flags={"no-tag": True, "no-commit": True},
+        flags={"auto-tag": False, "auto-commit": False},
         registries=[],
         project_root=".",
         config={})
@@ -166,7 +166,7 @@ def test_conflict_tip_printed_for_publish_yml(mock_git_repo, capsys):
         skipped=[],
         warnings=[f"{pub_path}: merge conflicts detected, resolve manually"],
         registry=None,
-        flags={"no-tag": True, "no-commit": True},
+        flags={"auto-tag": False, "auto-commit": False},
         registries=[],
         project_root=".",
         config={})
@@ -189,7 +189,7 @@ def test_conflict_tip_not_printed_when_no_conflict(mock_git_repo, capsys):
         skipped=[],
         warnings=[],
         registry=None,
-        flags={"no-tag": True, "no-commit": True},
+        flags={"auto-tag": False, "auto-commit": False},
         registries=[],
         project_root=".",
         config={})
@@ -211,7 +211,7 @@ def test_conflict_tip_not_printed_for_other_conflicts(mock_git_repo, capsys):
         skipped=[],
         warnings=[f"{other}: merge conflicts detected, resolve manually"],
         registry=None,
-        flags={"no-tag": True, "no-commit": True},
+        flags={"auto-tag": False, "auto-commit": False},
         registries=[],
         project_root=".",
         config={})

@@ -180,7 +180,7 @@ def test_scaffold_auto_commits_files(mock_git_repo, capsys):
         skipped=skipped,
         warnings=warnings,
         registry=None,
-        flags={"no-tag": True},
+        flags={"auto-tag": False},
         registries=[],
         project_root=".",
         config={})
@@ -222,13 +222,13 @@ def test_scaffold_no_commit_flag_skips_commit(mock_git_repo, capsys):
         skipped=skipped,
         warnings=warnings,
         registry=None,
-        flags={"no-commit": True, "no-tag": True},
+        flags={"auto-commit": False, "auto-tag": False},
         registries=[],
         project_root=".",
         config={})
 
     captured = capsys.readouterr()
-    assert "Skipping commit (--no-commit)." in captured.out
+    assert "Skipping commit (--no-auto-commit)." in captured.out
     assert "Committed scaffold changes." not in captured.out
 
     # Verify files are still uncommitted
@@ -236,7 +236,7 @@ def test_scaffold_no_commit_flag_skips_commit(mock_git_repo, capsys):
         ["git", "status", "--porcelain"],
         capture_output=True, text=True, cwd=str(mock_git_repo),
     )
-    assert result.stdout.strip() != "", "Tree should be dirty with --no-commit"
+    assert result.stdout.strip() != "", "Tree should be dirty with --no-auto-commit"
 
 
 def test_pre_push_hook_does_not_pass_args(mock_git_repo, capsys):
@@ -249,7 +249,7 @@ def test_pre_push_hook_does_not_pass_args(mock_git_repo, capsys):
         skipped=[],
         warnings=[],
         registry=None,
-        flags={"no-commit": True, "no-tag": True},
+        flags={"auto-commit": False, "auto-tag": False},
         registries=[],
         project_root=".",
         config={})
@@ -464,7 +464,7 @@ def test_scaffold_auto_commits_from_subdirectory(mock_git_repo, monkeypatch, cap
         skipped=skipped,
         warnings=warnings,
         registry=None,
-        flags={"no-tag": True},
+        flags={"auto-tag": False},
         registries=[],
         project_root=str(subdir),
         config={},
@@ -504,7 +504,7 @@ def test_pre_push_hook_installed_from_subdirectory(mock_git_repo, monkeypatch, c
         skipped=[],
         warnings=[],
         registry=None,
-        flags={"no-commit": True, "no-tag": True},
+        flags={"auto-commit": False, "auto-tag": False},
         registries=[],
         project_root=str(subdir),
         config={},

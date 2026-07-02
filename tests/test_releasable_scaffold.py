@@ -290,8 +290,8 @@ class TestReleasableMemberChangelogSkip:
         ctx = create_context(proj_dir)
 
         run_cmd("plain", [], {
-            "no-commit": True,
-            "no-tag": True,
+            "auto-commit": False,
+            "auto-tag": False,
             "skip-shared": False,
         }, ctx=ctx)
 
@@ -338,7 +338,7 @@ class TestMonorepoAddReleasable:
         with patch("rlsbl.commands.monorepo.commands.subprocess.run"):
             _cmd_add(["app"], {
                 "releasable": "www",
-                "no-commit": True,
+                "auto-commit": False,
             }, project_root=mock_git_repo)
 
         projects = load_workspace(str(mock_git_repo))
@@ -353,7 +353,7 @@ class TestMonorepoAddReleasable:
         with patch("rlsbl.commands.monorepo.commands.subprocess.run"):
             _cmd_add(["infra"], {
                 "releasable": "false",
-                "no-commit": True,
+                "auto-commit": False,
             }, project_root=mock_git_repo)
 
         projects = load_workspace(str(mock_git_repo))
@@ -367,7 +367,7 @@ class TestMonorepoAddReleasable:
 
         with pytest.raises(SystemExit):
             _cmd_add(["app"], {
-                "no-commit": True,
+                "auto-commit": False,
             }, project_root=mock_git_repo)
 
     def test_add_validates_releasable_exists(self, mock_git_repo):
@@ -378,7 +378,7 @@ class TestMonorepoAddReleasable:
         with pytest.raises(SystemExit):
             _cmd_add(["app"], {
                 "releasable": "nonexistent",
-                "no-commit": True,
+                "auto-commit": False,
             }, project_root=mock_git_repo)
 
     def test_add_without_releasable_flag(self, mock_git_repo):
@@ -389,7 +389,7 @@ class TestMonorepoAddReleasable:
 
         with patch("rlsbl.commands.monorepo.commands.subprocess.run"):
             _cmd_add(["lib"], {
-                "no-commit": True,
+                "auto-commit": False,
             }, project_root=mock_git_repo)
 
         projects = load_workspace(str(mock_git_repo))

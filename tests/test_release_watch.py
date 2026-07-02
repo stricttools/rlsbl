@@ -1,8 +1,6 @@
-"""Tests for --watch / --no-watch mutex flags on the release run subcommand.
+"""Tests for --watch / --no-watch flags on the release run subcommand.
 
 Verifies:
-- CLI rejects missing --watch/--no-watch (mutex group enforcement)
-- CLI rejects both --watch and --no-watch together
 - --no-watch prints the hint message
 - --watch invokes the watch command with the pushed SHA
 """
@@ -54,41 +52,6 @@ def _rc(**overrides):
     defaults = {"bump": "patch", "include": ["npm"], "exclude": []}
     defaults.update(overrides)
     return ReleaseConfig(**defaults)
-
-
-# ---------------------------------------------------------------------------
-# Mutex enforcement tests (CLI level via app.test)
-# ---------------------------------------------------------------------------
-
-class TestWatchMutexEnforcement:
-    """Strictcli mutex group rejects invalid flag combinations."""
-
-    def test_neither_watch_nor_no_watch_errors(self, tmp_project):
-        """Providing neither --watch nor --no-watch results in an error."""
-        # Create minimal project structure so _require_project_root succeeds
-        (tmp_project / ".rlsbl").mkdir()
-        releases_dir = tmp_project / ".rlsbl" / "releases"
-        releases_dir.mkdir()
-        (releases_dir / "unreleased.toml").write_text(
-            'bump = "patch"\ninclude = ["npm"]\nexclude = []\n'
-        )
-
-        result = app.test(["release", "run"])
-        assert result.exit_code != 0
-        assert "one of --watch, --no-watch is required" in result.stderr
-
-    def test_both_watch_and_no_watch_errors(self, tmp_project):
-        """Providing both --watch and --no-watch results in an error."""
-        (tmp_project / ".rlsbl").mkdir()
-        releases_dir = tmp_project / ".rlsbl" / "releases"
-        releases_dir.mkdir()
-        (releases_dir / "unreleased.toml").write_text(
-            'bump = "patch"\ninclude = ["npm"]\nexclude = []\n'
-        )
-
-        result = app.test(["release", "run", "--watch", "--no-watch"])
-        assert result.exit_code != 0
-        assert "mutually exclusive" in result.stderr
 
 
 # ---------------------------------------------------------------------------

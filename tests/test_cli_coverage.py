@@ -146,7 +146,7 @@ class TestCmdReleaseRun:
         with pytest.raises(SystemExit) as exc:
             rlsbl.cmd_release_run(
                 dry_run=False, yes=True, quiet=False,
-                allow_dirty=False, watch=False, no_watch=False,
+                allow_dirty=False, watch=False, 
                 bump="", description="", preid="",
             )
         assert exc.value.code == 1
@@ -160,7 +160,7 @@ class TestCmdReleaseRun:
         with pytest.raises(SystemExit) as exc:
             rlsbl.cmd_release_run(
                 dry_run=False, yes=True, quiet=False,
-                allow_dirty=False, watch=False, no_watch=False,
+                allow_dirty=False, watch=False, 
                 bump="", description="", preid="",
             )
         assert exc.value.code == 1
@@ -175,7 +175,7 @@ class TestCmdReleaseRun:
         with pytest.raises(SystemExit) as exc:
             rlsbl.cmd_release_run(
                 dry_run=False, yes=True, quiet=False,
-                allow_dirty=False, watch=False, no_watch=False,
+                allow_dirty=False, watch=False, 
                 bump="", description="", preid="",
             )
         assert exc.value.code == 1
@@ -191,7 +191,7 @@ class TestCmdReleaseRun:
         mock_read.return_value = MagicMock()
         rlsbl.cmd_release_run(
             dry_run=True, yes=True, quiet=False,
-            allow_dirty=True, watch=True, no_watch=False,
+            allow_dirty=True, watch=True, 
             bump="", description="", preid="",
         )
         mock_run.assert_called_once()
@@ -232,7 +232,7 @@ class TestCmdReleaseRetry:
         with pytest.raises(SystemExit) as exc:
             rlsbl.cmd_release_retry(
                 dry_run=False, yes=True, quiet=False,
-                watch=False, no_watch=False,
+                watch=False, 
             )
         assert exc.value.code == 1
 
@@ -243,7 +243,7 @@ class TestCmdReleaseRetry:
     def test_passes_none_config_when_no_file(self, mock_run, *_):
         rlsbl.cmd_release_retry(
             dry_run=True, yes=False, quiet=False,
-            watch=True, no_watch=False,
+            watch=True, 
         )
         mock_run.assert_called_once()
         assert mock_run.call_args[0][0] is None
@@ -536,10 +536,10 @@ class TestCmdDeploy:
     @patch("rlsbl.context.create_context")
     @patch("rlsbl.commands.deploy_cmd.run_cmd")
     def test_delegates(self, mock_run, *_):
-        rlsbl.cmd_deploy(target="npm", dry_run=True, force=True, target_name="staging")
+        rlsbl.cmd_deploy(target="npm", dry_run=True, target_name="staging")
         mock_run.assert_called_once()
         assert mock_run.call_args[0][1] == ["staging"]
-        assert mock_run.call_args[0][2]["force"] is True
+        assert mock_run.call_args[0][2]["dry-run"] is True
 
 
 # ============================================================================
@@ -572,19 +572,19 @@ class TestCmdChlogAdd:
     def test_delegates(self, mock_add, _):
         rlsbl.cmd_chlog_add(
             commits="abc123", description="New feature", type="feature",
-            no_user_facing=False, no_commit=True, allow_batch=False,
+            user_facing=True, auto_commit=False, allow_batch=False,
         )
         mock_add.assert_called_once()
         flags = mock_add.call_args[0][0]
         assert flags["commits"] == "abc123"
-        assert flags["no-commit"] is True
+        assert flags["auto-commit"] is False
 
 
 class TestCmdChlogGenerate:
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.changelog_cmd.cmd_generate")
     def test_delegates(self, mock_gen, _):
-        rlsbl.cmd_chlog_generate(dry_run=True, no_commit=False)
+        rlsbl.cmd_chlog_generate(dry_run=True, auto_commit=True)
         mock_gen.assert_called_once()
         flags = mock_gen.call_args[0][0]
         assert flags["dry-run"] is True
@@ -596,12 +596,12 @@ class TestCmdChlogAmend:
     def test_delegates(self, mock_amend, _):
         rlsbl.cmd_chlog_amend(
             version="1.0.0", commits="abc", description="fix",
-            type="fix", no_user_facing=False, no_resolve=True,
+            type="fix", user_facing=True, validate_hashes=False,
         )
         mock_amend.assert_called_once()
         flags = mock_amend.call_args[0][0]
         assert flags["version"] == "1.0.0"
-        assert flags["no-resolve"] is True
+        assert flags["validate-hashes"] is False
 
 
 class TestCmdChlogEdit:
@@ -610,7 +610,7 @@ class TestCmdChlogEdit:
     def test_delegates(self, mock_edit, _):
         rlsbl.cmd_chlog_edit(
             commits="abc", type="fix", description="updated",
-            no_user_facing=False, user_facing=True, no_commit=False,
+            user_facing=True, auto_commit=True,
         )
         mock_edit.assert_called_once()
         flags = mock_edit.call_args[0][0]
@@ -626,9 +626,9 @@ class TestCmdMonoInit:
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.monorepo._cmd_init")
     def test_delegates(self, mock_init, _):
-        rlsbl.cmd_mono_init(no_commit=True)
+        rlsbl.cmd_mono_init(auto_commit=False)
         mock_init.assert_called_once()
-        assert mock_init.call_args[0][0]["no-commit"] is True
+        assert mock_init.call_args[0][0]["auto-commit"] is False
 
 
 class TestCmdMonoAdd:
@@ -639,7 +639,7 @@ class TestCmdMonoAdd:
             name="mylib", target="npm", watch="*.ts,*.js",
             subtree_remote="git@github.com:user/mylib.git",
             depends_on="core,utils", library="true", dev_only="true",
-            releasable="core", no_commit=True, path="packages/mylib",
+            releasable="core", auto_commit=False, path="packages/mylib",
         )
         mock_add.assert_called_once()
         flags = mock_add.call_args[0][1]
@@ -668,7 +668,7 @@ class TestCmdMonoSync:
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.monorepo._cmd_sync")
     def test_delegates(self, mock_sync, _):
-        rlsbl.cmd_mono_sync(no_commit=True)
+        rlsbl.cmd_mono_sync(auto_commit=False)
         mock_sync.assert_called_once()
 
 
@@ -760,7 +760,7 @@ class TestCmdMonoRelease:
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.monorepo._cmd_batch_release")
     def test_delegates(self, mock_release, _):
-        rlsbl.cmd_mono_release_run(dry_run=True, yes=True, quiet=False, allow_dirty=True, watch=False, no_watch=False)
+        rlsbl.cmd_mono_release_run(dry_run=True, yes=True, quiet=False, allow_dirty=True, watch=False)
         mock_release.assert_called_once()
         flags = mock_release.call_args[0][0]
         assert flags["allow-dirty"] is True
@@ -768,7 +768,7 @@ class TestCmdMonoRelease:
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.monorepo._cmd_batch_release")
     def test_watch_flag_passed(self, mock_release, _):
-        rlsbl.cmd_mono_release_run(dry_run=False, yes=True, quiet=False, allow_dirty=False, watch=True, no_watch=False)
+        rlsbl.cmd_mono_release_run(dry_run=False, yes=True, quiet=False, allow_dirty=False, watch=True)
         flags = mock_release.call_args[0][0]
         assert flags["watch"] is True
 
@@ -1115,8 +1115,8 @@ class TestCmdScaffold:
             with patch("rlsbl.utils.find_project_root", return_value=None):
                 with pytest.raises(SystemExit) as exc:
                     rlsbl.cmd_scaffold(
-                        target="", force=False, private=False, no_commit=False,
-                        skip_shared=False, no_tag=False, dry_run=False,
+                        target="", force_overwrite=False, private=False, auto_commit=True,
+                        skip_shared=False, auto_tag=True, dry_run=False,
                     )
                 assert exc.value.code == 1
 
@@ -1126,8 +1126,8 @@ class TestCmdScaffold:
                 mock_ctx.return_value = _ctx(config={})
                 with patch("rlsbl.commands.init_cmd.run_cmd") as mock_run:
                     rlsbl.cmd_scaffold(
-                        target="", force=False, private=False, no_commit=False,
-                        skip_shared=False, no_tag=False, dry_run=False,
+                        target="", force_overwrite=False, private=False, auto_commit=True,
+                        skip_shared=False, auto_tag=True, dry_run=False,
                     )
                     mock_run.assert_called_once()
 
@@ -1137,16 +1137,16 @@ class TestCmdScaffold:
                 mock_ctx.return_value = _ctx(config={})
                 with patch("rlsbl.commands.init_cmd.run_cmd_multi") as mock_run_multi:
                     rlsbl.cmd_scaffold(
-                        target="", force=False, private=False, no_commit=False,
-                        skip_shared=False, no_tag=False, dry_run=False,
+                        target="", force_overwrite=False, private=False, auto_commit=True,
+                        skip_shared=False, auto_tag=True, dry_run=False,
                     )
                     mock_run_multi.assert_called_once()
 
     def test_explicit_unknown_target_exits(self, tmp_project):
         with pytest.raises(SystemExit) as exc:
             rlsbl.cmd_scaffold(
-                target="nonexistent", force=False, private=False, no_commit=False,
-                skip_shared=False, no_tag=False, dry_run=False,
+                target="nonexistent", force_overwrite=False, private=False, auto_commit=True,
+                skip_shared=False, auto_tag=True, dry_run=False,
             )
         assert exc.value.code == 1
 
@@ -1155,8 +1155,8 @@ class TestCmdScaffold:
             mock_ctx.return_value = _ctx()
             with patch("rlsbl.commands.init_cmd.run_cmd") as mock_run:
                 rlsbl.cmd_scaffold(
-                    target="npm", force=True, private=True, no_commit=True,
-                    skip_shared=True, no_tag=True, dry_run=True,
+                    target="npm", force_overwrite=True, private=True, auto_commit=False,
+                    skip_shared=True, auto_tag=False, dry_run=True,
                 )
                 mock_run.assert_called_once()
                 flags = mock_run.call_args[0][2]

@@ -219,27 +219,7 @@ class TestDeployBranchRestriction:
         assert exc_info.value.code == 1
         assert len(deploy_calls) == 0
         captured = capsys.readouterr()
-        assert "--force" in captured.err
         assert "production" in captured.err
-
-
-class TestDeployForceOverridesBranch:
-
-    def test_deploy_force_overrides_branch(self, mock_git_repo, monkeypatch, capsys):
-        """Wrong branch with --force -> deploys anyway."""
-        targets = [_minimal_target(only_on=["production"])]
-
-        deploy_calls = []
-
-        def mock_deploy_target(target_config, current_branch):
-            deploy_calls.append(target_config["name"])
-            return DeployResult("prod", True, "Deploy completed")
-
-        monkeypatch.setattr("rlsbl.commands.deploy_cmd.deploy_target", mock_deploy_target)
-
-        run_cmd(None, [], {"force": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"deploy": targets}))
-
-        assert len(deploy_calls) == 1
 
 
 class TestDeploySuccess:
