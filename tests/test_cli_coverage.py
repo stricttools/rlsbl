@@ -1468,17 +1468,18 @@ class TestWatchRunsThreadError:
 
 
 class TestWatchRunsSingleRun:
-    """Cover _watch_runs single-run path (line 178)."""
+    """Cover _watch_runs with a single-run pool."""
 
     @patch(f"{MOD_WATCH}._watch_single_run")
-    def test_single_run_no_threading(self, mock_single):
+    def test_single_run_uses_shared_dedup_state(self, mock_single):
         mock_single.return_value = {"name": "CI", "passed": True}
         from rlsbl.commands.watch import _watch_runs
         runs = [{"databaseId": 100, "name": "CI"}]
         results = _watch_runs(runs, "test", "user/repo")
         assert len(results) == 1
-        # Single-run path only passes 3 args (no retried_lock/retried_workflows)
-        assert len(mock_single.call_args[0]) == 3
+        # Even a single run goes through the pool path with the shared
+        # retry-dedup state (retried_lock, retried_workflows, known_ids)
+        assert len(mock_single.call_args[0]) == 6
 
 
 class TestWatchRunCmdRunIdRepoError:

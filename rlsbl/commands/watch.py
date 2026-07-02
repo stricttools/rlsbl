@@ -171,16 +171,15 @@ def _watch_single_run(ci_run, label, repo_slug, retried_lock=None, retried_workf
 
 def _watch_runs(runs, label, repo_slug, retried_lock=None, retried_workflows=None,
                 known_ids=None):
-    """Watch all runs in parallel (or directly if only one). Returns list of result dicts.
+    """Watch all runs in parallel. Returns list of result dicts.
 
     retried_lock, retried_workflows, and known_ids may be passed in so that
     retry deduplication state is shared across multiple _watch_runs calls
     (initial watch + late re-poll watch). Fresh state is created when omitted.
-    """
-    if len(runs) == 1:
-        # No need for threads when there's only one run
-        return [_watch_single_run(runs[0], label, repo_slug)]
 
+    Single-run pools deliberately go through the same thread-pool path so
+    every run participates in the shared retry-dedup machinery.
+    """
     if retried_lock is None:
         retried_lock = threading.Lock()
     if retried_workflows is None:
@@ -407,7 +406,7 @@ def run_cmd(registry, args, flags):
         retried_workflows = set()
         known_ids = {str(r["databaseId"]) for r in runs}
 
-        # Watch runs in parallel (or directly if only one)
+        # Watch runs in parallel
         results = _watch_runs(runs, label, repo_slug, retried_lock, retried_workflows,
                               known_ids)
 

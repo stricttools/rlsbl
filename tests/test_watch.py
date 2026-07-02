@@ -929,6 +929,68 @@ class TestLatePollRetryDedup:
         audit_arg = mock_audit.call_args[0][0]
         assert len(audit_arg) == 2, f"Expected 2 results, got {audit_arg}"
 
+    @patch("rlsbl.commands.watch._notify")
+    @patch("rlsbl.commands.watch._print_workflow_audit", return_value=False)
+    @patch("rlsbl.commands.watch.poll_runs")
+    @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.run_gh")
+    @patch("rlsbl.commands.watch.run")
+    def test_single_initial_run_late_poll_no_double_retry(
+        self, mock_run, mock_run_gh, mock_time, mock_poll, mock_audit, mock_notify
+    ):
+        """Retry dedup must also apply when the initial pool has exactly one
+        run: the single-run path must use the same shared-state machinery, so
+        the retry run appearing in the re-poll is not re-watched/re-retried."""
+        ci_run = {"databaseId": 100, "name": "CI", "headBranch": "main"}
+        retry_run = {"databaseId": 400, "name": "CI", "headBranch": "main"}
+
+        mock_poll.side_effect = [
+            [ci_run],             # initial discovery: single run
+            [ci_run, retry_run],  # late re-poll sees the retry run
+        ]
+        mock_run.side_effect = [
+            "abc123full",  # git rev-parse
+            "v1.0.0",      # git describe
+        ]
+
+        dispatch_count = 0
+        watch_calls = []
+
+        def run_gh_side_effect(args, **kwargs):
+            nonlocal dispatch_count
+            if args[:2] == ["repo", "view"]:
+                return json.dumps({"nameWithOwner": "user/repo", "name": "repo"})
+            if args[:2] == ["run", "watch"]:
+                watch_calls.append(args[2])
+                # Original run and all retry runs fail
+                raise subprocess.CalledProcessError(1, "gh")
+            if args[:2] == ["workflow", "run"]:
+                dispatch_count += 1
+                return ""
+            if args[:2] == ["run", "list"]:
+                rid = 400 if dispatch_count == 1 else 500
+                return json.dumps(
+                    [{"databaseId": rid, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]
+                )
+            return ""
+
+        mock_run_gh.side_effect = run_gh_side_effect
+
+        with pytest.raises(SystemExit) as exc_info:
+            run_cmd(None, ["abc123"], {})
+
+        assert exc_info.value.code == 1
+
+        assert dispatch_count == 1, (
+            f"Expected exactly 1 retry dispatch, got {dispatch_count}"
+        )
+        assert watch_calls.count("400") == 1, (
+            f"Retry run 400 watched {watch_calls.count('400')} times: {watch_calls}"
+        )
+        # Audit sees exactly one result: the CI retry failure.
+        audit_arg = mock_audit.call_args[0][0]
+        assert len(audit_arg) == 1, f"Expected 1 result, got {audit_arg}"
+
 
 if __name__ == "__main__":
     pytest.main([__file__])
