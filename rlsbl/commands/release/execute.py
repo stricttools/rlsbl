@@ -324,12 +324,15 @@ def collect_companion_tags(member_package_paths, workspace_root, version,
         if not os.path.isdir(abs_pkg):
             continue
 
-        try:
-            member = resolve_member_context(
-                abs_pkg, releasable_config_dir=releasable_config_dir,
-            )
-        except Exception:
-            continue
+        # A broken member config is a hard error, mirroring
+        # _sync_member_package_versions: version sync and companion-tag
+        # collection must agree on the member set, so this must never
+        # silently skip a member the sync path would abort on. (The undo
+        # flow wraps its collect_companion_tags call in its own try/except
+        # and degrades gracefully there.)
+        member = resolve_member_context(
+            abs_pkg, releasable_config_dir=releasable_config_dir,
+        )
 
         # Skip private packages (default True when unset)
         if member.is_private:

@@ -174,6 +174,23 @@ class TestCollectCompanionTags:
             )
         assert result == []
 
+    def test_corrupt_member_config_raises(self, tmp_path):
+        """A member with a corrupt config.json must abort companion-tag
+        collection with a hard error, mirroring _sync_member_package_versions.
+        Silently skipping would let a release proceed without the member's
+        Go proxy tag while version sync aborts on the very same config."""
+        from rlsbl.errors import ConfigError
+
+        pkg_dir = tmp_path / "packages" / "mylib"
+        (pkg_dir / ".rlsbl").mkdir(parents=True)
+        (pkg_dir / ".rlsbl" / "config.json").write_text("{not valid json")
+
+        with pytest.raises(ConfigError):
+            collect_companion_tags(
+                ["packages/mylib"], str(tmp_path), "1.0.0",
+                "myreleasable@v1.0.0",
+            )
+
     def test_skips_nonexistent_package_dir(self, tmp_path):
         """Non-existent package directories are silently skipped."""
         result = collect_companion_tags(
