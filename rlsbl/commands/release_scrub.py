@@ -9,6 +9,7 @@ from ..changelog.files import (
     enumerate_changelog_dirs,
     get_changes_dir,
     remap_jsonl_hashes,
+    validate_all_hashes_resolve,
 )
 from ..changelog.generate import generate_changelog
 from ..lock import acquire_lock, release_lock
@@ -323,6 +324,30 @@ def run_cmd(flags, *, ctx):
                 all_remap_results.extend(report.results)
 
             _save_step(scrub_result_path, scrub_data, "JSONL_REMAPPED")
+
+        # -- Post-remap validation gate --
+        # Every hash in every changelog dir must either have been remapped or
+        # still resolve after the rewrite. Otherwise abort loudly BEFORE the
+        # commit/push steps, keeping scrub-result.json for resume.
+        if "HASHES_VALIDATED" not in completed:
+            failures = validate_all_hashes_resolve(all_changes_dirs)
+            if failures:
+                print(
+                    "Error: after the history rewrite, some changelog commit "
+                    "hashes neither were remapped nor resolve:",
+                    file=sys.stderr,
+                )
+                for filepath, hashes in failures.items():
+                    print(f"  {filepath}: {', '.join(hashes)}", file=sys.stderr)
+                print(
+                    f"Aborting before commit/push. Fix the entries (e.g. "
+                    f"rlsbl changelog amend) and re-run to resume; "
+                    f"{scrub_result_path} is kept.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+
+            _save_step(scrub_result_path, scrub_data, "HASHES_VALIDATED")
 
         # -- Regenerate CHANGELOG.md --
         if "CHANGELOG_GENERATED" not in completed:

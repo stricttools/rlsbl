@@ -506,7 +506,10 @@ class TestFullScrubFlow:
         }
 
         ctx = _ctx(str(tmp_path))
-        run_cmd(flags, ctx=ctx)
+        # Fake hashes can't resolve against a real repo; the gate is
+        # unit-tested separately in TestPostRemapValidationGate.
+        with patch(f"{MOD}.validate_all_hashes_resolve", return_value={}):
+            run_cmd(flags, ctx=ctx)
 
         # -- Assertions --
 
@@ -635,7 +638,8 @@ class TestResumeFromScrubResult:
             "yes": True,
         }
 
-        run_cmd(flags, ctx=_ctx(str(tmp_path)))
+        with patch(f"{MOD}.validate_all_hashes_resolve", return_value={}):
+            run_cmd(flags, ctx=_ctx(str(tmp_path)))
 
         # -- Assertions --
 
@@ -739,13 +743,122 @@ class TestReleasableDirsRemapped:
             "entire-history": True, "yes": True,
         }
         ctx = _ctx(str(proj_dir), workspace_root=str(ws_root))
-        run_cmd(flags, ctx=ctx)
+        with patch(f"{MOD}.validate_all_hashes_resolve", return_value={}):
+            run_cmd(flags, ctx=ctx)
 
         # Both trees remapped
         proj_entries = parse_jsonl(str(proj_changes / "unreleased.jsonl"))
         assert proj_entries[0].commits == ["new_hash_1"]
         rel_entries = parse_jsonl(str(rel_changes / "unreleased.jsonl"))
         assert rel_entries[0].commits == ["new_hash_2"]
+
+
+# ===========================================================================
+# Post-remap validation gate
+# ===========================================================================
+
+
+class TestPostRemapValidationGate:
+    """After JSONL remap and BEFORE the commit step, every hash in every
+    changelog dir must resolve. Otherwise: loud abort with resume intact."""
+
+    @patch(f"{MOD}.release_lock")
+    @patch(f"{MOD}.acquire_lock")
+    @patch(f"{MOD}.get_current_branch", return_value="main")
+    @patch(f"{MOD}.get_push_timeout", return_value=120)
+    @patch(f"{MOD}.generate_changelog")
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_unresolvable_hash_aborts_before_commit(self, mock_run, _req_tool,
+                                                     mock_gen_changelog,
+                                                     _push_timeout, _get_branch,
+                                                     _acquire_lock, _release_lock,
+                                                     tmp_path, capsys):
+        changes_dir = tmp_path / ".rlsbl" / "changes"
+        changes_dir.mkdir(parents=True)
+        releases_dir = tmp_path / ".rlsbl" / "releases"
+        releases_dir.mkdir(parents=True)
+
+        bogus = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+        unreleased = changes_dir / "unreleased.jsonl"
+        _write_entries(str(unreleased), [
+            ChangelogEntry(commits=[bogus], user_facing=False),
+        ])
+
+        safegit_result = json.dumps({
+            "rewrites": {"old_hash_1": "new_hash_1"},
+            "tags": [],
+            "old_head": "old_hash_1",
+            "new_head": "new_hash_1",
+        })
+        mock_run.side_effect = [
+            "safegit 0.21.1",  # safegit --version
+            safegit_result,    # safegit scrub
+        ]
+
+        flags = {
+            "pattern": "secret", "replace": "XXX", "reason": "r",
+            "entire-history": True, "yes": True,
+        }
+
+        failures = {str(unreleased): [bogus]}
+        with patch(f"{MOD}.validate_all_hashes_resolve", return_value=failures):
+            with pytest.raises(SystemExit) as exc_info:
+                run_cmd(flags, ctx=_ctx(str(tmp_path)))
+        assert exc_info.value.code == 1
+
+        # Aborted BEFORE commit: no safegit commit call happened
+        for c in mock_run.call_args_list:
+            if c[0][0] == "safegit":
+                assert "commit" not in (c[0][1] or [])
+
+        # Resume state intact
+        assert (releases_dir / "scrub-result.json").exists()
+
+        err = capsys.readouterr().err
+        assert bogus in err
+        assert "resolve" in err.lower()
+
+    @patch(f"{MOD}.release_lock")
+    @patch(f"{MOD}.acquire_lock")
+    @patch(f"{MOD}.check_gh_auth", return_value=False)
+    @patch(f"{MOD}.check_gh_installed", return_value=False)
+    @patch(f"{MOD}.get_current_branch", return_value="main")
+    @patch(f"{MOD}.get_push_timeout", return_value=120)
+    @patch(f"{MOD}.generate_changelog")
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_gate_passes_when_all_resolve(self, mock_run, _req_tool,
+                                           _gen_cl, _push_timeout, _get_branch,
+                                           _gh_installed, _gh_auth,
+                                           _acquire_lock, _release_lock, tmp_path):
+        changes_dir = tmp_path / ".rlsbl" / "changes"
+        changes_dir.mkdir(parents=True)
+        (changes_dir / "unreleased.jsonl").write_text("")
+
+        safegit_result = json.dumps({
+            "rewrites": {"old": "new"}, "tags": [],
+            "old_head": "old", "new_head": "new",
+        })
+
+        def run_effect(cmd, args=None, **kw):
+            if cmd == "safegit" and args == ["--version"]:
+                return "safegit 0.21.1"
+            if cmd == "safegit" and args and args[0] == "scrub":
+                return safegit_result
+            return ""
+
+        mock_run.side_effect = run_effect
+
+        flags = {
+            "pattern": "secret", "replace": "XXX", "reason": "r",
+            "entire-history": True, "yes": True,
+        }
+        with patch(f"{MOD}.validate_all_hashes_resolve", return_value={}) as mock_gate:
+            run_cmd(flags, ctx=_ctx(str(tmp_path)))
+        mock_gate.assert_called_once()
+        # Flow completed: state cleared
+        assert not (tmp_path / ".rlsbl" / "releases" / "scrub-result.json").exists()
 
 
 # ===========================================================================
