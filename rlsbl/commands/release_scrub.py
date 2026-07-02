@@ -227,8 +227,11 @@ def run_cmd(flags, *, ctx):
     if not resuming:
         safegit_args = _build_safegit_args(flags, mode)
 
+        # Orchestration handshake: tells safegit this scrub is driven by
+        # rlsbl (safegit will enforce this in a future release).
+        scrub_env = {**os.environ, "RLSBL_SCRUB_ORCHESTRATED": "1"}
         try:
-            output = run("safegit", safegit_args, timeout=600)
+            output = run("safegit", safegit_args, timeout=600, env=scrub_env)
         except Exception as e:
             print(f"Error: safegit scrub failed: {e}", file=sys.stderr)
             sys.exit(1)

@@ -247,6 +247,29 @@ class TestRecipeMode:
         assert exc_info.value.code == 1
 
 
+class TestScrubOrchestrationHandshake:
+    """The safegit scrub subprocess must receive RLSBL_SCRUB_ORCHESTRATED=1."""
+
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_env_var_set_on_scrub_invocation(self, mock_run, _req_tool, tmp_path):
+        dry_json = json.dumps({
+            "version": 1, "dry_run": True, "pattern": "x",
+            "total_matches": 0, "estimated_commits": 0,
+        })
+        mock_run.side_effect = ["safegit 0.21.1", dry_json]
+        flags = {
+            "pattern": "x", "replace": "y", "reason": "r",
+            "entire-history": True, "dry-run": True,
+        }
+        run_cmd(flags, ctx=_ctx(str(tmp_path)))
+
+        scrub_call = mock_run.call_args_list[1]
+        env = scrub_call[1].get("env")
+        assert env is not None, "scrub invocation must pass an env"
+        assert env.get("RLSBL_SCRUB_ORCHESTRATED") == "1"
+
+
 class TestEmptyOutputMeansNoMatches:
     """safegit scrub execute emits NO JSON when there is nothing to rewrite."""
 
