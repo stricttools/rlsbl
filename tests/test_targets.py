@@ -849,13 +849,15 @@ class TestGoScaffoldTemplates:
         vars = target.template_vars(str(tmp_project), make_ctx(tmp_project))
         assert vars["goreleaserMain"] == "./cmd/myapp"
 
-    def test_goreleaser_main_fallback(self, tmp_project):
-        """Go project with no main.go anywhere returns goreleaserMain: '.'"""
+    def test_goreleaser_main_empty_for_library(self, tmp_project):
+        """Library project (no main packages) gets an empty goreleaserMain --
+        libraries never scaffold .goreleaser.yml, and a silent '.' fallback
+        used to produce broken configs for misdetected binary projects."""
         target = GoTarget()
         (tmp_project / "go.mod").write_text("module github.com/user/mylib\n\ngo 1.21\n")
         (tmp_project / "VERSION").write_text("0.1.0\n")
         vars = target.template_vars(str(tmp_project), make_ctx(tmp_project))
-        assert vars["goreleaserMain"] == "."
+        assert vars["goreleaserMain"] == ""
 
     def test_version_go_in_binary_mappings(self, tmp_project):
         """Go binary project includes version.go in template_mappings."""
@@ -892,16 +894,19 @@ class TestGoRootMainDetection:
 
     def test_has_root_main_true(self, tmp_project):
         target = GoTarget()
+        (tmp_project / "go.mod").write_text("module github.com/user/myapp\n\ngo 1.21\n")
         (tmp_project / "main.go").write_text("package main\n\nfunc main() {}\n")
         assert target._has_root_main(str(tmp_project)) is True
 
     def test_has_root_main_false(self, tmp_project):
         target = GoTarget()
-        # No main.go at root
+        (tmp_project / "go.mod").write_text("module github.com/user/myapp\n\ngo 1.21\n")
+        # No main package at root
         assert target._has_root_main(str(tmp_project)) is False
 
     def test_has_cmd_main_single_binary(self, tmp_project):
         target = GoTarget()
+        (tmp_project / "go.mod").write_text("module github.com/user/myapp\n\ngo 1.21\n")
         cmd_dir = tmp_project / "cmd" / "myapp"
         cmd_dir.mkdir(parents=True)
         (cmd_dir / "main.go").write_text("package main\n\nfunc main() {}\n")
@@ -909,6 +914,7 @@ class TestGoRootMainDetection:
 
     def test_has_cmd_main_multi_binary(self, tmp_project):
         target = GoTarget()
+        (tmp_project / "go.mod").write_text("module github.com/user/myapp\n\ngo 1.21\n")
         for name in ("foo", "bar"):
             cmd_dir = tmp_project / "cmd" / name
             cmd_dir.mkdir(parents=True)
@@ -918,6 +924,7 @@ class TestGoRootMainDetection:
 
     def test_has_cmd_main_no_cmd(self, tmp_project):
         target = GoTarget()
+        (tmp_project / "go.mod").write_text("module github.com/user/myapp\n\ngo 1.21\n")
         # No cmd/ directory at all
         assert target._has_cmd_main(str(tmp_project)) is False
 

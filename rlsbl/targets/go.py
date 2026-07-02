@@ -5,6 +5,11 @@ import os
 import re
 
 from .base import BaseTarget, TemplateVars
+from ..go_introspect import (
+    go_pipeline_install_paths,
+    list_main_packages,
+    resolve_main_package_dir,
+)
 from ..npm_wrapper import (
     build_artifacts,
     build_npm_publish_jobs,
@@ -63,28 +68,17 @@ class GoTarget(BaseTarget):
         return {}
 
     def _is_library(self, dir_path):
-        """Return True if the project has no `package main` in root .go files or cmd/ layout."""
-        if self._has_cmd_main(dir_path):
-            return False
-        for go_file in glob.glob(os.path.join(dir_path, "*.go")):
-            with open(go_file, encoding="utf-8") as f:
-                for line in f:
-                    if re.match(r"^package\s+main\b", line):
-                        return False
-        return True
+        """Return True if the project has no `package main` package anywhere."""
+        return len(list_main_packages(dir_path)) == 0
 
     def _has_root_main(self, dir_path):
-        """Return True if there's a main.go at the project root with `package main`."""
-        main_go = os.path.join(dir_path, "main.go")
-        if not os.path.exists(main_go):
-            return False
-        with open(main_go, encoding="utf-8") as f:
-            first_line = f.readline()
-        return bool(re.match(r"^package\s+main\b", first_line))
+        """Return True if the project root package is `package main`."""
+        return any(p.rel_dir == "." for p in list_main_packages(dir_path))
 
-    def _has_version_var(self, dir_path):
-        """Return True if any root-level .go file declares a Version variable."""
-        for go_file in glob.glob(os.path.join(dir_path, "*.go")):
+    def _has_version_var(self, dir_path, main_dir="."):
+        """Return True if a .go file in *main_dir* declares a Version variable."""
+        search_dir = os.path.normpath(os.path.join(dir_path, main_dir))
+        for go_file in glob.glob(os.path.join(search_dir, "*.go")):
             with open(go_file, encoding="utf-8") as f:
                 for line in f:
                     if re.match(r"^var\s+[Vv]ersion\b", line):
@@ -92,22 +86,16 @@ class GoTarget(BaseTarget):
         return False
 
     def _has_cmd_main(self, dir_path):
-        """Return True if there's a single cmd/*/main.go with `package main`.
+        """Return True if there's exactly one main package under cmd/.
 
-        Returns False if there are multiple cmd/ subdirectories (multi-binary
-        repos where cmd/ is the correct layout) or no cmd/ entries at all.
+        Returns False for multi-binary repos (multiple cmd/ mains) or when
+        no cmd/ main package exists at all.
         """
-        matches = glob.glob(os.path.join(dir_path, "cmd", "*", "main.go"))
-        if not matches:
-            return False
-        # Count distinct cmd/ subdirectories (not just main.go files)
-        cmd_dirs = set(os.path.dirname(m) for m in matches)
-        if len(cmd_dirs) > 1:
-            return False
-        # Verify the single match has `package main`
-        with open(matches[0], encoding="utf-8") as f:
-            first_line = f.readline()
-        return bool(re.match(r"^package\s+main\b", first_line))
+        cmd_mains = [
+            p for p in list_main_packages(dir_path)
+            if p.rel_dir.startswith("./cmd/")
+        ]
+        return len(cmd_mains) == 1
 
     def read_version(self, dir_path):
         """Read version from the VERSION file."""
@@ -197,20 +185,16 @@ class GoTarget(BaseTarget):
         except FileNotFoundError:
             version = "0.0.0"
 
-        if self._is_library(dir_path):
+        is_library = self._is_library(dir_path)
+        if is_library:
             publish_setup = "Go library -- no publish step needed. Tagged releases are available via go get."
+            goreleaser_main = ""
         else:
             publish_setup = "GoReleaser handles binary publishing via GitHub Actions (no secrets needed)"
-
-        # Determine the main package path for goreleaser
-        if self._has_root_main(dir_path):
-            goreleaser_main = "."
-        elif self._has_cmd_main(dir_path):
-            matches = glob.glob(os.path.join(dir_path, "cmd", "*", "main.go"))
-            cmd_name = os.path.basename(os.path.dirname(matches[0]))
-            goreleaser_main = f"./cmd/{cmd_name}"
-        else:
-            goreleaser_main = "."
+            # The main package path for goreleaser: hard error on ambiguity
+            # (multiple mains without declared install_paths) instead of a
+            # silent "." fallback that produces a broken .goreleaser.yml.
+            goreleaser_main = resolve_main_package_dir(dir_path, config or {})
 
         # npm binary wrapper support
         npm_wrapper_config = config.get("npm_wrapper", {}) if config else {}
@@ -245,7 +229,7 @@ class GoTarget(BaseTarget):
 
         # npm wrapper publish job
         npm_publish_jobs = ""
-        if npm_scope and not self._is_library(dir_path):
+        if npm_scope and not is_library:
             specs = load_platform_config(config or {})
             artifacts = build_artifacts(specs, short_name, _go_archive_fn)
             npm_publish_jobs = build_npm_publish_jobs(
@@ -286,20 +270,39 @@ class GoTarget(BaseTarget):
             {"template": "VERSION.tpl", "target": "VERSION"},
             {"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"},
         ]
+        # Without go.mod there is no module to introspect (mirrors the
+        # template_vars early return); binary scaffolding needs a module.
+        if not os.path.exists(os.path.join(project_root, "go.mod")):
+            return mappings
         if not self._is_library(project_root):
             mappings.append(
                 {"template": "goreleaser.yml.tpl", "target": ".goreleaser.yml"},
             )
-            if not self._has_version_var(project_root):
+            # version.go goes into the detected main-package dir, never
+            # unconditionally into the project root: a root `package main`
+            # file without func main breaks `go build ./...` for cmd-layout
+            # projects.
+            main_dir = resolve_main_package_dir(
+                project_root, ctx.config if ctx else {}
+            )
+            if not self._has_version_var(project_root, main_dir):
+                version_go_target = (
+                    "version.go"
+                    if main_dir == "."
+                    else main_dir[2:] + "/version.go"
+                )
                 mappings.append(
-                    {"template": "version.go.tpl", "target": "version.go"},
+                    {"template": "version.go.tpl", "target": version_go_target},
                 )
             # npm wrapper scaffolding is in shared_template_mappings()
         return mappings
 
     def shared_template_mappings(self, ctx):
         mappings = super().shared_template_mappings(ctx)
-        if not self._is_library(str(ctx.project_root)):
+        project_root = str(ctx.project_root)
+        if not os.path.exists(os.path.join(project_root, "go.mod")):
+            return mappings
+        if not self._is_library(project_root):
             config = ctx.config if ctx else {}
             npm_wrapper_config = config.get("npm_wrapper", {})
             if npm_wrapper_config.get("scope"):
@@ -313,11 +316,37 @@ class GoTarget(BaseTarget):
         return 'Run "go mod init <module-path>" first'
 
     def dev_install_command(self, project_dir):
+        from ..config import read_project_config
+        from ..go_introspect import (
+            GoIntrospectError,
+            describe_main_packages,
+            validate_install_paths,
+        )
+
+        if os.path.exists(os.path.join(project_dir, "go.mod")):
+            config = read_project_config(project_dir)
+            declared = go_pipeline_install_paths(config)
+            if declared is None:
+                mains = list_main_packages(project_dir)
+                raise GoIntrospectError(
+                    "the go pipeline in .rlsbl/config.json does not declare "
+                    "'install_paths', which is required to run 'go install'. "
+                    f"{describe_main_packages(mains)} "
+                    'Declare e.g. "install_paths": '
+                    f"{[p.rel_dir for p in mains] or ['./cmd/<name>']!r} "
+                    "on the go pipeline entry."
+                )
+            args = ["install"] + validate_install_paths(project_dir, declared)
+        else:
+            # Not a Go project dir (e.g. docs introspection of the target
+            # table): return the generic shape of the command.
+            args = ["install", "<install_paths from .rlsbl/config.json>"]
+
         return {
             "global": {
                 "tool": "go",
                 "purpose": "for go install",
-                "args": ["install", "./..."],
+                "args": args,
                 # `go install` does not have a clean reverse; tell the user.
                 "uninstall_args_template": None,
             },

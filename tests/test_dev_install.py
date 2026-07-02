@@ -24,10 +24,29 @@ def _make_npm(dir_path, name="my-npm-pkg"):
 
 
 def _make_go(dir_path):
-    """Create a minimal go.mod so the go target is detected."""
+    """Create a minimal go.mod + a main package + declared install_paths.
+
+    dev install for Go requires install_paths on the go pipeline config
+    (validated against `go list`), so the fixture provides all three.
+    """
     os.makedirs(dir_path, exist_ok=True)
     with open(os.path.join(dir_path, "go.mod"), "w", encoding="utf-8") as f:
         f.write("module example.com/foo\n\ngo 1.21\n")
+    with open(os.path.join(dir_path, "main.go"), "w", encoding="utf-8") as f:
+        f.write("package main\n\nfunc main() {}\n")
+    rlsbl_dir = os.path.join(dir_path, ".rlsbl")
+    os.makedirs(rlsbl_dir, exist_ok=True)
+    with open(os.path.join(rlsbl_dir, "config.json"), "w", encoding="utf-8") as f:
+        json.dump(
+            {
+                "targets": ["go"],
+                "pipelines": {
+                    "go": {"type": "go", "local": True, "install_paths": ["."]}
+                },
+                "private": False,
+            },
+            f,
+        )
 
 
 def _make_cargo(dir_path, name="mycrate"):
@@ -116,6 +135,20 @@ def all_tools_present(monkeypatch):
     )
 
 
+@pytest.fixture(autouse=True)
+def stub_go_introspect(monkeypatch):
+    """Stub go list introspection: fake_run patches subprocess.run globally,
+    which would break the real `go list` call inside go_introspect."""
+    from rlsbl.go_introspect import GoPackage
+
+    monkeypatch.setattr(
+        "rlsbl.go_introspect.list_main_packages",
+        lambda project_dir: [
+            GoPackage(name="main", import_path="example.com/foo", rel_dir=".")
+        ],
+    )
+
+
 # ---------------------------------------------------------------------------
 # Single-project install
 # ---------------------------------------------------------------------------
@@ -143,7 +176,8 @@ def test_go_install_runs_go_install(tmp_project, fake_run, all_tools_present):
     rc = run_install({}, project_root=".")
     assert rc == 0
     assert len(fake_run.calls) == 1
-    assert fake_run.calls[0]["cmd"] == ["go", "install", "./..."]
+    # Declared install_paths drive the install (never a blanket ./...)
+    assert fake_run.calls[0]["cmd"] == ["go", "install", "."]
 
 
 def test_pypi_uninstall_uses_project_name(tmp_project, fake_run, all_tools_present):
