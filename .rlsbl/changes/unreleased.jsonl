@@ -1,1 +1,2 @@
 {"commits":["78cb6afda605189b6fade326013444b97740e70e"],"user_facing":true,"description":"`rlsbl watch` no longer re-watches or re-retries a retry run that reappears in the late re-poll -- previously a failed workflow's retry could be dispatched twice on the same commit","type":"fix"}
+{"commits":["82a1ac9ca3a3dfb75c651e03ac1cf68fd0af9cb6"],"user_facing":true,"description":"`rlsbl watch` retry deduplication now also applies when only a single CI run is being watched -- previously single-run watches could double-retry a failed workflow","type":"fix"}
