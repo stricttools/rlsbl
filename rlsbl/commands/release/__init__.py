@@ -182,8 +182,10 @@ def _resume_cmd_inner(saved_state, flags, *, ctx):
     except Exception:
         current_version = new_version  # If we can't read, assume already bumped
 
-    # Extract changelog entry from CHANGELOG.md (already generated in prior run)
-    changelog_path = os.path.join(project_dir, "CHANGELOG.md")
+    # Extract changelog entry from CHANGELOG.md (already generated in prior
+    # run). Releasable mode: the canonical file lives in the releasable dir.
+    from ...changelog.home import get_changelog_home
+    changelog_path = get_changelog_home(project_dir, releasable_dir=_rel_cfg_dir)
     if os.path.exists(changelog_path):
         changelog_entry = extract_changelog_entry(changelog_path, new_version)
     else:
@@ -540,10 +542,16 @@ def _run_cmd_inner(release_config, flags, *, ctx):
 
     # Compute changelog content in memory (deferred write after pre-release checks pass)
     # In explicit releasable mode, changes_dir points to the releasable-level
-    # directory, not the per-project default.
+    # directory, not the per-project default, and the canonical CHANGELOG.md
+    # lives in the releasable's directory (single source of truth:
+    # rlsbl.changelog.home).
+    from ...changelog.home import get_changelog_home, generate_workspace_changelog
     changelog_gen_kwargs = {}
     if releasable_name and changes_dir:
         changelog_gen_kwargs["changes_dir_override"] = changes_dir
+        changelog_gen_kwargs["changelog_output_path"] = get_changelog_home(
+            project_dir, releasable_dir=_rel_cfg_dir,
+        )
     changelog_content = generate_changelog(
         project_dir, write_to_disk=False, version_override=new_version,
         description=release_config.description, context=release_config.context,
@@ -801,6 +809,10 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             bump_type=bump_type,
             **changelog_gen_kwargs,
         )
+        # Releasable mode: also regenerate the combined root CHANGELOG.md
+        # covering all releasables of the workspace.
+        if releasable_name and monorepo_root:
+            generate_workspace_changelog(str(monorepo_root))
 
     try:
         _run_release_mutating(ReleaseState(

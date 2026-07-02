@@ -19,6 +19,7 @@ def register_changelog_checks(app):
     def check_changelog_entry(ctx):
         """CHANGELOG.md must have an entry for the current version."""
         from ..utils import extract_changelog_entry
+        from ..changelog.home import get_changelog_home
         from ..check_context import WorkspaceCheckContext
         from ..workspace import (
             get_releasable_dir,
@@ -31,8 +32,10 @@ def register_changelog_checks(app):
         if not version:
             return CheckResult("skip", "no version detected")
 
-        # In explicit releasable mode, look for CHANGELOG.md in the releasable dir
-        changelog_path = os.path.join(str(ctx.project_root), "CHANGELOG.md")
+        # The canonical CHANGELOG.md location comes from the single home
+        # resolver: releasable dir in explicit releasable mode, project
+        # root otherwise.
+        releasable_dir = None
         if isinstance(ctx, WorkspaceCheckContext) and ctx.workspace_root is not None:
             ws_root = str(ctx.workspace_root)
             if is_explicit_mode(ws_root) and getattr(ctx, "releasables", None):
@@ -40,9 +43,10 @@ def register_changelog_checks(app):
                 if proj is not None:
                     rel = resolve_releasable_for_project(proj, ctx.releasables)
                     if rel is not None:
-                        changelog_path = os.path.join(
-                            get_releasable_dir(ws_root, rel.name), "CHANGELOG.md",
-                        )
+                        releasable_dir = get_releasable_dir(ws_root, rel.name)
+        changelog_path = get_changelog_home(
+            str(ctx.project_root), releasable_dir=releasable_dir,
+        )
 
         if not os.path.exists(changelog_path):
             return CheckResult("warn", "CHANGELOG.md not found")

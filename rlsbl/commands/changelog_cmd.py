@@ -419,27 +419,55 @@ def cmd_generate(flags, project_root):
         print("\n(dry-run: no files written)")
     else:
         if is_releasable_mode:
+            from ..changelog.home import (
+                generate_workspace_changelog,
+                get_changelog_home,
+                get_workspace_changelog_path,
+            )
             from ..workspace import get_releasable_dir
             releasable_dir = get_releasable_dir(
                 ws_context.ws_root, ws_context.releasable.name,
             )
+            canonical_path = get_changelog_home(
+                project_root, releasable_dir=releasable_dir,
+            )
             content = generate_changelog(
                 project_root,
                 changes_dir_override=changes_dir,
-                changelog_output_path=os.path.join(releasable_dir, "CHANGELOG.md"),
+                changelog_output_path=canonical_path,
             )
+            # Regenerate the combined root CHANGELOG.md covering all
+            # releasables of the workspace.
+            generate_workspace_changelog(ws_context.ws_root)
         else:
             content = generate_changelog(project_root)
         print("Generated CHANGELOG.md")
 
         if flags.get("auto-commit", True):
-            # Collect changed files: CHANGELOG.md and per-version .md files
-            changed_files = _get_generated_files(project_root)
+            if is_releasable_mode:
+                # Explicit paths: canonical releasable CHANGELOG.md, combined
+                # root CHANGELOG.md, and per-version .md files in the
+                # releasable changes dir -- filtered to those git reports as
+                # changed.
+                candidates = [
+                    canonical_path,
+                    get_workspace_changelog_path(ws_context.ws_root),
+                ]
+                for _version, jsonl_path in list_versioned_files(changes_dir):
+                    md_path = jsonl_path[: -len(".jsonl")] + ".md"
+                    candidates.append(md_path)
+                changed_files = _filter_dirty_files(candidates, ws_context.ws_root)
+                commit_cwd = ws_context.ws_root
+            else:
+                # Collect changed files: CHANGELOG.md and per-version .md files
+                changed_files = _get_generated_files(project_root)
+                commit_cwd = None
             if changed_files:
                 commit_files(
                     "changelog: regenerate from JSONL",
                     changed_files,
                     allow_failure=True,
+                    cwd=commit_cwd,
                 )
 
 
@@ -762,6 +790,32 @@ def _sync_github_release(version: str) -> None:
             f"Warning: could not sync GitHub Release notes: {e}",
             file=sys.stderr,
         )
+
+
+def _filter_dirty_files(paths: list[str], repo_root: str) -> list[str]:
+    """Return the subset of *paths* that git reports as modified/untracked.
+
+    Paths are returned as absolute paths. Used by releasable-mode changelog
+    generation where the generated files live outside the member project.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "status", "--porcelain", "--", *paths],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=repo_root,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return []
+
+    dirty = []
+    for line in result.stdout.splitlines():
+        if len(line) < 4:
+            continue
+        filepath = line[3:].strip()
+        dirty.append(os.path.join(repo_root, filepath))
+    return dirty
 
 
 def _get_generated_files(project_path: str) -> list[str]:

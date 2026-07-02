@@ -909,12 +909,28 @@ def _run_release_mutating(state: ReleaseState):
         # Re-run selfdoc check to refresh hashes after version bump
         _refresh_selfdoc_hashes(files_to_commit, log, project_dir=project_dir)
 
-        # Include the generated CHANGELOG.md in the commit (dev nodes have no CHANGELOG.md)
-        changelog_path = os.path.join(project_dir, "CHANGELOG.md")
-        if os.path.exists(changelog_path):
-            changelog_file = vpath("CHANGELOG.md")
-            if changelog_file not in files_to_commit:
-                files_to_commit.append(changelog_file)
+        # Include the generated CHANGELOG.md files in the commit (dev nodes
+        # have no CHANGELOG.md). The canonical location is resolved via
+        # rlsbl.changelog.home: releasable dir in releasable mode (plus the
+        # combined root CHANGELOG.md), project root otherwise.
+        from ...changelog.home import get_changelog_home, get_workspace_changelog_path
+        _changelog_commit_files = []
+        _canonical_changelog = get_changelog_home(
+            project_dir, releasable_dir=_releasable_cfg_dir,
+        )
+        if os.path.exists(_canonical_changelog):
+            _changelog_commit_files.append(
+                _rel_to_git_root(_canonical_changelog, _git_root)
+            )
+        if _releasable_cfg_dir and monorepo_root:
+            _root_changelog = get_workspace_changelog_path(str(monorepo_root))
+            if os.path.exists(_root_changelog):
+                _changelog_commit_files.append(
+                    _rel_to_git_root(_root_changelog, _git_root)
+                )
+        for _cl_file in _changelog_commit_files:
+            if _cl_file not in files_to_commit:
+                files_to_commit.append(_cl_file)
 
         # Include hook-generated files (created or modified by pre-checks/pre-release hooks)
         if hook_generated:
@@ -1062,8 +1078,7 @@ def _run_release_mutating(state: ReleaseState):
             jsonl_unreleased = _rel_to_git_root(os.path.join(changes_dir, "unreleased.jsonl"), _git_root)
             # Also commit the generated per-version .md file if it exists
             jsonl_md = _rel_to_git_root(os.path.join(changes_dir, f"{new_version}.md"), _git_root)
-            changelog_file = vpath("CHANGELOG.md")
-            finalize_files = [jsonl_finalized, jsonl_unreleased, changelog_file]
+            finalize_files = [jsonl_finalized, jsonl_unreleased, *_changelog_commit_files]
             if os.path.exists(jsonl_md):
                 finalize_files.append(jsonl_md)
             # generate_changelog() (run before the mutating phase) backfills
@@ -1440,7 +1455,10 @@ def _run_release_mutating(state: ReleaseState):
                     _state_path, "GITHUB_RELEASE",
                     f"GitHub Release creation failed for {tag}",
                 )
-                notes_path = f".rlsbl/changes/{new_version}.md"
+                # Point at the resolved changes dir (releasable dir in
+                # releasable mode, .rlsbl/changes/ otherwise).
+                _notes_base = changes_dir or os.path.join(".rlsbl", "changes")
+                notes_path = os.path.join(_notes_base, f"{new_version}.md")
                 print(
                     f"Error: GitHub Release creation failed for {tag}. "
                     f"The tag and commit are on the remote.\n"
