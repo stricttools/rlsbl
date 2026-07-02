@@ -26,8 +26,10 @@ def detect_strictcli(project_dir: str = ".") -> tuple[str, str] | None:
     For Python: if the project depends on strictcli and has a [project.scripts]
     entry, returns (entry_point_name, "python").
 
-    For Go: if go.mod requires github.com/smm-h/strictcli, detects the entry
-    point (root main.go or cmd/*/main.go) and returns (package_path, "go").
+    For Go: if go.mod requires github.com/smm-h/strictcli, enumerates main
+    packages via the go toolchain (go_introspect) and returns
+    (package_path, "go") -- see _detect_go_strictcli for the resolution
+    rules (single main, or the one main whose dir imports strictcli).
 
     Args:
         project_dir: path to the project root (default: current directory).
