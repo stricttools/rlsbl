@@ -48,7 +48,7 @@
   },
   "project_id": "rlsbl",
   "name": "rlsbl",
-  "version": "0.91.1",
+  "version": "0.92.0",
   "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 32 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
   "global_flags": [
     {
@@ -156,7 +156,7 @@
     },
     "scaffold": {
       "name": "scaffold",
-      "help": "Generate or update CI/CD workflows, git hooks, changelog, and license files. Safe to run repeatedly -- merges template changes with your customizations. Use --force to overwrite all files.",
+      "help": "Generate or update CI/CD workflows, git hooks, changelog, and license files. Safe to run repeatedly -- merges template changes with your customizations. Use --force-overwrite to overwrite all files.",
       "flags": [
         {
           "name": "target",
@@ -165,7 +165,7 @@
           "default": ""
         },
         {
-          "name": "force",
+          "name": "force-overwrite",
           "type": "bool",
           "help": "Overwrite all scaffold-managed files, discarding any user customizations",
           "default": false,
@@ -179,10 +179,10 @@
           "negatable": true
         },
         {
-          "name": "no-commit",
+          "name": "auto-commit",
           "type": "bool",
-          "help": "Write scaffolded files to disk without auto-committing them",
-          "default": false,
+          "help": "Auto-commit scaffolded files after writing them to disk",
+          "default": true,
           "negatable": true
         },
         {
@@ -193,10 +193,10 @@
           "negatable": true
         },
         {
-          "name": "no-tag",
+          "name": "auto-tag",
           "type": "bool",
-          "help": "Do not add or update the rlsbl GitHub topic tag on this invocation",
-          "default": false,
+          "help": "Add or update the rlsbl GitHub topic tag on this invocation",
+          "default": true,
           "negatable": true
         }
       ]
@@ -343,20 +343,13 @@
     },
     "deploy": {
       "name": "deploy",
-      "help": "Run the configured deployment pipeline for the project. Supports named deploy targets, dry-run preview of what would be deployed, and a --force flag to override branch restrictions.",
+      "help": "Run the configured deployment pipeline for the project. Supports named deploy targets and dry-run preview of what would be deployed. Branch restrictions are always enforced.",
       "flags": [
         {
           "name": "target",
           "type": "str",
           "help": "Registry whose deploy pipeline to run (auto-detected if omitted)",
           "default": ""
-        },
-        {
-          "name": "force",
-          "type": "bool",
-          "help": "Bypass branch restrictions that normally limit which branches can deploy",
-          "default": false,
-          "negatable": true
         }
       ],
       "args": [
@@ -390,10 +383,15 @@
           "help": "Bump version, validate the JSONL changelog, run tests and lint, commit, tag, push, and create a GitHub Release. Reads the bump type (patch, minor, major, or hotfix) and target selection from .rlsbl/releases/unreleased.toml, which can be scaffolded with rlsbl release init. Supports dry-run preview, non-interactive mode with --yes, and --allow-dirty to skip the clean working tree check.",
           "flags": [
             {
+              "name": "watch",
+              "type": "bool",
+              "help": "After release, automatically watch CI runs to completion (--no-watch to skip)",
+              "negatable": true
+            },
+            {
               "name": "allow-dirty",
               "type": "bool",
               "help": "Skip the clean working tree check and allow releasing with uncommitted changes",
-              "default": false,
               "negatable": true
             },
             {
@@ -413,29 +411,6 @@
               "type": "str",
               "help": "Pre-release identifier: alpha, beta, rc, stable. Only valid with --bump.",
               "default": ""
-            },
-            {
-              "name": "watch",
-              "type": "bool",
-              "help": "After release, automatically watch CI runs to completion",
-              "default": false,
-              "negatable": false
-            },
-            {
-              "name": "no-watch",
-              "type": "bool",
-              "help": "After release, print the watch command hint without watching",
-              "default": false,
-              "negatable": false
-            }
-          ],
-          "constraints": [
-            {
-              "type": "mutex",
-              "flags": [
-                "watch",
-                "no-watch"
-              ]
             }
           ]
         },
@@ -446,25 +421,8 @@
             {
               "name": "watch",
               "type": "bool",
-              "help": "After release, automatically watch CI runs to completion",
-              "default": false,
-              "negatable": false
-            },
-            {
-              "name": "no-watch",
-              "type": "bool",
-              "help": "After release, print the watch command hint without watching",
-              "default": false,
-              "negatable": false
-            }
-          ],
-          "constraints": [
-            {
-              "type": "mutex",
-              "flags": [
-                "watch",
-                "no-watch"
-              ]
+              "help": "After release, automatically watch CI runs to completion (--no-watch to skip)",
+              "negatable": true
             }
           ]
         },
@@ -479,25 +437,8 @@
             {
               "name": "watch",
               "type": "bool",
-              "help": "After retry, automatically watch CI runs to completion",
-              "default": false,
-              "negatable": false
-            },
-            {
-              "name": "no-watch",
-              "type": "bool",
-              "help": "After retry, print the watch command hint without watching",
-              "default": false,
-              "negatable": false
-            }
-          ],
-          "constraints": [
-            {
-              "type": "mutex",
-              "flags": [
-                "watch",
-                "no-watch"
-              ]
+              "help": "After retry, automatically watch CI runs to completion (--no-watch to skip)",
+              "negatable": true
             }
           ]
         },
@@ -544,7 +485,6 @@
               "name": "hard",
               "type": "bool",
               "help": "Delete the release instead of marking as pre-release",
-              "default": false,
               "negatable": true
             }
           ],
@@ -632,7 +572,7 @@
       "commands": {
         "add": {
           "name": "add",
-          "help": "Append a structured changelog entry to the project's unreleased.jsonl file. Each entry includes a human-readable description, an entry type (feature, fix, or breaking), and optional commit hashes linking it to specific changes. The file is auto-committed unless --no-commit is passed. Use --no-user-facing to mark internal changes that should not appear in the published changelog.",
+          "help": "Append a structured changelog entry to the project's unreleased.jsonl file. Each entry includes a human-readable description, an entry type (feature, fix, or breaking), and optional commit hashes linking it to specific changes. The file is auto-committed by default. Use --no-user-facing to mark internal changes that should not appear in the published changelog.",
           "flags": [
             {
               "name": "commits",
@@ -653,17 +593,17 @@
               "default": ""
             },
             {
-              "name": "no-user-facing",
+              "name": "user-facing",
               "type": "bool",
-              "help": "Mark this entry as internal (excluded from generated CHANGELOG.md output)",
-              "default": false,
+              "help": "Mark this entry as user-facing (included in generated CHANGELOG.md output)",
+              "default": true,
               "negatable": true
             },
             {
-              "name": "no-commit",
+              "name": "auto-commit",
               "type": "bool",
-              "help": "Append to unreleased.jsonl without auto-committing the change",
-              "default": false,
+              "help": "Auto-commit unreleased.jsonl after appending the entry",
+              "default": true,
               "negatable": true
             },
             {
@@ -680,17 +620,17 @@
           "help": "Compile all validated JSONL changelog entries into a formatted CHANGELOG.md file. Groups entries by type (features, fixes, breaking changes) under the appropriate version heading, preserving existing changelog content for previous releases. Use --dry-run to preview the generated Markdown output without writing to disk, which is useful for reviewing before committing.",
           "flags": [
             {
-              "name": "no-commit",
+              "name": "auto-commit",
               "type": "bool",
-              "help": "Write generated CHANGELOG.md and per-version .md files without auto-committing",
-              "default": false,
+              "help": "Auto-commit generated CHANGELOG.md and per-version .md files",
+              "default": true,
               "negatable": true
             }
           ]
         },
         "amend": {
           "name": "amend",
-          "help": "Append a changelog entry to a released version's JSONL file. Temporarily unlocks the read-only file, appends the entry, re-locks it, regenerates CHANGELOG.md, and syncs GitHub Release notes. Use --no-resolve to skip hash validation for old or amended commits.",
+          "help": "Append a changelog entry to a released version's JSONL file. Temporarily unlocks the read-only file, appends the entry, re-locks it, regenerates CHANGELOG.md, and syncs GitHub Release notes. Use --no-validate-hashes to skip hash validation for old or amended commits.",
           "flags": [
             {
               "name": "version",
@@ -715,17 +655,17 @@
               "default": ""
             },
             {
-              "name": "no-user-facing",
+              "name": "user-facing",
               "type": "bool",
-              "help": "Mark the amended entry as internal (excluded from CHANGELOG.md output)",
-              "default": false,
+              "help": "Mark the amended entry as user-facing (included in CHANGELOG.md output)",
+              "default": true,
               "negatable": true
             },
             {
-              "name": "no-resolve",
+              "name": "validate-hashes",
               "type": "bool",
-              "help": "Skip git rev-parse hash validation for old or rewritten commits",
-              "default": false,
+              "help": "Validate commit hashes via git rev-parse before appending",
+              "default": true,
               "negatable": true
             }
           ]
@@ -752,24 +692,16 @@
               "default": ""
             },
             {
-              "name": "no-user-facing",
-              "type": "bool",
-              "help": "Set user_facing=false on the matched entry, clearing its description and type",
-              "default": false,
-              "negatable": true
-            },
-            {
               "name": "user-facing",
               "type": "bool",
-              "help": "Set user_facing=true (requires --description and --type if entry doesn't already have them)",
-              "default": false,
+              "help": "Set user_facing status on the matched entry (--user-facing to set true, --no-user-facing to set false)",
               "negatable": true
             },
             {
-              "name": "no-commit",
+              "name": "auto-commit",
               "type": "bool",
-              "help": "Write the edited JSONL file without auto-committing the change",
-              "default": false,
+              "help": "Auto-commit the edited JSONL file",
+              "default": true,
               "negatable": true
             }
           ]
@@ -785,10 +717,10 @@
           "help": "Create a new monorepo workspace by generating the .rlsbl-monorepo directory and an empty workspace.toml configuration file at the current directory. This must be run at the repository root before adding individual projects with the add subcommand. Each workspace tracks multiple independently-versioned projects that share a single git repository.",
           "flags": [
             {
-              "name": "no-commit",
+              "name": "auto-commit",
               "type": "bool",
-              "help": "Create the workspace.toml file without auto-committing it to git",
-              "default": false,
+              "help": "Auto-commit workspace.toml after creating it",
+              "default": true,
               "negatable": true
             }
           ]
@@ -846,10 +778,10 @@
               "default": ""
             },
             {
-              "name": "no-commit",
+              "name": "auto-commit",
               "type": "bool",
-              "help": "Skip auto-commit of workspace.toml and suppress commits from auto-triggered scaffold/sync",
-              "default": false,
+              "help": "Auto-commit workspace.toml and trigger scaffold/sync commits",
+              "default": true,
               "negatable": true
             }
           ],
@@ -879,10 +811,10 @@
           "help": "Copy and merge CI workflow files from each project's individual scaffold into the shared .github/workflows directory at the repository root. This ensures that every project in the workspace has its publish and test pipelines properly configured as GitHub Actions workflows, even when projects use different target registries or have custom workflow steps.",
           "flags": [
             {
-              "name": "no-commit",
+              "name": "auto-commit",
               "type": "bool",
-              "help": "Write merged workflow files to .github/workflows/ without auto-committing",
-              "default": false,
+              "help": "Auto-commit merged workflow files in .github/workflows/",
+              "default": true,
               "negatable": true
             }
           ]
@@ -1076,34 +1008,16 @@
               "help": "Execute a batch release of multiple monorepo packages in topological order. Reads package configurations from .rlsbl-monorepo/releases/unreleased.toml. Each package is released sequentially using the single-package release flow, with leaves (no dependencies) released first. Supports --dry-run, --yes, --allow-dirty flags.",
               "flags": [
                 {
-                  "name": "allow-dirty",
+                  "name": "watch",
                   "type": "bool",
-                  "help": "Skip the clean working tree check and allow releasing with uncommitted changes",
-                  "default": false,
+                  "help": "After batch release, automatically watch CI runs to completion (--no-watch to skip)",
                   "negatable": true
                 },
                 {
-                  "name": "watch",
+                  "name": "allow-dirty",
                   "type": "bool",
-                  "help": "After batch release, automatically watch CI runs to completion",
-                  "default": false,
-                  "negatable": false
-                },
-                {
-                  "name": "no-watch",
-                  "type": "bool",
-                  "help": "After batch release, print the watch command hint without watching",
-                  "default": false,
-                  "negatable": false
-                }
-              ],
-              "constraints": [
-                {
-                  "type": "mutex",
-                  "flags": [
-                    "watch",
-                    "no-watch"
-                  ]
+                  "help": "Skip the clean working tree check and allow releasing with uncommitted changes",
+                  "negatable": true
                 }
               ]
             },
