@@ -46,12 +46,16 @@ def _select_and_validate_mode(flags):
       ``--replace``, ``--mangle``, or ``--entire-history`` flag; strictcli-go
       hard-errors on unknown flags.
 
-    Returns the mode string: "match" or "file".
+    - ``scrub run <recipe.toml>`` takes a POSITIONAL recipe path with
+      ``--from``/``--entire-history`` and ``--reason``; per-operation
+      pattern/replace/mangle live inside the recipe file.
+
+    Returns the mode string: "match", "file", or "recipe".
     """
-    selectors = [name for name in ("pattern", "file") if flags.get(name)]
+    selectors = [name for name in ("pattern", "file", "recipe") if flags.get(name)]
     if len(selectors) != 1:
-        _fail("exactly one of --pattern or --file must be provided.")
-    mode = {"pattern": "match", "file": "file"}[selectors[0]]
+        _fail("exactly one of --pattern, --file, or --recipe must be provided.")
+    mode = {"pattern": "match", "file": "file", "recipe": "recipe"}[selectors[0]]
 
     if not flags.get("reason"):
         _fail("--reason is required.")
@@ -75,6 +79,16 @@ def _select_and_validate_mode(flags):
             )
         if not flags.get("from-commit"):
             _fail("--from-commit is required in file mode (safegit scrub file requires --from).")
+    elif mode == "recipe":
+        if flags.get("replace") or flags.get("mangle"):
+            _fail(
+                "--replace/--mangle are match-mode flags; recipe operations "
+                "define their own replace/mangle inside the TOML file."
+            )
+        if not flags.get("from-commit") and not flags.get("entire-history"):
+            _fail("either --from-commit or --entire-history must be provided.")
+        if not os.path.isfile(flags["recipe"]):
+            _fail(f"recipe file not found: {flags['recipe']}")
 
     return mode
 
@@ -97,13 +111,26 @@ def _build_safegit_args(flags, mode):
         args.extend(["--reason", flags["reason"]])
         return args
 
-    # File mode: positional path last, --from mandatory.
-    args = ["scrub", "file", "--json"]
+    if mode == "file":
+        # File mode: positional path last, --from mandatory.
+        args = ["scrub", "file", "--json"]
+        if flags.get("dry-run"):
+            args.append("--dry-run")
+        args.extend(["--from", flags["from-commit"]])
+        args.extend(["--reason", flags["reason"]])
+        args.append(flags["file"])
+        return args
+
+    # Recipe mode: positional recipe path, range flags, reason.
+    args = ["scrub", "run", "--json"]
     if flags.get("dry-run"):
         args.append("--dry-run")
-    args.extend(["--from", flags["from-commit"]])
+    args.append(flags["recipe"])
+    if flags.get("from-commit"):
+        args.extend(["--from", flags["from-commit"]])
+    else:
+        args.append("--entire-history")
     args.extend(["--reason", flags["reason"]])
-    args.append(flags["file"])
     return args
 
 
@@ -131,6 +158,17 @@ def _print_dry_run_summary(mode, data):
         print(
             f"Dry run (file): {data.get('file')} would be {action}; "
             f"{data.get('commit_count', 0)} commits would be rewritten."
+        )
+    elif mode == "recipe":
+        ops = data.get("operation_count", 0)
+        blobs = data.get("total_blob_matches", 0)
+        msgs = data.get("total_commit_matches", 0)
+        tag_m = data.get("total_tag_matches", 0)
+        est = data.get("estimated_commits", 0)
+        print(
+            f"Dry run (recipe): {ops} operations; {blobs} blob, {msgs} "
+            f"commit-message, {tag_m} tag matches; "
+            f"~{est} commits would be rewritten."
         )
 
 

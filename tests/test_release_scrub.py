@@ -156,6 +156,97 @@ class TestFileModeRealSafegitContract:
         assert exc_info.value.code == 1
 
 
+class TestRecipeMode:
+    """Recipe mode drives `safegit scrub run <recipe.toml>`."""
+
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_recipe_mode_builds_args(self, mock_run, _req_tool, tmp_path, capsys):
+        recipe = tmp_path / "recipe.toml"
+        recipe.write_text('[[operations]]\npattern = "secret"\nreplace = "X"\n')
+
+        # Real ScrubRunDryRunResult schema (safegit scrub_run.go)
+        dry_json = json.dumps({
+            "version": 1,
+            "dry_run": True,
+            "operation_count": 2,
+            "operations": [],
+            "total_blob_matches": 4,
+            "total_commit_matches": 1,
+            "total_tag_matches": 0,
+            "total_affected_files": 3,
+            "estimated_commits": 5,
+            "objects_scanned": 20,
+            "binary_skipped": 0,
+        })
+        mock_run.side_effect = [
+            "safegit 0.21.1",  # safegit --version
+            dry_json,          # safegit scrub run --json --dry-run ...
+        ]
+
+        flags = {
+            "recipe": str(recipe),
+            "entire-history": True,
+            "reason": "multi-op scrub",
+            "dry-run": True,
+        }
+        run_cmd(flags, ctx=_ctx(str(tmp_path)))
+
+        args = mock_run.call_args_list[1][0][1]
+        assert args[:2] == ["scrub", "run"]
+        assert "--json" in args
+        assert "--dry-run" in args
+        assert str(recipe) in args
+        assert "--entire-history" in args
+        assert "--reason" in args
+        # Recipe mode has no pattern/replace flags of its own
+        assert "--pattern" not in args
+        assert "--replace" not in args
+
+        captured = capsys.readouterr()
+        assert "5 commits would be rewritten" in captured.out
+        assert "2 operations" in captured.out
+
+    def test_recipe_mutually_exclusive_with_pattern(self, tmp_path):
+        recipe = tmp_path / "recipe.toml"
+        recipe.write_text("[[operations]]\n")
+        flags = {
+            "recipe": str(recipe), "pattern": "x", "replace": "y",
+            "entire-history": True, "reason": "r",
+        }
+        with pytest.raises(SystemExit) as exc_info:
+            run_cmd(flags, ctx=_ctx(str(tmp_path)))
+        assert exc_info.value.code == 1
+
+    def test_recipe_rejects_replace(self, tmp_path):
+        recipe = tmp_path / "recipe.toml"
+        recipe.write_text("[[operations]]\n")
+        flags = {
+            "recipe": str(recipe), "replace": "y",
+            "entire-history": True, "reason": "r",
+        }
+        with pytest.raises(SystemExit) as exc_info:
+            run_cmd(flags, ctx=_ctx(str(tmp_path)))
+        assert exc_info.value.code == 1
+
+    def test_recipe_requires_range(self, tmp_path):
+        recipe = tmp_path / "recipe.toml"
+        recipe.write_text("[[operations]]\n")
+        flags = {"recipe": str(recipe), "reason": "r"}
+        with pytest.raises(SystemExit) as exc_info:
+            run_cmd(flags, ctx=_ctx(str(tmp_path)))
+        assert exc_info.value.code == 1
+
+    def test_recipe_file_must_exist(self, tmp_path):
+        flags = {
+            "recipe": str(tmp_path / "missing.toml"),
+            "entire-history": True, "reason": "r",
+        }
+        with pytest.raises(SystemExit) as exc_info:
+            run_cmd(flags, ctx=_ctx(str(tmp_path)))
+        assert exc_info.value.code == 1
+
+
 class TestEmptyOutputMeansNoMatches:
     """safegit scrub execute emits NO JSON when there is nothing to rewrite."""
 
