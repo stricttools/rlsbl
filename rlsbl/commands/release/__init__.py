@@ -110,7 +110,9 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
     """
     try:
         _run_cmd_inner(release_config, flags, ctx=ctx)
-    except PostReleaseError:
+    except PostReleaseError as e:
+        if str(e):
+            print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
     except (ReleaseValidationError, HookError, ConfigError) as e:
         print(f"Error: {e}", file=sys.stderr)
@@ -126,7 +128,9 @@ def resume_cmd(saved_state: dict, flags: dict | None = None, *, ctx):
     """
     try:
         _resume_cmd_inner(saved_state, flags, ctx=ctx)
-    except PostReleaseError:
+    except PostReleaseError as e:
+        if str(e):
+            print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
     except ReleaseAbortError:
         sys.exit(1)

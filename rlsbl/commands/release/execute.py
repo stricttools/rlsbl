@@ -8,9 +8,12 @@ import time
 
 from .release_state import (
     get_state_path,
+    get_missing_steps,
+    get_failed_steps,
     save_release_state,
     load_release_state,
     save_step,
+    save_step_failure,
     clear_release_state,
 )
 
@@ -724,6 +727,11 @@ def _run_release_mutating(state: ReleaseState):
         if _existing_state is not None
         else list(state.completed_steps)
     )
+    _prior_failed = (
+        _existing_state.get("failed_steps", {})
+        if _existing_state is not None
+        else {}
+    )
     _state_dict = {
         "new_version": new_version,
         "tag": tag,
@@ -732,6 +740,7 @@ def _run_release_mutating(state: ReleaseState):
         "bump_type": bump_type,
         "registry": registry,
         "completed_steps": list(_prior_completed),
+        "failed_steps": dict(_prior_failed),
         "companion_tags": [],
         "monorepo_name": monorepo_name,
         "releasable_name": releasable_name,
@@ -827,6 +836,12 @@ def _run_release_mutating(state: ReleaseState):
             if selfdoc_modified:
                 log(f"Synced version to {', '.join(vpath(r) for r in selfdoc_modified)}")
 
+            save_step(_state_path, "VERSION_BUMPED")
+            _completed.add("VERSION_BUMPED")
+
+        if "VERSION_BUMPED" not in _completed:
+            # Version unchanged (first release): nothing to bump. Mark the
+            # step so completeness is provable at the epilogue.
             save_step(_state_path, "VERSION_BUMPED")
             _completed.add("VERSION_BUMPED")
 
@@ -1061,6 +1076,9 @@ def _run_release_mutating(state: ReleaseState):
             _completed.add("CHANGELOG_FINALIZED")
         elif not changes_dir or not os.path.isdir(changes_dir or ""):
             log("No .rlsbl/changes/ directory; skipping changelog finalization")
+            # Not applicable: mark so completeness is provable at the epilogue.
+            save_step(_state_path, "CHANGELOG_FINALIZED")
+            _completed.add("CHANGELOG_FINALIZED")
 
         # Clean stale batch_limits exclusions that referenced unreleased.jsonl
         from ...config import clean_stale_exclusions
@@ -1130,6 +1148,12 @@ def _run_release_mutating(state: ReleaseState):
                         [md_regen_rel],
                         cwd=_git_root,
                     )
+            save_step(_state_path, "RELEASE_FILE_FINALIZED")
+            _completed.add("RELEASE_FILE_FINALIZED")
+
+        if "RELEASE_FILE_FINALIZED" not in _completed:
+            # No release file to archive (e.g. imperative invocation).
+            # Mark so completeness is provable at the epilogue.
             save_step(_state_path, "RELEASE_FILE_FINALIZED")
             _completed.add("RELEASE_FILE_FINALIZED")
 
@@ -1406,6 +1430,10 @@ def _run_release_mutating(state: ReleaseState):
                 _completed.add("GITHUB_RELEASE")
             else:
                 release_created = False
+                save_step_failure(
+                    _state_path, "GITHUB_RELEASE",
+                    f"GitHub Release creation failed for {tag}",
+                )
                 notes_path = f".rlsbl/changes/{new_version}.md"
                 print(
                     f"Error: GitHub Release creation failed for {tag}. "
@@ -1460,60 +1488,102 @@ def _run_release_mutating(state: ReleaseState):
             if os.path.exists(tmp):
                 os.unlink(tmp)
 
+    # ---- Post-release phase ----
+    # Every step below is tracked in the state file. Success markers gate
+    # resume-skip; failure markers feed the completion summary. Asset upload
+    # and pipeline publish failures are FATAL (state preserved, resumable);
+    # deploy / post-hooks / snapshot failures are non-fatal (recorded and
+    # loudly reported, then the release completes and state is cleared).
+
     # Upload release assets for pipelines with assets/custom_assets config
     if release_created:
-        try:
-            upload_release_assets(tag, new_version, log, flags, ctx=ctx)
-        except (ReleaseValidationError, HookError) as e:
-            from ...errors import PostReleaseError
-            raise PostReleaseError(str(e)) from e
-
-    # Load pipelines for the publish step (validation already ran in run_cmd)
-    release_pipelines = load_pipelines(ctx.config)
-
-    # Publish step: skip for private repos (they don't publish to registries)
-    is_private = ctx.config["private"]
-    if not is_private:
-        # Pipeline dispatch: run publish for each pipeline (runs once per release, not per-target)
-        for pl_name, pl in release_pipelines.items():
+        if "ASSETS_UPLOADED" in _completed:
+            log("Skipping asset upload (already done)")
+        else:
             try:
-                pl.publish(primary_path, new_version, ctx=ctx)
-            except Exception as e:
-                print(f"Warning: pipeline '{pl_name}' publish failed: {e}", file=sys.stderr)
+                upload_release_assets(tag, new_version, log, flags, ctx=ctx)
+            except (ReleaseValidationError, HookError) as e:
+                from ...errors import PostReleaseError
+                save_step_failure(_state_path, "ASSETS_UPLOADED", str(e))
+                raise PostReleaseError(str(e)) from e
+            save_step(_state_path, "ASSETS_UPLOADED")
+            _completed.add("ASSETS_UPLOADED")
 
-        # Multi-target: run build for secondary targets (build stays on targets, not pipelines)
-        if secondary_targets:
-            from ...targets import TARGETS as ALL_TARGETS
-            for sec_name in sorted(secondary_targets):
-                sec_target = ALL_TARGETS.get(sec_name)
-                if sec_target is None:
-                    continue
-                sec_path = secondary_targets[sec_name]
+    # Publish step: skip for private repos (they don't publish to registries).
+    # Publish failures are FATAL: for `local: true` pipelines this IS the
+    # publish, so downgrading a failure to a warning would silently ship a
+    # release that was never published.
+    is_private = ctx.config["private"]
+    if "PIPELINES_PUBLISHED" in _completed:
+        log("Skipping pipeline publish (already done)")
+    else:
+        if not is_private:
+            # Load pipelines for the publish step (validation already ran in
+            # run_cmd). Pipeline dispatch runs once per release, not per-target.
+            release_pipelines = load_pipelines(ctx.config)
+            for pl_name, pl in release_pipelines.items():
                 try:
-                    sec_target.build(sec_path, new_version)
+                    pl.publish(primary_path, new_version, ctx=ctx)
                 except Exception as e:
-                    print(f"Warning: {sec_name} target build failed: {e}", file=sys.stderr)
+                    from ...errors import PostReleaseError
+                    save_step_failure(
+                        _state_path, "PIPELINES_PUBLISHED",
+                        f"pipeline '{pl_name}': {e}",
+                    )
+                    raise PostReleaseError(
+                        f"pipeline '{pl_name}' publish failed: {e}. "
+                        f"Release state has been preserved; fix the issue and "
+                        f"run `rlsbl release resume` to re-attempt the publish."
+                    ) from e
 
-    # Deploy phase (after publish, before post-release hook)
-    deploy_targets, deploy_errors = read_deploy_config(ctx.config)
-    if deploy_targets and not deploy_errors:
-        current_branch = get_current_branch()
-        for target_config in deploy_targets:
-            print(f"\nDeploying to {target_config['name']}...")
-            result = deploy_target(target_config, current_branch)
-            if result.success:
-                print(f"  Deploy to {result.target_name}: {result.message}")
-            else:
-                print(f"  Deploy to {result.target_name} FAILED: {result.message}", file=sys.stderr)
-                if result.rolled_back:
-                    print("  Rollback was executed.", file=sys.stderr)
-                print(f"  Retry with: rlsbl deploy {result.target_name}", file=sys.stderr)
-                break  # Stop at first failure
-    elif deploy_errors:
-        print("Warning: deploy config has errors, skipping deploy:", file=sys.stderr)
-        for err in deploy_errors:
-            print(f"  {err}", file=sys.stderr)
-    # If no deploy targets configured, silently skip (most projects don't have deploy)
+            # Multi-target: run build for secondary targets (build stays on
+            # targets, not pipelines). Build failures remain warnings.
+            if secondary_targets:
+                from ...targets import TARGETS as ALL_TARGETS
+                for sec_name in sorted(secondary_targets):
+                    sec_target = ALL_TARGETS.get(sec_name)
+                    if sec_target is None:
+                        continue
+                    sec_path = secondary_targets[sec_name]
+                    try:
+                        sec_target.build(sec_path, new_version)
+                    except Exception as e:
+                        print(f"Warning: {sec_name} target build failed: {e}", file=sys.stderr)
+        save_step(_state_path, "PIPELINES_PUBLISHED")
+        _completed.add("PIPELINES_PUBLISHED")
+
+    # Deploy phase (after publish, before post-release hook). Non-fatal:
+    # a failure is recorded as a failure marker and named in the summary.
+    if "DEPLOYED" in _completed:
+        log("Skipping deploy (already done)")
+    else:
+        _deploy_failure = None
+        deploy_targets, deploy_errors = read_deploy_config(ctx.config)
+        if deploy_targets and not deploy_errors:
+            current_branch = get_current_branch()
+            for target_config in deploy_targets:
+                print(f"\nDeploying to {target_config['name']}...")
+                result = deploy_target(target_config, current_branch)
+                if result.success:
+                    print(f"  Deploy to {result.target_name}: {result.message}")
+                else:
+                    print(f"  Deploy to {result.target_name} FAILED: {result.message}", file=sys.stderr)
+                    if result.rolled_back:
+                        print("  Rollback was executed.", file=sys.stderr)
+                    print(f"  Retry with: rlsbl deploy {result.target_name}", file=sys.stderr)
+                    _deploy_failure = f"deploy to {result.target_name} failed: {result.message}"
+                    break  # Stop at first failure
+        elif deploy_errors:
+            print("Warning: deploy config has errors, skipping deploy:", file=sys.stderr)
+            for err in deploy_errors:
+                print(f"  {err}", file=sys.stderr)
+            _deploy_failure = "deploy config errors: " + "; ".join(deploy_errors)
+        # If no deploy targets configured, the step is trivially done.
+        if _deploy_failure is not None:
+            save_step_failure(_state_path, "DEPLOYED", _deploy_failure)
+        else:
+            save_step(_state_path, "DEPLOYED")
+            _completed.add("DEPLOYED")
 
     # Ecosystem tagging: add GitHub topic after release is created
     if should_tag(flags, ctx.config):
@@ -1522,8 +1592,11 @@ def _run_release_mutating(state: ReleaseState):
     # Run post-release hook if present (non-fatal: release is already complete)
     _use_releasable_hooks = releasable_name and monorepo_root and member_package_paths
     hook_timeout = get_hook_timeout()
+    _post_hook_error = None
 
-    if _use_releasable_hooks:
+    if "POST_HOOKS_RUN" in _completed:
+        log("Skipping post-release hooks (already done)")
+    elif _use_releasable_hooks:
         # Multi-level post-release: releasable first, then per-package
         from .hooks import build_hook_env, run_releasable_hooks
         from ...workspace import members_of, get_releasable_dir
@@ -1566,6 +1639,7 @@ def _run_release_mutating(state: ReleaseState):
         except Exception as e:
             # Post-release hooks are non-fatal
             print(f"Warning: post-release hook failed: {e}", file=sys.stderr)
+            _post_hook_error = str(e)
     else:
         from .hooks import build_hook_env, run_release_hook
 
@@ -1586,9 +1660,19 @@ def _run_release_mutating(state: ReleaseState):
         except Exception as e:
             # Post-release hooks are non-fatal
             print(f"Warning: post-release hook failed: {e}", file=sys.stderr)
+            _post_hook_error = str(e)
+
+    if "POST_HOOKS_RUN" not in _completed:
+        if _post_hook_error is not None:
+            save_step_failure(_state_path, "POST_HOOKS_RUN", _post_hook_error)
+        else:
+            save_step(_state_path, "POST_HOOKS_RUN")
+            _completed.add("POST_HOOKS_RUN")
 
     # Auto-regenerate monorepo snapshot after release (non-fatal)
-    if monorepo_name:
+    if "SNAPSHOT_REGENERATED" in _completed:
+        log("Skipping snapshot regeneration (already done)")
+    elif monorepo_name:
         try:
             from ...snapshot import generate_snapshot, write_snapshot
             from ...workspace_graph import WorkspaceGraph
@@ -1601,6 +1685,14 @@ def _run_release_mutating(state: ReleaseState):
             log(f"Regenerated monorepo snapshot: {rel_path}")
         except Exception as e:
             print(f"Warning: snapshot regeneration failed: {e}", file=sys.stderr)
+            save_step_failure(_state_path, "SNAPSHOT_REGENERATED", str(e))
+        else:
+            save_step(_state_path, "SNAPSHOT_REGENERATED")
+            _completed.add("SNAPSHOT_REGENERATED")
+    else:
+        # Not a monorepo: nothing to regenerate, the step is trivially done.
+        save_step(_state_path, "SNAPSHOT_REGENERATED")
+        _completed.add("SNAPSHOT_REGENERATED")
 
     # Advisory: constraint propagation
     if monorepo_name:
@@ -1611,6 +1703,27 @@ def _run_release_mutating(state: ReleaseState):
     if not release_created:
         from ...errors import PostReleaseError
         raise PostReleaseError(f"GitHub Release creation failed for {tag}")
+
+    # Completion summary: loudly name any non-fatal step failures.
+    _final_state = load_release_state(_state_path) or {}
+    _failed_final = get_failed_steps(_final_state)
+    if _failed_final:
+        print(
+            f"\nRelease {new_version} completed with non-fatal step failures:",
+            file=sys.stderr,
+        )
+        for _step, _msg in _failed_final.items():
+            print(f"  {_step}: {_msg}", file=sys.stderr)
+
+    # Provable completeness: every canonical step must carry a success or
+    # failure marker before the state file is cleared. A missing marker
+    # here is an internal bug (a step ran without recording itself).
+    _missing_final = get_missing_steps(_final_state)
+    if _missing_final:
+        raise RuntimeError(
+            "internal error: release reached the success epilogue with "
+            f"unmarked steps: {', '.join(_missing_final)}"
+        )
 
     # Success epilogue: clear state and announce BEFORE watch, because
     # watch_run_cmd() calls sys.exit() and would skip cleanup.
