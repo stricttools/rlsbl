@@ -86,7 +86,17 @@ from .execute import (
 )
 
 from ...release_file import VALID_BUMP_TYPES
-from .release_state import get_state_path, load_release_state
+from .release_state import (
+    FATAL_STEPS,
+    RELEASE_STEPS,
+    clear_release_state,
+    get_failed_steps,
+    get_missing_steps,
+    get_state_path,
+    is_state_complete,
+    load_release_state,
+    resolve_releasable_dir,
+)
 
 
 def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
@@ -278,20 +288,71 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         if not quiet:
             print(msg)
 
-    # Check for in-progress release -- must use resume instead
-    _ip_state_path = get_state_path(str(project_root))
+    # Check for in-progress release -- must use resume instead.
+    # The state path is releasable-aware: releasable members keep their
+    # state under .rlsbl-monorepo/releasables/<name>/releases/.
+    _ip_releasable_dir = None
+    if monorepo_root:
+        _ip_releasable_dir = resolve_releasable_dir(
+            str(project_root), str(monorepo_root),
+        )
+    _ip_state_path = get_state_path(
+        str(project_root), releasable_dir=_ip_releasable_dir,
+    )
     _ip_state = load_release_state(_ip_state_path)
+    if _ip_state is None and _ip_releasable_dir is not None:
+        # Legacy location check: older rlsbl versions wrote releasable
+        # release state under the representative member's .rlsbl/releases/.
+        # Never silently ignore pre-existing in-flight state.
+        _ip_legacy_path = get_state_path(str(project_root))
+        if load_release_state(_ip_legacy_path) is not None:
+            raise ReleaseValidationError(
+                f"found in-progress release state at the legacy location "
+                f"{_ip_legacy_path}. Releasable release state now lives at "
+                f"{_ip_state_path}. Move the file to the new location and "
+                f"run `rlsbl release resume` to continue, or run "
+                f"`rlsbl release undo` to roll back."
+            )
     if _ip_state is not None:
         _ip_version = _ip_state.get("new_version", "unknown")
-        _ip_steps = _ip_state.get("completed_steps", [])
-        _ip_total = 6
-        _ip_done = len(_ip_steps)
-        raise ReleaseValidationError(
-            f"a previous release is in progress "
-            f"(v{_ip_version}, {_ip_done}/{_ip_total} steps completed). "
-            f"Run `rlsbl release resume` to continue or "
-            f"`rlsbl release undo` to roll back."
-        )
+        if is_state_complete(_ip_state):
+            # Provably complete (all steps marked, no fatal failure): the
+            # previous run finished but crashed before clearing its state
+            # (or a legacy complete file was left behind). Auto-clear.
+            log(
+                f"Found completed release state for v{_ip_version} "
+                f"(all steps marked, no fatal failures); clearing it."
+            )
+            _ip_failed = get_failed_steps(_ip_state)
+            if _ip_failed:
+                print(
+                    f"The previous release (v{_ip_version}) completed with "
+                    f"non-fatal step failures:",
+                    file=sys.stderr,
+                )
+                for _step, _msg in _ip_failed.items():
+                    print(f"  {_step}: {_msg}", file=sys.stderr)
+            clear_release_state(_ip_state_path)
+        else:
+            _ip_completed = set(_ip_state.get("completed_steps", []))
+            _ip_done = len([s for s in RELEASE_STEPS if s in _ip_completed])
+            _ip_missing = get_missing_steps(_ip_state)
+            _ip_fatal = [
+                s for s in get_failed_steps(_ip_state) if s in FATAL_STEPS
+            ]
+            _parts = [
+                f"a previous release is in progress "
+                f"(v{_ip_version}, {_ip_done}/{len(RELEASE_STEPS)} steps completed"
+            ]
+            if _ip_missing:
+                _parts.append(f"; missing: {', '.join(_ip_missing)}")
+            if _ip_fatal:
+                _parts.append(f"; fatal step failure(s): {', '.join(_ip_fatal)}")
+            _parts.append(
+                "). Run `rlsbl release resume` to continue or "
+                "`rlsbl release undo` to roll back."
+            )
+            raise ReleaseValidationError("".join(_parts))
 
     # --- Validate inputs and environment ---
     # Target validation is deferred until after releasable context is resolved

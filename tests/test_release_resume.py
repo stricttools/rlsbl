@@ -340,6 +340,149 @@ class TestReleaseRunBlocksWhenInProgress:
         assert "release resume" in captured.err
 
 
+class TestInProgressGuardMessage:
+    """The guard message derives {n}/{total} and missing steps from the
+    canonical step list (regression: total was hardcoded to 6 while 7
+    mutating steps existed)."""
+
+    def test_message_derives_from_canonical_steps(self, mock_git_repo, capsys):
+        from rlsbl.commands.release.release_state import RELEASE_STEPS
+
+        _setup_releasable_npm_project(mock_git_repo)
+        _make_in_progress_state(
+            mock_git_repo,
+            completed_steps=["VERSION_BUMPED", "COMMITTED", "TAGGED"],
+        )
+
+        with pytest.raises(SystemExit):
+            with (
+                patch("rlsbl.commands.release.check_gh_installed", return_value=True),
+                patch("rlsbl.commands.release.check_gh_auth", return_value=True),
+                patch("rlsbl.commands.release.run", side_effect=_fake_run_factory()),
+                patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
+            ):
+                run_cmd(
+                    _rc(),
+                    {"yes": True, "quiet": False},
+                    ctx=_make_ctx(mock_git_repo),
+                )
+
+        captured = capsys.readouterr()
+        # Total derives from the canonical list (12), not a hardcoded 6
+        assert f"3/{len(RELEASE_STEPS)} steps completed" in captured.err
+        # The message names the missing steps
+        assert "missing:" in captured.err
+        assert "CHANGELOG_FINALIZED" in captured.err
+        assert "PIPELINES_PUBLISHED" in captured.err
+
+
+class TestGuardAutoClearsCompleteState:
+    """A provably-complete state file (all steps marked, no fatal failure)
+    is auto-cleared by the run guard instead of hard-blocking."""
+
+    def test_complete_state_auto_cleared_and_release_proceeds(
+        self, mock_git_repo, capsys,
+    ):
+        from rlsbl.commands.release.release_state import RELEASE_STEPS
+
+        _setup_releasable_npm_project(mock_git_repo)
+
+        # Simulate a crash after the last step but before state cleanup:
+        # every step has a success marker.
+        state_path = _make_in_progress_state(
+            mock_git_repo,
+            completed_steps=list(RELEASE_STEPS),
+        )
+
+        fake_run = _fake_run_factory()
+        with (
+            patch("rlsbl.commands.release.check_gh_installed", return_value=True),
+            patch("rlsbl.commands.release.check_gh_auth", return_value=True),
+            patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.run_gh", return_value=""),
+            patch("rlsbl.commands.release.run", side_effect=fake_run),
+            patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
+        ):
+            # Must NOT raise "previous release is in progress"
+            run_cmd(
+                _rc(),
+                {"yes": True, "quiet": False},
+                ctx=_make_ctx(mock_git_repo),
+            )
+
+        captured = capsys.readouterr()
+        assert "clearing it" in captured.out
+        assert not os.path.exists(state_path)
+
+    def test_deploy_failed_state_auto_clears_with_loud_summary(
+        self, mock_git_repo, capsys,
+    ):
+        """A complete state with a non-fatal DEPLOYED failure marker
+        auto-clears, and the summary loudly names the failed step."""
+        from rlsbl.commands.release.release_state import RELEASE_STEPS
+
+        _setup_releasable_npm_project(mock_git_repo)
+
+        completed = [s for s in RELEASE_STEPS if s != "DEPLOYED"]
+        state_path = _make_in_progress_state(
+            mock_git_repo,
+            completed_steps=completed,
+            extra={"failed_steps": {"DEPLOYED": "deploy to prod failed"}},
+        )
+
+        fake_run = _fake_run_factory()
+        with (
+            patch("rlsbl.commands.release.check_gh_installed", return_value=True),
+            patch("rlsbl.commands.release.check_gh_auth", return_value=True),
+            patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.run_gh", return_value=""),
+            patch("rlsbl.commands.release.run", side_effect=fake_run),
+            patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
+        ):
+            run_cmd(
+                _rc(),
+                {"yes": True, "quiet": False},
+                ctx=_make_ctx(mock_git_repo),
+            )
+
+        captured = capsys.readouterr()
+        assert "DEPLOYED" in captured.err
+        assert "deploy to prod failed" in captured.err
+        assert not os.path.exists(state_path)
+
+    def test_fatal_failure_marker_still_blocks(self, mock_git_repo, capsys):
+        """A state with a fatal PIPELINES_PUBLISHED failure marker must
+        hard-block (resume required), not auto-clear."""
+        from rlsbl.commands.release.release_state import RELEASE_STEPS
+
+        _setup_releasable_npm_project(mock_git_repo)
+
+        completed = [s for s in RELEASE_STEPS if s != "PIPELINES_PUBLISHED"]
+        state_path = _make_in_progress_state(
+            mock_git_repo,
+            completed_steps=completed,
+            extra={"failed_steps": {"PIPELINES_PUBLISHED": "npm publish failed"}},
+        )
+
+        with pytest.raises(SystemExit):
+            with (
+                patch("rlsbl.commands.release.check_gh_installed", return_value=True),
+                patch("rlsbl.commands.release.check_gh_auth", return_value=True),
+                patch("rlsbl.commands.release.run", side_effect=_fake_run_factory()),
+                patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
+            ):
+                run_cmd(
+                    _rc(),
+                    {"yes": True, "quiet": False},
+                    ctx=_make_ctx(mock_git_repo),
+                )
+
+        captured = capsys.readouterr()
+        assert "previous release is in progress" in captured.err
+        assert "PIPELINES_PUBLISHED" in captured.err
+        assert os.path.exists(state_path)
+
+
 class TestResumeWithWrongBranch:
     """Resume errors when current branch doesn't match saved state."""
 
