@@ -1631,84 +1631,33 @@ class TestGoPipeline:
         p.publish("/fake", "1.0.0", None)
         assert "Skipping" in capsys.readouterr().out
 
-    def test_publish_no_go_mod(self, capsys, tmp_path):
-        from rlsbl.pipelines.go import GoPipeline
-        p = GoPipeline("go", "go", True, {})
-        p.publish(str(tmp_path), "1.0.0", None)
-        assert "could not read module path" in capsys.readouterr().out
+    # Publish behavior (hard errors, install_paths validation) is covered
+    # in tests/test_go_pipeline_install.py. These cover the remaining lines.
 
-    def test_publish_no_go_tool(self, capsys, tmp_path):
+    def test_publish_no_go_mod_raises(self, tmp_path):
+        from rlsbl.errors import ConfigError
         from rlsbl.pipelines.go import GoPipeline
-        (tmp_path / "go.mod").write_text("module github.com/user/repo\n")
-        p = GoPipeline("go", "go", True, {})
-        with patch("rlsbl.pipelines.go.require_tool", return_value=False):
+        p = GoPipeline("go", "go", True, {"install_paths": ["."]})
+        with pytest.raises(ConfigError, match="module path"):
             p.publish(str(tmp_path), "1.0.0", None)
-        assert "'go' not found" in capsys.readouterr().out
 
-    def test_publish_proxy_notification_failure(self, capsys, tmp_path):
+    def test_publish_no_go_tool_raises(self, tmp_path):
         from rlsbl.pipelines.go import GoPipeline
         (tmp_path / "go.mod").write_text("module github.com/user/repo\n")
-        p = GoPipeline("go", "go", True, {})
-        with patch("rlsbl.pipelines.go.require_tool", return_value=True):
+        p = GoPipeline("go", "go", True, {"install_paths": ["."]})
+        with patch("rlsbl.pipelines.go.require_tool",
+                   side_effect=FileNotFoundError("Required tool not found on PATH: go")):
+            with pytest.raises(FileNotFoundError, match="go"):
+                p.publish(str(tmp_path), "1.0.0", None)
+
+    def test_publish_proxy_notification_failure_raises(self, tmp_path):
+        from rlsbl.pipelines.go import GoPipeline
+        (tmp_path / "go.mod").write_text("module github.com/user/repo\n")
+        p = GoPipeline("go", "go", True, {"install_paths": ["."]})
+        with patch("rlsbl.pipelines.go.require_tool", return_value="/usr/bin/go"):
             with patch("rlsbl.pipelines.go.run", side_effect=subprocess.CalledProcessError(1, "go")):
-                p.publish(str(tmp_path), "1.0.0", None)
-        assert "proxy notification failed" in capsys.readouterr().out
-
-    def test_publish_proxy_success_no_install_path(self, capsys, tmp_path):
-        from rlsbl.pipelines.go import GoPipeline
-        (tmp_path / "go.mod").write_text("module github.com/user/repo\n")
-        p = GoPipeline("go", "go", True, {})
-        with patch("rlsbl.pipelines.go.require_tool", return_value=True):
-            with patch("rlsbl.pipelines.go.run"):
-                p.publish(str(tmp_path), "1.0.0", None)
-        assert "Notified Go module proxy" in capsys.readouterr().out
-
-    def test_detect_install_path_cmd_layout(self, tmp_path):
-        from rlsbl.pipelines.go import GoPipeline
-        p = GoPipeline("go", "go", True, {})
-        cmd_dir = tmp_path / "cmd" / "myapp"
-        cmd_dir.mkdir(parents=True)
-        (cmd_dir / "main.go").write_text("package main\n")
-        result = p._detect_install_path(str(tmp_path))
-        assert result == "./cmd/myapp"
-
-    def test_detect_install_path_root_main(self, tmp_path):
-        from rlsbl.pipelines.go import GoPipeline
-        p = GoPipeline("go", "go", True, {})
-        (tmp_path / "main.go").write_text("package main\n")
-        result = p._detect_install_path(str(tmp_path))
-        assert result == "."
-
-    def test_detect_install_path_none(self, tmp_path):
-        from rlsbl.pipelines.go import GoPipeline
-        p = GoPipeline("go", "go", True, {})
-        result = p._detect_install_path(str(tmp_path))
-        assert result is None
-
-    def test_publish_with_install_path_success(self, capsys, tmp_path):
-        from rlsbl.pipelines.go import GoPipeline
-        (tmp_path / "go.mod").write_text("module github.com/user/repo\n")
-        (tmp_path / "main.go").write_text("package main\n")
-        p = GoPipeline("go", "go", True, {})
-        with patch("rlsbl.pipelines.go.require_tool", return_value=True):
-            with patch("rlsbl.pipelines.go.run"):
-                with patch("subprocess.run"):
+                with pytest.raises(RuntimeError, match="proxy notification failed"):
                     p.publish(str(tmp_path), "1.0.0", None)
-        out = capsys.readouterr().out
-        assert "Notified" in out
-        assert "Installed" in out
-
-    def test_publish_with_install_failure(self, capsys, tmp_path):
-        from rlsbl.pipelines.go import GoPipeline
-        (tmp_path / "go.mod").write_text("module github.com/user/repo\n")
-        (tmp_path / "main.go").write_text("package main\n")
-        p = GoPipeline("go", "go", True, {})
-        with patch("rlsbl.pipelines.go.require_tool", return_value=True):
-            with patch("rlsbl.pipelines.go.run"):
-                with patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "go")):
-                    p.publish(str(tmp_path), "1.0.0", None)
-        out = capsys.readouterr().out
-        assert "go install failed" in out
 
     def test_required_env_vars(self):
         from rlsbl.pipelines.go import GoPipeline

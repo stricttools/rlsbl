@@ -14,7 +14,7 @@ description: "Local development workflow: editable installs across 8 targets, CI
 | --- | --- | --- |
 | pypi | `uv tool install -e .` | `uv sync` |
 | npm | `npm link` | `npm install` |
-| go | `go install ./...` | (not supported) |
+| go | `go install <install_paths>` (declared on the go pipeline in `.rlsbl/config.json`) | (not supported) |
 | cargo | `cargo install --path .` | (not supported) |
 | deno | `deno install` | (not supported) |
 | zig | (not yet supported) | (not yet supported) |

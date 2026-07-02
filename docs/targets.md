@@ -168,11 +168,11 @@ Each target has an `ecosystem` string used for display and grouping in commands 
 - Detection: `go.mod` presence
 - Version stored in `VERSION` file (not go.mod — Go modules have no version field in go.mod)
 - Monorepo tag format uses path prefix: `{path}/v{version}` (Go module proxy convention)
-- Detects library vs binary projects (checks for `package main` in root files or `cmd/` layout)
-- GoReleaser integration for binary projects; library projects need no publish step
+- Detects library vs binary projects via `go list` (any `package main` package, regardless of file names or layout)
+- GoReleaser integration for binary projects; library projects need no publish step. Ambiguous multi-main layouts require `install_paths` on the go pipeline config.
 - npm binary wrapper support via `npm_wrapper` config
 - Homebrew tap support via `homebrew` config
-- `dev_install`: `go install ./...` (no venv concept)
+- `dev_install`: `go install <install_paths>` from the go pipeline config (no venv concept); undeclared `install_paths` is a hard error
 
 ### deno
 

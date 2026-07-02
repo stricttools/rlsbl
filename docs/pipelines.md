@@ -226,9 +226,9 @@ PyPI publishing happens in CI; docs deploy happens locally in a post-release hoo
 - **Class:** `BasePipeline` (no token required)
 - **Default token env var:** None
 - **Auth pattern:** No authentication. Go modules are published by pushing a tagged commit — the Go module proxy picks it up automatically.
-- **Publish command:** Notifies the Go module proxy (`proxy.golang.org`) by requesting the module at the new version. Optionally runs `go install` for binary projects.
+- **Publish command:** Notifies the Go module proxy (`proxy.golang.org`) by requesting the module at the new version, then runs `go install <path>` for every path declared in `install_paths`.
 - **CI template:** Minimal — Go publish is just the tag push plus a proxy notification step.
-- **Quirks:** Reads the module path from `go.mod` to construct the proxy notification URL. Binary projects (those with a `main` package) can optionally trigger a `go install` verification step.
+- **Quirks:** Reads the module path from `go.mod` to construct the proxy notification URL. Pipelines with `local: true` **must** declare `install_paths` (a list of main-package dirs relative to the project root, e.g. `["./cmd/mytool"]`). Missing or invalid declarations are hard errors; each declared path is validated against `go list` (it must be a `package main` dir). There is no auto-detection fallback — detection only validates declarations.
 
 ### cargo
 

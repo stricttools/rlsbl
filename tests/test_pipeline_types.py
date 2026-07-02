@@ -346,30 +346,44 @@ class TestGoPipeline:
         p = GoPipeline(name="go", pipeline_type="go", local=True, config={})
         assert p.required_env_vars() == []
 
-    def test_publish_no_gomod_warns(self, tmp_path, capsys):
-        p = GoPipeline(name="go", pipeline_type="go", local=True, config={})
-        p.publish(str(tmp_path), "1.0.0", None)
-        out = capsys.readouterr().out
-        assert "could not read module path" in out
+    def test_publish_no_gomod_raises(self, tmp_path):
+        from rlsbl.errors import ConfigError
+        p = GoPipeline(name="go", pipeline_type="go", local=True,
+                       config={"install_paths": ["."]})
+        with pytest.raises(ConfigError, match="module path"):
+            p.publish(str(tmp_path), "1.0.0", None)
 
-    def test_publish_with_gomod_calls_proxy(self, tmp_path, monkeypatch, capsys):
-        # Create a go.mod
+    def test_publish_with_gomod_calls_proxy(self, tmp_path, monkeypatch):
+        # Create a go.mod plus a main package matching the declared path
         gomod = tmp_path / "go.mod"
         gomod.write_text("module github.com/test/mymod\n\ngo 1.21\n")
+        (tmp_path / "main.go").write_text("package main\n\nfunc main() {}\n")
 
         calls = []
         monkeypatch.setattr(
             "rlsbl.pipelines.go.require_tool",
-            lambda name, fatal=True: "/usr/bin/go",
+            lambda name, purpose=None, fatal=True: "/usr/bin/go",
         )
         monkeypatch.setattr(
             "rlsbl.pipelines.go.run",
             lambda cmd, args, **kw: calls.append((cmd, args)),
         )
-        p = GoPipeline(name="go", pipeline_type="go", local=True, config={})
+        installs = []
+        monkeypatch.setattr(
+            "rlsbl.pipelines.go.validate_install_paths",
+            lambda d, paths: paths,
+        )
+        monkeypatch.setattr(
+            "rlsbl.pipelines.go.subprocess.run",
+            lambda cmd, **kw: installs.append(cmd)
+            or subprocess.CompletedProcess(args=cmd, returncode=0),
+        )
+        p = GoPipeline(name="go", pipeline_type="go", local=True,
+                       config={"install_paths": ["."]})
         p.publish(str(tmp_path), "1.0.0", None)
         assert len(calls) == 1
         assert calls[0] == ("go", ["list", "-m", "github.com/test/mymod@v1.0.0"])
+        assert installs == [["go", "install", "."]]
 
 
 # ---------------------------------------------------------------------------

@@ -1,11 +1,15 @@
-"""Go pipeline that notifies the Go module proxy of new versions, verifies module availability, and optionally installs the binary locally."""
+"""Go pipeline that notifies the Go module proxy of new versions, verifies module availability, and installs declared binaries locally."""
 
-import glob
 import os
-import re
 import subprocess
 
 from .base import BasePipeline
+from ..errors import ConfigError
+from ..go_introspect import (
+    describe_main_packages,
+    list_main_packages,
+    validate_install_paths,
+)
 from ..utils import read_go_module_path, require_tool, run
 
 
@@ -14,7 +18,10 @@ class GoPipeline(BasePipeline):
 
     Go modules don't use token-based publishing. The proxy is notified
     via ``go list -m``, and CLI binaries are installed locally via
-    ``go install``.
+    ``go install`` for every path declared in the pipeline's
+    ``install_paths`` config key.
+
+    All failures raise -- the outer release flow decides fatality.
     """
 
     def template_dir(self) -> str | None:
@@ -38,57 +45,45 @@ class GoPipeline(BasePipeline):
 
         module_path = read_go_module_path(dir_path)
         if module_path is None:
-            print("Warning: could not read module path from go.mod, skipping proxy notification")
-            return
+            raise ConfigError(
+                f"could not read module path from go.mod in {dir_path}"
+            )
 
-        if not require_tool("go", fatal=False):
-            print("Warning: 'go' not found on PATH, skipping proxy notification")
-            return
+        require_tool("go", purpose="for Go module proxy notification and go install")
 
         ref = f"{module_path}@v{version}"
         env = {**os.environ, "GOPROXY": "proxy.golang.org"}
         try:
             run("go", ["list", "-m", ref], env=env)
-            print(f"Notified Go module proxy: {ref}")
-        except (subprocess.CalledProcessError, FileNotFoundError) as exc:
-            print(f"Warning: proxy notification failed for {ref}: {exc}")
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+            raise RuntimeError(f"Go module proxy notification failed for {ref}: {exc}") from exc
+        print(f"Notified Go module proxy: {ref}")
 
-        # Install the binary locally for CLI projects
-        install_path = self._detect_install_path(dir_path)
-        if install_path:
+        # Install the declared binaries locally. install_paths is mandatory
+        # for local go pipelines -- detection only validates declarations.
+        install_paths = self.config.get("install_paths")
+        if install_paths is None:
+            mains = list_main_packages(dir_path)
+            raise ConfigError(
+                f"go pipeline '{self.name}' has local=true but does not declare "
+                "'install_paths' in .rlsbl/config.json. "
+                f"{describe_main_packages(mains)} "
+                'Add e.g. "install_paths": '
+                f"{[p.rel_dir for p in mains] or ['./cmd/<name>']!r} "
+                "to the pipeline entry."
+            )
+        paths = validate_install_paths(dir_path, install_paths)
+        for path in paths:
             try:
                 subprocess.run(
-                    ["go", "install", install_path],
+                    ["go", "install", path],
                     cwd=dir_path,
                     check=True,
                 )
-                print(f"Installed: go install {install_path}")
             except (subprocess.CalledProcessError, FileNotFoundError) as exc:
-                print(f"Warning: go install failed: {exc}")
+                raise RuntimeError(f"go install failed for {path}: {exc}") from exc
+            print(f"Installed: go install {path}")
 
     def required_env_vars(self) -> list[str]:
         # Go uses GITHUB_TOKEN which is always available in CI
         return []
-
-    def _detect_install_path(self, dir_path: str) -> str | None:
-        """Determine the go install path for CLI projects."""
-        # Check cmd/ layout first
-        matches = glob.glob(os.path.join(dir_path, "cmd", "*", "main.go"))
-        if matches:
-            cmd_dirs = set(os.path.dirname(m) for m in matches)
-            if len(cmd_dirs) == 1:
-                with open(matches[0], encoding="utf-8") as f:
-                    first_line = f.readline()
-                if re.match(r"^package\s+main\b", first_line):
-                    cmd_name = os.path.basename(os.path.dirname(matches[0]))
-                    return f"./cmd/{cmd_name}"
-
-        # Check root main.go
-        main_go = os.path.join(dir_path, "main.go")
-        if os.path.exists(main_go):
-            with open(main_go, encoding="utf-8") as f:
-                first_line = f.readline()
-            if re.match(r"^package\s+main\b", first_line):
-                return "."
-
-        return None
