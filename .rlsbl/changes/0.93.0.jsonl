@@ -1,0 +1,8 @@
+{"commits":["d10017f83d4555832eb17c0af782306d9f8eb7a5","209c573c0e703d9ff65c2357ff0002fe044679b5","0a2691cf380af4ca512c9e2751f76a5a2b41580a"],"user_facing":true,"description":"**Breaking:** Multiple flag renames: `--no-commit` to `--auto-commit`, `--no-tag` to `--auto-tag`, `--no-resolve` to `--validate-hashes`, `--force` to `--force-overwrite` on scaffold. `--watch` is now required (must pass `--watch` or `--no-watch`). `--allow-dirty` and `--hard` are now required. `--force` on deploy deleted. All bool flags require explicit defaults.","type":"breaking"}
+{"commits":["9d48f5a0eae8745df85fbeb786f9c5b311acdcd8","3d0da47e488be0dec86a532fdce63741688b6177"],"user_facing":false}
+{"commits":["1a1a6981d0c88ee7bf29cc9b15180112cea91d2f","92693157a27f4d92806438bfce3c9ee42fca8470","6192d5909707b6b5a2c0a6172c0c582d47788fe5","8eaf0267725aa3ae7f622f83d4dd0587d8e0e69a","a0951a9f08c8e060112b24155a6c747e7ab054b0"],"user_facing":false}
+{"commits":["400098add694590093719effb91d0ae178cca801"],"user_facing":false}
+{"commits":["f446e76846ec6f3dff8cd6968cbe905431091b07"],"user_facing":false}
+{"commits":["abfd03febdae9227dd7d0a518ccb044f825d959c","a5646356542fcdb7b78f775cbaa38a2621d4c492","31a0acecd9c89b5db40a724032b7a48f973bc568"],"user_facing":false}
+{"commits":["ff5e4e9774f6000db4ed882bb7c62110f74e77fc"],"user_facing":false}
+{"commits":["ecd30a62b6b41b7ef4d06ef752ad08a7591e8052"],"user_facing":false}
