@@ -2,7 +2,6 @@
 
 import glob
 import os
-import re
 
 import tomlkit
 
@@ -74,20 +73,56 @@ def _detect_python_strictcli(project_dir: str) -> tuple[str, str] | None:
     return (entry_point, "python")
 
 
+def _is_strictcli_module_path(path: str) -> bool:
+    """Return True if a Go module path is strictcli or a sub-path of it
+    (e.g. github.com/smm-h/strictcli/go), not a mere string prefix
+    (e.g. github.com/smm-h/strictcli-extras)."""
+    return path == _STRICTCLI_GO_MODULE or path.startswith(
+        _STRICTCLI_GO_MODULE + "/"
+    )
+
+
 def _go_mod_has_strictcli(project_dir: str) -> bool:
-    """Return True if go.mod requires a strictcli module."""
+    """Return True if go.mod has a require directive for a strictcli module.
+
+    Only require directives count -- both the single-line form
+    (`require path version`) and the block form (`require ( ... )`).
+    The `module` declaration is never a match: the strictcli library's
+    own go.mod declares `module github.com/smm-h/strictcli/go`, and
+    treating that as a dependency made rlsbl demand a strictcli entry
+    point from the strictcli library itself.
+    """
     go_mod_path = os.path.join(project_dir, "go.mod")
     if not os.path.exists(go_mod_path):
         return False
     with open(go_mod_path, "r", encoding="utf-8") as f:
-        content = f.read()
-    # Match require lines like: github.com/smm-h/strictcli/go v0.9.0
-    # The module path may be strictcli itself or a sub-path like strictcli/go
-    return bool(re.search(
-        r"(?:^|\s)" + re.escape(_STRICTCLI_GO_MODULE) + r"(?:/\S*)?\s",
-        content,
-        re.MULTILINE,
-    ))
+        lines = f.readlines()
+
+    in_require_block = False
+    for raw_line in lines:
+        line = raw_line.split("//", 1)[0].strip()
+        if not line:
+            continue
+        if in_require_block:
+            if line == ")":
+                in_require_block = False
+                continue
+            module_path = line.split()[0]
+            if _is_strictcli_module_path(module_path):
+                return True
+            continue
+        if line == "require (":
+            in_require_block = True
+            continue
+        if line.startswith("require "):
+            rest = line[len("require "):].strip()
+            if rest == "(":
+                in_require_block = True
+                continue
+            module_path = rest.split()[0]
+            if _is_strictcli_module_path(module_path):
+                return True
+    return False
 
 
 def _go_file_imports_strictcli(filepath: str) -> bool:

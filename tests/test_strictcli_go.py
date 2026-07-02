@@ -6,7 +6,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from rlsbl.strictcli_detect import StrictcliDetectError, detect_strictcli
+from rlsbl.strictcli_detect import (
+    StrictcliDetectError,
+    _go_mod_has_strictcli,
+    detect_strictcli,
+)
 from rlsbl.commands.release.validate import (
     ReleaseValidationError,
     _run_strictcli_schema_dump,
@@ -73,6 +77,26 @@ import "fmt"
 func main() {
 \tfmt.Println("other binary")
 }
+"""
+
+
+_GO_MOD_IS_STRICTCLI_ITSELF = """\
+module github.com/smm-h/strictcli/go
+
+go 1.21
+
+require github.com/example/otherlib v1.0.0
+"""
+
+_GO_MOD_STRICTCLI_IN_REQUIRE_BLOCK = """\
+module github.com/example/myapp
+
+go 1.21
+
+require (
+\tgithub.com/example/otherlib v1.0.0
+\tgithub.com/smm-h/strictcli/go v0.9.0
+)
 """
 
 
@@ -160,6 +184,24 @@ class TestGoDetection:
         result = detect_strictcli(str(tmp_path))
         assert result == ("./cmd/myapp/", "go")
 
+    def test_strictcli_library_itself_returns_none(self, tmp_path):
+        """The strictcli Go library's own go.mod declares
+        `module github.com/smm-h/strictcli/go` -- the module declaration
+        must NOT be mistaken for a require directive. A library layout
+        (no main packages) that merely IS strictcli returns None instead
+        of raising StrictcliDetectError."""
+        _write_go_mod(tmp_path, _GO_MOD_IS_STRICTCLI_ITSELF)
+        (tmp_path / "lib.go").write_text("package strictcli\n")
+        result = detect_strictcli(str(tmp_path))
+        assert result is None
+
+    def test_strictcli_in_require_block_detected(self, tmp_path):
+        """strictcli inside a `require ( ... )` block is detected."""
+        _write_go_mod(tmp_path, _GO_MOD_STRICTCLI_IN_REQUIRE_BLOCK)
+        (tmp_path / "main.go").write_text(_GO_MAIN_WITH_STRICTCLI)
+        result = detect_strictcli(str(tmp_path))
+        assert result == (".", "go")
+
     def test_multi_main_none_importing_strictcli_raises(self, tmp_path):
         """Multiple main packages, none with a direct strictcli import:
         ambiguous -- hard error instead of a silent None."""
@@ -170,6 +212,55 @@ class TestGoDetection:
             (cmd_dir / "main.go").write_text(_GO_CMD_WITHOUT_STRICTCLI)
         with pytest.raises(StrictcliDetectError, match="strictcli"):
             detect_strictcli(str(tmp_path))
+
+
+class TestGoModHasStrictcli:
+    """Unit tests for _go_mod_has_strictcli: only require directives count,
+    never the module declaration."""
+
+    def test_module_line_only_is_not_a_require(self, tmp_path):
+        """go.mod whose module path IS strictcli, requiring something
+        else, must not count as requiring strictcli."""
+        _write_go_mod(tmp_path, _GO_MOD_IS_STRICTCLI_ITSELF)
+        assert _go_mod_has_strictcli(str(tmp_path)) is False
+
+    def test_single_line_require_detected(self, tmp_path):
+        _write_go_mod(tmp_path, _GO_MOD_WITH_STRICTCLI)
+        assert _go_mod_has_strictcli(str(tmp_path)) is True
+
+    def test_require_block_detected(self, tmp_path):
+        _write_go_mod(tmp_path, _GO_MOD_STRICTCLI_IN_REQUIRE_BLOCK)
+        assert _go_mod_has_strictcli(str(tmp_path)) is True
+
+    def test_bare_strictcli_module_path_detected(self, tmp_path):
+        """The bare module path (no /go sub-path) also matches."""
+        _write_go_mod(
+            tmp_path,
+            "module github.com/example/myapp\n\ngo 1.21\n\n"
+            "require github.com/smm-h/strictcli v0.9.0\n",
+        )
+        assert _go_mod_has_strictcli(str(tmp_path)) is True
+
+    def test_prefix_lookalike_module_not_detected(self, tmp_path):
+        """A module whose path merely starts with the strictcli path as a
+        string prefix (not a path segment) does not match."""
+        _write_go_mod(
+            tmp_path,
+            "module github.com/example/myapp\n\ngo 1.21\n\n"
+            "require github.com/smm-h/strictcli-extras v1.0.0\n",
+        )
+        assert _go_mod_has_strictcli(str(tmp_path)) is False
+
+    def test_commented_require_not_detected(self, tmp_path):
+        _write_go_mod(
+            tmp_path,
+            "module github.com/example/myapp\n\ngo 1.21\n\n"
+            "// require github.com/smm-h/strictcli/go v0.9.0\n",
+        )
+        assert _go_mod_has_strictcli(str(tmp_path)) is False
+
+    def test_no_go_mod_returns_false(self, tmp_path):
+        assert _go_mod_has_strictcli(str(tmp_path)) is False
 
 
 class TestSchemaDumpBranching:
