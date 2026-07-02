@@ -101,6 +101,42 @@ class TestPublishHardErrors:
                         with pytest.raises(RuntimeError, match="go install failed"):
                             p.publish(str(tmp_path), "1.0.0", None)
 
+    def test_install_call_has_timeout(self, tmp_path):
+        """Every external call must be bounded: `go install` compiles, so
+        it gets a generous timeout instead of hanging a release forever."""
+        _write(tmp_path / "go.mod", GO_MOD)
+        _write(tmp_path / "main.go", "package main\n\nfunc main() {}\n")
+        p = _pipeline(install_paths=["."])
+        captured = {}
+
+        def fake_install(cmd, **kwargs):
+            captured.update(kwargs)
+            return subprocess.CompletedProcess(args=cmd, returncode=0)
+
+        with patch("rlsbl.pipelines.go.require_tool", return_value="/usr/bin/go"):
+            with patch("rlsbl.pipelines.go.run"):
+                with patch("rlsbl.pipelines.go.validate_install_paths",
+                           side_effect=lambda d, paths: paths):
+                    with patch("rlsbl.pipelines.go.subprocess.run",
+                               side_effect=fake_install):
+                        p.publish(str(tmp_path), "1.0.0", None)
+
+        assert captured.get("timeout") == 300
+
+    def test_install_timeout_expiry_raises(self, tmp_path):
+        """A timed-out `go install` is a hard error, same as a failed one."""
+        _write(tmp_path / "go.mod", GO_MOD)
+        _write(tmp_path / "main.go", "package main\n\nfunc main() {}\n")
+        p = _pipeline(install_paths=["."])
+        with patch("rlsbl.pipelines.go.require_tool", return_value="/usr/bin/go"):
+            with patch("rlsbl.pipelines.go.run"):
+                with patch("rlsbl.pipelines.go.validate_install_paths",
+                           side_effect=lambda d, paths: paths):
+                    with patch("rlsbl.pipelines.go.subprocess.run",
+                               side_effect=subprocess.TimeoutExpired("go", 300)):
+                        with pytest.raises(RuntimeError, match="go install failed"):
+                            p.publish(str(tmp_path), "1.0.0", None)
+
     def test_publish_installs_declared_paths(self, tmp_path, capsys):
         """cmd/x/cli.go layout installs via the declared path -- the old
         main.go glob skipped these projects forever."""

@@ -13,6 +13,10 @@ from ..go_introspect import (
 )
 from ..utils import read_go_module_path, require_tool, run
 
+# `go install` may compile the module and its dependency tree from scratch,
+# so it gets a more generous bound than the network-only proxy call (120s).
+_GO_INSTALL_TIMEOUT = 300
+
 
 class GoPipeline(BasePipeline):
     """Pipeline that notifies the Go module proxy for new versions.
@@ -80,8 +84,13 @@ class GoPipeline(BasePipeline):
                     ["go", "install", path],
                     cwd=dir_path,
                     check=True,
+                    timeout=_GO_INSTALL_TIMEOUT,
                 )
-            except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+            except (
+                subprocess.CalledProcessError,
+                subprocess.TimeoutExpired,
+                FileNotFoundError,
+            ) as exc:
                 raise RuntimeError(f"go install failed for {path}: {exc}") from exc
             print(f"Installed: go install {path}")
 
