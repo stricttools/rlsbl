@@ -93,6 +93,12 @@ def make_workspace(root, projects):
             lines.append("dev_node = true")
         if proj.get("dev_only"):
             lines.append("dev_only = true")
+        if "releasable" in proj:
+            rel = proj["releasable"]
+            if rel is False:
+                lines.append("releasable = false")
+            elif isinstance(rel, str):
+                lines.append(f'releasable = "{rel}"')
         lines.append("")
     (ws_dir / WORKSPACE_FILE).write_text("\n".join(lines))
 

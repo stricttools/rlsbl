@@ -2,9 +2,10 @@
 
 Checks: workspace-ci-router, workspace-ci-synced, workspace-targets,
 workspace-unregistered, workspace-stale-entries, dev-only-boundary,
-dead-workspace-packages, subtree-remote-reachable, workspace-unbuildable,
-layers-violations, deps-unused, deps-undeclared, deps-runtime-test-only,
-deps-dev-in-lib, deps-stale, root-rlsbl-conflict, test-suite-workspace.
+unversioned-boundary, dead-workspace-packages, subtree-remote-reachable,
+workspace-unbuildable, layers-violations, deps-unused, deps-undeclared,
+deps-runtime-test-only, deps-dev-in-lib, deps-stale, root-rlsbl-conflict,
+test-suite-workspace.
 """
 
 import json
@@ -247,6 +248,59 @@ def register_workspace_checks(app):
                 details=violations,
             )
         return CheckResult("pass", "dev-only boundary clean")
+
+    @app.check("unversioned-boundary")
+    def check_unversioned_boundary(ctx):
+        """Releasable projects must not have runtime deps on unversioned projects.
+
+        An unversioned project (``releasable = false``, not dev-only) is
+        skipped by changelog coverage entirely, so its changes would ship
+        inside consumer releases with zero changelog trail. Dev-only
+        projects are excluded here -- they are dev-only-boundary's job.
+        """
+        from ..workspace import project_is_releasable
+
+        projects_by_name = {p["name"]: p for p in ctx.projects}
+
+        # Unversioned: explicitly releasable = false, but not dev-only
+        unversioned_names = [
+            name for name, proj in projects_by_name.items()
+            if proj.get("releasable") is False and not project_is_dev_only(proj)
+        ]
+
+        if not unversioned_names:
+            return CheckResult("pass", "no unversioned projects")
+
+        violations = []
+        for unv_name in unversioned_names:
+            # Collect releasable dependents: runtime and explicit scopes
+            dependents = set()
+            for scope in ("runtime", "explicit"):
+                try:
+                    rdeps = ctx.graph.transitive_rdeps(unv_name, scope_filter=scope)
+                except KeyError:
+                    continue
+                dependents.update(rdeps)
+
+            for dep_name in sorted(dependents):
+                dep_proj = projects_by_name.get(dep_name)
+                if dep_proj is None:
+                    continue
+                if project_is_releasable(dep_proj):
+                    violations.append(
+                        f"releasable project '{dep_name}' has a runtime dependency "
+                        f"on unversioned project '{unv_name}' (releasable = false). "
+                        f"Changes in '{unv_name}' ship inside '{dep_name}' releases "
+                        f"with no changelog coverage."
+                    )
+
+        if violations:
+            return CheckResult(
+                "fail",
+                f"{len(violations)} boundary violation(s)",
+                details=violations,
+            )
+        return CheckResult("pass", "unversioned boundary clean")
 
     @app.check("dead-workspace-packages")
     def check_dead_workspace_packages(ctx):
