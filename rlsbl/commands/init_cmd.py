@@ -1076,9 +1076,9 @@ def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnin
             for i, step in enumerate(steps, 1):
                 print(f"  {i}. {step}")
 
-    # Auto-commit scaffold changes unless --no-commit is set
-    if flags.get("no-commit"):
-        print("Skipping commit (--no-commit).")
+    # Auto-commit scaffold changes unless --no-auto-commit is set
+    if not flags.get("auto-commit", True):
+        print("Skipping commit (--no-auto-commit).")
         return
 
     # Collect all files that were created/modified (not "unchanged" or "skipped").
@@ -1245,14 +1245,15 @@ def _ensure_pipeline_config(registries, ctx):
         ctx.config = write_project_config("pipelines", pipelines, ctx.project_root)
 
 
-def _trigger_monorepo_sync(no_commit=False):
+def _trigger_monorepo_sync(auto_commit=True):
     """If the current directory is inside a monorepo workspace, run sync.
 
     Uses a subprocess so that sys.exit() calls inside sync don't kill scaffold.
     Failures are silently ignored -- sync is best-effort after scaffold.
 
-    When ``no_commit`` is True, propagates ``--no-commit`` to the sync call so
-    a single user invocation with ``--no-commit`` produces zero commits.
+    When ``auto_commit`` is False, propagates ``--no-auto-commit`` to the sync
+    call so a single user invocation with ``--no-auto-commit`` produces zero
+    commits.
     """
     from ..workspace import find_workspace_root
 
@@ -1260,8 +1261,8 @@ def _trigger_monorepo_sync(no_commit=False):
     if ws_root:
         try:
             cmd = [sys.executable, "-m", "rlsbl", "monorepo", "sync"]
-            if no_commit:
-                cmd.append("--no-commit")
+            if not auto_commit:
+                cmd.append("--no-auto-commit")
             subprocess.run(
                 cmd,
                 cwd=ws_root,
@@ -1415,7 +1416,7 @@ def run_cmd(registry, args, flags, ctx):
             _print_private_summary()
 
         # If inside a monorepo, sync root CI workflows
-        _trigger_monorepo_sync(no_commit=bool(flags.get("no-commit")))
+        _trigger_monorepo_sync(auto_commit=flags.get("auto-commit", True))
     finally:
         release_lock()
 
@@ -2078,6 +2079,6 @@ def run_cmd_multi(registries_list, args, flags, ctx):
                 print(f"  {i}. {step}")
 
         # If inside a monorepo, sync root CI workflows
-        _trigger_monorepo_sync(no_commit=bool(flags.get("no-commit")))
+        _trigger_monorepo_sync(auto_commit=flags.get("auto-commit", True))
     finally:
         release_lock()

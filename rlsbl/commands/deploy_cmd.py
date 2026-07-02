@@ -13,7 +13,6 @@ def run_cmd(registry, args, flags, *, ctx):
     Usage:
         rlsbl deploy [name]       Deploy to target (auto-selects if only one)
         rlsbl deploy --dry-run    Show what would be deployed
-        rlsbl deploy --force      Override branch restrictions
     """
     # 1. Read deploy config
     targets, errors = read_deploy_config(ctx.config)
@@ -53,16 +52,14 @@ def run_cmd(registry, args, flags, *, ctx):
         _print_dry_run(target_config, branch)
         sys.exit(0)
 
-    # 5. Branch restriction (unless --force)
-    if not flags.get("force"):
-        only_on = target_config["only_on"]
-        if branch not in only_on:
-            print(
-                f'Error: current branch "{branch}" is not in allowed branches {only_on}. '
-                "Use --force to override.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
+    # 5. Branch restriction (always enforced)
+    only_on = target_config["only_on"]
+    if branch not in only_on:
+        print(
+            f'Error: current branch "{branch}" is not in allowed branches {only_on}.',
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     # 6. Deploy
     result = deploy_target(target_config, branch)

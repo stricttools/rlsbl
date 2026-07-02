@@ -94,7 +94,7 @@ def should_tag(flags, config):
     User-level config is still read from disk.
     """
     # CLI flag takes highest precedence
-    if flags.get("no-tag"):
+    if not flags.get("auto-tag", True):
         return False
 
     # Project-level config

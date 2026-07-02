@@ -23,8 +23,8 @@ def _cmd_init(flags, project_root):
     print("Initialized monorepo workspace in .rlsbl-monorepo/")
 
     rel_ws_file = os.path.join(WORKSPACE_DIR, WORKSPACE_FILE)
-    if flags.get("no-commit"):
-        print(f"Skipped commit (--no-commit). Run `safegit commit -- {rel_ws_file}` manually.")
+    if not flags.get("auto-commit", True):
+        print(f"Skipped commit (--no-auto-commit). Run `safegit commit -- {rel_ws_file}` manually.")
         return
 
     # Auto-commit workspace.toml
@@ -167,11 +167,11 @@ def _cmd_add(args, flags, project_root):
     save_workspace(root, projects)
     print(f"Added project '{name}' at {path}")
 
-    no_commit = bool(flags.get("no-commit"))
+    no_commit = not flags.get("auto-commit", True)
     ws_file = os.path.join(WORKSPACE_DIR, WORKSPACE_FILE)
 
     if no_commit:
-        print(f"Skipped commit (--no-commit). Run `safegit commit -- {ws_file}` manually.")
+        print(f"Skipped commit (--no-auto-commit). Run `safegit commit -- {ws_file}` manually.")
     else:
         # Commit workspace.toml
         commit_files(f"monorepo: add {name}", [ws_file], allow_failure=True)
@@ -185,7 +185,7 @@ def _cmd_add(args, flags, project_root):
             if explicit_target:
                 cmd.extend(["--target", explicit_target])
             if no_commit:
-                cmd.append("--no-commit")
+                cmd.append("--no-auto-commit")
             subprocess.run(
                 cmd,
                 cwd=path,
@@ -198,7 +198,7 @@ def _cmd_add(args, flags, project_root):
     try:
         sync_cmd = [sys.executable, "-m", "rlsbl", "monorepo", "sync"]
         if no_commit:
-            sync_cmd.append("--no-commit")
+            sync_cmd.append("--no-auto-commit")
         subprocess.run(
             sync_cmd,
             cwd=root,

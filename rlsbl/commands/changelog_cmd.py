@@ -174,8 +174,7 @@ def _build_entry(flags, resolved_commits):
     Validates that user-facing entries have description and type.
     Returns a validated ChangelogEntry.
     """
-    no_user_facing = flags.get("no-user-facing", False)
-    user_facing = not no_user_facing
+    user_facing = flags.get("user-facing", True)
     description = flags.get("description") or None
     entry_type = flags.get("type") or None
 
@@ -183,14 +182,14 @@ def _build_entry(flags, resolved_commits):
         if not description:
             print(
                 "Error: --description is required for user-facing entries. "
-                "Use --no-user-facing to skip.",
+                "Use --no-user-facing to mark as internal.",
                 file=sys.stderr,
             )
             sys.exit(1)
         if not entry_type:
             print(
                 "Error: --type is required for user-facing entries. "
-                "Use --no-user-facing to skip.",
+                "Use --no-user-facing to mark as internal.",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -347,7 +346,7 @@ def cmd_add(flags, project_root):
     append_entry(changes_dir, entry)
     print(f"Added entry with {len(resolved_commits)} commit(s)")
 
-    if not flags.get("no-commit"):
+    if flags.get("auto-commit", True):
         unreleased_path = os.path.join(changes_dir, "unreleased.jsonl")
         if user_facing:
             commit_msg = f"changelog: {description}"
@@ -419,7 +418,7 @@ def cmd_generate(flags, project_root):
             content = generate_changelog(project_root)
         print("Generated CHANGELOG.md")
 
-        if not flags.get("no-commit"):
+        if flags.get("auto-commit", True):
             # Collect changed files: CHANGELOG.md and per-version .md files
             changed_files = _get_generated_files(project_root)
             if changed_files:
@@ -443,7 +442,7 @@ def cmd_amend(flags, project_root):
     Optional flags:
     - --description and --type: required unless --no-user-facing is set
     - --no-user-facing: mark entry as non-user-facing
-    - --no-resolve: skip hash validation (for old/amended commits)
+    - --no-validate-hashes: skip hash validation (for old/amended commits)
     """
     ws_context = _resolve_workspace_project(project_root)
 
@@ -462,9 +461,9 @@ def cmd_amend(flags, project_root):
         print("Error: --commits must contain at least one hash.", file=sys.stderr)
         sys.exit(1)
 
-    no_resolve = flags.get("no-resolve", False)
+    validate_hashes = flags.get("validate-hashes", True)
 
-    if no_resolve:
+    if not validate_hashes:
         resolved_commits = commits
     else:
         resolved_commits = []
@@ -475,7 +474,7 @@ def cmd_amend(flags, project_root):
                 sys.exit(1)
             resolved_commits.append(full)
 
-    if not no_resolve:
+    if validate_hashes:
         _check_project_scope(resolved_commits, ws_context)
 
     entry = _build_entry(flags, resolved_commits)
@@ -530,20 +529,19 @@ def cmd_edit(flags, project_root):
     At least one edit flag required:
     - --type: new type value (feature, fix, breaking)
     - --description: new description text
-    - --no-user-facing: set user_facing=false, clear description and type
-    - --user-facing: set user_facing=true
+    - --user-facing / --no-user-facing: set user_facing status
     """
     ws_context = _resolve_workspace_project(project_root)
 
     # Validate at least one edit flag is provided
     has_type = bool(flags.get("type"))
     has_description = bool(flags.get("description"))
-    has_no_user_facing = flags.get("no-user-facing", False)
-    has_user_facing = flags.get("user-facing", False)
-    if not (has_type or has_description or has_no_user_facing or has_user_facing):
+    user_facing_value = flags.get("user-facing")  # None means not set
+    has_user_facing_change = user_facing_value is not None
+    if not (has_type or has_description or has_user_facing_change):
         print(
             "Error: at least one edit flag is required "
-            "(--type, --description, --no-user-facing, --user-facing).",
+            "(--type, --description, --user-facing, --no-user-facing).",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -626,11 +624,11 @@ def cmd_edit(flags, project_root):
     is_released = version is not None
 
     # Apply edits
-    if has_no_user_facing:
+    if user_facing_value is False:
         entry.user_facing = False
         entry.description = None
         entry.type = None
-    elif has_user_facing:
+    elif user_facing_value is True:
         entry.user_facing = True
         # If the entry doesn't already have description/type, require them
         if not entry.description and not has_description:
@@ -648,9 +646,9 @@ def cmd_edit(flags, project_root):
             )
             sys.exit(1)
 
-    if has_type and not has_no_user_facing:
+    if has_type and user_facing_value is not False:
         entry.type = flags["type"]
-    if has_description and not has_no_user_facing:
+    if has_description and user_facing_value is not False:
         entry.description = flags["description"]
 
     # Validate the edited entry
@@ -690,7 +688,7 @@ def cmd_edit(flags, project_root):
         _sync_github_release(version)
 
         # Auto-commit
-        if not flags.get("no-commit"):
+        if flags.get("auto-commit", True):
             changed_files = [file_path]
             md_path = os.path.join(changes_dir, f"{version}.md")
             if os.path.isfile(md_path):
@@ -705,7 +703,7 @@ def cmd_edit(flags, project_root):
         print("Edited entry in unreleased.jsonl")
 
         # Auto-commit
-        if not flags.get("no-commit"):
+        if flags.get("auto-commit", True):
             desc = entry.description or "entry"
             commit_files(f"changelog: edit unreleased: {desc}", [file_path], allow_failure=True)
 

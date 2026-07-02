@@ -353,7 +353,7 @@ def _cmd_sync(flags, project_root):
     # This runs early so that releasable dirs exist before CI workflow
     # generation, which may need to reference releasable paths.
     releasable_files = scaffold_releasable_dirs(root)
-    if releasable_files and not flags.get("no-commit"):
+    if releasable_files and flags.get("auto-commit", True):
         commit_files_if_changed(
             "monorepo: scaffold releasable directories",
             releasable_files,
@@ -545,9 +545,9 @@ def _cmd_sync(flags, project_root):
     # Auto-commit
     all_files = written_files + deleted_files
     if all_files:
-        if flags.get("no-commit"):
+        if not flags.get("auto-commit", True):
             quoted = " ".join(all_files)
-            print(f"Skipped commit (--no-commit). Run `safegit commit -- {quoted}` manually.")
+            print(f"Skipped commit (--no-auto-commit). Run `safegit commit -- {quoted}` manually.")
         else:
             commit_files_if_changed("monorepo: sync CI workflows", all_files, skip_message="No workflow changes to commit.")
 
