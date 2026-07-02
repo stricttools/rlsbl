@@ -91,7 +91,7 @@ class TestSelfdocCheck:
 
             assert result is True
             mock_run.assert_called_once_with(
-                ["selfdoc", "check"], cwd=None, check=True
+                ["selfdoc", "check", "--no-auto-commit"], cwd=None, check=True
             )
 
     def test_selfdoc_check_skipped_when_no_config(self, tmp_project):
@@ -125,7 +125,7 @@ class TestSelfdocCheck:
             patch("rlsbl.commands.release.require_tool", return_value="/usr/bin/selfdoc"),
             patch(
                 "rlsbl.commands.release.subprocess.run",
-                side_effect=subprocess.CalledProcessError(1, ["selfdoc", "check"]),
+                side_effect=subprocess.CalledProcessError(1, ["selfdoc", "check", "--no-auto-commit"]),
             ),
         ):
             with pytest.raises(HookError, match="selfdoc check failed"):
@@ -147,7 +147,7 @@ class TestSelfdocCheck:
 
             assert result is True
             mock_run.assert_called_once_with(
-                ["selfdoc", "check"], cwd=str(project_dir), check=True
+                ["selfdoc", "check", "--no-auto-commit"], cwd=str(project_dir), check=True
             )
 
     def test_selfdoc_check_dry_run_skips(self, tmp_project):
@@ -183,7 +183,7 @@ class TestSelfdocGen:
 
             assert result is True
             mock_run.assert_called_once_with(
-                ["selfdoc", "gen", "--no-commit"], cwd=None, check=True
+                ["selfdoc", "gen", "--no-auto-commit"], cwd=None, check=True
             )
 
     def test_selfdoc_gen_skipped_when_no_config(self, tmp_project):
@@ -217,7 +217,7 @@ class TestSelfdocGen:
             patch("rlsbl.commands.release.require_tool", return_value="/usr/bin/selfdoc"),
             patch(
                 "rlsbl.commands.release.subprocess.run",
-                side_effect=subprocess.CalledProcessError(1, ["selfdoc", "gen", "--no-commit"]),
+                side_effect=subprocess.CalledProcessError(1, ["selfdoc", "gen", "--no-auto-commit"]),
             ),
         ):
             with pytest.raises(HookError, match="selfdoc gen failed"):
@@ -239,7 +239,7 @@ class TestSelfdocGen:
 
             assert result is True
             mock_run.assert_called_once_with(
-                ["selfdoc", "gen", "--no-commit"], cwd=str(project_dir), check=True
+                ["selfdoc", "gen", "--no-auto-commit"], cwd=str(project_dir), check=True
             )
 
     def test_selfdoc_gen_dry_run_logs(self, tmp_project, capsys):
@@ -252,7 +252,7 @@ class TestSelfdocGen:
             assert result is True
             mock_run.assert_not_called()
             captured = capsys.readouterr()
-            assert "Would run: selfdoc gen --no-commit" in captured.out
+            assert "Would run: selfdoc gen --no-auto-commit" in captured.out
 
 
 # ---------------------------------------------------------------------------

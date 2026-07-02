@@ -619,7 +619,7 @@ def _run_selfdoc_gen(flags, project_dir=None):
         return True
 
     if flags.get("dry-run"):
-        print("Would run: selfdoc gen --no-commit")
+        print("Would run: selfdoc gen --no-auto-commit")
         return True
 
     if not require_tool("selfdoc", fatal=False):
@@ -630,7 +630,7 @@ def _run_selfdoc_gen(flags, project_dir=None):
 
     print("Running selfdoc gen...")
     try:
-        _subprocess.run(["selfdoc", "gen", "--no-commit"], cwd=project_dir, check=True)
+        _subprocess.run(["selfdoc", "gen", "--no-auto-commit"], cwd=project_dir, check=True)
     except _subprocess.CalledProcessError as e:
         print(
             f"Error: selfdoc gen failed (exit code {e.returncode}).",
@@ -663,7 +663,7 @@ def _run_selfdoc_check(flags, project_dir=None):
 
     print("Running selfdoc check...")
     try:
-        _subprocess.run(["selfdoc", "check"], cwd=project_dir, check=True)
+        _subprocess.run(["selfdoc", "check", "--no-auto-commit"], cwd=project_dir, check=True)
     except _subprocess.CalledProcessError as e:
         print(
             f"Error: selfdoc check failed (exit code {e.returncode}).",

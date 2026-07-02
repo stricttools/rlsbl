@@ -96,7 +96,7 @@ The release pipeline executes 18 steps in a fixed order, from initial validation
 | 4 | Generate CHANGELOG.md from all JSONL files | Yes |
 | 5 | Run `pre-checks.sh` hook | Yes |
 | 6 | Run strictcli schema dump (`--dump-schema`) if project uses strictcli | Yes |
-| 7 | Run `selfdoc gen --no-commit` if project uses selfdoc | Yes |
+| 7 | Run `selfdoc gen --no-auto-commit` if project uses selfdoc | Yes |
 | 8 | Run selfdoc check (verify generated files are up-to-date) if project uses selfdoc | Yes |
 | 9 | Run built-in tests (`uv run pytest` / `go test` / `npm test`) | Yes |
 | 10 | Run built-in lint (library projects only) | Yes |

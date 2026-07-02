@@ -145,7 +145,7 @@ def _refresh_selfdoc_hashes(files_to_commit, log, project_dir="."):
 
     log("Refreshing selfdoc hashes after version bump...")
     try:
-        subprocess.run(["selfdoc", "check"], cwd=project_dir, capture_output=True)
+        subprocess.run(["selfdoc", "check", "--no-auto-commit"], cwd=project_dir, capture_output=True)
     except Exception as e:
         log(f"Warning: selfdoc hash refresh failed: {e}")
         return
