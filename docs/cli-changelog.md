@@ -13,7 +13,7 @@ Structured changelog management using JSONL entries. Add and generate CHANGELOG.
 
 ## changelog add
 
-Append a structured changelog entry to the project's unreleased.jsonl file. Each entry includes a human-readable description, an entry type (feature, fix, or breaking), and optional commit hashes linking it to specific changes. The file is auto-committed unless --no-commit is passed. Use --no-user-facing to mark internal changes that should not appear in the published changelog.
+Append a structured changelog entry to the project's unreleased.jsonl file. Each entry includes a human-readable description, an entry type (feature, fix, or breaking), and optional commit hashes linking it to specific changes. The file is auto-committed by default. Use --no-user-facing to mark internal changes that should not appear in the published changelog.
 
 ### Flags
 
@@ -22,8 +22,8 @@ Append a structured changelog entry to the project's unreleased.jsonl file. Each
 | `--commits` |  | str |  |  | Comma-separated list of commit hashes to associate with this changelog entry |
 | `--description` |  | str |  |  | Human-readable description of the change, shown in the generated CHANGELOG.md |
 | `--type` |  | str |  |  | Classification of the change: feature, fix, or breaking (required if user-facing) |
-| `--no-user-facing` |  | bool |  |  | Mark this entry as internal (excluded from generated CHANGELOG.md output) |
-| `--no-commit` |  | bool |  |  | Append to unreleased.jsonl without auto-committing the change |
+| `--user-facing` |  | bool | True |  | Mark this entry as user-facing (included in generated CHANGELOG.md output) |
+| `--auto-commit` |  | bool | True |  | Auto-commit unreleased.jsonl after appending the entry |
 | `--allow-batch` |  | bool |  |  | Auto-create an exclusion if this entry exceeds the commit batch limit |
 
 ## changelog generate
@@ -34,11 +34,11 @@ Compile all validated JSONL changelog entries into a formatted CHANGELOG.md file
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--no-commit` |  | bool |  |  | Write generated CHANGELOG.md and per-version .md files without auto-committing |
+| `--auto-commit` |  | bool | True |  | Auto-commit generated CHANGELOG.md and per-version .md files |
 
 ## changelog amend
 
-Append a changelog entry to a released version's JSONL file. Temporarily unlocks the read-only file, appends the entry, re-locks it, regenerates CHANGELOG.md, and syncs GitHub Release notes. Use --no-resolve to skip hash validation for old or amended commits.
+Append a changelog entry to a released version's JSONL file. Temporarily unlocks the read-only file, appends the entry, re-locks it, regenerates CHANGELOG.md, and syncs GitHub Release notes. Use --no-validate-hashes to skip hash validation for old or amended commits.
 
 ### Flags
 
@@ -48,8 +48,8 @@ Append a changelog entry to a released version's JSONL file. Temporarily unlocks
 | `--commits` |  | str |  |  | Comma-separated commit hashes to associate with the amended changelog entry |
 | `--description` |  | str |  |  | Human-readable description for the amended entry in CHANGELOG.md |
 | `--type` |  | str |  |  | Classification for the amended entry: feature, fix, or breaking (required if user-facing) |
-| `--no-user-facing` |  | bool |  |  | Mark the amended entry as internal (excluded from CHANGELOG.md output) |
-| `--no-resolve` |  | bool |  |  | Skip git rev-parse hash validation for old or rewritten commits |
+| `--user-facing` |  | bool | True |  | Mark the amended entry as user-facing (included in CHANGELOG.md output) |
+| `--validate-hashes` |  | bool | True |  | Validate commit hashes via git rev-parse before appending |
 
 ## changelog edit
 
@@ -62,6 +62,5 @@ Modify an existing changelog entry in unreleased or released JSONL files. Finds 
 | `--commits` |  | str |  |  | Comma-separated commit hashes identifying the target entry |
 | `--type` |  | str |  |  | New type value (feature, fix, breaking); also disambiguates multi-entry commits |
 | `--description` |  | str |  |  | Replacement description text for the matched changelog entry |
-| `--no-user-facing` |  | bool |  |  | Set user_facing=false on the matched entry, clearing its description and type |
-| `--user-facing` |  | bool |  |  | Set user_facing=true (requires --description and --type if entry doesn't already have them) |
-| `--no-commit` |  | bool |  |  | Write the edited JSONL file without auto-committing the change |
+| `--user-facing` |  | bool |  |  | Set user_facing status on the matched entry (--user-facing to set true, --no-user-facing to set false) |
+| `--auto-commit` |  | bool | True |  | Auto-commit the edited JSONL file |

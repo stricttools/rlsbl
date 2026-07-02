@@ -9,15 +9,15 @@ nav_order: 15
 
 # rlsbl scaffold
 
-Generate or update CI/CD workflows, git hooks, changelog, and license files. Safe to run repeatedly -- merges template changes with your customizations. Use --force to overwrite all files.
+Generate or update CI/CD workflows, git hooks, changelog, and license files. Safe to run repeatedly -- merges template changes with your customizations. Use --force-overwrite to overwrite all files.
 
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--target` |  | str |  |  | Target a specific registry (auto-detected if omitted) |
-| `--force` |  | bool |  |  | Overwrite all scaffold-managed files, discarding any user customizations |
+| `--force-overwrite` |  | bool |  |  | Overwrite all scaffold-managed files, discarding any user customizations |
 | `--private` |  | bool |  |  | Generate workflows without publish steps, suitable for private repositories |
-| `--no-commit` |  | bool |  |  | Write scaffolded files to disk without auto-committing them |
+| `--auto-commit` |  | bool | True |  | Auto-commit scaffolded files after writing them to disk |
 | `--skip-shared` |  | bool |  |  | Skip processing of shared workflow templates across targets |
-| `--no-tag` |  | bool |  |  | Do not add or update the rlsbl GitHub topic tag on this invocation |
+| `--auto-tag` |  | bool | True |  | Add or update the rlsbl GitHub topic tag on this invocation |

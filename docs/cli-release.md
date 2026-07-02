@@ -19,12 +19,11 @@ Bump version, validate the JSONL changelog, run tests and lint, commit, tag, pus
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
+| `--watch` |  | bool |  |  | After release, automatically watch CI runs to completion (--no-watch to skip) |
 | `--allow-dirty` |  | bool |  |  | Skip the clean working tree check and allow releasing with uncommitted changes |
 | `--bump` |  | str |  |  | Bump type: patch, minor, major, hotfix, prerelease. Skips the release file. |
 | `--description` |  | str |  |  | Release description (required with --bump) |
 | `--preid` |  | str |  |  | Pre-release identifier: alpha, beta, rc, stable. Only valid with --bump. |
-| `--watch` |  | bool |  |  | After release, automatically watch CI runs to completion |
-| `--no-watch` |  | bool |  |  | After release, print the watch command hint without watching |
 
 ## release resume
 
@@ -34,8 +33,7 @@ Resume a previously failed release from where it left off. Reads the in-progress
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--watch` |  | bool |  |  | After release, automatically watch CI runs to completion |
-| `--no-watch` |  | bool |  |  | After release, print the watch command hint without watching |
+| `--watch` |  | bool |  |  | After release, automatically watch CI runs to completion (--no-watch to skip) |
 
 ## release init
 
@@ -49,8 +47,7 @@ Dispatch CI/CD workflows for a completed release via gh workflow run. Reads the 
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--watch` |  | bool |  |  | After retry, automatically watch CI runs to completion |
-| `--no-watch` |  | bool |  |  | After retry, print the watch command hint without watching |
+| `--watch` |  | bool |  |  | After retry, automatically watch CI runs to completion (--no-watch to skip) |
 
 ## release edit
 

@@ -9,14 +9,13 @@ nav_order: 6
 
 # rlsbl deploy
 
-Run the configured deployment pipeline for the project. Supports named deploy targets, dry-run preview of what would be deployed, and a --force flag to override branch restrictions.
+Run the configured deployment pipeline for the project. Supports named deploy targets and dry-run preview of what would be deployed. Branch restrictions are always enforced.
 
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--target` |  | str |  |  | Registry whose deploy pipeline to run (auto-detected if omitted) |
-| `--force` |  | bool |  |  | Bypass branch restrictions that normally limit which branches can deploy |
 
 ## Arguments
 

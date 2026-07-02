@@ -19,7 +19,7 @@ Create a new monorepo workspace by generating the .rlsbl-monorepo directory and 
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--no-commit` |  | bool |  |  | Create the workspace.toml file without auto-committing it to git |
+| `--auto-commit` |  | bool | True |  | Auto-commit workspace.toml after creating it |
 
 ## monorepo add
 
@@ -37,7 +37,7 @@ Register a project directory in the monorepo workspace.toml configuration. The p
 | `--library` |  | str |  |  | Mark as a shared library consumed by other workspace projects (true/false) |
 | `--dev-only` |  | str |  |  | Mark as a dev-only leaf node excluded from the dependency boundary guardrail (true/false) |
 | `--releasable` |  | str |  |  | Releasable group this project belongs to (name of a [[releasables]] entry, or 'false' to opt out of versioning) |
-| `--no-commit` |  | bool |  |  | Skip auto-commit of workspace.toml and suppress commits from auto-triggered scaffold/sync |
+| `--auto-commit` |  | bool | True |  | Auto-commit workspace.toml and trigger scaffold/sync commits |
 
 ### Arguments
 
@@ -67,7 +67,7 @@ Copy and merge CI workflow files from each project's individual scaffold into th
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--no-commit` |  | bool |  |  | Write merged workflow files to .github/workflows/ without auto-committing |
+| `--auto-commit` |  | bool | True |  | Auto-commit merged workflow files in .github/workflows/ |
 
 ## monorepo status
 
