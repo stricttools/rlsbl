@@ -1582,6 +1582,18 @@ def _run_release_mutating(state: ReleaseState):
     if monorepo_name:
         _print_stale_dep_advisory(monorepo_name, new_version, monorepo_root=monorepo_root)
 
+    # If GitHub Release creation failed, preserve the state file for resume
+    # and raise PostReleaseError BEFORE clearing state.
+    if not release_created:
+        from ...errors import PostReleaseError
+        raise PostReleaseError(f"GitHub Release creation failed for {tag}")
+
+    # Success epilogue: clear state and announce BEFORE watch, because
+    # watch_run_cmd() calls sys.exit() and would skip cleanup.
+    clear_release_state(_state_path)
+
+    log(f"\nRelease {new_version} complete!")
+
     # Watch CI or print hint (uses SHA captured before post-release hooks).
     # In batch-mode, the batch orchestrator handles watch after all packages
     # are released, so skip both the watch call and the hint here.
@@ -1593,14 +1605,3 @@ def _run_release_mutating(state: ReleaseState):
             watch_run_cmd(None, [pushed_sha], {})
         else:
             log(f"Watch CI: rlsbl watch {pushed_sha}")
-
-    # If GitHub Release creation failed, preserve the state file for resume
-    # and raise PostReleaseError BEFORE clearing state.
-    if not release_created:
-        from ...errors import PostReleaseError
-        raise PostReleaseError(f"GitHub Release creation failed for {tag}")
-
-    # Success epilogue: clear the state file now that all steps completed.
-    clear_release_state(_state_path)
-
-    log(f"\nRelease {new_version} complete!")

@@ -217,15 +217,17 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config, 
         if not dry_run and released:
             _finalize_batch_file(batch_path, log)
 
-            # Watch CI or print hint for the last release's commit
-            if flags.get("watch"):
-                log(f"Watching CI for {last_sha}...")
-                from ..watch import run_cmd as watch_run_cmd
-                watch_run_cmd(None, [last_sha], {})
-            else:
-                log(f"Watch CI: rlsbl watch {last_sha}")
-
+    # Log completion BEFORE watch, because watch_run_cmd() calls sys.exit().
     log(f"Batch release complete: {', '.join(released)}")
+
+    if not dry_run and released:
+        # Watch CI or print hint for the last release's commit
+        if flags.get("watch"):
+            log(f"Watching CI for {last_sha}...")
+            from ..watch import run_cmd as watch_run_cmd
+            watch_run_cmd(None, [last_sha], {})
+        else:
+            log(f"Watch CI: rlsbl watch {last_sha}")
 
 
 def _batch_release_packages(flags, workspace_root, batch_path, batch_config, projects):
@@ -332,15 +334,17 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config, pro
         if not dry_run and released:
             _finalize_batch_file(batch_path, log)
 
-            # Watch CI or print hint for the last release's commit
-            if flags.get("watch"):
-                log(f"Watching CI for {last_sha}...")
-                from ..watch import run_cmd as watch_run_cmd
-                watch_run_cmd(None, [last_sha], {})
-            else:
-                log(f"Watch CI: rlsbl watch {last_sha}")
-
+    # Log completion BEFORE watch, because watch_run_cmd() calls sys.exit().
     log(f"Batch release complete: {', '.join(released)}")
+
+    if not dry_run and released:
+        # Watch CI or print hint for the last release's commit
+        if flags.get("watch"):
+            log(f"Watching CI for {last_sha}...")
+            from ..watch import run_cmd as watch_run_cmd
+            watch_run_cmd(None, [last_sha], {})
+        else:
+            log(f"Watch CI: rlsbl watch {last_sha}")
 
 
 def _finalize_batch_file(batch_path, log):
