@@ -1,5 +1,6 @@
 """Go pipeline that notifies the Go module proxy of new versions, verifies module availability, and installs declared binaries locally."""
 
+import json
 import os
 import subprocess
 
@@ -69,7 +70,7 @@ class GoPipeline(BasePipeline):
                 "'install_paths' in .rlsbl/config.json. "
                 f"{describe_main_packages(mains)} "
                 'Add e.g. "install_paths": '
-                f"{[p.rel_dir for p in mains] or ['./cmd/<name>']!r} "
+                f"{json.dumps([p.rel_dir for p in mains] or ['./cmd/<name>'])} "
                 "to the pipeline entry."
             )
         paths = validate_install_paths(dir_path, install_paths)

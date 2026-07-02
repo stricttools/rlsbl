@@ -73,6 +73,9 @@ class TestPublishHardErrors:
         msg = str(exc.value)
         assert "install_paths" in msg
         assert "./cmd/x" in msg
+        # The suggestion advertises pasting into .rlsbl/config.json, so it
+        # must be valid JSON (double quotes), not a Python list repr.
+        assert '["./cmd/x"]' in msg
 
     def test_declared_path_not_a_main_package_raises(self, tmp_path):
         _write(tmp_path / "go.mod", GO_MOD)

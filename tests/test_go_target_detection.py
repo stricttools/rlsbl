@@ -137,6 +137,9 @@ class TestDevInstallCommand:
             target.dev_install_command(str(tmp_path))
         assert "install_paths" in str(exc.value)
         assert "./cmd/myapp" in str(exc.value)
+        # The suggestion advertises pasting into .rlsbl/config.json, so it
+        # must be valid JSON (double quotes), not a Python list repr.
+        assert '["./cmd/myapp"]' in str(exc.value)
 
     def test_non_go_dir_returns_placeholder_for_docs(self, tmp_path):
         """Doc introspection calls dev_install_command outside Go projects;

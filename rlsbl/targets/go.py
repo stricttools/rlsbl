@@ -1,6 +1,7 @@
 """Go release target using a VERSION file as source of truth, with GoReleaser integration for binaries and module proxy notification for libs."""
 
 import glob
+import json
 import os
 import re
 
@@ -340,7 +341,7 @@ class GoTarget(BaseTarget):
                     "'install_paths', which is required to run 'go install'. "
                     f"{describe_main_packages(mains)} "
                     'Declare e.g. "install_paths": '
-                    f"{[p.rel_dir for p in mains] or ['./cmd/<name>']!r} "
+                    f"{json.dumps([p.rel_dir for p in mains])} "
                     "on the go pipeline entry."
                 )
             args = ["install"] + validate_install_paths(project_dir, declared)
