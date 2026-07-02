@@ -195,6 +195,31 @@ class TestUnversionedBoundary:
         assert "proj-a" in violation_text
         assert "proj-c" in violation_text
 
+    def test_boundary_releasable_through_unversioned_chain(self, tmp_path, monkeypatch):
+        """A (releasable) -> B (unversioned) -> C (unversioned), all runtime deps.
+
+        Transitive rdeps of C include both B and A. Only A is releasable, so
+        A must be flagged (for both B and C) while B -- itself unversioned --
+        must not appear as a violating dependent.
+        """
+        _root, ctx = _setup_monorepo(tmp_path, monkeypatch, [
+            {"path": "proj-a", "name": "proj-a", "deps": ["proj-b"]},
+            {"path": "proj-b", "name": "proj-b", "releasable": False,
+             "deps": ["proj-c"]},
+            {"path": "proj-c", "name": "proj-c", "releasable": False},
+        ])
+        checks = _register_and_get_checks()
+        result = checks["unversioned-boundary"](ctx)
+
+        assert result.status == "fail"
+        # A is flagged for its direct dep on B and its transitive dep on C
+        assert any("'proj-a'" in v and "'proj-b'" in v for v in result.details)
+        assert any("'proj-a'" in v and "'proj-c'" in v for v in result.details)
+        # B is unversioned itself -- never flagged as a violating dependent
+        assert not any(
+            v.startswith("releasable project 'proj-b'") for v in result.details
+        )
+
     def test_no_unversioned_projects(self, tmp_path, monkeypatch):
         """No releasable=false projects at all -> PASS."""
         _root, ctx = _setup_monorepo(tmp_path, monkeypatch, [
