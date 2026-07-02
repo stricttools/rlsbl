@@ -2,7 +2,7 @@
 
 import unittest
 from io import StringIO
-from unittest.mock import patch, call
+from unittest.mock import patch, call, MagicMock
 
 from rlsbl.commands.yank import run_cmd, _build_notice
 
@@ -17,7 +17,7 @@ class TestSoftYank(unittest.TestCase):
     @patch("rlsbl.commands.yank.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.yank.run_gh")
     @patch("rlsbl.commands.yank.find_workspace_root", return_value=None)
-    @patch("rlsbl.commands.yank.detect_targets", return_value=[])
+    @patch("rlsbl.commands.yank.resolve_member_context", return_value=MagicMock(targets=[]))
     def test_soft_yank_basic(self, _detect, _ws_root, mock_run_gh, _gh_inst, _gh_auth, _rename, _unlink, _exists):
         """Soft yank marks release as pre-release and prepends deprecation notice."""
         mock_run_gh.side_effect = [
@@ -48,7 +48,7 @@ class TestSoftYank(unittest.TestCase):
     @patch("rlsbl.commands.yank.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.yank.run_gh")
     @patch("rlsbl.commands.yank.find_workspace_root", return_value=None)
-    @patch("rlsbl.commands.yank.detect_targets", return_value=[])
+    @patch("rlsbl.commands.yank.resolve_member_context", return_value=MagicMock(targets=[]))
     def test_soft_yank_with_reason_and_use(self, _detect, _ws_root, mock_run_gh, _gh_inst, _gh_auth, _rename, _unlink, _exists):
         """Soft yank with --reason and --use includes both in the deprecation notice."""
         mock_run_gh.side_effect = [
@@ -82,7 +82,7 @@ class TestHardYank(unittest.TestCase):
     @patch("rlsbl.commands.yank.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.yank.run_gh")
     @patch("rlsbl.commands.yank.find_workspace_root", return_value=None)
-    @patch("rlsbl.commands.yank.detect_targets", return_value=[])
+    @patch("rlsbl.commands.yank.resolve_member_context", return_value=MagicMock(targets=[]))
     def test_hard_yank(self, _detect, _ws_root, mock_run_gh, _gh_inst, _gh_auth):
         """Hard yank deletes the release."""
         mock_run_gh.side_effect = [
@@ -108,7 +108,7 @@ class TestDryRun(unittest.TestCase):
     @patch("rlsbl.commands.yank.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.yank.run_gh")
     @patch("rlsbl.commands.yank.find_workspace_root", return_value=None)
-    @patch("rlsbl.commands.yank.detect_targets", return_value=[])
+    @patch("rlsbl.commands.yank.resolve_member_context", return_value=MagicMock(targets=[]))
     def test_soft_dry_run(self, _detect, _ws_root, mock_run_gh, _gh_inst, _gh_auth):
         """Soft dry run prints what would happen without editing."""
         mock_run_gh.side_effect = [
@@ -132,7 +132,7 @@ class TestDryRun(unittest.TestCase):
     @patch("rlsbl.commands.yank.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.yank.run_gh")
     @patch("rlsbl.commands.yank.find_workspace_root", return_value=None)
-    @patch("rlsbl.commands.yank.detect_targets", return_value=[])
+    @patch("rlsbl.commands.yank.resolve_member_context", return_value=MagicMock(targets=[]))
     def test_hard_dry_run(self, _detect, _ws_root, mock_run_gh, _gh_inst, _gh_auth):
         """Hard dry run prints what would happen without deleting."""
         mock_run_gh.side_effect = [
@@ -159,7 +159,7 @@ class TestErrorCases(unittest.TestCase):
     @patch("rlsbl.commands.yank.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.yank.run_gh")
     @patch("rlsbl.commands.yank.find_workspace_root", return_value=None)
-    @patch("rlsbl.commands.yank.detect_targets", return_value=[])
+    @patch("rlsbl.commands.yank.resolve_member_context", return_value=MagicMock(targets=[]))
     def test_nonexistent_release(self, _detect, _ws_root, mock_run_gh, _gh_inst, _gh_auth):
         """Yanking a non-existent release prints an error and exits."""
         mock_run_gh.side_effect = Exception("release not found")
@@ -175,7 +175,7 @@ class TestErrorCases(unittest.TestCase):
     @patch("rlsbl.commands.yank.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.yank.run_gh")
     @patch("rlsbl.commands.yank.find_workspace_root", return_value=None)
-    @patch("rlsbl.commands.yank.detect_targets", return_value=[])
+    @patch("rlsbl.commands.yank.resolve_member_context", return_value=MagicMock(targets=[]))
     def test_latest_release_blocked(self, _detect, _ws_root, mock_run_gh, _gh_inst, _gh_auth):
         """Yanking the latest release is blocked with a suggestion to use undo."""
         mock_run_gh.side_effect = [
@@ -199,7 +199,7 @@ class TestVersionNormalization(unittest.TestCase):
     @patch("rlsbl.commands.yank.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.yank.run_gh")
     @patch("rlsbl.commands.yank.find_workspace_root", return_value=None)
-    @patch("rlsbl.commands.yank.detect_targets", return_value=[])
+    @patch("rlsbl.commands.yank.resolve_member_context", return_value=MagicMock(targets=[]))
     def test_without_v_prefix(self, _detect, _ws_root, mock_run_gh, _gh_inst, _gh_auth):
         """'0.9.1' is normalized to tag 'v0.9.1'."""
         mock_run_gh.side_effect = [
@@ -218,7 +218,7 @@ class TestVersionNormalization(unittest.TestCase):
     @patch("rlsbl.commands.yank.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.yank.run_gh")
     @patch("rlsbl.commands.yank.find_workspace_root", return_value=None)
-    @patch("rlsbl.commands.yank.detect_targets", return_value=[])
+    @patch("rlsbl.commands.yank.resolve_member_context", return_value=MagicMock(targets=[]))
     def test_with_v_prefix(self, _detect, _ws_root, mock_run_gh, _gh_inst, _gh_auth):
         """'v0.9.1' is also normalized to tag 'v0.9.1'."""
         mock_run_gh.side_effect = [
@@ -257,6 +257,48 @@ class TestBuildNotice(unittest.TestCase):
         """v prefix on --use is normalized."""
         result = _build_notice(None, "v0.9.2")
         self.assertEqual(result, "> **Deprecated:** Use v0.9.2 instead.")
+
+
+class TestYankReleasableInheritance:
+    """Yank must resolve the primary target with releasable-level config inheritance.
+
+    In explicit releasable mode a member's ``targets`` may live ONLY in the
+    releasable-level config.json. Bare detect_targets(project_dir) raises
+    ConfigError for such a member (config file present, no targets key), so
+    yank must route target resolution through resolve_member_context.
+    """
+
+    def test_yank_resolves_targets_with_releasable_inheritance(
+        self, multi_releasable_monorepo_factory,
+    ):
+        from rlsbl.workspace import Releasable
+
+        ns = multi_releasable_monorepo_factory(
+            releasables=[Releasable(name="alpha")],
+            projects=[{"path": "libs/alpha-core", "name": "alpha-core",
+                       "releasable": "alpha"}],
+            releasable_configs={"alpha": {"private": False, "targets": ["pypi"]}},
+        )
+        member = ns.root / "libs" / "alpha-core"
+        # Targets live ONLY at the releasable level: member config has none.
+        (member / ".rlsbl" / "config.json").write_text("{}\n")
+
+        gh_calls = []
+
+        def fake_run_gh(args, **kwargs):
+            gh_calls.append(list(args))
+            if args[:2] == ["release", "list"]:
+                return "alpha@v0.2.0"  # latest differs from the yank target
+            return ""
+
+        with patch("rlsbl.commands.yank.check_gh_installed", return_value=True), \
+             patch("rlsbl.commands.yank.check_gh_auth", return_value=True), \
+             patch("rlsbl.commands.yank.run_gh", side_effect=fake_run_gh):
+            run_cmd(["0.1.0"], {"hard": True, "yes": True},
+                    project_root=str(member))
+
+        assert ["release", "view", "alpha@v0.1.0"] in gh_calls
+        assert ["release", "delete", "alpha@v0.1.0", "--yes"] in gh_calls
 
 
 if __name__ == "__main__":

@@ -56,7 +56,7 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.resolve_member_context")
     @patch("rlsbl.commands.release_retry.TARGETS")
     @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
@@ -68,7 +68,7 @@ class TestReleaseRetry(unittest.TestCase):
         """Happy path: dispatch workflows, verify release exists, watch hint."""
         target = self._make_mock_target("0.41.7")
         entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
         mock_run.side_effect = self._run_side_effect
 
@@ -99,7 +99,7 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.resolve_member_context")
     @patch("rlsbl.commands.release_retry.TARGETS")
     @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
@@ -111,7 +111,7 @@ class TestReleaseRetry(unittest.TestCase):
         """RetryConfig dispatch and ref fields are used for workflow dispatch."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
         mock_run.side_effect = self._run_side_effect
 
@@ -140,7 +140,7 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.resolve_member_context")
     @patch("rlsbl.commands.release_retry.TARGETS")
     @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
@@ -152,7 +152,7 @@ class TestReleaseRetry(unittest.TestCase):
         """All workflows in dispatch list are dispatched unconditionally."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
         mock_run.side_effect = self._run_side_effect
 
@@ -180,7 +180,7 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.resolve_member_context")
     @patch("rlsbl.commands.release_retry.TARGETS")
     @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
@@ -191,7 +191,7 @@ class TestReleaseRetry(unittest.TestCase):
         """No GitHub Release exists for the tag -- exits with error."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
 
         # gh release view fails (now goes through run_gh)
@@ -210,7 +210,7 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.resolve_member_context")
     @patch("rlsbl.commands.release_retry.TARGETS")
     @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
@@ -221,7 +221,7 @@ class TestReleaseRetry(unittest.TestCase):
         """--dry-run prints what would dispatch without actually dispatching."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
         mock_run.side_effect = self._run_side_effect
 
@@ -246,7 +246,7 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.resolve_member_context")
     @patch("rlsbl.commands.release_retry.TARGETS")
     @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
@@ -258,7 +258,7 @@ class TestReleaseRetry(unittest.TestCase):
         """--yes flag skips the interactive confirmation prompt."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
         mock_run.side_effect = self._run_side_effect
 
@@ -281,7 +281,7 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.resolve_member_context")
     @patch("rlsbl.commands.release_retry.TARGETS")
     @patch("rlsbl.commands.release_retry.resolve_project")
     @patch("rlsbl.commands.release_retry.find_workspace_root", return_value="/repo")
@@ -294,7 +294,7 @@ class TestReleaseRetry(unittest.TestCase):
         """In monorepo context, uses monorepo_tag_format for the tag and dispatch ref."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
         mock_resolve.return_value = {"name": "my-pkg", "path": "packages/my-pkg"}
 
@@ -329,7 +329,7 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.resolve_member_context")
     @patch("rlsbl.commands.release_retry.TARGETS")
     @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
@@ -346,7 +346,7 @@ class TestReleaseRetry(unittest.TestCase):
         """
         target = self._make_mock_target()
         entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
         mock_run.side_effect = self._run_side_effect
 
@@ -371,7 +371,7 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.resolve_member_context")
     @patch("rlsbl.commands.release_retry.TARGETS")
     @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
@@ -382,7 +382,7 @@ class TestReleaseRetry(unittest.TestCase):
         """User says 'n' at 'Will dispatch' prompt -- aborts without dispatching."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
         mock_run.side_effect = self._run_side_effect
 
@@ -429,7 +429,7 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.resolve_member_context")
     @patch("rlsbl.commands.release_retry.TARGETS")
     @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
@@ -442,7 +442,7 @@ class TestReleaseRetry(unittest.TestCase):
         because ref is empty and must be set by the user."""
         target = self._make_mock_target("0.41.7")
         entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
         mock_run.side_effect = self._run_side_effect
 
@@ -470,7 +470,7 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.resolve_member_context")
     @patch("rlsbl.commands.release_retry.TARGETS")
     @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
@@ -484,7 +484,7 @@ class TestReleaseRetry(unittest.TestCase):
 
         target = self._make_mock_target("0.41.7")
         entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
         mock_run.side_effect = self._run_side_effect
 
@@ -526,7 +526,7 @@ class TestReleaseRetry(unittest.TestCase):
 
     @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
-    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.resolve_member_context")
     @patch("rlsbl.commands.release_retry.TARGETS")
     @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
@@ -540,7 +540,7 @@ class TestReleaseRetry(unittest.TestCase):
 
         target = self._make_mock_target("0.41.7")
         entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
         mock_run.side_effect = self._run_side_effect
 
@@ -569,7 +569,7 @@ class TestReleaseRetry(unittest.TestCase):
             self.assertIn("rlsbl release run", stderr_output)
 
     @patch("rlsbl.commands.release_retry.read_retry_file")
-    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.resolve_member_context")
     @patch("rlsbl.commands.release_retry.TARGETS")
     @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
@@ -580,7 +580,7 @@ class TestReleaseRetry(unittest.TestCase):
         """When retry.toml already exists and retry_config is None, reads the file."""
         target = self._make_mock_target("0.41.7")
         entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
 
         existing_config = _make_retry_config("0.41.7", dispatch=["custom.yml"])
@@ -611,7 +611,7 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.resolve_member_context")
     @patch("rlsbl.commands.release_retry.TARGETS")
     @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
@@ -623,7 +623,7 @@ class TestReleaseRetry(unittest.TestCase):
         """retry.toml is deleted via saferm after successful retry."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
         mock_run.side_effect = self._run_side_effect
 
@@ -772,14 +772,11 @@ class TestScaffoldRetryFile(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             retry_path = os.path.join(tmpdir, "retry.toml")
 
-            with patch("rlsbl.commands.release_retry.detect_targets", return_value=[entry]), \
-                 patch("rlsbl.commands.release_retry.TARGETS", {"pypi": target}), \
+            with patch("rlsbl.commands.release_retry.TARGETS", {"pypi": target}), \
                  patch("rlsbl.commands.release_retry._find_dispatch_workflows", return_value=["publish.yml", "ci.yml"]):
                 # read_retry_file will raise because ref is empty
                 with self.assertRaises(ReleaseFileError) as ctx:
-                    _scaffold_retry_file(
-                        retry_path, ".", target, None, None, lambda msg: None,
-                    )
+                    _scaffold_retry_file(retry_path, entry, lambda msg: None)
                 self.assertIn("ref must be set", str(ctx.exception))
 
             # Verify file on disk has correct structure
@@ -824,7 +821,7 @@ class TestRunIdCapture(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.resolve_member_context")
     @patch("rlsbl.commands.release_retry.TARGETS")
     @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
@@ -836,7 +833,7 @@ class TestRunIdCapture(unittest.TestCase):
         """When gh workflow run returns a URL with a run ID, it is captured."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
 
         def run_gh_effect(args, **kwargs):
@@ -858,7 +855,7 @@ class TestRunIdCapture(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.resolve_member_context")
     @patch("rlsbl.commands.release_retry.TARGETS")
     @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
@@ -870,7 +867,7 @@ class TestRunIdCapture(unittest.TestCase):
         """When gh workflow run returns no URL, falls back to polling gh run list."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
 
         def run_gh_effect(args, **kwargs):
@@ -895,7 +892,7 @@ class TestRunIdCapture(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.resolve_member_context")
     @patch("rlsbl.commands.release_retry.TARGETS")
     @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
@@ -907,7 +904,7 @@ class TestRunIdCapture(unittest.TestCase):
         """When no run IDs are captured (dispatch returns nothing, polling fails), falls back to SHA-based watching."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
 
         def run_gh_effect(args, **kwargs):
@@ -937,7 +934,7 @@ class TestRunIdCapture(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.resolve_member_context")
     @patch("rlsbl.commands.release_retry.TARGETS")
     @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
@@ -949,7 +946,7 @@ class TestRunIdCapture(unittest.TestCase):
         """When not watching and run IDs are captured, hint includes --run-id flags."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
 
         def run_gh_effect(args, **kwargs):
@@ -974,7 +971,7 @@ class TestRunIdCapture(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.resolve_member_context")
     @patch("rlsbl.commands.release_retry.TARGETS")
     @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
@@ -986,7 +983,7 @@ class TestRunIdCapture(unittest.TestCase):
         """When not watching and no run IDs captured, hint shows SHA."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
 
         def run_gh_effect(args, **kwargs):
@@ -1012,7 +1009,7 @@ class TestRunIdCapture(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.resolve_member_context")
     @patch("rlsbl.commands.release_retry.TARGETS")
     @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
@@ -1024,7 +1021,7 @@ class TestRunIdCapture(unittest.TestCase):
         """Multiple dispatched workflows each return a run ID -- all are collected."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
 
         call_count = {"n": 0}
@@ -1087,6 +1084,52 @@ class TestCmdReleaseRetryCleanup(unittest.TestCase):
             stderr_output = mock_stderr.getvalue()
             self.assertIn("ref must be set", stderr_output)
             self.assertIn("rlsbl release run", stderr_output)
+
+
+class TestRetryReleasableInheritance:
+    """release retry must resolve the primary target with releasable inheritance.
+
+    In explicit releasable mode a member's ``targets`` may live ONLY in the
+    releasable-level config.json. Bare detect_targets(project_dir) raises
+    ConfigError for such a member (config file present, no targets key), so
+    retry must route target resolution through resolve_member_context.
+    """
+
+    def test_retry_resolves_targets_with_releasable_inheritance(
+        self, multi_releasable_monorepo_factory,
+    ):
+        from rlsbl.workspace import Releasable
+
+        ns = multi_releasable_monorepo_factory(
+            releasables=[Releasable(name="alpha")],
+            projects=[{"path": "libs/alpha-core", "name": "alpha-core",
+                       "releasable": "alpha"}],
+            releasable_configs={"alpha": {"private": False, "targets": ["pypi"]}},
+        )
+        member = ns.root / "libs" / "alpha-core"
+        # Targets live ONLY at the releasable level: member config has none.
+        (member / ".rlsbl" / "config.json").write_text("{}\n")
+
+        config = _make_retry_config(
+            "0.1.0", dispatch=["ci.yml"], ref="alpha@v0.1.0",
+        )
+
+        gh_calls = []
+
+        def fake_run_gh(args, **kwargs):
+            gh_calls.append(list(args))
+            return ""
+
+        with patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True), \
+             patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True), \
+             patch("rlsbl.commands.release_retry.run_gh", side_effect=fake_run_gh), \
+             patch("rlsbl.commands.release_retry.run",
+                   return_value="abc123def456789012345678901234567890abcd"):
+            run_cmd(config, {"dry-run": True, "quiet": True},
+                    project_root=str(member))
+
+        # Tag built with the releasable tag format from releasable-level targets
+        assert ["release", "view", "alpha@v0.1.0"] in gh_calls
 
 
 if __name__ == "__main__":

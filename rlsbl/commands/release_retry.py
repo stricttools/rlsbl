@@ -20,8 +20,9 @@ import tomlkit
 
 from ..errors import ReleaseFileError
 
+from ..member_context import resolve_member_context
 from ..release_file import get_retry_file_path, read_retry_file
-from ..targets import TARGETS, detect_targets
+from ..targets import TARGETS, resolve_releasable_config_dir
 from ..utils import check_gh_auth, check_gh_installed, run, run_gh
 from ..workspace import find_workspace_root, resolve_project
 from .watch import run_cmd as watch_run_cmd
@@ -50,17 +51,15 @@ def _find_dispatch_workflows():
     return results
 
 
-def _scaffold_retry_file(retry_path, project_dir, target, monorepo_name, monorepo_project_path, log):
+def _scaffold_retry_file(retry_path, primary, log):
     """Auto-scaffold retry.toml from project state.
+
+    ``primary`` is the already-resolved primary TargetEntry (the caller
+    resolves it with releasable-level config inheritance).
 
     Returns the RetryConfig after writing the file.
     """
-    # Auto-detect version
-    entries = detect_targets(project_dir)
-    if not entries:
-        print("Error: no package.json, pyproject.toml, or go.mod found.", file=sys.stderr)
-        sys.exit(1)
-    primary = entries[0]
+    # Auto-detect version from the primary target
     tgt = TARGETS[primary.name]
     raw_version = tgt.read_version(primary.path)
     version = raw_version.lstrip("v")
@@ -136,6 +135,7 @@ def run_cmd(retry_config, flags, project_root):
     monorepo_project_path = None
     releasable_name = None
     releasable_tag_fmt = None
+    releasable_config_dir = None
     start_path = str(project_root)
     monorepo_root = find_workspace_root(start_path)
     if monorepo_root:
@@ -143,6 +143,7 @@ def run_cmd(retry_config, flags, project_root):
         if project is not None:
             monorepo_name = project["name"]
             monorepo_project_path = project["path"]
+            releasable_config_dir = resolve_releasable_config_dir(project, monorepo_root)
 
             # Detect explicit releasable mode
             from ..workspace import is_explicit_mode, load_releasables, load_workspace as _load_ws, resolve_releasable_for_project
@@ -158,8 +159,13 @@ def run_cmd(retry_config, flags, project_root):
     # in monorepo mode (via _require_sub_project_root).
     project_dir = start_path
 
-    # Detect primary target (needed for tag format)
-    entries = detect_targets(project_dir)
+    # Detect primary target (needed for tag format), with releasable-level
+    # config inheritance so members whose targets live only at the
+    # releasable level resolve correctly.
+    member = resolve_member_context(
+        project_dir, releasable_config_dir=releasable_config_dir,
+    )
+    entries = member.targets
     if not entries:
         print("Error: no package.json, pyproject.toml, or go.mod found.", file=sys.stderr)
         sys.exit(1)
@@ -188,10 +194,7 @@ def run_cmd(retry_config, flags, project_root):
                 sys.exit(1)
         else:
             try:
-                retry_config = _scaffold_retry_file(
-                    retry_path, project_dir, target,
-                    monorepo_name, monorepo_project_path, log,
-                )
+                retry_config = _scaffold_retry_file(retry_path, primary, log)
             except ReleaseFileError as e:
                 # Clean up the auto-scaffolded file -- it's untracked and
                 # would block subsequent `rlsbl release run`.

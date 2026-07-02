@@ -1190,7 +1190,7 @@ class TestYankMonorepoContext:
 
     @patch(f"{MOD_YANK}.find_workspace_root", return_value="/ws")
     @patch(f"{MOD_YANK}.resolve_project")
-    @patch(f"{MOD_YANK}.detect_targets", return_value=[])
+    @patch(f"{MOD_YANK}.resolve_member_context", return_value=MagicMock(targets=[]))
     @patch(f"{MOD_YANK}.check_gh_installed", return_value=True)
     @patch(f"{MOD_YANK}.check_gh_auth", return_value=True)
     @patch(f"{MOD_YANK}.run_gh")
@@ -1208,7 +1208,7 @@ class TestYankMonorepoContext:
 
     @patch(f"{MOD_YANK}.find_workspace_root", return_value="/ws")
     @patch(f"{MOD_YANK}.resolve_project")
-    @patch(f"{MOD_YANK}.detect_targets", return_value=[])
+    @patch(f"{MOD_YANK}.resolve_member_context", return_value=MagicMock(targets=[]))
     @patch(f"{MOD_YANK}.check_gh_installed", return_value=False)
     def test_gh_not_installed(self, *_):
         from rlsbl.commands.yank import run_cmd
@@ -1219,7 +1219,7 @@ class TestYankMonorepoContext:
             assert exc.value.code == 1
 
     @patch(f"{MOD_YANK}.find_workspace_root", return_value=None)
-    @patch(f"{MOD_YANK}.detect_targets", return_value=[])
+    @patch(f"{MOD_YANK}.resolve_member_context", return_value=MagicMock(targets=[]))
     @patch(f"{MOD_YANK}.check_gh_installed", return_value=True)
     @patch(f"{MOD_YANK}.check_gh_auth", return_value=False)
     def test_gh_not_authed(self, *_):
@@ -1233,7 +1233,7 @@ class TestYankLatestRefused:
     """Cover the 'latest release' guard (lines 93-104)."""
 
     @patch(f"{MOD_YANK}.find_workspace_root", return_value=None)
-    @patch(f"{MOD_YANK}.detect_targets", return_value=[])
+    @patch(f"{MOD_YANK}.resolve_member_context", return_value=MagicMock(targets=[]))
     @patch(f"{MOD_YANK}.check_gh_installed", return_value=True)
     @patch(f"{MOD_YANK}.check_gh_auth", return_value=True)
     @patch(f"{MOD_YANK}.run_gh")
@@ -1248,7 +1248,7 @@ class TestYankLatestRefused:
         assert exc.value.code == 1
 
     @patch(f"{MOD_YANK}.find_workspace_root", return_value=None)
-    @patch(f"{MOD_YANK}.detect_targets", return_value=[])
+    @patch(f"{MOD_YANK}.resolve_member_context", return_value=MagicMock(targets=[]))
     @patch(f"{MOD_YANK}.check_gh_installed", return_value=True)
     @patch(f"{MOD_YANK}.check_gh_auth", return_value=True)
     @patch(f"{MOD_YANK}.run_gh")
@@ -1267,7 +1267,7 @@ class TestYankConfirmation:
     """Cover confirmation prompt (lines 108-119)."""
 
     @patch(f"{MOD_YANK}.find_workspace_root", return_value=None)
-    @patch(f"{MOD_YANK}.detect_targets", return_value=[])
+    @patch(f"{MOD_YANK}.resolve_member_context", return_value=MagicMock(targets=[]))
     @patch(f"{MOD_YANK}.check_gh_installed", return_value=True)
     @patch(f"{MOD_YANK}.check_gh_auth", return_value=True)
     @patch(f"{MOD_YANK}.run_gh")
@@ -1283,7 +1283,7 @@ class TestYankConfirmation:
             assert exc.value.code == 0
 
     @patch(f"{MOD_YANK}.find_workspace_root", return_value=None)
-    @patch(f"{MOD_YANK}.detect_targets", return_value=[])
+    @patch(f"{MOD_YANK}.resolve_member_context", return_value=MagicMock(targets=[]))
     @patch(f"{MOD_YANK}.check_gh_installed", return_value=True)
     @patch(f"{MOD_YANK}.check_gh_auth", return_value=True)
     @patch(f"{MOD_YANK}.run_gh")
@@ -1303,7 +1303,7 @@ class TestYankSoftYank:
     """Cover _soft_yank (lines 137-168)."""
 
     @patch(f"{MOD_YANK}.find_workspace_root", return_value=None)
-    @patch(f"{MOD_YANK}.detect_targets", return_value=[])
+    @patch(f"{MOD_YANK}.resolve_member_context", return_value=MagicMock(targets=[]))
     @patch(f"{MOD_YANK}.check_gh_installed", return_value=True)
     @patch(f"{MOD_YANK}.check_gh_auth", return_value=True)
     @patch(f"{MOD_YANK}.run_gh")
@@ -1323,7 +1323,7 @@ class TestYankHardYank:
     """Cover _hard_yank (lines 127-134)."""
 
     @patch(f"{MOD_YANK}.find_workspace_root", return_value=None)
-    @patch(f"{MOD_YANK}.detect_targets", return_value=[])
+    @patch(f"{MOD_YANK}.resolve_member_context", return_value=MagicMock(targets=[]))
     @patch(f"{MOD_YANK}.check_gh_installed", return_value=True)
     @patch(f"{MOD_YANK}.check_gh_auth", return_value=True)
     @patch(f"{MOD_YANK}.run_gh")

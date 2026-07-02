@@ -4,7 +4,8 @@ import os
 import sys
 import time
 
-from ..targets import TARGETS, detect_targets
+from ..member_context import resolve_member_context
+from ..targets import TARGETS, resolve_releasable_config_dir
 from ..utils import check_gh_auth, check_gh_installed, extract_changelog_entry, run_gh
 from ..workspace import find_workspace_root, resolve_project
 
@@ -38,6 +39,7 @@ def run_cmd(args, flags, project_root):
     is_non_releasable = False
     releasable_name = None
     releasable_tag_fmt = None
+    releasable_config_dir = None
     start_path = str(project_root)
     monorepo_root = find_workspace_root(start_path)
     if monorepo_root:
@@ -46,6 +48,7 @@ def run_cmd(args, flags, project_root):
             monorepo_name = project["name"]
             monorepo_project_path = project["path"]
             is_non_releasable = not project.is_releasable
+            releasable_config_dir = resolve_releasable_config_dir(project, monorepo_root)
 
             # Detect explicit releasable mode
             from ..workspace import is_explicit_mode, load_releasables, load_workspace as _load_ws, resolve_releasable_for_project
@@ -70,8 +73,11 @@ def run_cmd(args, flags, project_root):
     # in monorepo mode (via _require_sub_project_root).
     project_dir = start_path
 
-    # Detect primary target
-    entries = detect_targets(project_dir)
+    # Detect primary target (with releasable-level config inheritance)
+    member = resolve_member_context(
+        project_dir, releasable_config_dir=releasable_config_dir,
+    )
+    entries = member.targets
     if not entries:
         print("Error: no package.json, pyproject.toml, or go.mod found.", file=sys.stderr)
         sys.exit(1)

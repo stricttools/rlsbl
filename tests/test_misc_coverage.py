@@ -672,7 +672,7 @@ class TestEditReleaseAdditionalCoverage:
         with patch("rlsbl.commands.edit_release.check_gh_installed", return_value=True), \
              patch("rlsbl.commands.edit_release.check_gh_auth", return_value=True), \
              patch("rlsbl.commands.edit_release.find_workspace_root", return_value=None), \
-             patch("rlsbl.commands.edit_release.detect_targets", return_value=[]):
+             patch("rlsbl.commands.edit_release.resolve_member_context", return_value=MagicMock(targets=[])):
             with pytest.raises(SystemExit) as exc_info:
                 edit_release_run_cmd([], {}, project_root=".")
             assert exc_info.value.code == 1
@@ -690,7 +690,7 @@ class TestEditReleaseAdditionalCoverage:
         with patch("rlsbl.commands.edit_release.check_gh_installed", return_value=True), \
              patch("rlsbl.commands.edit_release.check_gh_auth", return_value=True), \
              patch("rlsbl.commands.edit_release.find_workspace_root", return_value=None), \
-             patch("rlsbl.commands.edit_release.detect_targets", return_value=[mock_entry]), \
+             patch("rlsbl.commands.edit_release.resolve_member_context", return_value=MagicMock(targets=[mock_entry])), \
              patch("rlsbl.commands.edit_release.TARGETS", {"npm": mock_target}):
             with pytest.raises(SystemExit) as exc_info:
                 edit_release_run_cmd([], {}, project_root=str(tmp_path))
@@ -714,7 +714,7 @@ class TestEditReleaseAdditionalCoverage:
              patch("rlsbl.commands.edit_release.check_gh_auth", return_value=True), \
              patch("rlsbl.commands.edit_release.find_workspace_root", return_value=str(tmp_path)), \
              patch("rlsbl.commands.edit_release.resolve_project", return_value=mock_project), \
-             patch("rlsbl.commands.edit_release.detect_targets", return_value=[mock_entry]), \
+             patch("rlsbl.commands.edit_release.resolve_member_context", return_value=MagicMock(targets=[mock_entry])), \
              patch("rlsbl.commands.edit_release.TARGETS", {"npm": mock_target}):
             with pytest.raises(SystemExit) as exc_info:
                 edit_release_run_cmd([], {}, project_root=".")
@@ -1219,7 +1219,7 @@ class TestReleaseRetryQuietMode:
     @patch("rlsbl.commands.release_retry.run_gh")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.resolve_member_context")
     @patch("rlsbl.commands.release_retry.TARGETS")
     @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
@@ -1234,7 +1234,7 @@ class TestReleaseRetryQuietMode:
         entry = MagicMock()
         entry.name = "npm"
         entry.path = "."
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
 
         def run_effect(cmd, args=None, **kwargs):
@@ -1270,7 +1270,7 @@ class TestReleaseRetryConfirmationEOFError:
     @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.resolve_member_context")
     @patch("rlsbl.commands.release_retry.TARGETS")
     @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
@@ -1284,7 +1284,7 @@ class TestReleaseRetryConfirmationEOFError:
         entry = MagicMock()
         entry.name = "npm"
         entry.path = "."
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
 
         mock_run.return_value = "a" * 40  # git rev-list
@@ -1298,7 +1298,7 @@ class TestReleaseRetryConfirmationEOFError:
     @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.resolve_member_context")
     @patch("rlsbl.commands.release_retry.TARGETS")
     @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
@@ -1312,7 +1312,7 @@ class TestReleaseRetryConfirmationEOFError:
         entry = MagicMock()
         entry.name = "npm"
         entry.path = "."
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
 
         mock_run.return_value = "a" * 40  # git rev-list
@@ -1327,7 +1327,7 @@ class TestReleaseRetryConfirmationEOFError:
 class TestReleaseRetryNoTargets:
     """Test release retry when no targets are detected."""
 
-    @patch("rlsbl.commands.release_retry.detect_targets", return_value=[])
+    @patch("rlsbl.commands.release_retry.resolve_member_context", return_value=MagicMock(targets=[]))
     @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
@@ -1347,7 +1347,7 @@ class TestReleaseRetryDispatchWarning:
     @patch("rlsbl.commands.release_retry.run_gh")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.release_retry.detect_targets")
+    @patch("rlsbl.commands.release_retry.resolve_member_context")
     @patch("rlsbl.commands.release_retry.TARGETS")
     @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
@@ -1362,7 +1362,7 @@ class TestReleaseRetryDispatchWarning:
         entry = MagicMock()
         entry.name = "npm"
         entry.path = "."
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
 
         mock_run.return_value = "a" * 40  # git rev-list
@@ -1607,7 +1607,7 @@ class TestEditReleaseMonorepoTagFormat:
     @patch("rlsbl.commands.edit_release.run_gh")
     @patch("rlsbl.commands.edit_release.extract_changelog_entry", return_value="- Fixed bug")
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.edit_release.detect_targets")
+    @patch("rlsbl.commands.edit_release.resolve_member_context")
     @patch("rlsbl.commands.edit_release.TARGETS")
     @patch("rlsbl.commands.edit_release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.edit_release.check_gh_installed", return_value=True)
@@ -1622,7 +1622,7 @@ class TestEditReleaseMonorepoTagFormat:
         entry = MagicMock()
         entry.name = "npm"
         entry.path = "."
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
 
         mock_project = MagicMock()

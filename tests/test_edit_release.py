@@ -42,7 +42,7 @@ class TestEditRelease(unittest.TestCase):
     @patch("rlsbl.commands.edit_release.run_gh")
     @patch("rlsbl.commands.edit_release.extract_changelog_entry", return_value="- Added new feature X\n- Fixed bug Y")
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.edit_release.detect_targets")
+    @patch("rlsbl.commands.edit_release.resolve_member_context")
     @patch("rlsbl.commands.edit_release.TARGETS")
     @patch("rlsbl.commands.edit_release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.edit_release.check_gh_installed", return_value=True)
@@ -52,7 +52,7 @@ class TestEditRelease(unittest.TestCase):
         """Verify correct changelog entry is passed to gh release edit."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
 
         with patch("builtins.open", unittest.mock.mock_open()), \
@@ -76,7 +76,7 @@ class TestEditRelease(unittest.TestCase):
     @patch("rlsbl.commands.edit_release.run_gh")
     @patch("rlsbl.commands.edit_release.extract_changelog_entry", return_value="- Added new feature X")
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.edit_release.detect_targets")
+    @patch("rlsbl.commands.edit_release.resolve_member_context")
     @patch("rlsbl.commands.edit_release.TARGETS")
     @patch("rlsbl.commands.edit_release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.edit_release.check_gh_installed", return_value=True)
@@ -85,7 +85,7 @@ class TestEditRelease(unittest.TestCase):
         """No version arg -- uses current project version."""
         target = self._make_mock_target("0.23.0")
         entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
 
         with patch("builtins.open", unittest.mock.mock_open()), \
@@ -101,7 +101,7 @@ class TestEditRelease(unittest.TestCase):
     @patch("rlsbl.commands.edit_release.run_gh")
     @patch("rlsbl.commands.edit_release.extract_changelog_entry", return_value="- Fixed bug")
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.edit_release.detect_targets")
+    @patch("rlsbl.commands.edit_release.resolve_member_context")
     @patch("rlsbl.commands.edit_release.TARGETS")
     @patch("rlsbl.commands.edit_release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.edit_release.check_gh_installed", return_value=True)
@@ -110,7 +110,7 @@ class TestEditRelease(unittest.TestCase):
         """Pass '0.23.0' as explicit argument."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
 
         with patch("builtins.open", unittest.mock.mock_open()), \
@@ -126,7 +126,7 @@ class TestEditRelease(unittest.TestCase):
     @patch("rlsbl.commands.edit_release.run_gh")
     @patch("rlsbl.commands.edit_release.extract_changelog_entry", return_value="- Fixed bug")
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.edit_release.detect_targets")
+    @patch("rlsbl.commands.edit_release.resolve_member_context")
     @patch("rlsbl.commands.edit_release.TARGETS")
     @patch("rlsbl.commands.edit_release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.edit_release.check_gh_installed", return_value=True)
@@ -135,7 +135,7 @@ class TestEditRelease(unittest.TestCase):
         """Pass 'v0.23.0' -- the 'v' is stripped for changelog lookup."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
 
         with patch("builtins.open", unittest.mock.mock_open()), \
@@ -152,7 +152,7 @@ class TestEditRelease(unittest.TestCase):
 
     @patch("rlsbl.commands.edit_release.extract_changelog_entry", return_value=None)
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.edit_release.detect_targets")
+    @patch("rlsbl.commands.edit_release.resolve_member_context")
     @patch("rlsbl.commands.edit_release.TARGETS")
     @patch("rlsbl.commands.edit_release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.edit_release.check_gh_installed", return_value=True)
@@ -161,7 +161,7 @@ class TestEditRelease(unittest.TestCase):
         """Version has no entry in CHANGELOG.md -- exits with error."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
 
         with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
@@ -174,7 +174,7 @@ class TestEditRelease(unittest.TestCase):
     @patch("rlsbl.commands.edit_release.run_gh")
     @patch("rlsbl.commands.edit_release.extract_changelog_entry", return_value="- Some changes")
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.edit_release.detect_targets")
+    @patch("rlsbl.commands.edit_release.resolve_member_context")
     @patch("rlsbl.commands.edit_release.TARGETS")
     @patch("rlsbl.commands.edit_release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.edit_release.check_gh_installed", return_value=True)
@@ -183,7 +183,7 @@ class TestEditRelease(unittest.TestCase):
         """gh release view returns non-zero -- exits with error."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
 
         # Make gh release view fail
@@ -199,7 +199,7 @@ class TestEditRelease(unittest.TestCase):
     @patch("rlsbl.commands.edit_release.run_gh")
     @patch("rlsbl.commands.edit_release.extract_changelog_entry", return_value="- Added new feature X")
     @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.edit_release.detect_targets")
+    @patch("rlsbl.commands.edit_release.resolve_member_context")
     @patch("rlsbl.commands.edit_release.TARGETS")
     @patch("rlsbl.commands.edit_release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.edit_release.check_gh_installed", return_value=True)
@@ -208,7 +208,7 @@ class TestEditRelease(unittest.TestCase):
         """--dry-run prints but doesn't call gh release edit."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
-        mock_detect.return_value = [entry]
+        mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
 
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
@@ -224,6 +224,51 @@ class TestEditRelease(unittest.TestCase):
         edit_calls = [c for c in mock_run.call_args_list
                       if c[0][0] and "edit" in c[0][0]]
         self.assertEqual(len(edit_calls), 0)
+
+
+class TestEditReleaseReleasableInheritance:
+    """release edit must resolve the primary target with releasable inheritance.
+
+    In explicit releasable mode a member's ``targets`` may live ONLY in the
+    releasable-level config.json. Bare detect_targets(project_dir) raises
+    ConfigError for such a member (config file present, no targets key), so
+    the command must route target resolution through resolve_member_context.
+    """
+
+    def test_edit_release_resolves_targets_with_releasable_inheritance(
+        self, multi_releasable_monorepo_factory, capsys,
+    ):
+        from rlsbl.workspace import Releasable
+
+        ns = multi_releasable_monorepo_factory(
+            releasables=[Releasable(name="alpha")],
+            projects=[{"path": "libs/alpha-core", "name": "alpha-core",
+                       "releasable": "alpha"}],
+            releasable_configs={"alpha": {"private": False, "targets": ["pypi"]}},
+        )
+        member = ns.root / "libs" / "alpha-core"
+        # Targets live ONLY at the releasable level: member config has none.
+        (member / ".rlsbl" / "config.json").write_text("{}\n")
+        (member / "CHANGELOG.md").write_text(
+            "# Changelog\n\n## 0.1.0\n\n- Initial release\n"
+        )
+
+        gh_calls = []
+
+        def fake_run_gh(args, **kwargs):
+            gh_calls.append(list(args))
+            return ""
+
+        with patch("rlsbl.commands.edit_release.check_gh_installed", return_value=True), \
+             patch("rlsbl.commands.edit_release.check_gh_auth", return_value=True), \
+             patch("rlsbl.commands.edit_release.run_gh", side_effect=fake_run_gh):
+            run_cmd([], {"dry-run": True}, project_root=str(member))
+
+        # Version auto-detected from the pypi target (releasable-level),
+        # tag built with the releasable tag format.
+        assert ["release", "view", "alpha@v0.1.0"] in gh_calls
+        out = capsys.readouterr().out
+        assert "Would update GitHub Release notes for alpha@v0.1.0" in out
 
 
 if __name__ == "__main__":
