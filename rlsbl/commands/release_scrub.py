@@ -315,14 +315,14 @@ def run_cmd(flags, *, ctx):
                     proj_path = os.path.join(str(ctx.workspace_root), proj.path)
                     changes_dir = get_changes_dir(proj_path)
                     all_changes_dirs.append(changes_dir)
-                    results = remap_jsonl_hashes(changes_dir, rewrites)
-                    all_remap_results.extend(results)
+                    report = remap_jsonl_hashes(changes_dir, rewrites)
+                    all_remap_results.extend(report.results)
             else:
                 # Standalone project
                 changes_dir = get_changes_dir(str(project_root))
                 all_changes_dirs.append(changes_dir)
-                results = remap_jsonl_hashes(changes_dir, rewrites)
-                all_remap_results.extend(results)
+                report = remap_jsonl_hashes(changes_dir, rewrites)
+                all_remap_results.extend(report.results)
 
             _save_step(scrub_result_path, scrub_data, "JSONL_REMAPPED")
 

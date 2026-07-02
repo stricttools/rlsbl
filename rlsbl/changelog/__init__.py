@@ -12,6 +12,7 @@ from .schema import (
 )
 
 from .files import (
+    RemapReport,
     RemapResult,
     append_entry,
     changes_dir_exists,
@@ -33,6 +34,7 @@ from .validate import validate_unreleased
 
 __all__ = [
     "ChangelogEntry",
+    "RemapReport",
     "RemapResult",
     "append_entry",
     "changes_dir_exists",

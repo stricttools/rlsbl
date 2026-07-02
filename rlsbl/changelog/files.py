@@ -34,6 +34,45 @@ class RemapResult:
     hashes_remapped: int
 
 
+@dataclass
+class RemapReport:
+    """Full report of a remap across all JSONL files in one changes dir.
+
+    ``results`` lists the files that were modified.  ``unmapped`` and
+    ``ambiguous`` record, per file path, hashes that could NOT be mapped:
+    hashes matching no rewrite key, and abbreviated hashes matching more
+    than one rewrite key, respectively.  Callers must decide whether
+    unmapped hashes are a problem (e.g. by checking that they still
+    resolve after the rewrite).
+    """
+    results: list[RemapResult]
+    unmapped: dict[str, list[str]]
+    ambiguous: dict[str, list[str]]
+
+
+# Minimum abbreviated-hash length considered for prefix matching (git's
+# own minimum abbreviation length).
+_MIN_ABBREV = 4
+
+
+def _map_hash(h: str, sha_map: dict) -> "tuple[str | None, bool]":
+    """Map one (possibly abbreviated) hash through the rewrites map.
+
+    Returns ``(new_sha, ambiguous)``.  ``new_sha`` is None when the hash
+    matched no key; ``ambiguous`` is True when an abbreviated hash matched
+    more than one key.
+    """
+    if h in sha_map:
+        return sha_map[h], False
+    if len(h) >= _MIN_ABBREV:
+        candidates = [k for k in sha_map if k.startswith(h)]
+        if len(candidates) == 1:
+            return sha_map[candidates[0]], False
+        if len(candidates) > 1:
+            return None, True
+    return None, False
+
+
 def _parse_semver(filename: str) -> _SemverKey | None:
     """Extract a sort key from a versioned filename, or None.
 
@@ -281,20 +320,25 @@ def writable_jsonl(path):
             os.chmod(path, 0o444)
 
 
-def remap_jsonl_hashes(changes_dir, sha_map):
-    """Replace commit hashes in all JSONL files using a mapping.
+def remap_jsonl_hashes(changes_dir, sha_map) -> RemapReport:
+    """Replace commit hashes in all JSONL files using a rewrites mapping.
 
     Scans unreleased.jsonl and all versioned *.jsonl files in changes_dir.
-    Only modifies files that contain hashes present in sha_map.
-    Uses writable_jsonl to handle read-only versioned files.
+    Hashes are matched exactly against the (full-SHA) keys of ``sha_map``;
+    abbreviated hashes are matched by unique prefix.  Only files containing
+    matching hashes are modified.  Uses writable_jsonl to handle read-only
+    versioned files.
 
-    Returns a list of RemapResult for each file that was modified.
-    Returns an empty list if changes_dir does not exist or no files match.
+    Returns a RemapReport: modified files plus, per file, the hashes that
+    could not be mapped (no key match, or ambiguous abbreviated prefix).
+    Returns an empty report if changes_dir does not exist.
     """
-    if not os.path.isdir(changes_dir):
-        return []
-
     results = []
+    unmapped: dict[str, list[str]] = {}
+    ambiguous: dict[str, list[str]] = {}
+
+    if not os.path.isdir(changes_dir):
+        return RemapReport(results=results, unmapped=unmapped, ambiguous=ambiguous)
 
     # Collect all JSONL files: unreleased + versioned
     jsonl_files = []
@@ -308,18 +352,26 @@ def remap_jsonl_hashes(changes_dir, sha_map):
         entries = parse_jsonl(filepath)
         entries_modified = 0
         hashes_remapped = 0
+        file_unmapped: list[str] = []
+        file_ambiguous: list[str] = []
 
         new_entries = []
         for entry in entries:
             new_commits = []
             entry_changed = False
             for h in entry.commits:
-                if h in sha_map:
-                    new_commits.append(sha_map[h])
+                new_sha, is_ambiguous = _map_hash(h, sha_map)
+                if new_sha is not None:
+                    new_commits.append(new_sha)
                     hashes_remapped += 1
                     entry_changed = True
                 else:
                     new_commits.append(h)
+                    if is_ambiguous:
+                        if h not in file_ambiguous:
+                            file_ambiguous.append(h)
+                    elif h not in file_unmapped:
+                        file_unmapped.append(h)
             if entry_changed:
                 entries_modified += 1
             new_entries.append(ChangelogEntry(
@@ -330,6 +382,11 @@ def remap_jsonl_hashes(changes_dir, sha_map):
                 release_type=entry.release_type,
                 packages=entry.packages,
             ))
+
+        if file_unmapped:
+            unmapped[filepath] = file_unmapped
+        if file_ambiguous:
+            ambiguous[filepath] = file_ambiguous
 
         if entries_modified == 0:
             continue
@@ -357,4 +414,4 @@ def remap_jsonl_hashes(changes_dir, sha_map):
             hashes_remapped=hashes_remapped,
         ))
 
-    return results
+    return RemapReport(results=results, unmapped=unmapped, ambiguous=ambiguous)

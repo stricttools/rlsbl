@@ -1039,7 +1039,7 @@ class TestRemapJsonlHashes:
         )
 
         sha_map = {"old1": "new1", "old2": "new2"}
-        results = remap_jsonl_hashes(str(changes), sha_map)
+        results = remap_jsonl_hashes(str(changes), sha_map).results
 
         assert len(results) == 1
         assert results[0].entries_modified == 2
@@ -1059,7 +1059,7 @@ class TestRemapJsonlHashes:
         os.chmod(str(versioned), 0o444)
 
         sha_map = {"aaa": "bbb"}
-        results = remap_jsonl_hashes(str(changes), sha_map)
+        results = remap_jsonl_hashes(str(changes), sha_map).results
 
         assert len(results) == 1
         entries = parse_jsonl(str(versioned))
@@ -1077,11 +1077,11 @@ class TestRemapJsonlHashes:
         )
 
         sha_map = {"xxx": "yyy"}
-        results = remap_jsonl_hashes(str(changes), sha_map)
+        results = remap_jsonl_hashes(str(changes), sha_map).results
         assert results == []
 
     def test_nonexistent_dir_returns_empty(self, tmp_path):
-        results = remap_jsonl_hashes(str(tmp_path / "nope"), {"a": "b"})
+        results = remap_jsonl_hashes(str(tmp_path / "nope"), {"a": "b"}).results
         assert results == []
 
 

@@ -78,7 +78,7 @@ class TestRemapReplacesHashesInUnreleased:
         _write_entries(str(unreleased), entries)
 
         sha_map = {"aaa111": "new_aaa", "bbb222": "new_bbb"}
-        results = remap_jsonl_hashes(str(changes), sha_map)
+        results = remap_jsonl_hashes(str(changes), sha_map).results
 
         assert len(results) == 1
         result = results[0]
@@ -115,7 +115,7 @@ class TestRemapReplacesHashesInVersioned:
         assert is_read_only(str(versioned))
 
         sha_map = {"old_hash": "new_hash"}
-        results = remap_jsonl_hashes(str(changes), sha_map)
+        results = remap_jsonl_hashes(str(changes), sha_map).results
 
         assert len(results) == 1
         assert results[0].entries_modified == 1
@@ -145,7 +145,7 @@ class TestRemapSkipsUnaffectedFiles:
 
         # Map contains hashes that don't exist in the file
         sha_map = {"xyz789": "new_xyz"}
-        results = remap_jsonl_hashes(str(changes), sha_map)
+        results = remap_jsonl_hashes(str(changes), sha_map).results
 
         assert results == []
 
@@ -159,7 +159,7 @@ class TestRemapHandlesMissingDir:
 
     def test_remap_handles_missing_dir(self, tmp_path):
         nonexistent = tmp_path / "does_not_exist"
-        results = remap_jsonl_hashes(str(nonexistent), {"a": "b"})
+        results = remap_jsonl_hashes(str(nonexistent), {"a": "b"}).results
         assert results == []
 
 
@@ -183,7 +183,7 @@ class TestRemapPartialMapping:
 
         # Only hash_b is in the map
         sha_map = {"hash_b": "new_hash_b"}
-        results = remap_jsonl_hashes(str(changes), sha_map)
+        results = remap_jsonl_hashes(str(changes), sha_map).results
 
         assert len(results) == 1
         assert results[0].entries_modified == 1
@@ -191,3 +191,75 @@ class TestRemapPartialMapping:
 
         updated = parse_jsonl(str(unreleased))
         assert updated[0].commits == ["hash_a", "new_hash_b", "hash_c"]
+
+
+OLD_A = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+NEW_A = "0123456789abcdef0123456789abcdef01234567"
+OLD_B = "a1b2c3d4e5f6ffffffffffffffffffffffffffff"
+NEW_B = "fedcba9876543210fedcba9876543210fedcba98"
+
+
+class TestRemapAbbreviatedHashes:
+    """Abbreviated JSONL hashes must be remapped via unique-prefix matching
+    against the full-SHA keys of safegit's rewrites map."""
+
+    def test_unique_prefix_is_remapped_to_full_new_sha(self, tmp_path):
+        changes = tmp_path / "changes"
+        changes.mkdir()
+        unreleased = changes / "unreleased.jsonl"
+        _write_entries(str(unreleased), [
+            ChangelogEntry(commits=[OLD_A[:12]], user_facing=False),
+        ])
+
+        report = remap_jsonl_hashes(str(changes), {OLD_A: NEW_A})
+        assert len(report.results) == 1
+        assert report.results[0].hashes_remapped == 1
+
+        updated = parse_jsonl(str(unreleased))
+        assert updated[0].commits == [NEW_A]
+
+    def test_ambiguous_prefix_left_untouched_and_reported(self, tmp_path):
+        changes = tmp_path / "changes"
+        changes.mkdir()
+        unreleased = changes / "unreleased.jsonl"
+        # OLD_A and OLD_B share the first 12 chars
+        ambiguous = OLD_A[:12]
+        _write_entries(str(unreleased), [
+            ChangelogEntry(commits=[ambiguous], user_facing=False),
+        ])
+
+        report = remap_jsonl_hashes(str(changes), {OLD_A: NEW_A, OLD_B: NEW_B})
+        assert report.results == []
+        assert report.ambiguous == {str(unreleased): [ambiguous]}
+
+        updated = parse_jsonl(str(unreleased))
+        assert updated[0].commits == [ambiguous]
+
+
+class TestRemapReportsUnmapped:
+    """The remap must report every hash it could not map, per file."""
+
+    def test_unmapped_hashes_reported(self, tmp_path):
+        changes = tmp_path / "changes"
+        changes.mkdir()
+        unreleased = changes / "unreleased.jsonl"
+        _write_entries(str(unreleased), [
+            ChangelogEntry(commits=["abc123", OLD_A], user_facing=False),
+        ])
+
+        report = remap_jsonl_hashes(str(changes), {OLD_A: NEW_A})
+        # OLD_A mapped; abc123 did not match any rewrite key
+        assert report.unmapped == {str(unreleased): ["abc123"]}
+        assert report.results[0].hashes_remapped == 1
+
+    def test_no_unmapped_when_all_match(self, tmp_path):
+        changes = tmp_path / "changes"
+        changes.mkdir()
+        unreleased = changes / "unreleased.jsonl"
+        _write_entries(str(unreleased), [
+            ChangelogEntry(commits=[OLD_A], user_facing=False),
+        ])
+
+        report = remap_jsonl_hashes(str(changes), {OLD_A: NEW_A})
+        assert report.unmapped == {}
+        assert report.ambiguous == {}
