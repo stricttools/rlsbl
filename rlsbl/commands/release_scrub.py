@@ -107,6 +107,33 @@ def _build_safegit_args(flags, mode):
     return args
 
 
+def _print_dry_run_summary(mode, data):
+    """Print a per-mode dry-run preview from safegit's REAL dry-run JSON.
+
+    Dry-run schemas differ per mode and have NO rewrites/tags keys:
+    - match: ScrubMatchDryRunResult (total_matches, estimated_commits, ...)
+    - file:  ScrubFileDryRunResult (commit_count, mode, file)
+    """
+    if mode == "match":
+        total = data.get("total_matches", 0)
+        blobs = data.get("blob_matches", 0)
+        msgs = data.get("commit_matches", 0)
+        tag_m = data.get("tag_matches", 0)
+        scanned = data.get("objects_scanned", 0)
+        est = data.get("estimated_commits", 0)
+        print(
+            f"Dry run (match): {total} matches ({blobs} blob, {msgs} "
+            f"commit-message, {tag_m} tag) across {scanned} objects; "
+            f"~{est} commits would be rewritten."
+        )
+    elif mode == "file":
+        action = "replaced" if data.get("mode") == "replace" else "removed"
+        print(
+            f"Dry run (file): {data.get('file')} would be {action}; "
+            f"{data.get('commit_count', 0)} commits would be rewritten."
+        )
+
+
 def run_cmd(flags, *, ctx):
     # -- Validate inputs --
     mode = _select_and_validate_mode(flags)
@@ -177,9 +204,7 @@ def run_cmd(flags, *, ctx):
         scrub_data = json.loads(output)
 
         if flags.get("dry-run"):
-            rewrites = scrub_data.get("rewrites", {})
-            tags = scrub_data.get("tags", [])
-            print(f"Dry run: {len(rewrites)} commits would be rewritten, {len(tags)} tags affected.")
+            _print_dry_run_summary(mode, scrub_data)
             return
 
         # Save scrub-result.json for resume support

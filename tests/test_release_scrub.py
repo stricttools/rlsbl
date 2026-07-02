@@ -183,11 +183,12 @@ class TestEmptyOutputMeansNoMatches:
 
 
 class TestDryRunShowsPreviewNoMutations:
-    """--dry-run should print a preview and NOT mutate files or push."""
+    """--dry-run should print a real preview (from the actual dry-run JSON
+    schema, which has NO rewrites/tags keys) and NOT mutate files or push."""
 
     @patch(f"{MOD}.require_tool")
     @patch(f"{MOD}.run")
-    def test_dry_run(self, mock_run, _req_tool, tmp_path, capsys):
+    def test_dry_run_match(self, mock_run, _req_tool, tmp_path, capsys):
         # Set up a changes dir so we can verify nothing is modified
         changes_dir = tmp_path / ".rlsbl" / "changes"
         changes_dir.mkdir(parents=True)
@@ -196,14 +197,24 @@ class TestDryRunShowsPreviewNoMutations:
         _write_entries(str(unreleased), entries)
         original_content = unreleased.read_text()
 
-        # safegit --version returns a valid version, safegit scrub returns dry-run JSON
+        # Real ScrubMatchDryRunResult schema (safegit scrub_match.go)
         safegit_result = json.dumps({
-            "rewrites": {"aaa111": "bbb222", "ccc333": "ddd444"},
-            "tags": [{"refname": "refs/tags/v1.0.0"}],
+            "version": 1,
+            "dry_run": True,
+            "pattern": "secret",
+            "scope": "entire_history",
+            "objects_scanned": 12,
+            "binary_skipped": 0,
+            "total_matches": 3,
+            "blob_matches": 2,
+            "commit_matches": 1,
+            "tag_matches": 0,
+            "file_matches": 1,
+            "estimated_commits": 2,
         })
         mock_run.side_effect = [
-            "safegit 0.18.0",  # safegit --version
-            safegit_result,    # safegit scrub match --json ...
+            "safegit 0.21.1",  # safegit --version
+            safegit_result,    # safegit scrub match --json --dry-run ...
         ]
 
         flags = {
@@ -217,10 +228,11 @@ class TestDryRunShowsPreviewNoMutations:
         # Should NOT call sys.exit — just return
         run_cmd(flags, ctx=_ctx(str(tmp_path)))
 
-        # Verify preview message printed
+        # Verify the preview uses the REAL dry-run keys (non-zero counts)
         captured = capsys.readouterr()
+        assert "3 matches" in captured.out
         assert "2 commits would be rewritten" in captured.out
-        assert "1 tags affected" in captured.out
+        assert "0 commits" not in captured.out
 
         # No files modified
         assert unreleased.read_text() == original_content
@@ -234,6 +246,35 @@ class TestDryRunShowsPreviewNoMutations:
         # scrub-result.json should NOT exist
         scrub_result = tmp_path / ".rlsbl" / "releases" / "scrub-result.json"
         assert not scrub_result.exists()
+
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_dry_run_file(self, mock_run, _req_tool, tmp_path, capsys):
+        # Real ScrubFileDryRunResult schema (safegit scrub.go)
+        safegit_result = json.dumps({
+            "version": 1,
+            "dry_run": True,
+            "file": "secrets.env",
+            "mode": "remove",
+            "from": "abc123",
+            "commit_count": 7,
+            "old_head": "def456",
+        })
+        mock_run.side_effect = [
+            "safegit 0.21.1",
+            safegit_result,
+        ]
+        flags = {
+            "file": "secrets.env",
+            "from-commit": "abc123",
+            "reason": "remove secrets",
+            "dry-run": True,
+        }
+        run_cmd(flags, ctx=_ctx(str(tmp_path)))
+        captured = capsys.readouterr()
+        assert "7 commits would be rewritten" in captured.out
+        assert "secrets.env" in captured.out
+        assert "removed" in captured.out
 
 
 # ===========================================================================
