@@ -139,7 +139,7 @@ def _resolve_target(target):
 app = strictcli.App(
     name="rlsbl",
     version=__version__,
-    help="Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 32 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
+    help="Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 33 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
     flags=[
         strictcli.Flag(name="dry-run", type=bool, default=False, help="Preview changes without applying them"),
         strictcli.Flag(name="yes", type=bool, short="y", default=False, help="Skip confirmation prompts"),
@@ -954,7 +954,7 @@ def cmd_chlog_edit(commits, type, description, user_facing, auto_commit, dry_run
 # monorepo group
 # ---------------------------------------------------------------------------
 
-mono = app.group("monorepo", help="Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Provides 15 monorepo subcommands plus a release subgroup, and supports all 18 release targets in a single workspace.toml.")
+mono = app.group("monorepo", help="Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Provides 16 monorepo subcommands plus a release subgroup, and supports all 18 release targets in a single workspace.toml.")
 
 
 @mono.command(name="init", help="Create a new monorepo workspace by generating the .rlsbl-monorepo directory and an empty workspace.toml configuration file at the current directory. This must be run at the repository root before adding individual projects with the add subcommand. Each workspace tracks multiple independently-versioned projects that share a single git repository.")
@@ -1213,6 +1213,25 @@ def cmd_mono_extract_releasable(dry_run, releasable_name, target_path, **_kwargs
         print(f"Extracted releasable '{result['releasable_name']}' ({kind}) to {result['target_path']}")
         print(f"  Members: {members}")
         print(f"  Changelog: {result['entries_migrated']} entries in {result['files_written']} files")
+
+
+@mono.command(name="cleanup", help="Remove per-package release-state residue from releasable member packages: .rlsbl/changes/, .rlsbl/releases/, .rlsbl/bases/, .rlsbl/lint/, .rlsbl/version, per-package CHANGELOG.md, and .rlsbl/config.json when identical to the releasable-level config. Per-package hooks/ directories are preserved (live feature), and members whose path is the workspace root are exempt. Deletions go through saferm (audit trail, recoverable) and are committed automatically. Requires an explicit-mode workspace ([[releasables]] in workspace.toml). Detect residue first with `rlsbl check --name releasable-residue`.")
+def cmd_mono_cleanup(dry_run, yes, **_kwargs):
+    root = _require_project_root()
+    from .workspace import find_workspace_root, is_explicit_mode
+    ws_root = find_workspace_root(str(root))
+    if ws_root is None:
+        print("Error: No workspace found. Run 'rlsbl monorepo init' first.", file=sys.stderr)
+        sys.exit(1)
+    if not is_explicit_mode(ws_root):
+        print(
+            "Error: cleanup only applies to explicit-mode workspaces "
+            "([[releasables]] in workspace.toml).",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    from .releasable_cleanup import run_cleanup_command
+    run_cleanup_command(ws_root, dry_run=dry_run, yes=yes)
 
 
 @mono.command(name="migrate-releasable", help="Migrate a releasable from per-package release state to the releasable model. Detects current state, consolidates per-package changelogs and versions into the releasable directory, creates a releasable-format migration tag, and removes orphaned per-package .rlsbl/changes/ and .rlsbl/releases/ directories. Requires the workspace to be in explicit mode (with [[releasables]] in workspace.toml).")

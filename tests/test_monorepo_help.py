@@ -9,6 +9,7 @@ from rlsbl import app
 EXPECTED_SUBCOMMANDS = [
     "init", "add", "remove", "list", "sync",
     "status", "check-names", "outdated", "release",
+    "cleanup",
 ]
 
 

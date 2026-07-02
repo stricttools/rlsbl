@@ -87,6 +87,8 @@ EXPECTED_CHECKS = [
     "root-rlsbl-conflict",
     # Go companion tags
     "go-companion-tags",
+    # Releasable member residue
+    "releasable-residue",
 ]
 
 

@@ -68,16 +68,17 @@ releasable = "core"
 
 
 # ---------------------------------------------------------------------------
-# Test 1: hooks/ directory removed during cleanup
+# Test 1: hooks/ directory preserved during cleanup (live feature)
 # ---------------------------------------------------------------------------
 
 
-class TestCleanupRemovesHooks:
-    """cleanup_per_package_release_state removes hooks/ directory."""
+class TestCleanupPreservesHooks:
+    """cleanup_per_package_release_state preserves hooks/ -- per-package
+    script hooks are a live feature (run_releasable_hooks)."""
 
     @patch("rlsbl.releasable_cleanup.subprocess.run")
-    def test_hooks_dir_removed(self, mock_run, tmp_project):
-        """hooks/ directory is removed for a releasable member."""
+    def test_hooks_dir_preserved(self, mock_run, tmp_project):
+        """hooks/ directory is NOT removed for a releasable member."""
         pkg = tmp_project / "pkg"
         _make_rlsbl_dir(pkg, subdirs=["hooks"])
         _write_workspace(tmp_project, WORKSPACE_WITH_RELEASABLE)
@@ -85,12 +86,11 @@ class TestCleanupRemovesHooks:
 
         removed = cleanup_per_package_release_state(str(tmp_project))
         removed_names = [os.path.basename(p) for p in removed]
-        assert "hooks" in removed_names
-        # Verify saferm was called with -r for the hooks directory
+        assert "hooks" not in removed_names
+        assert (pkg / ".rlsbl" / "hooks").is_dir()
         calls = [c[0][0] for c in mock_run.call_args_list]
         hooks_calls = [c for c in calls if str(pkg / ".rlsbl" / "hooks") in c]
-        assert len(hooks_calls) == 1
-        assert "-r" in hooks_calls[0]
+        assert hooks_calls == []
 
 
 # ---------------------------------------------------------------------------
@@ -376,12 +376,13 @@ class TestVerifyMinimalAfterFullCleanup:
 class TestVerifyMinimalFlagsUnexpected:
     """verify_minimal_rlsbl identifies all non-minimal state as unexpected."""
 
-    def test_hooks_is_unexpected(self, tmp_project):
-        """hooks/ directory is flagged as unexpected."""
+    def test_hooks_is_expected(self, tmp_project):
+        """hooks/ directory is NOT flagged: per-package script hooks are a
+        live feature."""
         pkg = tmp_project / "pkg"
         _make_rlsbl_dir(pkg, subdirs=["hooks"])
         result = verify_minimal_rlsbl(str(pkg))
-        assert "hooks" in result
+        assert "hooks" not in result
 
     def test_bases_is_unexpected(self, tmp_project):
         """bases/ directory is flagged as unexpected."""
@@ -427,7 +428,7 @@ class TestVerifyMinimalFlagsUnexpected:
             files=["version"],
         )
         result = verify_minimal_rlsbl(str(pkg))
-        assert set(result) == {"changes", "releases", "hooks", "bases", "lint", "version"}
+        assert set(result) == {"changes", "releases", "bases", "lint", "version"}
 
     def test_expected_contents_is_minimal(self):
         """EXPECTED_RLSBL_CONTENTS contains only the minimal set."""
@@ -435,6 +436,7 @@ class TestVerifyMinimalFlagsUnexpected:
             "config.json",
             "hashes.json",
             "managed-files.json",
+            "hooks",
         }
 
 
@@ -466,10 +468,10 @@ class TestCleanupAllNewTargets:
         removed = cleanup_per_package_release_state(str(tmp_project))
         removed_names = [os.path.basename(p) for p in removed]
 
-        # Directories
+        # Directories (hooks/ is preserved: live per-package hooks feature)
         assert "changes" in removed_names
         assert "releases" in removed_names
-        assert "hooks" in removed_names
+        assert "hooks" not in removed_names
         assert "bases" in removed_names
         assert "lint" in removed_names
         # Files
@@ -477,5 +479,5 @@ class TestCleanupAllNewTargets:
         assert "CHANGELOG.md" in removed_names
         assert "config.json" in removed_names
 
-        assert len(removed) == 8  # 5 dirs + 3 files
+        assert len(removed) == 7  # 4 dirs (hooks/ preserved) + 3 files
 

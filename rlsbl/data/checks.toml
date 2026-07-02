@@ -504,3 +504,12 @@ pure = false
 needs_network = false
 depends_on = []
 scope = "workspace"
+
+[checks.releasable-residue]
+tags = ["workspace"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "workspace"

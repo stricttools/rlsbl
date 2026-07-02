@@ -821,3 +821,34 @@ def register_workspace_checks(app):
                 details=missing,
             )
         return CheckResult("pass", "all Go companion tags exist")
+
+    @app.check("releasable-residue")
+    def check_releasable_residue(ctx):
+        """Releasable member packages must not carry per-package release state."""
+        from ..releasable_cleanup import verify_minimal_rlsbl
+
+        if not ctx.releasables:
+            return CheckResult("skip", "no releasables defined")
+
+        root = str(ctx.workspace_root)
+        findings = []
+        for rel in ctx.releasables:
+            for proj in members_of(rel.name, ctx.projects):
+                abs_pkg = os.path.join(root, proj["path"])
+                # Root-path members are exempt: their .rlsbl/ and root
+                # CHANGELOG.md are workspace-level files.
+                if os.path.realpath(abs_pkg) == os.path.realpath(root):
+                    continue
+                for entry in verify_minimal_rlsbl(abs_pkg):
+                    findings.append(
+                        f"{rel.name}/{proj['name']}: .rlsbl/{entry}"
+                    )
+
+        if findings:
+            return CheckResult(
+                "fail",
+                f"{len(findings)} per-package release-state residue item(s); "
+                f"run `rlsbl monorepo cleanup` to remove them",
+                details=findings,
+            )
+        return CheckResult("pass", "no per-package release-state residue")

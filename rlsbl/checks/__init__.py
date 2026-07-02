@@ -111,6 +111,8 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "root-rlsbl-conflict": "workspace",
     # --- go companion tags ---
     "go-companion-tags": "workspace",
+    # --- releasable member residue ---
+    "releasable-residue": "workspace",
 }
 
 # Excluded targets: checks where a target is deliberately excluded because

@@ -21,6 +21,12 @@ from rlsbl.releasable_cleanup import (
 )
 from rlsbl.workspace import WORKSPACE_DIR, WORKSPACE_FILE
 
+import subprocess as _subprocess_module
+
+# Original subprocess.run, captured before any test patches the shared
+# subprocess module object.
+_REAL_SUBPROCESS_RUN = _subprocess_module.run
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -471,12 +477,13 @@ class TestVerifyMinimalCleanState:
         result = verify_minimal_rlsbl(str(pkg))
         assert result == []
 
-    def test_hooks_dir_is_unexpected(self, tmp_project):
-        """hooks/ directory is now unexpected (moved to releasable level)."""
+    def test_hooks_dir_is_expected(self, tmp_project):
+        """hooks/ directory is expected: per-package script hooks are a
+        live feature (run_releasable_hooks / get_package_hook_path)."""
         pkg = tmp_project / "pkg"
         _make_rlsbl_dir(pkg, subdirs=["hooks"])
         result = verify_minimal_rlsbl(str(pkg))
-        assert "hooks" in result
+        assert "hooks" not in result
 
     def test_expected_contents_match(self):
         """EXPECTED_RLSBL_CONTENTS has the documented set."""
@@ -484,6 +491,7 @@ class TestVerifyMinimalCleanState:
             "config.json",
             "hashes.json",
             "managed-files.json",
+            "hooks",
         }
 
     def test_clean_after_cleanup(self, tmp_project):
@@ -495,8 +503,9 @@ class TestVerifyMinimalCleanState:
             files=["config.json", "version"],
         )
         # Simulate cleanup by removing all non-minimal entries
+        # (hooks/ stays: per-package script hooks are a live feature)
         import shutil
-        for subdir in ("changes", "releases", "hooks", "bases", "lint"):
+        for subdir in ("changes", "releases", "bases", "lint"):
             shutil.rmtree(str(pkg / ".rlsbl" / subdir))
         os.remove(str(pkg / ".rlsbl" / "version"))
 
@@ -523,5 +532,290 @@ class TestVerifyMinimalMixedState:
         result = verify_minimal_rlsbl(str(pkg))
         assert "changes" in result
         assert "version" in result
-        assert "hooks" in result  # hooks is now unexpected after cleanup scope extension
+        assert "hooks" not in result  # live per-package script hooks feature
         assert "config.json" not in result
+
+
+# ---------------------------------------------------------------------------
+# Root-path member exemption + dry-run
+# ---------------------------------------------------------------------------
+
+
+class TestRootMemberExemption:
+    """Members whose path resolves to the workspace root are exempt from
+    cleanup: their .rlsbl/ and CHANGELOG.md are workspace-level files."""
+
+    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    def test_root_member_untouched(self, mock_run, tmp_project):
+        _make_rlsbl_dir(tmp_project, subdirs=["changes", "releases"],
+                        files=["version"])
+        (tmp_project / "CHANGELOG.md").write_text("# combined root changelog\n")
+        _write_workspace(tmp_project, """\
+[[releasables]]
+name = "solo"
+
+[[projects]]
+path = "."
+name = "solo-pkg"
+releasable = "solo"
+""")
+        removed = cleanup_per_package_release_state(str(tmp_project))
+        assert removed == []
+        assert (tmp_project / "CHANGELOG.md").is_file()
+        assert (tmp_project / ".rlsbl" / "changes").is_dir()
+        mock_run.assert_not_called()
+
+
+class TestCleanupDryRun:
+
+    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    def test_dry_run_collects_without_deleting(self, mock_run, tmp_project):
+        pkg = tmp_project / "pkg"
+        _make_rlsbl_dir(pkg, subdirs=["changes", "releases"], files=["version"])
+        (pkg / "CHANGELOG.md").write_text("# changelog\n")
+        _write_workspace(tmp_project, """\
+[[releasables]]
+name = "core"
+
+[[projects]]
+path = "pkg"
+name = "pkg"
+releasable = "core"
+""")
+        removed = cleanup_per_package_release_state(str(tmp_project), dry_run=True)
+        assert sorted(os.path.basename(p) for p in removed) == [
+            "CHANGELOG.md", "changes", "releases", "version",
+        ]
+        # Nothing deleted, no saferm calls
+        assert (pkg / ".rlsbl" / "changes").is_dir()
+        assert (pkg / "CHANGELOG.md").is_file()
+        mock_run.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# releasable-residue check
+# ---------------------------------------------------------------------------
+
+
+class TestReleasableResidueCheck:
+    """The releasable-residue workspace check wraps verify_minimal_rlsbl as
+    a hard error, with the hooks/ and root-path-member exemptions."""
+
+    def _ctx(self, root):
+        from pathlib import Path
+
+        from rlsbl.check_context import WorkspaceCheckContext
+        from rlsbl.workspace import load_releasables, load_workspace
+
+        projects = load_workspace(str(root))
+        releasables = load_releasables(str(root), projects=projects)
+        return WorkspaceCheckContext(
+            project_root=Path(str(root)),
+            workspace_root=Path(str(root)),
+            config={},
+            projects=projects,
+            graph=None,
+            releasables=releasables,
+        )
+
+    def _impl(self):
+        from rlsbl import app
+        return app._check_defs["releasable-residue"].impl
+
+    def test_registered_as_hard_error(self):
+        from rlsbl import app
+        check_def = app._check_defs["releasable-residue"]
+        assert check_def.impl is not None
+        assert "workspace" in check_def.tags
+        assert check_def.severity == "error"
+
+    def test_fails_on_residue(self, tmp_project):
+        pkg = tmp_project / "pkg"
+        _make_rlsbl_dir(pkg, subdirs=["changes"], files=["version"])
+        _write_workspace(tmp_project, """\
+[[releasables]]
+name = "core"
+
+[[projects]]
+path = "pkg"
+name = "pkg"
+releasable = "core"
+""")
+        result = self._impl()(self._ctx(tmp_project))
+        assert result.status == "fail"
+        assert any("changes" in d for d in result.details)
+        assert any("version" in d for d in result.details)
+
+    def test_passes_on_minimal_state_with_hooks(self, tmp_project):
+        pkg = tmp_project / "pkg"
+        _make_rlsbl_dir(pkg, subdirs=["hooks"],
+                        files=["config.json", "hashes.json"])
+        _write_workspace(tmp_project, """\
+[[releasables]]
+name = "core"
+
+[[projects]]
+path = "pkg"
+name = "pkg"
+releasable = "core"
+""")
+        result = self._impl()(self._ctx(tmp_project))
+        assert result.status == "pass", result.message
+
+    def test_root_member_exempt(self, tmp_project):
+        _make_rlsbl_dir(tmp_project, subdirs=["changes", "releases"],
+                        files=["version"])
+        _write_workspace(tmp_project, """\
+[[releasables]]
+name = "solo"
+
+[[projects]]
+path = "."
+name = "solo-pkg"
+releasable = "solo"
+""")
+        result = self._impl()(self._ctx(tmp_project))
+        assert result.status == "pass", result.message
+
+    def test_skips_without_releasables(self, tmp_project):
+        _write_workspace(tmp_project, """\
+[[projects]]
+path = "pkg"
+name = "pkg"
+""")
+        from pathlib import Path
+
+        from rlsbl.check_context import WorkspaceCheckContext
+        from rlsbl.workspace import load_workspace
+
+        ctx = WorkspaceCheckContext(
+            project_root=Path(str(tmp_project)),
+            workspace_root=Path(str(tmp_project)),
+            config={},
+            projects=load_workspace(str(tmp_project)),
+            graph=None,
+            releasables=[],
+        )
+        result = self._impl()(ctx)
+        assert result.status == "skip"
+
+
+# ---------------------------------------------------------------------------
+# rlsbl monorepo cleanup command
+# ---------------------------------------------------------------------------
+
+
+class TestCleanupCommand:
+    """run_cleanup_command removes residue via saferm and commits the
+    deletions so trees stay clean."""
+
+    @staticmethod
+    def _mock_saferm_delete(cmd, *args, **kwargs):
+        import shutil
+        import subprocess as real_subprocess
+
+        if isinstance(cmd, list) and cmd and cmd[0] == "saferm":
+            target = cmd[-1]
+            if os.path.isdir(target):
+                shutil.rmtree(target)
+            elif os.path.exists(target):
+                os.unlink(target)
+            return real_subprocess.CompletedProcess(args=cmd, returncode=0)
+        # subprocess is a shared module object, so patching
+        # rlsbl.releasable_cleanup.subprocess.run patches it globally --
+        # delegate to the original captured at module import time.
+        return _REAL_SUBPROCESS_RUN(cmd, *args, **kwargs)
+
+    def _setup_git_workspace(self, root):
+        import subprocess as sp
+
+        def git(*args):
+            sp.run(["git", *args], cwd=str(root), check=True,
+                   capture_output=True, text=True)
+
+        git("init", "-q", "-b", "main")
+        git("config", "user.email", "t@t.local")
+        git("config", "user.name", "T")
+
+        pkg = root / "pkg"
+        _make_rlsbl_dir(pkg, subdirs=["changes", "hooks"],
+                        files=["version", "config.json"])
+        (pkg / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
+        (pkg / ".rlsbl" / "hooks" / "pre-release.sh").write_text("#!/bin/sh\n")
+        (pkg / ".rlsbl" / "config.json").write_text('{"private": true}\n')
+        (pkg / "CHANGELOG.md").write_text("# Changelog\n")
+        _write_workspace(root, """\
+[[releasables]]
+name = "core"
+
+[[projects]]
+path = "pkg"
+name = "pkg"
+releasable = "core"
+""")
+        rel_dir = root / WORKSPACE_DIR / "releasables" / "core"
+        rel_dir.mkdir(parents=True, exist_ok=True)
+        (rel_dir / "config.json").write_text('{"private": true}\n')
+        git("add", "-A")
+        git("commit", "-q", "-m", "initial")
+        return pkg
+
+    def test_cleanup_removes_and_commits(self, tmp_project, monkeypatch):
+        from unittest.mock import patch as _patch
+
+        from rlsbl.releasable_cleanup import run_cleanup_command
+
+        pkg = self._setup_git_workspace(tmp_project)
+        monkeypatch.chdir(tmp_project)
+
+        with _patch(
+            "rlsbl.releasable_cleanup.subprocess.run",
+            side_effect=self._mock_saferm_delete,
+        ):
+            removed = run_cleanup_command(str(tmp_project), yes=True)
+
+        # Residue removed (changes/, version, CHANGELOG.md, config.json --
+        # identical to releasable config); hooks/ preserved
+        assert not (pkg / ".rlsbl" / "changes").exists()
+        assert not (pkg / ".rlsbl" / "version").exists()
+        assert not (pkg / "CHANGELOG.md").exists()
+        assert not (pkg / ".rlsbl" / "config.json").exists()
+        assert (pkg / ".rlsbl" / "hooks" / "pre-release.sh").is_file()
+        assert len(removed) == 4
+
+        # Deletions committed: clean tree + commit message
+        import subprocess as sp
+        status = sp.run(
+            ["git", "status", "--porcelain"], cwd=str(tmp_project),
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        assert status == "", f"cleanup must commit its deletions, got: {status}"
+        head_msg = sp.run(
+            ["git", "log", "-1", "--format=%s"], cwd=str(tmp_project),
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        assert "residue" in head_msg
+
+    def test_cleanup_dry_run_removes_nothing(self, tmp_project, monkeypatch):
+        from unittest.mock import patch as _patch
+
+        from rlsbl.releasable_cleanup import run_cleanup_command
+
+        pkg = self._setup_git_workspace(tmp_project)
+        monkeypatch.chdir(tmp_project)
+
+        with _patch(
+            "rlsbl.releasable_cleanup.subprocess.run",
+            side_effect=self._mock_saferm_delete,
+        ):
+            would = run_cleanup_command(str(tmp_project), dry_run=True)
+
+        assert len(would) == 4
+        assert (pkg / ".rlsbl" / "changes").is_dir()
+        assert (pkg / "CHANGELOG.md").is_file()
+
+    def test_cleanup_command_registered(self):
+        from rlsbl import app
+        # The monorepo group must expose the cleanup command
+        result = app.test(["monorepo", "--help"])
+        assert "cleanup" in result.stdout

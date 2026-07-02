@@ -1,5 +1,5 @@
 ---
-description: "Complete reference for rlsbl's 57 checks across 6 primary tags, including check metadata, severity levels, and target applicability."
+description: "Complete reference for rlsbl's 58 checks across 6 primary tags, including check metadata, severity levels, and target applicability."
 ---
 
 # Check system
@@ -41,7 +41,7 @@ Severity is declared per-check in metadata. A check with `severity = "error"` re
 | `project` | Project-level metadata, config schema, version consistency | 14 |
 | `release` | Git tag and GitHub Release validation | 5 |
 | `changelog` | JSONL changelog validation and structure | 9 |
-| `workspace` | Monorepo workspace integrity and dependency rules | 14 |
+| `workspace` | Monorepo workspace integrity and dependency rules | 15 |
 | `quality` | Code quality, dependency analysis, scaffold hygiene | 9 |
 | `prepush` | Pre-push enforcement: changelog coverage, gitignore guard, manual-push warning, tests | 6 |
 
@@ -110,6 +110,7 @@ Dependencies: `changelog-range` and `changelog-coverage` depend on `changelog-ha
 | `scaffold-gitignore-stale` | warn | Workspace project `.gitignore` files contain all rlsbl-managed entries |
 | `root-rlsbl-conflict` | error | Root `.rlsbl/` does not coexist with `.rlsbl-monorepo/` |
 | `go-companion-tags` | warn | Non-private Go members of releasables have companion tags for the current version; a broken member config is a hard failure |
+| `releasable-residue` | error | Releasable member packages carry no per-package release state (`.rlsbl/changes/`, `.rlsbl/releases/`, `.rlsbl/version`, etc.); `hooks/` and root-path members are exempt |
 
 `test-suite-workspace` (see prepush checks) is also tagged `workspace`.
 
