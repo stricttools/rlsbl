@@ -528,3 +528,96 @@ class TestFinalizeVersionPrerelease:
         result = list_versioned_files(str(changes))
         versions = [ver for ver, _ in result]
         assert "0.43.0-alpha.0" in versions
+
+
+# ---------------------------------------------------------------------------
+# enumerate_changelog_dirs / validate_all_hashes_resolve
+# ---------------------------------------------------------------------------
+
+
+class TestEnumerateChangelogDirs:
+    """enumerate_changelog_dirs must cover per-project .rlsbl/changes AND
+    releasable-level .rlsbl-monorepo/releasables/*/changes directories."""
+
+    def test_standalone(self, tmp_path):
+        from rlsbl.changelog.files import enumerate_changelog_dirs
+
+        changes = tmp_path / ".rlsbl" / "changes"
+        changes.mkdir(parents=True)
+        dirs = enumerate_changelog_dirs(str(tmp_path), None)
+        assert dirs == [str(changes)]
+
+    def test_standalone_missing_dir(self, tmp_path):
+        from rlsbl.changelog.files import enumerate_changelog_dirs
+
+        assert enumerate_changelog_dirs(str(tmp_path), None) == []
+
+    def test_monorepo_includes_releasable_dirs(self, tmp_path):
+        from rlsbl.changelog.files import enumerate_changelog_dirs
+
+        ws = tmp_path / "ws"
+        proj_changes = ws / "packages" / "alpha" / ".rlsbl" / "changes"
+        proj_changes.mkdir(parents=True)
+        rel_changes = ws / ".rlsbl-monorepo" / "releasables" / "core" / "changes"
+        rel_changes.mkdir(parents=True)
+        # A releasable dir without a changes/ subdir must be skipped
+        (ws / ".rlsbl-monorepo" / "releasables" / "empty").mkdir(parents=True)
+
+        (ws / ".rlsbl-monorepo").mkdir(exist_ok=True)
+        (ws / ".rlsbl-monorepo" / "workspace.toml").write_text(
+            'projects = [{ path = "packages/alpha", name = "alpha" }]\n'
+        )
+
+        dirs = enumerate_changelog_dirs(str(ws / "packages" / "alpha"), str(ws))
+        assert str(proj_changes) in dirs
+        assert str(rel_changes) in dirs
+        assert len(dirs) == 2
+
+
+class TestValidateAllHashesResolve:
+    """validate_all_hashes_resolve reports hashes that git cannot resolve."""
+
+    def test_reports_unresolvable_hashes(self, tmp_path, monkeypatch):
+        from rlsbl.changelog.files import validate_all_hashes_resolve
+
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        _run_git(repo, "init", "-q", "-b", "main")
+        _run_git(repo, "config", "user.email", "test@test.local")
+        _run_git(repo, "config", "user.name", "Test")
+        _make_commit(repo, "a.txt", "c1")
+        good = _git_head(repo)
+
+        changes = repo / ".rlsbl" / "changes"
+        changes.mkdir(parents=True)
+        bad = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+        (changes / "unreleased.jsonl").write_text(
+            json.dumps({"commits": [good], "user_facing": False}) + "\n"
+            + json.dumps({"commits": [bad], "user_facing": False}) + "\n"
+        )
+
+        monkeypatch.chdir(repo)
+        failures = validate_all_hashes_resolve([str(changes)])
+        assert failures == {str(changes / "unreleased.jsonl"): [bad]}
+
+    def test_all_resolve(self, tmp_path, monkeypatch):
+        from rlsbl.changelog.files import validate_all_hashes_resolve
+
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        _run_git(repo, "init", "-q", "-b", "main")
+        _run_git(repo, "config", "user.email", "test@test.local")
+        _run_git(repo, "config", "user.name", "Test")
+        _make_commit(repo, "a.txt", "c1")
+        good = _git_head(repo)
+
+        changes = repo / ".rlsbl" / "changes"
+        changes.mkdir(parents=True)
+        (changes / "1.0.0.jsonl").write_text(
+            json.dumps({"commits": [good], "user_facing": True,
+                        "description": "d", "type": "fix"}) + "\n"
+        )
+        os.chmod(str(changes / "1.0.0.jsonl"), 0o444)
+
+        monkeypatch.chdir(repo)
+        assert validate_all_hashes_resolve([str(changes)]) == {}

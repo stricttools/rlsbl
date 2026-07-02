@@ -97,6 +97,79 @@ def get_changes_dir(project_path: str) -> str:
     return os.path.join(project_path, ".rlsbl", "changes")
 
 
+def enumerate_changelog_dirs(project_root, workspace_root=None, workspace_projects=None):
+    """Enumerate every changelog changes-dir whose JSONL files may reference
+    commit hashes.
+
+    Standalone: the project's own ``.rlsbl/changes/``.  Monorepo: every
+    workspace project's ``.rlsbl/changes/`` PLUS every releasable's
+    ``.rlsbl-monorepo/releasables/<name>/changes/`` (enumerated from disk, so
+    coverage matches what is actually in the working tree).
+
+    ``workspace_projects`` may be passed by callers that already loaded the
+    workspace; when omitted it is loaded from ``workspace_root``.
+
+    Only directories that exist are returned.
+    """
+    dirs = []
+    if workspace_root:
+        from ..workspace import (
+            RELEASABLES_DIR,
+            WORKSPACE_DIR,
+            get_releasable_changes_dir,
+            load_workspace,
+        )
+
+        if workspace_projects is None:
+            workspace_projects = load_workspace(str(workspace_root))
+        for proj in workspace_projects:
+            d = get_changes_dir(os.path.join(str(workspace_root), proj.path))
+            if os.path.isdir(d):
+                dirs.append(d)
+        releasables_root = os.path.join(str(workspace_root), WORKSPACE_DIR, RELEASABLES_DIR)
+        if os.path.isdir(releasables_root):
+            for name in sorted(os.listdir(releasables_root)):
+                d = get_releasable_changes_dir(str(workspace_root), name)
+                if os.path.isdir(d):
+                    dirs.append(d)
+    else:
+        d = get_changes_dir(str(project_root))
+        if os.path.isdir(d):
+            dirs.append(d)
+    return dirs
+
+
+def _list_jsonl_files(changes_dir):
+    """All JSONL files in a changes dir: unreleased.jsonl plus versioned."""
+    files = []
+    unreleased = os.path.join(changes_dir, "unreleased.jsonl")
+    if os.path.isfile(unreleased):
+        files.append(unreleased)
+    for _version, path in list_versioned_files(changes_dir):
+        files.append(path)
+    return files
+
+
+def validate_all_hashes_resolve(dirs):
+    """Verify that every commit hash in every JSONL file resolves via git.
+
+    Runs ``git rev-parse`` (in the current working directory's repo) for each
+    distinct hash.  Returns ``{filepath: [unresolvable hashes]}`` — empty when
+    everything resolves.
+    """
+    from .resolve import resolve_hashes
+
+    failures: dict[str, list[str]] = {}
+    for changes_dir in dirs:
+        for filepath in _list_jsonl_files(changes_dir):
+            hashes = [h for entry in parse_jsonl(filepath) for h in entry.commits]
+            resolved = resolve_hashes(hashes)
+            bad = [h for h in dict.fromkeys(hashes) if resolved.get(h) is None]
+            if bad:
+                failures[filepath] = bad
+    return failures
+
+
 def changes_dir_exists(project_path: str) -> bool:
     """Check if .rlsbl/changes/ exists in the project."""
     return os.path.isdir(get_changes_dir(project_path))
@@ -340,15 +413,7 @@ def remap_jsonl_hashes(changes_dir, sha_map) -> RemapReport:
     if not os.path.isdir(changes_dir):
         return RemapReport(results=results, unmapped=unmapped, ambiguous=ambiguous)
 
-    # Collect all JSONL files: unreleased + versioned
-    jsonl_files = []
-    unreleased = os.path.join(changes_dir, "unreleased.jsonl")
-    if os.path.isfile(unreleased):
-        jsonl_files.append(unreleased)
-    for _version, path in list_versioned_files(changes_dir):
-        jsonl_files.append(path)
-
-    for filepath in jsonl_files:
+    for filepath in _list_jsonl_files(changes_dir):
         entries = parse_jsonl(filepath)
         entries_modified = 0
         hashes_remapped = 0

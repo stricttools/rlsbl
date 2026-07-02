@@ -5,7 +5,11 @@ import os
 import re
 import sys
 
-from ..changelog.files import get_changes_dir, remap_jsonl_hashes
+from ..changelog.files import (
+    enumerate_changelog_dirs,
+    get_changes_dir,
+    remap_jsonl_hashes,
+)
 from ..changelog.generate import generate_changelog
 from ..lock import acquire_lock, release_lock
 from ..utils import (
@@ -304,23 +308,17 @@ def run_cmd(flags, *, ctx):
     acquire_lock(lock_dir=lock_dir, project_root=lock_root)
 
     all_remap_results = []
-    all_changes_dirs = []
+
+    # Every changelog dir with hash-bearing JSONL files: per-project
+    # .rlsbl/changes/ plus releasable-level dirs in monorepos.
+    all_changes_dirs = enumerate_changelog_dirs(
+        str(project_root), ctx.workspace_root, workspace_projects=workspace_projects,
+    )
 
     try:
         # -- Remap JSONL hashes --
         if "JSONL_REMAPPED" not in completed:
-            if ctx.workspace_root:
-                # Monorepo: remap all projects
-                for proj in workspace_projects:
-                    proj_path = os.path.join(str(ctx.workspace_root), proj.path)
-                    changes_dir = get_changes_dir(proj_path)
-                    all_changes_dirs.append(changes_dir)
-                    report = remap_jsonl_hashes(changes_dir, rewrites)
-                    all_remap_results.extend(report.results)
-            else:
-                # Standalone project
-                changes_dir = get_changes_dir(str(project_root))
-                all_changes_dirs.append(changes_dir)
+            for changes_dir in all_changes_dirs:
                 report = remap_jsonl_hashes(changes_dir, rewrites)
                 all_remap_results.extend(report.results)
 
@@ -341,12 +339,6 @@ def run_cmd(flags, *, ctx):
 
         # -- Delete .validated caches --
         if "VALIDATED_DELETED" not in completed:
-            if not all_changes_dirs:
-                # Rebuild the list if resuming
-                if ctx.workspace_root:
-                    all_changes_dirs = [get_changes_dir(os.path.join(str(ctx.workspace_root), p.path)) for p in workspace_projects]
-                else:
-                    all_changes_dirs = [get_changes_dir(str(project_root))]
             for changes_dir in all_changes_dirs:
                 validated = os.path.join(changes_dir, ".validated")
                 try:

@@ -674,6 +674,81 @@ class TestResumeFromScrubResult:
 
 
 # ===========================================================================
+# Releasable changes dirs must be remapped too
+# ===========================================================================
+
+
+class TestReleasableDirsRemapped:
+    """Monorepo scrub must remap .rlsbl-monorepo/releasables/*/changes/, not
+    just per-project .rlsbl/changes/."""
+
+    @patch(f"{MOD}.release_lock")
+    @patch(f"{MOD}.acquire_lock")
+    @patch(f"{MOD}.check_gh_auth", return_value=False)
+    @patch(f"{MOD}.check_gh_installed", return_value=False)
+    @patch(f"{MOD}.get_current_branch", return_value="main")
+    @patch(f"{MOD}.get_push_timeout", return_value=120)
+    @patch(f"{MOD}.generate_changelog")
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    @patch(f"{MOD}.load_workspace")
+    def test_releasable_changes_remapped(self, mock_load_ws, mock_run,
+                                          _req_tool, _gen_cl, _push_timeout,
+                                          _get_branch, _gh_installed, _gh_auth,
+                                          _acquire_lock, _release_lock, tmp_path):
+        ws_root = tmp_path / "monorepo"
+        ws_root.mkdir()
+        (ws_root / ".rlsbl-monorepo").mkdir()
+
+        proj_dir = ws_root / "packages" / "alpha"
+        proj_changes = proj_dir / ".rlsbl" / "changes"
+        proj_changes.mkdir(parents=True)
+        _write_entries(str(proj_changes / "unreleased.jsonl"), [
+            ChangelogEntry(commits=["old_hash_1"], user_facing=False),
+        ])
+
+        rel_changes = ws_root / ".rlsbl-monorepo" / "releasables" / "core" / "changes"
+        rel_changes.mkdir(parents=True)
+        _write_entries(str(rel_changes / "unreleased.jsonl"), [
+            ChangelogEntry(commits=["old_hash_2"], user_facing=False),
+        ])
+
+        (proj_dir / ".rlsbl" / "releases").mkdir(parents=True)
+
+        mock_load_ws.return_value = [
+            WorkspaceProject({"name": "alpha", "path": "packages/alpha"}),
+        ]
+
+        safegit_result = json.dumps({
+            "rewrites": {"old_hash_1": "new_hash_1", "old_hash_2": "new_hash_2"},
+            "tags": [],
+            "old_head": "old_hash_1",
+            "new_head": "new_hash_1",
+        })
+        def run_effect(cmd, args=None, **kw):
+            if cmd == "safegit" and args == ["--version"]:
+                return "safegit 0.21.1"
+            if cmd == "safegit" and args and args[0] == "scrub":
+                return safegit_result
+            return ""
+
+        mock_run.side_effect = run_effect
+
+        flags = {
+            "pattern": "secret", "replace": "XXX", "reason": "r",
+            "entire-history": True, "yes": True,
+        }
+        ctx = _ctx(str(proj_dir), workspace_root=str(ws_root))
+        run_cmd(flags, ctx=ctx)
+
+        # Both trees remapped
+        proj_entries = parse_jsonl(str(proj_changes / "unreleased.jsonl"))
+        assert proj_entries[0].commits == ["new_hash_1"]
+        rel_entries = parse_jsonl(str(rel_changes / "unreleased.jsonl"))
+        assert rel_entries[0].commits == ["new_hash_2"]
+
+
+# ===========================================================================
 # Test 8: no matches exits cleanly
 # ===========================================================================
 
