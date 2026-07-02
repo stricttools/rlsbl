@@ -48,7 +48,7 @@
   },
   "project_id": "rlsbl",
   "name": "rlsbl",
-  "version": "0.92.0",
+  "version": "0.93.0",
   "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 32 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
   "global_flags": [
     {
@@ -416,7 +416,7 @@
         },
         "resume": {
           "name": "resume",
-          "help": "Resume a previously failed release from where it left off. Reads the in-progress state file (.rlsbl/releases/in-progress.json), validates that the current branch matches the saved state, and re-enters the release flow, skipping already-completed steps.",
+          "help": "Resume a previously failed release from where it left off. Reads the in-progress state file (.rlsbl/releases/in-progress.json, or .rlsbl-monorepo/releasables/<name>/releases/in-progress.json for releasable releases), validates that the current branch matches the saved state, and re-enters the release flow, skipping already-completed steps.",
           "flags": [
             {
               "name": "watch",
@@ -1393,6 +1393,17 @@
       "scope": "workspace"
     },
     "dev-only-boundary": {
+      "tags": [
+        "workspace"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [],
+      "scope": "workspace"
+    },
+    "unversioned-boundary": {
       "tags": [
         "workspace"
       ],
