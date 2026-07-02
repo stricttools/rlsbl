@@ -23,3 +23,4 @@
 {"commits":["4a3a943b764f5f885c76e041294fbac19320edf9"],"user_facing":true,"description":"**Fix.** A hung `go install` during local Go pipeline publishing no longer stalls the release forever: the call is bounded by a 300s timeout and expiry is a hard error.","type":"fix"}
 {"commits":["106bb6d70ce1458cc836a55135c964bf14fd83b2"],"user_facing":false}
 {"commits":["62804d16687614a7cf905cb9febf630f96514c2b"],"user_facing":false}
+{"commits":["ed9122a11322e0082e3c9763a3b25fc85b52ead9"],"user_facing":true,"description":"**Fix.** Releasing a monorepo releasable with a corrupt member `config.json` now aborts during Go companion-tag collection instead of silently releasing without that member's Go module proxy tag.","type":"fix"}
