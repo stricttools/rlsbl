@@ -889,44 +889,41 @@ class TestGoScaffoldTemplates:
         assert "version.go" not in targets
 
 
-class TestGoRootMainDetection:
-    """Tests for GoTarget._has_root_main() and _has_cmd_main() detection."""
+class TestGoLibraryClassification:
+    """Tests for GoTarget._is_library() across layouts.
 
-    def test_has_root_main_true(self, tmp_project):
+    Replaces tests for the deleted _has_root_main/_has_cmd_main wrappers
+    (superseded by go_introspect.list_main_packages, whose per-layout
+    enumeration is covered in test_go_introspect.py)."""
+
+    def test_root_main_is_binary(self, tmp_project):
         target = GoTarget()
         (tmp_project / "go.mod").write_text("module github.com/user/myapp\n\ngo 1.21\n")
         (tmp_project / "main.go").write_text("package main\n\nfunc main() {}\n")
-        assert target._has_root_main(str(tmp_project)) is True
+        assert target._is_library(str(tmp_project)) is False
 
-    def test_has_root_main_false(self, tmp_project):
+    def test_no_main_packages_is_library(self, tmp_project):
         target = GoTarget()
         (tmp_project / "go.mod").write_text("module github.com/user/myapp\n\ngo 1.21\n")
-        # No main package at root
-        assert target._has_root_main(str(tmp_project)) is False
+        (tmp_project / "lib.go").write_text("package myapp\n\nfunc Hello() {}\n")
+        assert target._is_library(str(tmp_project)) is True
 
-    def test_has_cmd_main_single_binary(self, tmp_project):
+    def test_single_cmd_main_is_binary(self, tmp_project):
         target = GoTarget()
         (tmp_project / "go.mod").write_text("module github.com/user/myapp\n\ngo 1.21\n")
         cmd_dir = tmp_project / "cmd" / "myapp"
         cmd_dir.mkdir(parents=True)
         (cmd_dir / "main.go").write_text("package main\n\nfunc main() {}\n")
-        assert target._has_cmd_main(str(tmp_project)) is True
+        assert target._is_library(str(tmp_project)) is False
 
-    def test_has_cmd_main_multi_binary(self, tmp_project):
+    def test_multi_binary_is_not_library(self, tmp_project):
         target = GoTarget()
         (tmp_project / "go.mod").write_text("module github.com/user/myapp\n\ngo 1.21\n")
         for name in ("foo", "bar"):
             cmd_dir = tmp_project / "cmd" / name
             cmd_dir.mkdir(parents=True)
             (cmd_dir / "main.go").write_text("package main\n\nfunc main() {}\n")
-        # Multi-binary: cmd/ is correct, should return False
-        assert target._has_cmd_main(str(tmp_project)) is False
-
-    def test_has_cmd_main_no_cmd(self, tmp_project):
-        target = GoTarget()
-        (tmp_project / "go.mod").write_text("module github.com/user/myapp\n\ngo 1.21\n")
-        # No cmd/ directory at all
-        assert target._has_cmd_main(str(tmp_project)) is False
+        assert target._is_library(str(tmp_project)) is False
 
 
 class TestNpmRegistryUrl:

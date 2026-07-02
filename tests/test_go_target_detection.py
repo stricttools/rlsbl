@@ -43,11 +43,14 @@ class TestCliGoLayoutDetection:
         _write(tmp_path / "cmd" / "myapp" / "cli.go", "package main\n\nfunc main() {}\n")
         assert target._is_library(str(tmp_path)) is False
 
-    def test_has_cmd_main_true_for_cli_go_layout(self, tmp_path):
-        target = GoTarget()
+    def test_main_package_enumerated_for_cli_go_layout(self, tmp_path):
+        """Re-targeted from the deleted _has_cmd_main wrapper: the helper
+        must enumerate the cmd/ main even when its entry file is cli.go."""
+        from rlsbl.go_introspect import list_main_packages
         _write(tmp_path / "go.mod", GO_MOD)
         _write(tmp_path / "cmd" / "myapp" / "cli.go", "package main\n\nfunc main() {}\n")
-        assert target._has_cmd_main(str(tmp_path)) is True
+        mains = list_main_packages(str(tmp_path))
+        assert [p.rel_dir for p in mains] == ["./cmd/myapp"]
 
     def test_goreleaser_main_for_cli_go_layout(self, tmp_path):
         target = GoTarget()

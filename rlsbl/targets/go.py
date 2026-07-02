@@ -72,10 +72,6 @@ class GoTarget(BaseTarget):
         """Return True if the project has no `package main` package anywhere."""
         return len(list_main_packages(dir_path)) == 0
 
-    def _has_root_main(self, dir_path):
-        """Return True if the project root package is `package main`."""
-        return any(p.rel_dir == "." for p in list_main_packages(dir_path))
-
     def _has_version_var(self, dir_path, main_dir="."):
         """Return True if a .go file in *main_dir* declares a Version variable."""
         search_dir = os.path.normpath(os.path.join(dir_path, main_dir))
@@ -85,18 +81,6 @@ class GoTarget(BaseTarget):
                     if re.match(r"^var\s+[Vv]ersion\b", line):
                         return True
         return False
-
-    def _has_cmd_main(self, dir_path):
-        """Return True if there's exactly one main package under cmd/.
-
-        Returns False for multi-binary repos (multiple cmd/ mains) or when
-        no cmd/ main package exists at all.
-        """
-        cmd_mains = [
-            p for p in list_main_packages(dir_path)
-            if p.rel_dir.startswith("./cmd/")
-        ]
-        return len(cmd_mains) == 1
 
     def read_version(self, dir_path):
         """Read version from the VERSION file."""
