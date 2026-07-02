@@ -22,3 +22,4 @@
 {"commits":["9b563972904f2450097cc45beed5d32f329f805e"],"user_facing":false}
 {"commits":["4a3a943b764f5f885c76e041294fbac19320edf9"],"user_facing":true,"description":"**Fix.** A hung `go install` during local Go pipeline publishing no longer stalls the release forever: the call is bounded by a 300s timeout and expiry is a hard error.","type":"fix"}
 {"commits":["106bb6d70ce1458cc836a55135c964bf14fd83b2"],"user_facing":false}
+{"commits":["62804d16687614a7cf905cb9febf630f96514c2b"],"user_facing":false}
