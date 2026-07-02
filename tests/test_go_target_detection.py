@@ -112,6 +112,20 @@ class TestDevInstallCommand:
         spec = target.dev_install_command(str(tmp_path))
         assert spec["global"]["args"] == ["install", "./cmd/myapp"]
 
+    def test_library_returns_noop_spec(self, tmp_path, capsys):
+        """A Go library (zero main packages) has nothing to `go install`:
+        dev_install_command returns the no-op spec shape that `rlsbl dev
+        install` skips, instead of demanding an install_paths declaration
+        that no config could satisfy (any declared path would fail
+        validation because there are no main packages)."""
+        target = GoTarget()
+        _write(tmp_path / "go.mod", GO_MOD)
+        _write(tmp_path / "lib.go", "package myapp\n\nfunc Hello() {}\n")
+        _write_config(tmp_path)  # go pipeline without install_paths
+        spec = target.dev_install_command(str(tmp_path))
+        assert spec == {"global": None, "venv": None}
+        assert "nothing to install" in capsys.readouterr().out
+
     def test_undeclared_install_paths_is_hard_error(self, tmp_path):
         """A Go project without declared install_paths cannot be
         dev-installed -- the error names the key and shows detected mains."""
