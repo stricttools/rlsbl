@@ -87,6 +87,97 @@ class TestValidateFromOrEntireHistoryRequired:
 
 
 # ===========================================================================
+# File-mode CLI contract (real safegit: positional path, --from required,
+# no --replace/--mangle/--entire-history)
+# ===========================================================================
+
+
+class TestFileModeRealSafegitContract:
+    """File mode must follow safegit's actual CLI: `scrub file <path> --from <sha> --reason <r>`.
+
+    safegit scrub file takes a POSITIONAL path, requires --from, and has no
+    --replace/--mangle/--entire-history flags (strictcli-go hard-errors on
+    unknown flags).
+    """
+
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_file_mode_builds_positional_args(self, mock_run, _req_tool, tmp_path):
+        file_dry_run = json.dumps({
+            "version": 1, "dry_run": True, "file": "secrets.env",
+            "mode": "remove", "from": "abc123", "commit_count": 3,
+            "old_head": "def456",
+        })
+        mock_run.side_effect = [
+            "safegit 0.21.1",  # safegit --version
+            file_dry_run,      # safegit scrub file --json --dry-run ...
+        ]
+
+        flags = {
+            "file": "secrets.env",
+            "from-commit": "abc123",
+            "reason": "remove secrets",
+            "dry-run": True,
+        }
+        run_cmd(flags, ctx=_ctx(str(tmp_path)))
+
+        scrub_call = mock_run.call_args_list[1]
+        args = scrub_call[0][1]
+        assert args[:2] == ["scrub", "file"]
+        # Positional path is the LAST argument -- no --file flag exists.
+        assert args[-1] == "secrets.env"
+        assert "--file" not in args
+        assert "--replace" not in args
+        assert "--mangle" not in args
+        assert "--entire-history" not in args
+        assert "--from" in args
+        assert args[args.index("--from") + 1] == "abc123"
+        assert "--reason" in args
+        assert "--json" in args
+        assert "--dry-run" in args
+
+    def test_file_mode_requires_from_commit(self, tmp_path):
+        """safegit scrub file requires --from; --entire-history does not exist."""
+        flags = {"file": "secrets.env", "reason": "r", "entire-history": True}
+        with pytest.raises(SystemExit) as exc_info:
+            run_cmd(flags, ctx=_ctx(str(tmp_path)))
+        assert exc_info.value.code == 1
+
+    def test_file_mode_rejects_replace(self, tmp_path):
+        flags = {"file": "secrets.env", "replace": "XXX", "from-commit": "abc", "reason": "r"}
+        with pytest.raises(SystemExit) as exc_info:
+            run_cmd(flags, ctx=_ctx(str(tmp_path)))
+        assert exc_info.value.code == 1
+
+    def test_file_mode_rejects_mangle(self, tmp_path):
+        flags = {"file": "secrets.env", "mangle": True, "from-commit": "abc", "reason": "r"}
+        with pytest.raises(SystemExit) as exc_info:
+            run_cmd(flags, ctx=_ctx(str(tmp_path)))
+        assert exc_info.value.code == 1
+
+
+class TestEmptyOutputMeansNoMatches:
+    """safegit scrub execute emits NO JSON when there is nothing to rewrite."""
+
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_empty_execute_output(self, mock_run, _req_tool, tmp_path, capsys):
+        mock_run.side_effect = [
+            "safegit 0.21.1",  # safegit --version
+            "",                # safegit scrub match: no matches -> empty stdout
+        ]
+        flags = {
+            "pattern": "nonexistent", "replace": "XXX",
+            "reason": "test", "entire-history": True, "yes": True,
+        }
+        run_cmd(flags, ctx=_ctx(str(tmp_path)))
+        captured = capsys.readouterr()
+        assert "No matches found" in captured.out
+        # scrub-result.json must not linger
+        assert not (tmp_path / ".rlsbl" / "releases" / "scrub-result.json").exists()
+
+
+# ===========================================================================
 # Test 5: dry run
 # ===========================================================================
 

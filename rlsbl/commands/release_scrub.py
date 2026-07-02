@@ -30,23 +30,86 @@ def _save_step(path, data, step_name):
     os.replace(tmp, path)
 
 
-def run_cmd(flags, *, ctx):
-    # -- Validate inputs --
-    if not flags.get("pattern") and not flags.get("file"):
-        print("Error: either --pattern or --file must be provided.", file=sys.stderr)
-        sys.exit(1)
+def _fail(msg):
+    print(f"Error: {msg}", file=sys.stderr)
+    sys.exit(1)
 
-    if not flags.get("replace") and not flags.get("mangle"):
-        print("Error: either --replace or --mangle must be provided.", file=sys.stderr)
-        sys.exit(1)
 
-    if not flags.get("from-commit") and not flags.get("entire-history"):
-        print("Error: either --from-commit or --entire-history must be provided.", file=sys.stderr)
-        sys.exit(1)
+def _select_and_validate_mode(flags):
+    """Determine the scrub mode from flags and validate the per-mode contract.
+
+    safegit's actual CLI contracts (verified against safegit source):
+    - ``scrub match --pattern <re>`` with ``--replace``/``--mangle`` and
+      ``--from``/``--entire-history``.
+    - ``scrub file <path>`` takes a POSITIONAL path and only supports
+      ``--from`` (required) and ``--reason``. There is no ``--file``,
+      ``--replace``, ``--mangle``, or ``--entire-history`` flag; strictcli-go
+      hard-errors on unknown flags.
+
+    Returns the mode string: "match" or "file".
+    """
+    selectors = [name for name in ("pattern", "file") if flags.get(name)]
+    if len(selectors) != 1:
+        _fail("exactly one of --pattern or --file must be provided.")
+    mode = {"pattern": "match", "file": "file"}[selectors[0]]
 
     if not flags.get("reason"):
-        print("Error: --reason is required.", file=sys.stderr)
-        sys.exit(1)
+        _fail("--reason is required.")
+
+    if mode == "match":
+        if not flags.get("replace") and not flags.get("mangle"):
+            _fail("either --replace or --mangle must be provided.")
+        if not flags.get("from-commit") and not flags.get("entire-history"):
+            _fail("either --from-commit or --entire-history must be provided.")
+    elif mode == "file":
+        if flags.get("replace") or flags.get("mangle"):
+            _fail(
+                "--replace/--mangle are match-mode flags; file mode replaces "
+                "the file with its current on-disk content (or removes it if "
+                "absent)."
+            )
+        if flags.get("entire-history"):
+            _fail(
+                "safegit scrub file has no --entire-history; pass "
+                "--from-commit <root-sha> to cover the full history."
+            )
+        if not flags.get("from-commit"):
+            _fail("--from-commit is required in file mode (safegit scrub file requires --from).")
+
+    return mode
+
+
+def _build_safegit_args(flags, mode):
+    """Build the safegit scrub argument list for the selected mode."""
+    if mode == "match":
+        args = ["scrub", "match", "--json"]
+        if flags.get("dry-run"):
+            args.append("--dry-run")
+        args.extend(["--pattern", flags["pattern"]])
+        if flags.get("replace"):
+            args.extend(["--replace", flags["replace"]])
+        else:
+            args.append("--mangle")
+        if flags.get("from-commit"):
+            args.extend(["--from", flags["from-commit"]])
+        else:
+            args.append("--entire-history")
+        args.extend(["--reason", flags["reason"]])
+        return args
+
+    # File mode: positional path last, --from mandatory.
+    args = ["scrub", "file", "--json"]
+    if flags.get("dry-run"):
+        args.append("--dry-run")
+    args.extend(["--from", flags["from-commit"]])
+    args.extend(["--reason", flags["reason"]])
+    args.append(flags["file"])
+    return args
+
+
+def run_cmd(flags, *, ctx):
+    # -- Validate inputs --
+    mode = _select_and_validate_mode(flags)
 
     # -- Check safegit >= 0.18.0 --
     require_tool("safegit", purpose="for history scrubbing")
@@ -97,38 +160,19 @@ def run_cmd(flags, *, ctx):
 
     # -- If not resuming, build and run safegit command --
     if not resuming:
-        # Determine subcommand: "match" for pattern, "file" for file
-        if flags.get("pattern"):
-            safegit_sub = "match"
-            safegit_target_flag = "--pattern"
-            safegit_target_value = flags["pattern"]
-        else:
-            safegit_sub = "file"
-            safegit_target_flag = "--file"
-            safegit_target_value = flags["file"]
-
-        safegit_args = ["scrub", safegit_sub, "--json", safegit_target_flag, safegit_target_value]
-
-        if flags.get("replace"):
-            safegit_args.extend(["--replace", flags["replace"]])
-        elif flags.get("mangle"):
-            safegit_args.append("--mangle")
-
-        if flags.get("from-commit"):
-            safegit_args.extend(["--from", flags["from-commit"]])
-        elif flags.get("entire-history"):
-            safegit_args.append("--entire-history")
-
-        safegit_args.extend(["--reason", flags["reason"]])
-
-        if flags.get("dry-run"):
-            safegit_args.append("--dry-run")
+        safegit_args = _build_safegit_args(flags, mode)
 
         try:
             output = run("safegit", safegit_args, timeout=600)
         except Exception as e:
             print(f"Error: safegit scrub failed: {e}", file=sys.stderr)
             sys.exit(1)
+
+        # safegit emits NO JSON (empty stdout) when there is nothing to
+        # rewrite, in both execute and some scoped paths.
+        if not output.strip():
+            print("No matches found, nothing to do.")
+            return
 
         scrub_data = json.loads(output)
 
