@@ -113,12 +113,17 @@ def _retry_workflow(workflow_name, branch, repo_slug, label):
         return {"name": workflow_name, "passed": False, "run_id": retry_id}
 
 
-def _watch_single_run(ci_run, label, repo_slug, retried_lock=None, retried_workflows=None):
+def _watch_single_run(ci_run, label, repo_slug, retried_lock=None, retried_workflows=None,
+                      known_ids=None):
     """Watch a single CI run. Returns a dict with name, passed, and run_id.
 
     When retried_lock and retried_workflows are provided, deduplicates retries
     so that only one retry is dispatched per workflow name even when multiple
     runs from the same workflow fail concurrently.
+
+    When known_ids (a shared set of run-id strings) is provided, run IDs of
+    dispatched retry runs are recorded in it so the caller can recognize them
+    later (e.g. the late re-poll must not treat a retry run as a new run).
     """
     run_id = str(ci_run["databaseId"])
     workflow_name = ci_run.get("name", f"run {run_id}")
@@ -150,6 +155,8 @@ def _watch_single_run(ci_run, label, repo_slug, retried_lock=None, retried_workf
             if should_retry:
                 retry_result = _retry_workflow(workflow_name, branch, repo_slug, label)
                 if retry_result is not None:
+                    if known_ids is not None and retry_result.get("run_id"):
+                        known_ids.add(str(retry_result["run_id"]))
                     return retry_result
         return {"name": workflow_name, "passed": False, "run_id": run_id}
     except subprocess.TimeoutExpired:
@@ -162,19 +169,31 @@ def _watch_single_run(ci_run, label, repo_slug, retried_lock=None, retried_workf
         return {"name": workflow_name, "passed": False, "run_id": run_id}
 
 
-def _watch_runs(runs, label, repo_slug):
-    """Watch all runs in parallel (or directly if only one). Returns list of result dicts."""
+def _watch_runs(runs, label, repo_slug, retried_lock=None, retried_workflows=None,
+                known_ids=None):
+    """Watch all runs in parallel (or directly if only one). Returns list of result dicts.
+
+    retried_lock, retried_workflows, and known_ids may be passed in so that
+    retry deduplication state is shared across multiple _watch_runs calls
+    (initial watch + late re-poll watch). Fresh state is created when omitted.
+    """
     if len(runs) == 1:
         # No need for threads when there's only one run
         return [_watch_single_run(runs[0], label, repo_slug)]
 
-    retried_lock = threading.Lock()
-    retried_workflows = set()
+    if retried_lock is None:
+        retried_lock = threading.Lock()
+    if retried_workflows is None:
+        retried_workflows = set()
+    if known_ids is None:
+        known_ids = set()
+    known_ids.update(str(r["databaseId"]) for r in runs)
 
     results = []
     with ThreadPoolExecutor(max_workers=len(runs)) as executor:
         futures = {
-            executor.submit(_watch_single_run, ci_run, label, repo_slug, retried_lock, retried_workflows): ci_run
+            executor.submit(_watch_single_run, ci_run, label, repo_slug, retried_lock,
+                            retried_workflows, known_ids): ci_run
             for ci_run in runs
         }
         for future in as_completed(futures):
@@ -381,23 +400,34 @@ def run_cmd(registry, args, flags):
 
         print(f"rlsbl: {label}: found {len(runs)} CI run(s), watching...", file=sys.stderr)
 
+        # Shared retry-dedup state, carried across the initial watch and the
+        # late re-poll watch so retries are never dispatched twice for the
+        # same workflow, and retry run IDs are recognized in the re-poll.
+        retried_lock = threading.Lock()
+        retried_workflows = set()
+        known_ids = {str(r["databaseId"]) for r in runs}
+
         # Watch runs in parallel (or directly if only one)
-        results = _watch_runs(runs, label, repo_slug)
+        results = _watch_runs(runs, label, repo_slug, retried_lock, retried_workflows,
+                              known_ids)
 
         # Re-poll for late-starting workflows (e.g. Publish triggered by
         # a GitHub Release that was created after CI started).  Wait briefly,
         # then check once for any runs that were not in the initial set.
-        initial_ids = {r["databaseId"] for r in runs}
+        # known_ids also contains run IDs of retries dispatched during the
+        # initial watch -- those run on the same commit SHA and must not be
+        # mistaken for late-starting runs.
         time.sleep(5)
         all_runs_now = poll_runs(commit_sha, max_attempts=1, interval=0)
-        late_runs = [r for r in all_runs_now if r["databaseId"] not in initial_ids]
+        late_runs = [r for r in all_runs_now if str(r["databaseId"]) not in known_ids]
 
         if late_runs:
             print(
                 f"rlsbl: {label}: found {len(late_runs)} late-starting run(s), watching...",
                 file=sys.stderr,
             )
-            late_results = _watch_runs(late_runs, label, repo_slug)
+            late_results = _watch_runs(late_runs, label, repo_slug, retried_lock,
+                                       retried_workflows, known_ids)
             results.extend(late_results)
 
         # Workflow audit: list what ran and flag missing publish workflows

@@ -849,5 +849,86 @@ class TestRetryDedup:
             assert r["name"] == "CI"
 
 
+class TestLatePollRetryDedup:
+    """Tests that retry runs dispatched during the initial watch are not
+    re-watched or re-retried when they reappear in the late re-poll.
+
+    A retry dispatched via `gh workflow run` executes on the same commit SHA,
+    so the late re-poll (`gh run list --commit`) includes it. It must be
+    recognized as a known retry run, not treated as a late-starting workflow.
+    """
+
+    @patch("rlsbl.commands.watch._notify")
+    @patch("rlsbl.commands.watch._print_workflow_audit", return_value=False)
+    @patch("rlsbl.commands.watch.poll_runs")
+    @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.run_gh")
+    @patch("rlsbl.commands.watch.run")
+    def test_retry_run_not_treated_as_late_run(
+        self, mock_run, mock_run_gh, mock_time, mock_poll, mock_audit, mock_notify
+    ):
+        """A failed CI run is retried once; the retry run showing up in the
+        re-poll is neither watched again nor retried again."""
+        ci_run = {"databaseId": 100, "name": "CI", "headBranch": "main"}
+        lint_run = {"databaseId": 101, "name": "Lint", "headBranch": "main"}
+        retry_run = {"databaseId": 400, "name": "CI", "headBranch": "main"}
+
+        mock_poll.side_effect = [
+            [ci_run, lint_run],             # initial discovery
+            [ci_run, lint_run, retry_run],  # late re-poll sees the retry run
+        ]
+        mock_run.side_effect = [
+            "abc123full",  # git rev-parse
+            "v1.0.0",      # git describe
+        ]
+
+        dispatch_count = 0
+        watch_calls = []
+
+        def run_gh_side_effect(args, **kwargs):
+            nonlocal dispatch_count
+            if args[:2] == ["repo", "view"]:
+                return json.dumps({"nameWithOwner": "user/repo", "name": "repo"})
+            if args[:2] == ["run", "watch"]:
+                run_id = args[2]
+                watch_calls.append(run_id)
+                if run_id == "101":
+                    return ""  # Lint passes
+                # CI original and any retry runs fail
+                raise subprocess.CalledProcessError(1, "gh")
+            if args[:2] == ["workflow", "run"]:
+                dispatch_count += 1
+                return ""
+            if args[:2] == ["run", "list"]:
+                # First dispatch produces run 400; a buggy second dispatch
+                # would produce run 500.
+                rid = 400 if dispatch_count == 1 else 500
+                return json.dumps(
+                    [{"databaseId": rid, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]
+                )
+            return ""
+
+        mock_run_gh.side_effect = run_gh_side_effect
+
+        with pytest.raises(SystemExit) as exc_info:
+            run_cmd(None, ["abc123"], {})
+
+        assert exc_info.value.code == 1  # CI and its retry failed
+
+        # Exactly ONE retry dispatch: the retry run reappearing in the
+        # re-poll must not trigger another `gh workflow run`.
+        assert dispatch_count == 1, (
+            f"Expected exactly 1 retry dispatch, got {dispatch_count}"
+        )
+        # The retry run is watched exactly once (during the retry), never
+        # again as a "late run".
+        assert watch_calls.count("400") == 1, (
+            f"Retry run 400 watched {watch_calls.count('400')} times: {watch_calls}"
+        )
+        # Audit sees one result per workflow: CI retry failure + Lint pass.
+        audit_arg = mock_audit.call_args[0][0]
+        assert len(audit_arg) == 2, f"Expected 2 results, got {audit_arg}"
+
+
 if __name__ == "__main__":
     pytest.main([__file__])
