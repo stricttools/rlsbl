@@ -130,6 +130,23 @@ def _strip_uv_no_sources(doc):
             del doc["env"]
 
 
+def _strip_concurrency(doc):
+    """Remove the workflow-level concurrency block from a called workflow.
+
+    Project CI workflows are rewritten to ``workflow_call:`` and invoked by
+    the router. GitHub evaluates a called workflow's top-level concurrency
+    in the CALLER's github context, so the per-SHA group scaffolded into CI
+    templates (``${{ github.workflow_ref }}-${{ github.sha }}``) would
+    resolve identically for every sibling called workflow in one router run
+    -- with ``cancel-in-progress: true`` they would cancel each other. The
+    router's own per-SHA concurrency covers the whole run instead.
+
+    Job-level concurrency (if a user added any) is left untouched.
+    """
+    if "concurrency" in doc:
+        del doc["concurrency"]
+
+
 def _generate_router(projects):
     """Generate ci-router.yml content from project list.
 
@@ -195,6 +212,13 @@ def _generate_router(projects):
             'push': {'branches': ['main']},
             'pull_request': None,
             'workflow_dispatch': None,
+        },
+        # Per-SHA group: re-runs of the same commit dedupe, but a new commit
+        # never cancels an earlier commit's in-flight run (release CI
+        # conclusions stay intact during back-to-back batch pushes).
+        'concurrency': {
+            'group': '${{ github.workflow_ref }}-${{ github.sha }}',
+            'cancel-in-progress': True,
         },
         'jobs': jobs,
     }
@@ -434,6 +458,7 @@ def _cmd_sync(flags, project_root):
                     print(f"Warning: {ci_src} has no jobs: key, skipping", file=sys.stderr)
                     continue
                 _rewrite_trigger(doc)
+                _strip_concurrency(doc)
                 _inject_working_directory(doc, clean_path)
                 _rewrite_version_file_inputs(doc, clean_path)
                 _inject_packages_dir(doc, clean_path)
