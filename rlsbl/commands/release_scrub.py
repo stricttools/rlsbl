@@ -20,6 +20,11 @@ from ..utils import (
 )
 from ..workspace import load_workspace
 
+# Minimum safegit release the scrub flow is built against: the fixes here
+# depend on >= 0.19 recipe mode and >= 0.20.x dry-run JSON behavior. The
+# integration test harness builds exactly this version.
+SAFEGIT_MIN_VERSION = (0, 21, 1)
+
 
 def _save_step(path, data, step_name):
     """Record a completed step in the scrub result file."""
@@ -176,15 +181,19 @@ def run_cmd(flags, *, ctx):
     # -- Validate inputs --
     mode = _select_and_validate_mode(flags)
 
-    # -- Check safegit >= 0.18.0 --
+    # -- Check safegit >= SAFEGIT_MIN_VERSION --
     require_tool("safegit", purpose="for history scrubbing")
     version_out = run("safegit", ["--version"])
-    # version_out is like "safegit 0.18.0" or just "0.18.0"
+    # version_out is like "safegit 0.21.1" or "safegit 0.21.1+dirty"
     version_str = version_out.strip().split()[-1]
-    parts = version_str.split(".")
-    version_tuple = tuple(int(p) for p in parts[:3])
-    if version_tuple < (0, 18, 0):
-        print(f"Error: safegit >= 0.18.0 required, found {version_str}", file=sys.stderr)
+    m = re.match(r"(\d+)\.(\d+)\.(\d+)", version_str)
+    if not m:
+        print(f"Error: cannot parse safegit version from {version_out!r}", file=sys.stderr)
+        sys.exit(1)
+    version_tuple = tuple(int(g) for g in m.groups())
+    if version_tuple < SAFEGIT_MIN_VERSION:
+        min_str = ".".join(str(p) for p in SAFEGIT_MIN_VERSION)
+        print(f"Error: safegit >= {min_str} required, found {version_str}", file=sys.stderr)
         sys.exit(1)
 
     # -- Check for scrub-result.json (resume support) --

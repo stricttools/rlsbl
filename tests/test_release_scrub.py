@@ -247,6 +247,39 @@ class TestRecipeMode:
         assert exc_info.value.code == 1
 
 
+class TestSafegitMinVersion:
+    """The scrub flow depends on safegit >= 0.21.1 (recipe mode, dry-run
+    schemas, positional file mode)."""
+
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_rejects_old_safegit(self, mock_run, _req_tool, tmp_path, capsys):
+        mock_run.side_effect = ["safegit 0.20.2"]
+        flags = {
+            "pattern": "x", "replace": "y", "reason": "r",
+            "entire-history": True, "dry-run": True,
+        }
+        with pytest.raises(SystemExit) as exc_info:
+            run_cmd(flags, ctx=_ctx(str(tmp_path)))
+        assert exc_info.value.code == 1
+        assert "0.21.1" in capsys.readouterr().err
+
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_accepts_dirty_build_suffix(self, mock_run, _req_tool, tmp_path):
+        """Version strings like '0.21.1+dirty' must parse, not crash."""
+        dry_json = json.dumps({
+            "version": 1, "dry_run": True, "pattern": "x",
+            "total_matches": 0, "estimated_commits": 0,
+        })
+        mock_run.side_effect = ["safegit 0.21.1+dirty", dry_json]
+        flags = {
+            "pattern": "x", "replace": "y", "reason": "r",
+            "entire-history": True, "dry-run": True,
+        }
+        run_cmd(flags, ctx=_ctx(str(tmp_path)))  # must not raise
+
+
 class TestScrubOrchestrationHandshake:
     """The safegit scrub subprocess must receive RLSBL_SCRUB_ORCHESTRATED=1."""
 
@@ -449,7 +482,7 @@ class TestFullScrubFlow:
 
         # Build the sequence of run() return values (git/safegit only)
         mock_run.side_effect = [
-            "safegit 0.18.0",  # safegit --version
+            "safegit 0.21.1",  # safegit --version
             safegit_result,    # safegit scrub match --json ...
             "",                # safegit commit (COMMITTED step)
             "",                # git push --force-with-lease (BRANCH_PUSHED)
@@ -579,7 +612,7 @@ class TestResumeFromScrubResult:
 
         # run() calls: git/safegit only (gh calls go through run_gh)
         mock_run.side_effect = [
-            "safegit 0.18.0",  # safegit --version
+            "safegit 0.21.1",  # safegit --version
             saved_head,        # git rev-parse HEAD
             "",                # safegit commit
             "",                # git push --force-with-lease
@@ -662,7 +695,7 @@ class TestNoMatchesExitsCleanly:
         })
 
         mock_run.side_effect = [
-            "safegit 0.18.0",  # safegit --version
+            "safegit 0.21.1",  # safegit --version
             safegit_result,    # safegit scrub match --json ...
         ]
 
@@ -761,7 +794,7 @@ class TestMonorepoTagCorrectProject:
         })
 
         mock_run.side_effect = [
-            "safegit 0.18.0",       # safegit --version
+            "safegit 0.21.1",       # safegit --version
             safegit_result,          # safegit scrub
             "",                      # safegit commit
             "",                      # git push --force-with-lease
@@ -870,7 +903,7 @@ class TestStandaloneTagNoPrefix:
         })
 
         mock_run.side_effect = [
-            "safegit 0.18.0",       # safegit --version
+            "safegit 0.21.1",       # safegit --version
             safegit_result,          # safegit scrub
             "",                      # safegit commit
             "",                      # git push --force-with-lease
