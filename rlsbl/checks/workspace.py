@@ -736,6 +736,7 @@ def register_workspace_checks(app):
     @app.check("go-companion-tags")
     def check_go_companion_tags(ctx):
         """Releasables with non-private Go members should have companion tags."""
+        from ..errors import ConfigError
         from ..member_context import resolve_member_context
         from ..targets import resolve_releasable_config_dir
         from ..workspace import read_releasable_version
@@ -745,6 +746,7 @@ def register_workspace_checks(app):
 
         root = str(ctx.workspace_root)
         missing = []
+        config_errors = []
         checked_any = False
 
         for rel in ctx.releasables:
@@ -763,18 +765,23 @@ def register_workspace_checks(app):
                 abs_pkg = os.path.join(root, pkg_path)
 
                 # Resolve effective config and targets with releasable
-                # inheritance (single source of truth: member_context)
+                # inheritance (single source of truth: member_context).
+                # A broken member config is a check FAILURE, not a silent
+                # skip -- the release flow hard-errors on the same config,
+                # so the check must not disagree about the member set.
                 rel_dir = resolve_releasable_config_dir(proj, ctx.workspace_root)
                 try:
                     member = resolve_member_context(
                         abs_pkg, releasable_config_dir=rel_dir,
                     )
-                except Exception:
+                    if member.is_private:
+                        continue
+                    has_go = any(e.name == "go" for e in member.targets)
+                except ConfigError as e:
+                    config_errors.append(
+                        f"{rel.name}/{proj['name']}: member config error: {e}"
+                    )
                     continue
-                if member.is_private:
-                    continue
-
-                has_go = any(e.name == "go" for e in member.targets)
                 if not has_go:
                     continue
 
@@ -791,6 +798,13 @@ def register_workspace_checks(app):
                     missing.append(
                         f"{rel.name}/{proj['name']}: missing companion tag {expected_tag}"
                     )
+
+        if config_errors:
+            return CheckResult(
+                "fail",
+                f"{len(config_errors)} member config error(s)",
+                details=config_errors,
+            )
 
         if not checked_any:
             return CheckResult("skip", "no non-private Go members in releasables")
