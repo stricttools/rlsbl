@@ -641,6 +641,18 @@ def _run_release_mutating(state: ReleaseState):
         from ...workspace import get_releasable_dir
         _releasable_cfg_dir = get_releasable_dir(str(monorepo_root), releasable_name)
 
+    # In releasable mode, the representative member is subject to the same
+    # private-awareness as every other member (resolve_member_context with
+    # releasable-level inheritance): a private representative's manifests
+    # are never version-bumped or keyword-tagged. The releasable version
+    # file remains the source of truth and is always updated.
+    _rep_is_private = False
+    if _releasable_cfg_dir is not None:
+        from ...member_context import resolve_member_context
+        _rep_is_private = resolve_member_context(
+            project_dir, releasable_config_dir=_releasable_cfg_dir,
+        ).is_private
+
     # Snapshot dirty files BEFORE any version-bump writes. This captures
     # everything dirtied by prior stages (generate_changelog, hooks, lint,
     # --allow-dirty pre-existing files, etc.). Only files that become dirty
@@ -804,23 +816,26 @@ def _run_release_mutating(state: ReleaseState):
                 files_to_commit.append(ver_rel)
                 log(f"Updated releasable version: {releasable_name} -> {new_version}")
 
-            modified = reg.write_version(primary_path, new_version, ctx=ctx)
-            for rel in modified:
-                files_to_commit.append(target_vpath(primary_path, rel))
-            if modified:
-                log(f"Updated version in {', '.join(target_vpath(primary_path, r) for r in modified)}")
+            if _rep_is_private:
+                log("Skipping representative manifest bump (private member)")
+            else:
+                modified = reg.write_version(primary_path, new_version, ctx=ctx)
+                for rel in modified:
+                    files_to_commit.append(target_vpath(primary_path, rel))
+                if modified:
+                    log(f"Updated version in {', '.join(target_vpath(primary_path, r) for r in modified)}")
 
-            # Sync version to other configured/detected targets (per-target paths)
-            for t_name, t_path in target_paths.items():
-                if t_name == registry:
-                    continue
-                other_reg = TARGETS.get(t_name)
-                if other_reg and other_reg.check_project_exists(t_path):
-                    other_modified = other_reg.write_version(t_path, new_version, ctx=ctx)
-                    for rel in other_modified:
-                        files_to_commit.append(target_vpath(t_path, rel))
-                    if other_modified:
-                        log(f"Synced version to {', '.join(target_vpath(t_path, r) for r in other_modified)}")
+                # Sync version to other configured/detected targets (per-target paths)
+                for t_name, t_path in target_paths.items():
+                    if t_name == registry:
+                        continue
+                    other_reg = TARGETS.get(t_name)
+                    if other_reg and other_reg.check_project_exists(t_path):
+                        other_modified = other_reg.write_version(t_path, new_version, ctx=ctx)
+                        for rel in other_modified:
+                            files_to_commit.append(target_vpath(t_path, rel))
+                        if other_modified:
+                            log(f"Synced version to {', '.join(target_vpath(t_path, r) for r in other_modified)}")
 
             # In explicit mode, sync version to published member packages
             if releasable_name and member_package_paths and monorepo_root:
@@ -851,8 +866,10 @@ def _run_release_mutating(state: ReleaseState):
             save_step(_state_path, "VERSION_BUMPED")
             _completed.add("VERSION_BUMPED")
 
-        # Ecosystem tagging: add keyword to manifests if enabled
-        if should_tag(flags, ctx.config):
+        # Ecosystem tagging: add keyword to manifests if enabled. A private
+        # representative's manifests are never touched (same private-awareness
+        # as the version bump above).
+        if should_tag(flags, ctx.config) and not _rep_is_private:
             npm_path = target_paths.get("npm", project_dir)
             try:
                 if TARGETS["npm"].check_project_exists(npm_path):
@@ -893,9 +910,18 @@ def _run_release_mutating(state: ReleaseState):
                         files_to_commit.append(norm)
                         log(f"Workspace lockfile included: {ws_lockfile_name}")
 
-        # Update .rlsbl/version marker so it's included in the release commit
+        # Update .rlsbl/version marker (the rlsbl TOOL version that generated
+        # the scaffolding) so it's included in the release commit. Only
+        # refresh it when the project was actually scaffolded (scaffold
+        # metadata present); never in releasable mode -- releasable member
+        # dirs are not scaffolded and nothing reads a member-level marker
+        # (the pre-push freshness check reads the repo root only).
         rlsbl_version_marker = vpath(os.path.join(".rlsbl", "version"))
-        if os.path.exists(os.path.dirname(rlsbl_version_marker)):
+        _scaffold_meta_present = any(
+            os.path.exists(os.path.join(project_dir, ".rlsbl", meta))
+            for meta in ("hashes.json", "managed-files.json")
+        )
+        if _releasable_cfg_dir is None and _scaffold_meta_present:
             try:
                 from ... import __version__ as rlsbl_ver
                 with open(rlsbl_version_marker, "w") as f:
@@ -1101,9 +1127,14 @@ def _run_release_mutating(state: ReleaseState):
             save_step(_state_path, "CHANGELOG_FINALIZED")
             _completed.add("CHANGELOG_FINALIZED")
 
-        # Clean stale batch_limits exclusions that referenced unreleased.jsonl
+        # Clean stale batch_limits exclusions that referenced unreleased.jsonl.
+        # In releasable mode, `changelog add --allow-batch` writes exclusions
+        # to the RELEASABLE-level config.json, so clean that one.
         from ...config import clean_stale_exclusions
-        config_path = os.path.join(project_dir, ".rlsbl", "config.json")
+        if _releasable_cfg_dir is not None:
+            config_path = os.path.join(_releasable_cfg_dir, "config.json")
+        else:
+            config_path = os.path.join(project_dir, ".rlsbl", "config.json")
         if os.path.exists(config_path):
             removed = clean_stale_exclusions(config_path)
             if removed:
