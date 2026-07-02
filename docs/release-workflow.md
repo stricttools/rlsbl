@@ -86,7 +86,7 @@ Target config sections for targets not listed in `include` are rejected as valid
 
 ## Release pipeline order
 
-The release pipeline executes 18 steps in a fixed order, from initial validation through post-release hooks. Each step either succeeds and proceeds to the next, or aborts the entire release with no partial state left behind. Steps 9 and 10 are conditionally skipped when the pre-release hook is customized:
+The release pipeline executes its steps in a fixed order, from initial validation through post-release hooks. Validation steps abort with no partial state left behind; once the mutating phase starts, progress is tracked in an in-progress state file so a failed release can be resumed with `rlsbl release resume`. Steps 9 and 10 are conditionally skipped when the pre-release hook is customized:
 
 | Step | Action | Abort on failure |
 | --- | --- | --- |
@@ -105,11 +105,18 @@ The release pipeline executes 18 steps in a fixed order, from initial validation
 | 13 | Commit (message = tag string, e.g. `v1.2.3`), tag, push | Yes |
 | 14 | Finalize JSONL: rename `unreleased.jsonl` to `x.y.z.jsonl` (chmod 444), create fresh `unreleased.jsonl`, regenerate CHANGELOG.md, generate `x.y.z.md`, commit | Yes |
 | 15 | Create GitHub Release with the version's changelog section as notes | Yes |
-| 16 | Upload assets if pipeline has `assets` or `custom_assets` configured | Yes |
-| 17 | Run `post-release.sh` hook | No (non-fatal) |
-| 18 | Print `Watch CI: rlsbl watch <sha>` | -- |
+| 16 | Upload assets if pipeline has `assets` or `custom_assets` configured | Yes (state preserved, resumable) |
+| 17 | Run pipeline `publish` for each configured pipeline (skipped for `private: true`) | Yes (state preserved, resumable) |
+| 18 | Deploy configured targets | No (failure recorded and named in the completion summary) |
+| 19 | Run `post-release.sh` hook | No (failure recorded and named in the completion summary) |
+| 20 | Regenerate monorepo snapshot | No (failure recorded and named in the completion summary) |
+| 21 | Print `Watch CI: rlsbl watch <sha>` | -- |
 
 Steps 9 and 10 are conditionally skipped — see the hooks override mechanism below.
+
+### Release state and resume
+
+From the version bump onward, every step records a success or failure marker in an in-progress state file (`.rlsbl/releases/in-progress.json`; for releasable releases, `.rlsbl-monorepo/releasables/<name>/releases/in-progress.json`). If a fatal step fails (anything through pipeline publish), the state file is preserved and `rlsbl release resume` continues from where the release stopped, skipping already-completed steps — including post-release steps such as asset upload. Non-fatal failures (deploy, post-release hook, snapshot) are recorded and loudly named in the completion summary, and the release completes. The state file is cleared only when every step carries a marker and no fatal step failed; `rlsbl release run` auto-clears a provably-complete leftover state file instead of blocking.
 
 ## Hooks
 
