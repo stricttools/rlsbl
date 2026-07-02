@@ -140,6 +140,78 @@ def resolve_releasable_dir(project_dir, workspace_root) -> str | None:
     )
 
 
+class StateResolutionError(Exception):
+    """Raised when the resume source cannot be resolved unambiguously."""
+
+
+def resolve_resume_source(workspace_root, cwd=".") -> tuple[str, str]:
+    """Resolve ``(project_dir, state_path)`` for ``rlsbl release resume``.
+
+    - Standalone (``workspace_root`` is None): state under
+      ``<cwd>/.rlsbl/releases/``.
+    - Inside a member package dir: the releasable-aware state path.  If
+      in-flight state exists only at the legacy per-project location, a
+      :class:`StateResolutionError` with a migration hint is raised (never
+      silently ignore pre-existing in-flight state).
+    - At the workspace root: finds the single releasable whose state file
+      exists and resolves the representative member (from the saved
+      ``monorepo_name``, falling back to the first member).  Errors on
+      zero or multiple in-flight releasables.
+    """
+    if workspace_root is None:
+        return cwd, get_state_path(cwd)
+
+    from ...workspace import load_workspace, members_of, resolve_project
+
+    workspace_root = str(workspace_root)
+    project = resolve_project(workspace_root, cwd)
+    if project is None:
+        # Not inside a member package (e.g. at the workspace root):
+        # look for releasable in-flight state.
+        rel_states = find_releasable_state_files(workspace_root)
+        if not rel_states:
+            raise StateResolutionError(
+                "cannot resume from monorepo root. "
+                "cd to the package directory where the release was started."
+            )
+        if len(rel_states) > 1:
+            names = ", ".join(name for name, _ in rel_states)
+            raise StateResolutionError(
+                f"multiple releasables have in-progress releases: {names}. "
+                f"cd into a member package directory of the releasable "
+                f"you want to resume."
+            )
+        rel_name, state_path = rel_states[0]
+        saved = load_release_state(state_path) or {}
+        projects = load_workspace(workspace_root)
+        rep_name = saved.get("monorepo_name")
+        rep = None
+        if rep_name:
+            rep = next((p for p in projects if p["name"] == rep_name), None)
+        if rep is None:
+            members = members_of(rel_name, projects)
+            rep = members[0] if members else None
+        if rep is None:
+            raise StateResolutionError(
+                f"cannot resolve a member package for releasable {rel_name!r}."
+            )
+        return os.path.join(workspace_root, rep["path"]), state_path
+
+    project_dir = os.path.join(workspace_root, project["path"])
+    rel_dir = resolve_releasable_dir(project_dir, workspace_root)
+    state_path = get_state_path(project_dir, releasable_dir=rel_dir)
+    if rel_dir is not None and not os.path.isfile(state_path):
+        legacy_path = get_state_path(project_dir)
+        if os.path.isfile(legacy_path):
+            raise StateResolutionError(
+                f"found in-progress release state at the legacy location "
+                f"{legacy_path}. Releasable release state now lives at "
+                f"{state_path}. Move the file to the new location and "
+                f"re-run `rlsbl release resume`."
+            )
+    return project_dir, state_path
+
+
 def find_releasable_state_files(workspace_root) -> list[tuple[str, str]]:
     """Scan all releasables in a workspace for in-progress release state.
 

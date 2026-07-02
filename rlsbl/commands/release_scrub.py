@@ -60,8 +60,19 @@ def run_cmd(flags, *, ctx):
         sys.exit(1)
 
     # -- Check for scrub-result.json (resume support) --
+    # Same home as the release state file: releasable members keep it under
+    # .rlsbl-monorepo/releasables/<name>/releases/.
+    from .release.release_state import get_scrub_result_path, resolve_releasable_dir
+
     project_root = ctx.project_root
-    scrub_result_path = os.path.join(str(project_root), ".rlsbl", "releases", "scrub-result.json")
+    _scrub_releasable_dir = None
+    if ctx.workspace_root:
+        _scrub_releasable_dir = resolve_releasable_dir(
+            str(project_root), str(ctx.workspace_root),
+        )
+    scrub_result_path = get_scrub_result_path(
+        str(project_root), releasable_dir=_scrub_releasable_dir,
+    )
 
     resuming = False
     scrub_data = None
@@ -79,7 +90,7 @@ def run_cmd(flags, *, ctx):
                 "Error: stale scrub-result.json found. Current HEAD does not match saved new_head.\n"
                 f"  saved:   {saved_head}\n"
                 f"  current: {current_head}\n"
-                "Delete .rlsbl/releases/scrub-result.json or run from the correct branch.",
+                f"Delete {scrub_result_path} or run from the correct branch.",
                 file=sys.stderr,
             )
             sys.exit(1)

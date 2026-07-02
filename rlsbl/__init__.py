@@ -329,32 +329,35 @@ def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, bump, description, 
 
 @release_group.command(
     name="resume",
-    help="Resume a previously failed release from where it left off. Reads the in-progress state file (.rlsbl/releases/in-progress.json), validates that the current branch matches the saved state, and re-enters the release flow, skipping already-completed steps.",
+    help="Resume a previously failed release from where it left off. Reads the in-progress state file (.rlsbl/releases/in-progress.json, or .rlsbl-monorepo/releasables/<name>/releases/in-progress.json for releasable releases), validates that the current branch matches the saved state, and re-enters the release flow, skipping already-completed steps.",
 )
 @strictcli.flag(name="watch", type=bool, help="After release, automatically watch CI runs to completion (--no-watch to skip)")
 def cmd_release_resume(dry_run, yes, quiet, watch, **_kwargs):
     root = _require_sub_project_root()
 
-    from .commands.release.release_state import get_state_path, load_release_state
-    from .workspace import find_workspace_root, resolve_project
+    from .commands.release.release_state import (
+        StateResolutionError,
+        load_release_state,
+        resolve_resume_source,
+    )
+    from .workspace import find_workspace_root
 
-    # Resolve project directory (same logic as release run)
-    project_dir = "."
+    # Resolve the project dir and the (releasable-aware) state path via the
+    # single resume-source resolver. At a workspace root, this finds the one
+    # releasable with in-flight state (error on none or ambiguity).
     monorepo_root = find_workspace_root(str(root))
-    ctx = create_context(root, workspace_root=Path(monorepo_root) if monorepo_root else None)
-    if monorepo_root:
-        project = resolve_project(monorepo_root, ".")
-        if project is None:
-            print(
-                "Error: cannot resume from monorepo root. "
-                "cd to the package directory where the release was started.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        project_dir = os.path.join(monorepo_root, project["path"])
+    try:
+        project_dir, state_path = resolve_resume_source(monorepo_root, cwd=".")
+    except StateResolutionError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    ctx = create_context(
+        root if project_dir == "." else Path(project_dir),
+        workspace_root=Path(monorepo_root) if monorepo_root else None,
+    )
 
     # Load in-progress state
-    state_path = get_state_path(project_dir)
     saved = load_release_state(state_path)
     if saved is None:
         print(

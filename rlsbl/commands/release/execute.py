@@ -720,7 +720,10 @@ def _run_release_mutating(state: ReleaseState):
     # This persists if the release fails mid-way, enabling future resume.
     # On a resume, an existing state file may already contain completed_steps
     # from a prior run. Preserve those so per-step guards can skip them.
-    _state_path = get_state_path(project_dir)
+    # Releasable releases keep their state under the releasable's own dir
+    # (.rlsbl-monorepo/releasables/<name>/releases/), never under the
+    # representative member's .rlsbl/.
+    _state_path = get_state_path(project_dir, releasable_dir=_releasable_cfg_dir)
     _existing_state = load_release_state(_state_path)
     _prior_completed = (
         _existing_state.get("completed_steps", [])
