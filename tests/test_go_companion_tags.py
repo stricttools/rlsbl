@@ -79,7 +79,7 @@ class TestCollectCompanionTags:
         go_entry.name = "go"
 
         with patch("rlsbl.config.read_project_config", return_value={"private": False}), \
-             patch("rlsbl.commands.release.detect_targets", return_value=[go_entry]), \
+             patch("rlsbl.targets.detect_targets", return_value=[go_entry]), \
              patch("rlsbl.commands.release.TARGETS", {"go": GoTarget()}):
             result = collect_companion_tags(
                 ["packages/mylib"], str(tmp_path), "1.0.0",
@@ -95,7 +95,7 @@ class TestCollectCompanionTags:
         mock_detect = MagicMock()
 
         with patch("rlsbl.config.read_project_config", return_value={"private": True}), \
-             patch("rlsbl.commands.release.detect_targets", mock_detect):
+             patch("rlsbl.targets.detect_targets", mock_detect):
             result = collect_companion_tags(
                 ["packages/internal"], str(tmp_path), "1.0.0",
                 "myreleasable@v1.0.0",
@@ -114,7 +114,7 @@ class TestCollectCompanionTags:
 
         # BaseTarget.companion_tags returns [] for npm
         with patch("rlsbl.config.read_project_config", return_value={"private": False}), \
-             patch("rlsbl.commands.release.detect_targets", return_value=[npm_entry]), \
+             patch("rlsbl.targets.detect_targets", return_value=[npm_entry]), \
              patch("rlsbl.commands.release.TARGETS", {"npm": BaseTarget()}):
             result = collect_companion_tags(
                 ["packages/jslib"], str(tmp_path), "1.0.0",
@@ -133,7 +133,7 @@ class TestCollectCompanionTags:
         go_entry2.name = "go"
 
         with patch("rlsbl.config.read_project_config", return_value={"private": False}), \
-             patch("rlsbl.commands.release.detect_targets", return_value=[go_entry1, go_entry2]), \
+             patch("rlsbl.targets.detect_targets", return_value=[go_entry1, go_entry2]), \
              patch("rlsbl.commands.release.TARGETS", {"go": GoTarget()}):
             result = collect_companion_tags(
                 ["packages/mylib"], str(tmp_path), "1.0.0",
@@ -152,7 +152,7 @@ class TestCollectCompanionTags:
 
         # Primary tag happens to match what GoTarget would produce
         with patch("rlsbl.config.read_project_config", return_value={"private": False}), \
-             patch("rlsbl.commands.release.detect_targets", return_value=[go_entry]), \
+             patch("rlsbl.targets.detect_targets", return_value=[go_entry]), \
              patch("rlsbl.commands.release.TARGETS", {"go": GoTarget()}):
             result = collect_companion_tags(
                 ["packages/mylib"], str(tmp_path), "1.0.0",

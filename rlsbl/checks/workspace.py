@@ -682,8 +682,8 @@ def register_workspace_checks(app):
     @app.check("go-companion-tags")
     def check_go_companion_tags(ctx):
         """Releasables with non-private Go members should have companion tags."""
-        from ..config import read_project_config
-        from ..targets import detect_targets, resolve_releasable_config_dir
+        from ..member_context import resolve_member_context
+        from ..targets import resolve_releasable_config_dir
         from ..workspace import read_releasable_version
 
         if not ctx.releasables:
@@ -708,18 +708,19 @@ def register_workspace_checks(app):
                 pkg_path = proj["path"]
                 abs_pkg = os.path.join(root, pkg_path)
 
-                # Check if private
+                # Resolve effective config and targets with releasable
+                # inheritance (single source of truth: member_context)
+                rel_dir = resolve_releasable_config_dir(proj, ctx.workspace_root)
                 try:
-                    pkg_config = read_project_config(abs_pkg)
+                    member = resolve_member_context(
+                        abs_pkg, releasable_config_dir=rel_dir,
+                    )
                 except Exception:
                     continue
-                if pkg_config.get("private", True):
+                if member.is_private:
                     continue
 
-                # Detect Go targets
-                rel_dir = resolve_releasable_config_dir(proj, ctx.workspace_root)
-                entries = detect_targets(abs_pkg, releasable_config_dir=rel_dir)
-                has_go = any(e.name == "go" for e in entries)
+                has_go = any(e.name == "go" for e in member.targets)
                 if not has_go:
                     continue
 

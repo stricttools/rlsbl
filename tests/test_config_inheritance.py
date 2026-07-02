@@ -349,7 +349,7 @@ class TestSyncMemberPackageVersionsInheritance:
         mock_target = MagicMock()
         mock_target.write_version.return_value = ["pyproject.toml"]
 
-        with patch("rlsbl.commands.release.detect_targets", return_value=[mock_entry]), \
+        with patch("rlsbl.targets.detect_targets", return_value=[mock_entry]), \
              patch("rlsbl.commands.release.TARGETS", {"pypi": mock_target}):
             _sync_member_package_versions(
                 member_package_paths=["pkg"],
@@ -395,7 +395,7 @@ class TestSyncMemberPackageVersionsInheritance:
         files_to_commit = []
         log_calls = []
 
-        with patch("rlsbl.commands.release.detect_targets") as mock_detect:
+        with patch("rlsbl.targets.detect_targets") as mock_detect:
             _sync_member_package_versions(
                 member_package_paths=["pkg"],
                 monorepo_root=str(monorepo_root),

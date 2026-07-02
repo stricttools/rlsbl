@@ -65,27 +65,33 @@ def _rel_to_git_root(path, git_root):
     return n
 
 
-def resolve_target_paths(project_dir="."):
+def resolve_target_paths(project_dir=".", releasable_config_dir=None):
     """Build a dict mapping target names to their resolved paths.
 
-    Uses detect_targets() which reads .rlsbl/config.json "targets" (supporting
-    both plain strings and dicts with "name"/"path") and falls back to
-    auto-detection.
+    Resolution goes through :func:`rlsbl.member_context.resolve_member_context`,
+    which reads the merged config "targets" (supporting both plain strings and
+    dicts with "name"/"path", with releasable-level inheritance when
+    ``releasable_config_dir`` is given) and falls back to auto-detection.
 
     Returns dict[str, str] mapping target name -> resolved directory path.
     """
-    from . import detect_targets
+    from ...member_context import resolve_member_context
 
-    entries = detect_targets(project_dir)
-    return {e.name: e.path for e in entries}
+    member = resolve_member_context(
+        project_dir, releasable_config_dir=releasable_config_dir,
+    )
+    return member.target_paths
 
 
-def resolve_release_targets(primary, flags, project_dir=".", *, config):
+def resolve_release_targets(primary, flags, project_dir=".", *, config,
+                            releasable_config_dir=None):
     """Compute the effective set of secondary targets for this release.
 
     Reads the baseline from config "release_targets" list.
-    If absent, falls back to auto-detect (all targets that detect(".")).
-    Entries can be plain strings or dicts with "name" and optional "path".
+    If absent, falls back to auto-detect (all targets that detect("."),
+    with releasable-level inheritance when ``releasable_config_dir`` is
+    given). Entries can be plain strings or dicts with "name" and
+    optional "path".
 
     The primary target is always excluded from the secondary set
     (it's handled separately by the main release flow).
@@ -109,7 +115,9 @@ def resolve_release_targets(primary, flags, project_dir=".", *, config):
                 baseline[te.name] = te.path
     else:
         # Auto-detect: use detect_targets which handles config and fallback
-        baseline = resolve_target_paths(project_dir)
+        baseline = resolve_target_paths(
+            project_dir, releasable_config_dir=releasable_config_dir,
+        )
 
     # Never include the primary target in the secondary set
     baseline.pop(primary, None)
@@ -273,7 +281,8 @@ def archive_blog_body(project_dir, version):
     return None
 
 
-def collect_companion_tags(member_package_paths, workspace_root, version, primary_tag):
+def collect_companion_tags(member_package_paths, workspace_root, version,
+                           primary_tag, releasable_config_dir=None):
     """Collect companion tags from all non-private member packages.
 
     Iterates member packages in an explicit releasable, detects their
@@ -283,19 +292,22 @@ def collect_companion_tags(member_package_paths, workspace_root, version, primar
     - Only meaningful in explicit releasable mode (caller checks).
     - Skips companion creation if the primary tag already contains a
       ``/v`` pattern (Go-compatible), to avoid duplicate tags.
-    - Skips private packages (same logic as _sync_member_package_versions).
+    - Skips private packages (same logic as _sync_member_package_versions,
+      including releasable-level config inheritance).
 
     Args:
         member_package_paths: workspace-relative paths for member packages.
         workspace_root: absolute path to the monorepo root.
         version: version string being released.
         primary_tag: the primary release tag string.
+        releasable_config_dir: optional path to the releasable's state
+            directory for config inheritance.
 
     Returns:
         List of companion tag strings (deduplicated, excluding the primary tag).
     """
-    from . import TARGETS, detect_targets
-    from ...config import read_project_config
+    from . import TARGETS
+    from ...member_context import resolve_member_context
 
     # If the primary tag is already Go-compatible (contains /v), skip
     # companion creation to avoid duplicates.
@@ -310,15 +322,17 @@ def collect_companion_tags(member_package_paths, workspace_root, version, primar
             continue
 
         try:
-            pkg_config = read_project_config(abs_pkg)
+            member = resolve_member_context(
+                abs_pkg, releasable_config_dir=releasable_config_dir,
+            )
         except Exception:
             continue
 
         # Skip private packages (default True when unset)
-        if pkg_config.get("private", True):
+        if member.is_private:
             continue
 
-        entries = detect_targets(abs_pkg)
+        entries = member.targets
         if not entries:
             continue
 
@@ -362,8 +376,8 @@ def _sync_member_package_versions(
         releasable_config_dir: optional path to the releasable's state directory
             for config inheritance.
     """
-    from . import TARGETS, detect_targets
-    from ...config import read_project_config
+    from . import TARGETS
+    from ...member_context import resolve_member_context
 
     for pkg_path in member_package_paths:
         if exclude_path and pkg_path == exclude_path:
@@ -373,15 +387,17 @@ def _sync_member_package_versions(
         if not os.path.isdir(abs_pkg):
             continue
 
-        # Load config through the inheritance-aware path
-        pkg_config = read_project_config(abs_pkg, releasable_config_dir=releasable_config_dir)
+        # Resolve config through the inheritance-aware path
+        member = resolve_member_context(
+            abs_pkg, releasable_config_dir=releasable_config_dir,
+        )
 
         # Skip private packages (default True when unset)
-        if pkg_config.get("private", True):
+        if member.is_private:
             continue
 
         # Detect targets and write version
-        entries = detect_targets(abs_pkg, releasable_config_dir=releasable_config_dir)
+        entries = member.targets
         if not entries:
             continue
 
@@ -612,6 +628,13 @@ def _run_release_mutating(state: ReleaseState):
     project_root = ctx.project_root
     monorepo_root = ctx.workspace_root
     project_dir = str(project_root)
+
+    # Releasable state dir for member config/target inheritance (explicit mode)
+    _releasable_cfg_dir = None
+    if releasable_name and monorepo_root:
+        from ...workspace import get_releasable_dir
+        _releasable_cfg_dir = get_releasable_dir(str(monorepo_root), releasable_name)
+
     # Snapshot dirty files BEFORE any version-bump writes. This captures
     # everything dirtied by prior stages (generate_changelog, hooks, lint,
     # --allow-dirty pre-existing files, etc.). Only files that become dirty
@@ -625,7 +648,9 @@ def _run_release_mutating(state: ReleaseState):
     if primary_path is None:
         primary_path = project_dir
     if target_paths is None:
-        target_paths = resolve_target_paths(project_dir)
+        target_paths = resolve_target_paths(
+            project_dir, releasable_config_dir=_releasable_cfg_dir,
+        )
 
     # git status --porcelain outputs paths relative to the repo root.
     # Compute the repo root so vpath can produce matching relative paths.
@@ -784,14 +809,12 @@ def _run_release_mutating(state: ReleaseState):
 
             # In explicit mode, sync version to published member packages
             if releasable_name and member_package_paths and monorepo_root:
-                from ...workspace import get_releasable_dir
-                _rel_cfg_dir = get_releasable_dir(str(monorepo_root), releasable_name)
                 _sync_member_package_versions(
                     member_package_paths, monorepo_root, new_version,
                     files_to_commit, _git_root, log, ctx,
                     # Skip the current project's path -- already handled above
                     exclude_path=monorepo_project_path,
-                    releasable_config_dir=_rel_cfg_dir,
+                    releasable_config_dir=_releasable_cfg_dir,
                 )
 
             # Bump selfdoc.json version inline (no DocsTarget dependency).
@@ -1148,6 +1171,7 @@ def _run_release_mutating(state: ReleaseState):
             if member_package_paths is not None:
                 _companion_list = collect_companion_tags(
                     member_package_paths, monorepo_root, new_version, tag,
+                    releasable_config_dir=_releasable_cfg_dir,
                 )
                 for ctag in _companion_list:
                     run("git", ["tag", ctag])

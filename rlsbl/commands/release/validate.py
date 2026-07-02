@@ -528,7 +528,8 @@ def print_dry_run_summary(log, registry, monorepo_name, monorepo_project_path,
                           bump_type, current_version, new_version, tag,
                           commit_msg, branch, target_paths, project_dir,
                           changelog_entry, monorepo_root=None,
-                          member_package_paths=None):
+                          member_package_paths=None,
+                          releasable_config_dir=None):
     """Print dry-run summary and return (caller should exit after this)."""
     from . import TARGETS, load_workspace
     from .execute import collect_companion_tags
@@ -561,6 +562,7 @@ def print_dry_run_summary(log, registry, monorepo_name, monorepo_project_path,
     if member_package_paths is not None and monorepo_root:
         companion = collect_companion_tags(
             member_package_paths, monorepo_root, new_version, tag,
+            releasable_config_dir=releasable_config_dir,
         )
         if companion:
             log(f"Companion tags: {', '.join(companion)}")

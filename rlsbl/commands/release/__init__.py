@@ -153,9 +153,13 @@ def _resume_cmd_inner(saved_state, flags, *, ctx):
     description = saved_state.get("description", "")
     context = saved_state.get("context", "")
 
-    # Resolve target and paths
+    # Resolve target and paths (with releasable-level inheritance)
+    _rel_cfg_dir = None
+    if releasable_name and monorepo_root:
+        from ...workspace import get_releasable_dir
+        _rel_cfg_dir = get_releasable_dir(str(monorepo_root), releasable_name)
     target = TARGETS[registry]
-    target_paths = resolve_target_paths(project_dir)
+    target_paths = resolve_target_paths(project_dir, releasable_config_dir=_rel_cfg_dir)
     primary_path = target_paths.get(registry, project_dir)
 
     # Read current version from disk (the version bump may already be done)
@@ -207,7 +211,10 @@ def _resume_cmd_inner(saved_state, flags, *, ctx):
     if changes_dir is None and changes_dir_exists(project_dir):
         changes_dir = get_changes_dir(project_dir)
 
-    secondary_targets = resolve_release_targets(registry, flags, project_dir=project_dir, config=config)
+    secondary_targets = resolve_release_targets(
+        registry, flags, project_dir=project_dir, config=config,
+        releasable_config_dir=_rel_cfg_dir,
+    )
 
     lock_dir = ".rlsbl-monorepo" if monorepo_name else ".rlsbl"
     lock_root = monorepo_root if monorepo_name else project_root
@@ -339,6 +346,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             log(f"Releasable: {releasable_name} ({len(member_package_paths)} member(s))")
 
     # Validate release targets (deferred to here so releasable context is available)
+    _rel_cfg_dir = None
     if member_package_paths is not None and monorepo_root:
         from ...workspace import get_releasable_dir
         _member_abs_dirs = [
@@ -358,9 +366,10 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     # Scaffold conflict guard
     _abort_on_scaffold_conflicts(project_dir)
 
-    # Resolve target paths and compute version
+    # Resolve target paths (with releasable-level inheritance in explicit
+    # mode, so releasable config "targets" drives primary path resolution)
     target = TARGETS[registry]
-    target_paths = resolve_target_paths(project_dir)
+    target_paths = resolve_target_paths(project_dir, releasable_config_dir=_rel_cfg_dir)
     primary_path = target_paths.get(registry, project_dir)
 
     current_version, new_version, bump_type, tag = compute_release_version(
@@ -703,11 +712,15 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             commit_msg, branch, target_paths, project_dir,
             changelog_entry, monorepo_root=monorepo_root,
             member_package_paths=member_package_paths,
+            releasable_config_dir=_rel_cfg_dir,
         )
         return
 
     # --- Execute release ---
-    secondary_targets = resolve_release_targets(registry, flags, project_dir=project_dir, config=ctx.config)
+    secondary_targets = resolve_release_targets(
+        registry, flags, project_dir=project_dir, config=ctx.config,
+        releasable_config_dir=_rel_cfg_dir,
+    )
 
     lock_dir = ".rlsbl-monorepo" if monorepo_name else ".rlsbl"
     lock_root = monorepo_root if monorepo_name else project_root

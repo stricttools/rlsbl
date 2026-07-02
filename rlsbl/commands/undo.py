@@ -303,6 +303,7 @@ def run_cmd(registry, args, flags, *, ctx):
     if releasable_name and ws_root:
         try:
             from ..commands.release.execute import collect_companion_tags
+            from ..workspace import get_releasable_dir as _get_rel_dir2
             from ..workspace import load_workspace as _load_ws2, members_of as _members_of2
 
             _version_for_companion = re.search(r"v(\d+\.\d+\.\d+(?:-[a-z]+\.\d+)?)$", tag)
@@ -311,7 +312,11 @@ def run_cmd(registry, args, flags, *, ctx):
                 _ws_projects2 = _load_ws2(ws_root)
                 _member_projs2 = _members_of2(releasable_name, _ws_projects2)
                 _member_paths2 = [p["path"] for p in _member_projs2]
-                _companion_tags = collect_companion_tags(_member_paths2, ws_root, _ver, tag)
+                _rel_cfg_dir2 = _get_rel_dir2(str(ws_root), releasable_name)
+                _companion_tags = collect_companion_tags(
+                    _member_paths2, ws_root, _ver, tag,
+                    releasable_config_dir=_rel_cfg_dir2,
+                )
                 for ctag in _companion_tags:
                     try:
                         undo_push_env_ct = {**os.environ, "RLSBL_RELEASE_PUSH": "1"}
