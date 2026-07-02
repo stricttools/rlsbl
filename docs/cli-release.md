@@ -27,7 +27,7 @@ Bump version, validate the JSONL changelog, run tests and lint, commit, tag, pus
 
 ## release resume
 
-Resume a previously failed release from where it left off. Reads the in-progress state file (.rlsbl/releases/in-progress.json), validates that the current branch matches the saved state, and re-enters the release flow, skipping already-completed steps.
+Resume a previously failed release from where it left off. Reads the in-progress state file (.rlsbl/releases/in-progress.json, or .rlsbl-monorepo/releasables/<name>/releases/in-progress.json for releasable releases), validates that the current branch matches the saved state, and re-enters the release flow, skipping already-completed steps.
 
 ### Flags
 
