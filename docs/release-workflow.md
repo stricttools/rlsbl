@@ -171,7 +171,7 @@ Dev nodes are projects at the edge of the dependency graph that nothing user-fac
 - Pre-push check ignores dev node commits
 - Batch release (`rlsbl monorepo release run`) excludes dev nodes
 - Remove `dev_node = true` from workspace.toml to make a project releasable
-- The `dev-node-boundary` check prevents non-dev-node projects from declaring runtime dependencies on dev nodes
+- The `dev-only-boundary` check prevents non-dev-node projects from declaring runtime dependencies on dev nodes
 
 ## Scrubbing sensitive content
 

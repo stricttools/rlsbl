@@ -118,16 +118,16 @@ Dev nodes are projects at the edge of the dependency graph that nothing user-fac
 - Pre-push check ignores dev node commits
 - Batch release (`rlsbl monorepo release run`) excludes dev nodes
 - Remove `dev_node = true` from workspace.toml to make a project releasable
-- The `dev-node-boundary` check prevents non-dev-node projects from declaring runtime dependencies on dev nodes
+- The `dev-only-boundary` check prevents non-dev-node projects from declaring runtime dependencies on dev nodes
 
 ## Dependency graph
 
-The workspace builds a directed dependency graph from two complementary sources, combining automatic manifest scanning with explicit declarations to capture all inter-project relationships. This graph drives topological release ordering, impact analysis, dead-package detection, and the dev-node boundary guardrail that prevents user-facing projects from depending on dev nodes:
+The workspace builds a directed dependency graph from two complementary sources, combining automatic manifest scanning with explicit declarations to capture all inter-project relationships. This graph drives topological release ordering, impact analysis, dead-package detection, and the dev-only boundary guardrail that prevents user-facing projects from depending on dev nodes:
 
 1. **Manifest scanning** — pluggable scanners (`PypiScanner`, `NpmScanner`, `DartScanner`) parse each project's manifest file looking for intra-workspace dependencies
 2. **Explicit `depends_on`** — the workspace.toml field adds edges the scanners cannot detect
 
-Dependencies have a `scope` attribute with 4 possible values: `runtime`, `dev`, `peer`, or `explicit`. The scope determines which edges the `dev-node-boundary` check considers (only 2 of the 4 scopes -- `runtime` and `explicit` -- trigger the boundary violation).
+Dependencies have a `scope` attribute with 4 possible values: `runtime`, `dev`, `peer`, or `explicit`. The scope determines which edges the `dev-only-boundary` check considers (only 2 of the 4 scopes -- `runtime` and `explicit` -- trigger the boundary violation).
 
 ### Viewing the graph
 
@@ -295,7 +295,7 @@ This ensures every project has its CI pipeline properly wired even when using di
 
 ## Workspace checks
 
-Eight checks run under `rlsbl check --tag workspace` (7 error-severity, 1 warning-severity), covering CI configuration consistency, project registration hygiene, dependency boundary enforcement, and code liveness. All error-severity checks block releases when they fail:
+Fourteen checks run under `rlsbl check --tag workspace`, covering CI configuration consistency, project registration hygiene, dependency boundary enforcement, buildability, and code liveness. All error-severity checks block releases when they fail:
 
 | Check | Severity | Description |
 | ----- | -------- | ----------- |
@@ -304,9 +304,15 @@ Eight checks run under `rlsbl check --tag workspace` (7 error-severity, 1 warnin
 | `workspace-targets` | error | Every project must have at least one detectable release target |
 | `workspace-unregistered` | error | Detects project directories with manifests that are not in workspace.toml |
 | `workspace-stale-entries` | error | Detects workspace.toml entries pointing to non-existent directories |
-| `dev-node-boundary` | error | Non-dev-node projects cannot have runtime dependencies on dev_node projects |
+| `dev-only-boundary` | error | Non-dev-only projects cannot have runtime dependencies on dev-only projects |
+| `unversioned-boundary` | error | Releasable projects cannot have runtime dependencies on unversioned (`releasable = false`) projects |
 | `dead-workspace-packages` | warn | Library projects with zero dependents (may indicate unused code) |
 | `subtree-remote-reachable` | error | All configured subtree_remote URLs must be accessible (network check) |
+| `workspace-unbuildable` | error | Workspace members build under `uv sync --all-packages` (pypi workspaces only) |
+| `scaffold-gitignore-stale` | warn | Workspace project `.gitignore` files contain all rlsbl-managed entries |
+| `root-rlsbl-conflict` | error | Root `.rlsbl/` must not coexist with `.rlsbl-monorepo/` |
+| `go-companion-tags` | warn | Non-private Go members of releasables have companion tags for the current version |
+| `test-suite-workspace` | error | Runs tests for affected workspace projects (also tagged `prepush`) |
 
 Run all workspace checks:
 
@@ -318,7 +324,7 @@ See [checks.md](checks.md) for the full check reference across all tags.
 
 ## Dev node boundary
 
-The `dev-node-boundary` check is a structural guardrail that prevents misuse of the `dev_node` flag by ensuring dev-only projects remain true leaf nodes in the dependency graph, consumed by nothing user-facing. The rule:
+The `dev-only-boundary` check is a structural guardrail that prevents misuse of the `dev_node` flag by ensuring dev-only projects remain true leaf nodes in the dependency graph, consumed by nothing user-facing. The rule:
 
 > If a non-dev-node project has a **runtime dependency** on a dev_node project, `rlsbl check --tag workspace` errors.
 
