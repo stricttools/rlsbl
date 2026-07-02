@@ -603,7 +603,7 @@ class TestRetryWorkflow:
             "",  # retry watch succeeds
         ]
 
-        result = _retry_workflow("CI", "main", "user/repo", "test-label")
+        result = _retry_workflow("CI", "main", "user/repo", "test-label", "100")
         assert result is not None
         assert result["passed"] is True
         assert result["run_id"] == "300"
@@ -617,7 +617,7 @@ class TestRetryWorkflow:
             "",  # gh workflow run trigger
         ] + [Exception("not found")] * 15  # all poll attempts fail
 
-        result = _retry_workflow("CI", "main", "user/repo", "test-label")
+        result = _retry_workflow("CI", "main", "user/repo", "test-label", "100")
         assert result is None
         err = capsys.readouterr().err
         assert "retry run not found" in err
@@ -990,6 +990,114 @@ class TestLatePollRetryDedup:
         # Audit sees exactly one result: the CI retry failure.
         audit_arg = mock_audit.call_args[0][0]
         assert len(audit_arg) == 1, f"Expected 1 result, got {audit_arg}"
+
+
+class TestRetryAttachment:
+    """Tests that _retry_workflow attaches to the actual dispatched retry run,
+    not to the just-failed original run (or another known run) that `gh run
+    list --limit 1` may still report as the newest run before the dispatched
+    run appears."""
+
+    @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_retry_does_not_attach_to_original_failed_run(self, mock_run_gh, mock_time, capsys):
+        """When the dispatched retry run has not appeared yet, the poll must
+        keep waiting instead of attaching to the original failed run."""
+        ci_run = {"databaseId": 100, "name": "CI", "headBranch": "main"}
+
+        list_calls = 0
+
+        def run_gh_side_effect(args, **kwargs):
+            nonlocal list_calls
+            if args[:2] == ["run", "watch"]:
+                if args[2] == "100":
+                    # Original run fails (both on the initial watch and if a
+                    # buggy retry attaches to it and watches it again)
+                    raise subprocess.CalledProcessError(1, "gh")
+                return ""  # the real retry run (400) passes
+            if args[:2] == ["workflow", "run"]:
+                return ""
+            if args[:2] == ["run", "list"]:
+                list_calls += 1
+                if list_calls == 1:
+                    # Dispatched run not visible yet: newest run is still the
+                    # just-failed original
+                    return json.dumps(
+                        [{"databaseId": 100, "name": "CI", "status": "completed", "createdAt": "2026-01-01"}]
+                    )
+                return json.dumps(
+                    [{"databaseId": 400, "name": "CI", "status": "queued", "createdAt": "2026-01-02"}]
+                )
+            return ""
+
+        mock_run_gh.side_effect = run_gh_side_effect
+
+        result = _watch_single_run(ci_run, "test-label", "user/repo")
+
+        # The retry must attach to the dispatched run (400), not report a
+        # bogus result from re-watching the original failed run (100).
+        assert result["run_id"] == "400", (
+            f"Retry attached to wrong run: {result}"
+        )
+        assert result["passed"] is True
+        assert list_calls >= 2, "Poll must retry until a new run ID appears"
+
+    @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_retry_does_not_attach_to_known_run(self, mock_run_gh, mock_time):
+        """A run ID already in known_ids (e.g. another initial run or a
+        previously dispatched retry) is never mistaken for the new retry."""
+        list_calls = 0
+
+        def run_gh_side_effect(args, **kwargs):
+            nonlocal list_calls
+            if args[:2] == ["workflow", "run"]:
+                return ""
+            if args[:2] == ["run", "list"]:
+                list_calls += 1
+                if list_calls == 1:
+                    # Newest run is another already-known run, not our retry
+                    return json.dumps(
+                        [{"databaseId": 101, "name": "CI", "status": "in_progress", "createdAt": "2026-01-01"}]
+                    )
+                return json.dumps(
+                    [{"databaseId": 400, "name": "CI", "status": "queued", "createdAt": "2026-01-02"}]
+                )
+            if args[:2] == ["run", "watch"]:
+                return ""
+            return ""
+
+        mock_run_gh.side_effect = run_gh_side_effect
+
+        known_ids = {"100", "101"}
+        result = _retry_workflow("CI", "main", "user/repo", "test-label", "100", known_ids)
+
+        assert result is not None
+        assert result["run_id"] == "400"
+        # The identified retry run is recorded in the shared known-IDs set
+        assert "400" in known_ids
+
+    @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_retry_not_found_when_only_original_appears(self, mock_run_gh, mock_time, capsys):
+        """If every poll only ever shows the original failed run, the retry
+        is reported as not found instead of attaching to the original."""
+
+        def run_gh_side_effect(args, **kwargs):
+            if args[:2] == ["workflow", "run"]:
+                return ""
+            if args[:2] == ["run", "list"]:
+                return json.dumps(
+                    [{"databaseId": 100, "name": "CI", "status": "completed", "createdAt": "2026-01-01"}]
+                )
+            return ""
+
+        mock_run_gh.side_effect = run_gh_side_effect
+
+        result = _retry_workflow("CI", "main", "user/repo", "test-label", "100")
+
+        assert result is None
+        assert "retry run not found" in capsys.readouterr().err
 
 
 if __name__ == "__main__":

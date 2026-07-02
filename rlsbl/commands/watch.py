@@ -58,8 +58,14 @@ def _notify(title, body, url=None):
         pass
 
 
-def _retry_workflow(workflow_name, branch, repo_slug, label):
+def _retry_workflow(workflow_name, branch, repo_slug, label, failed_run_id, known_ids=None):
     """Re-trigger a workflow once and watch the retry run.
+
+    failed_run_id is the ID of the run whose failure triggered this retry;
+    the poll below must never attach to it. known_ids, when provided, is a
+    shared set of already-known run-id strings (initial runs + previously
+    dispatched retries) that are likewise not the run we just dispatched.
+    The identified retry run's ID is added to known_ids.
 
     Returns a result dict with name, passed, and run_id.
     Returns None if the retry could not be triggered or found.
@@ -71,7 +77,10 @@ def _retry_workflow(workflow_name, branch, repo_slug, label):
         print(f"rlsbl: {label}: [{workflow_name}] retry trigger failed: {exc}", file=sys.stderr)
         return None
 
-    # Poll for the new run to appear (up to 30s)
+    # Poll for the new run to appear (up to 30s). `gh run list --limit 1`
+    # returns the newest run, which right after dispatch may still be the
+    # just-failed original (or another known run) -- keep polling until a
+    # run ID we have never seen before shows up.
     retry_run = None
     for _ in range(15):
         time.sleep(2)
@@ -83,8 +92,12 @@ def _retry_workflow(workflow_name, branch, repo_slug, label):
                          "--limit", "1"])
             parsed = json.loads(raw)
             if parsed:
-                retry_run = parsed[0]
-                break
+                candidate_id = str(parsed[0]["databaseId"])
+                if candidate_id != str(failed_run_id) and (
+                    known_ids is None or candidate_id not in known_ids
+                ):
+                    retry_run = parsed[0]
+                    break
         except Exception:
             pass
 
@@ -93,6 +106,8 @@ def _retry_workflow(workflow_name, branch, repo_slug, label):
         return None
 
     retry_id = str(retry_run["databaseId"])
+    if known_ids is not None:
+        known_ids.add(retry_id)
     print(f"rlsbl: {label}: [{workflow_name}] watching retry run {retry_id}...", file=sys.stderr)
 
     try:
@@ -153,10 +168,9 @@ def _watch_single_run(ci_run, label, repo_slug, retried_lock=None, retried_workf
                     else:
                         retried_workflows.add(workflow_name)
             if should_retry:
-                retry_result = _retry_workflow(workflow_name, branch, repo_slug, label)
+                retry_result = _retry_workflow(workflow_name, branch, repo_slug, label,
+                                               run_id, known_ids)
                 if retry_result is not None:
-                    if known_ids is not None and retry_result.get("run_id"):
-                        known_ids.add(str(retry_result["run_id"]))
                     return retry_result
         return {"name": workflow_name, "passed": False, "run_id": run_id}
     except subprocess.TimeoutExpired:

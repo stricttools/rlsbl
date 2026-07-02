@@ -1391,7 +1391,7 @@ class TestWatchRetryTimeout:
             subprocess.TimeoutExpired("gh", 3600),  # retry watch times out
         ]
         from rlsbl.commands.watch import _retry_workflow
-        result = _retry_workflow("CI", "main", "user/repo", "test")
+        result = _retry_workflow("CI", "main", "user/repo", "test", "100")
         assert result is not None
         assert result["passed"] is False
         assert "timed out" in capsys.readouterr().err
@@ -1409,7 +1409,7 @@ class TestWatchRetryGenericException:
             RuntimeError("unexpected"),  # retry watch fails
         ]
         from rlsbl.commands.watch import _retry_workflow
-        result = _retry_workflow("CI", "main", "user/repo", "test")
+        result = _retry_workflow("CI", "main", "user/repo", "test", "100")
         assert result is not None
         assert result["passed"] is False
         assert "retry error" in capsys.readouterr().err
