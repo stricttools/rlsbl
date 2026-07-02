@@ -333,8 +333,6 @@ def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, bump, description, 
 )
 @strictcli.flag(name="watch", type=bool, help="After release, automatically watch CI runs to completion (--no-watch to skip)")
 def cmd_release_resume(dry_run, yes, quiet, watch, **_kwargs):
-    root = _require_sub_project_root()
-
     from .commands.release.release_state import (
         StateResolutionError,
         load_release_state,
@@ -344,16 +342,25 @@ def cmd_release_resume(dry_run, yes, quiet, watch, **_kwargs):
 
     # Resolve the project dir and the (releasable-aware) state path via the
     # single resume-source resolver. At a workspace root, this finds the one
-    # releasable with in-flight state (error on none or ambiguity).
-    monorepo_root = find_workspace_root(str(root))
+    # releasable with in-flight state (error on none or ambiguity) -- so the
+    # workspace must be detected BEFORE requiring a sub-project root, which
+    # would sys.exit at a workspace root that is not itself a member.
+    monorepo_root = find_workspace_root()
+    root = None
+    if monorepo_root is None:
+        root = _require_project_root()
     try:
         project_dir, state_path = resolve_resume_source(monorepo_root, cwd=".")
     except StateResolutionError as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
+    if project_dir == "." and root is not None:
+        ctx_root = root
+    else:
+        ctx_root = Path(project_dir)
     ctx = create_context(
-        root if project_dir == "." else Path(project_dir),
+        ctx_root,
         workspace_root=Path(monorepo_root) if monorepo_root else None,
     )
 
