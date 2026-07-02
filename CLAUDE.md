@@ -16,12 +16,12 @@ This project uses [rlsbl](https://github.com/smm-h/rlsbl) for release orchestrat
 
 - Run `rlsbl release init` to scaffold `.rlsbl/releases/unreleased.toml`
 - Edit the release file: set bump type (patch/minor/major), include/exclude targets
-- Run `rlsbl release run --watch --yes` to execute the release
+- Run `rlsbl release run --no-allow-dirty --watch --yes` to execute the release
 - CI handles publishing automatically via the publish workflow
 - Never publish manually -- always use `rlsbl release run`
 - Use `rlsbl release run --dry-run` to preview without making changes
 - Global flags `--dry-run`, `--yes`, `--quiet` are available on all commands
-- Release-specific flags: `--allow-dirty`, `--watch`/`--no-watch`
+- Release-specific required flags: `--allow-dirty`/`--no-allow-dirty`, `--watch`/`--no-watch` (no defaults -- must choose explicitly)
 
 ## Release pipeline order
 
@@ -29,7 +29,7 @@ During `rlsbl release run`, the validation and build steps run in this order:
 
 1. Pre-checks hook (`.rlsbl/hooks/pre-checks.sh`)
 2. Strictcli schema dump (`--dump-schema`, for projects using strictcli)
-3. Selfdoc gen (`selfdoc gen --no-commit`, regenerates docs from source)
+3. Selfdoc gen (`selfdoc gen --no-auto-commit`, regenerates docs from source)
 4. Selfdoc check (verifies generated docs are up-to-date)
 5. Built-in tests (`uv run pytest`, `go test`, `npm test`) -- skipped if pre-release hook is customized
 6. Built-in lint (library projects only) -- skipped if pre-release hook is customized
