@@ -17,12 +17,12 @@ This project uses [rlsbl](https://github.com/smm-h/rlsbl) for release orchestrat
 
 - Run `rlsbl release init` to scaffold `.rlsbl/releases/unreleased.toml`
 - Edit the release file: set bump type (patch/minor/major), include/exclude targets
-- Run `rlsbl release run --watch --yes` to execute the release
+- Run `rlsbl release run --no-allow-dirty --watch --yes` to execute the release
 - CI handles publishing automatically via the publish workflow
 - Never publish manually -- always use `rlsbl release run`
 - Use `rlsbl release run --dry-run` to preview without making changes
 - Global flags `--dry-run`, `--yes`, `--quiet` are available on all commands
-- Release-specific flags: `--allow-dirty`, `--watch`/`--no-watch`
+- Release-specific required flags: `--allow-dirty`/`--no-allow-dirty`, `--watch`/`--no-watch` (no defaults -- must choose explicitly)
 
 ## Release pipeline order
 
