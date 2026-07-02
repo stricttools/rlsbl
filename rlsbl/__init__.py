@@ -880,7 +880,7 @@ chlog = app.group("changelog", help="Structured changelog management using JSONL
 @strictcli.flag(name="user-facing", type=bool, default=True, help="Mark this entry as user-facing (included in generated CHANGELOG.md output)")
 @strictcli.flag(name="auto-commit", type=bool, default=True, help="Auto-commit unreleased.jsonl after appending the entry")
 @strictcli.flag(name="allow-batch", type=bool, default=False, help="Auto-create an exclusion if this entry exceeds the commit batch limit")
-def cmd_chlog_add(commits, description, type, user_facing, auto_commit, allow_batch, **_kwargs):
+def cmd_chlog_add(commits, description, type, user_facing, auto_commit, allow_batch, dry_run, **_kwargs):
     root = _require_sub_project_root()
     flags = {
         "commits": commits,
@@ -889,6 +889,7 @@ def cmd_chlog_add(commits, description, type, user_facing, auto_commit, allow_ba
         "user-facing": user_facing,
         "auto-commit": auto_commit,
         "allow-batch": allow_batch,
+        "dry-run": dry_run,
     }
     from .commands.changelog_cmd import cmd_add
     cmd_add(flags, project_root=root)
@@ -911,7 +912,7 @@ def cmd_chlog_generate(dry_run, auto_commit, **_kwargs):
 @strictcli.flag(name="type", type=str, help="Classification for the amended entry: feature, fix, or breaking (required if user-facing)", default="")
 @strictcli.flag(name="user-facing", type=bool, default=True, help="Mark the amended entry as user-facing (included in CHANGELOG.md output)")
 @strictcli.flag(name="validate-hashes", type=bool, default=True, help="Validate commit hashes via git rev-parse before appending")
-def cmd_chlog_amend(version, commits, description, type, user_facing, validate_hashes, **_kwargs):
+def cmd_chlog_amend(version, commits, description, type, user_facing, validate_hashes, dry_run, **_kwargs):
     root = _require_sub_project_root()
     flags = {
         "version": version,
@@ -920,6 +921,7 @@ def cmd_chlog_amend(version, commits, description, type, user_facing, validate_h
         "type": type,
         "user-facing": user_facing,
         "validate-hashes": validate_hashes,
+        "dry-run": dry_run,
     }
     from .commands.changelog_cmd import cmd_amend
     cmd_amend(flags, project_root=root)
@@ -931,7 +933,7 @@ def cmd_chlog_amend(version, commits, description, type, user_facing, validate_h
 @strictcli.flag(name="description", type=str, help="Replacement description text for the matched changelog entry", default="")
 @strictcli.flag(name="user-facing", type=bool, default=None, help="Set user_facing status on the matched entry (--user-facing to set true, --no-user-facing to set false)")
 @strictcli.flag(name="auto-commit", type=bool, default=True, help="Auto-commit the edited JSONL file")
-def cmd_chlog_edit(commits, type, description, user_facing, auto_commit, **_kwargs):
+def cmd_chlog_edit(commits, type, description, user_facing, auto_commit, dry_run, **_kwargs):
     root = _require_sub_project_root()
     flags = {
         "commits": commits,
@@ -939,6 +941,7 @@ def cmd_chlog_edit(commits, type, description, user_facing, auto_commit, **_kwar
         "description": description,
         "user-facing": user_facing,
         "auto-commit": auto_commit,
+        "dry-run": dry_run,
     }
     from .commands.changelog_cmd import cmd_edit
     cmd_edit(flags, project_root=root)

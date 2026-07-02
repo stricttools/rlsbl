@@ -254,8 +254,13 @@ def cmd_add(flags, project_root):
     Required flags:
     - --commits: comma-separated commit hashes
     - --description and --type: required unless --no-user-facing is set
+
+    Under --dry-run, all validation runs (hash resolution, scope check,
+    schema, batch limit, duplicate check) but nothing is written: no
+    JSONL append, no auto-commit, no config.json exclusion.
     """
     ws_context = _resolve_workspace_project(project_root)
+    dry_run = flags.get("dry-run", False)
 
     commits_raw = flags.get("commits", "")
     if not commits_raw:
@@ -326,23 +331,32 @@ def cmd_add(flags, project_root):
             "reason": reason,
             "entries": [{"version": "unreleased", "line": line_number}],
         }
-        if releasable_config_dir is not None:
-            config_path = os.path.join(releasable_config_dir, "config.json")
+        if dry_run:
+            print(f"Would auto-create batch exclusion for line {line_number} in .rlsbl/config.json")
         else:
-            config_path = os.path.join(project_root, ".rlsbl", "config.json")
-        with open(config_path, "r", encoding="utf-8") as f:
-            config_data = json.load(f)
-        batch_limits = config_data.setdefault("batch_limits", {})
-        exclusions = batch_limits.setdefault("exclusions", [])
-        exclusions.append(exclusion)
-        with open(config_path, "w", encoding="utf-8") as f:
-            json.dump(config_data, f, indent=2)
-            f.write("\n")
-        print(f"Auto-created batch exclusion for line {line_number} in .rlsbl/config.json")
+            if releasable_config_dir is not None:
+                config_path = os.path.join(releasable_config_dir, "config.json")
+            else:
+                config_path = os.path.join(project_root, ".rlsbl", "config.json")
+            with open(config_path, "r", encoding="utf-8") as f:
+                config_data = json.load(f)
+            batch_limits = config_data.setdefault("batch_limits", {})
+            exclusions = batch_limits.setdefault("exclusions", [])
+            exclusions.append(exclusion)
+            with open(config_path, "w", encoding="utf-8") as f:
+                json.dump(config_data, f, indent=2)
+                f.write("\n")
+            print(f"Auto-created batch exclusion for line {line_number} in .rlsbl/config.json")
 
     changes_dir = _resolve_changes_dir(ws_context, project_root)
     existing = read_unreleased(changes_dir)
     _check_duplicate_commits(existing, entry)
+
+    if dry_run:
+        print(serialize_entry(entry))
+        print("(dry-run: no files written)")
+        return
+
     append_entry(changes_dir, entry)
     print(f"Added entry with {len(resolved_commits)} commit(s)")
 
@@ -443,6 +457,9 @@ def cmd_amend(flags, project_root):
     - --description and --type: required unless --no-user-facing is set
     - --no-user-facing: mark entry as non-user-facing
     - --no-validate-hashes: skip hash validation (for old/amended commits)
+
+    Under --dry-run, all validation runs but nothing is written: no JSONL
+    append, no CHANGELOG.md regeneration, no GitHub Release sync, no commit.
     """
     ws_context = _resolve_workspace_project(project_root)
 
@@ -488,9 +505,16 @@ def cmd_amend(flags, project_root):
         print(f"Error: {jsonl_path} does not exist.", file=sys.stderr)
         sys.exit(1)
 
+    # Validate against existing entries (read-only, no unlock needed)
+    existing = parse_jsonl(jsonl_path)
+    _check_duplicate_commits(existing, entry)
+
+    if flags.get("dry-run", False):
+        print(serialize_entry(entry))
+        print("(dry-run: no files written)")
+        return
+
     with writable_jsonl(jsonl_path):
-        existing = parse_jsonl(jsonl_path)
-        _check_duplicate_commits(existing, entry)
         append_entry_to_version(changes_dir, version, entry)
         print(f"Amended {version}.jsonl with {len(resolved_commits)} commit(s)")
 
@@ -530,6 +554,10 @@ def cmd_edit(flags, project_root):
     - --type: new type value (feature, fix, breaking)
     - --description: new description text
     - --user-facing / --no-user-facing: set user_facing status
+
+    Under --dry-run, all validation and entry matching runs but nothing is
+    written: no file rewrite, no CHANGELOG.md regeneration, no GitHub
+    Release sync, no commit.
     """
     ws_context = _resolve_workspace_project(project_root)
 
@@ -657,6 +685,11 @@ def cmd_edit(flags, project_root):
         for err in errors:
             print(f"Error: schema validation: {err}", file=sys.stderr)
         sys.exit(1)
+
+    if flags.get("dry-run", False):
+        print(serialize_entry(entry))
+        print("(dry-run: no files written)")
+        return
 
     # Rewrite the file atomically
     def _rewrite_file(target_path):

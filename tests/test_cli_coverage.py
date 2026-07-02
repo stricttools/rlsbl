@@ -573,11 +573,13 @@ class TestCmdChlogAdd:
         rlsbl.cmd_chlog_add(
             commits="abc123", description="New feature", type="feature",
             user_facing=True, auto_commit=False, allow_batch=False,
+            dry_run=False,
         )
         mock_add.assert_called_once()
         flags = mock_add.call_args[0][0]
         assert flags["commits"] == "abc123"
         assert flags["auto-commit"] is False
+        assert flags["dry-run"] is False
 
 
 class TestCmdChlogGenerate:
@@ -597,11 +599,13 @@ class TestCmdChlogAmend:
         rlsbl.cmd_chlog_amend(
             version="1.0.0", commits="abc", description="fix",
             type="fix", user_facing=True, validate_hashes=False,
+            dry_run=False,
         )
         mock_amend.assert_called_once()
         flags = mock_amend.call_args[0][0]
         assert flags["version"] == "1.0.0"
         assert flags["validate-hashes"] is False
+        assert flags["dry-run"] is False
 
 
 class TestCmdChlogEdit:
@@ -611,10 +615,12 @@ class TestCmdChlogEdit:
         rlsbl.cmd_chlog_edit(
             commits="abc", type="fix", description="updated",
             user_facing=True, auto_commit=True,
+            dry_run=False,
         )
         mock_edit.assert_called_once()
         flags = mock_edit.call_args[0][0]
         assert flags["user-facing"] is True
+        assert flags["dry-run"] is False
 
 
 # ============================================================================
