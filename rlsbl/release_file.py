@@ -383,9 +383,17 @@ class RetryConfig:
     ref: str  # git ref for CI dispatch, defaults to tag
 
 
-def get_retry_file_path(project_dir: str = ".") -> str:
-    """Return the path to .rlsbl/releases/retry.toml relative to project_dir."""
-    return os.path.join(project_dir, ".rlsbl", "releases", "retry.toml")
+def get_retry_file_path(project_dir: str = ".", *, releasable_dir: str | None = None) -> str:
+    """Return the path to retry.toml (same releases-dir home as unreleased.toml).
+
+    Releasable releases (explicit monorepo mode): pass ``releasable_dir``
+    so the file lives under the releasable's own releases dir instead of
+    the member's ``.rlsbl/releases/``.
+    """
+    return os.path.join(
+        get_releases_dir(project_dir, releasable_dir=releasable_dir),
+        "retry.toml",
+    )
 
 
 def read_retry_file(path: str) -> RetryConfig:

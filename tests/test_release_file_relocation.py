@@ -499,6 +499,57 @@ class TestCliReadsReleasableReleaseFile:
 
 
 # ---------------------------------------------------------------------------
+# retry.toml belongs to the same release-file family
+# ---------------------------------------------------------------------------
+
+
+class TestRetryFileReleasable:
+
+    def test_get_retry_file_path_releasable(self):
+        from rlsbl.release_file import get_retry_file_path
+
+        rel_dir = "/ws/.rlsbl-monorepo/releasables/alpha"
+        assert get_retry_file_path("/proj", releasable_dir=rel_dir) == os.path.join(
+            rel_dir, "releases", "retry.toml"
+        )
+        assert get_retry_file_path("/proj") == os.path.join(
+            "/proj", ".rlsbl", "releases", "retry.toml"
+        )
+
+    def test_retry_reads_from_releasable_location(
+        self, tmp_project, monkeypatch, capsys,
+    ):
+        """release retry must read (and scaffold) retry.toml at the
+        releasable releases dir, never the member's .rlsbl/releases/."""
+        from rlsbl.commands.release_retry import run_cmd as retry_run_cmd
+
+        core = _setup_releasable_workspace(tmp_project)
+        rel_releases = Path(get_releasable_dir(str(tmp_project), "alpha")) / "releases"
+        rel_releases.mkdir(parents=True, exist_ok=True)
+        (rel_releases / "retry.toml").write_text(
+            'version = "1.0.0"\ndispatch = ["publish.yml"]\nref = "main"\n'
+        )
+        monkeypatch.chdir(core)
+
+        with (
+            patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True),
+            patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True),
+            patch("rlsbl.commands.release_retry.run_gh", return_value=""),
+        ):
+            retry_run_cmd(
+                None, {"yes": True, "dry-run": True}, project_root=str(core),
+            )
+
+        out = capsys.readouterr().out
+        assert "Would dispatch" in out
+        # No member-level scaffold happened
+        assert not (core / ".rlsbl" / "releases").exists(), (
+            "retry must not scaffold or read retry.toml under the member's "
+            ".rlsbl/releases/"
+        )
+
+
+# ---------------------------------------------------------------------------
 # Changelog exemptions cover the relocated release-file paths
 # ---------------------------------------------------------------------------
 

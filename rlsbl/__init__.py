@@ -446,7 +446,15 @@ def cmd_release_retry(dry_run, yes, quiet, watch, **_kwargs):
 
     from .release_file import get_retry_file_path, read_retry_file
 
-    retry_path = get_retry_file_path(".")
+    # Releasable members keep retry.toml under the releasable's releases dir.
+    _retry_releasable_dir = None
+    from .workspace import find_workspace_root as _find_ws_root
+    _retry_ws_root = _find_ws_root(str(root))
+    if _retry_ws_root:
+        from .commands.release.release_state import resolve_releasable_dir
+        _retry_releasable_dir = resolve_releasable_dir(str(root), _retry_ws_root)
+
+    retry_path = get_retry_file_path(".", releasable_dir=_retry_releasable_dir)
     retry_config = None
     if os.path.exists(retry_path):
         try:

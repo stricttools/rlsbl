@@ -172,8 +172,11 @@ def run_cmd(retry_config, flags, project_root):
     primary = entries[0]
     target = TARGETS[primary.name]
 
-    # Auto-scaffold retry.toml if not provided
-    retry_path = get_retry_file_path(project_dir)
+    # Auto-scaffold retry.toml if not provided. Releasable members keep it
+    # under the releasable's own releases dir (same home as unreleased.toml).
+    retry_path = get_retry_file_path(
+        project_dir, releasable_dir=releasable_config_dir,
+    )
     if retry_config is None:
         if os.path.exists(retry_path):
             # File exists but wasn't read by the caller -- read it now
