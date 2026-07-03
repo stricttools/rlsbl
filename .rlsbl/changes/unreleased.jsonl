@@ -6,3 +6,4 @@
 {"commits":["0c9b46da5190c6ca686d8cf538ff52f8a7b160ed","a31eb24e2f7b96e7938123a9091f1604257349da","9f73120b7ffdff4d4899d49997cd996cc6dc8409","7759488c6f5d1303a26f8ebde80002cfee19f05c"],"user_facing":true,"description":"**Expanded CLI help text.** All command, flag, and argument help strings now meet the 50-character minimum for documentation quality checks.","type":"fix"}
 {"commits":["7ef8d0fce62c74b5c7c56921a61e49cc03192ae6"],"user_facing":false}
 {"commits":["fdd71430e2df92d46dc78d07409c1db60d5c3936"],"user_facing":false}
+{"commits":["1b2c8a7c4c5820f04413e6a3f04e62bea86015dc","82d3a778d68628b197319339a4dbac6464586786"],"user_facing":true,"description":"**Improved CLI help text for documentation quality.** Shortened overlong command descriptions and added numeric data points to meet SEO007 and SEO008 checks.","type":"fix"}
