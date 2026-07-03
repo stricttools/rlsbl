@@ -97,6 +97,7 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "dunder-version-missing": frozenset({"pypi"}),
     "selfdoc-version-drift": None,
     "scaffold-conflicts": None,
+    "cross-repo-path-sources": frozenset({"pypi"}),
     # --- prepush tag ---
     "prepush-changelog-coverage": None,
     "prepush-gitignore-guard": None,

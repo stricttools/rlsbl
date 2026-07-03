@@ -1,5 +1,5 @@
 ---
-description: "Complete reference for rlsbl's 58 checks across 6 primary tags, including check metadata, severity levels, and target applicability."
+description: "Complete reference for rlsbl's 59 checks across 6 primary tags, including check metadata, severity levels, and target applicability."
 ---
 
 # Check system
@@ -38,7 +38,7 @@ Severity is declared per-check in metadata. A check with `severity = "error"` re
 
 | Tag | Purpose | Check count |
 | --- | --- | --- |
-| `project` | Project-level metadata, config schema, version consistency | 14 |
+| `project` | Project-level metadata, config schema, version consistency | 15 |
 | `release` | Git tag and GitHub Release validation | 5 |
 | `changelog` | JSONL changelog validation and structure | 9 |
 | `workspace` | Monorepo workspace integrity and dependency rules | 15 |
@@ -65,6 +65,7 @@ Some checks carry multiple tags, so they appear in multiple tag counts: `test-su
 | `dunder-version-missing` | error | PyPI targets that keep a version constant in source must use `__version__` |
 | `selfdoc-version-drift` | error | selfdoc-generated version references match the actual project version |
 | `scaffold-conflicts` | error | Unresolved git merge conflict markers in scaffold files (managed-files registry, `.github/workflows/`, all of `.rlsbl/`); also tagged `prepush` and `release` |
+| `cross-repo-path-sources` | error | `[tool.uv.sources]` path entries in the committed `pyproject.toml` must resolve inside the repository (in-repo paths and `workspace = true` are legal; local overrides belong in `dev-sources.toml.local-only`). Also enforced unconditionally by `rlsbl release run` |
 
 ## Release checks
 

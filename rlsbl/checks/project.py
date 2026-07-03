@@ -3,11 +3,13 @@
 Checks: lock, version-consistency, name-consistency, license-consistency,
 description-consistency, private-hook-stale, config-schema, license-file,
 private-publish-workflow, npm-private-mismatch, target-version-readable,
-dunder-version-missing, selfdoc-version-drift, scaffold-conflicts.
+dunder-version-missing, selfdoc-version-drift, scaffold-conflicts,
+cross-repo-path-sources.
 """
 
 import json
 import os
+import tomllib
 
 from strictcli import CheckResult
 
@@ -79,6 +81,51 @@ def find_conflicted_scaffold_files(project_root):
             )
 
     return sorted(conflicted)
+
+
+def find_cross_repo_path_sources(project_root, boundary_root=None):
+    """Return ``(package, declared_path, resolved_path)`` tuples for
+    ``[tool.uv.sources]`` entries in ``project_root/pyproject.toml`` whose
+    ``path`` resolves outside *boundary_root* (defaults to *project_root*).
+
+    Relative paths are resolved against the pyproject.toml's directory,
+    matching uv's resolution rule. ``workspace = true`` sources and in-repo
+    path sources are legal and never reported. Returns an empty list when
+    pyproject.toml is missing, unparseable, or has no sources table.
+
+    Shared by the ``cross-repo-path-sources`` check and the pre-mutation
+    guard in ``rlsbl release run``.
+    """
+    root_str = str(project_root)
+    pyproject_path = os.path.join(root_str, "pyproject.toml")
+    if not os.path.isfile(pyproject_path):
+        return []
+    try:
+        with open(pyproject_path, "rb") as f:
+            data = tomllib.load(f)
+    except (OSError, tomllib.TOMLDecodeError):
+        return []
+
+    sources = data.get("tool", {}).get("uv", {}).get("sources", {})
+    if not isinstance(sources, dict):
+        return []
+
+    boundary = os.path.realpath(str(boundary_root) if boundary_root else root_str)
+    offenders = []
+    for package, spec in sources.items():
+        # A source is a single table or a list of marker-gated tables.
+        entries = spec if isinstance(spec, list) else [spec]
+        for entry in entries:
+            if not isinstance(entry, dict) or "path" not in entry:
+                continue
+            declared = entry["path"]
+            if os.path.isabs(declared):
+                resolved = os.path.realpath(declared)
+            else:
+                resolved = os.path.realpath(os.path.join(root_str, declared))
+            if resolved != boundary and not resolved.startswith(boundary + os.sep):
+                offenders.append((package, declared, resolved))
+    return offenders
 
 
 def _get_releasable_version_for_project(ctx):
@@ -638,3 +685,26 @@ def register_project_checks(app):
                 details=[f"{path}:{line}" for path, line in conflicted],
             )
         return CheckResult("pass", "no unresolved merge conflict markers")
+
+    @app.check("cross-repo-path-sources")
+    def check_cross_repo_path_sources(ctx):
+        """[tool.uv.sources] path entries must stay inside the repository."""
+        root_str = str(ctx.project_root)
+        if not os.path.isfile(os.path.join(root_str, "pyproject.toml")):
+            return CheckResult("skip", "no pyproject.toml")
+
+        workspace_root = getattr(ctx, "workspace_root", None)
+        boundary = str(workspace_root) if workspace_root else root_str
+        offenders = find_cross_repo_path_sources(root_str, boundary_root=boundary)
+        if offenders:
+            return CheckResult(
+                "fail",
+                f"{len(offenders)} [tool.uv.sources] path source(s) resolve "
+                "outside the repository -- depend on the registry release and "
+                "keep local overrides in dev-sources.toml.local-only",
+                details=[
+                    f'{pkg}: path = "{declared}" resolves to {resolved}'
+                    for pkg, declared, resolved in offenders
+                ],
+            )
+        return CheckResult("pass", "no cross-repo path sources")

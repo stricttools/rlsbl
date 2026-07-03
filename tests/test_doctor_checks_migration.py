@@ -74,6 +74,7 @@ EXPECTED_CHECKS = [
     "dunder-version-missing",
     "selfdoc-version-drift",
     "scaffold-conflicts",
+    "cross-repo-path-sources",
     # Pre-push checks
     "prepush-changelog-coverage",
     "prepush-gitignore-guard",

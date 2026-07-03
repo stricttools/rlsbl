@@ -701,6 +701,56 @@ def _abort_on_scaffold_conflicts(project_dir):
         raise ReleaseValidationError("Unresolved scaffold conflict markers")
 
 
+def _abort_on_cross_repo_sources(project_dir, *, boundary_root=None, member_dirs=None):
+    """Abort the release if any committed pyproject.toml declares a
+    [tool.uv.sources] path entry that resolves outside the repository.
+
+    Cross-repo path sources make lockfiles and CI builds depend on sibling
+    checkouts that only exist on the developer's machine. Local overrides
+    belong in dev-sources.toml.local-only (gitignored), never in the
+    committed pyproject.toml. Runs PRE-MUTATION: nothing has been modified
+    yet when this aborts. Runs unconditionally (unlike the preflight tag,
+    which is skipped when the pre-release hook is customized).
+
+    ``member_dirs`` (releasable mode) adds member package directories to
+    the scan; ``boundary_root`` is the repository/workspace root that
+    in-repo paths must stay within.
+    """
+    from ...checks.project import find_cross_repo_path_sources
+
+    dirs = [project_dir]
+    if member_dirs:
+        for d in member_dirs:
+            if d not in dirs:
+                dirs.append(d)
+
+    offenders = []
+    for d in dirs:
+        for pkg, declared, resolved in find_cross_repo_path_sources(
+            d, boundary_root=boundary_root or project_dir,
+        ):
+            rel = os.path.relpath(os.path.join(str(d), "pyproject.toml"), str(project_dir))
+            offenders.append((rel, pkg, declared, resolved))
+
+    if offenders:
+        print(
+            "Error: cross-repo path source(s) in [tool.uv.sources]:",
+            file=sys.stderr,
+        )
+        for rel, pkg, declared, resolved in offenders:
+            print(
+                f'  {rel}: {pkg} = {{ path = "{declared}" }} resolves outside '
+                f"the repository ({resolved})",
+                file=sys.stderr,
+            )
+        print(
+            "Remove the path source(s) -- depend on the registry release instead, "
+            "and keep local checkout overrides in dev-sources.toml.local-only.",
+            file=sys.stderr,
+        )
+        raise ReleaseValidationError("Cross-repo path sources in [tool.uv.sources]")
+
+
 def _schema_dump_command(entry_point: str, lang: str) -> list[str]:
     """Build the command list for running --dump-schema based on language."""
     if lang == "python":

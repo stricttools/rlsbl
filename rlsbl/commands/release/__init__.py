@@ -51,6 +51,7 @@ from .publish import _run_selfdoc_post_generate, _print_stale_dep_advisory, uplo
 from .validate import (
     parse_porcelain_paths,
     _run_selfdoc_gen, _run_selfdoc_check, _abort_on_scaffold_conflicts,
+    _abort_on_cross_repo_sources,
     _run_strictcli_schema_dump, validate_blog_body,
     ReleaseValidationError, HookError, _SCHEMA_DUMP_TIMEOUT,
     validate_release_targets, validate_ota_mode, validate_config_integrity,
@@ -426,6 +427,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
 
     # Validate release targets (deferred to here so releasable context is available)
     _rel_cfg_dir = None
+    _member_abs_dirs = None
     if member_package_paths is not None and monorepo_root:
         from ...workspace import get_releasable_dir
         _member_abs_dirs = [
@@ -444,6 +446,13 @@ def _run_cmd_inner(release_config, flags, *, ctx):
 
     # Scaffold conflict guard
     _abort_on_scaffold_conflicts(project_dir)
+
+    # Cross-repo path source guard (pre-mutation, unconditional)
+    _abort_on_cross_repo_sources(
+        project_dir,
+        boundary_root=str(monorepo_root) if monorepo_root else project_dir,
+        member_dirs=_member_abs_dirs,
+    )
 
     # Resolve target paths (with releasable-level inheritance in explicit
     # mode, so releasable config "targets" drives primary path resolution)
