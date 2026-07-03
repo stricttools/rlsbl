@@ -387,7 +387,10 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         if "CF_ACCOUNT_ID" in os.environ and "CLOUDFLARE_ACCOUNT_ID" not in os.environ:
             os.environ["CLOUDFLARE_ACCOUNT_ID"] = os.environ["CF_ACCOUNT_ID"]
 
-    validate_pipeline_config(config)
+    # Pipeline config validation is deferred until after releasable context
+    # is resolved, so per-member pipeline validation can run in releasable
+    # mode. Standalone/implicit mode validates the single representative.
+    # (Moved below, after member_package_paths is known.)
 
     # Validate and resolve release mode (imperative or pr)
     from ...config import validate_release_mode, get_release_mode
@@ -441,6 +444,25 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         )
     else:
         registry = validate_release_targets(release_config, project_root)
+
+    # Pipeline config validation (deferred from above so releasable
+    # context is available). In releasable mode, validates each non-private
+    # publishing member's pipeline config; in standalone/implicit mode,
+    # validates the representative's config.
+    if member_package_paths is not None and monorepo_root and _rel_cfg_dir:
+        from ...member_context import resolve_member_context as _rmc
+        for _mp in member_package_paths:
+            _mp_abs = os.path.join(str(monorepo_root), _mp)
+            if not os.path.isdir(_mp_abs):
+                continue
+            _m_ctx = _rmc(_mp_abs, releasable_config_dir=_rel_cfg_dir)
+            if _m_ctx.is_private:
+                continue
+            _m_pipelines = _m_ctx.config.get("pipelines")
+            if _m_pipelines is not None:
+                validate_pipeline_config(_m_ctx.config)
+    else:
+        validate_pipeline_config(config)
 
     project_dir = str(project_root)
 

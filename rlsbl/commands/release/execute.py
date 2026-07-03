@@ -414,6 +414,13 @@ def _sync_member_package_versions(
             tgt = TARGETS.get(entry.name)
             if not tgt:
                 continue
+            if not tgt.check_project_exists(entry.path):
+                from ...errors import ConfigError
+                raise ConfigError(
+                    f"member '{pkg_path}' declares target '{entry.name}' but "
+                    f"its manifest does not exist at {entry.path}. "
+                    f"Cannot sync version."
+                )
             modified = tgt.write_version(entry.path, new_version, ctx=ctx)
             for rel in modified:
                 fpath = _rel_to_git_root(os.path.join(entry.path, rel), git_root)
@@ -906,6 +913,22 @@ def _run_release_mutating(state: ReleaseState):
 
         # Sync lockfiles after version bumps so they reflect the new version
         _sync_lockfiles(target_paths, files_to_commit, log)
+        # In releasable mode, also sync lockfiles for publishing members
+        # whose manifests were version-bumped by _sync_member_package_versions.
+        if releasable_name and member_package_paths and monorepo_root:
+            from ...member_context import resolve_member_context as _rmc_lock
+            for _mp_path in member_package_paths:
+                _mp_abs = os.path.join(str(monorepo_root), _mp_path)
+                if not os.path.isdir(_mp_abs):
+                    continue
+                _mp_member = _rmc_lock(
+                    _mp_abs, releasable_config_dir=_releasable_cfg_dir,
+                )
+                if _mp_member.is_private:
+                    continue
+                _mp_tpaths = _mp_member.target_paths
+                if _mp_tpaths:
+                    _sync_lockfiles(_mp_tpaths, files_to_commit, log)
         if monorepo_root:
             _sync_lockfiles({"workspace_root": str(monorepo_root)}, files_to_commit, log)
             # Unconditionally include workspace-root lockfiles that exist.
@@ -1601,23 +1624,88 @@ def _run_release_mutating(state: ReleaseState):
         log("Skipping pipeline publish (already done)")
     else:
         if not is_private:
-            # Load pipelines for the publish step (validation already ran in
-            # run_cmd). Pipeline dispatch runs once per release, not per-target.
-            release_pipelines = load_pipelines(ctx.config)
-            for pl_name, pl in release_pipelines.items():
-                try:
-                    pl.publish(primary_path, new_version, ctx=ctx)
-                except Exception as e:
-                    from ...errors import PostReleaseError
-                    save_step_failure(
-                        _state_path, "PIPELINES_PUBLISHED",
-                        f"pipeline '{pl_name}': {e}",
+            if releasable_name and member_package_paths and monorepo_root:
+                # Per-member publish: each non-private member with pipelines
+                # publishes from its own directory at the shared version.
+                # Resume support: state tracks published_members list so
+                # completed members are skipped on retry.
+                _existing_state_pub = load_release_state(_state_path) or {}
+                _already_published = set(
+                    _existing_state_pub.get("published_members", [])
+                )
+                _published_members = list(_already_published)
+
+                from ...member_context import resolve_member_context as _resolve_mc
+
+                for pkg_path in member_package_paths:
+                    abs_pkg = os.path.join(str(monorepo_root), pkg_path)
+                    if not os.path.isdir(abs_pkg):
+                        continue
+
+                    member = _resolve_mc(
+                        abs_pkg, releasable_config_dir=_releasable_cfg_dir,
                     )
-                    raise PostReleaseError(
-                        f"pipeline '{pl_name}' publish failed: {e}. "
-                        f"Release state has been preserved; fix the issue and "
-                        f"run `rlsbl release resume` to re-attempt the publish."
-                    ) from e
+
+                    if member.is_private:
+                        log(f"  {pkg_path}: skipped (private)")
+                        continue
+
+                    member_pipelines = load_pipelines(member.config)
+                    if not member_pipelines:
+                        log(f"  {pkg_path}: no pipelines, not published")
+                        continue
+
+                    if pkg_path in _already_published:
+                        log(f"  {pkg_path}: skipped (already published)")
+                        continue
+
+                    for pl_name, pl in member_pipelines.items():
+                        try:
+                            pl.publish(abs_pkg, new_version, ctx=ctx)
+                        except Exception as e:
+                            from ...errors import PostReleaseError
+                            # Save partial progress so resume can skip
+                            # already-published members.
+                            _pub_state = load_release_state(_state_path) or {}
+                            _pub_state["published_members"] = _published_members
+                            save_release_state(_state_path, _pub_state)
+                            save_step_failure(
+                                _state_path, "PIPELINES_PUBLISHED",
+                                f"member '{pkg_path}' pipeline '{pl_name}': {e}",
+                            )
+                            raise PostReleaseError(
+                                f"member '{pkg_path}' pipeline '{pl_name}' "
+                                f"publish failed: {e}. "
+                                f"Release state has been preserved; fix the "
+                                f"issue and run `rlsbl release resume` to "
+                                f"re-attempt the publish."
+                            ) from e
+
+                    _published_members.append(pkg_path)
+                    log(f"  {pkg_path}: published ({', '.join(member_pipelines)})")
+
+                # Persist final published_members list in state
+                _pub_state_final = load_release_state(_state_path) or {}
+                _pub_state_final["published_members"] = _published_members
+                save_release_state(_state_path, _pub_state_final)
+            else:
+                # Standalone / implicit mode: single publish pass from
+                # representative config.
+                release_pipelines = load_pipelines(ctx.config)
+                for pl_name, pl in release_pipelines.items():
+                    try:
+                        pl.publish(primary_path, new_version, ctx=ctx)
+                    except Exception as e:
+                        from ...errors import PostReleaseError
+                        save_step_failure(
+                            _state_path, "PIPELINES_PUBLISHED",
+                            f"pipeline '{pl_name}': {e}",
+                        )
+                        raise PostReleaseError(
+                            f"pipeline '{pl_name}' publish failed: {e}. "
+                            f"Release state has been preserved; fix the issue and "
+                            f"run `rlsbl release resume` to re-attempt the publish."
+                        ) from e
 
             # Multi-target: run build for secondary targets (build stays on
             # targets, not pipelines). Build failures remain warnings.
