@@ -75,6 +75,68 @@ def make_commit(repo, filename="file.txt", message="change"):
     return git_head(repo)
 
 
+# ---------------------------------------------------------------------------
+# Pinned safegit binary for integration tests (real-binary harness)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="session")
+def safegit_bin(tmp_path_factory):
+    """Build the pinned safegit release once and return the binary path.
+
+    The pin is derived from SAFEGIT_MIN_VERSION (the exact version the scrub
+    flow declares as its minimum), installed via
+    ``go install github.com/smm-h/safegit@v<pin>`` into a shared directory.
+    Module-proxy installs are reproducible, so this pins properly on every
+    machine and in CI.
+
+    NO skip-if-absent: if the Go toolchain or network is unavailable the
+    tests FAIL. CI runners have Go preinstalled.
+
+    Cross-worker/session safety: the build directory lives in the shared
+    pytest temp root (one level above the per-session basetemp, which is also
+    shared by xdist workers) and is guarded by an O_EXCL lock file plus a
+    .done marker, so concurrent workers build exactly once.
+    """
+    from rlsbl.commands.release_scrub import SAFEGIT_MIN_VERSION
+
+    pin = "v" + ".".join(str(p) for p in SAFEGIT_MIN_VERSION)
+    shared_root = tmp_path_factory.getbasetemp().parent
+    gobin = shared_root / f"safegit-{pin}"
+    binary = gobin / "safegit"
+    done_marker = gobin / ".done"
+    lock_path = shared_root / f"safegit-{pin}.lock"
+
+    deadline = time.monotonic() + 600
+    while not done_marker.exists():
+        try:
+            fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            if time.monotonic() > deadline:
+                raise RuntimeError(
+                    f"timed out waiting for another worker to build safegit "
+                    f"{pin} (stale lock? {lock_path})"
+                )
+            time.sleep(1)
+            continue
+        try:
+            if not done_marker.exists():
+                gobin.mkdir(parents=True, exist_ok=True)
+                env = {**os.environ, "GOBIN": str(gobin)}
+                subprocess.run(
+                    ["go", "install", f"github.com/smm-h/safegit@{pin}"],
+                    env=env, check=True, timeout=600,
+                    capture_output=True, text=True,
+                )
+                done_marker.touch()
+        finally:
+            os.close(fd)
+            os.unlink(str(lock_path))
+
+    assert binary.exists(), f"safegit binary missing after build: {binary}"
+    return binary
+
+
 def make_workspace(root, projects):
     """Create a .rlsbl-monorepo/workspace.toml with the given project list."""
     ws_dir = root / WORKSPACE_DIR

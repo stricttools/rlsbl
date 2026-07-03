@@ -6,6 +6,7 @@ import re
 import sys
 
 from ..changelog.files import (
+    changes_dir_exists,
     enumerate_changelog_dirs,
     get_changes_dir,
     remap_jsonl_hashes,
@@ -462,15 +463,21 @@ def run_cmd(flags, *, ctx):
             _save_step(scrub_result_path, scrub_data, "HASHES_VALIDATED")
 
         # -- Regenerate CHANGELOG.md --
+        # Only for projects that actually have a changes dir: calling the
+        # generator on a project without one would fabricate a stub
+        # CHANGELOG.md (e.g. releasable members keep their changelog at the
+        # releasable level, not the project root).
         if "CHANGELOG_GENERATED" not in completed:
             if ctx.workspace_root:
                 for proj in workspace_projects:
                     if not proj.is_releasable:
                         continue
                     proj_path = os.path.join(str(ctx.workspace_root), proj.path)
-                    generate_changelog(proj_path)
+                    if changes_dir_exists(proj_path):
+                        generate_changelog(proj_path)
             else:
-                generate_changelog(str(project_root))
+                if changes_dir_exists(str(project_root)):
+                    generate_changelog(str(project_root))
 
             _save_step(scrub_result_path, scrub_data, "CHANGELOG_GENERATED")
 
