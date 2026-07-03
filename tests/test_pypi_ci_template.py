@@ -12,6 +12,7 @@ import os
 
 from conftest import make_ctx
 from rlsbl.commands.init_cmd import process_template
+from rlsbl.commands.monorepo import parse_ci_workflow
 from rlsbl.targets.pypi import PypiTarget
 
 
@@ -124,3 +125,36 @@ class TestCiTemplateRendering:
         for line in template.splitlines():
             if "uv sync" in line:
                 assert "--locked" in line
+
+
+class TestCiTemplateYamlStructure:
+    """Rendered CI outputs must parse as YAML (ruamel round-trip, matching
+    test_ci_concurrency conventions); pytest step presence is verified on
+    the parsed job structure, not raw strings."""
+
+    def _render(self, vars):
+        content, _ = process_template(_read_ci_template(), vars)
+        return content
+
+    def _run_steps(self, content):
+        doc = parse_ci_workflow(content)
+        assert doc is not None, "rendered CI is not a valid workflow document"
+        steps = doc["jobs"]["test"]["steps"]
+        return [step["run"] for step in steps if "run" in step]
+
+    def test_probe_positive_parses_with_pytest_step(self):
+        content = self._render({"pypi.hasPytest": "true", "importName": "mylib"})
+        runs = self._run_steps(content)
+        assert "uv run pytest" in runs
+        # pytest step comes after the import smoke test in the parsed steps
+        smoke_idx = next(
+            i for i, r in enumerate(runs) if r.startswith("uv run python -c")
+        )
+        assert runs.index("uv run pytest") > smoke_idx
+
+    def test_probe_negative_parses_without_pytest_step(self):
+        content = self._render({"importName": "mylib"})
+        runs = self._run_steps(content)
+        assert not any("pytest" in r for r in runs)
+        # the rest of the job survives rendering intact
+        assert "uv sync --locked" in runs
