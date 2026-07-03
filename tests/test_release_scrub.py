@@ -1961,6 +1961,9 @@ class TestChangelogRegenerateUnchanged:
         assert "differs" in err
         assert "Hand-written stale changelog" in err
         assert "regenerated" in err
+        # Concrete drift remediation named: regenerate, commit, re-run.
+        assert "rlsbl changelog generate" in err
+        assert "rlsbl commit" in err
         assert (tmp_path / ".rlsbl" / "releases" / "scrub-result.json").exists()
         for c in mock_run.call_args_list:
             if c[0][0] == "safegit":

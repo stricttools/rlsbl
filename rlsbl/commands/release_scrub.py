@@ -683,8 +683,10 @@ def _regenerate_and_assert_unchanged(proj_path, scrub_result_path):
         )
         sys.stderr.writelines(diff_lines)
     print(
-        f"\nAborting before commit/push. Fix the inconsistency and re-run "
-        f"to resume; {scrub_result_path} is kept.",
+        f"\nAborting before commit/push; {scrub_result_path} is kept. If "
+        f"the diff is generation drift, run `rlsbl changelog generate`, "
+        f"commit the result with `rlsbl commit`, and re-run this command "
+        f"to resume.",
         file=sys.stderr,
     )
     sys.exit(1)
