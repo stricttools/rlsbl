@@ -42,3 +42,4 @@
 {"commits":["a57d1fd2a88e44d5cb5d2b35c570ff492dd1c7bd"],"user_facing":true,"description":"**Fix.** `rlsbl release scrub` validates after remapping that every commit hash in every changelog file resolves against the rewritten history, and aborts loudly BEFORE committing or force-pushing if any hash is dangling (resume state is kept).","type":"fix"}
 {"commits":["7e32a0913a280e1e4477eb3917c27a3e090828c2"],"user_facing":false}
 {"commits":["02cf8277a3db04647ab7c66f93291ab0a7e3d525"],"user_facing":true,"description":"**Fix.** The release-workflow documentation no longer claims releases are atomic: it documents the preserved-state/resume model, corrects the post-release hook's pipeline step number, and documents the releasable location of scrub-result.json.","type":"fix"}
+{"commits":["2d16d843b7a236f6f048d6e89c2a45d9f0b03365"],"user_facing":false}
