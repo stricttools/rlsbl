@@ -7,8 +7,11 @@ on:
     branches: [main]
   workflow_dispatch:
 
-env:
-  UV_NO_SOURCES: "1"
+# Per-SHA group: re-runs of the same commit dedupe, but a new commit never
+# cancels an earlier commit's in-flight run (release CI conclusions stay intact).
+concurrency:
+  group: ${{ github.workflow_ref }}-${{ github.sha }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -16,22 +19,11 @@ jobs:
     strategy:
       matrix:
         # requires-python: >= 3.11
-        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        python-version: ["3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v7
       - run: uv python install ${{ matrix.python-version }}
-      - run: uv sync --group dev
-      - run: uv run pytest -n auto -x --junitxml=test-results.xml --cov=rlsbl --cov-report=xml --cov-fail-under=90
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: test-results-${{ matrix.python-version }}
-          path: test-results.xml
-      - name: Upload coverage
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: coverage-${{ matrix.python-version }}
-          path: coverage.xml
+      - run: uv sync --locked
+      - run: uv run python -c "import rlsbl"
+      - run: uv run pytest

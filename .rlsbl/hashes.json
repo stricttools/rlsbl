@@ -1,5 +1,5 @@
 {
-  ".github/workflows/ci-pypi.yml": "e8c26710a58177377b70041fe0ccb5d1a535325baa0a16ae482c1512c92db215",
+  ".github/workflows/ci-pypi.yml": "3323da9b8a2003ab59b9bb7e1e51a76be8ea7f6c20a51bace1b23e2fcaa73449",
   ".npmignore": "7c0eea9785c0318aeb39bf8b670ce8384f4a5b812fde69ce23d7d018057325a3",
   ".github/workflows/publish.yml": "d64cc1f19f60a2a3ec95d87c110f96387e2468372a2fc98f297e7a4909dd76b1",
   "CHANGELOG.md": "94a9e33102805caec6bc5536536fa67b6a41d8578eccd38889ebf16540eb481e",
