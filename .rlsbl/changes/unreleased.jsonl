@@ -2,3 +2,4 @@
 {"commits":["7941d0699781b15466bdb37c23ecae2efcd278c6"],"user_facing":true,"description":"**Fix.** All per-sub-project commands now show a workspace-root-specific error message instead of the misleading 'Run rlsbl monorepo add' when invoked from the monorepo workspace root.","type":"fix"}
 {"commits":["7fb5708b6f507975c36b58e5df740c39cd2c1fb1","d82453b1ca8bbc688561b7ba8f186a26c2c0aaf1"],"user_facing":false}
 {"commits":["4a7af03a47acfce1bd2b32713dd3df0d2166de37"],"user_facing":false}
+{"commits":["c68b2213e5686fec53381ac89df975d9e1efc1dd","96236540b6afedf1b5077dbea394c948c4c38d38","43bbe01945b36161309beeba5b58e3d436e2938d","c8fda60a08663f755ee8c0e31e3c7712997d97a8"],"user_facing":false}
