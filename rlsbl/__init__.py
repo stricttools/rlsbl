@@ -151,7 +151,10 @@ def _resolve_target(target):
 app = strictcli.App(
     name="rlsbl",
     version=__version__,
-    help="Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 34 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
+    # The command-count sentence is appended after all registrations (see
+    # "Derived help counts" near the bottom of this module) so it is computed
+    # from the live registry instead of hand-maintained literals that drift.
+    help="Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more).",
     flags=[
         strictcli.Flag(name="dry-run", type=bool, default=False, help="Preview changes without applying them"),
         strictcli.Flag(name="yes", type=bool, short="y", default=False, help="Skip confirmation prompts"),
@@ -1390,6 +1393,31 @@ def cmd_dev_sync(**_kwargs):
     rc = run_sync(root)
     if rc:
         sys.exit(rc)
+
+
+# ---------------------------------------------------------------------------
+# Derived help counts
+# ---------------------------------------------------------------------------
+
+def _count_leaf_commands(groups):
+    """Recursively count leaf commands across nested group registries."""
+    return sum(
+        len(group.commands) + _count_leaf_commands(group._groups)
+        for group in groups.values()
+    )
+
+
+# Appended after ALL command/group registrations above so the counts are
+# derived from the live registry and can never drift (they used to be
+# hand-maintained literals that went stale). strictcli renders app.help
+# lazily (at --help / schema-dump time), so mutating it here is safe.
+# Register new commands above this block, or test_app_help_counts.py fails.
+_total_commands = len(app._commands) + _count_leaf_commands(app._groups)
+app.help = (
+    f"{app.help} Ships {_total_commands} commands organized into "
+    f"{len(app._commands)} top-level commands and {len(app._groups)} "
+    f"command groups ({', '.join(app._groups)})."
+)
 
 
 # ---------------------------------------------------------------------------
