@@ -16,6 +16,7 @@ order: 90
 - [rlsbl.changelog.exemptions](rlsbl-changelog-exemptions.html)
 - [rlsbl.changelog.files](rlsbl-changelog-files.html)
 - [rlsbl.changelog.generate](rlsbl-changelog-generate.html)
+- [rlsbl.changelog.home](rlsbl-changelog-home.html)
 - [rlsbl.changelog.resolve](rlsbl-changelog-resolve.html)
 - [rlsbl.changelog.schema](rlsbl-changelog-schema.html)
 - [rlsbl.changelog.validate](rlsbl-changelog-validate.html)

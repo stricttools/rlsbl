@@ -208,6 +208,11 @@
       "type": "doc"
     },
     {
+      "path": "rlsbl-changelog-home.md",
+      "title": "rlsbl.changelog.home",
+      "type": "doc"
+    },
+    {
       "path": "rlsbl-changelog-resolve.md",
       "title": "rlsbl.changelog.resolve",
       "type": "doc"
@@ -895,5 +900,5 @@
       ]
     }
   ],
-  "last_gen": "2026-07-02T23:15:05.498703+00:00"
+  "last_gen": "2026-07-03T00:00:10.975301+00:00"
 }
