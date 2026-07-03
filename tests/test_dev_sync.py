@@ -418,6 +418,26 @@ def test_workspace_root_invocation_is_hard_error(
     assert "sub-project" in err
 
 
+def test_cli_workspace_root_gives_cd_guidance(tmp_project, monkeypatch):
+    """CLI-level: at a monorepo workspace root, `rlsbl dev sync` must say to
+    cd into a sub-project -- not misleadingly suggest `rlsbl monorepo add`
+    (the workspace root is not an unregistered project; it is simply the
+    wrong place to run dev sync from)."""
+    from rlsbl import app
+
+    ws_dir = tmp_project / ".rlsbl-monorepo"
+    ws_dir.mkdir()
+    (ws_dir / "workspace.toml").write_text('[[projects]]\npath = "py"\nname = "py"\n')
+    (tmp_project / "py").mkdir()
+    monkeypatch.setenv("UV_NO_SYNC", "1")
+
+    result = app.test(["dev", "sync"])
+    assert result.exit_code == 1
+    assert "sub-project" in result.stderr
+    assert OVERRIDES_FILENAME in result.stderr
+    assert "monorepo add" not in result.stderr
+
+
 # ---------------------------------------------------------------------------
 # CLI registration
 # ---------------------------------------------------------------------------

@@ -79,12 +79,18 @@ def _require_project_root():
     return Path(root)
 
 
-def _require_sub_project_root():
+def _require_sub_project_root(workspace_root_guidance=None):
     """Find the project root, resolving to the sub-project in monorepo mode.
 
     In standalone mode: same as _require_project_root().
     In monorepo mode: uses resolve_project() to find which sub-project CWD is in,
     returns the sub-project path instead of the monorepo root.
+
+    ``workspace_root_guidance``: optional error message printed when CWD is
+    the monorepo workspace root itself. Per-sub-project commands (dev sync,
+    dev install) pass this so a workspace-root invocation says "cd into a
+    sub-project" instead of the misleading default "run 'rlsbl monorepo add'"
+    (the workspace root is not an unregistered project).
 
     Side effect: sets module-level ``_resolved_project`` to the
     WorkspaceProject when in monorepo mode, or None in standalone mode.
@@ -101,6 +107,12 @@ def _require_sub_project_root():
             _resolved_project = project
             sub_path = Path(ws_root) / project["path"]
             return sub_path
+        if (
+            workspace_root_guidance is not None
+            and Path(ws_root).resolve() == Path.cwd().resolve()
+        ):
+            print(workspace_root_guidance, file=sys.stderr)
+            sys.exit(1)
         # CWD is inside the monorepo but not in any registered project
         print(f"Error: CWD is inside monorepo at {ws_root} but not inside any registered project.", file=sys.stderr)
         print("Run 'rlsbl monorepo add <path>' to register this project.", file=sys.stderr)
@@ -1339,7 +1351,14 @@ def cmd_dev_install(all, include, exclude, uninstall, global_, venv, **_kwargs):
             file=sys.stderr,
         )
         sys.exit(2)
-    root = _require_sub_project_root()
+    root = _require_sub_project_root(
+        workspace_root_guidance=(
+            "Error: `rlsbl dev install` must run inside a sub-project, not "
+            "at the monorepo workspace root. cd into a sub-project and "
+            "re-run; from within any sub-project, --all/--include/--exclude "
+            "select which workspace projects to install."
+        )
+    )
     # Both flags default to False (not True) so strictcli's mutex check doesn't
     # always fire when neither is passed. The user-visible default (no flags ->
     # global mode) is preserved by deriving install_global from --venv only.
@@ -1360,8 +1379,14 @@ def cmd_dev_install(all, include, exclude, uninstall, global_, venv, **_kwargs):
 
 @dev.command(name="sync", help="Overlay local editable checkouts of sibling projects onto this project's locked environment, driven by a git-invisible dev-sources.toml.local-only file at the project root (one [[overlay]] block with 'package' and 'path' per checkout). Runs a single 'uv sync --inexact' excluding every overlaid package, then 'uv pip install -e <path>' per entry, so the locked registry wheels never clobber the local checkouts and no [tool.uv.sources] path dependency ever needs to be committed. Requires UV_NO_SYNC=1 in the environment (a bare 'uv run' would otherwise auto-sync and silently wipe the overlays); a bare 'uv sync' still reverts overlays harmlessly -- re-run this command to restore them. In monorepo mode, run it from within a sub-project.")
 def cmd_dev_sync(**_kwargs):
-    root = _require_sub_project_root()
-    from .commands.dev_sync import run_sync
+    from .commands.dev_sync import OVERRIDES_FILENAME, run_sync
+    root = _require_sub_project_root(
+        workspace_root_guidance=(
+            "Error: `rlsbl dev sync` must run inside a sub-project, not at "
+            "the monorepo workspace root. cd into the sub-project (its "
+            f"{OVERRIDES_FILENAME} lives at the sub-project root) and re-run."
+        )
+    )
     rc = run_sync(root)
     if rc:
         sys.exit(rc)

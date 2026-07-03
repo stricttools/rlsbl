@@ -695,3 +695,27 @@ def test_cli_global_and_venv_are_mutually_exclusive():
             venv=True,
         )
     assert excinfo.value.code == 2
+
+
+# ---------------------------------------------------------------------------
+# CLI: workspace-root invocation guidance
+# ---------------------------------------------------------------------------
+
+
+def test_cli_workspace_root_gives_cd_guidance(tmp_path, monkeypatch):
+    """CLI-level: at a monorepo workspace root, `rlsbl dev install` must say
+    to cd into a sub-project -- not misleadingly suggest `rlsbl monorepo add`
+    (the workspace root is not an unregistered project; it is simply the
+    wrong place to run dev install from)."""
+    from rlsbl import app
+
+    ws_dir = tmp_path / ".rlsbl-monorepo"
+    ws_dir.mkdir()
+    (ws_dir / "workspace.toml").write_text('[[projects]]\npath = "py"\nname = "py"\n')
+    (tmp_path / "py").mkdir()
+    monkeypatch.chdir(tmp_path)
+
+    result = app.test(["dev", "install"])
+    assert result.exit_code == 1
+    assert "sub-project" in result.stderr
+    assert "monorepo add" not in result.stderr
