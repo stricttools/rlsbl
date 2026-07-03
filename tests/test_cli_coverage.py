@@ -396,14 +396,113 @@ class TestCmdReleaseScrub:
     @patch("rlsbl.commands.release_scrub.run_cmd")
     def test_delegates(self, mock_run, *_):
         rlsbl.cmd_release_scrub(
-            pattern="secret", file=None, replace="XXX", mangle=False,
-            from_commit="abc123", entire_history=False, reason="test",
-            dry_run=True, yes=True,
+            pattern="secret", file=None, recipe=None, replace="XXX",
+            mangle=False, from_commit="abc123", entire_history=False,
+            reason="test", dry_run=True, yes=True,
         )
         mock_run.assert_called_once()
         flags = mock_run.call_args[0][0]
         assert flags["pattern"] == "secret"
         assert flags["from-commit"] == "abc123"
+        assert flags["recipe"] is None
+
+
+class TestReleaseScrubCliParsing:
+    """CLI-level tests: `release scrub` argv goes through the real strictcli
+    parser and must reach release_scrub.run_cmd with the right flags dict.
+
+    These exist because the run_cmd contract (three mode selectors:
+    --pattern/--file/--recipe) was broader than what the command
+    registration exposed: --recipe was not registered at all, and the
+    replace/mangle mutex group (exactly-one-required in strictcli) made
+    file and recipe modes unreachable from the CLI.
+    """
+
+    def _scrub(self, argv):
+        with patch("rlsbl._require_project_root", return_value=Path("/fake")), \
+             patch("rlsbl.workspace.find_workspace_root", return_value=None), \
+             patch("rlsbl.create_context"), \
+             patch("rlsbl.commands.release_scrub.run_cmd") as mock_run:
+            result = rlsbl.app.test(["release", "scrub", *argv])
+        return result, mock_run
+
+    def test_recipe_mode_reaches_run_cmd(self):
+        result, mock_run = self._scrub(
+            ["--recipe", "x.toml", "--from-commit", "abc", "--reason", "r"])
+        assert result.exit_code == 0, result.stderr
+        mock_run.assert_called_once()
+        flags = mock_run.call_args[0][0]
+        assert flags["recipe"] == "x.toml"
+        assert flags["from-commit"] == "abc"
+        assert flags["reason"] == "r"
+
+    def test_recipe_mode_with_entire_history(self):
+        result, mock_run = self._scrub(
+            ["--recipe", "x.toml", "--entire-history", "--reason", "r"])
+        assert result.exit_code == 0, result.stderr
+        flags = mock_run.call_args[0][0]
+        assert flags["recipe"] == "x.toml"
+        assert flags["entire-history"] is True
+
+    def test_file_mode_needs_no_match_flags(self):
+        # safegit scrub file has no replace/mangle concept; the CLI must not
+        # demand them just to satisfy a mutex group.
+        result, mock_run = self._scrub(
+            ["--file", "f.txt", "--from-commit", "abc", "--reason", "r"])
+        assert result.exit_code == 0, result.stderr
+        flags = mock_run.call_args[0][0]
+        assert flags["file"] == "f.txt"
+        assert not flags["replace"]
+        assert not flags["mangle"]
+
+    def test_match_mode_still_works(self):
+        result, mock_run = self._scrub(
+            ["--pattern", "sec", "--replace", "X",
+             "--from-commit", "abc", "--reason", "r"])
+        assert result.exit_code == 0, result.stderr
+        flags = mock_run.call_args[0][0]
+        assert flags["pattern"] == "sec"
+        assert flags["replace"] == "X"
+
+    def test_mode_selectors_mutually_exclusive(self):
+        result, mock_run = self._scrub(
+            ["--pattern", "sec", "--recipe", "x.toml",
+             "--from-commit", "abc", "--reason", "r"])
+        assert result.exit_code == 1
+        assert "mutually exclusive" in result.stderr
+        mock_run.assert_not_called()
+
+    def test_mode_selector_required(self):
+        result, mock_run = self._scrub(
+            ["--from-commit", "abc", "--reason", "r"])
+        assert result.exit_code == 1
+        # The required-mode error must offer all three selectors.
+        assert "--recipe" in result.stderr
+        mock_run.assert_not_called()
+
+    def test_replace_requires_pattern(self):
+        result, mock_run = self._scrub(
+            ["--file", "f.txt", "--replace", "X",
+             "--from-commit", "abc", "--reason", "r"])
+        assert result.exit_code == 1
+        assert "requires '--pattern'" in result.stderr
+        mock_run.assert_not_called()
+
+    def test_mangle_requires_pattern(self):
+        result, mock_run = self._scrub(
+            ["--recipe", "x.toml", "--mangle",
+             "--from-commit", "abc", "--reason", "r"])
+        assert result.exit_code == 1
+        assert "requires '--pattern'" in result.stderr
+        mock_run.assert_not_called()
+
+    def test_replace_and_mangle_mutually_exclusive(self):
+        result, mock_run = self._scrub(
+            ["--pattern", "sec", "--replace", "X", "--mangle",
+             "--from-commit", "abc", "--reason", "r"])
+        assert result.exit_code == 1
+        assert "mutually exclusive" in result.stderr
+        mock_run.assert_not_called()
 
 
 # ============================================================================

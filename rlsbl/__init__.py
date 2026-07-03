@@ -701,24 +701,37 @@ def cmd_release_yank(reason, use, hard, dry_run, yes, version, **_kwargs):
 
 @release_group.command(
     name="scrub",
-    help="Scrub sensitive content from git history and update release metadata to match the rewritten commits. Wraps safegit scrub (match or file mode), remaps commit hashes in all JSONL changelog files, regenerates CHANGELOG.md, force-pushes the rewritten history, and recreates GitHub Releases on the new tags. A scrub-result.json file records the SHA mapping for recovery if any post-rewrite step fails.",
+    help="Scrub sensitive content from git history and update release metadata to match the rewritten commits. Wraps safegit scrub in one of three modes: match (--pattern with --replace or --mangle), file (--file, which replaces the file throughout history with its current on-disk content or removes it if absent; requires --from-commit), or recipe (--recipe, a scrub recipe TOML executed via safegit scrub run). Afterwards remaps commit hashes in all JSONL changelog files, regenerates CHANGELOG.md, force-pushes the rewritten history, and recreates GitHub Releases on the new tags. A scrub-result.json file records the SHA mapping for recovery if any post-rewrite step fails.",
     mutex=[
         strictcli.MutexGroup(flags=[
-            strictcli.Flag(name="pattern", type=str, help="Regex pattern to match against file contents (mutually exclusive with --file)"),
-            strictcli.Flag(name="file", type=str, help="Path to the file to remove from git history (mutually exclusive with --pattern)"),
-        ]),
-        strictcli.MutexGroup(flags=[
-            strictcli.Flag(name="replace", type=str, help="Literal text to substitute for each match (mutually exclusive with --mangle)"),
-            strictcli.Flag(name="mangle", type=bool, negatable=False, default=False, help="Replace matched content with random ASCII of same length"),
+            strictcli.Flag(name="pattern", type=str, help="Match mode: regex pattern to match against file contents (mutually exclusive with --file and --recipe)"),
+            strictcli.Flag(name="file", type=str, help="File mode: path of the file to rewrite throughout history; it is replaced with its current on-disk content, or removed if absent (mutually exclusive with --pattern and --recipe; requires --from-commit)"),
+            strictcli.Flag(name="recipe", type=str, help="Recipe mode: path to a scrub recipe TOML file executed via safegit scrub run; per-operation pattern/replace/mangle live inside the recipe (mutually exclusive with --pattern and --file)"),
         ]),
         strictcli.MutexGroup(flags=[
             strictcli.Flag(name="from-commit", type=str, help="SHA of the earliest commit to rewrite (all descendants are also rewritten)"),
-            strictcli.Flag(name="entire-history", type=bool, negatable=False, default=False, help="Rewrite every commit in the repository from the initial commit onward"),
+            strictcli.Flag(name="entire-history", type=bool, negatable=False, default=False, help="Rewrite every commit in the repository from the initial commit onward (match and recipe modes only; file mode requires --from-commit)"),
         ]),
     ],
+    dependencies=[
+        # replace/mangle are match-mode-only knobs; file mode has no
+        # replace/mangle concept and recipe mode defines them per-operation
+        # inside the TOML. Enforced at parse time so the other modes never
+        # have to carry (or reject) them. Their mutual exclusion cannot be a
+        # MutexGroup (strictcli mutex is exactly-one-REQUIRED, which would
+        # make file/recipe modes unreachable), so it is checked in the
+        # handler below.
+        strictcli.Requires(flag="replace", depends_on="pattern"),
+        strictcli.Requires(flag="mangle", depends_on="pattern"),
+    ],
 )
+@strictcli.flag(name="replace", type=str, help="Match mode: literal text to substitute for each match (mutually exclusive with --mangle)", default="")
+@strictcli.flag(name="mangle", type=bool, negatable=False, default=False, help="Match mode: replace matched content with random ASCII of same length (mutually exclusive with --replace)")
 @strictcli.flag(name="reason", type=str, help="Reason for scrubbing (required, used in commit message)", default="")
-def cmd_release_scrub(pattern, file, replace, mangle, from_commit, entire_history, reason, dry_run, yes, **_kwargs):
+def cmd_release_scrub(pattern, file, recipe, replace, mangle, from_commit, entire_history, reason, dry_run, yes, **_kwargs):
+    if replace and mangle:
+        print("Error: --replace and --mangle are mutually exclusive", file=sys.stderr)
+        sys.exit(1)
     root = _require_project_root()
     from .workspace import find_workspace_root
     monorepo_root = find_workspace_root(str(root))
@@ -726,6 +739,7 @@ def cmd_release_scrub(pattern, file, replace, mangle, from_commit, entire_histor
     flags = {
         "pattern": pattern or None,
         "file": file or None,
+        "recipe": recipe or None,
         "replace": replace or None,
         "mangle": mangle,
         "from-commit": from_commit or None,
