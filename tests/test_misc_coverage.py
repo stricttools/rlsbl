@@ -1132,7 +1132,7 @@ class TestResolveHashes:
     def test_deduplicates_lookups(self, monkeypatch):
         call_count = 0
 
-        def mock_resolve(h):
+        def mock_resolve(h, *, cwd=None):
             nonlocal call_count
             call_count += 1
             return "a" * 40
