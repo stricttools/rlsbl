@@ -64,3 +64,4 @@
 {"commits":["664ca54c9fa43eddfdbea0f7fdd6d342766c2969","a34f7927db8aaffa88cc652ec4c7617272a00f0f"],"user_facing":false}
 {"commits":["ad5bd7db3fc8deb15512295fbf06ea0cff2d6c42"],"user_facing":true,"description":"**Fix.** Successful releases no longer leave a stale `in-progress.json` behind when `--watch` is used, which previously blocked the next release with 'a previous release is in progress'.","type":"fix"}
 {"commits":["0f59ec0707358094d3f91fd4d3a35d47934d4659","4726bf04b16f6a783c6c077e79ced34b34209320"],"user_facing":false}
+{"commits":["bcd618bf2d6d02d32dbcfe04e436652458f2fdec"],"user_facing":false}
