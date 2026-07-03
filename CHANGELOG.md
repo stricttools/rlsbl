@@ -2,6 +2,31 @@
 
 # Changelog
 
+## 0.96.0
+
+Publish workflows now gate on CI success for the release commit (no more publish-races-CI), with a ref-based retry contract and a fix for dispatch runs skipping all router jobs.
+
+<details>
+<summary>Context</summary>
+
+Closes the wesktop-v0.7.0-class failure mode where a package was published
+while CI was failing. A gate job (single source of truth in
+rlsbl/publish_gate.py) now runs first in every publish workflow: it polls
+check runs for the release SHA (ref-based, so workflow_dispatch retries at
+the tag ref work), uses explicit conclusion semantics, and hard-errors on
+failed, cancelled, or skipped CI. The gate is wired across templates, the
+merged-workflow generator, the npm wrapper, and the monorepo router; router
+conditions are ref-based (fixing dispatch runs skipping all jobs), publish
+concurrency is per-ref, and the gate job requests checks:read. Verified
+live on a staging sandbox repo across 6 scenarios.
+
+</details>
+
+### Features
+
+- **Publish gating.** Publish workflows now wait for CI to pass on the release commit before publishing: a `gate` job polls the commit's CI check runs (ref-based, so dispatch retries at the tag ref work) and hard-errors on failed, cancelled, or skipped CI. Monorepo publish routers use ref-based tag matching, fixing workflow_dispatch runs skipping all jobs.
+- **Docs: publish gating.** New release-workflow.md section covering the publish gate's conclusion semantics, the retry-dispatch-at-tag-ref contract, and monorepo router gating.
+
 ## 0.95.0
 
 Local dev overlays via `rlsbl dev sync`, the cross-repo path-source ban, a release-time version-skew guard, detached CI watching with `--watch-async`/`rlsbl watch --stop`, and history-consistent scrubs on safegit 0.22.0.
