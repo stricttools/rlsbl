@@ -304,14 +304,47 @@ def register_workspace_checks(app):
 
     @app.check("dead-workspace-packages")
     def check_dead_workspace_packages(ctx):
-        """Library packages must be imported by at least one workspace sibling."""
+        """Library packages must be imported by at least one workspace sibling.
+
+        Published releasable members (non-private, with pipelines) are
+        exempt -- they are consumed externally via a package registry.
+        """
         from ..dep_validation import find_dead_workspace_packages
+        from ..member_context import resolve_member_context
+        from ..pipelines import load_pipelines
+        from ..targets import resolve_releasable_config_dir
 
         import_cache = _build_dep_import_cache(ctx)
-        dead = find_dead_workspace_packages(ctx.projects, import_cache)
+
+        # Build set of published member names for exemption
+        published_members = set()
+        for rel in ctx.releasables:
+            rel_members = members_of(rel.name, ctx.projects)
+            for proj in rel_members:
+                abs_pkg = os.path.join(str(ctx.workspace_root), proj["path"])
+                rel_dir = resolve_releasable_config_dir(proj, ctx.workspace_root)
+                try:
+                    member = resolve_member_context(
+                        abs_pkg, releasable_config_dir=rel_dir,
+                    )
+                    if member.is_private:
+                        continue
+                    pipelines = load_pipelines(member.config)
+                    if pipelines:
+                        published_members.add(proj["name"])
+                except Exception:
+                    continue
+
+        dead = find_dead_workspace_packages(
+            ctx.projects, import_cache,
+            published_members=published_members,
+        )
 
         if not dead:
-            return CheckResult("pass", "all library packages have workspace importers")
+            msg = "all library packages have workspace importers"
+            if published_members:
+                msg += f" ({len(published_members)} published member(s) exempt)"
+            return CheckResult("pass", msg)
 
         details = [d.message for d in dead]
         return CheckResult(

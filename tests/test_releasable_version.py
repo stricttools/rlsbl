@@ -429,10 +429,12 @@ releasable = "core"
         check_fn = self._get_check_fn()
         result = check_fn(ctx)
 
-        # Should pass with the releasable version, not fail on mismatch
+        # Should pass with the releasable version, not fail on mismatch.
+        # Without a per-package config, the member defaults to private,
+        # so only the version file is checked.
         assert result.status == "pass"
         assert "2.0.0" in result.message
-        assert "releasable version file" in result.message
+        assert "version file" in result.message
 
     def test_no_releasables_compares_targets(self, tmp_path):
         """Without [[releasables]], the check compares target versions."""

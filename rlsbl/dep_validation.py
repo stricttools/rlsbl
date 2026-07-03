@@ -1139,6 +1139,8 @@ class DeadWorkspacePackage:
 def find_dead_workspace_packages(
     projects: list[dict],
     import_cache: dict[str, tuple[set[str], set[str]]],
+    *,
+    published_members: set[str] | None = None,
 ) -> list[DeadWorkspacePackage]:
     """Find library packages that no other workspace package imports.
 
@@ -1151,6 +1153,10 @@ def find_dead_workspace_packages(
         import_cache: mapping of project name to (lib_imports, test_imports,
             guarded_imports) as produced by _build_dep_import_cache in
             rlsbl/checks/_common.py.
+        published_members: optional set of project names that are published
+            members of a releasable (non-private, with pipelines). These
+            are exempt from the dead-workspace check because they are
+            consumed externally via a package registry.
 
     Returns:
         list of DeadWorkspacePackage for packages with no workspace importers.
@@ -1184,6 +1190,11 @@ def find_dead_workspace_packages(
         # Skip non-library projects (apps, CLIs) -- they are entry points
         # that consume but aren't consumed.
         if not proj.get("library"):
+            continue
+
+        # Skip published releasable members -- they are consumed externally
+        # via a package registry, so zero workspace importers is expected.
+        if published_members and name in published_members:
             continue
 
         has_lib_importers = bool(lib_importers.get(name))

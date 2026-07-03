@@ -204,19 +204,60 @@ def register_project_checks(app):
         """All detected targets must report the same version.
 
         In explicit releasable mode (when the project belongs to a named
-        releasable with a version file), the releasable version file is the
-        source of truth. Member package manifest versions are informational
-        and do not trigger a consistency failure.
+        releasable with a version file), the releasable version is the
+        source of truth. Published (non-private) member manifests are
+        checked against the releasable version -- a mismatch is an error.
 
         In implicit mode (no [[releasables]]), all targets within the
         project must agree on the same version.
         """
         # In explicit mode, the releasable version file is authoritative.
+        # Published members' manifests must match it.
         releasable_version = _get_releasable_version_for_project(ctx)
         if releasable_version is not None:
+            from ..targets import TARGETS, detect_targets, resolve_releasable_config_dir_for_ctx
+            from ..member_context import resolve_member_context
+
+            rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
+            member = resolve_member_context(
+                str(ctx.project_root), releasable_config_dir=rel_dir,
+            )
+            if member.is_private:
+                return CheckResult(
+                    "pass",
+                    f"{releasable_version} (private member, version file only)",
+                )
+
+            # Check manifest versions of published member
+            target_entries = detect_targets(str(ctx.project_root), releasable_config_dir=rel_dir)
+            mismatches = []
+            for name, path in target_entries:
+                target = TARGETS.get(name)
+                if target is None:
+                    continue
+                try:
+                    manifest_version = target.read_version(path)
+                except Exception:
+                    continue
+                if manifest_version is not None and manifest_version != releasable_version:
+                    # Tolerate PEP 440 normalization for pypi targets
+                    if name == "pypi":
+                        from ..targets.pypi import PypiTarget
+                        if PypiTarget.format_version(None, releasable_version) == manifest_version:
+                            continue
+                    mismatches.append(
+                        f"{name}={manifest_version} (expected {releasable_version})"
+                    )
+
+            if mismatches:
+                return CheckResult(
+                    "fail",
+                    f"published member manifest version mismatch vs releasable "
+                    f"version {releasable_version}: {', '.join(mismatches)}",
+                )
             return CheckResult(
                 "pass",
-                f"{releasable_version} (from releasable version file)",
+                f"{releasable_version} (releasable version, manifests match)",
             )
 
         from ..targets import TARGETS, detect_targets, resolve_releasable_config_dir_for_ctx
