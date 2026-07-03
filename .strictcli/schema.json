@@ -263,6 +263,20 @@
           "default": [],
           "repeatable": true,
           "unique": true
+        },
+        {
+          "name": "as-daemon-child",
+          "type": "bool",
+          "help": "Internal: run as the detached watcher child spawned by --watch-async (fire-and-forget notifications, pidfile cleanup on exit). Not intended for direct use.",
+          "default": false,
+          "negatable": false
+        },
+        {
+          "name": "stop",
+          "type": "bool",
+          "help": "Stop a running detached watcher started with --watch-async. With a SHA, stops that watcher; without, stops the single live watcher (errors and lists candidates when several are live).",
+          "default": false,
+          "negatable": false
         }
       ],
       "args": [
@@ -383,12 +397,6 @@
           "help": "Bump version, validate the JSONL changelog, run tests and lint, commit, tag, push, and create a GitHub Release. Reads the bump type (patch, minor, major, or hotfix) and target selection from .rlsbl/releases/unreleased.toml, which can be scaffolded with rlsbl release init. Supports dry-run preview, non-interactive mode with --yes, and --allow-dirty to skip the clean working tree check.",
           "flags": [
             {
-              "name": "watch",
-              "type": "bool",
-              "help": "After release, automatically watch CI runs to completion (--no-watch to skip)",
-              "negatable": true
-            },
-            {
               "name": "allow-dirty",
               "type": "bool",
               "help": "Skip the clean working tree check and allow releasing with uncommitted changes",
@@ -411,6 +419,27 @@
               "type": "str",
               "help": "Pre-release identifier: alpha, beta, rc, stable. Only valid with --bump.",
               "default": ""
+            },
+            {
+              "name": "watch",
+              "type": "bool",
+              "help": "After release, automatically watch CI runs to completion (--no-watch to skip)",
+              "negatable": true
+            },
+            {
+              "name": "watch-async",
+              "type": "bool",
+              "help": "After release, spawn a detached background watcher and return immediately (--no-watch-async is equivalent to --no-watch)",
+              "negatable": true
+            }
+          ],
+          "constraints": [
+            {
+              "type": "mutex",
+              "flags": [
+                "watch",
+                "watch-async"
+              ]
             }
           ]
         },
@@ -423,6 +452,21 @@
               "type": "bool",
               "help": "After release, automatically watch CI runs to completion (--no-watch to skip)",
               "negatable": true
+            },
+            {
+              "name": "watch-async",
+              "type": "bool",
+              "help": "After release, spawn a detached background watcher and return immediately (--no-watch-async is equivalent to --no-watch)",
+              "negatable": true
+            }
+          ],
+          "constraints": [
+            {
+              "type": "mutex",
+              "flags": [
+                "watch",
+                "watch-async"
+              ]
             }
           ]
         },
@@ -439,6 +483,21 @@
               "type": "bool",
               "help": "After retry, automatically watch CI runs to completion (--no-watch to skip)",
               "negatable": true
+            },
+            {
+              "name": "watch-async",
+              "type": "bool",
+              "help": "After retry, spawn a detached background watcher and return immediately (--no-watch-async is equivalent to --no-watch)",
+              "negatable": true
+            }
+          ],
+          "constraints": [
+            {
+              "type": "mutex",
+              "flags": [
+                "watch",
+                "watch-async"
+              ]
             }
           ]
         },
@@ -1022,16 +1081,31 @@
               "help": "Execute a batch release of multiple monorepo packages in topological order. Reads package configurations from .rlsbl-monorepo/releases/unreleased.toml. Each package is released sequentially using the single-package release flow, with leaves (no dependencies) released first. Supports --dry-run, --yes, --allow-dirty flags.",
               "flags": [
                 {
+                  "name": "allow-dirty",
+                  "type": "bool",
+                  "help": "Skip the clean working tree check and allow releasing with uncommitted changes",
+                  "negatable": true
+                },
+                {
                   "name": "watch",
                   "type": "bool",
                   "help": "After batch release, automatically watch CI runs to completion (--no-watch to skip)",
                   "negatable": true
                 },
                 {
-                  "name": "allow-dirty",
+                  "name": "watch-async",
                   "type": "bool",
-                  "help": "Skip the clean working tree check and allow releasing with uncommitted changes",
+                  "help": "After batch release, spawn a detached background watcher and return immediately (--no-watch-async is equivalent to --no-watch)",
                   "negatable": true
+                }
+              ],
+              "constraints": [
+                {
+                  "type": "mutex",
+                  "flags": [
+                    "watch",
+                    "watch-async"
+                  ]
                 }
               ]
             },
