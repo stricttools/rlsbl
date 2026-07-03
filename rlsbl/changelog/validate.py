@@ -14,12 +14,12 @@ from .exemptions import (
     is_changelog_path,
 )
 from .files import list_versioned_files, read_unreleased
-from .resolve import resolve_hash, resolve_hashes
+from .resolve import resolve_hash, resolve_hashes, _get_last_version_tag, _git_log_hashes, _unreleased_range
 from .schema import ChangelogEntry, parse_jsonl, validate_schema
 from ..config import get_changelog_validation_config
 from ..git_util import filter_commits_for_project, filter_commits_for_releasable
 from ..errors import ChangelogError
-from ..utils import commit_files_if_changed, get_last_version_tag
+from ..utils import commit_files_if_changed
 
 
 def _filter_commits_for_scope(commits, project):
@@ -81,46 +81,6 @@ def _get_batch_limits_config(config) -> dict:
 
     return resolved
 
-
-def _git_log_hashes(range_spec: str) -> list[str]:
-    """Get commit hashes from git log for a given range spec.
-
-    Returns a list of full 40-char SHAs, or empty list on error.
-    """
-    try:
-        result = subprocess.run(
-            ["git", "log", "--format=%H", range_spec],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        if result.returncode != 0:
-            return []
-        return [line.strip() for line in result.stdout.strip().splitlines() if line.strip()]
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
-        return []
-
-
-def _get_last_version_tag(tag_glob: str | None = None) -> str | None:
-    """Backward-compatible wrapper around get_last_version_tag from utils.
-
-    Accepts None for tag_glob (defaulting to "v*") to preserve the old call
-    signature used by _unreleased_range and external callers like status.py.
-    """
-    return get_last_version_tag(tag_glob if tag_glob else "v*")
-
-
-def _unreleased_range(tag_glob: str | None = None) -> str:
-    """Return the git log range spec for unreleased commits.
-
-    Uses <last_tag>..HEAD if a version tag exists, otherwise HEAD
-    (all commits, for first release). Passes tag_glob through to
-    _get_last_version_tag for monorepo-aware tag discovery.
-    """
-    tag = _get_last_version_tag(tag_glob)
-    if tag:
-        return f"{tag}..HEAD"
-    return "HEAD"
 
 
 def _git_head() -> str | None:

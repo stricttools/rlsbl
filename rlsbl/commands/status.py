@@ -6,11 +6,8 @@ import subprocess
 import sys
 
 from ..changelog import changes_dir_exists, get_changes_dir, read_unreleased, resolve_hashes
-from ..changelog.validate import (
-    _get_last_version_tag,
-    _unreleased_range,
-    filter_exempt_commits,
-)
+from ..changelog.resolve import _get_last_version_tag, _unreleased_range
+from ..changelog.validate import filter_exempt_commits
 from ..git_util import filter_commits_for_project
 from ..targets import TARGETS, detect_targets
 from ..errors import GitError

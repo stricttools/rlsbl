@@ -7,7 +7,7 @@ import subprocess
 import pytest
 
 from conftest import make_ctx
-from rlsbl.changelog.validate import _unreleased_range
+from rlsbl.changelog.resolve import _unreleased_range
 from rlsbl.commands.monorepo import _cmd_init, _cmd_add, _cmd_status
 from rlsbl.workspace import load_workspace, save_workspace, WORKSPACE_DIR, WORKSPACE_FILE
 

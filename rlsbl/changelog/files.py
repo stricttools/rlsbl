@@ -317,8 +317,7 @@ def _warn_stale_entries(src: str, tag_glob: str) -> None:
     emit a warning per stale entry but do not strip them (warn-only).
     """
     # Local imports to avoid circular dependency at module load time.
-    from .resolve import resolve_hashes
-    from .validate import _git_log_hashes, _unreleased_range
+    from .resolve import resolve_hashes, _git_log_hashes, _unreleased_range
 
     range_spec = _unreleased_range(tag_glob)
     in_range = set(_git_log_hashes(range_spec))
