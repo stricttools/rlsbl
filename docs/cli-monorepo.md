@@ -9,7 +9,7 @@ nav_order: 10
 
 # rlsbl monorepo
 
-Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Provides 15 monorepo subcommands plus a release subgroup, and supports all 18 release targets in a single workspace.toml.
+Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Provides 16 monorepo subcommands plus a release subgroup, and supports all 18 release targets in a single workspace.toml.
 
 ## monorepo init
 
@@ -174,6 +174,10 @@ Extract all member packages of a releasable into a new repository. If the releas
 | --- | --- | --- |
 | `target_path` | yes | Filesystem path where the new repository will be created |
 | `releasable_name` | yes | Name of the releasable group in workspace.toml to extract |
+
+## monorepo cleanup
+
+Remove per-package release-state residue from releasable member packages: .rlsbl/changes/, .rlsbl/releases/, .rlsbl/bases/, .rlsbl/lint/, .rlsbl/version, per-package CHANGELOG.md, and .rlsbl/config.json when identical to the releasable-level config. Per-package hooks/ directories are preserved (live feature), and members whose path is the workspace root are exempt. Deletions go through saferm (audit trail, recoverable) and are committed automatically. Requires an explicit-mode workspace ([[releasables]] in workspace.toml). Detect residue first with `rlsbl check --name releasable-residue`.
 
 ## monorepo migrate-releasable
 

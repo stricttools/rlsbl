@@ -156,7 +156,7 @@
     "description": "92c829699be90c4ea09e05c6e0ff3830b755bdd05be47a9427e51074cedcb831"
   },
   "en/cli-index.md": {
-    "content": "ee75273fd4e1f1501319ad1afb6db9e57bc8058d3a9e726a9aab17f921145721",
+    "content": "a762f81faf498b6f5aa558c3db62e1e6f6564e073d6721ee584b9618b2d9004e",
     "description": "0f01533cb10562a220aa70ea5e33e2500c0c1e4aa8e16b2f80c532449a68b7ea"
   },
   "en/cli-migrate.md": {
@@ -164,7 +164,7 @@
     "description": "ed5d34392baa022c09e4daec00277910a7cbc15b08d430083b3bff2510762617"
   },
   "en/cli-monorepo.md": {
-    "content": "0b9a2e8dce0da760a89b984df424563bbbf48731381fc73a9b4c2d0ab70d566a",
+    "content": "8789523b3712cd9aafad45b772b6c0d48b289aacec0c4e85483007b68eac09da",
     "description": "752342d5365828fb0c019d6c4bf04f94b450d75f34ab4ac641fd3a028e963749"
   },
   "en/cli-pre-push-check.md": {
@@ -480,7 +480,7 @@
     "description": "8c62baaa1542c6c835f6d8561abd56d1dece16493f2536c70d1fbe87c3c66b68"
   },
   "en/rlsbl-commands-release_scrub.md": {
-    "content": "ba49fcc9d35ea9233699735171463ec1b6895e8874fb1ad9619908a1d6c2abc7",
+    "content": "293cb3bf4c001ec2e1a44626bacae06a9871d2f1fd169587b293f51d300278f6",
     "description": "d7ad7d10555f83bd472c5bdbc0abcbe10eed7ee25207c39e62ce748f184916b2"
   },
   "en/rlsbl-commands-status.md": {
