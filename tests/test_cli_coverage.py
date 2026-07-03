@@ -1052,6 +1052,21 @@ class TestCmdDevInstall:
         assert exc.value.code == 1
 
 
+class TestCmdDevSync:
+    @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
+    @patch("rlsbl.commands.dev_sync.run_sync", return_value=0)
+    def test_delegates_to_run_sync(self, mock_run, _):
+        rlsbl.cmd_dev_sync()
+        mock_run.assert_called_once_with(Path("/fake"))
+
+    @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
+    @patch("rlsbl.commands.dev_sync.run_sync", return_value=1)
+    def test_exits_on_nonzero_return(self, mock_run, _):
+        with pytest.raises(SystemExit) as exc:
+            rlsbl.cmd_dev_sync()
+        assert exc.value.code == 1
+
+
 # ============================================================================
 # _extract_variadic_args
 # ============================================================================

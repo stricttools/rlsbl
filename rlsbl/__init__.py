@@ -139,7 +139,7 @@ def _resolve_target(target):
 app = strictcli.App(
     name="rlsbl",
     version=__version__,
-    help="Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 33 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
+    help="Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 34 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
     flags=[
         strictcli.Flag(name="dry-run", type=bool, default=False, help="Preview changes without applying them"),
         strictcli.Flag(name="yes", type=bool, short="y", default=False, help="Skip confirmation prompts"),
@@ -1354,6 +1354,15 @@ def cmd_dev_install(all, include, exclude, uninstall, global_, venv, **_kwargs):
     }
     from .commands.dev import run_install
     rc = run_install(flags, project_root=root)
+    if rc:
+        sys.exit(rc)
+
+
+@dev.command(name="sync", help="Overlay local editable checkouts of sibling projects onto this project's locked environment, driven by a git-invisible dev-sources.toml.local-only file at the project root (one [[overlay]] block with 'package' and 'path' per checkout). Runs a single 'uv sync --inexact' excluding every overlaid package, then 'uv pip install -e <path>' per entry, so the locked registry wheels never clobber the local checkouts and no [tool.uv.sources] path dependency ever needs to be committed. Requires UV_NO_SYNC=1 in the environment (a bare 'uv run' would otherwise auto-sync and silently wipe the overlays); a bare 'uv sync' still reverts overlays harmlessly -- re-run this command to restore them. In monorepo mode, run it from within a sub-project.")
+def cmd_dev_sync(**_kwargs):
+    root = _require_sub_project_root()
+    from .commands.dev_sync import run_sync
+    rc = run_sync(root)
     if rc:
         sys.exit(rc)
 

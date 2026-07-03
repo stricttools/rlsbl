@@ -1,5 +1,5 @@
 ---
-description: "Local development workflow: editable installs across 8 targets, CI watching with auto-retry, and pre-push hook enforcement."
+description: "Local development workflow: editable installs across 8 targets, local editable overlays via dev sync, CI watching with auto-retry, and pre-push hook enforcement."
 ---
 
 # Development workflow
@@ -52,6 +52,51 @@ In a monorepo workspace with multiple independently-versioned projects, `rlsbl d
 | `--exclude <names>` | Comma-separated project names to exclude |
 
 Without a filter flag, the command errors with guidance. Install and uninstall operations apply recursively to matching projects.
+
+## Local editable overlays (`rlsbl dev sync`)
+
+`rlsbl dev sync` overlays local editable checkouts of sibling projects onto the current project's locked environment -- the supported way to develop against a sibling checkout (e.g. a library you are changing in lockstep) without committing machine-local `[tool.uv.sources]` path dependencies, which poison `uv.lock` with machine-specific paths and break CI.
+
+### Why a wrapper is required
+
+Verified against uv 0.9.17, no native uv mechanism suffices:
+
+- `uv pip install -e ../x` alone is wiped by the next `uv sync`: exact sync reinstalls the locked registry wheel even at equal versions.
+- `uv sync --inexact --no-install-package <name>` preserves a pre-existing editable install (even under version conflict, and with `--frozen`), but neither flag has an environment-variable equivalent.
+- A bare `uv run` auto-syncs (and wipes overlays) unless `UV_NO_SYNC=1` is set.
+- `[sources]` in `uv.toml` is rejected by uv, and the `UV_SOURCES` environment variable is silently ignored (unshipped proposal).
+
+### The overlay file
+
+Overlays are declared in `dev-sources.toml.local-only` at the project root. The `*.local-only` suffix is ignored by the scaffold gitignore fleet-wide, so the file never reaches git. One `[[overlay]]` block per checkout:
+
+```toml
+[[overlay]]
+package = "strictcli"          # distribution name, as uv knows it
+path = "../strictcli/python"   # absolute, or relative to the project root
+```
+
+Every problem is a hard error, never a silent no-op: missing file (the error shows the format above), invalid TOML, unknown keys, missing `package` or `path`, nonexistent path, path without a `pyproject.toml`, and a `package` that does not match the checkout's `[project].name` (PEP 503-normalized) -- a mismatch would make the sync exclusion miss, letting the next sync silently wipe the overlay.
+
+### Behavior
+
+1. Hard-errors unless `UV_NO_SYNC=1` is set in the environment (see below).
+2. Runs a single `uv sync --inexact` with `--no-install-package <pkg>` for every overlay entry.
+3. Runs `uv pip install -e <path>` per entry. Re-installing on every run is deliberate: it picks up new transitive dependencies of the overlaid checkouts.
+4. Prints exactly what was overlaid: package, version (from the checkout's `pyproject.toml`), and resolved path.
+
+`VIRTUAL_ENV` is stripped from both subprocess invocations so `uv sync` and `uv pip` deterministically target the same project environment (a leaked active venv would otherwise split the two steps across environments). The command is idempotent. In a monorepo, run it from within a sub-project; invoking it at the workspace root is a hard error.
+
+### The UV_NO_SYNC=1 gate
+
+Without `UV_NO_SYNC=1`, any bare `uv run` silently reinstalls the locked registry wheels over the overlays just created. `rlsbl dev sync` therefore refuses to run until it is set permanently:
+
+```bash
+# shell profile (~/.bashrc / ~/.zshrc) or the project's .envrc (direnv)
+export UV_NO_SYNC=1
+```
+
+A bare `uv sync` still reverts overlays -- harmlessly: re-run `rlsbl dev sync` to restore them.
 
 ## Watch and CI monitoring
 
