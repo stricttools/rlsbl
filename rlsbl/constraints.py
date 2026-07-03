@@ -1,4 +1,4 @@
-"""Version constraint evaluation utilities.
+"""Version constraint evaluation utilities for semver range parsing, compatibility checking, and dependency version resolution across workspace packages.
 
 Extracted from commands/monorepo/commands.py to break the checks/ -> commands/
 circular dependency. Used by checks/workspace.py for the deps-stale check.

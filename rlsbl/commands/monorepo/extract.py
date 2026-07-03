@@ -1,4 +1,4 @@
-"""Extract and absorb operations for moving packages in and out of monorepos.
+"""Extract and absorb operations for moving packages in and out of monorepos, including history migration, changelog transfer, and workspace.toml updates.
 
 Provides:
 - require_filter_repo(): dependency check for git-filter-repo

@@ -1,4 +1,4 @@
-"""Centralized changelog exemption registry for commit filtering rules."""
+"""Centralized changelog exemption registry for commit filtering rules, managing path-based and message-based exclusions from coverage checks."""
 
 from __future__ import annotations
 

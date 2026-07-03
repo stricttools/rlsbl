@@ -1,4 +1,4 @@
-"""Publishing helpers: selfdoc blog post generation, asset uploads, stale dep advisory."""
+"""Publishing helpers: selfdoc blog post generation, GitHub Release asset uploads, and stale dependency advisory for post-release notifications."""
 
 import json
 import os

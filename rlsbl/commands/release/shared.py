@@ -1,4 +1,4 @@
-"""Shared utilities for release commands."""
+"""Shared utilities for release commands: project root detection, git auth verification, working tree guards, and release file loading."""
 
 
 def build_release_flags(dry_run, yes, quiet, allow_dirty, watch=False, watch_async=False):

@@ -1,4 +1,4 @@
-"""Core workspace types and path-building utilities.
+"""Core workspace types and path-building utilities defining WorkspaceProject, Releasable, and directory resolution for monorepo workspace operations.
 
 This module contains the fundamental types (WorkspaceProject, Releasable)
 and pure path-building functions (get_releasable_dir, etc.) that are used

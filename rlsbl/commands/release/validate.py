@@ -1,4 +1,4 @@
-"""Validation helpers: tests, lint, selfdoc, scaffold conflicts, strictcli schema, blog body.
+"""Validation helpers for release: test runner, lint, selfdoc gen/check, scaffold conflict detection, strictcli schema dump, and blog post body validation.
 
 Also contains extracted validation steps from run_cmd: target validation, OTA mode,
 config integrity, pipeline config, gh CLI, clean tree, branch/remote, monorepo context,

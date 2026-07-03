@@ -1,4 +1,4 @@
-"""Claim a package name on npm or PyPI by publishing a minimal placeholder package."""
+"""Claim a package name on npm or PyPI by publishing a minimal placeholder package with version 0.0.0 and an empty description."""
 
 import json
 import os

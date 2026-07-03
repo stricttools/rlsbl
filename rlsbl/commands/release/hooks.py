@@ -1,4 +1,4 @@
-"""Hook helpers: content hashing, template hash lookup, hook emptiness check, hook runner.
+"""Hook helpers: content hashing, template hash lookup, hook emptiness check, and shell script runner for pre-checks, pre-release, and post-release hooks.
 
 Supports two levels of hooks in monorepo explicit mode:
 - Per-releasable: ``.rlsbl-monorepo/releasables/{name}/hooks/``

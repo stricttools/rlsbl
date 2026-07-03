@@ -1,4 +1,4 @@
-"""Release state file: persistence for idempotent release flow.
+"""Release state file: JSON persistence for idempotent release flow, tracking which steps completed so failed releases can resume from the last successful step.
 
 Tracks which release steps have completed so that a failed release can be
 resumed without re-executing already-done work.

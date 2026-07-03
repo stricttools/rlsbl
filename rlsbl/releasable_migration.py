@@ -1,4 +1,4 @@
-"""Migration tooling for transitioning monorepos to the releasable model.
+"""Migration tooling for transitioning monorepos to the releasable model, moving packages into releasable groups with changelog and config consolidation.
 
 Provides functions for Phase 10 of the releasable model redesign:
 

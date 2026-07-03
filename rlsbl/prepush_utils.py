@@ -1,4 +1,4 @@
-"""Pre-push check utilities shared between checks/prepush.py and checks/workspace.py.
+"""Pre-push check utilities shared between checks/prepush.py and checks/workspace.py, providing commit enumeration and JSONL coverage verification.
 
 Extracted from commands/pre_push_check.py to break the checks/ -> commands/
 circular dependency. The original module existed solely to host these

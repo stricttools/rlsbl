@@ -1,4 +1,4 @@
-"""Shared resolution of a member package's effective config and targets.
+"""Shared resolution of a member package's effective config and targets, merging releasable-level and per-package overrides for release pipelines and hooks.
 
 In explicit releasable mode, a member package's effective configuration is
 the releasable-level config.json merged with the per-package config.json

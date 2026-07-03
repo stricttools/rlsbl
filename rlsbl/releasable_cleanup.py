@@ -1,4 +1,4 @@
-"""Cleanup utilities for per-package .rlsbl/ directories after releasable model migration.
+"""Cleanup utilities for per-package .rlsbl/ directories after releasable model migration, removing orphaned changelog and release state files from the old layout.
 
 When a workspace uses explicit-mode releasables, changelog and release state
 moves to per-releasable directories under ``.rlsbl-monorepo/releasables/{name}/``.

@@ -1,4 +1,4 @@
-"""Toolchain-backed Go project introspection via ``go list``.
+"""Toolchain-backed Go project introspection via ``go list``, classifying projects as library or binary and resolving module paths and import dependencies.
 
 Single source of truth for project-level Go classification (library vs
 binary, entry-point location). Hand-rolled main.go globbing misdetects

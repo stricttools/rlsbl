@@ -1,4 +1,4 @@
-"""Registry version query functions for npm, PyPI, Go proxy, and crates.io."""
+"""Registry version query functions for npm, PyPI, Go proxy, and crates.io, returning the latest published version for name availability and dependency checks."""
 
 import json
 import urllib.error

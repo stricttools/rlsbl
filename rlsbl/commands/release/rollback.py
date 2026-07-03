@@ -1,4 +1,4 @@
-"""Rollback helpers for cleaning up after a failed release."""
+"""Rollback helpers for cleaning up after a failed release: deleting tags, reverting version bump commits, and removing GitHub Releases."""
 
 import os
 

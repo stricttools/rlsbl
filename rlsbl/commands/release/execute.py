@@ -1,4 +1,4 @@
-"""Release execution: version bump, commit, tag, push, GitHub Release, and post-release steps."""
+"""Release execution: version bump, commit, tag, push, GitHub Release creation, JSONL changelog finalization, and post-release hook invocation."""
 
 import dataclasses
 import json

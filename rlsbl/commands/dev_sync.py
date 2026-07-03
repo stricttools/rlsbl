@@ -1,4 +1,4 @@
-"""Local editable overlays for `rlsbl dev sync`.
+"""Local editable overlays for `rlsbl dev sync`, installing sibling project checkouts as editable packages without committing path dependencies.
 
 Overlays sibling checkouts (e.g. ../strictcli/python) onto the project's
 locked environment without committing machine-local [tool.uv.sources] path

@@ -1,4 +1,4 @@
-"""Maven Central publishing requirements validation.
+"""Maven Central publishing requirements validation, checking POM metadata, GPG signing, javadoc/sources jars, and artifact naming conventions.
 
 Validates that a Maven/Gradle project meets Maven Central's artifact
 requirements: complete POM metadata (name, description, url, licenses,

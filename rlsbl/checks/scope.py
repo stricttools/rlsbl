@@ -1,4 +1,4 @@
-"""Scope adapter for the strictcli check system.
+"""Scope adapter for the strictcli check system, interpreting colon-separated scope tokens to pre-filter checks by project path and workspace context.
 
 Interprets colon-separated scope tokens to pre-filter the check context
 before the check function runs.  Registered via ``app.set_scope_adapter()``.

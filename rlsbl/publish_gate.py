@@ -1,4 +1,4 @@
-"""Single source of truth for the publish CI gate.
+"""Single source of truth for the publish CI gate, generating the GitHub Actions gate job that blocks publishing until all CI checks pass on the release commit.
 
 Publish workflows trigger on ``release: published`` and ``workflow_dispatch``
 and would otherwise RACE CI on the same commit -- a broken artifact could
