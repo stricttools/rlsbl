@@ -52,9 +52,14 @@ def _install_single(project_dir, flags):
         )
         spec = modes.get("venv" if venv else "global")
         if spec is None:
+            reason = modes.get("reason")
             if venv and modes.get("global") is not None:
                 # Global install exists for this target but venv mode does not.
                 print(f"Skipping {name}: --venv not supported for this target")
+            elif reason:
+                # The target explained why there is nothing to install
+                # (e.g. "Go library: nothing to install").
+                print(f"Skipping {name}: {reason}")
             else:
                 print(f"Skipping {name}: install not yet supported for this target")
             continue

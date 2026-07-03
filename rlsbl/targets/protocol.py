@@ -137,5 +137,10 @@ class ReleaseTarget(Protocol):
                 project directory basename). None means uninstall is not
                 supported for this mode of this target.
             purpose: human-readable string for the require_tool error message.
+
+        The returned dict may also carry an optional top-level "reason" key:
+        a human-readable explanation for why the modes are None (e.g. "Go
+        library: nothing to install"). `rlsbl dev install` surfaces it in the
+        skip message instead of the generic "not yet supported" line.
         """
         return {"global": None, "venv": None}

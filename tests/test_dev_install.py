@@ -218,6 +218,40 @@ def test_unsupported_target_skipped(tmp_project, fake_run, all_tools_present, ca
     assert "install not yet supported" in captured.out
 
 
+def test_skip_reason_from_target_is_shown(
+    tmp_project, fake_run, all_tools_present, capsys, monkeypatch
+):
+    """When a target's dev_install_command carries a 'reason' for the no-op
+    spec (e.g. a Go library with no main packages), dev install prints that
+    reason instead of the generic 'install not yet supported' line."""
+    _make_go(str(tmp_project))
+    # Turn the fixture's go project into a library: no main packages, and no
+    # install_paths declared (a library can never satisfy that requirement).
+    os.remove(str(tmp_project / "main.go"))
+    with open(str(tmp_project / ".rlsbl" / "config.json"), "w", encoding="utf-8") as f:
+        json.dump(
+            {
+                "targets": ["go"],
+                "pipelines": {"go": {"type": "go", "local": True}},
+                "private": False,
+            },
+            f,
+        )
+    monkeypatch.setattr(
+        "rlsbl.go_introspect.list_main_packages", lambda project_dir: []
+    )
+    # go.py binds list_main_packages at module top, so patch that name too.
+    monkeypatch.setattr(
+        "rlsbl.targets.go.list_main_packages", lambda project_dir: []
+    )
+    rc = run_install({}, project_root=".")
+    assert rc == 0
+    assert fake_run.calls == []
+    captured = capsys.readouterr()
+    assert "Skipping go: Go library: nothing to install (no main packages)" in captured.out
+    assert "not yet supported" not in captured.out
+
+
 def test_missing_tool_is_skipped(tmp_project, fake_run, monkeypatch, capsys):
     _make_pypi(str(tmp_project))
     # All tools missing.

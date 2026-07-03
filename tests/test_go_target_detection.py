@@ -120,14 +120,20 @@ class TestDevInstallCommand:
         dev_install_command returns the no-op spec shape that `rlsbl dev
         install` skips, instead of demanding an install_paths declaration
         that no config could satisfy (any declared path would fail
-        validation because there are no main packages)."""
+        validation because there are no main packages). The "reason" key
+        carries the explanation for the skip message; nothing is printed
+        here (dev install owns the output)."""
         target = GoTarget()
         _write(tmp_path / "go.mod", GO_MOD)
         _write(tmp_path / "lib.go", "package myapp\n\nfunc Hello() {}\n")
         _write_config(tmp_path)  # go pipeline without install_paths
         spec = target.dev_install_command(str(tmp_path))
-        assert spec == {"global": None, "venv": None}
-        assert "nothing to install" in capsys.readouterr().out
+        assert spec == {
+            "global": None,
+            "venv": None,
+            "reason": "Go library: nothing to install (no main packages)",
+        }
+        assert capsys.readouterr().out == ""
 
     def test_undeclared_install_paths_is_hard_error(self, tmp_path):
         """A Go project without declared install_paths cannot be

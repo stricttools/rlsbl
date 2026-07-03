@@ -317,9 +317,13 @@ class GoTarget(BaseTarget):
                     # Go library: no binaries exist, so there is nothing to
                     # `go install` and no install_paths declaration could
                     # ever validate. Return the no-op spec shape that
-                    # `rlsbl dev install` skips instead of hard-erroring.
-                    print("Go library: nothing to install (no main packages)")
-                    return {"global": None, "venv": None}
+                    # `rlsbl dev install` skips instead of hard-erroring; the
+                    # "reason" key is surfaced in the skip message.
+                    return {
+                        "global": None,
+                        "venv": None,
+                        "reason": "Go library: nothing to install (no main packages)",
+                    }
                 raise GoIntrospectError(
                     "the go pipeline in .rlsbl/config.json does not declare "
                     "'install_paths', which is required to run 'go install'. "
