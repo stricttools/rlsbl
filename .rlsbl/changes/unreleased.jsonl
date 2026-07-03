@@ -4,3 +4,4 @@
 {"commits":["453b15d7654dc26266657fe2d6f059c92adea154"],"user_facing":true,"description":"**Fix.** `rlsbl dev install` and `rlsbl dev sync` invoked at a monorepo workspace root now explain to cd into a sub-project instead of misleadingly suggesting `rlsbl monorepo add`.","type":"fix"}
 {"commits":["8d73790b3a45b78b515c7dad51c5309a6d039def"],"user_facing":false}
 {"commits":["4c4081368c41f620d6d1ca6e1834d947279f0290"],"user_facing":false}
+{"commits":["d85a184837b65a8e7b563f70e32cdb51d11cf476"],"user_facing":true,"description":"**Fix.** `rlsbl --help` now reports accurate command counts (49 commands, 15 top-level, 4 groups), derived from the live command registry instead of stale hand-maintained literals.","type":"fix"}
