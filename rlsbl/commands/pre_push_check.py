@@ -165,6 +165,24 @@ def _get_pushed_commits(refs):
                     capture_output=True, text=True, timeout=30,
                 )
             else:
+                # After a history rewrite (e.g. rlsbl release scrub), the old
+                # remote head no longer resolves locally, which makes the
+                # range empty. Previously that produced a silent, accidental
+                # pass; make the skip explicit and loud instead. Pass/fail
+                # semantics are unchanged.
+                probe = subprocess.run(
+                    ["git", "rev-parse", "--verify", "--quiet",
+                     f"{remote_sha}^{{commit}}"],
+                    capture_output=True, text=True, timeout=30,
+                )
+                if probe.returncode != 0:
+                    print(
+                        f"history rewrite detected: old remote head "
+                        f"{remote_sha[:12]} unresolvable — coverage check "
+                        f"skipped for this ref",
+                        file=sys.stderr,
+                    )
+                    continue
                 result = subprocess.run(
                     ["git", "log", "--format=%H", f"{remote_sha}..{local_sha}"],
                     capture_output=True, text=True, timeout=30,
