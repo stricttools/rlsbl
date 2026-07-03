@@ -1071,6 +1071,7 @@ class TestCmdReleaseRetryCleanup(unittest.TestCase):
                             yes=True,
                             quiet=True,
                             watch=False,
+                            watch_async=False,
                             no_watch=True,
                         )
 

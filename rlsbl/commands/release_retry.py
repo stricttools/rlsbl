@@ -25,7 +25,7 @@ from ..release_file import get_retry_file_path, read_retry_file
 from ..targets import TARGETS, resolve_releasable_config_dir
 from ..utils import check_gh_auth, check_gh_installed, run, run_gh
 from ..workspace import find_workspace_root, resolve_project
-from .watch import run_cmd as watch_run_cmd
+from .watch import run_cmd as watch_run_cmd, spawn_detached_watcher
 
 
 def _find_dispatch_workflows():
@@ -111,12 +111,14 @@ def run_cmd(retry_config, flags, project_root):
 
     Args:
         retry_config: RetryConfig instance, or None to auto-scaffold.
-        flags: dict with keys ``dry-run``, ``yes``, ``quiet``, ``watch``.
+        flags: dict with keys ``dry-run``, ``yes``, ``quiet``, ``watch``,
+            ``watch-async``.
         project_root: Path to the project root directory, or None for cwd.
     """
     dry_run = flags.get("dry-run", False)
     quiet = flags.get("quiet", False)
     watch = flags.get("watch", False)
+    watch_async = flags.get("watch-async", False)
 
     def log(msg):
         if not quiet:
@@ -288,6 +290,8 @@ def run_cmd(retry_config, flags, project_root):
             watch_run_cmd(None, [], {"run-id": collected_run_ids})
         else:
             watch_run_cmd(None, [commit_sha], {})
+    elif watch_async:
+        spawn_detached_watcher(commit_sha, run_ids=collected_run_ids or None)
     else:
         if collected_run_ids:
             log(f"Watch CI: rlsbl watch --run-id {' --run-id '.join(collected_run_ids)}")

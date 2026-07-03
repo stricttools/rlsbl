@@ -228,13 +228,18 @@ release_group = app.group("release", help="Release orchestration commands. Provi
 @release_group.command(
     name="run",
     help="Bump version, validate the JSONL changelog, run tests and lint, commit, tag, push, and create a GitHub Release. Reads the bump type (patch, minor, major, or hotfix) and target selection from .rlsbl/releases/unreleased.toml, which can be scaffolded with rlsbl release init. Supports dry-run preview, non-interactive mode with --yes, and --allow-dirty to skip the clean working tree check.",
+    mutex=[
+        strictcli.MutexGroup(flags=[
+            strictcli.Flag(name="watch", type=bool, help="After release, automatically watch CI runs to completion (--no-watch to skip)"),
+            strictcli.Flag(name="watch-async", type=bool, help="After release, spawn a detached background watcher and return immediately (--no-watch-async is equivalent to --no-watch)"),
+        ]),
+    ],
 )
-@strictcli.flag(name="watch", type=bool, help="After release, automatically watch CI runs to completion (--no-watch to skip)")
 @strictcli.flag(name="allow-dirty", type=bool, help="Skip the clean working tree check and allow releasing with uncommitted changes")
 @strictcli.flag(name="bump", type=str, help="Bump type: patch, minor, major, hotfix, prerelease. Skips the release file.", default="")
 @strictcli.flag(name="description", type=str, help="Release description (required with --bump)", default="")
 @strictcli.flag(name="preid", type=str, help="Pre-release identifier: alpha, beta, rc, stable. Only valid with --bump.", default="")
-def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, bump, description, preid, **_kwargs):
+def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, watch_async, bump, description, preid, **_kwargs):
     root = _require_sub_project_root()
 
     from .release_file import read_release_file, get_release_file_path, ReleaseConfig, VALID_BUMP_TYPES
@@ -324,7 +329,8 @@ def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, bump, description, 
             preid=preid,
         )
         from .commands.release.shared import build_release_flags
-        flags = build_release_flags(dry_run, yes, quiet, allow_dirty, watch=watch)
+        flags = build_release_flags(dry_run, yes, quiet, allow_dirty, watch=watch,
+                                    watch_async=watch_async)
         from .commands.release import run_cmd
         run_cmd(release_config, flags, ctx=ctx)
         return
@@ -345,7 +351,8 @@ def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, bump, description, 
         sys.exit(1)
 
     from .commands.release.shared import build_release_flags
-    flags = build_release_flags(dry_run, yes, quiet, allow_dirty, watch=watch)
+    flags = build_release_flags(dry_run, yes, quiet, allow_dirty, watch=watch,
+                                watch_async=watch_async)
     from .commands.release import run_cmd
     run_cmd(release_config, flags, ctx=ctx)
 
@@ -353,9 +360,14 @@ def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, bump, description, 
 @release_group.command(
     name="resume",
     help="Resume a previously failed release from where it left off. Reads the in-progress state file (.rlsbl/releases/in-progress.json, or .rlsbl-monorepo/releasables/<name>/releases/in-progress.json for releasable releases), validates that the current branch matches the saved state, and re-enters the release flow, skipping already-completed steps.",
+    mutex=[
+        strictcli.MutexGroup(flags=[
+            strictcli.Flag(name="watch", type=bool, help="After release, automatically watch CI runs to completion (--no-watch to skip)"),
+            strictcli.Flag(name="watch-async", type=bool, help="After release, spawn a detached background watcher and return immediately (--no-watch-async is equivalent to --no-watch)"),
+        ]),
+    ],
 )
-@strictcli.flag(name="watch", type=bool, help="After release, automatically watch CI runs to completion (--no-watch to skip)")
-def cmd_release_resume(dry_run, yes, quiet, watch, **_kwargs):
+def cmd_release_resume(dry_run, yes, quiet, watch, watch_async, **_kwargs):
     from .commands.release.release_state import (
         StateResolutionError,
         load_release_state,
@@ -439,7 +451,8 @@ def cmd_release_resume(dry_run, yes, quiet, watch, **_kwargs):
         )
 
     from .commands.release.shared import build_release_flags
-    flags = build_release_flags(dry_run, yes, quiet, allow_dirty=False, watch=watch)
+    flags = build_release_flags(dry_run, yes, quiet, allow_dirty=False, watch=watch,
+                                watch_async=watch_async)
     from .commands.release import resume_cmd
     resume_cmd(saved, flags, ctx=ctx)
 
@@ -454,9 +467,14 @@ def cmd_release_init(**_kwargs):
 @release_group.command(
     name="retry",
     help="Dispatch CI/CD workflows for a completed release via gh workflow run. Reads the dispatch list and ref from .rlsbl/releases/retry.toml, which is auto-scaffolded with sensible defaults if missing. Verifies the GitHub Release exists before dispatching. Each workflow in the dispatch list is triggered against the configured ref (defaults to the release tag).",
+    mutex=[
+        strictcli.MutexGroup(flags=[
+            strictcli.Flag(name="watch", type=bool, help="After retry, automatically watch CI runs to completion (--no-watch to skip)"),
+            strictcli.Flag(name="watch-async", type=bool, help="After retry, spawn a detached background watcher and return immediately (--no-watch-async is equivalent to --no-watch)"),
+        ]),
+    ],
 )
-@strictcli.flag(name="watch", type=bool, help="After retry, automatically watch CI runs to completion (--no-watch to skip)")
-def cmd_release_retry(dry_run, yes, quiet, watch, **_kwargs):
+def cmd_release_retry(dry_run, yes, quiet, watch, watch_async, **_kwargs):
     root = _require_sub_project_root()
 
     from .release_file import get_retry_file_path, read_retry_file
@@ -493,6 +511,7 @@ def cmd_release_retry(dry_run, yes, quiet, watch, **_kwargs):
         "yes": yes,
         "quiet": quiet,
         "watch": bool(watch),
+        "watch-async": bool(watch_async),
     }
     from .commands.release_retry import run_cmd
     run_cmd(retry_config, flags, project_root=root)
@@ -1169,12 +1188,18 @@ mono_release = mono.group("release", help="Release commands for monorepo workspa
 @mono_release.command(
     name="run",
     help="Execute a batch release of multiple monorepo packages in topological order. Reads package configurations from .rlsbl-monorepo/releases/unreleased.toml. Each package is released sequentially using the single-package release flow, with leaves (no dependencies) released first. Supports --dry-run, --yes, --allow-dirty flags.",
+    mutex=[
+        strictcli.MutexGroup(flags=[
+            strictcli.Flag(name="watch", type=bool, help="After batch release, automatically watch CI runs to completion (--no-watch to skip)"),
+            strictcli.Flag(name="watch-async", type=bool, help="After batch release, spawn a detached background watcher and return immediately (--no-watch-async is equivalent to --no-watch)"),
+        ]),
+    ],
 )
-@strictcli.flag(name="watch", type=bool, help="After batch release, automatically watch CI runs to completion (--no-watch to skip)")
 @strictcli.flag(name="allow-dirty", type=bool, help="Skip the clean working tree check and allow releasing with uncommitted changes")
-def cmd_mono_release_run(dry_run, yes, quiet, allow_dirty, watch, **_kwargs):
+def cmd_mono_release_run(dry_run, yes, quiet, allow_dirty, watch, watch_async, **_kwargs):
     from .commands.release.shared import build_release_flags
-    flags = build_release_flags(dry_run, yes, quiet, allow_dirty, watch=watch)
+    flags = build_release_flags(dry_run, yes, quiet, allow_dirty, watch=watch,
+                                watch_async=watch_async)
     root = _require_project_root()
     from .commands.monorepo import _cmd_batch_release
     _cmd_batch_release(flags, project_root=root)

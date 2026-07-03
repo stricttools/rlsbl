@@ -27,6 +27,7 @@ _BASE_KWARGS = dict(
     quiet=False,
     allow_dirty=False,
     watch=False,
+    watch_async=False,
     no_watch=False,
     preid="",
 )

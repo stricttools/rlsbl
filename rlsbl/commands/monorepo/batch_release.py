@@ -226,6 +226,9 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config, 
             log(f"Watching CI for {last_sha}...")
             from ..watch import run_cmd as watch_run_cmd
             watch_run_cmd(None, [last_sha], {})
+        elif flags.get("watch-async"):
+            from ..watch import spawn_detached_watcher
+            spawn_detached_watcher(last_sha)
         else:
             log(f"Watch CI: rlsbl watch {last_sha}")
 
@@ -343,6 +346,9 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config, pro
             log(f"Watching CI for {last_sha}...")
             from ..watch import run_cmd as watch_run_cmd
             watch_run_cmd(None, [last_sha], {})
+        elif flags.get("watch-async"):
+            from ..watch import spawn_detached_watcher
+            spawn_detached_watcher(last_sha)
         else:
             log(f"Watch CI: rlsbl watch {last_sha}")
 

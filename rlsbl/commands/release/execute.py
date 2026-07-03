@@ -1823,5 +1823,8 @@ def _run_release_mutating(state: ReleaseState):
             log(f"Watching CI for {pushed_sha}...")
             from ..watch import run_cmd as watch_run_cmd
             watch_run_cmd(None, [pushed_sha], {})
+        elif flags.get("watch-async"):
+            from ..watch import spawn_detached_watcher
+            spawn_detached_watcher(pushed_sha)
         else:
             log(f"Watch CI: rlsbl watch {pushed_sha}")
