@@ -317,7 +317,7 @@ class TestMergedPublishCombinations:
         npm_publish_yaml = (
             "\n"
             "  npm-publish:\n"
-            "    needs: [goreleaser]\n"
+            "    needs: [gate, goreleaser]\n"
             "    runs-on: ubuntu-latest\n"
             "    steps:\n"
             "      - uses: actions/checkout@v4\n"
@@ -349,7 +349,7 @@ class TestMergedPublishCombinations:
 
         # npm-publish job should have npm publish step
         npm_job = data["jobs"]["go-npm-publish"]
-        assert npm_job["needs"] == ["goreleaser"]
+        assert npm_job["needs"] == ["gate", "go"]
         step_names = [s.get("name", "") for s in npm_job["steps"]]
         assert any("npm" in n.lower() for n in step_names), "npm step missing from npm-publish job"
 

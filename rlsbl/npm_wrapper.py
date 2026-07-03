@@ -147,7 +147,7 @@ def build_npm_publish_jobs(
     setup_node_action = format_action("actions/setup-node")
     return f"""
   npm-publish:
-    needs: [{depends_on}]
+    needs: [gate, {depends_on}]
     runs-on: ubuntu-latest
     steps:
       - uses: {checkout_action}

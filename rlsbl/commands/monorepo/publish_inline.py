@@ -6,11 +6,17 @@ import copy
 import hashlib
 import json
 import os
+import re
 from io import StringIO
 
 from ruamel.yaml import YAML
 
 from ...errors import ConfigError
+from ...publish_gate import (
+    GATE_JOB_KEY,
+    build_router_gate_job,
+    publish_concurrency_block,
+)
 from .sync import _get_monorepo_tag_prefix
 
 
@@ -71,11 +77,16 @@ def emit_workflow(workflow_dict: dict) -> str:
 def prefix_jobs(project_name: str, jobs: dict) -> dict:
     """Prefix every job key with ``{project_name}-`` and rewrite ``needs:`` references.
 
+    ``needs: gate`` references are preserved as-is: the router emits ONE
+    shared gate job, so member references to it must never be force-prefixed
+    (a ``{project}-gate`` need would dangle).
+
     Returns a new dict; the original *jobs* is not mutated.
     """
     jobs = copy.deepcopy(jobs)
-    # Build old→new key mapping
+    # Build old→new key mapping; the shared gate maps to itself.
     key_map = {key: f"{project_name}-{key}" for key in jobs}
+    key_map[GATE_JOB_KEY] = GATE_JOB_KEY
 
     result: dict = {}
     for old_key, job in jobs.items():
@@ -100,7 +111,11 @@ def inject_job_metadata(jobs: dict, tag_prefix: str, working_dir: str) -> dict:
     jobs = copy.deepcopy(jobs)
     result: dict = {}
     for key, job in jobs.items():
-        job["if"] = f"startsWith(github.event.release.tag_name, '{tag_prefix}')"
+        # Ref-based condition: true for release events AND workflow_dispatch
+        # retries at the tag ref. The release event payload is empty on
+        # dispatches, so matching github.event.release.tag_name would skip
+        # every job on a retry.
+        job["if"] = f"startsWith(github.ref_name, '{tag_prefix}')"
 
         defaults = job.get("defaults", {})
         run_block = defaults.get("run", {})
@@ -178,20 +193,39 @@ def transform_project_jobs(
     """Parse a sub-project's publish workflow and transform its jobs for the monorepo router.
 
     Applies all transforms in the correct order:
-    1. resolve_permissions (before prefixing — references original job structure)
-    2. rewrite_action_paths
-    3. inject_job_metadata
-    4. prefix_jobs (last — changes keys)
+    1. strip the member's own gate job (the router emits ONE shared gate)
+    2. resolve_permissions (before prefixing — references original job structure)
+    3. rewrite_action_paths
+    4. inject_job_metadata
+    5. prefix_jobs (last — changes keys; ``needs: gate`` is preserved)
+    6. ensure every inlined job depends on the shared gate
 
     Returns a dict of transformed jobs ready for merging into the root workflow.
     """
     workflow = parse_publish_workflow(workflow_path)
-    jobs = workflow["jobs"]
+    jobs = dict(workflow["jobs"])
+
+    # The member workflow's gate polls the member's standalone CI check
+    # names, which do not exist in a monorepo (CI runs via the router as
+    # reusable workflows). The router's shared gate replaces it.
+    jobs.pop(GATE_JOB_KEY, None)
 
     jobs = resolve_permissions(jobs, workflow.get("permissions"))
     jobs = rewrite_action_paths(jobs, project_path)
     jobs = inject_job_metadata(jobs, tag_prefix, project_path)
     jobs = prefix_jobs(project_name, jobs)
+
+    # Wire every inlined job to the shared gate (covers member workflows
+    # scaffolded before the gate existed).
+    for job in jobs.values():
+        needs = job.get("needs")
+        if needs is None:
+            job["needs"] = GATE_JOB_KEY
+        elif isinstance(needs, str):
+            if needs != GATE_JOB_KEY:
+                job["needs"] = [GATE_JOB_KEY, needs]
+        elif GATE_JOB_KEY not in needs:
+            job["needs"] = [GATE_JOB_KEY, *needs]
 
     return jobs
 
@@ -201,13 +235,42 @@ def transform_project_jobs(
 # ---------------------------------------------------------------------------
 
 
+def _router_ci_job_keys(project) -> list[str]:
+    """Return the CI router's job keys for *project*.
+
+    Mirrors ``sync._generate_router``: a single CI file uses the project
+    name as the job key; multiple CI files use one key per file (the file
+    name minus ``.yml``). Reusable-workflow check runs are named
+    ``<job key> / <ci job name>``, which is what the shared gate matches.
+    """
+    name = project["name"]
+    ci_files = project.get("_ci_files") if isinstance(project, dict) else None
+    if not ci_files:
+        ci_files = [f"{name}-ci.yml"]
+    if len(ci_files) == 1:
+        return [name]
+    return [ci_file.removesuffix(".yml") for ci_file in ci_files]
+
+
+def _router_ci_check_regex(project) -> str:
+    """Regex matching *project*'s prefixed CI check-run names."""
+    alternation = "|".join(re.escape(k) for k in _router_ci_job_keys(project))
+    return f"^({alternation}) / "
+
+
 def generate_inline_publish_router(projects_with_publish: list, root: str, releasables=None) -> str:
     """Generate a monorepo publish router with all sub-project jobs inlined.
 
     Instead of calling per-project reusable workflows via ``workflow_call``,
     this inlines every sub-project's publish jobs directly into a single
-    ``publish.yml``.  Each job gets an ``if: startsWith(...)`` condition
-    so only the relevant project's jobs run on a given release.
+    ``publish.yml``.  Each job gets an ``if: startsWith(github.ref_name,
+    ...)`` condition so only the relevant project's jobs run on a given
+    release -- ref-based so a ``workflow_dispatch`` retry at the tag ref
+    hits the same jobs as the original release event.
+
+    A single shared ``gate`` job blocks all inlined publish jobs until the
+    releasing project's CI check runs (resolved from the tag ref) conclude
+    successfully. Member gate jobs are stripped during inlining.
 
     When *releasables* are provided, tag prefixes are derived from the
     releasable's ``tag_format`` instead of the target's ``monorepo_tag_glob``.
@@ -223,8 +286,10 @@ def generate_inline_publish_router(projects_with_publish: list, root: str, relea
         },
     }
 
+    prefix_regex_pairs: list = []
     for project in projects_with_publish:
         tag_prefix = _get_monorepo_tag_prefix(project, root, releasables=releasables)
+        prefix_regex_pairs.append((tag_prefix, _router_ci_check_regex(project)))
         workflow_path = os.path.join(
             root, project["path"], ".github", "workflows", "publish.yml"
         )
@@ -236,14 +301,29 @@ def generate_inline_publish_router(projects_with_publish: list, root: str, relea
         )
         all_jobs.update(jobs)
 
+    all_jobs = {
+        GATE_JOB_KEY: build_router_gate_job(prefix_regex_pairs),
+        **all_jobs,
+    }
+
     workflow_dict = {
         "name": "Publish Router",
         "on": {"release": {"types": ["published"]}, "workflow_dispatch": None},
+        # Per-ref publish concurrency: a dispatch retry at the same tag
+        # queues behind the in-flight run; never cancel a publish.
+        "concurrency": publish_concurrency_block(),
         "jobs": all_jobs,
     }
 
     yaml_str = emit_workflow(workflow_dict)
-    return f"# DO NOT EDIT -- generated by rlsbl monorepo sync\n{yaml_str}"
+    header = (
+        "# DO NOT EDIT -- generated by rlsbl monorepo sync\n"
+        "# Retry contract: to re-run a release publish, dispatch this workflow\n"
+        "# AT THE TAG REF: gh workflow run publish.yml --ref <tag>. Job\n"
+        "# conditions and the gate resolve the releasing project from the ref,\n"
+        "# never from the release event payload (dispatches have none).\n"
+    )
+    return header + yaml_str
 
 
 # ---------------------------------------------------------------------------

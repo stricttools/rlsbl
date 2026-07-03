@@ -131,7 +131,7 @@ class TestDockerPublishConditionalLatest:
 
     def test_enable_uses_contains_check(self):
         content = _read_template(DOCKER_TEMPLATE_DIR, "publish.yml.tpl")
-        assert "!contains(github.event.release.tag_name, '-')" in content
+        assert "!contains(github.ref_name, '-')" in content
 
     def test_semver_tag_still_present(self):
         content = _read_template(DOCKER_TEMPLATE_DIR, "publish.yml.tpl")

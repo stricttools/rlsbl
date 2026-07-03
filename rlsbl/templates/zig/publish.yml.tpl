@@ -5,11 +5,20 @@ on:
     types: [published]
   workflow_dispatch:
 
+# One publish run per tag ref: a workflow_dispatch retry at the same tag
+# queues behind the in-flight run instead of racing it. A publish is never
+# cancelled mid-flight.
+concurrency:
+  group: ${{ github.workflow_ref }}-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
 jobs:
+{{publishGate}}
   build-and-upload:
+    needs: gate
     runs-on: ubuntu-latest
     steps:
       - uses: {{action "actions/checkout"}}
@@ -49,7 +58,7 @@ jobs:
 
       - name: Upload release assets
         run: |
-          gh release upload "${{ github.event.release.tag_name }}" \
+          gh release upload "${{ github.ref_name }}" \
             {{zig.projectName}}-x86_64-linux \
             {{zig.projectName}}-aarch64-linux \
             {{zig.projectName}}-x86_64-macos \

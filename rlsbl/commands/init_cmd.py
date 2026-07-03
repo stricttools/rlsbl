@@ -1324,6 +1324,17 @@ def run_cmd(registry, args, flags, ctx):
         from datetime import datetime
         vars_dict["year"] = str(datetime.now().year)
 
+        # Publish gate: publish workflows wait for this repo's CI check
+        # runs on the release commit. The filter covers every scaffolded
+        # target's CI job names.
+        from ..publish_gate import ci_check_regex_for_targets, gate_job_template_snippet
+        gate_targets = list((ctx.config or {}).get("targets") or [])
+        if registry not in gate_targets:
+            gate_targets.append(registry)
+        vars_dict["publishGate"] = gate_job_template_snippet(
+            ci_check_regex_for_targets(gate_targets)
+        )
+
         force = flags.get("force", False)
 
         existing_hashes = load_hashes()
@@ -1598,6 +1609,13 @@ def _generate_merged_publish(targets, template_vars, target_paths=None):
 
     from ruamel.yaml import YAML
 
+    from ..publish_gate import (
+        GATE_JOB_KEY,
+        build_gate_job,
+        ci_check_regex_for_targets,
+        publish_concurrency_block,
+    )
+
     if target_paths is None:
         target_paths = {}
 
@@ -1685,19 +1703,43 @@ def _generate_merged_publish(targets, template_vars, target_paths=None):
         if target_path != ".":
             _rewrite_action_paths_for_jobs(jobs, target_path)
 
+        # Drop per-target gate jobs: the merged workflow gets exactly ONE
+        # gate (inserted below) covering all targets' CI checks.
+        jobs.pop(GATE_JOB_KEY, None)
+
         # Rename job keys to target name for uniqueness.
         # Single-job templates get the target name as key (e.g. "npm").
         # Multi-job templates (e.g. Go with npmPublishJobs) get the first
         # job as target name, additional jobs as "{target}-{original_key}".
+        # needs: references follow the rename; "gate" always points at the
+        # single merged gate and is never renamed.
         job_keys = list(jobs)
+        key_map = {}
         for i, original_key in enumerate(job_keys):
-            job = jobs.pop(original_key)
-            if len(job_keys) == 1:
-                merged_jobs[target_name] = job
-            elif i == 0:
-                merged_jobs[target_name] = job
+            if i == 0:
+                key_map[original_key] = target_name
             else:
-                merged_jobs[f"{target_name}-{original_key}"] = job
+                key_map[original_key] = f"{target_name}-{original_key}"
+
+        def _map_need(need):
+            if need == GATE_JOB_KEY:
+                return GATE_JOB_KEY
+            return key_map.get(need, need)
+
+        for original_key in job_keys:
+            job = jobs.pop(original_key)
+            needs = job.get("needs")
+            if isinstance(needs, str):
+                needs = [_map_need(needs)]
+            elif isinstance(needs, list):
+                needs = [_map_need(n) for n in needs]
+            else:
+                needs = []
+            # Every publish job waits for the gate.
+            if GATE_JOB_KEY not in needs:
+                needs.insert(0, GATE_JOB_KEY)
+            job["needs"] = needs[0] if len(needs) == 1 else needs
+            merged_jobs[key_map[original_key]] = job
 
     # Guarantee workflow_dispatch is present
     if "workflow_dispatch" not in all_on_triggers:
@@ -1709,11 +1751,21 @@ def _generate_merged_publish(targets, template_vars, target_paths=None):
     # Compose the final workflow dict
     workflow = {"name": "Publish"}
     workflow["on"] = all_on_triggers
+    # Per-ref publish concurrency: a dispatch retry at the same tag queues
+    # behind the in-flight run; a publish is never cancelled mid-flight.
+    workflow["concurrency"] = publish_concurrency_block()
     if merged_perms:
         workflow["permissions"] = dict(sorted(merged_perms.items()))
     if merged_env:
         workflow["env"] = merged_env
-    workflow["jobs"] = merged_jobs
+    # Single gate for all targets: waits for every target's CI check runs
+    # on the release commit before any publish job starts.
+    workflow["jobs"] = {
+        GATE_JOB_KEY: build_gate_job(
+            check_regex=ci_check_regex_for_targets(list(targets))
+        ),
+        **merged_jobs,
+    }
 
     # Serialize with ruamel.yaml
     yml = YAML()

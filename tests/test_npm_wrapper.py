@@ -183,7 +183,7 @@ class TestBuildNpmPublishJobs:
         artifacts = self._make_go_artifacts()
         result = build_npm_publish_jobs("@testuser", "mycli", artifacts)
         assert "npm-publish:" in result
-        assert "needs: [goreleaser]" in result
+        assert "needs: [gate, goreleaser]" in result
 
     def test_contains_extract_steps_for_all_platforms(self):
         artifacts = self._make_go_artifacts()
@@ -241,10 +241,10 @@ class TestBuildNpmPublishJobs:
         assert "npm publish" in result
 
     def test_default_depends_on_goreleaser(self):
-        """Default depends_on produces needs: [goreleaser] (Go convention)."""
+        """Default depends_on produces needs: [gate, goreleaser] (Go convention)."""
         artifacts = self._make_go_artifacts()
         result = build_npm_publish_jobs("@testuser", "mycli", artifacts)
-        assert "needs: [goreleaser]" in result
+        assert "needs: [gate, goreleaser]" in result
 
     def test_custom_depends_on(self):
         """Custom depends_on overrides the job dependency (e.g. Zig)."""
@@ -252,7 +252,7 @@ class TestBuildNpmPublishJobs:
         result = build_npm_publish_jobs(
             "@testuser", "mycli", artifacts, depends_on="build-and-upload"
         )
-        assert "needs: [build-and-upload]" in result
+        assert "needs: [gate, build-and-upload]" in result
         assert "goreleaser" not in result
 
 

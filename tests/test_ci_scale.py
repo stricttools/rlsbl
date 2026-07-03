@@ -324,7 +324,7 @@ class TestPublishRouterScale:
         assert isinstance(parsed, dict)
 
     def test_job_count(self, tmp_path):
-        """Inline publish router has 30 project jobs + 1 no-op job."""
+        """Inline publish router has 30 project jobs + no-op + shared gate."""
         root = str(tmp_path)
         projects = _make_projects_on_disk(root, PROJECT_COUNT)
         with patch(
@@ -333,7 +333,7 @@ class TestPublishRouterScale:
         ):
             content = generate_inline_publish_router(projects, root)
         parsed = _safe_load(content)
-        assert len(parsed["jobs"]) == PROJECT_COUNT + 1  # +1 for no-op job
+        assert len(parsed["jobs"]) == PROJECT_COUNT + 2  # +1 no-op, +1 shared gate
 
     def test_no_duplicate_job_names(self, tmp_path):
         """All job names in inline publish router are unique."""
@@ -363,7 +363,7 @@ class TestPublishRouterScale:
             job_key = f"{name}-publish"
             assert job_key in parsed["jobs"], f"Missing job {job_key}"
             job = parsed["jobs"][job_key]
-            expected = f"startsWith(github.event.release.tag_name, '{name}@v')"
+            expected = f"startsWith(github.ref_name, '{name}@v')"
             assert job["if"] == expected
 
     def test_all_jobs_have_permissions(self, tmp_path):

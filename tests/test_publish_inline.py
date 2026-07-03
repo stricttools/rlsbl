@@ -260,7 +260,7 @@ class TestInjectJobMetadata:
         jobs = {"publish": {"runs-on": "ubuntu-latest", "steps": []}}
         result = inject_job_metadata(jobs, "strictcli/v", "packages/strictcli")
 
-        assert result["publish"]["if"] == "startsWith(github.event.release.tag_name, 'strictcli/v')"
+        assert result["publish"]["if"] == "startsWith(github.ref_name, 'strictcli/v')"
 
     def test_adds_working_directory(self):
         jobs = {"publish": {"runs-on": "ubuntu-latest", "steps": []}}
@@ -506,11 +506,11 @@ class TestTransformProjectJobs:
         npm_job = result["strictcli-npm"]
 
         # needs: rewritten
-        assert npm_job["needs"] == "strictcli-pypi"
+        assert npm_job["needs"] == ["gate", "strictcli-pypi"]
 
         # if: condition added
-        assert pypi_job["if"] == "startsWith(github.event.release.tag_name, 'strictcli/v')"
-        assert npm_job["if"] == "startsWith(github.event.release.tag_name, 'strictcli/v')"
+        assert pypi_job["if"] == "startsWith(github.ref_name, 'strictcli/v')"
+        assert npm_job["if"] == "startsWith(github.ref_name, 'strictcli/v')"
 
         # working-directory injected
         assert pypi_job["defaults"]["run"]["working-directory"] == "packages/strictcli"
@@ -618,7 +618,7 @@ class TestGenerateInlinePublishRouter:
             result = generate_inline_publish_router(projects, root)
 
         parsed = _safe_load(result)
-        assert len(parsed["jobs"]) == 2  # 1 project job + 1 no-op
+        assert len(parsed["jobs"]) == 3  # 1 project job + no-op + shared gate
         assert "mypkg-pypi" in parsed["jobs"]
         assert "no-op" in parsed["jobs"]
 
@@ -638,7 +638,7 @@ class TestGenerateInlinePublishRouter:
             result = generate_inline_publish_router(projects, root)
 
         parsed = _safe_load(result)
-        assert len(parsed["jobs"]) == 3  # 2 project jobs + 1 no-op
+        assert len(parsed["jobs"]) == 4  # 2 project jobs + no-op + shared gate
         assert "mypkg-pypi" in parsed["jobs"]
         assert "mylib-npm" in parsed["jobs"]
         assert "no-op" in parsed["jobs"]
@@ -692,8 +692,8 @@ class TestGenerateInlinePublishRouter:
         pypi_job = parsed["jobs"]["mypkg-pypi"]
         npm_job = parsed["jobs"]["mylib-npm"]
 
-        assert pypi_job["if"] == "startsWith(github.event.release.tag_name, 'mypkg@v')"
-        assert npm_job["if"] == "startsWith(github.event.release.tag_name, 'mylib@v')"
+        assert pypi_job["if"] == "startsWith(github.ref_name, 'mypkg@v')"
+        assert npm_job["if"] == "startsWith(github.ref_name, 'mylib@v')"
 
     def test_no_top_level_permissions(self, tmp_path):
         root = str(tmp_path)
@@ -984,7 +984,7 @@ class TestIntegrationRealWorkflows:
         assert "strictcli-npm" in jobs
 
         # Both have correct if condition
-        expected_if = "startsWith(github.event.release.tag_name, 'strictcli@v')"
+        expected_if = "startsWith(github.ref_name, 'strictcli@v')"
         assert jobs["strictcli-pypi"]["if"] == expected_if
         assert jobs["strictcli-npm"]["if"] == expected_if
 
@@ -1036,7 +1036,7 @@ class TestIntegrationRealWorkflows:
         assert "golib-npm-publish" in jobs
 
         # needs: is rewritten to prefixed name
-        assert jobs["golib-npm-publish"]["needs"] == ["golib-goreleaser"]
+        assert jobs["golib-npm-publish"]["needs"] == ["gate", "golib-goreleaser"]
 
         # go-version-file is prefixed with project path
         goreleaser_steps = jobs["golib-goreleaser"]["steps"]
@@ -1071,8 +1071,8 @@ class TestIntegrationRealWorkflows:
         assert isinstance(parsed, dict), "Output must be valid YAML"
         jobs = parsed["jobs"]
 
-        # pylib has 1 job, jslib has 1 job, golib has 2 jobs + 1 no-op = 5 total
-        assert len(jobs) == 5
+        # pylib 1 job, jslib 1 job, golib 2 jobs + no-op + shared gate = 6 total
+        assert len(jobs) == 6
 
         # All expected jobs present
         assert "pylib-pypi" in jobs
