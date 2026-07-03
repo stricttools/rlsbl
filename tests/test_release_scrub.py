@@ -2051,6 +2051,192 @@ class TestNoMatchesExitsCleanly:
 
 
 # ===========================================================================
+# No-match scrubs still validate changelog hashes (and repair via journal)
+# ===========================================================================
+
+
+class TestNoMatchValidatesHashes:
+    """A scrub that finds nothing to rewrite must NOT skip the changelog
+    hash validation: dangling hashes left behind by a prior crashed or
+    direct scrub would otherwise go unnoticed until a later check, when the
+    journal-based repair is unreachable. On a no-match run there is no
+    rewrite and therefore no force-push -- just validate, repair from the
+    rewrite journal when possible, and commit the repairs."""
+
+    REPAIR_MSG = "scrub: repair changelog hashes from rewrite journal"
+
+    def _flags(self):
+        return {
+            "pattern": "secret", "replace": "XXX", "reason": "r",
+            "entire-history": True, "yes": True,
+        }
+
+    def _setup(self, tmp_path, journal_groups, *, empty_stdout=False):
+        """Project with one dangling-hash entry, a rewrite journal, and a
+        safegit scrub that finds NOTHING to rewrite (either empty stdout or
+        a JSON result with empty rewrites)."""
+        changes_dir = tmp_path / ".rlsbl" / "changes"
+        changes_dir.mkdir(parents=True)
+        unreleased = changes_dir / "unreleased.jsonl"
+        _write_entries(str(unreleased), [
+            ChangelogEntry(commits=[OLD_SHA], user_facing=False),
+        ])
+
+        gitdir = tmp_path / "gitdir"
+        (gitdir / "safegit").mkdir(parents=True)
+        if journal_groups is not None:
+            lines = [json.dumps(rec) for group in journal_groups for rec in group]
+            (gitdir / "safegit" / "rewrite-maps.jsonl").write_text(
+                "\n".join(lines) + "\n"
+            )
+
+        no_match_result = "" if empty_stdout else json.dumps(
+            {"rewrites": {}, "tags": []}
+        )
+
+        def run_effect(cmd, args=None, **kw):
+            if cmd == "safegit" and args == ["--version"]:
+                return "safegit 0.22.0"
+            if cmd == "safegit" and args and args[0] == "scrub":
+                return no_match_result
+            if cmd == "git" and args == ["rev-parse", "--git-dir"]:
+                return str(gitdir)
+            return ""
+
+        return unreleased, run_effect
+
+    def _commit_calls(self, mock_run):
+        return [
+            c for c in mock_run.call_args_list
+            if c[0][0] == "safegit" and (c[0][1] or [])[:1] == ["commit"]
+        ]
+
+    @patch(f"{MOD}.release_lock")
+    @patch(f"{MOD}.acquire_lock")
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_no_match_clean_exits_happily_after_validating(
+        self, mock_run, _req_tool, _acquire_lock, _release_lock,
+        tmp_path, capsys,
+    ):
+        """No matches + all hashes resolve: still 'nothing to do', but the
+        validation must actually have run."""
+        unreleased, run_effect = self._setup(tmp_path, None)
+        mock_run.side_effect = run_effect
+
+        with patch(
+            f"{MOD}.validate_all_hashes_resolve", return_value={},
+        ) as gate:
+            run_cmd(self._flags(), ctx=_ctx(str(tmp_path)))
+
+        gate.assert_called_once()
+        assert "No matches found" in capsys.readouterr().out
+        assert self._commit_calls(mock_run) == []
+        assert not (tmp_path / ".rlsbl" / "releases" / "scrub-result.json").exists()
+
+    @patch(f"{MOD}.release_lock")
+    @patch(f"{MOD}.acquire_lock")
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_no_match_dangling_journal_fixable_repairs_and_commits(
+        self, mock_run, _req_tool, _acquire_lock, _release_lock,
+        tmp_path, capsys,
+    ):
+        """No matches + dangling hashes the journal can fix: repair the
+        JSONL, commit the repaired files (no force-push -- no rewrite
+        happened), and exit cleanly."""
+        unreleased, run_effect = self._setup(
+            tmp_path, [_journal_records("id-1", {OLD_SHA: NEW_SHA})],
+        )
+        mock_run.side_effect = run_effect
+
+        with patch(
+            f"{MOD}.validate_all_hashes_resolve",
+            side_effect=[{str(unreleased): [OLD_SHA]}, {}],
+        ):
+            run_cmd(self._flags(), ctx=_ctx(str(tmp_path)))
+
+        # Repaired on disk
+        assert parse_jsonl(str(unreleased))[0].commits == [NEW_SHA]
+
+        # Committed with a clear message; no pushes at all
+        commit_calls = self._commit_calls(mock_run)
+        assert len(commit_calls) == 1
+        commit_args = commit_calls[0][0][1]
+        assert self.REPAIR_MSG in commit_args
+        assert str(unreleased) in commit_args
+        for c in mock_run.call_args_list:
+            if c[0][0] == "git":
+                assert (c[0][1] or [])[:1] != ["push"], \
+                    "a no-match run must never push"
+
+        combined = capsys.readouterr()
+        combined = combined.out + combined.err
+        assert "rewrite journal" in combined
+        assert "No matches found" in combined
+
+    @patch(f"{MOD}.release_lock")
+    @patch(f"{MOD}.acquire_lock")
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_no_match_dangling_unfixable_hard_error(
+        self, mock_run, _req_tool, _acquire_lock, _release_lock,
+        tmp_path, capsys,
+    ):
+        """No matches + dangling hashes the journal can NOT fix: hard error
+        naming the file and the hashes that remain dangling."""
+        other = "f" * 40
+        unreleased, run_effect = self._setup(
+            tmp_path, [_journal_records("id-1", {other: NEW_SHA})],
+        )
+        mock_run.side_effect = run_effect
+
+        with patch(
+            f"{MOD}.validate_all_hashes_resolve",
+            return_value={str(unreleased): [OLD_SHA]},
+        ):
+            with pytest.raises(SystemExit) as exc_info:
+                run_cmd(self._flags(), ctx=_ctx(str(tmp_path)))
+        assert exc_info.value.code == 1
+
+        # File untouched, nothing committed, hash and file named
+        assert parse_jsonl(str(unreleased))[0].commits == [OLD_SHA]
+        assert self._commit_calls(mock_run) == []
+        err = capsys.readouterr().err
+        assert OLD_SHA in err
+        assert str(unreleased) in err
+
+    @patch(f"{MOD}.release_lock")
+    @patch(f"{MOD}.acquire_lock")
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_empty_stdout_path_also_validates_and_repairs(
+        self, mock_run, _req_tool, _acquire_lock, _release_lock,
+        tmp_path, capsys,
+    ):
+        """safegit's OTHER no-match shape -- empty stdout instead of a JSON
+        result with empty rewrites -- must run the same validation and
+        journal repair."""
+        unreleased, run_effect = self._setup(
+            tmp_path, [_journal_records("id-1", {OLD_SHA: NEW_SHA})],
+            empty_stdout=True,
+        )
+        mock_run.side_effect = run_effect
+
+        with patch(
+            f"{MOD}.validate_all_hashes_resolve",
+            side_effect=[{str(unreleased): [OLD_SHA]}, {}],
+        ):
+            run_cmd(self._flags(), ctx=_ctx(str(tmp_path)))
+
+        assert parse_jsonl(str(unreleased))[0].commits == [NEW_SHA]
+        commit_calls = self._commit_calls(mock_run)
+        assert len(commit_calls) == 1
+        assert self.REPAIR_MSG in commit_calls[0][0][1]
+        assert "No matches found" in capsys.readouterr().out
+
+
+# ===========================================================================
 # Test 9: monorepo tag prefix index -- correct project selection
 # ===========================================================================
 

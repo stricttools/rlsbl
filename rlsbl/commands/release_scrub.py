@@ -437,6 +437,88 @@ def _recover_from_rewrite_journal(all_changes_dirs, failures, scrub_data):
     return True
 
 
+def _no_match_validate_and_repair(project_root, workspace_root, workspace_projects):
+    """Changelog hash validation for a scrub that found NOTHING to rewrite.
+
+    A no-match scrub is the one moment damage from a PRIOR crashed or
+    direct scrub is still cheaply repairable: the safegit rewrite journal
+    is at hand and the repair path is wired up right here. Exiting
+    "nothing to do" without validating would let dangling hashes go
+    unnoticed until a later `rlsbl check`, when the journal recovery is
+    unreachable and the operator is pointed at manual amends.
+
+    No rewrite happened on this run, so there is nothing to force-push:
+    validate, repair from the journal when possible, COMMIT the repaired
+    files, and hard-error naming anything that remains dangling.
+    """
+    all_changes_dirs = enumerate_changelog_dirs(
+        str(project_root), workspace_root, workspace_projects=workspace_projects,
+    )
+    repo_root = str(workspace_root) if workspace_root else str(project_root)
+    failures = validate_all_hashes_resolve(all_changes_dirs, repo_root=repo_root)
+    if not failures:
+        return
+
+    # Repairs mutate changelog files, so take the same lock the main flow
+    # holds while touching them.
+    lock_dir = ".rlsbl-monorepo" if workspace_root else ".rlsbl"
+    acquire_lock(lock_dir=lock_dir, project_root=repo_root)
+    try:
+        # Stand-in for scrub_data: the recovery helper only records the
+        # repaired paths under "remapped_files".
+        tracking = {}
+        if _recover_from_rewrite_journal(all_changes_dirs, failures, tracking):
+            failures = validate_all_hashes_resolve(
+                all_changes_dirs, repo_root=repo_root,
+            )
+        repaired = tracking.get("remapped_files", [])
+
+        if failures:
+            print(
+                "Error: the scrub found nothing to rewrite, but some "
+                "changelog commit hashes do not resolve -- likely left "
+                "behind by a previous crashed or direct scrub -- and the "
+                "rewrite journal could not fix them:",
+                file=sys.stderr,
+            )
+            for filepath, hashes in failures.items():
+                print(f"  {filepath}: {', '.join(hashes)}", file=sys.stderr)
+            if repaired:
+                print(
+                    f"  ({len(repaired)} file(s) were repaired from the "
+                    f"rewrite journal but NOT committed; commit or revert "
+                    f"them after fixing the remaining entries.)",
+                    file=sys.stderr,
+                )
+            print(
+                "Fix the entries (e.g. rlsbl changelog amend) and re-run.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        # Everything repaired: commit. No rewrite happened, so no
+        # force-push follows -- the repair commit rides the next normal
+        # push like any other commit.
+        try:
+            run("safegit", [
+                "commit", "-m",
+                "scrub: repair changelog hashes from rewrite journal",
+                "--",
+            ] + sorted(repaired))
+        except Exception as e:
+            print(
+                f"Error: failed to commit journal-repaired changelog "
+                f"files: {e}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        print(
+            f"Committed {len(repaired)} journal-repaired changelog file(s)."
+        )
+    finally:
+        release_lock()
+
+
 def _require_cleanup_ok(scrub_data, scrub_result_path):
     """Hard gate on safegit's machine-readable post-rewrite cleanup status.
 
@@ -703,6 +785,13 @@ def run_cmd(flags, *, ctx):
         # rewrite, in both execute and some scoped paths.
         if not output.strip():
             print("No matches found, nothing to do.")
+            # Even a no-op scrub validates the changelog hashes (and can
+            # repair prior damage from the rewrite journal) -- but never on
+            # a dry run, which must not mutate anything.
+            if not flags.get("dry-run"):
+                _no_match_validate_and_repair(
+                    project_root, ctx.workspace_root, workspace_projects,
+                )
             return
 
         scrub_data = json.loads(output)
@@ -756,6 +845,10 @@ def run_cmd(flags, *, ctx):
         # Clean up scrub-result.json if it exists
         if os.path.exists(scrub_result_path):
             os.unlink(scrub_result_path)
+        # Same validation/repair as the empty-stdout no-match path above.
+        _no_match_validate_and_repair(
+            project_root, ctx.workspace_root, workspace_projects,
+        )
         return
 
     # -- Confirmation prompt (unless --yes or resuming) --
