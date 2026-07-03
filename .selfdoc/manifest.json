@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.94.0",
+  "version": "0.95.0",
   "description": "",
   "language": "python",
   "base_url": "https://rlsbl.smmh.dev",
@@ -693,6 +693,11 @@
       "type": "doc"
     },
     {
+      "path": "rlsbl-publish_gate.md",
+      "title": "rlsbl.publish_gate",
+      "type": "doc"
+    },
+    {
       "path": "rlsbl-registry.md",
       "title": "rlsbl.registry",
       "type": "doc"
@@ -905,5 +910,5 @@
       ]
     }
   ],
-  "last_gen": "2026-07-03T09:14:28.780301+00:00"
+  "last_gen": "2026-07-03T09:47:07.681256+00:00"
 }

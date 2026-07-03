@@ -113,6 +113,7 @@ order: 90
 - [rlsbl.pipelines.npm](rlsbl-pipelines-npm.html)
 - [rlsbl.pipelines.protocol](rlsbl-pipelines-protocol.html)
 - [rlsbl.pipelines.pypi](rlsbl-pipelines-pypi.html)
+- [rlsbl.publish_gate](rlsbl-publish_gate.html)
 - [rlsbl.registry](rlsbl-registry.html)
 - [rlsbl.releasable_cleanup](rlsbl-releasable_cleanup.html)
 - [rlsbl.releasable_migration](rlsbl-releasable_migration.html)
