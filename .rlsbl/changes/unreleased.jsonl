@@ -25,3 +25,4 @@
 {"commits":["c5d1379749dfaefc06ff308ef8deea02148a6e6e"],"user_facing":false}
 {"commits":["5fd602b019c425df3683dc4c5af760ac6c69e87c"],"user_facing":true,"description":"**New check: `cross-repo-path-sources`.** Committed `pyproject.toml` files must not declare `[tool.uv.sources]` path entries that resolve outside the repository. In-repo paths and `workspace = true` sources stay legal. Runs under the `project` tag and unconditionally during `rlsbl release run`.","type":"feature"}
 {"commits":["e59102c437d3c0d86bd77ee3eb927e81d747bc7c"],"user_facing":true,"description":"**Scaffolded pypi CI is locked and tests.** `ci.yml` now runs `uv sync --locked` (registry-pure lockfiles are guaranteed by the new ban check) and adds a `uv run pytest` step when the project declares pytest. The `UV_NO_SOURCES` env escape hatch is gone.","type":"feature"}
+{"commits":["700d191861ff225b893f1005675c7e0f89ed4ccb"],"user_facing":false}
