@@ -1124,15 +1124,20 @@ class TestScrubBranchPushFails:
 
 
 class TestScrubCommitFails:
-    def test_commit_failure_warns(self, tmp_path, capsys):
+    def test_commit_failure_is_hard_error_with_resume_intact(self, tmp_path, capsys):
         (tmp_path / ".rlsbl" / "changes").mkdir(parents=True)
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         (tmp_path / "CHANGELOG.md").write_text("# Changelog\n")
         safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True, "yes": True}
-        # With CHANGELOG.md, commit IS attempted: version, scrub, commit(fail), push
-        _scrub_full(tmp_path, ["safegit 0.21.1", safegit_result, Exception("commit failed"), ""], flags)
+        # With CHANGELOG.md, commit IS attempted: version, scrub, commit(fail).
+        # A failed commit must ABORT (never push metadata-less history) and
+        # keep scrub-result.json for resume.
+        with pytest.raises(SystemExit) as exc_info:
+            _scrub_full(tmp_path, ["safegit 0.21.1", safegit_result, Exception("commit failed")], flags)
+        assert exc_info.value.code == 1
         assert "commit failed" in capsys.readouterr().err
+        assert (tmp_path / ".rlsbl" / "releases" / "scrub-result.json").exists()
 
 
 class TestScrubTagPushFails:

@@ -480,14 +480,15 @@ class TestFullScrubFlow:
             "new_head": "deadbeef1234",
         })
 
-        # Build the sequence of run() return values (git/safegit only)
-        mock_run.side_effect = [
-            "safegit 0.21.1",  # safegit --version
-            safegit_result,    # safegit scrub match --json ...
-            "",                # safegit commit (COMMITTED step)
-            "",                # git push --force-with-lease (BRANCH_PUSHED)
-            "",                # git push --force origin v1.0.0 (TAGS_PUSHED)
-        ]
+        # Function-style side effect: robust to extra bookkeeping calls
+        def run_effect(cmd, args=None, **kw):
+            if cmd == "safegit" and args == ["--version"]:
+                return "safegit 0.21.1"
+            if cmd == "safegit" and args and args[0] == "scrub":
+                return safegit_result
+            return ""
+
+        mock_run.side_effect = run_effect
 
         # gh calls go through run_gh
         def run_gh_effect(args, **kwargs):
@@ -525,8 +526,18 @@ class TestFullScrubFlow:
         # 2. CHANGELOG.md regenerated
         mock_gen_changelog.assert_called_once_with(str(tmp_path))
 
-        # 3. .validated deleted
+        # 3. .validated deleted AND its deletion is part of the commit
         assert not validated.exists()
+        commit_calls = [
+            c for c in mock_run.call_args_list
+            if c[0][0] == "safegit" and (c[0][1] or [])[:1] == ["commit"]
+        ]
+        assert len(commit_calls) == 1
+        commit_args = commit_calls[0][0][1]
+        assert str(validated) in commit_args, \
+            "deleted .validated must be included in the scrub commit"
+        assert str(unreleased) in commit_args
+        assert str(versioned) in commit_args
 
         # 4. scrub-result.json created during flow then deleted at the end
         scrub_result = releases_dir / "scrub-result.json"
@@ -611,16 +622,20 @@ class TestResumeFromScrubResult:
             "tags": [{"refname": "refs/tags/v1.0.0"}],
             "new_head": saved_head,
             "completed_steps": ["JSONL_REMAPPED"],
+            # Persisted by the JSONL_REMAPPED step so a resumed run can
+            # still commit the files remapped before the interruption.
+            "remapped_files": [str(unreleased)],
         }))
 
         # run() calls: git/safegit only (gh calls go through run_gh)
-        mock_run.side_effect = [
-            "safegit 0.21.1",  # safegit --version
-            saved_head,        # git rev-parse HEAD
-            "",                # safegit commit
-            "",                # git push --force-with-lease
-            "",                # git push --force origin v1.0.0
-        ]
+        def run_effect(cmd, args=None, **kw):
+            if cmd == "safegit" and args == ["--version"]:
+                return "safegit 0.21.1"
+            if cmd == "git" and args and args[:2] == ["rev-parse", "HEAD"]:
+                return saved_head
+            return ""
+
+        mock_run.side_effect = run_effect
 
         # gh calls go through run_gh
         def run_gh_effect(args, **kwargs):
@@ -654,6 +669,17 @@ class TestResumeFromScrubResult:
 
         # .validated deleted
         assert not validated.exists()
+
+        # The commit on resume includes the PERSISTED remapped files and the
+        # deleted .validated (the in-memory remap list is empty on resume).
+        commit_calls = [
+            c for c in mock_run.call_args_list
+            if c[0][0] == "safegit" and (c[0][1] or [])[:1] == ["commit"]
+        ]
+        assert len(commit_calls) == 1
+        commit_args = commit_calls[0][0][1]
+        assert str(unreleased) in commit_args
+        assert str(validated) in commit_args
 
         # scrub-result.json cleaned up at the end
         assert not scrub_result.exists()

@@ -323,6 +323,9 @@ def run_cmd(flags, *, ctx):
                 report = remap_jsonl_hashes(changes_dir, rewrites)
                 all_remap_results.extend(report.results)
 
+            # Persist the modified paths so a resumed run can still commit
+            # files remapped before an interruption.
+            scrub_data["remapped_files"] = [r.path for r in all_remap_results]
             _save_step(scrub_result_path, scrub_data, "JSONL_REMAPPED")
 
         # -- Post-remap validation gate --
@@ -364,21 +367,32 @@ def run_cmd(flags, *, ctx):
 
         # -- Delete .validated caches --
         if "VALIDATED_DELETED" not in completed:
+            deleted_validated = []
             for changes_dir in all_changes_dirs:
                 validated = os.path.join(changes_dir, ".validated")
+                if not os.path.exists(validated):
+                    continue
+                # Only tracked files can (and must) have their deletion
+                # committed; untracked caches are just removed.
+                tracked = True
                 try:
-                    os.unlink(validated)
-                except FileNotFoundError:
-                    pass
+                    run("git", ["ls-files", "--error-unmatch", validated])
+                except Exception:
+                    tracked = False
+                os.unlink(validated)
+                if tracked:
+                    deleted_validated.append(validated)
 
+            # Persist so a resumed run still commits the deletions.
+            scrub_data["deleted_validated"] = deleted_validated
             _save_step(scrub_result_path, scrub_data, "VALIDATED_DELETED")
 
         # -- Commit --
         if "COMMITTED" not in completed:
-            # Collect all modified files
-            modified_files = []
-            for r in all_remap_results:
-                modified_files.append(r.path)
+            # Collect all modified files. Remapped paths come from the
+            # persisted state (survives resume); fresh runs stored them in
+            # the JSONL_REMAPPED step above.
+            modified_files = list(scrub_data.get("remapped_files", []))
 
             # Add CHANGELOG.md files
             if ctx.workspace_root:
@@ -405,6 +419,10 @@ def run_cmd(flags, *, ctx):
                         if fname.endswith(".md"):
                             modified_files.append(os.path.join(changes_dir, fname))
 
+            # Include tracked .validated deletions so the tree is clean
+            # after the scrub commit.
+            modified_files.extend(scrub_data.get("deleted_validated", []))
+
             # Only commit if there are modified files
             if modified_files:
                 reason = flags.get("reason", "scrub")
@@ -412,8 +430,16 @@ def run_cmd(flags, *, ctx):
                 try:
                     run("safegit", ["commit", "-m", commit_msg, "--"] + modified_files)
                 except Exception as e:
-                    print(f"Warning: commit failed: {e}", file=sys.stderr)
-                    print("You may need to commit the changes manually.", file=sys.stderr)
+                    # Never proceed to force-push without the metadata
+                    # repairs committed -- that would publish inconsistent
+                    # history. Abort with resume state intact.
+                    print(f"Error: scrub metadata commit failed: {e}", file=sys.stderr)
+                    print(
+                        f"Aborting before push; fix the issue and re-run to "
+                        f"resume ({scrub_result_path} is kept).",
+                        file=sys.stderr,
+                    )
+                    sys.exit(1)
 
             _save_step(scrub_result_path, scrub_data, "COMMITTED")
 
