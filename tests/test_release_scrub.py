@@ -1612,6 +1612,63 @@ class TestJournalRecovery:
 
 
 # ===========================================================================
+# Docs: every scrub example in release-workflow.md must actually parse
+# ===========================================================================
+
+
+class TestDocsScrubExamplesParse:
+    """Every `rlsbl release scrub` example in docs/release-workflow.md must
+    be accepted by the real strictcli parser. A docs example that dies at
+    parse time (wrong flag name like `--from`, or a match-only flag such as
+    `--mangle` in file mode) is a broken example."""
+
+    DOCS = Path(__file__).resolve().parent.parent / "docs" / "release-workflow.md"
+
+    def _scrub_examples(self):
+        examples = [
+            line.strip()
+            for line in self.DOCS.read_text(encoding="utf-8").splitlines()
+            if line.strip().startswith("rlsbl release scrub ")
+        ]
+        assert examples, "no scrub examples found in docs/release-workflow.md"
+        return examples
+
+    def test_every_docs_example_parses(self):
+        import shlex
+
+        import strictcli
+
+        from rlsbl import app
+
+        for example in self._scrub_examples():
+            argv = shlex.split(example)[1:]  # drop the leading "rlsbl"
+            try:
+                app._parse(argv)
+            except strictcli._ParseError as e:
+                pytest.fail(f"docs example does not parse: {example!r}: {e}")
+
+    def test_parser_rejects_the_historically_broken_example(self):
+        """Regression guard for the shapes the docs used to show: `--mangle`
+        without `--pattern` and the nonexistent `--from` flag are parse-time
+        rejections, which is exactly why they must never appear in docs."""
+        import shlex
+
+        import strictcli
+
+        from rlsbl import app
+
+        broken = [
+            'release scrub --file config/secrets.yml --mangle '
+            '--reason "Remove secrets file" --from v0.50.0',
+            'release scrub --file config/secrets.yml --mangle '
+            '--reason "Remove secrets file" --from-commit a1b2c3d',
+        ]
+        for example in broken:
+            with pytest.raises(strictcli._ParseError):
+                app._parse(shlex.split(example))
+
+
+# ===========================================================================
 # Corrupt rewrite journal: hard error naming the file and line
 # ===========================================================================
 
