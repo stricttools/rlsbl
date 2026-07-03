@@ -1836,6 +1836,62 @@ class TestCleanupOkGate:
         # Flow completed: state cleared
         assert not (tmp_path / ".rlsbl" / "releases" / "scrub-result.json").exists()
 
+    @patch(f"{MOD}.release_lock")
+    @patch(f"{MOD}.acquire_lock")
+    @patch(f"{MOD}.check_gh_auth", return_value=False)
+    @patch(f"{MOD}.check_gh_installed", return_value=False)
+    @patch(f"{MOD}.get_current_branch", return_value="main")
+    @patch(f"{MOD}.get_push_timeout", return_value=120)
+    @patch(f"{MOD}.generate_changelog")
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_identity_rewrite_does_not_deadlock_on_old_head(
+        self, mock_run, _req_tool, _gen_cl, _push_timeout, _get_branch,
+        _gh_installed, _gh_auth, _acquire_lock, _release_lock,
+        tmp_path, capsys,
+    ):
+        """Tag-annotation-only rewrite: safegit 0.22.0 emits an ALL-IDENTITY
+        commit map (every commit maps to itself) and old_head == new_head.
+        The head object legitimately exists forever, so with
+        cleanup_ok=false the gate must not demand a prune of old_head that
+        can never succeed -- that would block the scrub permanently."""
+        changes_dir = tmp_path / ".rlsbl" / "changes"
+        changes_dir.mkdir(parents=True)
+        (changes_dir / "unreleased.jsonl").write_text("")
+
+        head = "e" * 40
+        other = "d" * 40
+        safegit_result = json.dumps({
+            # All-identity map: nothing to prune, ever.
+            "rewrites": {head: head, other: other},
+            "tags": [{
+                "refname": "refs/tags/v1.0.0",
+                "old_sha": "1" * 40, "new_sha": "2" * 40, "annotated": True,
+            }],
+            "old_head": head, "new_head": head,
+            "cleanup_ok": False,
+            "cleanup_errors": ["expiring reflogs: exit status 1"],
+        })
+
+        def run_effect(cmd, args=None, **kw):
+            if cmd == "safegit" and args == ["--version"]:
+                return "safegit 0.22.0"
+            if cmd == "safegit" and args and args[0] == "scrub":
+                return safegit_result
+            # git cat-file -e succeeds for EVERY sha: head and the identity
+            # commits all exist (and always will).
+            return ""
+
+        mock_run.side_effect = run_effect
+
+        with patch(f"{MOD}.validate_all_hashes_resolve", return_value={}):
+            run_cmd(self._flags(), ctx=_ctx(str(tmp_path)))
+
+        out = capsys.readouterr().out
+        assert "Continuing" in out
+        # Flow completed: state cleared, no permanent block.
+        assert not (tmp_path / ".rlsbl" / "releases" / "scrub-result.json").exists()
+
 
 # ===========================================================================
 # CHANGELOG step: regenerate-and-assert-unchanged

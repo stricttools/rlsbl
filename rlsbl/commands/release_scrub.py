@@ -460,8 +460,27 @@ def _require_cleanup_ok(scrub_data, scrub_result_path):
         if old != new
     ]
     old_head = scrub_data.get("old_head")
-    if old_head and old_head not in old_shas:
+    new_head = scrub_data.get("new_head")
+    # A tag-annotation-only rewrite maps every commit to itself (safegit
+    # 0.22.0 emits all-identity commit maps for those) and old_head ==
+    # new_head. The head object then legitimately exists forever, so
+    # demanding its prune would deadlock the gate permanently.
+    if old_head and old_head != new_head and old_head not in old_shas:
         old_shas.append(old_head)
+
+    if not old_shas:
+        print(
+            "Note: safegit reported a failed post-rewrite cleanup, but this "
+            "rewrite maps every commit to itself (e.g. a tag-annotation-only "
+            "rewrite), so no pre-rewrite commit object needs pruning. "
+            "Continuing."
+        )
+        scrub_data["cleanup_ok"] = True
+        tmp = scrub_result_path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(scrub_data, f, indent=2)
+        os.replace(tmp, scrub_result_path)
+        return
 
     still_present = []
     for sha in old_shas:
