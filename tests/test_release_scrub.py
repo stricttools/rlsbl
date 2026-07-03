@@ -1111,7 +1111,7 @@ class TestScrubArchiveWhitelist:
             "commits_rewritten": 2,
             "old_head": "aaa",
             "new_head": "bbb",
-            "completed_steps": ["JSONL_REMAPPED"],
+            "completed_steps": ["HASHES_VALIDATED"],
         }
 
         archive = _build_scrub_archive(scrub_data, "match", "clean leak")
@@ -1609,6 +1609,43 @@ class TestJournalRecovery:
         assert exc_info.value.code == 1
         assert parse_jsonl(str(unreleased))[0].commits == [ambiguous]
         assert ambiguous in capsys.readouterr().err
+
+
+# ===========================================================================
+# Corrupt rewrite journal: hard error naming the file and line
+# ===========================================================================
+
+
+class TestCorruptJournalLine:
+    """A line in .git/safegit/rewrite-maps.jsonl that fails to parse is a
+    hard error naming the journal file and the line number -- recovering
+    with a partial commit map would silently mis-repair changelogs."""
+
+    @patch(f"{MOD}.run")
+    def test_garbage_line_is_hard_error_naming_file_and_line(
+        self, mock_run, tmp_path, capsys,
+    ):
+        from rlsbl.commands.release_scrub import _load_rewrite_journal
+
+        gitdir = tmp_path / "gitdir"
+        (gitdir / "safegit").mkdir(parents=True)
+        journal = gitdir / "safegit" / "rewrite-maps.jsonl"
+        good = json.dumps({
+            "phase": "start", "id": "id-1", "op": "scrub-match",
+            "commit_map": {OLD_SHA: NEW_SHA},
+        })
+        journal.write_text(good + "\n" + "{this is not json\n")
+
+        mock_run.return_value = str(gitdir)  # git rev-parse --git-dir
+
+        with pytest.raises(SystemExit) as exc_info:
+            _load_rewrite_journal()
+        assert exc_info.value.code == 1
+
+        err = capsys.readouterr().err
+        assert str(journal) in err
+        assert "line 2" in err
+        assert "corrupt" in err.lower()
 
 
 # ===========================================================================
