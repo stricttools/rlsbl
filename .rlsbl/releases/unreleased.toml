@@ -1,0 +1,35 @@
+# Version bump type: patch, minor, major, hotfix, or prerelease
+bump = "minor"
+# Short description of this release (required)
+description = "Overhauls the releasable release flow with provable post-release step tracking and incremental resume, moves releasable state and release files into the releasable directory, and hardens the Go pipeline and release-scrub with hard errors in place of silent skips. Includes breaking changes: Go pipelines now require explicit install_paths, and pipeline publish failures are fatal."
+# Optional context explaining why these changes were made
+context = """
+This release is a correctness push for the releasable model plus a philosophy
+sweep replacing silent skips with hard errors.
+
+The releasable release flow previously wrote per-package artifacts to an
+arbitrary "representative" member package and had no record of which
+post-release steps had completed, making partial failures unrecoverable and
+unverifiable. Post-release steps are now tracked with provable completeness
+and incremental resume, releasable state and release files live under the
+releasable's own directory, representative writes are eliminated, changelogs
+are generated canonically per releasable plus a combined root changelog, and a
+new releasable-residue check with a monorepo cleanup command guards against
+stray artifacts.
+
+The Go pipeline moved from filename-based main.go globbing to toolchain-based
+entry-point detection with mandatory install_paths, because silent
+install-skips left stale binaries. The same hard-errors-over-silent-skips
+principle now applies to pipeline publish failures (fatal) and release-scrub
+(file/recipe modes actually working, real-binary e2e harness, validation gate,
+explicit-lease pushes, committed no-content audit archive, orchestration
+handshake, min safegit 0.21.1). Also: watch reliability fixes, per-SHA CI
+concurrency groups, member-context resolution unification, changelog --dry-run
+fix, and an unversioned-boundary check.
+"""
+# Pre-release identifier: alpha, beta, rc, or stable
+# preid = ""
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["npm", "pypi"]
+exclude = []
