@@ -786,6 +786,131 @@ class TestReleasableDirsRemapped:
 
 
 # ===========================================================================
+# Committed audit archive (whitelisted schema -- never re-leaks scrubbed data)
+# ===========================================================================
+
+
+class TestScrubArchiveWhitelist:
+    """The archived scrub record must contain ONLY whitelisted fields:
+    commit SHAs, tag refnames, reason, mode, step list. Never the pattern,
+    replacement string, file path, or any matched content."""
+
+    def test_build_archive_strips_everything_not_whitelisted(self):
+        from rlsbl.commands.release_scrub import _build_scrub_archive
+
+        scrub_data = {
+            "version": 1,
+            "dry_run": False,
+            # Hostile/leaky fields that must NOT survive archiving:
+            "pattern": "SECRETPATTERN",
+            "replace": "REPLACEMENTXXX",
+            "file": "path/to/leaked.env",
+            "scope": "*.env",
+            "args": ["scrub", "match", "--pattern", "SECRETPATTERN"],
+            "blobs_replaced": 2,
+            "messages_modified": 0,
+            "tags_rewritten": 1,
+            # Whitelisted content:
+            "rewrites": {"aaa": "bbb"},
+            "tags": [{
+                "refname": "refs/tags/v1.0.0",
+                "old_sha": "ccc", "new_sha": "ddd", "annotated": True,
+                "message": "tag message that could contain SECRETPATTERN",
+            }],
+            "commits_rewritten": 2,
+            "old_head": "aaa",
+            "new_head": "bbb",
+            "completed_steps": ["JSONL_REMAPPED"],
+        }
+
+        archive = _build_scrub_archive(scrub_data, "match", "clean leak")
+
+        assert set(archive.keys()) == {
+            "schema_version", "mode", "reason", "old_head", "new_head",
+            "rewrites", "tags", "commits_rewritten", "completed_steps",
+        }
+        assert archive["mode"] == "match"
+        assert archive["reason"] == "clean leak"
+        assert archive["rewrites"] == {"aaa": "bbb"}
+        assert archive["tags"] == [{
+            "refname": "refs/tags/v1.0.0",
+            "old_sha": "ccc", "new_sha": "ddd", "annotated": True,
+        }]
+
+        serialized = json.dumps(archive)
+        assert "SECRETPATTERN" not in serialized
+        assert "REPLACEMENTXXX" not in serialized
+        assert "leaked.env" not in serialized
+
+
+class TestScrubArchiveCommitted:
+    """On success the scrub state is archived (committed), not deleted."""
+
+    @patch(f"{MOD}.release_lock")
+    @patch(f"{MOD}.acquire_lock")
+    @patch(f"{MOD}.check_gh_auth", return_value=False)
+    @patch(f"{MOD}.check_gh_installed", return_value=False)
+    @patch(f"{MOD}.get_current_branch", return_value="main")
+    @patch(f"{MOD}.get_push_timeout", return_value=120)
+    @patch(f"{MOD}.generate_changelog")
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_archive_written_and_committed(self, mock_run, _req_tool, _gen_cl,
+                                            _push_timeout, _get_branch,
+                                            _gh_installed, _gh_auth,
+                                            _acquire_lock, _release_lock, tmp_path):
+        changes_dir = tmp_path / ".rlsbl" / "changes"
+        changes_dir.mkdir(parents=True)
+        _write_entries(str(changes_dir / "unreleased.jsonl"), [
+            ChangelogEntry(commits=["old_hash_1"], user_facing=False),
+        ])
+
+        safegit_result = json.dumps({
+            "rewrites": {"old_hash_1": "new_hash_1"},
+            "tags": [],
+            "old_head": "cafebabe567812345678",
+            "new_head": "deadbeef123412345678",
+        })
+
+        def run_effect(cmd, args=None, **kw):
+            if cmd == "safegit" and args == ["--version"]:
+                return "safegit 0.21.1"
+            if cmd == "safegit" and args and args[0] == "scrub":
+                return safegit_result
+            return ""
+
+        mock_run.side_effect = run_effect
+
+        flags = {
+            "pattern": "SECRETPATTERN", "replace": "REPLACEMENTXXX",
+            "reason": "clean leak", "entire-history": True, "yes": True,
+        }
+        with patch(f"{MOD}.validate_all_hashes_resolve", return_value={}):
+            run_cmd(flags, ctx=_ctx(str(tmp_path)))
+
+        # Archive exists under .rlsbl/scrubs/scrub-<newhead12>.json
+        archive_path = tmp_path / ".rlsbl" / "scrubs" / "scrub-deadbeef1234.json"
+        assert archive_path.exists()
+        archive = json.loads(archive_path.read_text())
+        assert archive["mode"] == "match"
+        assert archive["rewrites"] == {"old_hash_1": "new_hash_1"}
+        text = archive_path.read_text()
+        assert "SECRETPATTERN" not in text
+        assert "REPLACEMENTXXX" not in text
+
+        # The archive is part of the scrub commit
+        commit_calls = [
+            c for c in mock_run.call_args_list
+            if c[0][0] == "safegit" and (c[0][1] or [])[:1] == ["commit"]
+        ]
+        assert len(commit_calls) == 1
+        assert str(archive_path) in commit_calls[0][0][1]
+
+        # scrub-result.json (working state) is gone
+        assert not (tmp_path / ".rlsbl" / "releases" / "scrub-result.json").exists()
+
+
+# ===========================================================================
 # Post-remap validation gate
 # ===========================================================================
 

@@ -1114,12 +1114,12 @@ class TestScrubBranchPushFails:
     def test_branch_push_failure_exits(self, tmp_path):
         (tmp_path / ".rlsbl" / "changes").mkdir(parents=True)
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
-        # With empty unreleased.jsonl and no rewrites matching, COMMITTED step is
-        # skipped (no modified_files). So call sequence: version, scrub, push.
+        # The audit archive is always committed, so the sequence is:
+        # version, scrub, commit(archive), push(fail).
         safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True, "yes": True}
         with pytest.raises(SystemExit) as exc_info:
-            _scrub_full(tmp_path, ["safegit 0.21.1", safegit_result, Exception("push failed")], flags)
+            _scrub_full(tmp_path, ["safegit 0.21.1", safegit_result, "", Exception("push failed")], flags)
         assert exc_info.value.code == 1
 
 
@@ -1146,8 +1146,8 @@ class TestScrubTagPushFails:
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True, "yes": True}
-        # No modified_files so commit is skipped; calls: version, scrub, branch_push, tag_push(fail)
-        _scrub_full(tmp_path, ["safegit 0.21.1", safegit_result, "", Exception("tag push failed")], flags)
+        # Calls: version, scrub, commit(archive), branch_push, tag_push(fail)
+        _scrub_full(tmp_path, ["safegit 0.21.1", safegit_result, "", "", Exception("tag push failed")], flags)
         assert "tag push failed" in capsys.readouterr().err
 
 
@@ -1157,9 +1157,9 @@ class TestScrubNoGhForReleases:
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True, "yes": True}
-        # No modified_files -> commit skipped; calls: version, scrub, branch_push, tag_push
-        mock_run = _scrub_full(tmp_path, ["safegit 0.21.1", safegit_result, "", ""], flags)
-        assert mock_run.call_count == 4
+        # Calls: version, scrub, commit(archive), branch_push, tag_push
+        mock_run = _scrub_full(tmp_path, ["safegit 0.21.1", safegit_result, "", "", ""], flags)
+        assert mock_run.call_count == 5
 
 
 class TestScrubReleaseDeleteFails:
@@ -1168,8 +1168,8 @@ class TestScrubReleaseDeleteFails:
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True, "yes": True}
-        # Calls: version, scrub, branch_push, tag_push (run); gh_view, gh_delete(fail) (run_gh)
-        _scrub_full(tmp_path, ["safegit 0.21.1", safegit_result, "", ""], flags,
+        # Calls: version, scrub, commit(archive), branch_push, tag_push (run); gh_view, gh_delete(fail) (run_gh)
+        _scrub_full(tmp_path, ["safegit 0.21.1", safegit_result, "", "", ""], flags,
                     gh_auth=True, gh_installed=True,
                     run_gh_side_effect=['{"body": "old"}', Exception("delete failed")])
         assert "delete failed" in capsys.readouterr().err
@@ -1181,8 +1181,8 @@ class TestScrubVersionExtractFails:
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/not-a-version"}], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True, "yes": True}
-        # Calls: version, scrub, branch_push, tag_push (run); gh_view, gh_delete (run_gh)
-        _scrub_full(tmp_path, ["safegit 0.21.1", safegit_result, "", ""], flags,
+        # Calls: version, scrub, commit(archive), branch_push, tag_push (run); gh_view, gh_delete (run_gh)
+        _scrub_full(tmp_path, ["safegit 0.21.1", safegit_result, "", "", ""], flags,
                     gh_auth=True, gh_installed=True,
                     run_gh_side_effect=['{"body": "old"}', ""])
         assert "cannot extract version" in capsys.readouterr().err
@@ -1195,8 +1195,8 @@ class TestScrubGhReleaseCreateFails:
         safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True, "yes": True}
         ep = {f"{MOD_SCRUB}.extract_changelog_entry": MagicMock(return_value="notes")}
-        # Calls: version, scrub, branch_push, tag_push (run); gh_view, gh_delete, gh_create(fail) (run_gh)
-        _scrub_full(tmp_path, ["safegit 0.21.1", safegit_result, "", ""], flags,
+        # Calls: version, scrub, commit(archive), branch_push, tag_push (run); gh_view, gh_delete, gh_create(fail) (run_gh)
+        _scrub_full(tmp_path, ["safegit 0.21.1", safegit_result, "", "", ""], flags,
                     gh_auth=True, gh_installed=True, extra_patches=ep,
                     run_gh_side_effect=['{"body": "old"}', "", Exception("create failed")])
         assert "create failed" in capsys.readouterr().err
@@ -1225,11 +1225,11 @@ class TestScrubNoReleaseForTag:
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True, "yes": True}
-        # Calls: version, scrub, branch_push, tag_push (run); gh_view(fail) (run_gh)
-        mock_run, mock_run_gh = _scrub_full(tmp_path, ["safegit 0.21.1", safegit_result, "", ""], flags,
+        # Calls: version, scrub, commit(archive), branch_push, tag_push (run); gh_view(fail) (run_gh)
+        mock_run, mock_run_gh = _scrub_full(tmp_path, ["safegit 0.21.1", safegit_result, "", "", ""], flags,
                     gh_auth=True, gh_installed=True,
                     run_gh_side_effect=[Exception("not found")])
-        assert mock_run.call_count == 4
+        assert mock_run.call_count == 5
         assert mock_run_gh.call_count == 1
 
 
@@ -1239,8 +1239,9 @@ class TestScrubNoRefname:
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [{"refname": ""}, {"refname": "refs/tags/"}], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True, "yes": True}
-        # Empty refnames -> no tag pushes, no gh release checks. Calls: version, scrub, branch_push
-        _scrub_full(tmp_path, ["safegit 0.21.1", safegit_result, ""], flags, gh_auth=True, gh_installed=True)
+        # Empty refnames -> no tag pushes, no gh release checks.
+        # Calls: version, scrub, commit(archive), branch_push
+        _scrub_full(tmp_path, ["safegit 0.21.1", safegit_result, "", ""], flags, gh_auth=True, gh_installed=True)
 
 
 class TestScrubMonorepoFallbackScan:

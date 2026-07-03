@@ -144,6 +144,43 @@ def _build_safegit_args(flags, mode):
     return args
 
 
+# Fields allowed in the archived TagRewrite records.
+_ARCHIVE_TAG_KEYS = ("refname", "old_sha", "new_sha", "annotated")
+
+
+def _build_scrub_archive(scrub_data, mode, reason):
+    """Build the committed audit archive from the working scrub state.
+
+    HARD SCHEMA RULE: the archive is committed to the repo, so it must never
+    re-introduce what was scrubbed. Fields are WHITELISTED explicitly --
+    commit SHAs, tag refnames, reason, mode, and the step list only. No
+    patterns, no replacement strings, no file paths, no matched content, and
+    nothing that arrives unexpectedly in safegit's JSON or rlsbl's state.
+    """
+    tags = [
+        {k: t[k] for k in _ARCHIVE_TAG_KEYS if k in t}
+        for t in scrub_data.get("tags", [])
+    ]
+    return {
+        "schema_version": 1,
+        "mode": mode,
+        "reason": reason,
+        "old_head": scrub_data.get("old_head"),
+        "new_head": scrub_data.get("new_head"),
+        "rewrites": scrub_data.get("rewrites", {}),
+        "tags": tags,
+        "commits_rewritten": scrub_data.get("commits_rewritten"),
+        "completed_steps": list(scrub_data.get("completed_steps", [])),
+    }
+
+
+def _get_archive_path(scrub_result_path, new_head):
+    """Archive location: a scrubs/ dir sibling to the releases/ state dir
+    (so releasable-mode archives live under the releasable directory)."""
+    state_home = os.path.dirname(os.path.dirname(scrub_result_path))
+    return os.path.join(state_home, "scrubs", f"scrub-{new_head[:12]}.json")
+
+
 def _print_dry_run_summary(mode, data):
     """Print a per-mode dry-run preview from safegit's REAL dry-run JSON.
 
@@ -422,6 +459,19 @@ def run_cmd(flags, *, ctx):
             # Include tracked .validated deletions so the tree is clean
             # after the scrub commit.
             modified_files.extend(scrub_data.get("deleted_validated", []))
+
+            # Write the committed audit archive (whitelisted schema). It is
+            # always a new file, so the scrub commit is never empty.
+            new_head = scrub_data.get("new_head", "")
+            if new_head:
+                archive_path = _get_archive_path(scrub_result_path, new_head)
+                os.makedirs(os.path.dirname(archive_path), exist_ok=True)
+                archive = _build_scrub_archive(scrub_data, mode, flags["reason"])
+                tmp_archive = archive_path + ".tmp"
+                with open(tmp_archive, "w", encoding="utf-8") as f:
+                    json.dump(archive, f, indent=2)
+                os.replace(tmp_archive, archive_path)
+                modified_files.append(archive_path)
 
             # Only commit if there are modified files
             if modified_files:
