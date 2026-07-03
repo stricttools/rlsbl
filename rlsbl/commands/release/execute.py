@@ -1497,9 +1497,10 @@ def _run_release_mutating(state: ReleaseState):
                     f"GitHub Release creation failed for {tag}",
                 )
                 # Point at the resolved changes dir (releasable dir in
-                # releasable mode, .rlsbl/changes/ otherwise).
-                _notes_base = changes_dir or os.path.join(".rlsbl", "changes")
-                notes_path = os.path.join(_notes_base, f"{new_version}.md")
+                # releasable mode, .rlsbl/changes/ otherwise), relative to
+                # the CWD the release ran from so the hint is pasteable.
+                _notes_base = changes_dir or os.path.join(project_dir, ".rlsbl", "changes")
+                notes_path = os.path.relpath(os.path.join(_notes_base, f"{new_version}.md"))
                 print(
                     f"Error: GitHub Release creation failed for {tag}. "
                     f"The tag and commit are on the remote.\n"
