@@ -385,6 +385,19 @@ def _pid_alive(pid):
         return False
 
 
+def _pgid_alive(pgid):
+    """Return True if a process group with this ID still has members."""
+    try:
+        os.killpg(pgid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except Exception:
+        return False
+
+
 def _read_pidfile(path):
     """Read a PID from a pidfile. Returns None on any error."""
     try:
@@ -497,11 +510,18 @@ def _sha12_from_pidfile(path):
 def _stop_one(pidfile, sha12):
     """Stop the watcher recorded in pidfile: SIGTERM, wait up to 5s, SIGKILL.
 
+    The watcher was spawned with start_new_session, so it leads its own
+    process group (pgid == pid). Signals go to the whole group so in-flight
+    children (e.g. a blocking `gh run watch`) die with the watcher instead
+    of surviving and polling GitHub for up to an hour.
+
     A dead PID (stale pidfile) is reported and cleaned. The pidfile is
     always removed (SIGTERM'd children never reach their atexit cleanup).
     """
     pid = _read_pidfile(pidfile)
-    if pid is None or not _pid_alive(pid):
+    # pid <= 1 guards a corrupt pidfile: signaling group 0 would hit our
+    # own process group, group 1 init's. Treat it as stale.
+    if pid is None or pid <= 1 or not _pid_alive(pid):
         try:
             os.remove(pidfile)
         except OSError:
@@ -510,17 +530,17 @@ def _stop_one(pidfile, sha12):
         return
 
     try:
-        os.kill(pid, signal.SIGTERM)
+        os.killpg(pid, signal.SIGTERM)
     except ProcessLookupError:
         pass
     deadline = time.time() + 5
     while time.time() < deadline:
-        if not _pid_alive(pid):
+        if not _pgid_alive(pid):
             break
         time.sleep(0.1)
-    if _pid_alive(pid):
+    if _pgid_alive(pid):
         try:
-            os.kill(pid, signal.SIGKILL)
+            os.killpg(pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
         print(f"rlsbl: watcher for {sha12} (pid {pid}) did not exit on SIGTERM; killed")

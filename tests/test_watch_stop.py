@@ -1,23 +1,26 @@
 """Tests for `rlsbl watch --stop`: stopping detached watchers.
 
 Covers:
-- stopping a live watcher by SHA (SIGTERM, pidfile removed)
-- SIGKILL escalation when the process ignores SIGTERM
-- stale-pid detection and cleanup
+- stopping a live watcher by SHA (SIGTERM to the process group, pidfile removed)
+- the whole process group dies, including in-flight subprocesses
+- SIGKILL escalation when the group ignores SIGTERM
+- stale-pid detection and cleanup (including corrupt pid <= 1)
 - no-watcher and ambiguous (multiple live) cases
 - CLI flag wiring and flag combinations
 """
 
 import os
+import signal
 import subprocess
 import sys
 import threading
+import time
 from unittest.mock import patch
 
 import pytest
 
 import rlsbl.commands.watch as watch_mod
-from rlsbl.commands.watch import _pidfile_path, stop_watcher
+from rlsbl.commands.watch import _pid_alive, _pidfile_path, stop_watcher
 
 
 SHA = "b" * 40
@@ -31,15 +34,53 @@ def _setup_state(tmp_project):
 def _spawn_sleeper(reap=False):
     """Start a real child process that sleeps; returns the Popen object.
 
+    start_new_session mirrors production: the detached watcher is spawned
+    as a session (and process-group) leader, and --stop signals the group.
+
     With reap=True, a background thread wait()s on the child so it is
     reaped as soon as it dies -- mirroring production, where the detached
     watcher is reparented to init (its spawner has exited) and never
     lingers as a zombie.
     """
-    proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"],
+                            start_new_session=True)
     if reap:
         threading.Thread(target=proc.wait, daemon=True).start()
     return proc
+
+
+def _spawn_leader_with_grandchild(tmp_path):
+    """Session-leader child that spawns a long-lived grandchild in its own
+    process group -- modeling a detached watcher with an in-flight
+    `gh run watch` subprocess. Returns (proc, grandchild_pid). The leader
+    is reaped by a background thread (see _spawn_sleeper)."""
+    gpid_file = tmp_path / "grandchild.pid"
+    child_code = (
+        "import subprocess, sys, time\n"
+        "g = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(120)'])\n"
+        f"open({str(gpid_file)!r}, 'w').write(str(g.pid))\n"
+        "time.sleep(120)\n"
+    )
+    proc = subprocess.Popen([sys.executable, "-c", child_code],
+                            start_new_session=True)
+    threading.Thread(target=proc.wait, daemon=True).start()
+    deadline = time.time() + 10
+    while time.time() < deadline:
+        if gpid_file.exists() and gpid_file.read_text().strip():
+            break
+        time.sleep(0.05)
+    else:
+        raise RuntimeError("grandchild did not start in time")
+    return proc, int(gpid_file.read_text().strip())
+
+
+def _wait_until(predicate, timeout=10, interval=0.1):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if predicate():
+            return True
+        time.sleep(interval)
+    return False
 
 
 def _write_pidfile(sha, pid):
@@ -72,13 +113,41 @@ class TestStopBySha:
                 proc.kill()
                 proc.wait()
 
+    def test_stop_kills_whole_process_group(self, tmp_project, capsys):
+        """The detached watcher is a session/group leader; its in-flight
+        subprocesses (e.g. `gh run watch`) must die with it on --stop,
+        not linger and keep polling GitHub for up to an hour."""
+        _setup_state(tmp_project)
+        proc, gpid = _spawn_leader_with_grandchild(tmp_project)
+        try:
+            pidfile = _write_pidfile(SHA, proc.pid)
+
+            with pytest.raises(SystemExit) as exc:
+                stop_watcher(SHA12)
+
+            assert exc.value.code == 0
+            assert not os.path.exists(pidfile)
+            # The leader died (reaper thread collects it)
+            assert _wait_until(lambda: proc.poll() is not None)
+            # The grandchild died too (reparented to init and reaped)
+            assert _wait_until(lambda: not _pid_alive(gpid)), (
+                "grandchild survived --stop: the process group was not signaled"
+            )
+        finally:
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+
     def test_sigkill_escalation_when_sigterm_ignored(self, tmp_project, capsys):
         _setup_state(tmp_project)
         pidfile = _write_pidfile(SHA, 12345)
 
         sent = []
         with patch("rlsbl.commands.watch._pid_alive", return_value=True), \
-             patch("rlsbl.commands.watch.os.kill", side_effect=lambda p, s: sent.append(s)), \
+             patch("rlsbl.commands.watch._pgid_alive", return_value=True), \
+             patch("rlsbl.commands.watch.os.killpg",
+                   side_effect=lambda p, s: sent.append((p, s))), \
              patch("rlsbl.commands.watch.time") as mock_time:
             mock_time.time.side_effect = [0, 10, 10, 10]
             mock_time.sleep.return_value = None
@@ -86,11 +155,23 @@ class TestStopBySha:
                 stop_watcher(SHA12)
 
         assert exc.value.code == 0
-        import signal
-        assert signal.SIGTERM in sent
-        assert signal.SIGKILL in sent
+        assert (12345, signal.SIGTERM) in sent
+        assert (12345, signal.SIGKILL) in sent
         assert not os.path.exists(pidfile)
         assert "did not exit on SIGTERM" in capsys.readouterr().out
+
+    def test_corrupt_pidfile_with_pid_zero_treated_as_stale(self, tmp_project, capsys):
+        """A pidfile holding pid <= 1 must never be signaled: group 0 is
+        our own process group. Treat it as stale and clean it up."""
+        _setup_state(tmp_project)
+        pidfile = _write_pidfile(SHA, 0)
+
+        with pytest.raises(SystemExit) as exc:
+            stop_watcher(SHA12)
+
+        assert exc.value.code == 0
+        assert not os.path.exists(pidfile)
+        assert "was not running" in capsys.readouterr().out
 
     def test_stale_pidfile_reported_and_cleaned(self, tmp_project, capsys):
         _setup_state(tmp_project)
