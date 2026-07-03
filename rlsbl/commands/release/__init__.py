@@ -51,7 +51,7 @@ from .publish import _run_selfdoc_post_generate, _print_stale_dep_advisory, uplo
 from .validate import (
     parse_porcelain_paths,
     _run_selfdoc_gen, _run_selfdoc_check, _abort_on_scaffold_conflicts,
-    _abort_on_cross_repo_sources,
+    _abort_on_cross_repo_sources, _abort_on_version_skew,
     _run_strictcli_schema_dump, validate_blog_body,
     ReleaseValidationError, HookError, _SCHEMA_DUMP_TIMEOUT,
     validate_release_targets, validate_ota_mode, validate_config_integrity,
@@ -452,6 +452,13 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         project_dir,
         boundary_root=str(monorepo_root) if monorepo_root else project_dir,
         member_dirs=_member_abs_dirs,
+    )
+
+    # Version-skew guard: local dev-sources overlay checkouts must not be
+    # ahead of the registry (pre-mutation, unconditional)
+    _abort_on_version_skew(
+        project_dir,
+        workspace_root=str(monorepo_root) if monorepo_root else None,
     )
 
     # Resolve target paths (with releasable-level inheritance in explicit

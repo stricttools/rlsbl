@@ -112,6 +112,12 @@ The release pipeline executes its steps in a fixed order, from initial validatio
 | 20 | Regenerate monorepo snapshot | No (failure recorded and named in the completion summary) |
 | 21 | Print `Watch CI: rlsbl watch <sha>` | -- |
 
+Between steps 2 and 3, three pre-mutation guards run unconditionally -- they are direct validation calls, not preflight-tag checks, so a customized pre-release hook never skips them:
+
+- **Scaffold conflict guard** -- unresolved merge conflict markers in scaffold-managed files abort the release.
+- **Cross-repo path source guard** -- a committed `pyproject.toml` (including releasable member packages) declaring a `[tool.uv.sources]` path entry that resolves outside the repository aborts the release. See the `cross-repo-path-sources` check in [checks](checks.md).
+- **Version-skew guard** -- if `dev-sources.toml.local-only` declares local checkout overlays (see [dev workflow](dev-workflow.md)), each overlaid package's local version is compared against its latest PyPI release. Local ahead of the registry aborts with "release the dependency first: `<pkg>` local X > registry Y" -- the release was developed against unreleased dependency code. An unpublished overlay package or a registry/network failure is also a hard error, never a silent skip. No overlays file means nothing to check.
+
 Steps 9 and 10 are conditionally skipped — see the hooks override mechanism below.
 
 ### Release state and resume

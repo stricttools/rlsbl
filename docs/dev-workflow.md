@@ -57,6 +57,10 @@ Without a filter flag, the command errors with guidance. Install and uninstall o
 
 `rlsbl dev sync` overlays local editable checkouts of sibling projects onto the current project's locked environment -- the supported way to develop against a sibling checkout (e.g. a library you are changing in lockstep) without committing machine-local `[tool.uv.sources]` path dependencies, which poison `uv.lock` with machine-specific paths and break CI.
 
+Committing such path sources is not just discouraged -- it is banned outright. The `cross-repo-path-sources` check (project tag, also enforced unconditionally by `rlsbl release run`) hard-errors when a committed `pyproject.toml` declares a `[tool.uv.sources]` path entry that resolves outside the repository, whether absolute (`/home/user/other-repo`) or relative (`../sibling`, resolved against the pyproject's directory, matching uv's rule). In-repo paths and `workspace = true` sources stay legal. The ban is what keeps every committed lockfile registry-pure, which in turn lets scaffolded CI run `uv sync --locked` unconditionally.
+
+The overlay file also feeds the release-time **version-skew guard**: `rlsbl release run` reads `dev-sources.toml.local-only` and hard-errors when any overlaid checkout's local version is ahead of its latest registry release ("release the dependency first") -- releasing code developed and tested against unreleased dependency features would ship something the registry cannot satisfy. See the [release workflow](release-workflow.md) for details.
+
 ### Why a wrapper is required
 
 Verified against uv 0.9.17, no native uv mechanism suffices:

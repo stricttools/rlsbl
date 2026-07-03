@@ -751,6 +751,84 @@ def _abort_on_cross_repo_sources(project_dir, *, boundary_root=None, member_dirs
         raise ReleaseValidationError("Cross-repo path sources in [tool.uv.sources]")
 
 
+def _abort_on_version_skew(project_dir, *, workspace_root=None):
+    """Abort the release when a dev-sources overlay checkout is ahead of
+    the registry.
+
+    Reads ``dev-sources.toml.local-only`` at the project root (falling back
+    to the workspace root in a monorepo). For each declared overlay, the
+    local checkout's ``[project].version`` is compared against the latest
+    PyPI release: local ahead means the release was developed and tested
+    against unreleased dependency code, so the dependency must be released
+    first. Equal or behind passes. An unpublished dependency, a registry
+    error, or an unreadable overlay file is a hard error -- never a silent
+    skip. No overlays file means nothing is declared, so nothing to check.
+
+    Runs PRE-MUTATION and unconditionally (like the other release guards,
+    not the hook-skippable preflight tag).
+    """
+    from ..dev_sync import OVERRIDES_FILENAME, _load_overlays
+
+    overlay_root = None
+    if os.path.isfile(os.path.join(str(project_dir), OVERRIDES_FILENAME)):
+        overlay_root = str(project_dir)
+    elif workspace_root is not None and os.path.isfile(
+        os.path.join(str(workspace_root), OVERRIDES_FILENAME)
+    ):
+        overlay_root = str(workspace_root)
+    if overlay_root is None:
+        return
+
+    overlays = _load_overlays(overlay_root)
+    if overlays is None:
+        # _load_overlays already printed the specific error to stderr.
+        raise ReleaseValidationError(
+            f"invalid {OVERRIDES_FILENAME} at {overlay_root}"
+        )
+
+    from ...registry import query_pypi_version
+    from ..monorepo.commands import _parse_version_tuple
+
+    for overlay in overlays:
+        pkg = overlay["package"]
+        local_version = overlay["version"]
+        if not local_version:
+            raise ReleaseValidationError(
+                f"version skew check: local checkout of '{pkg}' at "
+                f"{overlay['path']} declares no [project].version"
+            )
+
+        result = query_pypi_version(pkg)
+        status = result["status"]
+        if status == "error":
+            raise ReleaseValidationError(
+                f"version skew check: could not query PyPI for '{pkg}': "
+                f"{result.get('message', 'unknown error')}. The "
+                f"{OVERRIDES_FILENAME} overlay declares a local checkout of "
+                f"'{pkg}'; network access is required to verify it is not "
+                "ahead of the registry."
+            )
+        if status == "not_found":
+            raise ReleaseValidationError(
+                f"release the dependency first: '{pkg}' local {local_version} "
+                "is not published on PyPI"
+            )
+
+        registry_version = result["version"]
+        local_tuple = _parse_version_tuple(local_version)
+        registry_tuple = _parse_version_tuple(registry_version)
+        if local_tuple is None or registry_tuple is None:
+            raise ReleaseValidationError(
+                f"version skew check: cannot compare versions for '{pkg}' "
+                f"(local {local_version}, registry {registry_version})"
+            )
+        if local_tuple > registry_tuple:
+            raise ReleaseValidationError(
+                f"release the dependency first: {pkg} local {local_version} "
+                f"> registry {registry_version}"
+            )
+
+
 def _schema_dump_command(entry_point: str, lang: str) -> list[str]:
     """Build the command list for running --dump-schema based on language."""
     if lang == "python":
