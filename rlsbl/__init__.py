@@ -1010,7 +1010,7 @@ def cmd_commit(message, **_kwargs):
 # changelog group
 # ---------------------------------------------------------------------------
 
-chlog = app.group("changelog", help="Structured changelog management using JSONL entries. Add and generate CHANGELOG.md from per-commit changelog entries stored in unreleased.jsonl for precise, auditable release notes.")
+chlog = app.group("changelog", help="Structured changelog management using JSONL entries with 3 entry types (feature, fix, breaking). Add and generate CHANGELOG.md from per-commit changelog entries stored in unreleased.jsonl for precise, auditable release notes.")
 
 
 @chlog.command(name="add", help="Append a structured changelog entry to the project's unreleased.jsonl file. Each entry includes a human-readable description, an entry type (feature, fix, or breaking), and optional commit hashes linking it to specific changes. The file is auto-committed by default. Use --no-user-facing to mark internal changes that should not appear in the published changelog.")
@@ -1139,7 +1139,7 @@ def cmd_mono_init(auto_commit, **_kwargs):
     _cmd_init({"auto-commit": auto_commit}, project_root=root)
 
 
-@mono.command(name="add", help="Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Optionally set a display name, target registry for publishing, glob patterns for change detection, a subtree remote URL for split publishing, inter-project dependencies, and a library flag to mark shared code packages.")
+@mono.command(name="add", help="Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Supports 6 optional settings: display name, target registry, glob patterns for change detection, subtree remote URL, inter-project dependencies, and a library flag to mark shared code packages.")
 @strictcli.flag(name="name", type=str, help="Display name for the project in workspace.toml (defaults to directory name)", default="")
 @strictcli.flag(name="target", type=str, help="Registry this project publishes to (e.g. npm, pypi, go, cargo)", default="")
 @strictcli.flag(name="watch", type=str, help="Comma-separated glob patterns for change detection in CI workflows", default="")
