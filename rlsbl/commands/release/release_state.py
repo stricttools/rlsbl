@@ -135,9 +135,9 @@ def resolve_releasable_dir(project_dir, workspace_root) -> str | None:
         return None
     from pathlib import Path
 
-    from ...context import _resolve_releasable_config_dir
+    from ...context import resolve_releasable_config_dir
 
-    return _resolve_releasable_config_dir(
+    return resolve_releasable_config_dir(
         Path(str(project_dir)), Path(str(workspace_root)),
     )
 

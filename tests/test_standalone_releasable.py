@@ -189,17 +189,24 @@ class TestLoadStandaloneReleasable:
 class TestDeriveStandaloneName:
     """_derive_standalone_name picks the right name source."""
 
+    def _detect(self, project_root):
+        """Helper: detect targets and return (entries, TARGETS) for injection."""
+        from rlsbl.targets import detect_targets, TARGETS
+        return detect_targets(str(project_root)), TARGETS
+
     def test_pypi_project_name(self, tmp_project):
         (tmp_project / "pyproject.toml").write_text(
             '[project]\nname = "fromtoml"\nversion = "0.1.0"\n'
         )
-        assert _derive_standalone_name(tmp_project) == "fromtoml"
+        entries, targets_map = self._detect(tmp_project)
+        assert _derive_standalone_name(tmp_project, detected_targets=entries, targets_map=targets_map) == "fromtoml"
 
     def test_npm_package_name(self, tmp_project):
         (tmp_project / "package.json").write_text(
             json.dumps({"name": "fromnpm", "version": "1.0.0"})
         )
-        assert _derive_standalone_name(tmp_project) == "fromnpm"
+        entries, targets_map = self._detect(tmp_project)
+        assert _derive_standalone_name(tmp_project, detected_targets=entries, targets_map=targets_map) == "fromnpm"
 
     def test_no_manifest_returns_dirname(self, tmp_project):
         name = _derive_standalone_name(tmp_project)
@@ -207,7 +214,8 @@ class TestDeriveStandaloneName:
 
     def test_pypi_without_project_name_returns_dirname(self, tmp_project):
         (tmp_project / "pyproject.toml").write_text("[tool.pytest]\n")
-        name = _derive_standalone_name(tmp_project)
+        entries, targets_map = self._detect(tmp_project)
+        name = _derive_standalone_name(tmp_project, detected_targets=entries, targets_map=targets_map)
         assert name == os.path.basename(str(tmp_project))
 
 

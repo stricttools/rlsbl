@@ -90,7 +90,7 @@ def resolve_releasable_config_dir(proj, workspace_root):
     Returns:
         Path string to the releasable config directory, or None.
     """
-    from ..workspace import WorkspaceProject, get_releasable_dir
+    from ..workspace_types import WorkspaceProject, get_releasable_dir
 
     if isinstance(proj, WorkspaceProject):
         rel_name = proj.releasable if isinstance(proj.releasable, str) else None

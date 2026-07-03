@@ -266,9 +266,9 @@ def _build_project_template_vars(project_dir, root):
     in workflow comments.
     """
     from pathlib import Path
-    from ...context import _resolve_releasable_config_dir
+    from ...context import resolve_releasable_config_dir
 
-    rel_dir = _resolve_releasable_config_dir(Path(project_dir), Path(root))
+    rel_dir = resolve_releasable_config_dir(Path(project_dir), Path(root))
     target_entries = detect_targets(project_dir, releasable_config_dir=rel_dir)
     if not target_entries:
         return {}
