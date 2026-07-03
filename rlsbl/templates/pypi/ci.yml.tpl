@@ -13,11 +13,6 @@ concurrency:
   group: ${{ github.workflow_ref }}-${{ github.sha }}
   cancel-in-progress: true
 
-{{#if pypi.uvNoSources}}
-env:
-  UV_NO_SOURCES: "1"
-
-{{/if}}
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -29,5 +24,6 @@ jobs:
       - uses: {{action "actions/checkout"}}
       - uses: {{action "astral-sh/setup-uv"}}
       - run: uv python install ${{ matrix.python-version }}
-      - run: uv sync
-      - run: uv run python -c "import {{importName}}"
+      - run: uv sync --locked
+      - run: uv run python -c "import {{importName}}"{{#if pypi.hasPytest}}
+      - run: uv run pytest{{/if}}

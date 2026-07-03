@@ -61,7 +61,7 @@ def _collect_all_var_references():
         bare_if_vars: dict[varName, list[(file, lineno)]] for bare
             ``{{#if varName}}`` occurrences.
         namespaced_suffixes: set of bare suffixes that appear in any
-            namespaced form (e.g., ``uvNoSources`` if ``pypi.uvNoSources``
+            namespaced form (e.g., ``hasPytest`` if ``pypi.hasPytest``
             exists).
         shared_bare_vars: set of bare var names used in ``{{varName}}``
             (non-conditional) across multiple target directories, indicating
