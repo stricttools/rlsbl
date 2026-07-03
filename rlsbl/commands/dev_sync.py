@@ -148,7 +148,19 @@ def _load_overlays(project_root):
                 )
         project_table = pyproject.get("project") or {}
         declared_name = project_table.get("name")
-        if declared_name and _normalize(declared_name) != _normalize(package):
+        if not declared_name:
+            # Without a declared static name, the entry's 'package' cannot be
+            # verified against what uv will actually install, so the
+            # --no-install-package exclusion cannot be trusted to protect the
+            # overlay. Hard error, never a silent skip of the guard.
+            return _fail(
+                f"Error: [[overlay]] entry '{package}': {pyproject_path} "
+                "declares no [project].name. The overlay checkout must "
+                "declare a static [project].name (PEP 621) matching the "
+                "entry's 'package', or the sync exclusion cannot be verified "
+                "to protect the overlay."
+            )
+        if _normalize(declared_name) != _normalize(package):
             # A mismatched name means --no-install-package would not match
             # and the next sync would silently wipe the overlay.
             return _fail(

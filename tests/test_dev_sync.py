@@ -227,6 +227,43 @@ def test_package_name_mismatch_is_hard_error(
     assert "actual-name" in err
 
 
+def test_missing_project_name_is_hard_error(
+    tmp_project, fake_run, uv_present, no_sync_env, capsys
+):
+    """A checkout whose pyproject.toml has a [project] table without 'name'
+    cannot be verified against the entry's 'package', so the sync-exclusion
+    guard cannot be trusted -- hard error, never a silent skip."""
+    dep = tmp_project / "dep"
+    dep.mkdir()
+    (dep / "pyproject.toml").write_text('[project]\nversion = "0.1.0"\n')
+    _write_overlay_file(tmp_project, '[[overlay]]\npackage = "depa"\npath = "dep"\n')
+    rc = run_sync(str(tmp_project))
+    assert rc == 1
+    assert fake_run.calls == []
+    err = capsys.readouterr().err
+    assert "[project].name" in err
+    assert "depa" in err
+
+
+def test_missing_project_table_is_hard_error(
+    tmp_project, fake_run, uv_present, no_sync_env, capsys
+):
+    """Same for a pyproject.toml with no [project] table at all (e.g. a
+    legacy build-system-only project): without a declared name the guard
+    cannot be verified."""
+    dep = tmp_project / "dep"
+    dep.mkdir()
+    (dep / "pyproject.toml").write_text(
+        '[build-system]\nrequires = ["setuptools"]\n'
+        'build-backend = "setuptools.build_meta"\n'
+    )
+    _write_overlay_file(tmp_project, '[[overlay]]\npackage = "depa"\npath = "dep"\n')
+    rc = run_sync(str(tmp_project))
+    assert rc == 1
+    assert fake_run.calls == []
+    assert "[project].name" in capsys.readouterr().err
+
+
 def test_package_name_match_is_normalized(
     tmp_project, fake_run, uv_present, no_sync_env
 ):
