@@ -262,24 +262,14 @@ def _upload_assets_for_config(
 def upload_release_assets(tag, new_version, log, flags, *, ctx):
     """Build and upload release assets for pipelines with ``assets: true`` or ``custom_assets``.
 
-    In releasable mode, iterates each non-private member and builds/uploads
-    assets from each member's directory with member-prefixed artifact names.
-
-    In standalone/implicit mode, builds from the representative config.
+    Handles standalone and implicit-mode projects. In releasable mode,
+    the caller (``_run_release_mutating``) iterates members directly
+    and calls ``_upload_assets_for_config`` per member.
 
     Skips silently if no pipelines have assets enabled.
 
     ctx: ProjectContext carrying project_root, monorepo_root, and config.
     """
-    project_dir = str(ctx.project_root)
-    config = ctx.config
-
-    # Check if we're in releasable mode by looking at state
-    releasable_name = getattr(ctx, '_releasable_name', None)
-    monorepo_root = ctx.workspace_root
-    member_package_paths = getattr(ctx, '_member_package_paths', None)
-
-    # Standalone/implicit mode: single config
     _upload_assets_for_config(
-        tag, new_version, log, flags, config, project_dir, ctx,
+        tag, new_version, log, flags, ctx.config, str(ctx.project_root), ctx,
     )
