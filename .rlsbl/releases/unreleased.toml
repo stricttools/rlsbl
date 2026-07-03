@@ -1,0 +1,24 @@
+# Version bump type: patch, minor, major, hotfix, or prerelease
+bump = "minor"
+# Short description of this release (required)
+description = "Local dev overlays via `rlsbl dev sync`, the cross-repo path-source ban, a release-time version-skew guard, detached CI watching with `--watch-async`/`rlsbl watch --stop`, and history-consistent scrubs on safegit 0.22.0."
+# Optional context explaining why these changes were made
+context = """
+This release is a hard-constraints sweep: committed lockfiles must be
+registry-pure (the new cross-repo-path-sources check bans out-of-repo
+[tool.uv.sources] paths, and scaffolded pypi CI now runs `uv sync --locked`),
+and nothing degrades silently -- the version-skew guard hard-errors when a
+dev-overlaid dependency's local checkout is ahead of its PyPI release, and
+unpublished overlays or registry failures are hard errors, never skips.
+Local editable development moves to `rlsbl dev sync` overlays instead of
+committed path sources. Scrubs are now orchestrated with safegit 0.22.0:
+persisted SHA maps, in-history JSONL remapping via --remap-shas-in,
+journal-backed recovery for no-match validation scrubs, and a cleanup_ok
+gate, so history rewrites keep changelog metadata consistent end to end.
+"""
+# Pre-release identifier: alpha, beta, rc, or stable
+# preid = ""
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["npm", "pypi"]
+exclude = []
