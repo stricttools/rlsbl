@@ -143,17 +143,30 @@ This means an unmodified scaffold hook or a missing hook file is considered "eff
 
 ## Flags
 
-`rlsbl release run` accepts both global flags (shared with all rlsbl commands) and release-specific flags that control working tree validation and post-release CI monitoring. The `--watch` and `--no-watch` flags are mutually exclusive — exactly one must be specified when running non-interactively with `--yes`.
+`rlsbl release run` accepts both global flags (shared with all rlsbl commands) and release-specific flags that control working tree validation and post-release CI monitoring. `--watch` and `--watch-async` form a mutually exclusive group — exactly one member of the pair (or its `--no-` negation) must be specified.
 
 | Flag | Effect |
 | --- | --- |
 | `--dry-run` | Preview the entire flow without making changes (no commits, tags, pushes, or GitHub Releases) |
 | `--yes` | Non-interactive mode, skip all confirmation prompts |
-| `--watch` | After release, automatically watch CI runs to completion |
-| `--no-watch` | After release, print the watch command hint without watching |
+| `--watch` | After release, automatically watch CI runs to completion (blocking) |
+| `--watch-async` | After release, spawn a detached background watcher and return immediately |
+| `--no-watch` / `--no-watch-async` | After release, print the watch command hint without watching |
 | `--allow-dirty` | Skip the clean working tree check (step 1) |
 
-`--dry-run`, `--yes`, and `--quiet` are global flags available on all rlsbl commands. `--allow-dirty`, `--watch`, and `--no-watch` are release-specific.
+`--dry-run`, `--yes`, and `--quiet` are global flags available on all rlsbl commands. `--allow-dirty`, `--watch`, and `--watch-async` are release-specific. The same `--watch` / `--watch-async` pair applies to `rlsbl release resume`, `rlsbl release retry`, and `rlsbl monorepo release run`.
+
+### Detached watching (`--watch-async`)
+
+`--watch-async` spawns the watcher as a detached background process (its own session, survives the terminal) and returns immediately. The watcher keeps the full blocking-watch behavior — CI auto-retry, late-run re-poll, publish-workflow audit, and a desktop notification (fire-and-forget, no action button). Its output goes to a per-commit log file, and a pidfile guards against spawning two watchers for the same commit:
+
+- Log: `.rlsbl/watch-<sha12>.log.local-only`
+- Pidfile: `.rlsbl/watch-<sha12>.pid.local-only` (removed when the watcher exits)
+
+Both live at the repo root (in `.rlsbl/`, or `.rlsbl-monorepo/` when only that exists) and use the `.local-only` suffix so they are never committed. Manage running watchers with:
+
+- `rlsbl watch --stop <sha>` — stop the watcher for that commit (SIGTERM, then SIGKILL after 5s)
+- `rlsbl watch --stop` — stop the single live watcher; with several live, lists them and asks for the SHA. Stale pidfiles from dead watchers are cleaned up automatically.
 
 ## Related commands
 
