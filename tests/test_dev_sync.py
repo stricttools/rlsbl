@@ -8,7 +8,6 @@ locked registry wheels never clobber the local checkouts.
 """
 
 import os
-import shutil
 import subprocess
 
 import pytest
@@ -497,7 +496,6 @@ def test_dev_group_lists_sync_command():
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(shutil.which("uv") is None, reason="uv not on PATH")
 def test_e2e_real_uv_overlay_survives_rerun(tmp_project, no_sync_env):
     """Real uv: overlay an editable package onto a synced project, then run
     dev sync again -- the editable overlay must survive (uv sync --inexact
