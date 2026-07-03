@@ -17,6 +17,7 @@ from unittest.mock import patch
 
 import pytest
 
+from rlsbl.changelog.generate import generate_changelog
 from rlsbl.commands.release_scrub import run_cmd
 from rlsbl.context import ProjectContext
 
@@ -71,6 +72,53 @@ def _jsonl_line(commits, user_facing=False, description=None, type_=None):
         entry["description"] = description or "A change"
         entry["type"] = type_ or "fix"
     return json.dumps(entry) + "\n"
+
+
+def _snapshot_remote_refs(repo):
+    """Snapshot origin's refs exactly the way run_cmd does before a scrub."""
+    refs = {}
+    for line in _git(repo, "ls-remote", "origin").splitlines():
+        parts = line.split()
+        if len(parts) == 2:
+            refs[parts[1]] = parts[0]
+    return refs
+
+
+def _generate_and_commit_changelog(repo):
+    """Generate CHANGELOG.md from the JSONL (as a release would) and commit
+    it, so the scrub flow's regenerate-and-assert-unchanged step passes."""
+    generate_changelog(str(repo))
+    _git(repo, "add", "CHANGELOG.md")
+    _git(repo, "commit", "-q", "-m", "generate changelog")
+
+
+def _scrub_commit_files(repo):
+    """Relative paths touched by the HEAD commit."""
+    out = _git(repo, "show", "--name-only", "--format=", "HEAD")
+    return {line for line in out.splitlines() if line}
+
+
+def _assert_historical_full_hashes_resolve(repo, relpath, *, forbidden=()):
+    """The killer capability of --remap-shas-in: at EVERY commit of the
+    rewritten history where ``relpath`` exists, the file parses as JSONL and
+    every FULL 40-hex hash it references resolves to a live commit.
+    (Abbreviated hashes are out of scope for the in-history remap; the
+    working tree recovery path handles those.)"""
+    seen_any = False
+    for sha in _git(repo, "rev-list", "HEAD").splitlines():
+        content = _git(repo, "show", f"{sha}:{relpath}", check=False)
+        if not content.strip():
+            continue
+        seen_any = True
+        for bad in forbidden:
+            assert bad not in content, (
+                f"pre-rewrite hash {bad} survives at {sha}:{relpath}"
+            )
+        for line in content.splitlines():
+            for h in json.loads(line)["commits"]:
+                if len(h) == 40:
+                    _git(repo, "rev-parse", "--verify", f"{h}^{{commit}}")
+    assert seen_any, f"{relpath} not found in any commit of the history"
 
 
 @pytest.fixture
@@ -177,6 +225,21 @@ class TestMatchModeFullFlowE2E:
                     assert h not in (c1, c2), f"{jsonl}: old hash survived"
                     _git(ws, "rev-parse", "--verify", f"{h}^{{commit}}")
 
+        # --- Historical self-consistency (the --remap-shas-in capability):
+        # EVERY historical version of the changelog files carries resolvable
+        # full hashes, and the pre-rewrite c1 appears nowhere. Covers both a
+        # per-project tree and the releasable-level tree (proving the
+        # wildcard glob crosses the releasable directory correctly under
+        # safegit's path.Match-based matcher). ---
+        _assert_historical_full_hashes_resolve(
+            ws, "packages/beta/.rlsbl/changes/unreleased.jsonl",
+            forbidden=(c1,),
+        )
+        _assert_historical_full_hashes_resolve(
+            ws, ".rlsbl-monorepo/releasables/core/changes/unreleased.jsonl",
+            forbidden=(c1,),
+        )
+
         # --- .validated deleted in BOTH trees and the deletion committed ---
         assert not (beta_changes / ".validated").exists()
         assert not (core_changes / ".validated").exists()
@@ -187,6 +250,21 @@ class TestMatchModeFullFlowE2E:
         last_msg = _git(ws, "log", "-1", "--format=%B")
         assert last_msg.startswith("scrub: remove leaked token")
         assert re.search(r"Scrub-remap: [0-9a-f]{40}\.\.[0-9a-f]{40}", last_msg)
+
+        # --- The scrub commit shrank to cache/archive artifacts plus the
+        # ONE file the journal recovery had to repair: beta's 1.0.0.jsonl
+        # held an ABBREVIATED hash, which the in-history remap deliberately
+        # skips, so the working-tree recovery path (persisted rewrite
+        # journal) fixed and committed it. The full-hash JSONL files were
+        # already consistent at HEAD and are NOT in the commit. ---
+        committed = _scrub_commit_files(ws)
+        archive_entries = {p for p in committed if "/scrubs/" in p}
+        assert len(archive_entries) == 1
+        assert committed == archive_entries | {
+            "packages/beta/.rlsbl/changes/1.0.0.jsonl",
+            "packages/beta/.rlsbl/changes/.validated",
+            ".rlsbl-monorepo/releasables/core/changes/.validated",
+        }
 
         # --- Committed audit archive under the RELEASABLE dir, whitelisted ---
         scrubs_dir = ws / ".rlsbl-monorepo" / "releasables" / "core" / "scrubs"
@@ -238,9 +316,9 @@ class TestFileModeE2E:
         changes = repo / ".rlsbl" / "changes"
         changes.mkdir(parents=True)
         (changes / "unreleased.jsonl").write_text(_jsonl_line([c1]))
-        (repo / "CHANGELOG.md").write_text("# Changelog\n")
-        _git(repo, "add", ".rlsbl/changes/unreleased.jsonl", "CHANGELOG.md")
+        _git(repo, "add", ".rlsbl/changes/unreleased.jsonl")
         _git(repo, "commit", "-q", "-m", "changelog")
+        _generate_and_commit_changelog(repo)
 
         _add_remote(repo, e2e_env / "remote")
 
@@ -268,6 +346,22 @@ class TestFileModeE2E:
         assert _git(repo, "status", "--porcelain") == ""
         assert not (repo / ".rlsbl" / "releases" / "scrub-result.json").exists()
         assert _remote_ref(repo, "refs/heads/main") == _git(repo, "rev-parse", "HEAD")
+
+        # In-history remap also applies in FILE mode: every historical
+        # version of the changelog is self-consistent, old hash gone.
+        _assert_historical_full_hashes_resolve(
+            repo, ".rlsbl/changes/unreleased.jsonl", forbidden=(c1,),
+        )
+
+        # Validation-only primary path: no remap commit needed. The scrub
+        # commit shrinks to exactly the committed audit archive -- the JSONL
+        # was already consistent at HEAD (in-history remap), CHANGELOG.md
+        # regeneration was asserted byte-identical, and no .validated cache
+        # existed in this fixture.
+        committed = _scrub_commit_files(repo)
+        assert len(committed) == 1
+        (only,) = committed
+        assert only.startswith(".rlsbl/scrubs/scrub-") and only.endswith(".json")
 
 
 # ===========================================================================
@@ -322,6 +416,7 @@ class TestRecipeModeE2E:
         (changes / "unreleased.jsonl").write_text(_jsonl_line([c1]))
         _git(repo, "add", ".rlsbl/changes/unreleased.jsonl")
         _git(repo, "commit", "-q", "-m", "changelog")
+        _generate_and_commit_changelog(repo)
         _add_remote(repo, e2e_env / "remote")
 
         recipe = e2e_env / "recipe.toml"
@@ -401,3 +496,168 @@ class TestValidationGateAbortE2E:
         # Resume state intact; nothing pushed
         assert (repo / ".rlsbl" / "releases" / "scrub-result.json").exists()
         assert _remote_ref(repo, "refs/heads/main") == old_remote_head
+
+
+# ===========================================================================
+# Journal recovery: interrupted orchestration / scrub without remap globs
+# ===========================================================================
+
+
+class TestJournalRecoveryE2E:
+    def test_recovery_after_interrupted_orchestration(
+        self, e2e_env, monkeypatch, capsys,
+    ):
+        """Simulates the crash window: safegit finished (run DIRECTLY here,
+        orchestrated but WITHOUT --remap-shas-in, like an older orchestrator
+        would), rlsbl saved its state, then died before any steps ran. The
+        resumed run must find the dangling JSONL hashes, consume the
+        persisted rewrite journal (.git/safegit/rewrite-maps.jsonl), repair
+        the working tree, and complete the flow."""
+        repo = e2e_env / "repo"
+        _init_repo(repo)
+        c1 = _commit_file(repo, "config.env", f"token={SECRET}\n", "add config")
+
+        changes = repo / ".rlsbl" / "changes"
+        changes.mkdir(parents=True)
+        (changes / "unreleased.jsonl").write_text(_jsonl_line([c1]))
+        _git(repo, "add", ".rlsbl/changes/unreleased.jsonl")
+        _git(repo, "commit", "-q", "-m", "changelog")
+        _generate_and_commit_changelog(repo)
+        _add_remote(repo, e2e_env / "remote")
+
+        # Pre-scrub lease snapshot, exactly as run_cmd captures it.
+        remote_refs = _snapshot_remote_refs(repo)
+
+        # Direct orchestrated scrub WITHOUT remap globs. The env var is
+        # required: the repo is rlsbl-managed, so safegit's guard is live.
+        env = {**os.environ, "RLSBL_SCRUB_ORCHESTRATED": "1"}
+        result = subprocess.run(
+            ["safegit", "scrub", "match", "--json",
+             "--pattern", SECRET, "--replace", REPLACEMENT,
+             "--entire-history", "--reason", "direct scrub"],
+            cwd=str(repo), env=env,
+            capture_output=True, text=True, check=True,
+        )
+        data = json.loads(result.stdout)
+        assert data["rewrites"], "direct scrub must have rewritten commits"
+
+        # The worktree JSONL still references the OLD (now pruned) commit.
+        line = (changes / "unreleased.jsonl").read_text().splitlines()[0]
+        assert json.loads(line)["commits"] == [c1]
+        assert _git(
+            repo, "rev-parse", "--verify", f"{c1}^{{commit}}", check=False,
+        ) == "", "old commit must be pruned after the direct scrub"
+
+        # Fabricate the state run_cmd saves right after safegit returns.
+        data["completed_steps"] = []
+        data["remote_refs"] = remote_refs
+        releases = repo / ".rlsbl" / "releases"
+        releases.mkdir(parents=True)
+        (releases / "scrub-result.json").write_text(json.dumps(data))
+
+        monkeypatch.chdir(repo)
+        ctx = ProjectContext(project_root=repo, workspace_root=None, config={})
+        flags = {
+            "pattern": SECRET, "replace": REPLACEMENT,
+            "reason": "direct scrub", "entire-history": True, "yes": True,
+        }
+        with patch(f"{MOD}.check_gh_installed", return_value=False):
+            run_cmd(flags, ctx=ctx)
+
+        # Loud about the journal recovery
+        out = capsys.readouterr().out
+        assert "rewrite journal" in out
+
+        # Repaired to a resolvable full SHA, committed, remote updated.
+        line = (changes / "unreleased.jsonl").read_text().splitlines()[0]
+        new_hash = json.loads(line)["commits"][0]
+        assert new_hash != c1 and len(new_hash) == 40
+        _git(repo, "rev-parse", "--verify", f"{new_hash}^{{commit}}")
+        assert _git(repo, "status", "--porcelain") == ""
+        assert ".rlsbl/changes/unreleased.jsonl" in _scrub_commit_files(repo)
+        assert not (releases / "scrub-result.json").exists()
+        assert _remote_ref(repo, "refs/heads/main") == _git(repo, "rev-parse", "HEAD")
+
+
+# ===========================================================================
+# Unorchestrated-scrub guard: the handshake is real end-to-end
+# ===========================================================================
+
+
+class TestOrchestrationGuardE2E:
+    def test_direct_destructive_scrub_blocked_without_env(self, e2e_env):
+        """In an rlsbl-managed repo, a destructive safegit scrub WITHOUT
+        RLSBL_SCRUB_ORCHESTRATED=1 must die pointing at 'rlsbl release
+        scrub', proving the orchestration handshake is enforced for real
+        (the other e2e tests prove the env rlsbl sets satisfies it)."""
+        repo = e2e_env / "repo"
+        _init_repo(repo)
+        _commit_file(repo, "config.env", f"token={SECRET}\n", "add config")
+        _commit_file(repo, ".rlsbl/config.json", "{}\n", "rlsbl config")
+        head = _git(repo, "rev-parse", "HEAD")
+
+        env = {
+            k: v for k, v in os.environ.items()
+            if k != "RLSBL_SCRUB_ORCHESTRATED"
+        }
+        result = subprocess.run(
+            ["safegit", "scrub", "match",
+             "--pattern", SECRET, "--replace", REPLACEMENT,
+             "--entire-history", "--reason", "unorchestrated"],
+            cwd=str(repo), env=env, capture_output=True, text=True,
+        )
+        assert result.returncode != 0
+        assert "rlsbl release scrub" in (result.stderr + result.stdout)
+
+        # Nothing was rewritten
+        assert _git(repo, "rev-parse", "HEAD") == head
+        assert SECRET in (repo / "config.env").read_text()
+
+
+# ===========================================================================
+# CHANGELOG regenerate-and-assert-unchanged: a diff aborts the flow
+# ===========================================================================
+
+
+class TestChangelogDiffAbortsE2E:
+    def test_stale_changelog_md_aborts_with_diff(
+        self, e2e_env, monkeypatch, capsys,
+    ):
+        repo = e2e_env / "repo"
+        _init_repo(repo)
+        c1 = _commit_file(repo, "config.env", f"token={SECRET}\n", "add config")
+
+        changes = repo / ".rlsbl" / "changes"
+        changes.mkdir(parents=True)
+        (changes / "unreleased.jsonl").write_text(
+            _jsonl_line([c1], user_facing=True, description="A change")
+        )
+        # STALE hand-written changelog: regeneration cannot reproduce it.
+        stale = "# Hand-written stale changelog\n"
+        (repo / "CHANGELOG.md").write_text(stale)
+        _git(repo, "add", ".rlsbl/changes/unreleased.jsonl", "CHANGELOG.md")
+        _git(repo, "commit", "-q", "-m", "changelog")
+        _add_remote(repo, e2e_env / "remote")
+        old_remote_head = _remote_ref(repo, "refs/heads/main")
+
+        monkeypatch.chdir(repo)
+        ctx = ProjectContext(project_root=repo, workspace_root=None, config={})
+        flags = {
+            "pattern": SECRET, "replace": REPLACEMENT,
+            "reason": "cleanup", "entire-history": True, "yes": True,
+        }
+        with patch(f"{MOD}.check_gh_installed", return_value=False):
+            with pytest.raises(SystemExit) as exc_info:
+                run_cmd(flags, ctx=ctx)
+        assert exc_info.value.code == 1
+
+        err = capsys.readouterr().err
+        assert "differs" in err
+        assert "Hand-written stale changelog" in err
+
+        # On-disk original restored; no scrub commit; nothing pushed;
+        # resume state intact.
+        assert (repo / "CHANGELOG.md").read_text() == stale
+        assert "scrub:" not in _git(repo, "log", "--format=%s")
+        assert _remote_ref(repo, "refs/heads/main") == old_remote_head
+        assert (repo / ".rlsbl" / "releases" / "scrub-result.json").exists()

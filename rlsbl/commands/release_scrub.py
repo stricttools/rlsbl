@@ -1,11 +1,14 @@
-"""Release scrub command: wraps safegit scrub with JSONL hash remapping, CHANGELOG regeneration, tag updates, and GitHub Release recreation."""
+"""Release scrub command: wraps safegit scrub with in-history JSONL hash remapping (--remap-shas-in), CHANGELOG verification, tag updates, and GitHub Release recreation."""
 
+import difflib
 import json
 import os
 import re
 import sys
 
 from ..changelog.files import (
+    can_remap_hash,
+    changelog_remap_globs,
     changes_dir_exists,
     enumerate_changelog_dirs,
     get_changes_dir,
@@ -26,10 +29,12 @@ from ..utils import (
 )
 from ..workspace import load_workspace
 
-# Minimum safegit release the scrub flow is built against: the fixes here
-# depend on >= 0.19 recipe mode and >= 0.20.x dry-run JSON behavior. The
-# integration test harness builds exactly this version.
-SAFEGIT_MIN_VERSION = (0, 21, 1)
+# Minimum safegit release the scrub flow is built against: the flow depends
+# on >= 0.22.0 for --remap-shas-in (in-history changelog hash remapping), the
+# persisted rewrite journal (.git/safegit/rewrite-maps.jsonl), and the
+# cleanup_ok/cleanup_errors/pre_rewrite_remotes JSON fields. The integration
+# test harness builds exactly this version.
+SAFEGIT_MIN_VERSION = (0, 22, 0)
 
 
 def _tag_name_from_refname(refname):
@@ -117,8 +122,23 @@ def _select_and_validate_mode(flags):
     return mode
 
 
-def _build_safegit_args(flags, mode):
-    """Build the safegit scrub argument list for the selected mode."""
+def _remap_glob_args(remap_globs):
+    """Repeatable --remap-shas-in flag pairs for the safegit invocation."""
+    args = []
+    for glob in remap_globs:
+        args.extend(["--remap-shas-in", glob])
+    return args
+
+
+def _build_safegit_args(flags, mode, remap_globs):
+    """Build the safegit scrub argument list for the selected mode.
+
+    ``remap_globs`` (from ``changelog_remap_globs``) is passed as repeatable
+    ``--remap-shas-in`` flags in every mode: safegit rewrites full 40-hex
+    commit hashes inside the glob-matched changelog files at EVERY commit of
+    the rewritten history, so all historical versions -- including HEAD --
+    stay self-consistent.
+    """
     if mode == "match":
         args = ["scrub", "match", "--json"]
         if flags.get("dry-run"):
@@ -132,6 +152,7 @@ def _build_safegit_args(flags, mode):
             args.extend(["--from", flags["from-commit"]])
         else:
             args.append("--entire-history")
+        args.extend(_remap_glob_args(remap_globs))
         args.extend(["--reason", flags["reason"]])
         return args
 
@@ -141,6 +162,7 @@ def _build_safegit_args(flags, mode):
         if flags.get("dry-run"):
             args.append("--dry-run")
         args.extend(["--from", flags["from-commit"]])
+        args.extend(_remap_glob_args(remap_globs))
         args.extend(["--reason", flags["reason"]])
         args.append(flags["file"])
         return args
@@ -154,6 +176,7 @@ def _build_safegit_args(flags, mode):
         args.extend(["--from", flags["from-commit"]])
     else:
         args.append("--entire-history")
+    args.extend(_remap_glob_args(remap_globs))
     args.extend(["--reason", flags["reason"]])
     return args
 
@@ -288,6 +311,217 @@ def _print_dry_run_summary(mode, data):
         )
 
 
+def _load_rewrite_journal():
+    """Load the LAST rewrite group from safegit's persisted rewrite journal.
+
+    ``.git/safegit/rewrite-maps.jsonl`` holds up to three phase records per
+    rewrite (start/refs/complete) sharing one id. The start record carries
+    the full old-to-new commit map and is written BEFORE any refs move, so
+    even a crashed rewrite leaves its mapping recoverable.
+
+    Lines can be MB-scale (full commit maps), so the file is streamed one
+    ``json.loads`` per line with no line-length assumptions. Multiple
+    rewrite ids are tolerated: the group whose start record appears last
+    wins. A corrupt line is a hard error -- recovering with a partial map
+    would silently mis-repair changelogs.
+
+    Returns ``{"id", "op", "reason", "created_at", "commit_map",
+    "complete", "path"}`` or None when no journal (or no start record)
+    exists.
+    """
+    try:
+        git_dir = run("git", ["rev-parse", "--git-dir"])
+    except Exception:
+        return None
+    if not git_dir:
+        return None
+    journal_path = os.path.join(
+        os.path.abspath(git_dir), "safegit", "rewrite-maps.jsonl"
+    )
+    if not os.path.isfile(journal_path):
+        return None
+
+    groups: dict[str, dict] = {}
+    order: list[str] = []
+    with open(journal_path, "r", encoding="utf-8") as f:
+        for lineno, line in enumerate(f, start=1):
+            stripped = line.strip()
+            if not stripped:
+                continue
+            try:
+                rec = json.loads(stripped)
+            except json.JSONDecodeError as e:
+                _fail(
+                    f"corrupt safegit rewrite journal "
+                    f"{journal_path} line {lineno}: {e}"
+                )
+            rid = rec.get("id")
+            phase = rec.get("phase")
+            if not rid or not phase:
+                continue
+            group = groups.setdefault(rid, {})
+            if phase == "start" and "start" not in group:
+                order.append(rid)
+                group["start"] = rec
+            elif phase == "complete":
+                group["complete"] = rec
+
+    for rid in reversed(order):
+        start = groups[rid]["start"]
+        return {
+            "id": rid,
+            "op": start.get("op", ""),
+            "reason": start.get("reason", ""),
+            "created_at": start.get("created_at", ""),
+            "commit_map": start.get("commit_map", {}) or {},
+            "complete": "complete" in groups[rid],
+            "path": journal_path,
+        }
+    return None
+
+
+def _recover_from_rewrite_journal(all_changes_dirs, failures, scrub_data):
+    """Repair dangling changelog hashes from the persisted rewrite journal.
+
+    Fallback for a scrub whose in-history remap did not cover the working
+    tree -- e.g. a scrub interrupted after safegit finished but before
+    rlsbl's steps completed, or a scrub someone ran orchestrated but outside
+    ``rlsbl release scrub`` (without ``--remap-shas-in``). Applies ONLY when
+    the journal's commit map can actually fix at least one dangling hash;
+    otherwise returns False and leaves every file untouched.
+
+    Repaired file paths are recorded in ``scrub_data["remapped_files"]`` so
+    the commit step includes them (and a resumed run still commits them).
+    """
+    journal = _load_rewrite_journal()
+    if journal is None:
+        return False
+    commit_map = journal["commit_map"]
+    fixable = any(
+        can_remap_hash(h, commit_map)
+        for hashes in failures.values()
+        for h in hashes
+    )
+    if not fixable:
+        return False
+
+    print(
+        f"Dangling changelog hashes found; recovering from the safegit "
+        f"rewrite journal:\n"
+        f"  journal: {journal['path']}\n"
+        f"  rewrite: id={journal['id']} op={journal['op']} "
+        f"created_at={journal['created_at']}"
+    )
+    if not journal["complete"]:
+        print(
+            "Warning: the journal's last rewrite has a 'start' record but "
+            "no 'complete' record -- that rewrite CRASHED partway. The "
+            "commit map was persisted before any refs moved, so it is used "
+            "for recovery, but investigate the crashed rewrite (safegit "
+            "doctor) before trusting the repository state.",
+            file=sys.stderr,
+        )
+
+    repaired = []
+    for changes_dir in all_changes_dirs:
+        report = remap_jsonl_hashes(changes_dir, commit_map)
+        repaired.extend(report.results)
+    for r in repaired:
+        print(
+            f"  repaired {r.path}: {r.hashes_remapped} hash(es) in "
+            f"{r.entries_modified} entrie(s)"
+        )
+    scrub_data["remapped_files"] = sorted(
+        set(scrub_data.get("remapped_files", [])) | {r.path for r in repaired}
+    )
+    return True
+
+
+def _read_file_bytes(path):
+    """File content as bytes, or None when the file does not exist."""
+    if not os.path.exists(path):
+        return None
+    with open(path, "rb") as f:
+        return f.read()
+
+
+def _regenerate_and_assert_unchanged(proj_path, scrub_result_path):
+    """Regenerate the changelog and assert it is byte-identical to disk.
+
+    With in-history hash remapping, HEAD's JSONL already carries the new
+    SHAs when safegit returns, so regeneration must be a no-op. A diff means
+    something ELSE is wrong (hand-edited CHANGELOG.md, generation drift,
+    inconsistent JSONL) -- hard error with the diff shown, originals
+    restored, and resume state intact. Nothing is committed when unchanged.
+    """
+    changes_dir = get_changes_dir(proj_path)
+    changelog_path = os.path.join(proj_path, "CHANGELOG.md")
+
+    watched = {changelog_path: _read_file_bytes(changelog_path)}
+    if os.path.isdir(changes_dir):
+        for fname in os.listdir(changes_dir):
+            if fname.endswith(".md"):
+                p = os.path.join(changes_dir, fname)
+                watched[p] = _read_file_bytes(p)
+
+    generate_changelog(proj_path)
+
+    # Include files the regeneration may have newly created.
+    after_paths = set(watched)
+    if os.path.isdir(changes_dir):
+        after_paths.update(
+            os.path.join(changes_dir, fname)
+            for fname in os.listdir(changes_dir)
+            if fname.endswith(".md")
+        )
+
+    diffs = []
+    for p in sorted(after_paths):
+        before = watched.get(p)
+        after = _read_file_bytes(p)
+        if before != after:
+            diffs.append((p, before, after))
+
+    if not diffs:
+        return
+
+    # Restore the on-disk originals: the working tree must stay exactly as
+    # the scrub left it so the operator diagnoses against reality.
+    for p, before, _after in diffs:
+        if before is None:
+            if os.path.exists(p):
+                os.unlink(p)
+        else:
+            with open(p, "wb") as f:
+                f.write(before)
+
+    print(
+        "Error: regenerating the changelog produced content that differs "
+        "from what is on disk. With in-history hash remapping the "
+        "changelog at HEAD must already be consistent -- a diff means "
+        "something else is wrong (e.g. a hand-edited CHANGELOG.md, or "
+        "files generated by a different rlsbl version). The regenerated "
+        "content was NOT kept. Diff (on disk -> regenerated):",
+        file=sys.stderr,
+    )
+    for p, before, after in diffs:
+        before_text = (before or b"").decode("utf-8", errors="replace")
+        after_text = (after or b"").decode("utf-8", errors="replace")
+        diff_lines = difflib.unified_diff(
+            before_text.splitlines(keepends=True),
+            after_text.splitlines(keepends=True),
+            fromfile=f"{p} (on disk)",
+            tofile=f"{p} (regenerated)",
+        )
+        sys.stderr.writelines(diff_lines)
+    print(
+        f"\nAborting before commit/push. Fix the inconsistency and re-run "
+        f"to resume; {scrub_result_path} is kept.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+
 def run_cmd(flags, *, ctx):
     # -- Validate inputs --
     mode = _select_and_validate_mode(flags)
@@ -343,6 +577,9 @@ def run_cmd(flags, *, ctx):
             )
             sys.exit(1)
 
+    # -- Cache workspace projects (also needed for the remap globs) --
+    workspace_projects = load_workspace(str(ctx.workspace_root)) if ctx.workspace_root else None
+
     # -- If not resuming, build and run safegit command --
     if not resuming:
         # Snapshot remote refs BEFORE rewriting: these are the lease
@@ -361,7 +598,11 @@ def run_cmd(flags, *, ctx):
                 )
                 sys.exit(1)
 
-        safegit_args = _build_safegit_args(flags, mode)
+        remap_globs = changelog_remap_globs(
+            str(project_root), ctx.workspace_root,
+            workspace_projects=workspace_projects,
+        )
+        safegit_args = _build_safegit_args(flags, mode, remap_globs)
 
         # Orchestration handshake: tells safegit this scrub is driven by
         # rlsbl (safegit will enforce this in a future release).
@@ -418,9 +659,6 @@ def run_cmd(flags, *, ctx):
             print("Aborted.")
             sys.exit(0)
 
-    # -- Cache workspace projects --
-    workspace_projects = load_workspace(str(ctx.workspace_root)) if ctx.workspace_root else None
-
     # -- Build tag prefix index for monorepo tag-to-project lookup --
     tag_prefix_index = None
     if workspace_projects is not None:
@@ -431,8 +669,6 @@ def run_cmd(flags, *, ctx):
     lock_root = str(ctx.workspace_root) if ctx.workspace_root else str(project_root)
     acquire_lock(lock_dir=lock_dir, project_root=lock_root)
 
-    all_remap_results = []
-
     # Every changelog dir with hash-bearing JSONL files: per-project
     # .rlsbl/changes/ plus releasable-level dirs in monorepos.
     all_changes_dirs = enumerate_changelog_dirs(
@@ -440,65 +676,31 @@ def run_cmd(flags, *, ctx):
     )
 
     try:
-        # -- Remap JSONL hashes --
-        if "JSONL_REMAPPED" not in completed:
-            all_unmapped: dict[str, list[str]] = {}
-            all_ambiguous: dict[str, list[str]] = {}
-            for changes_dir in all_changes_dirs:
-                report = remap_jsonl_hashes(changes_dir, rewrites)
-                all_remap_results.extend(report.results)
-                all_unmapped.update(report.unmapped)
-                all_ambiguous.update(report.ambiguous)
-
-            # Surface hashes the remap could NOT handle -- BEFORE the
-            # validation gate. The gate only catches hashes that stopped
-            # resolving; an unmapped hash that still resolves (untouched
-            # history) or an ambiguous abbreviated hash silently kept
-            # as-is would otherwise never be seen by anyone.
-            if all_unmapped or all_ambiguous:
-                n_unmapped = sum(len(v) for v in all_unmapped.values())
-                n_ambiguous = sum(len(v) for v in all_ambiguous.values())
-                print(
-                    f"Warning: JSONL remap left {n_unmapped} unmapped "
-                    f"hash(es) and {n_ambiguous} ambiguous abbreviated "
-                    f"hash(es) unchanged:",
-                    file=sys.stderr,
-                )
-                for filepath in sorted(all_unmapped):
-                    print(
-                        f"  unmapped   {filepath}: "
-                        f"{', '.join(all_unmapped[filepath])}",
-                        file=sys.stderr,
-                    )
-                for filepath in sorted(all_ambiguous):
-                    print(
-                        f"  ambiguous  {filepath}: "
-                        f"{', '.join(all_ambiguous[filepath])}",
-                        file=sys.stderr,
-                    )
-                print(
-                    "  These entries were left as-is; the post-remap "
-                    "validation gate verifies they still resolve.",
-                    file=sys.stderr,
-                )
-
-            # Persist the modified paths so a resumed run can still commit
-            # files remapped before an interruption.
-            scrub_data["remapped_files"] = [r.path for r in all_remap_results]
-            _save_step(scrub_result_path, scrub_data, "JSONL_REMAPPED")
-
-        # -- Post-remap validation gate --
-        # Every hash in every changelog dir must either have been remapped or
-        # still resolve after the rewrite. Otherwise abort loudly BEFORE the
-        # commit/push steps, keeping scrub-result.json for resume.
+        # -- Validation gate (in-history remap makes a worktree remap
+        # unnecessary: safegit's --remap-shas-in already rewrote the JSONL
+        # hashes at every commit, and Finalize synced the worktree) --
+        # Every hash in every changelog dir must resolve after the rewrite.
+        # When some do not, the persisted rewrite journal is the explicit
+        # recovery fallback (e.g. a scrub run without --remap-shas-in, or
+        # one interrupted before rlsbl's steps completed). Anything still
+        # dangling afterwards aborts loudly BEFORE the commit/push steps,
+        # keeping scrub-result.json for resume.
         if "HASHES_VALIDATED" not in completed:
             failures = validate_all_hashes_resolve(
                 all_changes_dirs, repo_root=lock_root,
             )
             if failures:
+                if _recover_from_rewrite_journal(
+                    all_changes_dirs, failures, scrub_data,
+                ):
+                    failures = validate_all_hashes_resolve(
+                        all_changes_dirs, repo_root=lock_root,
+                    )
+            if failures:
                 print(
                     "Error: after the history rewrite, some changelog commit "
-                    "hashes neither were remapped nor resolve:",
+                    "hashes do not resolve (and no rewrite journal could fix "
+                    "them):",
                     file=sys.stderr,
                 )
                 for filepath, hashes in failures.items():
@@ -513,24 +715,31 @@ def run_cmd(flags, *, ctx):
 
             _save_step(scrub_result_path, scrub_data, "HASHES_VALIDATED")
 
-        # -- Regenerate CHANGELOG.md --
+        # -- Verify CHANGELOG.md (regenerate-and-assert-unchanged) --
+        # In-history remap means HEAD's JSONL was already consistent when
+        # safegit returned, so regeneration must reproduce what is on disk
+        # byte-for-byte; a diff is a hard error (something else is wrong).
         # Only for projects that actually have a changes dir: calling the
         # generator on a project without one would fabricate a stub
         # CHANGELOG.md (e.g. releasable members keep their changelog at the
         # releasable level, not the project root).
-        if "CHANGELOG_GENERATED" not in completed:
+        if "CHANGELOG_VERIFIED" not in completed:
             if ctx.workspace_root:
                 for proj in workspace_projects:
                     if not proj.is_releasable:
                         continue
                     proj_path = os.path.join(str(ctx.workspace_root), proj.path)
                     if changes_dir_exists(proj_path):
-                        generate_changelog(proj_path)
+                        _regenerate_and_assert_unchanged(
+                            proj_path, scrub_result_path,
+                        )
             else:
                 if changes_dir_exists(str(project_root)):
-                    generate_changelog(str(project_root))
+                    _regenerate_and_assert_unchanged(
+                        str(project_root), scrub_result_path,
+                    )
 
-            _save_step(scrub_result_path, scrub_data, "CHANGELOG_GENERATED")
+            _save_step(scrub_result_path, scrub_data, "CHANGELOG_VERIFIED")
 
         # -- Delete .validated caches --
         if "VALIDATED_DELETED" not in completed:
@@ -556,38 +765,13 @@ def run_cmd(flags, *, ctx):
 
         # -- Commit --
         if "COMMITTED" not in completed:
-            # Collect all modified files. Remapped paths come from the
-            # persisted state (survives resume); fresh runs stored them in
-            # the JSONL_REMAPPED step above.
+            # The scrub commit carries only rlsbl's own artifacts: files the
+            # journal recovery repaired (persisted in remapped_files so a
+            # resumed run still commits them), tracked .validated deletions,
+            # and the audit archive below. Changelog files are NOT collected:
+            # the in-history remap already made HEAD consistent, and the
+            # CHANGELOG step above asserted regeneration is a no-op.
             modified_files = list(scrub_data.get("remapped_files", []))
-
-            # Add CHANGELOG.md files
-            if ctx.workspace_root:
-                for proj in workspace_projects:
-                    if not proj.is_releasable:
-                        continue
-                    proj_path = os.path.join(str(ctx.workspace_root), proj.path)
-                    cl = os.path.join(proj_path, "CHANGELOG.md")
-                    if os.path.exists(cl):
-                        modified_files.append(cl)
-                    # Also add per-version .md files in changes dir
-                    changes_dir = get_changes_dir(proj_path)
-                    if os.path.isdir(changes_dir):
-                        for fname in os.listdir(changes_dir):
-                            if fname.endswith(".md"):
-                                modified_files.append(os.path.join(changes_dir, fname))
-            else:
-                cl = os.path.join(str(project_root), "CHANGELOG.md")
-                if os.path.exists(cl):
-                    modified_files.append(cl)
-                changes_dir = get_changes_dir(str(project_root))
-                if os.path.isdir(changes_dir):
-                    for fname in os.listdir(changes_dir):
-                        if fname.endswith(".md"):
-                            modified_files.append(os.path.join(changes_dir, fname))
-
-            # Include tracked .validated deletions so the tree is clean
-            # after the scrub commit.
             modified_files.extend(scrub_data.get("deleted_validated", []))
 
             # Write the committed audit archive (whitelisted schema). It is
@@ -762,11 +946,16 @@ def run_cmd(flags, *, ctx):
         if os.path.exists(scrub_result_path):
             os.unlink(scrub_result_path)
 
-        total_hashes = sum(r.hashes_remapped for r in all_remap_results)
-        total_files = len(all_remap_results)
         releases_count = sum(1 for t in tags if re.search(r"v\d+\.\d+\.\d+$", t.get("refname", "")))
-        print(f"\nScrub complete. {total_hashes} hashes remapped across {total_files} files, "
-              f"{len(tags)} tags updated, {releases_count} releases recreated.")
+        repaired_count = len(scrub_data.get("remapped_files", []))
+        repaired_note = (
+            f" {repaired_count} changelog file(s) repaired from the rewrite "
+            f"journal."
+            if repaired_count else ""
+        )
+        print(f"\nScrub complete. {len(rewrites)} commits rewritten, "
+              f"{len(tags)} tags updated, {releases_count} releases "
+              f"recreated.{repaired_note}")
 
     finally:
         release_lock()

@@ -109,7 +109,7 @@ class TestFileModeRealSafegitContract:
             "old_head": "def456",
         })
         mock_run.side_effect = [
-            "safegit 0.21.1",  # safegit --version
+            "safegit 0.22.0",  # safegit --version
             file_dry_run,      # safegit scrub file --json --dry-run ...
         ]
 
@@ -180,7 +180,7 @@ class TestRecipeMode:
             "binary_skipped": 0,
         })
         mock_run.side_effect = [
-            "safegit 0.21.1",  # safegit --version
+            "safegit 0.22.0",  # safegit --version
             dry_json,          # safegit scrub run --json --dry-run ...
         ]
 
@@ -248,13 +248,13 @@ class TestRecipeMode:
 
 
 class TestSafegitMinVersion:
-    """The scrub flow depends on safegit >= 0.21.1 (recipe mode, dry-run
-    schemas, positional file mode)."""
+    """The scrub flow depends on safegit >= 0.22.0 (--remap-shas-in, the
+    persisted rewrite journal, cleanup_ok/pre_rewrite_remotes JSON)."""
 
     @patch(f"{MOD}.require_tool")
     @patch(f"{MOD}.run")
     def test_rejects_old_safegit(self, mock_run, _req_tool, tmp_path, capsys):
-        mock_run.side_effect = ["safegit 0.20.2"]
+        mock_run.side_effect = ["safegit 0.21.1"]
         flags = {
             "pattern": "x", "replace": "y", "reason": "r",
             "entire-history": True, "dry-run": True,
@@ -262,7 +262,7 @@ class TestSafegitMinVersion:
         with pytest.raises(SystemExit) as exc_info:
             run_cmd(flags, ctx=_ctx(str(tmp_path)))
         assert exc_info.value.code == 1
-        assert "0.21.1" in capsys.readouterr().err
+        assert "0.22.0" in capsys.readouterr().err
 
     @patch(f"{MOD}.require_tool")
     @patch(f"{MOD}.run")
@@ -272,7 +272,7 @@ class TestSafegitMinVersion:
             "version": 1, "dry_run": True, "pattern": "x",
             "total_matches": 0, "estimated_commits": 0,
         })
-        mock_run.side_effect = ["safegit 0.21.1+dirty", dry_json]
+        mock_run.side_effect = ["safegit 0.22.0+dirty", dry_json]
         flags = {
             "pattern": "x", "replace": "y", "reason": "r",
             "entire-history": True, "dry-run": True,
@@ -290,7 +290,7 @@ class TestScrubOrchestrationHandshake:
             "version": 1, "dry_run": True, "pattern": "x",
             "total_matches": 0, "estimated_commits": 0,
         })
-        mock_run.side_effect = ["safegit 0.21.1", dry_json]
+        mock_run.side_effect = ["safegit 0.22.0", dry_json]
         flags = {
             "pattern": "x", "replace": "y", "reason": "r",
             "entire-history": True, "dry-run": True,
@@ -303,6 +303,71 @@ class TestScrubOrchestrationHandshake:
         assert env.get("RLSBL_SCRUB_ORCHESTRATED") == "1"
 
 
+class TestRemapGlobsPassedToSafegit:
+    """Every safegit scrub invocation (all three modes) must carry the
+    repeatable --remap-shas-in globs derived from changelog_remap_globs, so
+    safegit rewrites commit hashes inside the JSONL changelogs at EVERY
+    commit of the rewritten history (including HEAD)."""
+
+    @staticmethod
+    def _remap_pairs(args):
+        return [
+            args[i + 1] for i, a in enumerate(args) if a == "--remap-shas-in"
+        ]
+
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_match_mode_standalone_glob(self, mock_run, _req_tool, tmp_path):
+        dry_json = json.dumps({
+            "version": 1, "dry_run": True, "pattern": "x",
+            "total_matches": 0, "estimated_commits": 0,
+        })
+        mock_run.side_effect = ["safegit 0.22.0", dry_json]
+        flags = {
+            "pattern": "x", "replace": "y", "reason": "r",
+            "entire-history": True, "dry-run": True,
+        }
+        run_cmd(flags, ctx=_ctx(str(tmp_path)))
+        args = mock_run.call_args_list[1][0][1]
+        assert self._remap_pairs(args) == [".rlsbl/changes/*.jsonl"]
+
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_file_mode_glob_and_positional_last(self, mock_run, _req_tool, tmp_path):
+        dry_json = json.dumps({
+            "version": 1, "dry_run": True, "file": "secrets.env",
+            "mode": "remove", "from": "abc", "commit_count": 1,
+        })
+        mock_run.side_effect = ["safegit 0.22.0", dry_json]
+        flags = {
+            "file": "secrets.env", "from-commit": "abc",
+            "reason": "r", "dry-run": True,
+        }
+        run_cmd(flags, ctx=_ctx(str(tmp_path)))
+        args = mock_run.call_args_list[1][0][1]
+        assert self._remap_pairs(args) == [".rlsbl/changes/*.jsonl"]
+        # The positional path must still come last.
+        assert args[-1] == "secrets.env"
+
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_recipe_mode_glob(self, mock_run, _req_tool, tmp_path):
+        recipe = tmp_path / "recipe.toml"
+        recipe.write_text('[[operations]]\npattern = "x"\nreplace = "y"\n')
+        dry_json = json.dumps({
+            "version": 1, "dry_run": True, "operation_count": 1,
+            "estimated_commits": 0,
+        })
+        mock_run.side_effect = ["safegit 0.22.0", dry_json]
+        flags = {
+            "recipe": str(recipe), "reason": "r",
+            "entire-history": True, "dry-run": True,
+        }
+        run_cmd(flags, ctx=_ctx(str(tmp_path)))
+        args = mock_run.call_args_list[1][0][1]
+        assert self._remap_pairs(args) == [".rlsbl/changes/*.jsonl"]
+
+
 class TestEmptyOutputMeansNoMatches:
     """safegit scrub execute emits NO JSON when there is nothing to rewrite."""
 
@@ -310,7 +375,7 @@ class TestEmptyOutputMeansNoMatches:
     @patch(f"{MOD}.run")
     def test_empty_execute_output(self, mock_run, _req_tool, tmp_path, capsys):
         mock_run.side_effect = [
-            "safegit 0.21.1",  # safegit --version
+            "safegit 0.22.0",  # safegit --version
             "",                # git ls-remote origin (pre-scrub snapshot)
             "",                # safegit scrub match: no matches -> empty stdout
         ]
@@ -361,7 +426,7 @@ class TestDryRunShowsPreviewNoMutations:
             "estimated_commits": 2,
         })
         mock_run.side_effect = [
-            "safegit 0.21.1",  # safegit --version
+            "safegit 0.22.0",  # safegit --version
             safegit_result,    # safegit scrub match --json --dry-run ...
         ]
 
@@ -409,7 +474,7 @@ class TestDryRunShowsPreviewNoMutations:
             "old_head": "def456",
         })
         mock_run.side_effect = [
-            "safegit 0.21.1",
+            "safegit 0.22.0",
             safegit_result,
         ]
         flags = {
@@ -485,7 +550,7 @@ class TestFullScrubFlow:
         # Function-style side effect: robust to extra bookkeeping calls
         def run_effect(cmd, args=None, **kw):
             if cmd == "safegit" and args == ["--version"]:
-                return "safegit 0.21.1"
+                return "safegit 0.22.0"
             if cmd == "safegit" and args and args[0] == "scrub":
                 return safegit_result
             return ""
@@ -516,19 +581,23 @@ class TestFullScrubFlow:
 
         # -- Assertions --
 
-        # 1. JSONL files have remapped hashes
+        # 1. rlsbl leaves the JSONL files UNTOUCHED: the in-history remap
+        # (safegit --remap-shas-in) is responsible for the worktree content
+        # now, and safegit is mocked here.
         updated_unreleased = parse_jsonl(str(unreleased))
-        assert updated_unreleased[0].commits == ["new_hash_1"]
+        assert updated_unreleased[0].commits == ["old_hash_1"]
 
-        # Versioned file should be re-locked after remap
+        # Versioned file keeps its read-only mode and content
         assert stat.S_IMODE(os.stat(str(versioned)).st_mode) & stat.S_IWUSR == 0
         updated_versioned = parse_jsonl(str(versioned))
-        assert updated_versioned[0].commits == ["new_hash_2"]
+        assert updated_versioned[0].commits == ["old_hash_2"]
 
-        # 2. CHANGELOG.md regenerated
+        # 2. CHANGELOG.md regenerated (for the byte-identical assertion)
         mock_gen_changelog.assert_called_once_with(str(tmp_path))
 
-        # 3. .validated deleted AND its deletion is part of the commit
+        # 3. .validated deleted AND its deletion is part of the commit; the
+        # scrub commit shrinks to cache/archive artifacts -- no JSONL files,
+        # no CHANGELOG.md.
         assert not validated.exists()
         commit_calls = [
             c for c in mock_run.call_args_list
@@ -538,8 +607,14 @@ class TestFullScrubFlow:
         commit_args = commit_calls[0][0][1]
         assert str(validated) in commit_args, \
             "deleted .validated must be included in the scrub commit"
-        assert str(unreleased) in commit_args
-        assert str(versioned) in commit_args
+        assert str(unreleased) not in commit_args
+        assert str(versioned) not in commit_args
+        assert str(tmp_path / "CHANGELOG.md") not in commit_args
+        committed_files = commit_args[commit_args.index("--") + 1:]
+        archive_files = [f for f in committed_files if "scrubs" in f]
+        assert sorted(committed_files) == sorted(
+            [str(validated)] + archive_files
+        )
 
         # Machine-greppable audit trailer on the scrub commit
         assert "--trailer" in commit_args
@@ -623,16 +698,16 @@ class TestResumeFromScrubResult:
         # CHANGELOG.md
         (tmp_path / "CHANGELOG.md").write_text("# Changelog\n")
 
-        # scrub-result.json: JSONL_REMAPPED already done
+        # scrub-result.json: HASHES_VALIDATED already done
         saved_head = "deadbeef1234abcd"
         scrub_result = releases_dir / "scrub-result.json"
         scrub_result.write_text(json.dumps({
             "rewrites": {"old_hash_1": "new_hash_1"},
             "tags": [{"refname": "refs/tags/v1.0.0"}],
             "new_head": saved_head,
-            "completed_steps": ["JSONL_REMAPPED"],
-            # Persisted by the JSONL_REMAPPED step so a resumed run can
-            # still commit the files remapped before the interruption.
+            "completed_steps": ["HASHES_VALIDATED"],
+            # Persisted by the journal-recovery fallback so a resumed run
+            # can still commit the files repaired before the interruption.
             "remapped_files": [str(unreleased)],
             # Pre-scrub remote snapshot (lease expectations for pushes)
             "remote_refs": {
@@ -644,7 +719,7 @@ class TestResumeFromScrubResult:
         # run() calls: git/safegit only (gh calls go through run_gh)
         def run_effect(cmd, args=None, **kw):
             if cmd == "safegit" and args == ["--version"]:
-                return "safegit 0.21.1"
+                return "safegit 0.22.0"
             if cmd == "git" and args and args[:2] == ["rev-parse", "HEAD"]:
                 return saved_head
             return ""
@@ -726,8 +801,10 @@ class TestResumeFromScrubResult:
 
 
 class TestReleasableDirsRemapped:
-    """Monorepo scrub must remap .rlsbl-monorepo/releasables/*/changes/, not
-    just per-project .rlsbl/changes/."""
+    """Monorepo scrub must cover .rlsbl-monorepo/releasables/*/changes/ AND
+    per-project .rlsbl/changes/ via the --remap-shas-in globs handed to
+    safegit -- the in-history remap replaced rlsbl's own worktree remap, so
+    rlsbl itself must leave the JSONL files untouched."""
 
     @patch(f"{MOD}.release_lock")
     @patch(f"{MOD}.acquire_lock")
@@ -772,10 +849,14 @@ class TestReleasableDirsRemapped:
             "old_head": "old_hash_1",
             "new_head": "new_hash_1",
         })
+
+        scrub_args = []
+
         def run_effect(cmd, args=None, **kw):
             if cmd == "safegit" and args == ["--version"]:
-                return "safegit 0.21.1"
+                return "safegit 0.22.0"
             if cmd == "safegit" and args and args[0] == "scrub":
+                scrub_args.extend(args)
                 return safegit_result
             return ""
 
@@ -789,11 +870,22 @@ class TestReleasableDirsRemapped:
         with patch(f"{MOD}.validate_all_hashes_resolve", return_value={}):
             run_cmd(flags, ctx=ctx)
 
-        # Both trees remapped
+        # Both trees covered by the globs handed to safegit: the wildcard
+        # releasable glob plus the exact per-project glob.
+        globs = [
+            scrub_args[i + 1]
+            for i, a in enumerate(scrub_args) if a == "--remap-shas-in"
+        ]
+        assert ".rlsbl-monorepo/releasables/*/changes/*.jsonl" in globs
+        assert "packages/alpha/.rlsbl/changes/*.jsonl" in globs
+
+        # rlsbl no longer rewrites the JSONL files itself: safegit's
+        # in-history remap already produced consistent worktree content
+        # (mocked here, so the files simply stay untouched).
         proj_entries = parse_jsonl(str(proj_changes / "unreleased.jsonl"))
-        assert proj_entries[0].commits == ["new_hash_1"]
+        assert proj_entries[0].commits == ["old_hash_1"]
         rel_entries = parse_jsonl(str(rel_changes / "unreleased.jsonl"))
-        assert rel_entries[0].commits == ["new_hash_2"]
+        assert rel_entries[0].commits == ["old_hash_2"]
 
 
 # ===========================================================================
@@ -835,7 +927,7 @@ class TestPushMechanics:
         def run_effect(cmd, args=None, **kw):
             calls.append((cmd, list(args or []), kw))
             if cmd == "safegit" and args == ["--version"]:
-                return "safegit 0.21.1"
+                return "safegit 0.22.0"
             if cmd == "git" and args and args[0] == "ls-remote":
                 return ls_remote_out
             if cmd == "safegit" and args and args[0] == "scrub":
@@ -948,7 +1040,7 @@ class TestPushMechanics:
         def run_effect(cmd, args=None, **kw):
             calls.append((cmd, list(args or []), kw))
             if cmd == "safegit" and args == ["--version"]:
-                return "safegit 0.21.1"
+                return "safegit 0.22.0"
             if cmd == "git" and args and args[0] == "ls-remote":
                 return ls_remote_out
             if cmd == "safegit" and args and args[0] == "scrub":
@@ -1073,7 +1165,7 @@ class TestScrubArchiveCommitted:
 
         def run_effect(cmd, args=None, **kw):
             if cmd == "safegit" and args == ["--version"]:
-                return "safegit 0.21.1"
+                return "safegit 0.22.0"
             if cmd == "safegit" and args and args[0] == "scrub":
                 return safegit_result
             return ""
@@ -1148,9 +1240,11 @@ class TestPostRemapValidationGate:
             "new_head": "new_hash_1",
         })
         mock_run.side_effect = [
-            "safegit 0.21.1",  # safegit --version
+            "safegit 0.22.0",  # safegit --version
             "",                # git ls-remote origin (pre-scrub snapshot)
             safegit_result,    # safegit scrub
+            # git rev-parse --git-dir (journal lookup; no journal there)
+            str(tmp_path / "no-such-gitdir"),
         ]
 
         flags = {
@@ -1200,7 +1294,7 @@ class TestPostRemapValidationGate:
 
         def run_effect(cmd, args=None, **kw):
             if cmd == "safegit" and args == ["--version"]:
-                return "safegit 0.21.1"
+                return "safegit 0.22.0"
             if cmd == "safegit" and args and args[0] == "scrub":
                 return safegit_result
             return ""
@@ -1219,16 +1313,68 @@ class TestPostRemapValidationGate:
 
 
 # ===========================================================================
-# Remap report surfacing: unmapped/ambiguous hashes are printed loudly
+# Journal recovery: the persisted rewrite journal repairs dangling hashes
 # ===========================================================================
 
 
-class TestRemapReportSurfacing:
-    """remap_jsonl_hashes reports unmapped and ambiguous hashes per file;
-    the scrub flow must SURFACE them (counts + per-file hash lists) before
-    the validation gate instead of silently discarding the report. The
-    gate only catches hashes that stopped resolving -- an unmapped hash
-    that still resolves (e.g. untouched history) must still be shown."""
+OLD_SHA = "1" * 40
+NEW_SHA = "2" * 40
+
+
+def _journal_records(rid, commit_map, *, complete=True, op="scrub-match"):
+    recs = [
+        {"phase": "start", "id": rid, "op": op, "reason": "r",
+         "created_at": "2026-07-03T00:00:00Z", "old_head": OLD_SHA,
+         "commit_map": commit_map, "pre_rewrite_remotes": {}},
+        {"phase": "refs", "id": rid,
+         "created_at": "2026-07-03T00:00:01Z", "tag_rewrites": []},
+    ]
+    if complete:
+        recs.append({"phase": "complete", "id": rid,
+                     "created_at": "2026-07-03T00:00:02Z",
+                     "new_head": NEW_SHA, "cleanup_ok": True,
+                     "cleanup_errors": []})
+    return recs
+
+
+class TestJournalRecovery:
+    """When validation finds dangling hashes AND safegit's persisted rewrite
+    journal (.git/safegit/rewrite-maps.jsonl) can fix them, the retained
+    remap utility repairs the working-tree JSONL -- the explicit fallback
+    for a scrub that ran without --remap-shas-in (older orchestrator, or a
+    direct orchestrated scrub) or was interrupted before rlsbl's steps."""
+
+    def _setup(self, tmp_path, journal_groups):
+        changes_dir = tmp_path / ".rlsbl" / "changes"
+        changes_dir.mkdir(parents=True)
+        unreleased = changes_dir / "unreleased.jsonl"
+        _write_entries(str(unreleased), [
+            ChangelogEntry(commits=[OLD_SHA], user_facing=False),
+        ])
+
+        gitdir = tmp_path / "gitdir"
+        (gitdir / "safegit").mkdir(parents=True)
+        if journal_groups is not None:
+            lines = [json.dumps(rec) for group in journal_groups for rec in group]
+            (gitdir / "safegit" / "rewrite-maps.jsonl").write_text(
+                "\n".join(lines) + "\n"
+            )
+
+        safegit_result = json.dumps({
+            "rewrites": {OLD_SHA: NEW_SHA}, "tags": [],
+            "old_head": OLD_SHA, "new_head": NEW_SHA,
+        })
+
+        def run_effect(cmd, args=None, **kw):
+            if cmd == "safegit" and args == ["--version"]:
+                return "safegit 0.22.0"
+            if cmd == "safegit" and args and args[0] == "scrub":
+                return safegit_result
+            if cmd == "git" and args == ["rev-parse", "--git-dir"]:
+                return str(gitdir)
+            return ""
+
+        return unreleased, run_effect
 
     def _flags(self):
         return {
@@ -1236,15 +1382,6 @@ class TestRemapReportSurfacing:
             "entire-history": True, "yes": True,
         }
 
-    def _run_effect(self, safegit_result):
-        def run_effect(cmd, args=None, **kw):
-            if cmd == "safegit" and args == ["--version"]:
-                return "safegit 0.21.1"
-            if cmd == "safegit" and args and args[0] == "scrub":
-                return safegit_result
-            return ""
-        return run_effect
-
     @patch(f"{MOD}.release_lock")
     @patch(f"{MOD}.acquire_lock")
     @patch(f"{MOD}.check_gh_auth", return_value=False)
@@ -1254,40 +1391,39 @@ class TestRemapReportSurfacing:
     @patch(f"{MOD}.generate_changelog")
     @patch(f"{MOD}.require_tool")
     @patch(f"{MOD}.run")
-    def test_unmapped_but_resolving_hash_is_surfaced(
+    def test_journal_fixes_dangling_hashes(
         self, mock_run, _req_tool, _gen_cl, _push_timeout, _get_branch,
         _gh_installed, _gh_auth, _acquire_lock, _release_lock,
         tmp_path, capsys,
     ):
-        changes_dir = tmp_path / ".rlsbl" / "changes"
-        changes_dir.mkdir(parents=True)
+        unreleased, run_effect = self._setup(
+            tmp_path, [_journal_records("id-1", {OLD_SHA: NEW_SHA})],
+        )
+        mock_run.side_effect = run_effect
 
-        # This hash is NOT in the rewrites map but still resolves (the
-        # validation gate passes) -- it must be named in the output anyway.
-        untouched = "cafebabecafebabecafebabecafebabecafebabe"
-        mapped = "1111111111111111111111111111111111111111"
-        unreleased = changes_dir / "unreleased.jsonl"
-        _write_entries(str(unreleased), [
-            ChangelogEntry(commits=[mapped], user_facing=False),
-            ChangelogEntry(commits=[untouched], user_facing=False),
-        ])
-
-        safegit_result = json.dumps({
-            "rewrites": {mapped: "2" * 40}, "tags": [],
-            "old_head": mapped, "new_head": "2" * 40,
-        })
-        mock_run.side_effect = self._run_effect(safegit_result)
-
-        with patch(f"{MOD}.validate_all_hashes_resolve", return_value={}):
+        # First validation: dangling; after the journal repair: clean.
+        with patch(
+            f"{MOD}.validate_all_hashes_resolve",
+            side_effect=[{str(unreleased): [OLD_SHA]}, {}],
+        ):
             run_cmd(self._flags(), ctx=_ctx(str(tmp_path)))
 
-        out = capsys.readouterr()
-        combined = out.out + out.err
-        assert untouched in combined, (
-            "unmapped hashes must be surfaced after the remap step"
-        )
+        entries = parse_jsonl(str(unreleased))
+        assert entries[0].commits == [NEW_SHA]
+
+        # Loud about what it did
+        combined = capsys.readouterr()
+        combined = combined.out + combined.err
+        assert "rewrite journal" in combined
         assert str(unreleased) in combined
-        assert "unmapped" in combined.lower()
+
+        # The repaired file is part of the scrub commit
+        commit_calls = [
+            c for c in mock_run.call_args_list
+            if c[0][0] == "safegit" and (c[0][1] or [])[:1] == ["commit"]
+        ]
+        assert len(commit_calls) == 1
+        assert str(unreleased) in commit_calls[0][0][1]
 
     @patch(f"{MOD}.release_lock")
     @patch(f"{MOD}.acquire_lock")
@@ -1298,38 +1434,293 @@ class TestRemapReportSurfacing:
     @patch(f"{MOD}.generate_changelog")
     @patch(f"{MOD}.require_tool")
     @patch(f"{MOD}.run")
-    def test_ambiguous_abbreviated_hash_is_surfaced(
+    def test_crashed_rewrite_group_is_surfaced_loudly(
         self, mock_run, _req_tool, _gen_cl, _push_timeout, _get_branch,
         _gh_installed, _gh_auth, _acquire_lock, _release_lock,
         tmp_path, capsys,
     ):
-        changes_dir = tmp_path / ".rlsbl" / "changes"
-        changes_dir.mkdir(parents=True)
+        """A start-without-complete group means the rewrite CRASHED. The
+        start record was persisted before any refs moved, so its map is
+        still used -- but the crash must be surfaced loudly."""
+        unreleased, run_effect = self._setup(
+            tmp_path,
+            [_journal_records("id-1", {OLD_SHA: NEW_SHA}, complete=False)],
+        )
+        mock_run.side_effect = run_effect
 
-        # Abbreviated hash matching TWO rewrite keys -> ambiguous.
-        ambiguous_abbrev = "abcd12"
+        with patch(
+            f"{MOD}.validate_all_hashes_resolve",
+            side_effect=[{str(unreleased): [OLD_SHA]}, {}],
+        ):
+            run_cmd(self._flags(), ctx=_ctx(str(tmp_path)))
+
+        assert parse_jsonl(str(unreleased))[0].commits == [NEW_SHA]
+        err = capsys.readouterr().err
+        assert "CRASHED" in err
+        assert "complete" in err
+
+    @patch(f"{MOD}.release_lock")
+    @patch(f"{MOD}.acquire_lock")
+    @patch(f"{MOD}.check_gh_auth", return_value=False)
+    @patch(f"{MOD}.check_gh_installed", return_value=False)
+    @patch(f"{MOD}.get_current_branch", return_value="main")
+    @patch(f"{MOD}.get_push_timeout", return_value=120)
+    @patch(f"{MOD}.generate_changelog")
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_last_journal_group_wins(
+        self, mock_run, _req_tool, _gen_cl, _push_timeout, _get_branch,
+        _gh_installed, _gh_auth, _acquire_lock, _release_lock, tmp_path,
+    ):
+        """Multiple rewrite ids in the journal: the LAST start record's
+        group provides the map."""
+        stale_new = "3" * 40
+        unreleased, run_effect = self._setup(
+            tmp_path,
+            [
+                _journal_records("id-old", {OLD_SHA: stale_new}),
+                _journal_records("id-new", {OLD_SHA: NEW_SHA}),
+            ],
+        )
+        mock_run.side_effect = run_effect
+
+        with patch(
+            f"{MOD}.validate_all_hashes_resolve",
+            side_effect=[{str(unreleased): [OLD_SHA]}, {}],
+        ):
+            run_cmd(self._flags(), ctx=_ctx(str(tmp_path)))
+
+        assert parse_jsonl(str(unreleased))[0].commits == [NEW_SHA]
+
+    @patch(f"{MOD}.release_lock")
+    @patch(f"{MOD}.acquire_lock")
+    @patch(f"{MOD}.get_current_branch", return_value="main")
+    @patch(f"{MOD}.get_push_timeout", return_value=120)
+    @patch(f"{MOD}.generate_changelog")
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_no_journal_hard_error(
+        self, mock_run, _req_tool, _gen_cl, _push_timeout, _get_branch,
+        _acquire_lock, _release_lock, tmp_path, capsys,
+    ):
+        unreleased, run_effect = self._setup(tmp_path, None)
+        mock_run.side_effect = run_effect
+
+        with patch(
+            f"{MOD}.validate_all_hashes_resolve",
+            return_value={str(unreleased): [OLD_SHA]},
+        ):
+            with pytest.raises(SystemExit) as exc_info:
+                run_cmd(self._flags(), ctx=_ctx(str(tmp_path)))
+        assert exc_info.value.code == 1
+
+        # Untouched file, resume intact, hash surfaced
+        assert parse_jsonl(str(unreleased))[0].commits == [OLD_SHA]
+        assert (tmp_path / ".rlsbl" / "releases" / "scrub-result.json").exists()
+        assert OLD_SHA in capsys.readouterr().err
+
+    @patch(f"{MOD}.release_lock")
+    @patch(f"{MOD}.acquire_lock")
+    @patch(f"{MOD}.get_current_branch", return_value="main")
+    @patch(f"{MOD}.get_push_timeout", return_value=120)
+    @patch(f"{MOD}.generate_changelog")
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_unfixable_dangles_hard_error_without_mutation(
+        self, mock_run, _req_tool, _gen_cl, _push_timeout, _get_branch,
+        _acquire_lock, _release_lock, tmp_path, capsys,
+    ):
+        """A journal whose map cannot fix ANY dangling hash must not touch
+        any file -- straight to the hard error."""
+        other = "f" * 40
+        unreleased, run_effect = self._setup(
+            tmp_path, [_journal_records("id-1", {other: NEW_SHA})],
+        )
+        mock_run.side_effect = run_effect
+
+        with patch(
+            f"{MOD}.validate_all_hashes_resolve",
+            return_value={str(unreleased): [OLD_SHA]},
+        ):
+            with pytest.raises(SystemExit) as exc_info:
+                run_cmd(self._flags(), ctx=_ctx(str(tmp_path)))
+        assert exc_info.value.code == 1
+        assert parse_jsonl(str(unreleased))[0].commits == [OLD_SHA]
+        assert OLD_SHA in capsys.readouterr().err
+
+    @patch(f"{MOD}.release_lock")
+    @patch(f"{MOD}.acquire_lock")
+    @patch(f"{MOD}.get_current_branch", return_value="main")
+    @patch(f"{MOD}.get_push_timeout", return_value=120)
+    @patch(f"{MOD}.generate_changelog")
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_ambiguous_abbreviated_hash_not_fixable(
+        self, mock_run, _req_tool, _gen_cl, _push_timeout, _get_branch,
+        _acquire_lock, _release_lock, tmp_path, capsys,
+    ):
+        """An abbreviated hash matching TWO journal keys is ambiguous: the
+        recovery must refuse to guess and hard-error with the hash named."""
+        ambiguous = "abcd12"
         key_a = "abcd12" + "a" * 34
         key_b = "abcd12" + "b" * 34
+
+        changes_dir = tmp_path / ".rlsbl" / "changes"
+        changes_dir.mkdir(parents=True)
         unreleased = changes_dir / "unreleased.jsonl"
         _write_entries(str(unreleased), [
-            ChangelogEntry(commits=[ambiguous_abbrev], user_facing=False),
+            ChangelogEntry(commits=[ambiguous], user_facing=False),
         ])
+
+        gitdir = tmp_path / "gitdir"
+        (gitdir / "safegit").mkdir(parents=True)
+        lines = [
+            json.dumps(rec)
+            for rec in _journal_records(
+                "id-1", {key_a: "3" * 40, key_b: "4" * 40},
+            )
+        ]
+        (gitdir / "safegit" / "rewrite-maps.jsonl").write_text(
+            "\n".join(lines) + "\n"
+        )
 
         safegit_result = json.dumps({
             "rewrites": {key_a: "3" * 40, key_b: "4" * 40}, "tags": [],
             "old_head": key_a, "new_head": "3" * 40,
         })
-        mock_run.side_effect = self._run_effect(safegit_result)
+
+        def run_effect(cmd, args=None, **kw):
+            if cmd == "safegit" and args == ["--version"]:
+                return "safegit 0.22.0"
+            if cmd == "safegit" and args and args[0] == "scrub":
+                return safegit_result
+            if cmd == "git" and args == ["rev-parse", "--git-dir"]:
+                return str(gitdir)
+            return ""
+
+        mock_run.side_effect = run_effect
+
+        with patch(
+            f"{MOD}.validate_all_hashes_resolve",
+            return_value={str(unreleased): [ambiguous]},
+        ):
+            with pytest.raises(SystemExit) as exc_info:
+                run_cmd(self._flags(), ctx=_ctx(str(tmp_path)))
+        assert exc_info.value.code == 1
+        assert parse_jsonl(str(unreleased))[0].commits == [ambiguous]
+        assert ambiguous in capsys.readouterr().err
+
+
+# ===========================================================================
+# CHANGELOG step: regenerate-and-assert-unchanged
+# ===========================================================================
+
+
+class TestChangelogRegenerateUnchanged:
+    """With in-history remap, HEAD's JSONL is already consistent, so the
+    CHANGELOG step regenerates and asserts the output is byte-identical to
+    disk. A diff is a hard error (something else is wrong): the diff is
+    shown, the on-disk originals are restored, and resume state is kept."""
+
+    def _flags(self):
+        return {
+            "pattern": "secret", "replace": "XXX", "reason": "r",
+            "entire-history": True, "yes": True,
+        }
+
+    def _run_effect(self):
+        safegit_result = json.dumps({
+            "rewrites": {"1" * 40: "2" * 40}, "tags": [],
+            "old_head": "1" * 40, "new_head": "2" * 40,
+        })
+
+        def run_effect(cmd, args=None, **kw):
+            if cmd == "safegit" and args == ["--version"]:
+                return "safegit 0.22.0"
+            if cmd == "safegit" and args and args[0] == "scrub":
+                return safegit_result
+            return ""
+
+        return run_effect
+
+    @patch(f"{MOD}.release_lock")
+    @patch(f"{MOD}.acquire_lock")
+    @patch(f"{MOD}.get_current_branch", return_value="main")
+    @patch(f"{MOD}.get_push_timeout", return_value=120)
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_diff_is_hard_error_with_diff_shown_and_originals_restored(
+        self, mock_run, _req_tool, _push_timeout, _get_branch,
+        _acquire_lock, _release_lock, tmp_path, capsys,
+    ):
+        # Real generation (NOT mocked): the on-disk stub cannot match the
+        # generated content, so the step must abort.
+        changes_dir = tmp_path / ".rlsbl" / "changes"
+        changes_dir.mkdir(parents=True)
+        _write_entries(str(changes_dir / "unreleased.jsonl"), [
+            ChangelogEntry(commits=["2" * 40], user_facing=True,
+                           description="Thing", type="feature"),
+        ])
+        stale_content = "# Hand-written stale changelog\n"
+        (tmp_path / "CHANGELOG.md").write_text(stale_content)
+
+        mock_run.side_effect = self._run_effect()
+
+        with patch(f"{MOD}.validate_all_hashes_resolve", return_value={}):
+            with pytest.raises(SystemExit) as exc_info:
+                run_cmd(self._flags(), ctx=_ctx(str(tmp_path)))
+        assert exc_info.value.code == 1
+
+        # On-disk original restored byte-for-byte
+        assert (tmp_path / "CHANGELOG.md").read_text() == stale_content
+
+        # Diff shown, resume intact, no commit happened
+        err = capsys.readouterr().err
+        assert "differs" in err
+        assert "Hand-written stale changelog" in err
+        assert "regenerated" in err
+        assert (tmp_path / ".rlsbl" / "releases" / "scrub-result.json").exists()
+        for c in mock_run.call_args_list:
+            if c[0][0] == "safegit":
+                assert "commit" not in (c[0][1] or [])
+
+    @patch(f"{MOD}.release_lock")
+    @patch(f"{MOD}.acquire_lock")
+    @patch(f"{MOD}.check_gh_auth", return_value=False)
+    @patch(f"{MOD}.check_gh_installed", return_value=False)
+    @patch(f"{MOD}.get_current_branch", return_value="main")
+    @patch(f"{MOD}.get_push_timeout", return_value=120)
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_identical_regeneration_passes_and_commits_nothing_extra(
+        self, mock_run, _req_tool, _push_timeout, _get_branch,
+        _gh_installed, _gh_auth, _acquire_lock, _release_lock, tmp_path,
+    ):
+        from rlsbl.changelog.generate import generate_changelog as real_gen
+
+        changes_dir = tmp_path / ".rlsbl" / "changes"
+        changes_dir.mkdir(parents=True)
+        _write_entries(str(changes_dir / "unreleased.jsonl"), [
+            ChangelogEntry(commits=["2" * 40], user_facing=True,
+                           description="Thing", type="feature"),
+        ])
+        # Pre-generate so disk matches regeneration exactly.
+        real_gen(str(tmp_path))
+        original = (tmp_path / "CHANGELOG.md").read_text()
+
+        mock_run.side_effect = self._run_effect()
 
         with patch(f"{MOD}.validate_all_hashes_resolve", return_value={}):
             run_cmd(self._flags(), ctx=_ctx(str(tmp_path)))
 
-        out = capsys.readouterr()
-        combined = out.out + out.err
-        assert ambiguous_abbrev in combined, (
-            "ambiguous abbreviated hashes must be surfaced after the remap step"
-        )
-        assert "ambiguous" in combined.lower()
+        # Unchanged on disk; CHANGELOG.md NOT part of the scrub commit
+        assert (tmp_path / "CHANGELOG.md").read_text() == original
+        commit_calls = [
+            c for c in mock_run.call_args_list
+            if c[0][0] == "safegit" and (c[0][1] or [])[:1] == ["commit"]
+        ]
+        assert len(commit_calls) == 1
+        assert str(tmp_path / "CHANGELOG.md") not in commit_calls[0][0][1]
 
 
 # ===========================================================================
@@ -1354,7 +1745,7 @@ class TestNoMatchesExitsCleanly:
         })
 
         mock_run.side_effect = [
-            "safegit 0.21.1",  # safegit --version
+            "safegit 0.22.0",  # safegit --version
             "",                # git ls-remote origin (pre-scrub snapshot)
             safegit_result,    # safegit scrub match --json ...
         ]
@@ -1454,7 +1845,7 @@ class TestMonorepoTagCorrectProject:
         })
 
         mock_run.side_effect = [
-            "safegit 0.21.1",       # safegit --version
+            "safegit 0.22.0",       # safegit --version
             "",                      # git ls-remote origin (snapshot)
             safegit_result,          # safegit scrub
             "",                      # safegit commit (archive)
@@ -1565,7 +1956,7 @@ class TestStandaloneTagNoPrefix:
         })
 
         mock_run.side_effect = [
-            "safegit 0.21.1",       # safegit --version
+            "safegit 0.22.0",       # safegit --version
             "",                      # git ls-remote origin (snapshot)
             safegit_result,          # safegit scrub
             "",                      # safegit commit (archive)

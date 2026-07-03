@@ -452,7 +452,7 @@ class TestScrubStateRelocation:
             with (
                 patch(f"{mod}.require_tool"),
                 patch(f"{mod}.run", MagicMock(
-                    side_effect=["safegit 0.21.1", "different_sha"],
+                    side_effect=["safegit 0.22.0", "different_sha"],
                 )),
             ):
                 scrub_run_cmd(flags, ctx=_make_ctx(core, tmp_project))
