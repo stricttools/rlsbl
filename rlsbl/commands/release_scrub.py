@@ -429,9 +429,45 @@ def run_cmd(flags, *, ctx):
     try:
         # -- Remap JSONL hashes --
         if "JSONL_REMAPPED" not in completed:
+            all_unmapped: dict[str, list[str]] = {}
+            all_ambiguous: dict[str, list[str]] = {}
             for changes_dir in all_changes_dirs:
                 report = remap_jsonl_hashes(changes_dir, rewrites)
                 all_remap_results.extend(report.results)
+                all_unmapped.update(report.unmapped)
+                all_ambiguous.update(report.ambiguous)
+
+            # Surface hashes the remap could NOT handle -- BEFORE the
+            # validation gate. The gate only catches hashes that stopped
+            # resolving; an unmapped hash that still resolves (untouched
+            # history) or an ambiguous abbreviated hash silently kept
+            # as-is would otherwise never be seen by anyone.
+            if all_unmapped or all_ambiguous:
+                n_unmapped = sum(len(v) for v in all_unmapped.values())
+                n_ambiguous = sum(len(v) for v in all_ambiguous.values())
+                print(
+                    f"Warning: JSONL remap left {n_unmapped} unmapped "
+                    f"hash(es) and {n_ambiguous} ambiguous abbreviated "
+                    f"hash(es) unchanged:",
+                    file=sys.stderr,
+                )
+                for filepath in sorted(all_unmapped):
+                    print(
+                        f"  unmapped   {filepath}: "
+                        f"{', '.join(all_unmapped[filepath])}",
+                        file=sys.stderr,
+                    )
+                for filepath in sorted(all_ambiguous):
+                    print(
+                        f"  ambiguous  {filepath}: "
+                        f"{', '.join(all_ambiguous[filepath])}",
+                        file=sys.stderr,
+                    )
+                print(
+                    "  These entries were left as-is; the post-remap "
+                    "validation gate verifies they still resolve.",
+                    file=sys.stderr,
+                )
 
             # Persist the modified paths so a resumed run can still commit
             # files remapped before an interruption.

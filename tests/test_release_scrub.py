@@ -1139,6 +1139,120 @@ class TestPostRemapValidationGate:
 
 
 # ===========================================================================
+# Remap report surfacing: unmapped/ambiguous hashes are printed loudly
+# ===========================================================================
+
+
+class TestRemapReportSurfacing:
+    """remap_jsonl_hashes reports unmapped and ambiguous hashes per file;
+    the scrub flow must SURFACE them (counts + per-file hash lists) before
+    the validation gate instead of silently discarding the report. The
+    gate only catches hashes that stopped resolving -- an unmapped hash
+    that still resolves (e.g. untouched history) must still be shown."""
+
+    def _flags(self):
+        return {
+            "pattern": "secret", "replace": "XXX", "reason": "r",
+            "entire-history": True, "yes": True,
+        }
+
+    def _run_effect(self, safegit_result):
+        def run_effect(cmd, args=None, **kw):
+            if cmd == "safegit" and args == ["--version"]:
+                return "safegit 0.21.1"
+            if cmd == "safegit" and args and args[0] == "scrub":
+                return safegit_result
+            return ""
+        return run_effect
+
+    @patch(f"{MOD}.release_lock")
+    @patch(f"{MOD}.acquire_lock")
+    @patch(f"{MOD}.check_gh_auth", return_value=False)
+    @patch(f"{MOD}.check_gh_installed", return_value=False)
+    @patch(f"{MOD}.get_current_branch", return_value="main")
+    @patch(f"{MOD}.get_push_timeout", return_value=120)
+    @patch(f"{MOD}.generate_changelog")
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_unmapped_but_resolving_hash_is_surfaced(
+        self, mock_run, _req_tool, _gen_cl, _push_timeout, _get_branch,
+        _gh_installed, _gh_auth, _acquire_lock, _release_lock,
+        tmp_path, capsys,
+    ):
+        changes_dir = tmp_path / ".rlsbl" / "changes"
+        changes_dir.mkdir(parents=True)
+
+        # This hash is NOT in the rewrites map but still resolves (the
+        # validation gate passes) -- it must be named in the output anyway.
+        untouched = "cafebabecafebabecafebabecafebabecafebabe"
+        mapped = "1111111111111111111111111111111111111111"
+        unreleased = changes_dir / "unreleased.jsonl"
+        _write_entries(str(unreleased), [
+            ChangelogEntry(commits=[mapped], user_facing=False),
+            ChangelogEntry(commits=[untouched], user_facing=False),
+        ])
+
+        safegit_result = json.dumps({
+            "rewrites": {mapped: "2" * 40}, "tags": [],
+            "old_head": mapped, "new_head": "2" * 40,
+        })
+        mock_run.side_effect = self._run_effect(safegit_result)
+
+        with patch(f"{MOD}.validate_all_hashes_resolve", return_value={}):
+            run_cmd(self._flags(), ctx=_ctx(str(tmp_path)))
+
+        out = capsys.readouterr()
+        combined = out.out + out.err
+        assert untouched in combined, (
+            "unmapped hashes must be surfaced after the remap step"
+        )
+        assert str(unreleased) in combined
+        assert "unmapped" in combined.lower()
+
+    @patch(f"{MOD}.release_lock")
+    @patch(f"{MOD}.acquire_lock")
+    @patch(f"{MOD}.check_gh_auth", return_value=False)
+    @patch(f"{MOD}.check_gh_installed", return_value=False)
+    @patch(f"{MOD}.get_current_branch", return_value="main")
+    @patch(f"{MOD}.get_push_timeout", return_value=120)
+    @patch(f"{MOD}.generate_changelog")
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_ambiguous_abbreviated_hash_is_surfaced(
+        self, mock_run, _req_tool, _gen_cl, _push_timeout, _get_branch,
+        _gh_installed, _gh_auth, _acquire_lock, _release_lock,
+        tmp_path, capsys,
+    ):
+        changes_dir = tmp_path / ".rlsbl" / "changes"
+        changes_dir.mkdir(parents=True)
+
+        # Abbreviated hash matching TWO rewrite keys -> ambiguous.
+        ambiguous_abbrev = "abcd12"
+        key_a = "abcd12" + "a" * 34
+        key_b = "abcd12" + "b" * 34
+        unreleased = changes_dir / "unreleased.jsonl"
+        _write_entries(str(unreleased), [
+            ChangelogEntry(commits=[ambiguous_abbrev], user_facing=False),
+        ])
+
+        safegit_result = json.dumps({
+            "rewrites": {key_a: "3" * 40, key_b: "4" * 40}, "tags": [],
+            "old_head": key_a, "new_head": "3" * 40,
+        })
+        mock_run.side_effect = self._run_effect(safegit_result)
+
+        with patch(f"{MOD}.validate_all_hashes_resolve", return_value={}):
+            run_cmd(self._flags(), ctx=_ctx(str(tmp_path)))
+
+        out = capsys.readouterr()
+        combined = out.out + out.err
+        assert ambiguous_abbrev in combined, (
+            "ambiguous abbreviated hashes must be surfaced after the remap step"
+        )
+        assert "ambiguous" in combined.lower()
+
+
+# ===========================================================================
 # Test 8: no matches exits cleanly
 # ===========================================================================
 
