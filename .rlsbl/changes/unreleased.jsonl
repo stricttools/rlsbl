@@ -60,3 +60,4 @@
 {"commits":["56b83c3c7cae0b3ab9cbac3b5cec8a87bb228fce"],"user_facing":true,"description":"**Fix.** `rlsbl monorepo status` no longer shows \"no changelog\" for releasable member packages \u2014 the Unreleased column now reads the releasable-level CHANGELOG.md.","type":"fix"}
 {"commits":["507d79900f6b60a65f20a0b09d68401f544e0427"],"user_facing":false}
 {"commits":["99ab1ceb8c91ec25d2861970b8b2ce72cd52d048"],"user_facing":true,"description":"**Fix.** `rlsbl release retry` for releasable members now keeps `retry.toml` under the releasable's releases directory instead of the member package's `.rlsbl/releases/`.","type":"fix"}
+{"commits":["a27a7982b41d2334edf77103942238dba029a33b"],"user_facing":false}
