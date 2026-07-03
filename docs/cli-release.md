@@ -89,16 +89,17 @@ Mark a past release as deprecated (soft yank) or delete it (hard yank). Soft yan
 
 ## release scrub
 
-Scrub sensitive content from git history and update release metadata to match the rewritten commits. Wraps safegit scrub (match or file mode), remaps commit hashes in all JSONL changelog files, regenerates CHANGELOG.md, force-pushes the rewritten history, and recreates GitHub Releases on the new tags. A scrub-result.json file records the SHA mapping for recovery if any post-rewrite step fails.
+Scrub sensitive content from git history and update release metadata to match the rewritten commits. Wraps safegit scrub in one of three modes: match (--pattern with --replace or --mangle), file (--file, which replaces the file throughout history with its current on-disk content or removes it if absent; requires --from-commit), or recipe (--recipe, a scrub recipe TOML executed via safegit scrub run). Afterwards remaps commit hashes in all JSONL changelog files, regenerates CHANGELOG.md, force-pushes the rewritten history, and recreates GitHub Releases on the new tags. A scrub-result.json file records the SHA mapping for recovery if any post-rewrite step fails.
 
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
+| `--replace` |  | str |  |  | Match mode: literal text to substitute for each match (mutually exclusive with --mangle) |
+| `--mangle` |  | bool |  |  | Match mode: replace matched content with random ASCII of same length (mutually exclusive with --replace) |
 | `--reason` |  | str |  |  | Reason for scrubbing (required, used in commit message) |
-| `--pattern` |  | str |  |  | Regex pattern to match against file contents (mutually exclusive with --file) |
-| `--file` |  | str |  |  | Path to the file to remove from git history (mutually exclusive with --pattern) |
-| `--replace` |  | str |  |  | Literal text to substitute for each match (mutually exclusive with --mangle) |
-| `--mangle` |  | bool |  |  | Replace matched content with random ASCII of same length |
+| `--pattern` |  | str |  |  | Match mode: regex pattern to match against file contents (mutually exclusive with --file and --recipe) |
+| `--file` |  | str |  |  | File mode: path of the file to rewrite throughout history; it is replaced with its current on-disk content, or removed if absent (mutually exclusive with --pattern and --recipe; requires --from-commit) |
+| `--recipe` |  | str |  |  | Recipe mode: path to a scrub recipe TOML file executed via safegit scrub run; per-operation pattern/replace/mangle live inside the recipe (mutually exclusive with --pattern and --file) |
 | `--from-commit` |  | str |  |  | SHA of the earliest commit to rewrite (all descendants are also rewritten) |
-| `--entire-history` |  | bool |  |  | Rewrite every commit in the repository from the initial commit onward |
+| `--entire-history` |  | bool |  |  | Rewrite every commit in the repository from the initial commit onward (match and recipe modes only; file mode requires --from-commit) |
