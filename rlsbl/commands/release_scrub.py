@@ -437,6 +437,73 @@ def _recover_from_rewrite_journal(all_changes_dirs, failures, scrub_data):
     return True
 
 
+def _require_cleanup_ok(scrub_data, scrub_result_path):
+    """Hard gate on safegit's machine-readable post-rewrite cleanup status.
+
+    The hash validation gate silently DEPENDS on old objects being pruned:
+    a dangling changelog hash is only detectable because the pre-rewrite
+    object is gone. When safegit reports ``cleanup_ok: false`` the old
+    objects may still resolve, validation would falsely pass, and the flow
+    would push a repository whose next prune breaks the changelog -- so the
+    scrub stops here, BEFORE the commit step, with resume state intact.
+
+    Remediation re-check: on a resumed run after the operator completed the
+    prune manually, the recorded flag is stale. The gate re-checks REALITY
+    (does any pre-rewrite object still exist?) and proceeds -- updating the
+    persisted state -- when the prune is confirmed done.
+    """
+    if scrub_data.get("cleanup_ok") is not False:
+        return
+
+    old_shas = [
+        old for old, new in scrub_data.get("rewrites", {}).items()
+        if old != new
+    ]
+    old_head = scrub_data.get("old_head")
+    if old_head and old_head not in old_shas:
+        old_shas.append(old_head)
+
+    still_present = []
+    for sha in old_shas:
+        try:
+            run("git", ["cat-file", "-e", sha])
+        except Exception:
+            continue
+        still_present.append(sha)
+
+    if not still_present:
+        print(
+            "Note: safegit reported a failed post-rewrite cleanup, but no "
+            "pre-rewrite object resolves any more -- the prune has been "
+            "completed since. Continuing."
+        )
+        scrub_data["cleanup_ok"] = True
+        tmp = scrub_result_path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(scrub_data, f, indent=2)
+        os.replace(tmp, scrub_result_path)
+        return
+
+    print(
+        "Error: safegit reported cleanup_ok=false -- the post-rewrite "
+        "cleanup (reflog expire / repack / prune) did not fully succeed:",
+        file=sys.stderr,
+    )
+    for err in scrub_data.get("cleanup_errors") or []:
+        print(f"  - {err}", file=sys.stderr)
+    print(
+        f"  {len(still_present)} pre-rewrite object(s) still present "
+        f"(e.g. {still_present[0][:12]}).\n"
+        f"The changelog hash validation depends on old objects being "
+        f"pruned, so continuing would be unsafe. Investigate the errors "
+        f"above, complete the prune (e.g. `git reflog expire --expire=now "
+        f"--all && git gc --prune=now`), and re-run this command to "
+        f"resume; {scrub_result_path} is kept.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+
 def _read_file_bytes(path):
     """File content as bytes, or None when the file does not exist."""
     if not os.path.exists(path):
@@ -676,6 +743,11 @@ def run_cmd(flags, *, ctx):
     )
 
     try:
+        # -- Cleanup gate: the validation below is only meaningful when the
+        # pre-rewrite objects were actually pruned. Not a recorded step: it
+        # re-runs on every resume until cleanup is confirmed done. --
+        _require_cleanup_ok(scrub_data, scrub_result_path)
+
         # -- Validation gate (in-history remap makes a worktree remap
         # unnecessary: safegit's --remap-shas-in already rewrote the JSONL
         # hashes at every commit, and Finalize synced the worktree) --

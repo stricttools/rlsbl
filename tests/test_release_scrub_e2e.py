@@ -661,3 +661,55 @@ class TestChangelogDiffAbortsE2E:
         assert "scrub:" not in _git(repo, "log", "--format=%s")
         assert _remote_ref(repo, "refs/heads/main") == old_remote_head
         assert (repo / ".rlsbl" / "releases" / "scrub-result.json").exists()
+
+
+# ===========================================================================
+# cleanup_ok=false abort: real repo, old objects still present
+# ===========================================================================
+
+
+class TestCleanupOkAbortE2E:
+    def test_cleanup_failed_state_aborts_resume(
+        self, e2e_env, monkeypatch, capsys,
+    ):
+        """A resume state carrying cleanup_ok=false, in a repo where the
+        recorded pre-rewrite object genuinely still resolves, must abort
+        before any commit with the cleanup errors and remediation shown."""
+        repo = e2e_env / "repo"
+        _init_repo(repo)
+        c_old = _commit_file(repo, "a.txt", "one\n", "first")
+        c_new = _commit_file(repo, "b.txt", "two\n", "second")
+        _add_remote(repo, e2e_env / "remote")
+
+        releases = repo / ".rlsbl" / "releases"
+        releases.mkdir(parents=True)
+        (releases / "scrub-result.json").write_text(json.dumps({
+            "rewrites": {c_old: c_new},
+            "tags": [],
+            "old_head": c_old,
+            "new_head": c_new,
+            "cleanup_ok": False,
+            "cleanup_errors": ["pruning objects: exit status 1"],
+            "completed_steps": [],
+            "remote_refs": {},
+        }))
+
+        monkeypatch.chdir(repo)
+        ctx = ProjectContext(project_root=repo, workspace_root=None, config={})
+        flags = {
+            "pattern": SECRET, "replace": REPLACEMENT,
+            "reason": "cleanup", "entire-history": True, "yes": True,
+        }
+        with patch(f"{MOD}.check_gh_installed", return_value=False):
+            with pytest.raises(SystemExit) as exc_info:
+                run_cmd(flags, ctx=ctx)
+        assert exc_info.value.code == 1
+
+        err = capsys.readouterr().err
+        assert "cleanup_ok" in err
+        assert "pruning objects: exit status 1" in err
+        assert "prune" in err
+
+        # No scrub commit; resume state intact for the remediated re-run.
+        assert "scrub:" not in _git(repo, "log", "--format=%s")
+        assert (releases / "scrub-result.json").exists()

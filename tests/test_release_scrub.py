@@ -1612,6 +1612,126 @@ class TestJournalRecovery:
 
 
 # ===========================================================================
+# cleanup_ok consumption: validation depends on old objects being pruned
+# ===========================================================================
+
+
+class TestCleanupOkGate:
+    """safegit 0.22.0 reports cleanup_ok/cleanup_errors. rlsbl's hash
+    validation gate silently DEPENDS on old objects being pruned (dangling
+    old hashes are only detectable because the objects are gone), so
+    cleanup_ok=false is a hard error BEFORE the commit step -- with the
+    cleanup errors and remediation printed, and resume state intact."""
+
+    OLD = "a" * 40
+    NEW = "b" * 40
+
+    def _flags(self):
+        return {
+            "pattern": "secret", "replace": "XXX", "reason": "r",
+            "entire-history": True, "yes": True,
+        }
+
+    def _safegit_result(self):
+        return json.dumps({
+            "rewrites": {self.OLD: self.NEW}, "tags": [],
+            "old_head": self.OLD, "new_head": self.NEW,
+            "cleanup_ok": False,
+            "cleanup_errors": ["expiring reflogs: exit status 1"],
+        })
+
+    @patch(f"{MOD}.release_lock")
+    @patch(f"{MOD}.acquire_lock")
+    @patch(f"{MOD}.get_current_branch", return_value="main")
+    @patch(f"{MOD}.get_push_timeout", return_value=120)
+    @patch(f"{MOD}.generate_changelog")
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_cleanup_failed_aborts_before_commit(
+        self, mock_run, _req_tool, _gen_cl, _push_timeout, _get_branch,
+        _acquire_lock, _release_lock, tmp_path, capsys,
+    ):
+        changes_dir = tmp_path / ".rlsbl" / "changes"
+        changes_dir.mkdir(parents=True)
+        (changes_dir / "unreleased.jsonl").write_text("")
+
+        safegit_result = self._safegit_result()
+
+        def run_effect(cmd, args=None, **kw):
+            if cmd == "safegit" and args == ["--version"]:
+                return "safegit 0.22.0"
+            if cmd == "safegit" and args and args[0] == "scrub":
+                return safegit_result
+            # git cat-file -e <old-sha> succeeds: the object still exists,
+            # so the prune really is incomplete.
+            return ""
+
+        mock_run.side_effect = run_effect
+
+        with patch(f"{MOD}.validate_all_hashes_resolve", return_value={}) as gate:
+            with pytest.raises(SystemExit) as exc_info:
+                run_cmd(self._flags(), ctx=_ctx(str(tmp_path)))
+        assert exc_info.value.code == 1
+
+        # The gate fires BEFORE validation (which would falsely pass while
+        # old objects still resolve) and BEFORE any commit.
+        gate.assert_not_called()
+        for c in mock_run.call_args_list:
+            if c[0][0] == "safegit":
+                assert "commit" not in (c[0][1] or [])
+
+        err = capsys.readouterr().err
+        assert "cleanup_ok" in err
+        assert "expiring reflogs: exit status 1" in err
+        assert "prune" in err
+
+        # Resume state intact
+        assert (tmp_path / ".rlsbl" / "releases" / "scrub-result.json").exists()
+
+    @patch(f"{MOD}.release_lock")
+    @patch(f"{MOD}.acquire_lock")
+    @patch(f"{MOD}.check_gh_auth", return_value=False)
+    @patch(f"{MOD}.check_gh_installed", return_value=False)
+    @patch(f"{MOD}.get_current_branch", return_value="main")
+    @patch(f"{MOD}.get_push_timeout", return_value=120)
+    @patch(f"{MOD}.generate_changelog")
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_cleanup_failed_but_objects_pruned_proceeds(
+        self, mock_run, _req_tool, _gen_cl, _push_timeout, _get_branch,
+        _gh_installed, _gh_auth, _acquire_lock, _release_lock,
+        tmp_path, capsys,
+    ):
+        """Remediation path: the recorded cleanup_ok=false is stale because
+        the operator completed the prune since. The gate re-checks REALITY
+        (no pre-rewrite object resolves any more) and proceeds."""
+        changes_dir = tmp_path / ".rlsbl" / "changes"
+        changes_dir.mkdir(parents=True)
+        (changes_dir / "unreleased.jsonl").write_text("")
+
+        safegit_result = self._safegit_result()
+
+        def run_effect(cmd, args=None, **kw):
+            if cmd == "safegit" and args == ["--version"]:
+                return "safegit 0.22.0"
+            if cmd == "safegit" and args and args[0] == "scrub":
+                return safegit_result
+            if cmd == "git" and args and args[:2] == ["cat-file", "-e"]:
+                raise Exception("object missing")
+            return ""
+
+        mock_run.side_effect = run_effect
+
+        with patch(f"{MOD}.validate_all_hashes_resolve", return_value={}):
+            run_cmd(self._flags(), ctx=_ctx(str(tmp_path)))
+
+        out = capsys.readouterr().out
+        assert "prune has been completed" in out
+        # Flow completed: state cleared
+        assert not (tmp_path / ".rlsbl" / "releases" / "scrub-result.json").exists()
+
+
+# ===========================================================================
 # CHANGELOG step: regenerate-and-assert-unchanged
 # ===========================================================================
 
