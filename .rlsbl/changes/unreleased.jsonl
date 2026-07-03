@@ -19,3 +19,4 @@
 {"commits":["2eba8d11bfde783b0bf025d965befa9bf1630aeb"],"user_facing":false}
 {"commits":["8df0c83add76950f1d1fe3c11a2dd06aa378d125"],"user_facing":false}
 {"commits":["35ecdd97e3954094d85d20466df99b0fd005277a"],"user_facing":false}
+{"commits":["db2329981ba4bd29ebc76e94fbba04e6e7dac935","b7a471a5a8acad33e50af5eabb7693ef5b6d8e2d"],"user_facing":true,"description":"**`--watch-async` releases without blocking on CI.** `release run`, `release resume`, `release retry`, and `monorepo release run` now accept `--watch-async` (mutually exclusive with `--watch`; exactly one of the pair is required) to spawn a detached background watcher and return immediately. The watcher logs to `.rlsbl/watch-<sha>.log.local-only`, keeps auto-retry, publish audit, and desktop notifications working, and refuses to double-spawn for the same commit. `--no-watch-async` is equivalent to `--no-watch`.","type":"feature"}
