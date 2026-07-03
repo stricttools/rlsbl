@@ -1601,13 +1601,36 @@ def _run_release_mutating(state: ReleaseState):
     # deploy / post-hooks / snapshot failures are non-fatal (recorded and
     # loudly reported, then the release completes and state is cleared).
 
-    # Upload release assets for pipelines with assets/custom_assets config
+    # Upload release assets for pipelines with assets/custom_assets config.
+    # In releasable mode, iterate each non-private publishing member and
+    # upload assets from each member's directory with member-prefixed names.
     if release_created:
         if "ASSETS_UPLOADED" in _completed:
             log("Skipping asset upload (already done)")
         else:
             try:
-                upload_release_assets(tag, new_version, log, flags, ctx=ctx)
+                if releasable_name and member_package_paths and monorepo_root:
+                    from ...member_context import resolve_member_context as _rmc_asset
+                    from .publish import _upload_assets_for_config
+
+                    for _a_pkg_path in member_package_paths:
+                        _a_abs_pkg = os.path.join(str(monorepo_root), _a_pkg_path)
+                        if not os.path.isdir(_a_abs_pkg):
+                            continue
+                        _a_member = _rmc_asset(
+                            _a_abs_pkg, releasable_config_dir=_releasable_cfg_dir,
+                        )
+                        if _a_member.is_private:
+                            continue
+                        # Use the member name (last path component) as prefix
+                        _a_member_name = os.path.basename(_a_pkg_path.rstrip("/"))
+                        _upload_assets_for_config(
+                            tag, new_version, log, flags,
+                            _a_member.config, _a_abs_pkg, ctx,
+                            member_name=_a_member_name,
+                        )
+                else:
+                    upload_release_assets(tag, new_version, log, flags, ctx=ctx)
             except (ReleaseValidationError, HookError) as e:
                 from ...errors import PostReleaseError
                 save_step_failure(_state_path, "ASSETS_UPLOADED", str(e))

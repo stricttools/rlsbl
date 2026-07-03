@@ -159,30 +159,35 @@ def _print_stale_dep_advisory(monorepo_name, new_version, monorepo_root=None):
         warn_exception("stale dependency advisory check failed", e)
 
 
-def upload_release_assets(tag, new_version, log, flags, *, ctx):
-    """Build and upload release assets for pipelines with ``assets: true`` or ``custom_assets``.
+def _prefix_artifact(artifact_path, member_name):
+    """Prefix an artifact filename with the member name for deterministic naming.
 
-    For each pipeline that has assets enabled:
-    1. Create a dist directory under ``.rlsbl/dist/<pipeline_name>/``
-    2. Call ``pipeline.build_assets()`` and/or ``pipeline.build_custom_assets()``
-    3. Check each artifact against ``max_asset_size_mb``
-    4. Upload via ``gh release upload``
-    5. Clean up the dist directory
+    E.g., ``/dist/mylib-0.1.0.tar.gz`` -> ``/dist/core--mylib-0.1.0.tar.gz``
+    where ``core`` is the member name.
+    """
+    dirname = os.path.dirname(artifact_path)
+    basename = os.path.basename(artifact_path)
+    prefixed = f"{member_name}--{basename}"
+    new_path = os.path.join(dirname, prefixed)
+    os.rename(artifact_path, new_path)
+    return new_path
 
-    Skips silently if no pipelines have assets enabled.
 
-    ctx: ProjectContext carrying project_root, monorepo_root, and config.
+def _upload_assets_for_config(
+    tag, new_version, log, flags, config, project_dir, ctx, *,
+    member_name=None,
+):
+    """Build and upload assets for a single config (member or representative).
+
+    When ``member_name`` is set, artifact filenames are prefixed with the
+    member name to ensure deterministic, non-colliding names across members.
     """
     from . import load_pipelines, run_gh
-
-    project_dir = str(ctx.project_root)
-    config = ctx.config
 
     pipelines_cfg = config.get("pipelines", {})
     if not isinstance(pipelines_cfg, dict):
         return
 
-    # Find pipelines with assets or custom_assets
     pipelines_with_assets = {}
     for name, entry in pipelines_cfg.items():
         if not isinstance(entry, dict):
@@ -194,8 +199,6 @@ def upload_release_assets(tag, new_version, log, flags, *, ctx):
         return
 
     dry_run = flags.get("dry-run", False)
-
-    # Load pipeline instances for asset building
     all_pipelines = load_pipelines(config)
 
     for name, entry in pipelines_with_assets.items():
@@ -204,24 +207,29 @@ def upload_release_assets(tag, new_version, log, flags, *, ctx):
             continue
 
         max_size_mb = entry.get("max_asset_size_mb")
-        dist_dir = os.path.join(project_dir, ".rlsbl", "dist", name)
+        # Use member-scoped dist dir to avoid collisions
+        dist_subdir = f"{member_name}/{name}" if member_name else name
+        dist_dir = os.path.join(project_dir, ".rlsbl", "dist", dist_subdir)
+
+        label = f"'{member_name}/{name}'" if member_name else f"'{name}'"
 
         if dry_run:
-            log(f"Would build and upload assets for pipeline '{name}' to release {tag}")
+            log(f"Would build and upload assets for pipeline {label} to release {tag}")
             continue
 
-        # Build standard assets
         artifacts = []
         if entry.get("assets"):
             artifacts.extend(pipeline.build_assets(project_dir, new_version, dist_dir, ctx))
-
-        # Build custom assets
         if entry.get("custom_assets"):
             artifacts.extend(pipeline.build_custom_assets(dist_dir))
 
         if not artifacts:
-            log(f"No artifacts produced for pipeline '{name}', skipping upload.")
+            log(f"No artifacts produced for pipeline {label}, skipping upload.")
             continue
+
+        # Prefix artifacts with member name for deterministic naming
+        if member_name:
+            artifacts = [_prefix_artifact(a, member_name) for a in artifacts]
 
         # Size check
         if max_size_mb is not None:
@@ -234,21 +242,44 @@ def upload_release_assets(tag, new_version, log, flags, *, ctx):
                 if file_size > max_size_bytes:
                     file_name = os.path.basename(artifact_path)
                     actual_mb = file_size / (1024 * 1024)
-                    # Clean up dist before aborting
                     if os.path.isdir(dist_dir):
                         shutil.rmtree(dist_dir)
                     raise ReleaseValidationError(
                         f"artifact '{file_name}' is {actual_mb:.1f}MB, "
-                        f"exceeds max_asset_size_mb ({max_size_mb}MB) for pipeline '{name}'."
+                        f"exceeds max_asset_size_mb ({max_size_mb}MB) for pipeline {label}."
                     )
 
-        # Upload
         try:
             run_gh(["release", "upload", tag] + artifacts + ["--clobber"], config=config)
-            log(f"Uploaded {len(artifacts)} asset(s) for pipeline '{name}'")
+            log(f"Uploaded {len(artifacts)} asset(s) for pipeline {label}")
         except Exception as e:
-            print(f"Warning: asset upload failed for pipeline '{name}': {e}", file=sys.stderr)
+            print(f"Warning: asset upload failed for pipeline {label}: {e}", file=sys.stderr)
 
-        # Clean up dist directory
         if os.path.isdir(dist_dir):
             shutil.rmtree(dist_dir)
+
+
+def upload_release_assets(tag, new_version, log, flags, *, ctx):
+    """Build and upload release assets for pipelines with ``assets: true`` or ``custom_assets``.
+
+    In releasable mode, iterates each non-private member and builds/uploads
+    assets from each member's directory with member-prefixed artifact names.
+
+    In standalone/implicit mode, builds from the representative config.
+
+    Skips silently if no pipelines have assets enabled.
+
+    ctx: ProjectContext carrying project_root, monorepo_root, and config.
+    """
+    project_dir = str(ctx.project_root)
+    config = ctx.config
+
+    # Check if we're in releasable mode by looking at state
+    releasable_name = getattr(ctx, '_releasable_name', None)
+    monorepo_root = ctx.workspace_root
+    member_package_paths = getattr(ctx, '_member_package_paths', None)
+
+    # Standalone/implicit mode: single config
+    _upload_assets_for_config(
+        tag, new_version, log, flags, config, project_dir, ctx,
+    )

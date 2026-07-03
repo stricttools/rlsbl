@@ -47,7 +47,7 @@ from ...utils import (
     run_gh,
 )
 from .rollback import _cleanup_release_artifacts
-from .publish import _run_selfdoc_post_generate, _print_stale_dep_advisory, upload_release_assets
+from .publish import _run_selfdoc_post_generate, _print_stale_dep_advisory, upload_release_assets, _upload_assets_for_config
 from .validate import (
     parse_porcelain_paths,
     _run_selfdoc_gen, _run_selfdoc_check, _abort_on_scaffold_conflicts,
