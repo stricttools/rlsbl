@@ -637,7 +637,7 @@
     },
     "changelog": {
       "name": "changelog",
-      "help": "Structured changelog management using JSONL entries. Add and generate CHANGELOG.md from per-commit changelog entries stored in unreleased.jsonl for precise, auditable release notes.",
+      "help": "Structured changelog management using JSONL entries with 3 entry types (feature, fix, breaking). Add and generate CHANGELOG.md from per-commit changelog entries stored in unreleased.jsonl for precise, auditable release notes.",
       "commands": {
         "add": {
           "name": "add",
@@ -796,7 +796,7 @@
         },
         "add": {
           "name": "add",
-          "help": "Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Optionally set a display name, target registry for publishing, glob patterns for change detection, a subtree remote URL for split publishing, inter-project dependencies, and a library flag to mark shared code packages.",
+          "help": "Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Supports 6 optional settings: display name, target registry, glob patterns for change detection, subtree remote URL, inter-project dependencies, and a library flag to mark shared code packages.",
           "flags": [
             {
               "name": "name",
