@@ -12,3 +12,4 @@
 {"commits":["05b95b2cd3ffb6c5cbcfd3dc5eefa4ff1672bb42"],"user_facing":true,"description":"**`rlsbl watch` publish-workflow audit works from subdirectories.** The audit now looks for `.github/workflows` at the git repo root instead of the current directory, so watching from a monorepo package directory no longer falsely warns that a publish workflow is missing.","type":"fix"}
 {"commits":["77b1359a7d7d2cb75a07042fc04e331ace4933db"],"user_facing":false}
 {"commits":["db2329981ba4bd29ebc76e94fbba04e6e7dac935"],"user_facing":false}
+{"commits":["2e1abcd33702648aaf2bc906322b88594ac64de2"],"user_facing":true,"description":"**`rlsbl watch --stop [sha]` stops a detached background watcher.** With a SHA it stops that watcher; without one it stops the single live watcher or lists candidates. Sends SIGTERM, escalates to SIGKILL after 5s, and cleans up stale pidfiles left by dead watchers.","type":"feature"}
