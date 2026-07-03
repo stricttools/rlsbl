@@ -1039,7 +1039,20 @@ mono = app.group("monorepo", help="Manage monorepo workspaces with multiple inde
 @mono.command(name="init", help="Create a new monorepo workspace by generating the .rlsbl-monorepo directory and an empty workspace.toml configuration file at the current directory. This must be run at the repository root before adding individual projects with the add subcommand. Each workspace tracks multiple independently-versioned projects that share a single git repository.")
 @strictcli.flag(name="auto-commit", type=bool, default=True, help="Auto-commit workspace.toml after creating it")
 def cmd_mono_init(auto_commit, **_kwargs):
-    root = _require_project_root()
+    # monorepo init does NOT require a pre-existing .rlsbl/ marker --
+    # it bootstraps a fresh workspace. Resolve to CWD instead of
+    # _require_project_root(), but refuse if CWD is inside an existing
+    # workspace (which would create a nested workspace).
+    from .workspace import find_workspace_root
+    root = Path.cwd()
+    existing_ws = find_workspace_root(str(root))
+    if existing_ws is not None:
+        print(
+            f"Error: CWD is inside an existing workspace at {existing_ws}. "
+            f"Cannot create a nested workspace.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     from .commands.monorepo import _cmd_init
     _cmd_init({"auto-commit": auto_commit}, project_root=root)
 
