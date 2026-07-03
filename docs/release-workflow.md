@@ -8,7 +8,7 @@ description: "Complete reference for the rlsbl release flow — prerequisites, p
 
 `rlsbl release run` orchestrates the full release lifecycle: validates the project state, bumps the version, runs quality checks, commits, tags, pushes, creates a GitHub Release, finalizes the changelog, and optionally watches CI. The entire flow is driven by a release file (`.rlsbl/releases/unreleased.toml`) that declares the bump type, description, and optional context.
 
-Releases are atomic — if any step fails, the release aborts without leaving partial state. Use `rlsbl release undo` to revert a release that succeeded locally but failed in CI.
+Validation failures abort with no partial state left behind. Once the mutating phase starts, every step records a success or failure marker in an in-progress state file: a fatal failure preserves the state so `rlsbl release resume` can continue from where the release stopped, and non-fatal failures are recorded and loudly named in the completion summary while the release completes (see "Resumable release state" below). Use `rlsbl release undo` to revert a release that succeeded locally but failed in CI.
 
 ## Prerequisites
 
@@ -126,7 +126,7 @@ Three shell scripts in `.rlsbl/hooks/` provide extension points at different sta
 | --- | --- | --- | --- | --- |
 | `pre-checks.sh` | 5 | User-owned | No (created once, never touched again) | Non-zero aborts release |
 | `pre-release.sh` | 11 | Scaffold-managed | Yes | Non-zero aborts release |
-| `post-release.sh` | 17 | Scaffold-managed | Yes | Non-fatal (release continues) |
+| `post-release.sh` | 19 | Scaffold-managed | Yes | Non-fatal (release continues) |
 
 ### Hooks override
 
@@ -201,12 +201,12 @@ The command:
 
 Flags: `--pattern` or `--file` (what to scrub), `--replace` or `--mangle` (replacement strategy), `--reason` (required, appears in commit message), `--from` or `--entire-history` (scope).
 
-Error recovery: if the command fails partway, `.rlsbl/releases/scrub-result.json` preserves the safegit output. Re-running the command resumes from the last completed step without re-running safegit.
+Error recovery: if the command fails partway, `scrub-result.json` preserves the safegit output at `.rlsbl/releases/scrub-result.json` (for releasable releases: `.rlsbl-monorepo/releasables/<name>/releases/scrub-result.json`). Re-running the command resumes from the last completed step without re-running safegit.
 
 Requires safegit 0.18.0+ (for --json output).
 
 ## Source reference
 
-The release workflow is implemented in the `rlsbl.commands.release` module, which orchestrates the full 17-step release pipeline from validation through GitHub Release creation. This module coordinates version bumping, JSONL finalization, git operations, and hook execution.
+The release workflow is implemented in the `rlsbl.commands.release` module, which orchestrates the full release pipeline (see the step table above) from validation through GitHub Release creation and the post-release phase. This module coordinates version bumping, JSONL finalization, git operations, and hook execution.
 
 :-: ref path="rlsbl.commands.release"
