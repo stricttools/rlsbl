@@ -2,6 +2,7 @@
 
 import json
 import os
+import subprocess
 import time
 
 import pytest
@@ -461,3 +462,45 @@ class TestRenderCommentedSection:
         assert '# description = ""' in result
         assert '# context = ""' in result
         assert "# exclude = []" in result
+
+
+class TestBatchReleaseInitAutoCommit:
+    """monorepo release init auto-commits the scaffolded file."""
+
+    def test_auto_commits_batch_release_file(self, mock_git_repo):
+        """After monorepo release init, the scaffolded file is committed to git."""
+        make_workspace(mock_git_repo, [
+            {"path": "pkg-a", "name": "pkg-a"},
+        ])
+
+        pkg_a = mock_git_repo / "pkg-a"
+        pkg_a.mkdir()
+        (pkg_a / "package.json").write_text(
+            json.dumps({"name": "pkg-a", "version": "1.0.0"}) + "\n"
+        )
+
+        run_git(mock_git_repo, "add", ".")
+        run_git(mock_git_repo, "commit", "-q", "-m", "add workspace")
+
+        _cmd_batch_release_init(project_root=mock_git_repo)
+
+        batch_path = get_batch_release_file_path(str(mock_git_repo))
+        assert os.path.exists(batch_path)
+
+        # The file must be tracked (committed), not just on disk
+        result = subprocess.run(
+            ["git", "ls-files", batch_path],
+            cwd=str(mock_git_repo),
+            capture_output=True, text=True,
+        )
+        assert result.stdout.strip(), \
+            "monorepo release init should auto-commit the scaffolded file"
+
+        # Working tree should be clean for this file
+        status = subprocess.run(
+            ["git", "status", "--porcelain", "--", batch_path],
+            cwd=str(mock_git_repo),
+            capture_output=True, text=True,
+        )
+        assert status.stdout.strip() == "", \
+            f"batch release file should be clean after auto-commit, got: {status.stdout}"

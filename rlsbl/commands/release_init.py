@@ -3,6 +3,8 @@
 import os
 import sys
 
+from ..utils import commit_files
+
 
 def run_cmd(project_root):
     """Create .rlsbl/releases/unreleased.toml with auto-detected targets.
@@ -90,5 +92,7 @@ def run_cmd(project_root):
 
     with open(release_path, "w", encoding="utf-8") as f:
         tomlkit.dump(doc, f)
+
+    commit_files("release: scaffold unreleased.toml", [release_path], allow_failure=True)
 
     print(release_path)

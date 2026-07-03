@@ -1,6 +1,7 @@
 """Tests for the release-init command."""
 
 import os
+import subprocess
 from unittest.mock import patch
 
 import pytest
@@ -254,6 +255,51 @@ class TestReleaseInitNoTargets:
     def test_errors_with_no_targets(self, tmp_path, monkeypatch):
         with pytest.raises(SystemExit):
             _run_release_init(tmp_path, [], monkeypatch)
+
+
+class TestReleaseInitAutoCommit:
+    """release init auto-commits the scaffolded file."""
+
+    def _init_git_repo(self, path):
+        """Initialize a git repo with an initial commit."""
+        subprocess.run(["git", "init", "-q", "-b", "main"], cwd=str(path), check=True)
+        subprocess.run(["git", "config", "user.email", "test@test.local"], cwd=str(path), check=True)
+        subprocess.run(["git", "config", "user.name", "Test"], cwd=str(path), check=True)
+        readme = path / "README.md"
+        readme.write_text("# test\n")
+        subprocess.run(["git", "add", "README.md"], cwd=str(path), check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "initial"], cwd=str(path), check=True)
+
+    def _is_tracked(self, repo_path, file_path):
+        """Check if a file is tracked (committed) in git."""
+        result = subprocess.run(
+            ["git", "ls-files", str(file_path)],
+            cwd=str(repo_path),
+            capture_output=True, text=True,
+        )
+        return bool(result.stdout.strip())
+
+    def test_standalone_auto_commits(self, tmp_path, monkeypatch):
+        """After release init, the scaffolded file is committed to git."""
+        self._init_git_repo(tmp_path)
+
+        entries = [TargetEntry(name="pypi", path=str(tmp_path))]
+        _run_release_init(tmp_path, entries, monkeypatch)
+
+        release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
+        assert release_path.exists()
+
+        # The file must be tracked (committed), not just on disk
+        assert self._is_tracked(tmp_path, release_path), \
+            "release init should auto-commit the scaffolded file"
+
+        # Working tree should be clean for this file
+        status = subprocess.run(
+            ["git", "status", "--porcelain", "--", str(release_path)],
+            cwd=str(tmp_path), capture_output=True, text=True,
+        )
+        assert status.stdout.strip() == "", \
+            f"release file should be clean after auto-commit, got: {status.stdout}"
 
 
 class TestReleaseInitMonorepo:
