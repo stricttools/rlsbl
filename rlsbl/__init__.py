@@ -803,12 +803,19 @@ def cmd_discover(mine, **_kwargs):
 @strictcli.flag(name="target", type=str, help="Registry whose CI workflow to watch (auto-detected if omitted)", default="")
 @strictcli.flag(name="run-id", type=str, help="GitHub Actions workflow run ID to poll directly instead of searching by SHA", repeatable=True, unique=True)
 @strictcli.flag(name="as-daemon-child", type=bool, negatable=False, default=False, help="Internal: run as the detached watcher child spawned by --watch-async (fire-and-forget notifications, pidfile cleanup on exit). Not intended for direct use.")
+@strictcli.flag(name="stop", type=bool, negatable=False, default=False, help="Stop a running detached watcher started with --watch-async. With a SHA, stops that watcher; without, stops the single live watcher (errors and lists candidates when several are live).")
 @strictcli.arg(name="sha", help="Git commit SHA whose CI workflows to monitor (defaults to HEAD if omitted)", required=False)
-def cmd_watch(target, run_id, as_daemon_child, sha=None, **_kwargs):
+def cmd_watch(target, run_id, as_daemon_child, stop, sha=None, **_kwargs):
     if sha and run_id:
         print("Error: cannot use both SHA and --run-id", file=sys.stderr)
         sys.exit(1)
-    flags = {"run-id": run_id or [], "as-daemon-child": as_daemon_child}
+    if stop and run_id:
+        print("Error: cannot use both --stop and --run-id", file=sys.stderr)
+        sys.exit(1)
+    if stop and as_daemon_child:
+        print("Error: cannot use both --stop and --as-daemon-child", file=sys.stderr)
+        sys.exit(1)
+    flags = {"run-id": run_id or [], "as-daemon-child": as_daemon_child, "stop": stop}
     args = [sha] if sha else []
     from .commands.watch import run_cmd
     run_cmd(target or None, args, flags)

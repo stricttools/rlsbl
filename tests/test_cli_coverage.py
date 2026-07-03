@@ -526,18 +526,20 @@ class TestCmdDiscover:
 class TestCmdWatch:
     def test_sha_and_run_id_mutual_exclusion(self):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_watch(target="", run_id=["123"], as_daemon_child=False, sha="abc")
+            rlsbl.cmd_watch(target="", run_id=["123"], as_daemon_child=False,
+                            stop=False, sha="abc")
         assert exc.value.code == 1
 
     @patch("rlsbl.commands.watch.run_cmd")
     def test_sha_only(self, mock_run):
-        rlsbl.cmd_watch(target="npm", run_id=[], as_daemon_child=False, sha="abc123")
+        rlsbl.cmd_watch(target="npm", run_id=[], as_daemon_child=False,
+                        stop=False, sha="abc123")
         mock_run.assert_called_once()
         assert mock_run.call_args[0][1] == ["abc123"]
 
     @patch("rlsbl.commands.watch.run_cmd")
     def test_no_args_uses_head(self, mock_run):
-        rlsbl.cmd_watch(target="", run_id=[], as_daemon_child=False)
+        rlsbl.cmd_watch(target="", run_id=[], as_daemon_child=False, stop=False)
         mock_run.assert_called_once()
         assert mock_run.call_args[0][1] == []
 

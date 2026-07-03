@@ -4,6 +4,7 @@ import atexit
 import glob
 import json
 import os
+import signal
 import subprocess
 import sys
 import threading
@@ -487,6 +488,98 @@ def spawn_detached_watcher(commit_sha, run_ids=None):
     return {"pid": proc.pid, "pidfile": pidfile, "logfile": logfile}
 
 
+def _sha12_from_pidfile(path):
+    """Extract the 12-char SHA prefix from a watch-<sha12>.pid.local-only name."""
+    name = os.path.basename(path)
+    return name[len("watch-"):-len(".pid.local-only")]
+
+
+def _stop_one(pidfile, sha12):
+    """Stop the watcher recorded in pidfile: SIGTERM, wait up to 5s, SIGKILL.
+
+    A dead PID (stale pidfile) is reported and cleaned. The pidfile is
+    always removed (SIGTERM'd children never reach their atexit cleanup).
+    """
+    pid = _read_pidfile(pidfile)
+    if pid is None or not _pid_alive(pid):
+        try:
+            os.remove(pidfile)
+        except OSError:
+            pass
+        print(f"rlsbl: watcher for {sha12} was not running (stale pidfile removed)")
+        return
+
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        if not _pid_alive(pid):
+            break
+        time.sleep(0.1)
+    if _pid_alive(pid):
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        print(f"rlsbl: watcher for {sha12} (pid {pid}) did not exit on SIGTERM; killed")
+    else:
+        print(f"rlsbl: stopped watcher for {sha12} (pid {pid})")
+    try:
+        os.remove(pidfile)
+    except OSError:
+        pass
+
+
+def stop_watcher(sha_arg):
+    """Stop a detached watcher. Always exits the process.
+
+    With sha_arg: stops the watcher for that commit (error if none exists).
+    Without: stale pidfiles are cleaned first; then stops the single live
+    watcher, or errors listing the candidates when several are live.
+    """
+    if sha_arg:
+        try:
+            full_sha = run("git", ["rev-parse", sha_arg])
+        except Exception:
+            full_sha = sha_arg
+        sha12 = full_sha[:12]
+        pidfile = _pidfile_path(full_sha)
+        if not os.path.exists(pidfile):
+            print(f"Error: no detached watcher found for {sha12}.", file=sys.stderr)
+            sys.exit(1)
+        _stop_one(pidfile, sha12)
+        sys.exit(0)
+
+    live = []
+    pattern = os.path.join(_watch_state_dir(), "watch-*.pid.local-only")
+    for path in sorted(glob.glob(pattern)):
+        sha12 = _sha12_from_pidfile(path)
+        pid = _read_pidfile(path)
+        if pid is None or not _pid_alive(pid):
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+            print(f"rlsbl: removed stale pidfile for {sha12}", file=sys.stderr)
+            continue
+        live.append((path, sha12, pid))
+
+    if not live:
+        print("Error: no live detached watchers found.", file=sys.stderr)
+        sys.exit(1)
+    if len(live) > 1:
+        print("Error: multiple live detached watchers; specify the SHA:", file=sys.stderr)
+        for _path, sha12, pid in live:
+            print(f"  rlsbl watch --stop {sha12}    (pid {pid})", file=sys.stderr)
+        sys.exit(1)
+
+    path, sha12, _pid = live[0]
+    _stop_one(path, sha12)
+    sys.exit(0)
+
+
 def run_cmd(registry, args, flags):
     """Watch all CI runs for a commit until they complete.
 
@@ -494,6 +587,10 @@ def run_cmd(registry, args, flags):
            rlsbl watch --run-id <id> [--run-id <id2>]
     Defaults to HEAD if no commit SHA is provided.
     """
+    if flags.get("stop"):
+        # Stop mode needs no gh/repo resolution; handle it first.
+        stop_watcher(args[0] if args else None)
+
     if flags.get("as-daemon-child"):
         # Running as the detached watcher child: notifications must not
         # block waiting for a click, and the pidfile written by the spawner
