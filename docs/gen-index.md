@@ -37,6 +37,7 @@ order: 90
 - [rlsbl.commands.commit_cmd](rlsbl-commands-commit_cmd.html)
 - [rlsbl.commands.deploy_cmd](rlsbl-commands-deploy_cmd.html)
 - [rlsbl.commands.dev](rlsbl-commands-dev.html)
+- [rlsbl.commands.dev_sync](rlsbl-commands-dev_sync.html)
 - [rlsbl.commands.discover](rlsbl-commands-discover.html)
 - [rlsbl.commands.edit_release](rlsbl-commands-edit_release.html)
 - [rlsbl.commands.init_cmd](rlsbl-commands-init_cmd.html)

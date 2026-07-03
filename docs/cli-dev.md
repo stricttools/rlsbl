@@ -25,3 +25,7 @@ Install the project locally for development using the detected target's editable
 | `--uninstall` |  | bool |  |  | Reverse a previous dev install (where supported by the target) |
 | `--global` |  | bool |  |  | Install as a global tool/symlink. This is the default behavior when neither --global nor --venv is passed. Mutually exclusive with --venv. |
 | `--venv` |  | bool |  |  | Install into the project's local environment only (e.g. uv sync, npm install). Mutually exclusive with --global. |
+
+## dev sync
+
+Overlay local editable checkouts of sibling projects onto this project's locked environment, driven by a git-invisible dev-sources.toml.local-only file at the project root (one [[overlay]] block with 'package' and 'path' per checkout). Runs a single 'uv sync --inexact' excluding every overlaid package, then 'uv pip install -e <path>' per entry, so the locked registry wheels never clobber the local checkouts and no [tool.uv.sources] path dependency ever needs to be committed. Requires UV_NO_SYNC=1 in the environment (a bare 'uv run' would otherwise auto-sync and silently wipe the overlays); a bare 'uv sync' still reverts overlays harmlessly -- re-run this command to restore them. In monorepo mode, run it from within a sub-project.
