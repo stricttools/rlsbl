@@ -237,7 +237,7 @@ release_group = app.group("release", help="Release orchestration commands. Provi
 )
 @strictcli.flag(name="allow-dirty", type=bool, help="Skip the clean working tree check and allow releasing with uncommitted changes")
 @strictcli.flag(name="bump", type=str, help="Bump type: patch, minor, major, hotfix, prerelease. Skips the release file.", default="")
-@strictcli.flag(name="description", type=str, help="Release description (required with --bump)", default="")
+@strictcli.flag(name="description", type=str, help="Short release description summarizing the changes (required with --bump)", default="")
 @strictcli.flag(name="preid", type=str, help="Pre-release identifier: alpha, beta, rc, stable. Only valid with --bump.", default="")
 def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, watch_async, bump, description, preid, **_kwargs):
     root = _require_sub_project_root(
@@ -1090,7 +1090,7 @@ def cmd_chlog_amend(version, commits, description, type, user_facing, validate_h
 @strictcli.flag(name="type", type=str, help="New type value (feature, fix, breaking); also disambiguates multi-entry commits", default="")
 @strictcli.flag(name="description", type=str, help="Replacement description text for the matched changelog entry", default="")
 @strictcli.flag(name="user-facing", type=bool, default=None, help="Set user_facing status on the matched entry (--user-facing to set true, --no-user-facing to set false)")
-@strictcli.flag(name="auto-commit", type=bool, default=True, help="Auto-commit the edited JSONL file")
+@strictcli.flag(name="auto-commit", type=bool, default=True, help="Automatically commit the edited JSONL changelog file to git after modification")
 def cmd_chlog_edit(commits, type, description, user_facing, auto_commit, dry_run, **_kwargs):
     root = _require_sub_project_root(
         workspace_root_guidance=(
@@ -1119,7 +1119,7 @@ mono = app.group("monorepo", help="Manage monorepo workspaces with multiple inde
 
 
 @mono.command(name="init", help="Create a new monorepo workspace by generating the .rlsbl-monorepo directory and an empty workspace.toml configuration file at the current directory. This must be run at the repository root before adding individual projects with the add subcommand. Each workspace tracks multiple independently-versioned projects that share a single git repository.")
-@strictcli.flag(name="auto-commit", type=bool, default=True, help="Auto-commit workspace.toml after creating it")
+@strictcli.flag(name="auto-commit", type=bool, default=True, help="Automatically commit the generated workspace.toml configuration file to git")
 def cmd_mono_init(auto_commit, **_kwargs):
     # monorepo init does NOT require a pre-existing .rlsbl/ marker --
     # it bootstraps a fresh workspace. Resolve to CWD instead of
@@ -1316,7 +1316,7 @@ def cmd_mono_release_order(**_kwargs):
 
 
 @mono.command(name="extract", help="Extract a package from the monorepo into a new standalone repository. Clones the monorepo, runs git filter-repo to keep only the package's history, migrates changelog entries, creates .rlsbl/ config in the new repo, and removes the project from workspace.toml.")
-@strictcli.arg(name="package_name", help="Name of the package in workspace.toml to extract")
+@strictcli.arg(name="package_name", help="Name of the package as defined in workspace.toml to extract into a standalone repo")
 @strictcli.arg(name="target_path", help="Filesystem path where the new standalone repository will be created")
 def cmd_mono_extract(dry_run, package_name, target_path, **_kwargs):
     root = _require_project_root()
@@ -1341,7 +1341,7 @@ def cmd_mono_extract(dry_run, package_name, target_path, **_kwargs):
 @mono.command(name="absorb", help="Absorb an external repository as a package in the monorepo. Runs git subtree add to import the source repo's history under the package name, adds the project to workspace.toml, and migrates changelog entries from the source repo's .rlsbl/changes/ directory.")
 @strictcli.flag(name="releasable", type=str, help="Releasable group to assign the absorbed package to", default="")
 @strictcli.arg(name="source_path", help="Filesystem path to the external git repository to absorb")
-@strictcli.arg(name="package_name", help="Name for the package in the monorepo workspace")
+@strictcli.arg(name="package_name", help="Name to assign to the absorbed package in the monorepo workspace.toml")
 def cmd_mono_absorb(dry_run, releasable, source_path, package_name, **_kwargs):
     root = _require_project_root()
     from .workspace import find_workspace_root
