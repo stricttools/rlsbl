@@ -210,6 +210,56 @@ class TestUndoReleasablePaths:
         )
 
 
+class TestUndoPrModeClearsState:
+    """PR-mode undo (open PR: close + delete branch + restore files) must
+    also clear any preserved in-progress release state after a successful
+    rollback -- mirroring the imperative-mode clear."""
+
+    def test_pr_undo_clears_releasable_in_progress_state(
+        self, tmp_project, monkeypatch,
+    ):
+        core = _setup_released_releasable_workspace(tmp_project)
+        rel_dir = get_releasable_dir(str(tmp_project), "alpha")
+        state_path = get_state_path(str(core), releasable_dir=rel_dir)
+        save_release_state(state_path, {
+            "new_version": "1.0.1",
+            "tag": "alpha@v1.0.1",
+            "branch": "main",
+            "completed_steps": ["VERSION_BUMPED", "COMMITTED"],
+            "releasable_name": "alpha",
+            "release_mode": "pr",
+        })
+
+        # PR-mode config for the member (committed: undo requires a clean tree)
+        (core / ".rlsbl" / "config.json").write_text(
+            json.dumps({
+                "private": False, "targets": ["npm"], "pipelines": {},
+                "release": {"mode": "pr"},
+            }) + "\n"
+        )
+        _git(tmp_project, "add", "packages/core/.rlsbl/config.json")
+        _git(tmp_project, "commit", "-q", "-m", "switch to pr release mode")
+
+        monkeypatch.chdir(core)
+        ctx = create_context(Path(str(core)), workspace_root=Path(str(tmp_project)))
+
+        patches = _undo_patches() + [
+            patch("rlsbl.commands.undo._detect_pr_state", return_value="open"),
+        ]
+        for p in patches:
+            p.start()
+        try:
+            undo_run_cmd(None, [], {"yes": True}, ctx=ctx)
+        finally:
+            for p in patches:
+                p.stop()
+
+        assert not os.path.exists(state_path), (
+            "PR-mode undo must clear the in-progress release state after a "
+            "successful rollback"
+        )
+
+
 class TestUndoClearsStandaloneState:
 
     def test_undo_clears_standalone_in_progress_state(self, tmp_project, monkeypatch):
