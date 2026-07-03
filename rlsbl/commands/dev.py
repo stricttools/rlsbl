@@ -39,9 +39,14 @@ def _install_single(project_dir, flags):
 
     for entry in targets:
         name = entry.name
+        # Path-scoped targets (e.g. an npm/ or pypi/ wrapper subdir next to a
+        # root go target) must be installed from their own directory: npm needs
+        # npm/package.json, uv needs pypi/pyproject.toml. entry.path is the
+        # target's declared directory (== project_dir for root targets).
+        target_dir = entry.path
         target = TARGETS.get(name)
         modes = (
-            target.dev_install_command(project_dir)
+            target.dev_install_command(target_dir)
             if target is not None
             else {"global": None, "venv": None}
         )
@@ -64,16 +69,16 @@ def _install_single(project_dir, flags):
             if template is None:
                 print(f"Skipping {name} uninstall: not supported for this target")
                 continue
-            pkg_name = _resolve_project_name(project_dir, name, project_dir)
-            dir_name = os.path.basename(os.path.abspath(project_dir))
+            pkg_name = _resolve_project_name(target_dir, name, project_dir)
+            dir_name = os.path.basename(os.path.abspath(target_dir))
             args = [a.format(name=pkg_name, dir=dir_name) for a in template]
         else:
             args = list(spec["args"])
 
         action = "Uninstalling" if uninstall else "Installing"
-        print(f"{action} {name} from {project_dir}...")
+        print(f"{action} {name} from {target_dir}...")
         any_handled = True
-        result = subprocess.run([spec["tool"]] + args, cwd=project_dir)
+        result = subprocess.run([spec["tool"]] + args, cwd=target_dir)
         if result.returncode != 0:
             print(
                 f"Error: {action.lower()} failed for {name} (exit {result.returncode})",

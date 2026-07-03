@@ -243,6 +243,70 @@ def test_install_failure_returns_nonzero(tmp_project, monkeypatch, all_tools_pre
 
 
 # ---------------------------------------------------------------------------
+# Path-scoped targets (multi-target projects like go root + npm/ + pypi/)
+# ---------------------------------------------------------------------------
+
+
+def _make_multi_target(root):
+    """Create a project with a root go target plus path-scoped npm/ and pypi/
+    targets, mirroring real multi-target layouts (go binary + npm wrapper +
+    pypi wrapper)."""
+    _make_npm(str(root / "npm"), name="multi-npm")
+    _make_pypi(str(root / "pypi"), name="multi-pypi")
+    with open(str(root / "go.mod"), "w", encoding="utf-8") as f:
+        f.write("module example.com/multi\n\ngo 1.21\n")
+    with open(str(root / "main.go"), "w", encoding="utf-8") as f:
+        f.write("package main\n\nfunc main() {}\n")
+    rlsbl_dir = root / ".rlsbl"
+    rlsbl_dir.mkdir()
+    with open(str(rlsbl_dir / "config.json"), "w", encoding="utf-8") as f:
+        json.dump(
+            {
+                "targets": [
+                    "go",
+                    {"name": "npm", "path": "npm/"},
+                    {"name": "pypi", "path": "pypi/"},
+                ],
+                "pipelines": {
+                    "go": {"type": "go", "local": True, "install_paths": ["."]}
+                },
+                "private": False,
+            },
+            f,
+        )
+
+
+def test_path_scoped_targets_run_in_their_own_dirs(
+    tmp_project, fake_run, all_tools_present
+):
+    """Each target's install command must run in that target entry's declared
+    directory, not the project root: npm link needs npm/package.json, uv needs
+    pypi/pyproject.toml."""
+    _make_multi_target(tmp_project)
+    rc = run_install({}, project_root=".")
+    assert rc == 0
+    cwds = {c["cmd"][0]: os.path.normpath(c["kwargs"]["cwd"]) for c in fake_run.calls}
+    assert cwds["go"] == "."
+    assert cwds["npm"] == "npm"
+    assert cwds["uv"] == "pypi"
+
+
+def test_path_scoped_uninstall_reads_manifest_from_target_dir(
+    tmp_project, fake_run, all_tools_present
+):
+    """Uninstall must resolve the package name from the target entry's own
+    manifest (pypi/pyproject.toml), not fall back to the root dir basename."""
+    _make_multi_target(tmp_project)
+    rc = run_install({"uninstall": True}, project_root=".")
+    assert rc == 0
+    cmds = [c["cmd"] for c in fake_run.calls]
+    assert ["uv", "tool", "uninstall", "multi-pypi"] in cmds
+    # npm unlink also runs in its own dir.
+    npm_calls = [c for c in fake_run.calls if c["cmd"][0] == "npm"]
+    assert os.path.normpath(npm_calls[0]["kwargs"]["cwd"]) == "npm"
+
+
+# ---------------------------------------------------------------------------
 # Monorepo install
 # ---------------------------------------------------------------------------
 
