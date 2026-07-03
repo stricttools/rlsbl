@@ -92,7 +92,7 @@ Mark a past release as deprecated (soft yank) or delete it (hard yank). Soft yan
 
 ## release scrub
 
-Scrub sensitive content from git history and update release metadata to match the rewritten commits. Wraps safegit scrub in one of three modes: match (--pattern with --replace or --mangle), file (--file, which replaces the file throughout history with its current on-disk content or removes it if absent; requires --from-commit), or recipe (--recipe, a scrub recipe TOML executed via safegit scrub run). Afterwards remaps commit hashes in all JSONL changelog files, regenerates CHANGELOG.md, force-pushes the rewritten history, and recreates GitHub Releases on the new tags. A scrub-result.json file records the SHA mapping for recovery if any post-rewrite step fails.
+Scrub sensitive content from git history and update release metadata to match the rewritten commits. Supports 3 modes: match (--pattern), file (--file), or recipe (--recipe). After rewriting, remaps commit hashes in JSONL changelog files, regenerates CHANGELOG.md, force-pushes, and recreates GitHub Releases on the new tags.
 
 ### Flags
 
