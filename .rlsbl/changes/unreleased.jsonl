@@ -1,0 +1,1 @@
+{"commits":["2821fac524eef61b7df21b139d87ec1635e83c26"],"user_facing":true,"description":"**Fix.** `release init` and `monorepo release init` now auto-commit the scaffolded `unreleased.toml`, eliminating the manual commit step that blocked `--no-allow-dirty` releases.","type":"fix"}
