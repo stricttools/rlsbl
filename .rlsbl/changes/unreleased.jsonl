@@ -1,1 +1,2 @@
 {"commits":["2821fac524eef61b7df21b139d87ec1635e83c26"],"user_facing":true,"description":"**Fix.** `release init` and `monorepo release init` now auto-commit the scaffolded `unreleased.toml`, eliminating the manual commit step that blocked `--no-allow-dirty` releases.","type":"fix"}
+{"commits":["7941d0699781b15466bdb37c23ecae2efcd278c6"],"user_facing":true,"description":"**Fix.** All per-sub-project commands now show a workspace-root-specific error message instead of the misleading 'Run rlsbl monorepo add' when invoked from the monorepo workspace root.","type":"fix"}
