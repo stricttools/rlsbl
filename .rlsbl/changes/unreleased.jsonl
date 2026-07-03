@@ -27,3 +27,4 @@
 {"commits":["e59102c437d3c0d86bd77ee3eb927e81d747bc7c"],"user_facing":true,"description":"**Scaffolded pypi CI is locked and tests.** `ci.yml` now runs `uv sync --locked` (registry-pure lockfiles are guaranteed by the new ban check) and adds a `uv run pytest` step when the project declares pytest. The `UV_NO_SOURCES` env escape hatch is gone.","type":"feature"}
 {"commits":["700d191861ff225b893f1005675c7e0f89ed4ccb"],"user_facing":false}
 {"commits":["cbbebf58da613c9db31cff4e1504d9340c9801e7"],"user_facing":true,"description":"**New release guard: version skew.** `rlsbl release run` now reads `dev-sources.toml.local-only` and hard-errors when an overlaid dependency's local checkout is ahead of its latest PyPI release (\"release the dependency first\"). Unpublished overlay packages and registry failures are hard errors too -- never a silent skip.","type":"feature"}
+{"commits":["8370dbbabda3e5a2095f9f0597cffa0108dadb44"],"user_facing":false}
