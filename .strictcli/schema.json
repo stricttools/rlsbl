@@ -1699,6 +1699,16 @@
       "needs_network": false,
       "depends_on": []
     },
+    "cross-repo-path-sources": {
+      "tags": [
+        "project"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
     "prepush-changelog-coverage": {
       "tags": [
         "prepush"
