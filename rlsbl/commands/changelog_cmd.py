@@ -211,6 +211,39 @@ def _build_entry(flags, resolved_commits):
     return entry
 
 
+def _regenerate_changelog_outputs(ws_context, project_root, changes_dir):
+    """Regenerate CHANGELOG.md via the single home resolver.
+
+    In explicit releasable mode, writes the canonical CHANGELOG.md into the
+    releasable dir and regenerates the combined root CHANGELOG.md; otherwise
+    writes the project-root CHANGELOG.md. Returns the list of output paths
+    (for auto-commit).
+    """
+    if (isinstance(ws_context, _ResolvedContext)
+            and ws_context.releasable is not None
+            and ws_context.ws_root is not None):
+        from ..changelog.home import (
+            generate_workspace_changelog,
+            get_changelog_home,
+            get_workspace_changelog_path,
+        )
+
+        releasable_dir = get_releasable_dir(
+            ws_context.ws_root, ws_context.releasable.name,
+        )
+        canonical = get_changelog_home(project_root, releasable_dir=releasable_dir)
+        generate_changelog(
+            project_root,
+            changes_dir_override=changes_dir,
+            changelog_output_path=canonical,
+        )
+        generate_workspace_changelog(ws_context.ws_root)
+        return [canonical, get_workspace_changelog_path(ws_context.ws_root)]
+
+    generate_changelog(project_root)
+    return [os.path.join(project_root, "CHANGELOG.md")]
+
+
 def _resolve_changes_dir(ws_context, project_root):
     """Return the appropriate changes directory based on context.
 
@@ -548,8 +581,10 @@ def cmd_amend(flags, project_root):
         append_entry_to_version(changes_dir, version, entry)
         print(f"Amended {version}.jsonl with {len(resolved_commits)} commit(s)")
 
-    # Regenerate CHANGELOG.md
-    generate_changelog(project_root)
+    # Regenerate CHANGELOG.md at the canonical home (releasable-aware)
+    changelog_outputs = _regenerate_changelog_outputs(
+        ws_context, project_root, changes_dir,
+    )
     print("Regenerated CHANGELOG.md")
 
     # Sync GitHub Release notes (best-effort)
@@ -560,9 +595,9 @@ def cmd_amend(flags, project_root):
     md_path = os.path.join(changes_dir, f"{version}.md")
     if os.path.isfile(md_path):
         changed_files.append(md_path)
-    changelog_path = os.path.join(project_root, "CHANGELOG.md")
-    if os.path.isfile(changelog_path):
-        changed_files.append(changelog_path)
+    for changelog_path in changelog_outputs:
+        if os.path.isfile(changelog_path):
+            changed_files.append(changelog_path)
 
     commit_msg = f"changelog: amend {version}"
     if user_facing and description:
@@ -742,8 +777,10 @@ def cmd_edit(flags, project_root):
         with writable_jsonl(file_path):
             _rewrite_file(file_path)
 
-        # Regenerate CHANGELOG.md
-        generate_changelog(project_root)
+        # Regenerate CHANGELOG.md at the canonical home (releasable-aware)
+        changelog_outputs = _regenerate_changelog_outputs(
+            ws_context, project_root, changes_dir,
+        )
         print(f"Edited entry in {version}.jsonl")
         print("Regenerated CHANGELOG.md")
 
@@ -756,9 +793,9 @@ def cmd_edit(flags, project_root):
             md_path = os.path.join(changes_dir, f"{version}.md")
             if os.path.isfile(md_path):
                 changed_files.append(md_path)
-            changelog_path = os.path.join(project_root, "CHANGELOG.md")
-            if os.path.isfile(changelog_path):
-                changed_files.append(changelog_path)
+            for changelog_path in changelog_outputs:
+                if os.path.isfile(changelog_path):
+                    changed_files.append(changelog_path)
             desc = entry.description or "entry"
             commit_files(f"changelog: edit {version}: {desc}", changed_files, allow_failure=True)
     else:

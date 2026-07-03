@@ -396,6 +396,80 @@ class TestReleasableReleaseChangelogHome:
         result = app._check_defs["changelog-entry"].impl(ctx)
         assert result.status == "pass", result.message
 
+    def test_changelog_amend_regenerates_at_home(self, tmp_project, monkeypatch):
+        """`rlsbl changelog amend` on a released version regenerates the
+        canonical releasable CHANGELOG.md (and root combined), never a
+        member-dir CHANGELOG.md."""
+        core = _setup_releasable_workspace(tmp_project)
+        _run_release(core, tmp_project)
+
+        # A new member-scoped commit to amend into the released version
+        (core / "hotfix.txt").write_text("hotfix\n")
+        _git(tmp_project, "add", "packages/core/hotfix.txt")
+        _git(tmp_project, "commit", "-q", "-m", "hotfix")
+        sha = _git_head(tmp_project)
+
+        from rlsbl.commands.changelog_cmd import cmd_amend
+        monkeypatch.chdir(core)
+        with patch("rlsbl.commands.changelog_cmd._sync_github_release"):
+            cmd_amend(
+                {
+                    "version": "1.0.1",
+                    "commits": sha,
+                    "description": "**Amended fix.** Hot stuff.",
+                    "type": "fix",
+                    "user-facing": True,
+                    "validate-hashes": True,
+                },
+                project_root=str(core),
+            )
+
+        rel_dir = get_releasable_dir(str(tmp_project), "alpha")
+        canonical = (Path(rel_dir) / "CHANGELOG.md").read_text()
+        assert "Amended fix." in canonical
+        root_combined = (Path(str(tmp_project)) / "CHANGELOG.md").read_text()
+        assert "Amended fix." in root_combined
+        assert not (core / "CHANGELOG.md").exists(), (
+            "amend must not write CHANGELOG.md into the member directory"
+        )
+
+    def test_changelog_edit_regenerates_at_home(self, tmp_project, monkeypatch):
+        """`rlsbl changelog edit` on a released entry regenerates the
+        canonical releasable CHANGELOG.md (and root combined), never a
+        member-dir CHANGELOG.md."""
+        core = _setup_releasable_workspace(tmp_project)
+        _run_release(core, tmp_project)
+
+        # The released 1.0.1.jsonl contains the feature entry; edit it
+        changes_dir = get_releasable_changes_dir(str(tmp_project), "alpha")
+        entry = json.loads(
+            (Path(changes_dir) / "1.0.1.jsonl").read_text().splitlines()[0]
+        )
+        sha = entry["commits"][0]
+
+        from rlsbl.commands.changelog_cmd import cmd_edit
+        monkeypatch.chdir(core)
+        with patch("rlsbl.commands.changelog_cmd._sync_github_release"):
+            cmd_edit(
+                {
+                    "commits": sha,
+                    "description": "**Edited feature.** Even shinier.",
+                    "type": "",
+                    "user-facing": None,
+                    "auto-commit": True,
+                },
+                project_root=str(core),
+            )
+
+        rel_dir = get_releasable_dir(str(tmp_project), "alpha")
+        canonical = (Path(rel_dir) / "CHANGELOG.md").read_text()
+        assert "Edited feature." in canonical
+        root_combined = (Path(str(tmp_project)) / "CHANGELOG.md").read_text()
+        assert "Edited feature." in root_combined
+        assert not (core / "CHANGELOG.md").exists(), (
+            "edit must not write CHANGELOG.md into the member directory"
+        )
+
     def test_root_member_releasable_sane_layout(self, tmp_project):
         """orxtra-shaped workspace: the sole member's path is '.'. The
         canonical file in the releasable dir and the combined root file
