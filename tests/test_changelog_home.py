@@ -349,6 +349,34 @@ class TestReleasableReleaseChangelogHome:
         # No new CHANGELOG.md appeared in the member dir
         assert not (core / "CHANGELOG.md").exists()
 
+    def test_changelog_generate_auto_commit_releasable(self, tmp_project, monkeypatch):
+        """`rlsbl changelog generate` with auto-commit in releasable mode
+        commits the canonical and combined root files (leaves a clean tree)."""
+        core = _setup_releasable_workspace(tmp_project)
+        _run_release(core, tmp_project)
+
+        # Dirty the canonical file so generate has something to regenerate
+        rel_dir = get_releasable_dir(str(tmp_project), "alpha")
+        canonical = Path(rel_dir) / "CHANGELOG.md"
+        canonical.write_text("stale\n")
+        subprocess.run(
+            ["git", "commit", "-q", "-am", "stale changelog"],
+            cwd=str(tmp_project), check=True,
+        )
+
+        from rlsbl.commands.changelog_cmd import cmd_generate
+        monkeypatch.chdir(core)
+        cmd_generate({"auto-commit": True}, project_root=str(core))
+
+        assert "## 1.0.1" in canonical.read_text()
+        status = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=str(tmp_project), capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        assert status == "", (
+            f"auto-commit must leave a clean tree, got: {status}"
+        )
+
     def test_changelog_entry_check_passes_new_layout(self, tmp_project):
         """The changelog-entry check reads the canonical releasable
         CHANGELOG.md and passes after a release."""

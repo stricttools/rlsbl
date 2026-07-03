@@ -390,7 +390,9 @@ def cmd_generate(flags, project_root):
     dry_run = flags.get("dry-run", False)
 
     if dry_run:
-        from ..changelog.files import list_versioned_files, read_unreleased
+        # NOTE: list_versioned_files and read_unreleased come from the
+        # module-level import -- a local re-import here would shadow the
+        # name for the WHOLE function and break the auto-commit path below.
         from ..changelog.generate import (
             _HEADER_COMMENT,
             _read_release_metadata_full,
