@@ -324,8 +324,18 @@ def _cmd_status(flags, project_root):
         except Exception:
             pass
 
-        # Count unreleased changelog entries
-        changelog_path = os.path.join(path, "CHANGELOG.md")
+        # Count unreleased changelog entries. Route through the changelog
+        # home resolver: releasable members keep the canonical CHANGELOG.md
+        # at the releasable level, not the package root.
+        from ...changelog.home import get_changelog_home
+        _cl_releasable_dir = None
+        _cl_rel_name = releasable_map.get(name, "") if explicit else ""
+        if _cl_rel_name:
+            from ...workspace import get_releasable_dir
+            _cl_releasable_dir = get_releasable_dir(root, _cl_rel_name)
+        changelog_path = get_changelog_home(
+            os.path.join(root, path), releasable_dir=_cl_releasable_dir,
+        )
         if not os.path.isfile(changelog_path):
             unreleased_str = "no changelog"
         else:
