@@ -63,4 +63,4 @@ Modify an existing changelog entry in unreleased or released JSONL files. Finds 
 | `--type` |  | str |  |  | New type value (feature, fix, breaking); also disambiguates multi-entry commits |
 | `--description` |  | str |  |  | Replacement description text for the matched changelog entry |
 | `--user-facing` |  | bool |  |  | Set user_facing status on the matched entry (--user-facing to set true, --no-user-facing to set false) |
-| `--auto-commit` |  | bool | True |  | Auto-commit the edited JSONL file |
+| `--auto-commit` |  | bool | True |  | Automatically commit the edited JSONL changelog file to git after modification |

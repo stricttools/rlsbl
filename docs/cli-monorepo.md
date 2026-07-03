@@ -19,7 +19,7 @@ Create a new monorepo workspace by generating the .rlsbl-monorepo directory and 
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--auto-commit` |  | bool | True |  | Auto-commit workspace.toml after creating it |
+| `--auto-commit` |  | bool | True |  | Automatically commit the generated workspace.toml configuration file to git |
 
 ## monorepo add
 
@@ -145,7 +145,7 @@ Extract a package from the monorepo into a new standalone repository. Clones the
 | Name | Required | Description |
 | --- | --- | --- |
 | `target_path` | yes | Filesystem path where the new standalone repository will be created |
-| `package_name` | yes | Name of the package in workspace.toml to extract |
+| `package_name` | yes | Name of the package as defined in workspace.toml to extract into a standalone repo |
 
 ## monorepo absorb
 
@@ -161,7 +161,7 @@ Absorb an external repository as a package in the monorepo. Runs git subtree add
 
 | Name | Required | Description |
 | --- | --- | --- |
-| `package_name` | yes | Name for the package in the monorepo workspace |
+| `package_name` | yes | Name to assign to the absorbed package in the monorepo workspace.toml |
 | `source_path` | yes | Filesystem path to the external git repository to absorb |
 
 ## monorepo extract-releasable

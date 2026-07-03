@@ -21,7 +21,7 @@ Bump version, validate the JSONL changelog, run tests and lint, commit, tag, pus
 | --- | --- | --- | --- | --- | --- |
 | `--allow-dirty` |  | bool |  |  | Skip the clean working tree check and allow releasing with uncommitted changes |
 | `--bump` |  | str |  |  | Bump type: patch, minor, major, hotfix, prerelease. Skips the release file. |
-| `--description` |  | str |  |  | Release description (required with --bump) |
+| `--description` |  | str |  |  | Short release description summarizing the changes (required with --bump) |
 | `--preid` |  | str |  |  | Pre-release identifier: alpha, beta, rc, stable. Only valid with --bump. |
 | `--watch` |  | bool |  |  | After release, automatically watch CI runs to completion (--no-watch to skip) |
 | `--watch-async` |  | bool |  |  | After release, spawn a detached background watcher and return immediately (--no-watch-async is equivalent to --no-watch) |
