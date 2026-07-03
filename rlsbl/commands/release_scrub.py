@@ -181,6 +181,61 @@ def _get_archive_path(scrub_result_path, new_head):
     return os.path.join(state_home, "scrubs", f"scrub-{new_head[:12]}.json")
 
 
+def _snapshot_remote_refs():
+    """Snapshot the remote's refs BEFORE the rewrite.
+
+    Returns {refname: sha}. These are the only trustworthy lease
+    expectations for the post-scrub force-pushes: after the rewrite, bare
+    --force-with-lease is useless because safegit rewrites the
+    remote-tracking refs, and tags carry no tracking information at all.
+    """
+    out = run("git", ["ls-remote", "origin"], timeout=120)
+    refs = {}
+    for line in out.splitlines():
+        parts = line.split(None, 1)
+        if len(parts) == 2:
+            sha, ref = parts
+            refs[ref.strip()] = sha.strip()
+    return refs
+
+
+def _push_ref_with_lease(refname, expected_sha, target_sha, *, timeout, env):
+    """Force-push one ref with an explicit lease expectation.
+
+    ``expected_sha`` is the remote value captured before the scrub (None
+    when the ref did not exist remotely). ``target_sha`` is the value the
+    remote should end up with; if the push is rejected but the remote
+    already equals ``target_sha`` (a resumed run), the push is treated as
+    done. Any other rejection is a hard error: the remote changed under us
+    and force-pushing would destroy someone's work.
+    """
+    lease = f"--force-with-lease={refname}:{expected_sha or ''}"
+    try:
+        run("git", ["push", lease, "origin", f"{refname}:{refname}"],
+            timeout=timeout, env=env)
+        return
+    except Exception as push_exc:
+        # Idempotence: a previous (partially completed) run may have
+        # already pushed this ref.
+        try:
+            out = run("git", ["ls-remote", "origin", refname], timeout=120)
+            current = out.split()[0] if out.split() else ""
+        except Exception:
+            current = ""
+        if target_sha and current == target_sha:
+            print(f"{refname} already up to date on origin.")
+            return
+        print(
+            f"Error: failed to push {refname}: {push_exc}\n"
+            f"  expected remote value: {expected_sha or '<absent>'}\n"
+            f"  current remote value:  {current or '<unknown>'}\n"
+            f"The remote changed since the scrub started; refusing to "
+            f"force-push over it.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
 def _print_dry_run_summary(mode, data):
     """Print a per-mode dry-run preview from safegit's REAL dry-run JSON.
 
@@ -276,6 +331,22 @@ def run_cmd(flags, *, ctx):
 
     # -- If not resuming, build and run safegit command --
     if not resuming:
+        # Snapshot remote refs BEFORE rewriting: these are the lease
+        # expectations for the force-pushes later. Only needed when the
+        # rewrite will actually happen.
+        remote_refs = None
+        if not flags.get("dry-run"):
+            try:
+                remote_refs = _snapshot_remote_refs()
+            except Exception as e:
+                print(
+                    f"Error: cannot read remote refs from origin: {e}\n"
+                    f"A scrub force-pushes rewritten history, so push access "
+                    f"to origin is required before starting.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+
         safegit_args = _build_safegit_args(flags, mode)
 
         # Orchestration handshake: tells safegit this scrub is driven by
@@ -301,6 +372,7 @@ def run_cmd(flags, *, ctx):
 
         # Save scrub-result.json for resume support
         scrub_data["completed_steps"] = []
+        scrub_data["remote_refs"] = remote_refs or {}
         os.makedirs(os.path.dirname(scrub_result_path), exist_ok=True)
         tmp_path = scrub_result_path + ".tmp"
         with open(tmp_path, "w", encoding="utf-8") as f:
@@ -502,32 +574,37 @@ def run_cmd(flags, *, ctx):
 
             _save_step(scrub_result_path, scrub_data, "COMMITTED")
 
-        # -- Force-push branch --
+        # -- Force-push branch (explicit lease from the pre-scrub snapshot) --
+        remote_refs = scrub_data.get("remote_refs", {})
+        push_timeout = get_push_timeout(ctx.config)
+
         if "BRANCH_PUSHED" not in completed:
             push_env = {**os.environ, "RLSBL_RELEASE_PUSH": "1"}
             branch = get_current_branch()
+            branch_ref = f"refs/heads/{branch}"
+            # Target: the local branch tip (new head plus the metadata commit).
             try:
-                run("git", ["push", "--force-with-lease", "origin", branch],
-                    timeout=get_push_timeout(ctx.config), env=push_env)
-            except Exception as e:
-                print(f"Error: failed to push branch: {e}", file=sys.stderr)
-                sys.exit(1)
+                branch_target = run("git", ["rev-parse", branch_ref])
+            except Exception:
+                branch_target = ""
+            _push_ref_with_lease(
+                branch_ref, remote_refs.get(branch_ref), branch_target,
+                timeout=push_timeout, env=push_env,
+            )
 
             _save_step(scrub_result_path, scrub_data, "BRANCH_PUSHED")
 
-        # -- Force-push tags --
+        # -- Force-push tags (explicit lease each; never plain --force) --
         if "TAGS_PUSHED" not in completed:
             push_env = {**os.environ, "RLSBL_RELEASE_PUSH": "1"}
             for tag_info in tags:
                 refname = tag_info.get("refname", "")
-                tag_name = refname.removeprefix("refs/tags/")
-                if not tag_name:
+                if not refname.removeprefix("refs/tags/"):
                     continue
-                try:
-                    run("git", ["push", "--force", "origin", tag_name],
-                        timeout=get_push_timeout(ctx.config), env=push_env)
-                except Exception as e:
-                    print(f"Warning: failed to push tag {tag_name}: {e}", file=sys.stderr)
+                _push_ref_with_lease(
+                    refname, remote_refs.get(refname), tag_info.get("new_sha", ""),
+                    timeout=push_timeout, env=push_env,
+                )
 
             _save_step(scrub_result_path, scrub_data, "TAGS_PUSHED")
 

@@ -311,6 +311,7 @@ class TestEmptyOutputMeansNoMatches:
     def test_empty_execute_output(self, mock_run, _req_tool, tmp_path, capsys):
         mock_run.side_effect = [
             "safegit 0.21.1",  # safegit --version
+            "",                # git ls-remote origin (pre-scrub snapshot)
             "",                # safegit scrub match: no matches -> empty stdout
         ]
         flags = {
@@ -552,18 +553,20 @@ class TestFullScrubFlow:
         # 5. Verify specific subprocess calls
         all_calls = mock_run.call_args_list
 
-        # git push --force-with-lease origin main
+        # Branch push: explicit lease refspec
         force_lease_calls = [
             c for c in all_calls
-            if c[0][0] == "git" and "--force-with-lease" in c[0][1]
+            if c[0][0] == "git" and c[0][1][:1] == ["push"]
+            and any(a.startswith("--force-with-lease=refs/heads/main:") for a in c[0][1])
         ]
         assert len(force_lease_calls) == 1
-        assert "main" in force_lease_calls[0][0][1]
+        assert "refs/heads/main:refs/heads/main" in force_lease_calls[0][0][1]
 
-        # git push --force origin v1.0.0
+        # Tag push: explicit lease too (plain --force is gone)
         force_tag_calls = [
             c for c in all_calls
-            if c[0][0] == "git" and "--force" in c[0][1] and "v1.0.0" in c[0][1]
+            if c[0][0] == "git" and c[0][1][:1] == ["push"]
+            and any(a.startswith("--force-with-lease=refs/tags/v1.0.0:") for a in c[0][1])
         ]
         assert len(force_tag_calls) == 1
 
@@ -631,6 +634,11 @@ class TestResumeFromScrubResult:
             # Persisted by the JSONL_REMAPPED step so a resumed run can
             # still commit the files remapped before the interruption.
             "remapped_files": [str(unreleased)],
+            # Pre-scrub remote snapshot (lease expectations for pushes)
+            "remote_refs": {
+                "refs/heads/main": "aaa111",
+                "refs/tags/v1.0.0": "bbb222",
+            },
         }))
 
         # run() calls: git/safegit only (gh calls go through run_gh)
@@ -690,17 +698,20 @@ class TestResumeFromScrubResult:
         # scrub-result.json cleaned up at the end
         assert not scrub_result.exists()
 
-        # Branch push happened
+        # Branch push happened, with the lease expectation from the
+        # PERSISTED pre-scrub snapshot
         force_lease_calls = [
             c for c in mock_run.call_args_list
-            if c[0][0] == "git" and len(c[0]) > 1 and "--force-with-lease" in c[0][1]
+            if c[0][0] == "git" and len(c[0]) > 1 and c[0][1][:1] == ["push"]
+            and "--force-with-lease=refs/heads/main:aaa111" in c[0][1]
         ]
         assert len(force_lease_calls) == 1
 
-        # Tag push happened
+        # Tag push happened with its own lease expectation
         force_tag_calls = [
             c for c in mock_run.call_args_list
-            if c[0][0] == "git" and len(c[0]) > 1 and "--force" in c[0][1] and "v1.0.0" in c[0][1]
+            if c[0][0] == "git" and len(c[0]) > 1 and c[0][1][:1] == ["push"]
+            and "--force-with-lease=refs/tags/v1.0.0:bbb222" in c[0][1]
         ]
         assert len(force_tag_calls) == 1
 
@@ -783,6 +794,114 @@ class TestReleasableDirsRemapped:
         assert proj_entries[0].commits == ["new_hash_1"]
         rel_entries = parse_jsonl(str(rel_changes / "unreleased.jsonl"))
         assert rel_entries[0].commits == ["new_hash_2"]
+
+
+# ===========================================================================
+# Push mechanics: explicit force-with-lease for BOTH branch and tags
+# ===========================================================================
+
+
+class TestPushMechanics:
+    """Post-scrub pushes must use --force-with-lease with EXPLICIT expected
+    values captured from the remote BEFORE the rewrite. Bare
+    --force-with-lease is broken after a scrub (safegit rewrites the
+    remote-tracking refs, and tags have no tracking information), and plain
+    --force on tags had no safety at all."""
+
+    OLD_HEAD = "aaaa111122223333444455556666777788889999"
+    NEW_HEAD = "bbbb111122223333444455556666777788889999"
+    OLD_TAG = "cccc111122223333444455556666777788889999"
+    NEW_TAG = "dddd111122223333444455556666777788889999"
+
+    def _run(self, tmp_path, mock_run):
+        safegit_result = json.dumps({
+            "rewrites": {self.OLD_HEAD: self.NEW_HEAD},
+            "tags": [{
+                "refname": "refs/tags/v1.0.0",
+                "old_sha": self.OLD_TAG, "new_sha": self.NEW_TAG,
+                "annotated": True,
+            }],
+            "old_head": self.OLD_HEAD,
+            "new_head": self.NEW_HEAD,
+        })
+        ls_remote_out = (
+            f"{self.OLD_HEAD}\trefs/heads/main\n"
+            f"{self.OLD_TAG}\trefs/tags/v1.0.0\n"
+            f"{self.OLD_HEAD}\trefs/tags/v1.0.0^{{}}\n"
+        )
+
+        calls = []
+
+        def run_effect(cmd, args=None, **kw):
+            calls.append((cmd, list(args or []), kw))
+            if cmd == "safegit" and args == ["--version"]:
+                return "safegit 0.21.1"
+            if cmd == "git" and args and args[0] == "ls-remote":
+                return ls_remote_out
+            if cmd == "safegit" and args and args[0] == "scrub":
+                return safegit_result
+            return ""
+
+        mock_run.side_effect = run_effect
+
+        changes_dir = tmp_path / ".rlsbl" / "changes"
+        changes_dir.mkdir(parents=True)
+        (changes_dir / "unreleased.jsonl").write_text("")
+
+        flags = {
+            "pattern": "secret", "replace": "XXX", "reason": "r",
+            "entire-history": True, "yes": True,
+        }
+        with patch(f"{MOD}.validate_all_hashes_resolve", return_value={}):
+            run_cmd(flags, ctx=_ctx(str(tmp_path)))
+        return calls
+
+    @patch(f"{MOD}.release_lock")
+    @patch(f"{MOD}.acquire_lock")
+    @patch(f"{MOD}.check_gh_auth", return_value=False)
+    @patch(f"{MOD}.check_gh_installed", return_value=False)
+    @patch(f"{MOD}.get_current_branch", return_value="main")
+    @patch(f"{MOD}.get_push_timeout", return_value=120)
+    @patch(f"{MOD}.generate_changelog")
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_explicit_lease_for_branch_and_tags(self, mock_run, _req_tool,
+                                                 _gen_cl, _push_timeout,
+                                                 _get_branch, _gh_installed,
+                                                 _gh_auth, _acquire_lock,
+                                                 _release_lock, tmp_path):
+        calls = self._run(tmp_path, mock_run)
+
+        # Remote refs were snapshotted BEFORE the scrub ran
+        ls_remote_idx = next(
+            i for i, (cmd, args, _) in enumerate(calls)
+            if cmd == "git" and args[:1] == ["ls-remote"]
+        )
+        scrub_idx = next(
+            i for i, (cmd, args, _) in enumerate(calls)
+            if cmd == "safegit" and args[:1] == ["scrub"]
+        )
+        assert ls_remote_idx < scrub_idx
+
+        push_calls = [
+            (args, kw) for cmd, args, kw in calls
+            if cmd == "git" and args[:1] == ["push"]
+        ]
+        assert len(push_calls) == 2
+
+        # Branch push: explicit lease expecting the PRE-scrub remote value
+        branch_args, branch_kw = push_calls[0]
+        assert f"--force-with-lease=refs/heads/main:{self.OLD_HEAD}" in branch_args
+        assert "refs/heads/main:refs/heads/main" in branch_args
+        assert branch_kw.get("env", {}).get("RLSBL_RELEASE_PUSH") == "1"
+
+        # Tag push: explicit lease too (plain --force is gone)
+        tag_args, tag_kw = push_calls[1]
+        assert f"--force-with-lease=refs/tags/v1.0.0:{self.OLD_TAG}" in tag_args
+        assert "refs/tags/v1.0.0:refs/tags/v1.0.0" in tag_args
+        assert tag_kw.get("env", {}).get("RLSBL_RELEASE_PUSH") == "1"
+        for args, _ in push_calls:
+            assert "--force" not in args, "plain --force must never be used"
 
 
 # ===========================================================================
@@ -950,6 +1069,7 @@ class TestPostRemapValidationGate:
         })
         mock_run.side_effect = [
             "safegit 0.21.1",  # safegit --version
+            "",                # git ls-remote origin (pre-scrub snapshot)
             safegit_result,    # safegit scrub
         ]
 
@@ -1041,6 +1161,7 @@ class TestNoMatchesExitsCleanly:
 
         mock_run.side_effect = [
             "safegit 0.21.1",  # safegit --version
+            "",                # git ls-remote origin (pre-scrub snapshot)
             safegit_result,    # safegit scrub match --json ...
         ]
 
@@ -1059,7 +1180,7 @@ class TestNoMatchesExitsCleanly:
         assert "No matches found" in captured.out
 
         # No force-push or gh calls
-        assert mock_run.call_count == 2  # only version check + scrub
+        assert mock_run.call_count == 3  # version check + ls-remote snapshot + scrub
 
 
 # ===========================================================================
@@ -1140,11 +1261,13 @@ class TestMonorepoTagCorrectProject:
 
         mock_run.side_effect = [
             "safegit 0.21.1",       # safegit --version
+            "",                      # git ls-remote origin (snapshot)
             safegit_result,          # safegit scrub
-            "",                      # safegit commit
-            "",                      # git push --force-with-lease
-            "",                      # git push --force origin alpha@v1.0.0
-            "",                      # git push --force origin beta@v1.0.0
+            "",                      # safegit commit (archive)
+            "",                      # git rev-parse (branch target)
+            "",                      # git push (branch, lease)
+            "",                      # git push (alpha@v1.0.0, lease)
+            "",                      # git push (beta@v1.0.0, lease)
         ]
 
         # gh calls go through run_gh
@@ -1249,10 +1372,12 @@ class TestStandaloneTagNoPrefix:
 
         mock_run.side_effect = [
             "safegit 0.21.1",       # safegit --version
+            "",                      # git ls-remote origin (snapshot)
             safegit_result,          # safegit scrub
-            "",                      # safegit commit
-            "",                      # git push --force-with-lease
-            "",                      # git push --force origin v1.0.0
+            "",                      # safegit commit (archive)
+            "",                      # git rev-parse (branch target)
+            "",                      # git push (branch, lease)
+            "",                      # git push (v1.0.0, lease)
         ]
 
         # gh calls go through run_gh
