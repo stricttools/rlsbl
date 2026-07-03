@@ -61,3 +61,4 @@
 {"commits":["507d79900f6b60a65f20a0b09d68401f544e0427"],"user_facing":false}
 {"commits":["99ab1ceb8c91ec25d2861970b8b2ce72cd52d048"],"user_facing":true,"description":"**Fix.** `rlsbl release retry` for releasable members now keeps `retry.toml` under the releasable's releases directory instead of the member package's `.rlsbl/releases/`.","type":"fix"}
 {"commits":["a27a7982b41d2334edf77103942238dba029a33b"],"user_facing":false}
+{"commits":["664ca54c9fa43eddfdbea0f7fdd6d342766c2969","a34f7927db8aaffa88cc652ec4c7617272a00f0f"],"user_facing":false}
