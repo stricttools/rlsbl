@@ -18,7 +18,7 @@ def register_prepush_checks(app):
     def check_prepush_changelog_coverage(ctx):
         """Every pushed commit must have a JSONL changelog entry."""
         from ..changelog import changes_dir_exists
-        from ..commands.pre_push_check import (
+        from ..prepush_utils import (
             _check_jsonl_changelog,
             _get_pushed_commits,
             _parse_stdin_refs,
@@ -117,7 +117,7 @@ def register_prepush_checks(app):
     @app.check("prepush-gitignore-guard")
     def check_prepush_gitignore_guard(ctx):
         """rlsbl-managed files must not be gitignored."""
-        from ..commands.pre_push_check import _check_gitignore_guard
+        from ..prepush_utils import _check_gitignore_guard
 
         # In explicit releasable mode, also check releasable-level files
         extra_paths = None
@@ -152,7 +152,7 @@ def register_prepush_checks(app):
     @app.check("prepush-manual-warning")
     def check_prepush_manual_warning(ctx):
         """Warn when pushing to a release branch outside rlsbl release."""
-        from ..commands.pre_push_check import _get_release_branches
+        from ..prepush_utils import _get_release_branches
         from ..git_util import detect_manual_push_branches
 
         if ctx.push_stdin is None:

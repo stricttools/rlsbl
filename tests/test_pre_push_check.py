@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from conftest import run_git as _run_git, git_head as _git_head
-from rlsbl.commands.pre_push_check import (
+from rlsbl.prepush_utils import (
     _check_gitignore_guard,
     _check_jsonl_changelog,
 )

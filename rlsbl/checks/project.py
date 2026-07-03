@@ -451,7 +451,7 @@ def register_project_checks(app):
                 if project is not None:
                     rel_val = project.releasable
                     if isinstance(rel_val, str):
-                        from ..commands.release.hooks import get_releasable_hook_path
+                        from ..workspace_types import get_releasable_hook_path
                         rel_hook = get_releasable_hook_path(ws_root, rel_val, "post-release.sh")
                         if os.path.exists(rel_hook):
                             hooks_found = True

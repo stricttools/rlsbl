@@ -9,9 +9,10 @@ from .commands import (
     _cmd_outdated,
     _cmd_release_order,
     _cmd_check_names,
-    _evaluate_constraint,
-    _parse_version_tuple,
 )
+
+# Re-exported from constraints module for backward compatibility.
+from ...constraints import _evaluate_constraint, _parse_version_tuple  # noqa: F401
 
 from .batch_release import _cmd_batch_release
 from .batch_release_init import _cmd_batch_release_init

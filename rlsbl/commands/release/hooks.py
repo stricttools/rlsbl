@@ -369,21 +369,9 @@ def run_release_hook(hook_name, hook_path, project_dir, env, timeout,
 # ---------------------------------------------------------------------------
 
 
-def get_releasable_hook_path(workspace_root, releasable_name, hook_name):
-    """Return the absolute path to a releasable-level hook script.
-
-    Path: ``<workspace_root>/.rlsbl-monorepo/releasables/<name>/hooks/<hook_name>``
-
-    Args:
-        workspace_root: path to the monorepo root.
-        releasable_name: name of the releasable.
-        hook_name: hook file name (e.g. ``"pre-checks.sh"``).
-
-    Returns:
-        Absolute path string. The file may or may not exist on disk.
-    """
-    from ...workspace import get_releasable_dir
-    return os.path.join(get_releasable_dir(str(workspace_root), releasable_name), "hooks", hook_name)
+# Re-exported from workspace_types for backward compatibility.
+# The canonical definition lives in workspace_types.py.
+from ...workspace_types import get_releasable_hook_path  # noqa: F401
 
 
 def get_package_hook_path(package_dir, hook_name):

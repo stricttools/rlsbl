@@ -550,7 +550,7 @@ def register_workspace_checks(app):
     @app.check("deps-stale")
     def check_deps_stale(ctx):
         """Intra-workspace dependency constraints must satisfy current versions."""
-        from ..commands.monorepo import _evaluate_constraint
+        from ..constraints import _evaluate_constraint
         from ..targets import TARGETS, detect_targets, resolve_releasable_config_dir
 
         root = str(ctx.workspace_root)
@@ -625,7 +625,7 @@ def register_workspace_checks(app):
         if ctx.push_stdin is None:
             return CheckResult("skip", "not in push context")
 
-        from ..commands.pre_push_check import _parse_stdin_refs
+        from ..prepush_utils import _parse_stdin_refs
         from ..git_util import affected_projects as _affected, get_push_changed_files
         from ..targets import detect_targets, resolve_releasable_config_dir
         from ..testing import run_project_tests, sync_workspace

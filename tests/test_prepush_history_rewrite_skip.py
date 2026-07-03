@@ -4,7 +4,7 @@ explicit -- not a silent, accidental pass."""
 
 import subprocess
 
-from rlsbl.commands.pre_push_check import _get_pushed_commits
+from rlsbl.prepush_utils import _get_pushed_commits
 
 
 def _init_repo(repo):

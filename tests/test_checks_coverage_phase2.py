@@ -150,7 +150,7 @@ class TestPrepushMonorepoPushedCommitsNone:
         )
 
         with patch(
-            "rlsbl.commands.pre_push_check._get_pushed_commits",
+            "rlsbl.prepush_utils._get_pushed_commits",
             return_value=None,
         ):
             result = app._check_defs["prepush-changelog-coverage"].impl(ctx)
@@ -2930,7 +2930,7 @@ class TestWorkspaceDepsChecksWithGraph:
         ctx = self._make_deps_ctx(repo, projects, mock_graph)
 
         with patch(
-            "rlsbl.commands.monorepo._evaluate_constraint",
+            "rlsbl.constraints._evaluate_constraint",
             return_value="outdated",
         ):
             result = app._check_defs["deps-stale"].impl(ctx)

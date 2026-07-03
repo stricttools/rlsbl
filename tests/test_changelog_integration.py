@@ -174,7 +174,7 @@ class TestPrePushWithJsonl:
             (sha1, "Something", "feature", True),
         ])
 
-        from rlsbl.commands.pre_push_check import _check_jsonl_changelog
+        from rlsbl.prepush_utils import _check_jsonl_changelog
 
         # Simulate refs: pushing sha1 with known remote state (initial_sha)
         refs = [(sha1, initial_sha)]
@@ -200,7 +200,7 @@ class TestPrePushWithJsonl:
             (sha1, "Something", "feature", True),
         ])
 
-        from rlsbl.commands.pre_push_check import _check_jsonl_changelog
+        from rlsbl.prepush_utils import _check_jsonl_changelog
 
         # Push range: initial_sha..sha2 includes both sha1 and sha2
         refs = [(sha2, initial_sha)]
@@ -224,7 +224,7 @@ class TestPrePushWithJsonl:
         os.makedirs(changes_dir, exist_ok=True)
         (repo / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
 
-        from rlsbl.commands.pre_push_check import _check_jsonl_changelog
+        from rlsbl.prepush_utils import _check_jsonl_changelog
 
         refs = [(sha, initial_sha)]
         error = _check_jsonl_changelog(".", refs)

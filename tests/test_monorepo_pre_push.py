@@ -9,7 +9,7 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 from conftest import run_git, git_head, make_commit, make_workspace as _make_workspace
-from rlsbl.commands.pre_push_check import _parse_stdin_refs
+from rlsbl.prepush_utils import _parse_stdin_refs
 from rlsbl.git_util import (
     get_commit_files,
     file_matches_project,

@@ -187,7 +187,7 @@ def get_push_changed_files(refs):
     """Get the list of files changed across all pushed refs.
 
     Takes a list of (local_sha, remote_sha) tuples (as returned by
-    ``_parse_stdin_refs`` in pre_push_check.py).
+    ``_parse_stdin_refs`` in prepush_utils.py).
 
     Returns a set of file paths relative to the repo root, or None if
     git commands fail.

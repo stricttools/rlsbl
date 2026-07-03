@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from rlsbl.commands.pre_push_check import _get_release_branches
+from rlsbl.prepush_utils import _get_release_branches
 from rlsbl.errors import ConfigError
 from rlsbl.context import ProjectContext
 

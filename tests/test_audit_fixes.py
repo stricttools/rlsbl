@@ -155,7 +155,7 @@ class TestPrepushChangelogCoverageReleasable:
         entry = {"commits": [sha], "user_facing": False}
         (custom_changes / "unreleased.jsonl").write_text(json.dumps(entry) + "\n")
 
-        from rlsbl.commands.pre_push_check import _check_jsonl_changelog
+        from rlsbl.prepush_utils import _check_jsonl_changelog
 
         # Without custom changes_dir, would fail (no .rlsbl/changes/)
         # With changes_dir override, should pass
@@ -201,7 +201,7 @@ class TestGitignoreGuardExtraPaths:
         run_git(tmp_path, "add", ".gitignore")
         run_git(tmp_path, "commit", "-q", "-m", "add gitignore")
 
-        from rlsbl.commands.pre_push_check import _check_gitignore_guard
+        from rlsbl.prepush_utils import _check_gitignore_guard
 
         # Without extra_paths, should pass (standard files not gitignored)
         result_no_extra = _check_gitignore_guard(str(tmp_path))
