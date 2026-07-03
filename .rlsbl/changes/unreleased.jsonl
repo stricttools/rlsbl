@@ -15,3 +15,4 @@
 {"commits":["2e1abcd33702648aaf2bc906322b88594ac64de2"],"user_facing":true,"description":"**`rlsbl watch --stop [sha]` stops a detached background watcher.** With a SHA it stops that watcher; without one it stops the single live watcher or lists candidates. Sends SIGTERM, escalates to SIGKILL after 5s, and cleans up stale pidfiles left by dead watchers.","type":"feature"}
 {"commits":["9ab34aebc853803c59ac4f8f972d8dc2bcb46352"],"user_facing":false}
 {"commits":["ef01a6b8900316bfd76a1a3ef45f50fd5449a172"],"user_facing":false}
+{"commits":["457420bc2afd39622ee8ff72621340404b3a9c36"],"user_facing":false}
