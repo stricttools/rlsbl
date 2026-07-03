@@ -2,6 +2,27 @@
 
 # Changelog
 
+## 0.97.0
+
+Multi-artifact releasables (per-member publishing at the shared version, collision-proof asset naming), version-consistency enforcement for published members, monorepo-init bootstrap fix
+
+<details>
+<summary>Context</summary>
+
+Completes the six-todo scope of the Phase 10 multi-artifact releasable effort.
+
+</details>
+
+### Features
+
+- **Per-member publish loop.** In releasable mode, each non-private member with publish pipelines is published independently at the shared version. Private members are skipped, pipeline-less members are logged, and resume tracks per-member progress.
+- **Releasable version-consistency checks.** Published members' manifests must match the releasable version. Dead-workspace-packages exempts published releasable members.
+- **Per-member asset upload.** In releasable mode, each publishing member uploads assets with member-name-prefixed filenames for deterministic naming.
+
+### Fixes
+
+- **Monorepo init bootstrap fix.** `rlsbl monorepo init` no longer requires a pre-existing `.rlsbl/` directory, enabling fresh workspace initialization. Refuses nested workspaces.
+
 ## 0.96.0
 
 Publish workflows now gate on CI success for the release commit (no more publish-races-CI), with a ref-based retry contract and a fix for dispatch runs skipping all router jobs.
