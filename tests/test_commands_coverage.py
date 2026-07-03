@@ -899,7 +899,7 @@ class TestArchiveBlogBody:
         releases_dir.mkdir(parents=True)
         (releases_dir / "unreleased.md").write_text("blog body")
 
-        result = archive_blog_body(str(tmp_path), "1.0.0")
+        result = archive_blog_body(str(releases_dir), "1.0.0")
         assert result is not None
         assert "v1.0.0.md" in result
         assert os.path.exists(result)
@@ -912,7 +912,7 @@ class TestArchiveBlogBody:
 
         releases_dir = tmp_path / ".rlsbl" / "releases"
         releases_dir.mkdir(parents=True)
-        result = archive_blog_body(str(tmp_path), "1.0.0")
+        result = archive_blog_body(str(releases_dir), "1.0.0")
         assert result is None
 
 

@@ -269,12 +269,15 @@ def _sync_lockfiles(target_paths, files_to_commit, log):
                     log(f"Lockfile updated: {lockfile}")
 
 
-def archive_blog_body(project_dir, version):
+def archive_blog_body(releases_dir, version):
     """Archive unreleased.md to v{version}.md during release finalization.
+
+    ``releases_dir`` is the resolved releases directory (member
+    ``.rlsbl/releases/``, or the releasable's ``releases/`` dir in
+    explicit releasable mode).
 
     Returns the archived path if the file existed, None otherwise.
     """
-    releases_dir = os.path.join(project_dir, ".rlsbl", "releases")
     blog_body_src = os.path.join(releases_dir, "unreleased.md")
     blog_body_dst = os.path.join(releases_dir, f"v{version}.md")
     if os.path.exists(blog_body_src):
@@ -1159,8 +1162,12 @@ def _run_release_mutating(state: ReleaseState):
         # Finalize release file: rename unreleased.toml to vX.Y.Z.toml
         # RELEASE_FILE_FINALIZED guard: skip if vX.Y.Z.toml exists and
         # unreleased.toml doesn't (indicating finalization already ran).
+        # Releasable releases keep the release file (and its archive) under
+        # the releasable's own releases dir, never the member's .rlsbl/.
         from ...release_file import get_release_file_path
-        release_file_path = get_release_file_path(project_dir)
+        release_file_path = get_release_file_path(
+            project_dir, releasable_dir=_releasable_cfg_dir,
+        )
         _release_file_already_finalized = False
         if "RELEASE_FILE_FINALIZED" in _completed:
             _release_file_already_finalized = True
@@ -1180,7 +1187,7 @@ def _run_release_mutating(state: ReleaseState):
             os.rename(release_file_path, versioned_release)
             os.chmod(versioned_release, 0o444)
             # Archive blog body file if it exists (unreleased.md -> v{version}.md)
-            blog_body_dst = archive_blog_body(project_dir, new_version)
+            blog_body_dst = archive_blog_body(releases_dir, new_version)
             release_finalize_files = [
                 _rel_to_git_root(versioned_release, _git_root),
                 _rel_to_git_root(release_file_path, _git_root),
@@ -1196,7 +1203,9 @@ def _run_release_mutating(state: ReleaseState):
             # consistent with what future generate_changelog() calls produce.
             changes_dir_regen = state.changes_dir or (get_changes_dir(project_dir) if changes_dir_exists(project_dir) else None)
             if changes_dir_regen and os.path.isdir(changes_dir_regen):
-                ver_desc, ver_ctx, ver_bump = _read_release_metadata_full(project_dir, new_version)
+                ver_desc, ver_ctx, ver_bump = _read_release_metadata_full(
+                    project_dir, new_version, releases_dir=releases_dir,
+                )
                 generate_version_file(
                     changes_dir_regen, new_version,
                     description=ver_desc, context=ver_ctx,
@@ -1354,7 +1363,11 @@ def _run_release_mutating(state: ReleaseState):
         else:
             run("git", ["reset", "--hard", pre_release_sha])
         # State file is useless after local rollback -- clean it up.
-        _cleanup_release_artifacts(project_dir, new_version, changes_dir=state.changes_dir)
+        from ...release_file import get_releases_dir as _get_releases_dir
+        _cleanup_release_artifacts(
+            project_dir, new_version, changes_dir=state.changes_dir,
+            releases_dir=_get_releases_dir(project_dir, releasable_dir=_releasable_cfg_dir),
+        )
         clear_release_state(_state_path)
         print(str(e), file=sys.stderr)
         print(
@@ -1417,7 +1430,11 @@ def _run_release_mutating(state: ReleaseState):
                     pass
             run("git", ["reset", "--hard", pre_release_sha])
         # State file is useless after local rollback -- clean it up.
-        _cleanup_release_artifacts(project_dir, new_version, changes_dir=state.changes_dir)
+        from ...release_file import get_releases_dir as _get_releases_dir
+        _cleanup_release_artifacts(
+            project_dir, new_version, changes_dir=state.changes_dir,
+            releases_dir=_get_releases_dir(project_dir, releasable_dir=_releasable_cfg_dir),
+        )
         clear_release_state(_state_path)
         if hasattr(e, 'stderr') and e.stderr:
             print(f"Command error: {e.stderr.strip()}", file=sys.stderr)

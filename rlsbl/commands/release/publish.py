@@ -16,7 +16,8 @@ from .validate import HookError, ReleaseValidationError
 
 def _run_selfdoc_post_generate(flags, *, project_dir=None, release_config=None,
                                 new_version=None, current_version=None,
-                                bump_type=None, changelog_entry=None, tag=None):
+                                bump_type=None, changelog_entry=None, tag=None,
+                                releases_dir=None):
     """Generate a blog post via selfdoc during release.
 
     Called when release_config.blog is True and selfdoc.json exists.
@@ -73,8 +74,10 @@ def _run_selfdoc_post_generate(flags, *, project_dir=None, release_config=None,
             cmd.extend(["--context", release_config.context])
         cmd.extend(["--changelog-file", tmp_changelog.name])
 
-        # Body file (optional)
-        blog_body_path = os.path.join(check_dir, ".rlsbl", "releases", "unreleased.md")
+        # Body file (optional). ``releases_dir`` is the resolved releases
+        # dir (releasable-level in explicit releasable mode).
+        _releases_dir = releases_dir or os.path.join(check_dir, ".rlsbl", "releases")
+        blog_body_path = os.path.join(_releases_dir, "unreleased.md")
         if os.path.exists(blog_body_path):
             cmd.extend(["--body-file", blog_body_path])
 

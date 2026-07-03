@@ -1,0 +1,517 @@
+"""Tests for releasable release-FILE relocation (unreleased.toml family).
+
+Releasable releases used to scaffold/read/archive release TOMLs under the
+representative member's ``.rlsbl/releases/`` — recreating per-package
+residue on every file-based release, failing the ``releasable-residue``
+workspace check immediately after a release, and inviting
+``rlsbl monorepo cleanup`` to saferm freshly committed immutable
+``v{x}.toml`` archives.
+
+The release file now lives in the releasable state-dir family (the same
+home as ``in-progress.json``/``pending.json``/``scrub-result.json``):
+``.rlsbl-monorepo/releasables/<name>/releases/unreleased.toml``.
+
+Covers:
+- ``get_release_file_path`` is releasable-aware (single derivation).
+- KILLER: a file-based releasable single release archives ``v{x}.toml``
+  at the releasable level, leaves the member's ``.rlsbl/`` untouched, and
+  the ``releasable-residue`` check passes IMMEDIATELY AFTER the release.
+- ``release init`` scaffolds into the releasable releases dir.
+- A release file found at the OLD member location in releasable mode is a
+  hard error with a migration hint (mirrors the in-progress.json legacy
+  pattern) — never silently ignored, never archived at the member level.
+- ``release undo`` restores ``unreleased.toml`` from the releasable
+  location.
+- The CLI file-based read path resolves the releasable location.
+- Changelog exemptions cover the relocated release-file paths.
+"""
+
+import json
+import os
+import stat
+import subprocess
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from rlsbl.commands.release import run_cmd
+from rlsbl.commands.undo import run_cmd as undo_run_cmd
+from rlsbl.context import create_context
+from rlsbl.release_file import ReleaseConfig, get_release_file_path
+from rlsbl.utils import run as real_run
+from rlsbl.workspace import (
+    Releasable,
+    get_releasable_changes_dir,
+    get_releasable_dir,
+    save_workspace,
+    write_releasable_version,
+)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _git(repo, *args):
+    subprocess.run(
+        ["git"] + list(args),
+        cwd=str(repo),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
+def _git_head(repo):
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=str(repo),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.strip()
+
+
+def _rc(description="test release"):
+    return ReleaseConfig(
+        bump="patch",
+        include=["npm"],
+        exclude=[],
+        description=description,
+    )
+
+
+_RELEASE_TOML = (
+    'bump = "patch"\n'
+    'description = "test release"\n'
+    'context = ""\n'
+    'include = ["npm"]\n'
+    'exclude = []\n'
+)
+
+
+def _setup_releasable_workspace(root):
+    """Workspace with releasable 'alpha' whose sole member is packages/core.
+
+    Returns the member (representative) directory path.
+    """
+    _git(root, "init", "-q", "-b", "main")
+    _git(root, "config", "user.email", "test@test.local")
+    _git(root, "config", "user.name", "Test")
+
+    core = root / "packages" / "core"
+    core.mkdir(parents=True)
+    (core / "package.json").write_text(
+        json.dumps({"name": "core", "version": "1.0.0"}, indent=2) + "\n"
+    )
+    (core / ".rlsbl").mkdir()
+    (core / ".rlsbl" / "config.json").write_text(
+        json.dumps({"private": False, "targets": ["npm"], "pipelines": {}}) + "\n"
+    )
+
+    save_workspace(
+        str(root),
+        [{"path": "packages/core", "name": "core", "releasable": "alpha"}],
+        releasables=[Releasable(name="alpha")],
+    )
+    write_releasable_version(str(root), "alpha", "1.0.0")
+    changes_dir = get_releasable_changes_dir(str(root), "alpha")
+    os.makedirs(changes_dir, exist_ok=True)
+    with open(os.path.join(changes_dir, "unreleased.jsonl"), "w") as f:
+        f.write("")
+    rel_dir = get_releasable_dir(str(root), "alpha")
+    with open(os.path.join(rel_dir, "config.json"), "w") as f:
+        f.write("{}\n")
+
+    _git(root, "add", ".rlsbl-monorepo", "packages")
+    _git(root, "commit", "-q", "-m", "initial")
+    _git(root, "tag", "alpha@v1.0.0")
+
+    # Member-scoped feature commit
+    (core / "feature.txt").write_text("new feature\n")
+    _git(root, "add", "packages/core/feature.txt")
+    _git(root, "commit", "-q", "-m", "add feature")
+    feature_sha = _git_head(root)
+
+    # Cover it in the releasable-level changelog
+    entry = {
+        "commits": [feature_sha],
+        "user_facing": True,
+        "description": "**New feature.** A shiny new thing.",
+        "type": "feature",
+    }
+    with open(os.path.join(changes_dir, "unreleased.jsonl"), "w") as f:
+        f.write(json.dumps(entry) + "\n")
+    _git(root, "add", os.path.relpath(changes_dir, str(root)))
+    _git(root, "commit", "-q", "-m", "changelog: add feature entry",
+         "--trailer", "Autogenerated: true")
+
+    return core
+
+
+def _write_releasable_release_file(root, name="alpha"):
+    """Write and commit unreleased.toml at the RELEASABLE releases dir."""
+    rel_dir = get_releasable_dir(str(root), name)
+    releases_dir = os.path.join(rel_dir, "releases")
+    os.makedirs(releases_dir, exist_ok=True)
+    path = os.path.join(releases_dir, "unreleased.toml")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(_RELEASE_TOML)
+    _git(root, "add", os.path.relpath(path, str(root)))
+    _git(root, "commit", "-q", "-m", "add release file",
+         "--trailer", "Autogenerated: true")
+    return path
+
+
+def _make_ctx(member_dir, root):
+    return create_context(Path(str(member_dir)), workspace_root=Path(str(root)))
+
+
+def _fake_run_factory():
+    def fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
+        if cmd == "gh":
+            return ""
+        if cmd == "git" and args and args[0] == "push":
+            return ""
+        if cmd == "git" and args and args[0] == "fetch":
+            return ""
+        if cmd == "git" and args and args[:2] == ["rev-list", "--count"] and any("origin/" in a for a in args):
+            return "0"
+        return real_run(cmd, args=args, timeout=timeout, env=env, cwd=cwd)
+    return fake_run
+
+
+def _release_patches():
+    return (
+        patch("rlsbl.commands.release.check_gh_installed", return_value=True),
+        patch("rlsbl.commands.release.check_gh_auth", return_value=True),
+        patch("rlsbl.commands.release.push_if_needed"),
+        patch("rlsbl.commands.release.run_gh", return_value=""),
+        patch("rlsbl.commands.release.run", side_effect=_fake_run_factory()),
+        patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
+    )
+
+
+def _residue_check_result(root):
+    """Run the releasable-residue workspace check against the workspace."""
+    from rlsbl import app
+    from rlsbl.check_context import WorkspaceCheckContext
+    from rlsbl.workspace import load_releasables, load_workspace
+
+    projects = load_workspace(str(root))
+    releasables = load_releasables(str(root), projects=projects)
+    ctx = WorkspaceCheckContext(
+        project_root=Path(str(root)),
+        workspace_root=Path(str(root)),
+        config={},
+        projects=projects,
+        graph=None,
+        releasables=releasables,
+    )
+    return app._check_defs["releasable-residue"].impl(ctx)
+
+
+# ---------------------------------------------------------------------------
+# Path resolution
+# ---------------------------------------------------------------------------
+
+
+class TestGetReleaseFilePath:
+
+    def test_default_member_location(self):
+        assert get_release_file_path("/proj") == os.path.join(
+            "/proj", ".rlsbl", "releases", "unreleased.toml"
+        )
+
+    def test_releasable_location(self):
+        rel_dir = "/ws/.rlsbl-monorepo/releasables/alpha"
+        assert get_release_file_path("/proj", releasable_dir=rel_dir) == os.path.join(
+            rel_dir, "releases", "unreleased.toml"
+        )
+
+
+# ---------------------------------------------------------------------------
+# KILLER: file-based releasable release archives at the releasable level
+# ---------------------------------------------------------------------------
+
+
+class TestReleasableReleaseFileArchival:
+
+    def test_release_archives_at_releasable_level_and_residue_check_passes(
+        self, tmp_project,
+    ):
+        """A file-based releasable release must archive v{x}.toml under
+        .rlsbl-monorepo/releasables/<name>/releases/, leave the member's
+        .rlsbl/ untouched, and pass the releasable-residue check
+        IMMEDIATELY afterwards."""
+        core = _setup_releasable_workspace(tmp_project)
+        _write_releasable_release_file(tmp_project)
+
+        p1, p2, p3, p4, p5, p6 = _release_patches()
+        with p1, p2, p3, p4, p5, p6:
+            run_cmd(
+                _rc(),
+                {"yes": True, "quiet": True, "skip-lock": True},
+                ctx=_make_ctx(core, tmp_project),
+            )
+
+        rel_releases = Path(get_releasable_dir(str(tmp_project), "alpha")) / "releases"
+        versioned = rel_releases / "v1.0.1.toml"
+        assert versioned.exists(), (
+            "release must archive v1.0.1.toml at the RELEASABLE level"
+        )
+        # Archived file is immutable (chmod 444)
+        assert not (versioned.stat().st_mode & stat.S_IWUSR)
+        # unreleased.toml consumed by the rename
+        assert not (rel_releases / "unreleased.toml").exists()
+
+        # ZERO pollution of the representative member
+        assert not (core / ".rlsbl" / "releases").exists(), (
+            "file-based releasable release must not touch the member's "
+            ".rlsbl/releases/"
+        )
+
+        # The killer assertion: residue check passes right after the release
+        result = _residue_check_result(tmp_project)
+        assert result.status == "pass", (
+            f"releasable-residue must pass immediately after a release: "
+            f"{result.message} {getattr(result, 'details', None)}"
+        )
+
+        # Working tree stays clean (finalize commit covered the rename)
+        status = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=str(tmp_project), capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        assert status == "", f"working tree must be clean after release:\n{status}"
+
+    def test_quick_bump_release_leaves_member_untouched(self, tmp_project):
+        """Quick-bump (--bump) releasable releases never had a release file;
+        they must also leave the member's .rlsbl/ untouched."""
+        core = _setup_releasable_workspace(tmp_project)
+
+        p1, p2, p3, p4, p5, p6 = _release_patches()
+        with p1, p2, p3, p4, p5, p6:
+            run_cmd(
+                _rc(),
+                {"yes": True, "quiet": True, "skip-lock": True},
+                ctx=_make_ctx(core, tmp_project),
+            )
+
+        assert not (core / ".rlsbl" / "releases").exists()
+        result = _residue_check_result(tmp_project)
+        assert result.status == "pass", result.message
+
+
+# ---------------------------------------------------------------------------
+# Legacy member-level release file: hard error with migration hint
+# ---------------------------------------------------------------------------
+
+
+class TestLegacyReleaseFileDetection:
+
+    def test_legacy_member_release_file_is_hard_error(self, tmp_project, capsys):
+        core = _setup_releasable_workspace(tmp_project)
+
+        legacy_path = Path(get_release_file_path(str(core)))
+        legacy_path.parent.mkdir(parents=True, exist_ok=True)
+        legacy_path.write_text(_RELEASE_TOML)
+
+        with pytest.raises(SystemExit):
+            run_cmd(
+                _rc(),
+                {"yes": True, "quiet": True, "skip-lock": True},
+                ctx=_make_ctx(core, tmp_project),
+            )
+
+        captured = capsys.readouterr()
+        assert "legacy location" in captured.err
+        assert str(legacy_path) in captured.err
+        # Migration hint names the new location
+        new_path = get_release_file_path(
+            str(core),
+            releasable_dir=get_releasable_dir(str(tmp_project), "alpha"),
+        )
+        assert new_path in captured.err
+
+        # Nothing was archived anywhere
+        rel_releases = Path(get_releasable_dir(str(tmp_project), "alpha")) / "releases"
+        assert not (rel_releases / "v1.0.1.toml").exists()
+        assert legacy_path.exists(), "the legacy file must be left in place"
+
+
+# ---------------------------------------------------------------------------
+# release init scaffolds into the releasable releases dir
+# ---------------------------------------------------------------------------
+
+
+class TestReleaseInitReleasable:
+
+    def test_init_scaffolds_at_releasable_location(self, tmp_project, monkeypatch, capsys):
+        from rlsbl.commands.release_init import run_cmd as init_run_cmd
+
+        core = _setup_releasable_workspace(tmp_project)
+        monkeypatch.chdir(core)
+
+        init_run_cmd(project_root=str(core))
+
+        rel_path = get_release_file_path(
+            str(core),
+            releasable_dir=get_releasable_dir(str(tmp_project), "alpha"),
+        )
+        assert os.path.isfile(rel_path), (
+            "release init must scaffold unreleased.toml into the releasable "
+            "releases dir in releasable mode"
+        )
+        assert not (core / ".rlsbl" / "releases").exists(), (
+            "release init must not create the member-level releases dir"
+        )
+        captured = capsys.readouterr()
+        assert os.path.realpath(rel_path) in os.path.realpath(
+            captured.out.strip().splitlines()[-1]
+        )
+
+    def test_init_errors_on_legacy_member_file(self, tmp_project, monkeypatch, capsys):
+        from rlsbl.commands.release_init import run_cmd as init_run_cmd
+
+        core = _setup_releasable_workspace(tmp_project)
+        legacy_path = Path(get_release_file_path(str(core)))
+        legacy_path.parent.mkdir(parents=True, exist_ok=True)
+        legacy_path.write_text(_RELEASE_TOML)
+        monkeypatch.chdir(core)
+
+        with pytest.raises(SystemExit):
+            init_run_cmd(project_root=str(core))
+        captured = capsys.readouterr()
+        assert "legacy location" in captured.err
+
+
+# ---------------------------------------------------------------------------
+# Undo restores from the releasable location
+# ---------------------------------------------------------------------------
+
+
+class TestUndoRestoresReleasableReleaseFile:
+
+    def _setup_released_workspace(self, root):
+        """Workspace in the state a completed file-based release leaves:
+        version bump + changelog finalize + release-file finalize commits,
+        with v1.0.1.toml archived at the RELEASABLE level."""
+        core = _setup_releasable_workspace(root)
+        _write_releasable_release_file(root)
+        rel_dir = get_releasable_dir(str(root), "alpha")
+        changes_dir = get_releasable_changes_dir(str(root), "alpha")
+        releases_dir = Path(rel_dir) / "releases"
+
+        (Path(rel_dir) / "CHANGELOG.md").write_text(
+            "<!-- Generated by rlsbl from .rlsbl/changes/ — do not edit -->\n\n"
+            "# Changelog\n\n## 1.0.0\n\n- No user-facing changes.\n"
+        )
+        _git(root, "add", os.path.relpath(str(rel_dir), str(root)))
+        _git(root, "commit", "-q", "-m", "add canonical changelog")
+
+        # Version-bump commit
+        pkg = json.loads((core / "package.json").read_text())
+        pkg["version"] = "1.0.1"
+        (core / "package.json").write_text(json.dumps(pkg, indent=2) + "\n")
+        write_releasable_version(str(root), "alpha", "1.0.1")
+        _git(root, "add", "-A")
+        _git(root, "commit", "-q", "-m", "alpha: release v1.0.1")
+
+        # Changelog-finalize commit
+        unreleased = Path(changes_dir) / "unreleased.jsonl"
+        finalized = Path(changes_dir) / "1.0.1.jsonl"
+        os.rename(unreleased, finalized)
+        unreleased.write_text("")
+        _git(root, "add", "-A")
+        _git(root, "commit", "-q", "-m", "chore: finalize changelog for 1.0.1")
+
+        # Release-file finalize commit at the RELEASABLE level (a rename of
+        # the committed unreleased.toml, exactly as the release flow does it)
+        versioned = releases_dir / "v1.0.1.toml"
+        os.rename(releases_dir / "unreleased.toml", versioned)
+        os.chmod(versioned, 0o444)
+        _git(root, "add", "-A")
+        _git(root, "commit", "-q", "-m", "chore: finalize release file for 1.0.1")
+
+        _git(root, "tag", "alpha@v1.0.1")
+        return core
+
+    def test_undo_restores_release_file_at_releasable_level(
+        self, tmp_project, monkeypatch,
+    ):
+        core = self._setup_released_workspace(tmp_project)
+        monkeypatch.chdir(core)
+        ctx = _make_ctx(core, tmp_project)
+
+        def failing_run_gh(args, **kwargs):
+            raise subprocess.CalledProcessError(1, "gh")
+
+        with (
+            patch("rlsbl.commands.undo.check_gh_installed", return_value=True),
+            patch("rlsbl.commands.undo.check_gh_auth", return_value=True),
+            patch("rlsbl.commands.undo.run_gh", side_effect=failing_run_gh),
+            patch("rlsbl.commands.undo.run", side_effect=_fake_run_factory()),
+            patch("rlsbl.commands.undo.push_if_needed"),
+        ):
+            undo_run_cmd(None, [], {"yes": True}, ctx=ctx)
+
+        releases_dir = Path(get_releasable_dir(str(tmp_project), "alpha")) / "releases"
+        assert (releases_dir / "unreleased.toml").exists(), (
+            "undo must restore unreleased.toml at the RELEASABLE level"
+        )
+        assert not (releases_dir / "v1.0.1.toml").exists()
+        # The member's .rlsbl/releases/ must never be created by undo
+        assert not (core / ".rlsbl" / "releases").exists()
+
+
+# ---------------------------------------------------------------------------
+# CLI file-based read path
+# ---------------------------------------------------------------------------
+
+
+class TestCliReadsReleasableReleaseFile:
+
+    def test_cmd_release_run_finds_releasable_release_file(
+        self, tmp_project, monkeypatch,
+    ):
+        """The CLI file-based flow must read the release file from the
+        releasable location (not error with 'No release file found')."""
+        import rlsbl as rlsbl_mod
+
+        core = _setup_releasable_workspace(tmp_project)
+        _write_releasable_release_file(tmp_project)
+        monkeypatch.chdir(core)
+
+        with patch("rlsbl.commands.release.run_cmd") as mock_run:
+            rlsbl_mod.cmd_release_run(
+                dry_run=False, yes=True, quiet=True,
+                allow_dirty=False, watch=False,
+                bump="", description="", preid="",
+            )
+        mock_run.assert_called_once()
+        cfg = mock_run.call_args[0][0]
+        assert cfg.bump == "patch"
+        assert cfg.description == "test release"
+
+
+# ---------------------------------------------------------------------------
+# Changelog exemptions cover the relocated release-file paths
+# ---------------------------------------------------------------------------
+
+
+class TestExemptionCoversReleasableReleaseFiles:
+
+    @pytest.mark.parametrize("path", [
+        ".rlsbl-monorepo/releasables/alpha/releases/unreleased.toml",
+        ".rlsbl-monorepo/releasables/alpha/releases/v1.0.1.toml",
+        ".rlsbl-monorepo/releasables/alpha/releases/v1.0.1.md",
+        "sub/.rlsbl-monorepo/releasables/alpha/releases/unreleased.toml",
+    ])
+    def test_release_file_paths_are_exempt(self, path):
+        from rlsbl.changelog.exemptions import is_changelog_path
+
+        assert is_changelog_path(path)

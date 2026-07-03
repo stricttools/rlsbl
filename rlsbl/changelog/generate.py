@@ -35,25 +35,35 @@ _TYPE_ORDER: list[tuple[str, str]] = [
 ]
 
 
-def _read_release_metadata(project_path: str, version: str) -> tuple[str, str]:
+def _read_release_metadata(project_path: str, version: str, *,
+                           releases_dir: str | None = None) -> tuple[str, str]:
     """Read description and context from an archived release toml file.
 
-    Looks for .rlsbl/releases/v{version}.toml and extracts the description
-    and context fields. Returns ("", "") if the file doesn't exist or can't
+    Looks for v{version}.toml in ``releases_dir`` (default:
+    ``<project_path>/.rlsbl/releases/``; releasable releases archive under
+    the releasable's own releases dir) and extracts the description and
+    context fields. Returns ("", "") if the file doesn't exist or can't
     be parsed.
     """
-    desc, ctx, _bump = _read_release_metadata_full(project_path, version)
+    desc, ctx, _bump = _read_release_metadata_full(
+        project_path, version, releases_dir=releases_dir,
+    )
     return (desc, ctx)
 
 
-def _read_release_metadata_full(project_path: str, version: str) -> tuple[str, str, str]:
+def _read_release_metadata_full(project_path: str, version: str, *,
+                                releases_dir: str | None = None) -> tuple[str, str, str]:
     """Read description, context, and bump type from an archived release toml file.
 
-    Looks for .rlsbl/releases/v{version}.toml and extracts the description,
+    Looks for v{version}.toml in ``releases_dir`` (default:
+    ``<project_path>/.rlsbl/releases/``; releasable releases archive under
+    the releasable's own releases dir) and extracts the description,
     context, and bump fields. Returns ("", "", "") if the file doesn't exist
     or can't be parsed.
     """
-    toml_path = os.path.join(project_path, ".rlsbl", "releases", f"v{version}.toml")
+    if releases_dir is None:
+        releases_dir = os.path.join(project_path, ".rlsbl", "releases")
+    toml_path = os.path.join(releases_dir, f"v{version}.toml")
     try:
         with open(toml_path, "r", encoding="utf-8") as f:
             data = tomlkit.load(f)
@@ -318,6 +328,7 @@ def generate_changelog(
     context: str = "",
     changes_dir_override: str | None = None,
     changelog_output_path: str | None = None,
+    releases_dir_override: str | None = None,
     bump_type: str | None = None,
 ) -> str:
     """Generate the complete CHANGELOG.md from .rlsbl/changes/ JSONL files.
@@ -351,6 +362,11 @@ def generate_changelog(
     Used in explicit releasable mode to write CHANGELOG.md into the releasable
     directory instead of the project root.
 
+    ``releases_dir_override`` overrides the default ``.rlsbl/releases/`` path
+    used for the archived-release-file metadata backfill (description,
+    context, bump type of versioned sections). Used in explicit releasable
+    mode where v{version}.toml archives live under the releasable directory.
+
     ``bump_type`` is passed through to ``generate_version_section()`` for the
     unreleased section. For versioned sections, the bump type is read from the
     archived release file.
@@ -376,7 +392,9 @@ def generate_changelog(
 
     # Always generate individual per-version .md files.
     for version, _jsonl_path in versioned:
-        ver_desc, ver_ctx, ver_bump = _read_release_metadata_full(project_path, version)
+        ver_desc, ver_ctx, ver_bump = _read_release_metadata_full(
+            project_path, version, releases_dir=releases_dir_override,
+        )
         generate_version_file(
             changes_dir, version, write_to_disk=write_to_disk,
             description=ver_desc, context=ver_ctx,
@@ -416,7 +434,9 @@ def generate_changelog(
             # (group is newest-first from list_versioned_files, reverse it).
             prerelease_asc = list(reversed(prerelease_versions))
 
-            ver_desc, ver_ctx, ver_bump = _read_release_metadata_full(project_path, base)
+            ver_desc, ver_ctx, ver_bump = _read_release_metadata_full(
+                project_path, base, releases_dir=releases_dir_override,
+            )
             section = _generate_consolidated_section(
                 base,
                 all_entries,
@@ -431,7 +451,9 @@ def generate_changelog(
             # No consolidation needed: either all pre-releases or a lone stable.
             # Emit each version individually.
             for ver in group:
-                ver_desc, ver_ctx, ver_bump = _read_release_metadata_full(project_path, ver)
+                ver_desc, ver_ctx, ver_bump = _read_release_metadata_full(
+                    project_path, ver, releases_dir=releases_dir_override,
+                )
                 md = generate_version_section(
                     ver,
                     parse_jsonl(os.path.join(changes_dir, f"{ver}.jsonl")),

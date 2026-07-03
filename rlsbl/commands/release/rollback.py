@@ -4,7 +4,8 @@ import os
 
 
 def _cleanup_release_artifacts(project_dir: str, version: str, *,
-                               changes_dir: str | None = None) -> None:
+                               changes_dir: str | None = None,
+                               releases_dir: str | None = None) -> None:
     """Best-effort removal of generated files that become orphaned after rollback.
 
     After `git reset --hard` reverts the release commits, files created during
@@ -14,17 +15,19 @@ def _cleanup_release_artifacts(project_dir: str, version: str, *,
 
     ``changes_dir`` overrides the default per-project ``.rlsbl/changes/``
     location -- in explicit releasable mode the finalized JSONL and its
-    per-version .md live in the releasable's changes dir. The release TOML
-    candidates stay per-project: the release-file finalization archives at
-    ``<project>/.rlsbl/releases/`` regardless of mode.
+    per-version .md live in the releasable's changes dir. ``releases_dir``
+    overrides the default per-project ``.rlsbl/releases/`` location the
+    same way -- in explicit releasable mode the release-file finalization
+    archives v{version}.toml/.md under the releasable's own releases dir.
     """
     try:
         resolved_changes = changes_dir or os.path.join(project_dir, ".rlsbl", "changes")
+        resolved_releases = releases_dir or os.path.join(project_dir, ".rlsbl", "releases")
         candidates = [
             os.path.join(resolved_changes, f"{version}.jsonl"),
             os.path.join(resolved_changes, f"{version}.md"),
-            os.path.join(project_dir, ".rlsbl", "releases", f"v{version}.toml"),
-            os.path.join(project_dir, ".rlsbl", "releases", f"v{version}.md"),
+            os.path.join(resolved_releases, f"v{version}.toml"),
+            os.path.join(resolved_releases, f"v{version}.md"),
         ]
         for path in candidates:
             if os.path.exists(path):

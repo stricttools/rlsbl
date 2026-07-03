@@ -80,7 +80,7 @@ class TestBlogBodyArchival:
         body = releases_dir / "unreleased.md"
         body.write_text("# My blog post\n\nDetails about the release.\n")
 
-        result = archive_blog_body(str(tmp_path), "1.2.3")
+        result = archive_blog_body(str(releases_dir), "1.2.3")
 
         expected_dst = str(releases_dir / "v1.2.3.md")
         assert result == expected_dst
@@ -96,7 +96,7 @@ class TestBlogBodyArchival:
         releases_dir = tmp_path / ".rlsbl" / "releases"
         releases_dir.mkdir(parents=True)
 
-        result = archive_blog_body(str(tmp_path), "1.2.3")
+        result = archive_blog_body(str(releases_dir), "1.2.3")
 
         assert result is None
         assert not (releases_dir / "v1.2.3.md").exists(), "no body file should be created"
@@ -108,7 +108,7 @@ class TestBlogBodyArchival:
         body = releases_dir / "unreleased.md"
         body.write_text("Blog content.\n")
 
-        result = archive_blog_body(str(tmp_path), "2.0.0")
+        result = archive_blog_body(str(releases_dir), "2.0.0")
 
         assert result is not None, "archived blog body path should be returned for commit"
         assert os.path.exists(result)
@@ -118,7 +118,7 @@ class TestBlogBodyArchival:
         releases_dir = tmp_path / ".rlsbl" / "releases"
         releases_dir.mkdir(parents=True)
 
-        result = archive_blog_body(str(tmp_path), "2.0.0")
+        result = archive_blog_body(str(releases_dir), "2.0.0")
 
         assert result is None, "no blog body path when the file does not exist"
 

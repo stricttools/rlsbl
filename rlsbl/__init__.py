@@ -241,6 +241,14 @@ def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, bump, description, 
             sys.exit(1)
         project_dir = os.path.join(monorepo_root, project["path"])
 
+    # Releasable releases keep their release file under the releasable's
+    # own dir (.rlsbl-monorepo/releasables/<name>/releases/), never under
+    # the representative member's .rlsbl/ (same home as in-progress.json).
+    _releasable_dir = None
+    if monorepo_root:
+        from .commands.release.release_state import resolve_releasable_dir
+        _releasable_dir = resolve_releasable_dir(project_dir, monorepo_root)
+
     # --- Quick bump mode: --bump + --description bypass the release file ---
     if preid and not bump:
         print("Error: --preid requires --bump", file=sys.stderr)
@@ -266,7 +274,7 @@ def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, bump, description, 
                     file=sys.stderr,
                 )
                 sys.exit(1)
-        release_path = get_release_file_path(project_dir)
+        release_path = get_release_file_path(project_dir, releasable_dir=_releasable_dir)
         if os.path.exists(release_path):
             print(
                 "Error: release file exists — use `rlsbl release run` without --bump, "
@@ -307,7 +315,7 @@ def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, bump, description, 
         return
 
     # --- File-based flow ---
-    release_path = get_release_file_path(project_dir)
+    release_path = get_release_file_path(project_dir, releasable_dir=_releasable_dir)
     if not os.path.exists(release_path):
         print(
             "No release file found. Run `rlsbl release init` to create one.",

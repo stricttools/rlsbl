@@ -33,19 +33,21 @@ def _resolve_undo_changelog_paths(project_path, ws_root, releasable_name):
             get_changelog_home,
             get_workspace_changelog_path,
         )
+        from ..release_file import get_releases_dir
         from ..workspace import get_releasable_changes_dir, get_releasable_dir
 
+        rel_dir = get_releasable_dir(str(ws_root), releasable_name)
         changes_dir = get_releasable_changes_dir(str(ws_root), releasable_name)
-        canonical = get_changelog_home(
-            project_path,
-            releasable_dir=get_releasable_dir(str(ws_root), releasable_name),
-        )
+        canonical = get_changelog_home(project_path, releasable_dir=rel_dir)
 
         def regenerate():
             generate_changelog(
                 project_path,
                 changes_dir_override=changes_dir,
                 changelog_output_path=canonical,
+                releases_dir_override=get_releases_dir(
+                    project_path, releasable_dir=rel_dir,
+                ),
             )
             generate_workspace_changelog(str(ws_root))
 
@@ -61,6 +63,21 @@ def _resolve_undo_changelog_paths(project_path, ws_root, releasable_name):
 
     add_paths = [changes_dir, os.path.join(project_path, "CHANGELOG.md")]
     return changes_dir, regenerate, add_paths
+
+
+def _resolve_undo_releases_dir(project_path, ws_root, releasable_name):
+    """Resolve the releases dir holding the release-file family -- releasable-aware.
+
+    In explicit releasable mode the archived v{x}.toml (and unreleased.toml)
+    live under the releasable's own releases dir; otherwise per-project.
+    """
+    from ..release_file import get_releases_dir
+
+    rel_dir = None
+    if releasable_name and ws_root:
+        from ..workspace import get_releasable_dir
+        rel_dir = get_releasable_dir(str(ws_root), releasable_name)
+    return get_releases_dir(project_path, releasable_dir=rel_dir)
 
 
 def _clear_release_state(project_path, ws_root):
@@ -215,9 +232,12 @@ def _undo_pr_release(tag, release_branch, bare_version, flags,
         results.append(("Restore changelog", FAILED,
                          "manually restore the changes dir and regenerate CHANGELOG.md"))
 
-    # Restore the release file
+    # Restore the release file (releasable-aware: the archive lives under
+    # the releasable's releases dir in explicit releasable mode)
     try:
-        releases_dir = os.path.join(project_path, ".rlsbl", "releases")
+        releases_dir = _resolve_undo_releases_dir(
+            project_path, ws_root, releasable_name,
+        )
         release_file_changed = unfinalize_release_file(releases_dir, bare_version)
         if release_file_changed:
             run("git", ["add", releases_dir])
@@ -226,7 +246,7 @@ def _undo_pr_release(tag, release_branch, bare_version, flags,
     except Exception:
         traceback.print_exc()
         results.append(("Restore release file", FAILED,
-                         f"manually restore .rlsbl/releases/unreleased.toml from v{bare_version}.toml"))
+                         f"manually restore unreleased.toml from v{bare_version}.toml in the releases dir"))
 
     # Print summary
     has_failure = any(status == FAILED for _, status, _ in results)
@@ -490,8 +510,12 @@ def run_cmd(registry, args, flags, *, ctx):
     # and this is a no-op; when it wasn't at HEAD (e.g., post-release hooks
     # added commits), the finalized read-only vX.Y.Z.toml and the fresh empty
     # unreleased.toml are still on disk and must be repaired directly.
+    # Releasable-aware: the archive lives under the releasable's releases
+    # dir in explicit releasable mode.
     try:
-        releases_dir = os.path.join(project_path, ".rlsbl", "releases")
+        releases_dir = _resolve_undo_releases_dir(
+            project_path, ws_root, releasable_name,
+        )
         release_file_changed = unfinalize_release_file(releases_dir, bare_version)
         if release_file_changed:
             run("git", ["add", releases_dir])
@@ -499,7 +523,7 @@ def run_cmd(registry, args, flags, *, ctx):
             results.append(("Restore release file", OK, "-"))
     except Exception:
         traceback.print_exc()
-        results.append(("Restore release file", FAILED, f"manually restore .rlsbl/releases/unreleased.toml from v{bare_version}.toml"))
+        results.append(("Restore release file", FAILED, f"manually restore unreleased.toml from v{bare_version}.toml in the releases dir"))
 
     # Push the revert commit to remote
     if reverted:

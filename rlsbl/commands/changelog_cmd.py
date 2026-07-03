@@ -228,6 +228,8 @@ def _regenerate_changelog_outputs(ws_context, project_root, changes_dir):
             get_workspace_changelog_path,
         )
 
+        from ..release_file import get_releases_dir
+
         releasable_dir = get_releasable_dir(
             ws_context.ws_root, ws_context.releasable.name,
         )
@@ -236,6 +238,9 @@ def _regenerate_changelog_outputs(ws_context, project_root, changes_dir):
             project_root,
             changes_dir_override=changes_dir,
             changelog_output_path=canonical,
+            releases_dir_override=get_releases_dir(
+                project_root, releasable_dir=releasable_dir,
+            ),
         )
         generate_workspace_changelog(ws_context.ws_root)
         return [canonical, get_workspace_changelog_path(ws_context.ws_root)]
@@ -420,6 +425,20 @@ def cmd_generate(flags, project_root):
         and ws_context.ws_root is not None
     )
 
+    # Archived release files (v{x}.toml metadata backfill) live at the
+    # releasable level in explicit releasable mode.
+    releases_dir_override = None
+    if is_releasable_mode:
+        from ..release_file import get_releases_dir
+        from ..workspace import get_releasable_dir as _get_rel_dir
+
+        releases_dir_override = get_releases_dir(
+            project_root,
+            releasable_dir=_get_rel_dir(
+                ws_context.ws_root, ws_context.releasable.name,
+            ),
+        )
+
     dry_run = flags.get("dry-run", False)
 
     if dry_run:
@@ -442,7 +461,9 @@ def cmd_generate(flags, project_root):
             from ..changelog.schema import parse_jsonl
 
             entries = parse_jsonl(jsonl_path)
-            ver_desc, ver_ctx, ver_bump = _read_release_metadata_full(project_root, version)
+            ver_desc, ver_ctx, ver_bump = _read_release_metadata_full(
+                project_root, version, releases_dir=releases_dir_override,
+            )
             sections.append(generate_version_section(
                 version, entries, description=ver_desc, context=ver_ctx,
                 bump_type=ver_bump or None,
@@ -470,6 +491,7 @@ def cmd_generate(flags, project_root):
                 project_root,
                 changes_dir_override=changes_dir,
                 changelog_output_path=canonical_path,
+                releases_dir_override=releases_dir_override,
             )
             # Regenerate the combined root CHANGELOG.md covering all
             # releasables of the workspace.

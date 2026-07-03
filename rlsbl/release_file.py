@@ -36,9 +36,57 @@ class ReleaseConfig:
     blog: bool = False
 
 
-def get_release_file_path(project_dir: str = ".") -> str:
-    """Return the path to .rlsbl/releases/unreleased.toml relative to project_dir."""
-    return os.path.join(project_dir, ".rlsbl", "releases", "unreleased.toml")
+def get_releases_dir(project_dir: str = ".", *, releasable_dir: str | None = None) -> str:
+    """Return the directory holding release files (unreleased.toml family).
+
+    ``releasable_dir`` is the releasable's state directory
+    (``.rlsbl-monorepo/releasables/<name>/``); when given, release files
+    live in its ``releases/`` subdirectory — the same home as
+    in-progress.json/pending.json/scrub-result.json — instead of the
+    project's ``.rlsbl/releases/``. This is the single derivation for the
+    releases dir; the release state module delegates here.
+    """
+    if releasable_dir:
+        return os.path.join(releasable_dir, "releases")
+    return os.path.join(project_dir, ".rlsbl", "releases")
+
+
+def get_release_file_path(project_dir: str = ".", *, releasable_dir: str | None = None) -> str:
+    """Return the path to the release file (unreleased.toml).
+
+    Standalone projects and implicit-monorepo packages:
+    ``<project_dir>/.rlsbl/releases/unreleased.toml``. Releasable releases
+    (explicit monorepo mode): pass ``releasable_dir`` — the file lives at
+    ``.rlsbl-monorepo/releasables/<name>/releases/unreleased.toml``.
+    """
+    return os.path.join(
+        get_releases_dir(project_dir, releasable_dir=releasable_dir),
+        "unreleased.toml",
+    )
+
+
+def check_legacy_release_file(project_dir: str, releasable_dir: str | None) -> None:
+    """Hard-error if a release file sits at the legacy member location.
+
+    Releasable release files used to live under the representative
+    member's ``.rlsbl/releases/``. A file found there in releasable mode
+    must never be silently ignored (it would be skipped by the relocated
+    read path and left behind as per-package residue).
+
+    Raises ReleaseFileError with a migration hint. No-op when
+    ``releasable_dir`` is None (standalone / implicit mode).
+    """
+    if not releasable_dir:
+        return
+    legacy_path = get_release_file_path(project_dir)
+    if os.path.isfile(legacy_path):
+        raise ReleaseFileError(
+            f"found a release file at the legacy location {legacy_path}. "
+            f"Releasable release files now live at "
+            f"{get_release_file_path(project_dir, releasable_dir=releasable_dir)}. "
+            f"Move the file to the new location (or delete it if stale) and "
+            f"re-run."
+        )
 
 
 def _validate_release_config(data: dict, prefix: str = "") -> ReleaseConfig:

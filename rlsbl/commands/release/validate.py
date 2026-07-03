@@ -760,8 +760,12 @@ def _run_strictcli_schema_dump(flags, log, project_dir="."):
         print(f"Warning: strictcli schema dump failed: {e}", file=sys.stderr)
 
 
-def validate_blog_body(project_dir, blog_enabled):
+def validate_blog_body(project_dir, blog_enabled, *, releases_dir=None):
     """Validate the blog body file for a release.
+
+    ``releases_dir`` overrides the default ``.rlsbl/releases/`` location --
+    releasable releases keep the blog body (unreleased.md) in the
+    releasable's own releases dir, alongside unreleased.toml.
 
     Returns (body_path, warning_message) where body_path is the path if it exists
     and warning_message is set if the file is missing.
@@ -769,15 +773,17 @@ def validate_blog_body(project_dir, blog_enabled):
     """
     if not blog_enabled:
         return None, None
-    blog_body_path = os.path.join(project_dir, ".rlsbl", "releases", "unreleased.md")
+    if releases_dir is None:
+        releases_dir = os.path.join(project_dir, ".rlsbl", "releases")
+    blog_body_path = os.path.join(releases_dir, "unreleased.md")
     if os.path.exists(blog_body_path):
         with open(blog_body_path, "r", encoding="utf-8") as f:
             body_content = f.read()
         if not body_content.strip():
             print(
-                "Error: blog body file at .rlsbl/releases/unreleased.md exists but is empty.",
+                f"Error: blog body file at {blog_body_path} exists but is empty.",
                 file=sys.stderr,
             )
             raise ReleaseValidationError("Blog body validation failed")
         return blog_body_path, None
-    return None, "blog = true but no body file at .rlsbl/releases/unreleased.md (post will be changelog-only)"
+    return None, f"blog = true but no body file at {blog_body_path} (post will be changelog-only)"

@@ -305,6 +305,18 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     _ip_state_path = get_state_path(
         str(project_root), releasable_dir=_ip_releasable_dir,
     )
+    # Legacy release-FILE check: releasable release files (unreleased.toml)
+    # used to live under the representative member's .rlsbl/releases/. A
+    # file there must never be silently ignored (the relocated read path
+    # would skip it and the archive step would leave it as residue).
+    if _ip_releasable_dir is not None:
+        from ...release_file import check_legacy_release_file
+        from ...errors import ReleaseFileError
+        try:
+            check_legacy_release_file(str(project_root), _ip_releasable_dir)
+        except ReleaseFileError as e:
+            raise ReleaseValidationError(str(e))
+
     _ip_state = load_release_state(_ip_state_path)
     if _ip_state is None and _ip_releasable_dir is not None:
         # Legacy location check: older rlsbl versions wrote releasable
@@ -535,8 +547,13 @@ def _run_cmd_inner(release_config, flags, *, ctx):
                     "— use patch, minor, or major instead"
                 )
 
-    # Validate blog body file if blog is enabled
-    _blog_body_path, blog_warning = validate_blog_body(project_dir, release_config.blog)
+    # Validate blog body file if blog is enabled (releasable-aware: the
+    # body lives alongside unreleased.toml in the releasable releases dir)
+    from ...release_file import get_releases_dir as _get_releases_dir
+    _blog_body_path, blog_warning = validate_blog_body(
+        project_dir, release_config.blog,
+        releases_dir=_get_releases_dir(project_dir, releasable_dir=_rel_cfg_dir),
+    )
     if blog_warning:
         log(blog_warning)
 
@@ -548,8 +565,13 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     from ...changelog.home import get_changelog_home, generate_workspace_changelog
     changelog_gen_kwargs = {}
     if releasable_name and changes_dir:
+        from ...release_file import get_releases_dir
         changelog_gen_kwargs["changes_dir_override"] = changes_dir
         changelog_gen_kwargs["changelog_output_path"] = get_changelog_home(
+            project_dir, releasable_dir=_rel_cfg_dir,
+        )
+        # Archived release files (v{x}.toml) live at the releasable level too.
+        changelog_gen_kwargs["releases_dir_override"] = get_releases_dir(
             project_dir, releasable_dir=_rel_cfg_dir,
         )
     changelog_content = generate_changelog(
@@ -648,6 +670,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         bump_type=bump_type,
         changelog_entry=changelog_entry,
         tag=tag,
+        releases_dir=_get_releases_dir(project_dir, releasable_dir=_rel_cfg_dir),
     )
 
     # Commit selfdoc-generated files immediately so the tree is clean if later

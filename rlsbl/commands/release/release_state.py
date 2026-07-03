@@ -93,11 +93,13 @@ def get_state_dir(project_dir: str, *, releasable_dir: str | None = None) -> str
     ``releasable_dir`` is the releasable's state directory
     (``.rlsbl-monorepo/releasables/<name>/``); when given, state lives in
     its ``releases/`` subdirectory instead of the project's
-    ``.rlsbl/releases/``.
+    ``.rlsbl/releases/``. Delegates to the single releases-dir derivation
+    in :mod:`rlsbl.release_file` (shared with the release-file family:
+    unreleased.toml, v{x}.toml, unreleased.md, v{x}.md).
     """
-    if releasable_dir:
-        return os.path.join(releasable_dir, "releases")
-    return os.path.join(project_dir, ".rlsbl", "releases")
+    from ...release_file import get_releases_dir
+
+    return get_releases_dir(project_dir, releasable_dir=releasable_dir)
 
 
 def get_state_path(project_dir: str, *, releasable_dir: str | None = None) -> str:

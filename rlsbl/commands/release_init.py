@@ -12,13 +12,19 @@ def run_cmd(project_root):
     """
     import tomlkit
 
-    from ..release_file import get_release_file_path
+    from ..errors import ReleaseFileError
+    from ..release_file import check_legacy_release_file, get_release_file_path
     from ..targets import detect_targets
     from ..workspace import find_workspace_root, resolve_project
 
-    # In monorepo mode, create the release file in the package's directory
+    # In monorepo mode, create the release file in the package's directory.
+    # For releasable members (explicit mode), the file is scaffolded into
+    # the releasable's own releases dir
+    # (.rlsbl-monorepo/releasables/<name>/releases/), never under the
+    # member's .rlsbl/ — same home as in-progress.json.
     start_path = str(project_root)
     project_dir = start_path
+    releasable_dir = None
     monorepo_root = find_workspace_root(start_path)
     if monorepo_root:
         from ..workspace import is_explicit_mode
@@ -32,8 +38,16 @@ def run_cmd(project_root):
         project = resolve_project(monorepo_root, start_path)
         if project is not None:
             project_dir = os.path.join(monorepo_root, project["path"])
+        from .release.release_state import resolve_releasable_dir
+        releasable_dir = resolve_releasable_dir(project_dir, monorepo_root)
 
-    release_path = get_release_file_path(project_dir)
+    try:
+        check_legacy_release_file(project_dir, releasable_dir)
+    except ReleaseFileError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    release_path = get_release_file_path(project_dir, releasable_dir=releasable_dir)
     if os.path.exists(release_path):
         content = open(release_path).read().strip()
         if content:
