@@ -17,6 +17,8 @@ Poll GitHub Actions CI workflow runs for a specific commit SHA and report pass o
 | --- | --- | --- | --- | --- | --- |
 | `--target` |  | str |  |  | Registry whose CI workflow to watch (auto-detected if omitted) |
 | `--run-id` |  | str |  |  | GitHub Actions workflow run ID to poll directly instead of searching by SHA |
+| `--as-daemon-child` |  | bool |  |  | Internal: run as the detached watcher child spawned by --watch-async (fire-and-forget notifications, pidfile cleanup on exit). Not intended for direct use. |
+| `--stop` |  | bool |  |  | Stop a running detached watcher started with --watch-async. With a SHA, stops that watcher; without, stops the single live watcher (errors and lists candidates when several are live). |
 
 ## Arguments
 
