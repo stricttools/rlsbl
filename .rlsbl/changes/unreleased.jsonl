@@ -3,3 +3,4 @@
 {"commits":["d1f8e30a950fca0a745bd699ef76e798c25fc64a"],"user_facing":true,"description":"**Monorepo init bootstrap fix.** `rlsbl monorepo init` no longer requires a pre-existing `.rlsbl/` directory, enabling fresh workspace initialization. Refuses nested workspaces.","type":"fix"}
 {"commits":["85cbd89ce62c3622951013626179c77dc338abe8"],"user_facing":true,"description":"**Per-member asset upload.** In releasable mode, each publishing member uploads assets with member-name-prefixed filenames for deterministic naming.","type":"feature"}
 {"commits":["ddbaf9c4e833fbbec444fd428f246c7791fd2a9a","c96f7b5379e391bf20f9a6ccd8a921430d95e653","4b5e911d69c2d9e62cd4e1873fbfe834da5b69e8","98dfbbab0e7275407ced8ce37d51e3d432179db4"],"user_facing":false}
+{"commits":["d31900e2eadae5eef6b66e7413aa25c2d8382921"],"user_facing":false}
