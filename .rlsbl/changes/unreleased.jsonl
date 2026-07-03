@@ -1,0 +1,1 @@
+{"commits":["d07a4103e014a73a6d3fac674254de822b7eff6b"],"user_facing":true,"description":"**Per-member publish loop.** In releasable mode, each non-private member with publish pipelines is published independently at the shared version. Private members are skipped, pipeline-less members are logged, and resume tracks per-member progress.","type":"feature"}
