@@ -1,6 +1,6 @@
 ---
 title: rlsbl.releasable_cleanup
-description: "Cleanup utilities for per-package .rlsbl/ directories after releasable model migration."
+description: "Cleanup utilities for per-package .rlsbl/ directories after releasable model migration, removing orphaned changelog and release state files from the old..."
 generated: true
 nav_group: "API Reference"
 nav_order: 107

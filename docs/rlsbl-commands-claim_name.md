@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.claim_name
-description: "Claim a package name on npm or PyPI by publishing a minimal placeholder package."
+description: "Claim a package name on npm or PyPI by publishing a minimal placeholder package with version 0.0.0 and an empty description."
 generated: true
 nav_group: "API Reference"
 nav_order: 24

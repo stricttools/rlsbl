@@ -1,6 +1,6 @@
 ---
 title: rlsbl.checks.quality
-description: "Quality checks (tag: quality)."
+description: "Quality checks (tag: quality) covering library lint, dead module detection, circular dependencies, unreplaced scaffold variables, and the test suite."
 generated: true
 nav_group: "API Reference"
 nav_order: 17

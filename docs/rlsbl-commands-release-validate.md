@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.release.validate
-description: "Validation helpers: tests, lint, selfdoc, scaffold conflicts, strictcli schema, blog body."
+description: "Validation helpers for release: test runner, lint, selfdoc gen/check, scaffold conflict detection, strictcli schema dump, and blog post body validation."
 generated: true
 nav_group: "API Reference"
 nav_order: 52

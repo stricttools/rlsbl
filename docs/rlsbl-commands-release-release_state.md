@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.release.release_state
-description: "Release state file: persistence for idempotent release flow."
+description: "Release state file: JSON persistence for idempotent release flow, tracking which steps completed so failed releases can resume from the last successful ..."
 generated: true
 nav_group: "API Reference"
 nav_order: 49

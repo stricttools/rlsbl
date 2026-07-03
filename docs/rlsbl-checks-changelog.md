@@ -1,6 +1,6 @@
 ---
 title: rlsbl.checks.changelog
-description: "Changelog checks (tag: changelog)."
+description: "Changelog checks (tag: changelog) validating JSONL entry schema, commit hash resolution, coverage, orphans, and batch size limits."
 generated: true
 nav_group: "API Reference"
 nav_order: 14

@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.release.shared
-description: "Shared utilities for release commands."
+description: "Shared utilities for release commands: project root detection, git auth verification, working tree guards, and release file loading."
 generated: true
 nav_group: "API Reference"
 nav_order: 51

@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.release.hooks
-description: "Hook helpers: content hashing, template hash lookup, hook emptiness check, hook runner."
+description: "Hook helpers: content hashing, template hash lookup, hook emptiness check, and shell script runner for pre-checks, pre-release, and post-release hooks."
 generated: true
 nav_group: "API Reference"
 nav_order: 47

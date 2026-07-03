@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.release.publish
-description: "Publishing helpers: selfdoc blog post generation, asset uploads, stale dep advisory."
+description: "Publishing helpers: selfdoc blog post generation, GitHub Release asset uploads, and stale dependency advisory for post-release notifications."
 generated: true
 nav_group: "API Reference"
 nav_order: 48

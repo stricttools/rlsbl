@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.dev_sync
-description: "Local editable overlays for `rlsbl dev sync`."
+description: "Local editable overlays for `rlsbl dev sync`, installing sibling project checkouts as editable packages without committing path dependencies."
 generated: true
 nav_group: "API Reference"
 nav_order: 28

@@ -1,6 +1,6 @@
 ---
 title: rlsbl.workspace_types
-description: "Core workspace types and path-building utilities."
+description: "Core workspace types and path-building utilities defining WorkspaceProject, Releasable, and directory resolution for monorepo workspace operations."
 generated: true
 nav_group: "API Reference"
 nav_order: 142

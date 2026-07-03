@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.release.rollback
-description: "Rollback helpers for cleaning up after a failed release."
+description: "Rollback helpers for cleaning up after a failed release: deleting tags, reverting version bump commits, and removing GitHub Releases."
 generated: true
 nav_group: "API Reference"
 nav_order: 50

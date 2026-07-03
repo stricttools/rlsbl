@@ -1,6 +1,6 @@
 ---
 title: rlsbl.errors
-description: "Custom exception hierarchy for rlsbl."
+description: "Custom exception hierarchy for rlsbl, providing typed error classes for config, workspace, changelog, version, and release file failures."
 generated: true
 nav_group: "API Reference"
 nav_order: 68

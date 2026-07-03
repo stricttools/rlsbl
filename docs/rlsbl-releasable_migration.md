@@ -1,6 +1,6 @@
 ---
 title: rlsbl.releasable_migration
-description: "Migration tooling for transitioning monorepos to the releasable model."
+description: "Migration tooling for transitioning monorepos to the releasable model, moving packages into releasable groups with changelog and config consolidation."
 generated: true
 nav_group: "API Reference"
 nav_order: 108

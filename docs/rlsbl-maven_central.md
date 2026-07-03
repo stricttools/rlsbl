@@ -1,6 +1,6 @@
 ---
 title: rlsbl.maven_central
-description: "Maven Central publishing requirements validation."
+description: "Maven Central publishing requirements validation, checking POM metadata, GPG signing, javadoc/sources jars, and artifact naming conventions."
 generated: true
 nav_group: "API Reference"
 nav_order: 87

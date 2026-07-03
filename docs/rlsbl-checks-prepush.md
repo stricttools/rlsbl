@@ -1,6 +1,6 @@
 ---
 title: rlsbl.checks.prepush
-description: "Pre-push checks (tag: prepush)."
+description: "Pre-push checks (tag: prepush) enforcing changelog coverage for pushed commits, gitignore guards, and manual release push warnings."
 generated: true
 nav_group: "API Reference"
 nav_order: 15

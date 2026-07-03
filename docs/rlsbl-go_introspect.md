@@ -1,6 +1,6 @@
 ---
 title: rlsbl.go_introspect
-description: "Toolchain-backed Go project introspection via ``go list``."
+description: "Toolchain-backed Go project introspection via ``go list``, classifying projects as library or binary and resolving module paths and import dependencies."
 generated: true
 nav_group: "API Reference"
 nav_order: 70

@@ -1,6 +1,6 @@
 ---
 title: rlsbl.checks.project
-description: "Project checks (tag: project)."
+description: "Project checks (tag: project) validating version, name, license, and description consistency, config schema, and scaffold conflicts."
 generated: true
 nav_group: "API Reference"
 nav_order: 16

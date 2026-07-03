@@ -1,6 +1,6 @@
 ---
 title: rlsbl.changelog.exemptions
-description: "Centralized changelog exemption registry for commit filtering rules."
+description: "Centralized changelog exemption registry for commit filtering rules, managing path-based and message-based exclusions from coverage checks."
 generated: true
 nav_group: "API Reference"
 nav_order: 4

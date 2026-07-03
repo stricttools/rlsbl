@@ -1,6 +1,6 @@
 ---
 title: rlsbl.changelog.home
-description: "Single source of truth for where generated CHANGELOG.md files live."
+description: "Single source of truth for where generated CHANGELOG.md files live, resolving the correct directory for standalone, implicit, and releasable modes."
 generated: true
 nav_group: "API Reference"
 nav_order: 7

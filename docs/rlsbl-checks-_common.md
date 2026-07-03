@@ -1,6 +1,6 @@
 ---
 title: rlsbl.checks._common
-description: "Shared helpers for check modules."
+description: "Shared helpers for rlsbl check modules: version and tag resolution, changelog context loading, and sibling project directory exclusion."
 generated: true
 nav_group: "API Reference"
 nav_order: 13

@@ -1,6 +1,6 @@
 ---
 title: rlsbl.member_context
-description: "Shared resolution of a member package's effective config and targets."
+description: "Shared resolution of a member package's effective config and targets, merging releasable-level and per-package overrides for release pipelines and hooks."
 generated: true
 nav_group: "API Reference"
 nav_order: 88

@@ -1,6 +1,6 @@
 ---
 title: rlsbl.constraints
-description: "Version constraint evaluation utilities."
+description: "Version constraint evaluation utilities for semver range parsing, compatibility checking, and dependency version resolution across workspace packages."
 generated: true
 nav_group: "API Reference"
 nav_order: 63

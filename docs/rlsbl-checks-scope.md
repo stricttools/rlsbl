@@ -1,6 +1,6 @@
 ---
 title: rlsbl.checks.scope
-description: "Scope adapter for the strictcli check system."
+description: "Scope adapter for the strictcli check system, interpreting colon-separated scope tokens to pre-filter checks by project path and workspace context."
 generated: true
 nav_group: "API Reference"
 nav_order: 19

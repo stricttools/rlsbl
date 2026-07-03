@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.monorepo.extract
-description: "Extract and absorb operations for moving packages in and out of monorepos."
+description: "Extract and absorb operations for moving packages in and out of monorepos, including history migration, changelog transfer, and workspace.toml updates."
 generated: true
 nav_group: "API Reference"
 nav_order: 36
