@@ -32,6 +32,19 @@ from ..workspace import load_workspace
 SAFEGIT_MIN_VERSION = (0, 21, 1)
 
 
+def _tag_name_from_refname(refname):
+    """Return the tag name for a ``refs/tags/...`` refname, else None.
+
+    safegit's tags[] list should only contain tag refs, but a stray
+    non-tag refname (e.g. ``refs/heads/x``) must never be treated as a
+    tag: ``removeprefix`` alone would leave it unchanged and the tag step
+    would force-push it.
+    """
+    if not refname.startswith("refs/tags/"):
+        return None
+    return refname[len("refs/tags/"):] or None
+
+
 def _save_step(path, data, step_name):
     """Record a completed step in the scrub result file."""
     data["completed_steps"].append(step_name)
@@ -479,7 +492,9 @@ def run_cmd(flags, *, ctx):
         # still resolve after the rewrite. Otherwise abort loudly BEFORE the
         # commit/push steps, keeping scrub-result.json for resume.
         if "HASHES_VALIDATED" not in completed:
-            failures = validate_all_hashes_resolve(all_changes_dirs)
+            failures = validate_all_hashes_resolve(
+                all_changes_dirs, repo_root=lock_root,
+            )
             if failures:
                 print(
                     "Error: after the history rewrite, some changelog commit "
@@ -642,7 +657,12 @@ def run_cmd(flags, *, ctx):
             push_env = {**os.environ, "RLSBL_RELEASE_PUSH": "1"}
             for tag_info in tags:
                 refname = tag_info.get("refname", "")
-                if not refname.removeprefix("refs/tags/"):
+                if _tag_name_from_refname(refname) is None:
+                    print(
+                        f"Warning: skipping non-tag refname in scrub tag "
+                        f"list: {refname!r}",
+                        file=sys.stderr,
+                    )
                     continue
                 _push_ref_with_lease(
                     refname, remote_refs.get(refname), tag_info.get("new_sha", ""),
@@ -656,8 +676,13 @@ def run_cmd(flags, *, ctx):
             if check_gh_installed() and check_gh_auth():
                 for tag_info in tags:
                     refname = tag_info.get("refname", "")
-                    tag_name = refname.removeprefix("refs/tags/")
-                    if not tag_name:
+                    tag_name = _tag_name_from_refname(refname)
+                    if tag_name is None:
+                        print(
+                            f"Warning: skipping non-tag refname in scrub "
+                            f"tag list: {refname!r}",
+                            file=sys.stderr,
+                        )
                         continue
 
                     # Check if a GitHub Release exists for this tag

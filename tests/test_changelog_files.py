@@ -597,7 +597,7 @@ class TestValidateAllHashesResolve:
         )
 
         monkeypatch.chdir(repo)
-        failures = validate_all_hashes_resolve([str(changes)])
+        failures = validate_all_hashes_resolve([str(changes)], repo_root=str(repo))
         assert failures == {str(changes / "unreleased.jsonl"): [bad]}
 
     def test_all_resolve(self, tmp_path, monkeypatch):
@@ -620,4 +620,39 @@ class TestValidateAllHashesResolve:
         os.chmod(str(changes / "1.0.0.jsonl"), 0o444)
 
         monkeypatch.chdir(repo)
-        assert validate_all_hashes_resolve([str(changes)]) == {}
+        assert validate_all_hashes_resolve([str(changes)], repo_root=str(repo)) == {}
+
+    def test_resolves_against_explicit_repo_root_not_cwd(self, tmp_path, monkeypatch):
+        """Hash resolution must run in the EXPLICIT repo_root, not whatever
+        the process CWD happens to be -- the planned validation-only mode
+        may run from outside the target repo."""
+        from rlsbl.changelog.files import validate_all_hashes_resolve
+
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        _run_git(repo, "init", "-q", "-b", "main")
+        _run_git(repo, "config", "user.email", "test@test.local")
+        _run_git(repo, "config", "user.name", "Test")
+        _make_commit(repo, "a.txt", "c1")
+        good = _git_head(repo)
+
+        other = tmp_path / "other"
+        other.mkdir()
+        _run_git(other, "init", "-q", "-b", "main")
+        _run_git(other, "config", "user.email", "test@test.local")
+        _run_git(other, "config", "user.name", "Test")
+        _make_commit(other, "b.txt", "c1")
+
+        changes = repo / ".rlsbl" / "changes"
+        changes.mkdir(parents=True)
+        (changes / "unreleased.jsonl").write_text(
+            json.dumps({"commits": [good], "user_facing": False}) + "\n"
+        )
+
+        # CWD is a DIFFERENT repo where the hash does not exist: passing
+        # the correct repo_root must still resolve everything...
+        monkeypatch.chdir(other)
+        assert validate_all_hashes_resolve([str(changes)], repo_root=str(repo)) == {}
+        # ...and pointing repo_root at the wrong repo must report it.
+        failures = validate_all_hashes_resolve([str(changes)], repo_root=str(other))
+        assert failures == {str(changes / "unreleased.jsonl"): [good]}

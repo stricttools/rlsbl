@@ -903,6 +903,86 @@ class TestPushMechanics:
         for args, _ in push_calls:
             assert "--force" not in args, "plain --force must never be used"
 
+    @patch(f"{MOD}.release_lock")
+    @patch(f"{MOD}.acquire_lock")
+    @patch(f"{MOD}.check_gh_auth", return_value=False)
+    @patch(f"{MOD}.check_gh_installed", return_value=False)
+    @patch(f"{MOD}.get_current_branch", return_value="main")
+    @patch(f"{MOD}.get_push_timeout", return_value=120)
+    @patch(f"{MOD}.generate_changelog")
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_non_tag_refname_in_tags_is_skipped_with_warning(
+        self, mock_run, _req_tool, _gen_cl, _push_timeout, _get_branch,
+        _gh_installed, _gh_auth, _acquire_lock, _release_lock,
+        tmp_path, capsys,
+    ):
+        """A non-refs/tags/ refname in the tags[] list must never be
+        force-pushed by the TAG step -- the old guard used removeprefix
+        without checking the prefix exists, so 'refs/heads/x' passed."""
+        rogue = "refs/heads/feature-x"
+        safegit_result = json.dumps({
+            "rewrites": {self.OLD_HEAD: self.NEW_HEAD},
+            "tags": [
+                {
+                    "refname": rogue,
+                    "old_sha": self.OLD_TAG, "new_sha": self.NEW_TAG,
+                    "annotated": False,
+                },
+                {
+                    "refname": "refs/tags/v1.0.0",
+                    "old_sha": self.OLD_TAG, "new_sha": self.NEW_TAG,
+                    "annotated": True,
+                },
+            ],
+            "old_head": self.OLD_HEAD,
+            "new_head": self.NEW_HEAD,
+        })
+        ls_remote_out = (
+            f"{self.OLD_HEAD}\trefs/heads/main\n"
+            f"{self.OLD_TAG}\trefs/tags/v1.0.0\n"
+        )
+
+        calls = []
+
+        def run_effect(cmd, args=None, **kw):
+            calls.append((cmd, list(args or []), kw))
+            if cmd == "safegit" and args == ["--version"]:
+                return "safegit 0.21.1"
+            if cmd == "git" and args and args[0] == "ls-remote":
+                return ls_remote_out
+            if cmd == "safegit" and args and args[0] == "scrub":
+                return safegit_result
+            return ""
+
+        mock_run.side_effect = run_effect
+
+        changes_dir = tmp_path / ".rlsbl" / "changes"
+        changes_dir.mkdir(parents=True)
+        (changes_dir / "unreleased.jsonl").write_text("")
+
+        flags = {
+            "pattern": "secret", "replace": "XXX", "reason": "r",
+            "entire-history": True, "yes": True,
+        }
+        with patch(f"{MOD}.validate_all_hashes_resolve", return_value={}):
+            run_cmd(flags, ctx=_ctx(str(tmp_path)))
+
+        push_calls = [
+            args for cmd, args, _ in calls
+            if cmd == "git" and args[:1] == ["push"]
+        ]
+        # Branch push + ONE tag push; the rogue refname is never pushed
+        assert len(push_calls) == 2, push_calls
+        for args in push_calls[1:]:
+            assert not any(rogue in a for a in args), (
+                "non-tag refnames must never be force-pushed by the tag step"
+            )
+
+        err = capsys.readouterr().err
+        assert rogue in err
+        assert "skip" in err.lower()
+
 
 # ===========================================================================
 # Committed audit archive (whitelisted schema -- never re-leaks scrubbed data)

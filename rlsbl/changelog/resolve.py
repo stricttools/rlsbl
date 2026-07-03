@@ -5,10 +5,14 @@ from __future__ import annotations
 import subprocess
 
 
-def resolve_hash(hash_str: str) -> str | None:
+def resolve_hash(hash_str: str, *, cwd: str | None = None) -> str | None:
     """Resolve a (possibly abbreviated) commit hash to a full 40-char SHA.
 
-    Returns None if the hash doesn't resolve in the current repo.
+    ``cwd`` is the repository to resolve in; None means the process CWD
+    (the historical behavior). Callers that may run from outside the
+    target repo must pass it explicitly.
+
+    Returns None if the hash doesn't resolve in that repo.
     """
     try:
         result = subprocess.run(
@@ -16,6 +20,7 @@ def resolve_hash(hash_str: str) -> str | None:
             capture_output=True,
             text=True,
             timeout=10,
+            cwd=cwd,
         )
         if result.returncode != 0:
             return None
@@ -27,8 +32,10 @@ def resolve_hash(hash_str: str) -> str | None:
         return None
 
 
-def resolve_hashes(hashes: list[str]) -> dict[str, str | None]:
+def resolve_hashes(hashes: list[str], *, cwd: str | None = None) -> dict[str, str | None]:
     """Batch-resolve a list of commit hashes.
+
+    ``cwd`` is the repository to resolve in; None means the process CWD.
 
     Returns a mapping from each input hash to its full 40-char SHA,
     or None if it doesn't resolve.
@@ -36,5 +43,5 @@ def resolve_hashes(hashes: list[str]) -> dict[str, str | None]:
     results: dict[str, str | None] = {}
     for h in hashes:
         if h not in results:
-            results[h] = resolve_hash(h)
+            results[h] = resolve_hash(h, cwd=cwd)
     return results

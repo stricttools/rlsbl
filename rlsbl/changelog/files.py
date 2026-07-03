@@ -150,12 +150,16 @@ def _list_jsonl_files(changes_dir):
     return files
 
 
-def validate_all_hashes_resolve(dirs):
+def validate_all_hashes_resolve(dirs, *, repo_root):
     """Verify that every commit hash in every JSONL file resolves via git.
 
-    Runs ``git rev-parse`` (in the current working directory's repo) for each
-    distinct hash.  Returns ``{filepath: [unresolvable hashes]}`` — empty when
-    everything resolves.
+    Runs ``git rev-parse`` for each distinct hash in ``repo_root`` — the
+    repository the hashes belong to. The parameter is mandatory so callers
+    (including the planned validation-only mode) can never accidentally
+    resolve against whatever repo the process CWD happens to be in.
+
+    Returns ``{filepath: [unresolvable hashes]}`` — empty when everything
+    resolves.
     """
     from .resolve import resolve_hashes
 
@@ -163,7 +167,7 @@ def validate_all_hashes_resolve(dirs):
     for changes_dir in dirs:
         for filepath in _list_jsonl_files(changes_dir):
             hashes = [h for entry in parse_jsonl(filepath) for h in entry.commits]
-            resolved = resolve_hashes(hashes)
+            resolved = resolve_hashes(hashes, cwd=str(repo_root))
             bad = [h for h in dict.fromkeys(hashes) if resolved.get(h) is None]
             if bad:
                 failures[filepath] = bad
