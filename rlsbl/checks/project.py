@@ -93,6 +93,10 @@ def find_cross_repo_path_sources(project_root, boundary_root=None):
     path sources are legal and never reported. Returns an empty list when
     pyproject.toml is missing, unparseable, or has no sources table.
 
+    A non-string ``path`` value (malformed TOML) is reported as an offender
+    whose third element is an "invalid path value" message naming the source
+    and file, so consumers fail the check instead of crashing.
+
     Shared by the ``cross-repo-path-sources`` check and the pre-mutation
     guard in ``rlsbl release run``.
     """
@@ -119,6 +123,16 @@ def find_cross_repo_path_sources(project_root, boundary_root=None):
             if not isinstance(entry, dict) or "path" not in entry:
                 continue
             declared = entry["path"]
+            if not isinstance(declared, str):
+                # Malformed TOML (e.g. path = 123 or a table) must surface
+                # as a check failure naming the entry, never a TypeError.
+                offenders.append((
+                    package,
+                    repr(declared),
+                    f"invalid path value for source '{package}' in "
+                    f"{pyproject_path} (expected string)",
+                ))
+                continue
             if os.path.isabs(declared):
                 resolved = os.path.realpath(declared)
             else:

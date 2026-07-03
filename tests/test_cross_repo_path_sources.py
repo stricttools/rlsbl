@@ -107,6 +107,31 @@ class TestFindCrossRepoPathSources:
         # Without the workspace boundary, the same source is cross-repo.
         assert len(find_cross_repo_path_sources(str(member))) == 1
 
+    def test_non_string_path_reported_not_crash(self, tmp_path):
+        """A non-string TOML path value is reported as invalid, not a TypeError."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        _write_pyproject(repo, 'dep = { path = 123 }\n')
+
+        offenders = find_cross_repo_path_sources(str(repo))
+        assert len(offenders) == 1
+        pkg, declared, resolved = offenders[0]
+        assert pkg == "dep"
+        assert declared == "123"
+        assert "invalid path value for source 'dep'" in resolved
+        assert "pyproject.toml" in resolved
+
+    def test_table_path_reported_not_crash(self, tmp_path):
+        """A table path value is equally invalid and reported, not crashed on."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        _write_pyproject(repo, 'dep = { path = { nested = true } }\n')
+
+        offenders = find_cross_repo_path_sources(str(repo))
+        assert len(offenders) == 1
+        assert offenders[0][0] == "dep"
+        assert "invalid path value for source 'dep'" in offenders[0][2]
+
     def test_list_of_sources(self, tmp_path):
         """uv allows a list of marker-gated sources; each entry is checked."""
         repo = tmp_path / "repo"
@@ -145,6 +170,18 @@ class TestCrossRepoPathSourcesCheck:
 
         result = _run_check(repo)
         assert result.status == "fail"
+
+    def test_fail_non_string_path(self, tmp_path):
+        """Malformed path values produce a check failure naming the entry."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        _write_pyproject(repo, 'dep = { path = 123 }\n')
+
+        result = _run_check(repo)
+        assert result.status == "fail"
+        joined = " ".join(result.details or [result.message])
+        assert "invalid path value for source 'dep'" in joined
+        assert "pyproject.toml" in joined
 
     def test_pass_in_repo_path(self, tmp_path):
         repo = tmp_path / "repo"
