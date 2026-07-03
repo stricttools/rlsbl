@@ -121,15 +121,6 @@ def _inject_packages_dir(doc, project_path):
     return doc
 
 
-def _strip_uv_no_sources(doc):
-    """Remove UV_NO_SOURCES from workflow-level env block (defense-in-depth for monorepo)."""
-    env = doc.get("env")
-    if isinstance(env, dict) and "UV_NO_SOURCES" in env:
-        del env["UV_NO_SOURCES"]
-        if not env:
-            del doc["env"]
-
-
 def _strip_concurrency(doc):
     """Remove the workflow-level concurrency block from a called workflow.
 
@@ -462,7 +453,6 @@ def _cmd_sync(flags, project_root):
                 _inject_working_directory(doc, clean_path)
                 _rewrite_version_file_inputs(doc, clean_path)
                 _inject_packages_dir(doc, clean_path)
-                _strip_uv_no_sources(doc)
                 rewritten = emit_ci_workflow(doc)
 
                 header = (
