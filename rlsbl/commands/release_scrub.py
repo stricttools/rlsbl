@@ -692,6 +692,32 @@ def run_cmd(flags, *, ctx):
             _print_dry_run_summary(mode, scrub_data)
             return
 
+        # LEASE AUTHORITY: the ls-remote snapshot above queried the ACTUAL
+        # remote before the rewrite. safegit's pre_rewrite_remotes is the
+        # LOCAL remote-tracking snapshot (refs/remotes/*), which may be
+        # stale -- e.g. no fetch since someone else pushed. The
+        # --force-with-lease expectations therefore always come from the
+        # ls-remote snapshot; pre_rewrite_remotes is cross-checked here
+        # purely informationally.
+        prefix = "refs/remotes/origin/"
+        for refname, tracking_sha in (
+            scrub_data.get("pre_rewrite_remotes") or {}
+        ).items():
+            if not refname.startswith(prefix):
+                continue
+            branch_ref = "refs/heads/" + refname[len(prefix):]
+            actual_sha = (remote_refs or {}).get(branch_ref)
+            if actual_sha is not None and actual_sha != tracking_sha:
+                print(
+                    f"Warning: safegit's pre_rewrite_remotes snapshot "
+                    f"disagrees with the remote for {branch_ref}: local "
+                    f"tracking ref had {tracking_sha[:12]}, origin had "
+                    f"{actual_sha[:12]}. The local tracking state was "
+                    f"stale; the force-push lease uses the value read "
+                    f"from origin.",
+                    file=sys.stderr,
+                )
+
         # Save scrub-result.json for resume support
         scrub_data["completed_steps"] = []
         scrub_data["remote_refs"] = remote_refs or {}

@@ -1612,6 +1612,112 @@ class TestJournalRecovery:
 
 
 # ===========================================================================
+# pre_rewrite_remotes: informational cross-check only, never the lease source
+# ===========================================================================
+
+
+class TestPreRewriteRemotesCrossCheck:
+    """safegit 0.22.0 reports pre_rewrite_remotes -- the LOCAL
+    remote-tracking snapshot taken before updateRefs. It may be stale (no
+    fetch since the last push), so rlsbl's ls-remote snapshot of the ACTUAL
+    remote stays the --force-with-lease authority. When the two disagree,
+    an informational warning is printed."""
+
+    OLD_HEAD = "aaaa111122223333444455556666777788889999"
+    NEW_HEAD = "bbbb111122223333444455556666777788889999"
+    STALE = "cccc111122223333444455556666777788889999"
+
+    def _flags(self):
+        return {
+            "pattern": "secret", "replace": "XXX", "reason": "r",
+            "entire-history": True, "yes": True,
+        }
+
+    def _run(self, tmp_path, mock_run, tracking_sha):
+        safegit_result = json.dumps({
+            "rewrites": {self.OLD_HEAD: self.NEW_HEAD}, "tags": [],
+            "old_head": self.OLD_HEAD, "new_head": self.NEW_HEAD,
+            "pre_rewrite_remotes": {
+                "refs/remotes/origin/main": tracking_sha,
+            },
+        })
+        ls_remote_out = f"{self.OLD_HEAD}\trefs/heads/main\n"
+
+        calls = []
+
+        def run_effect(cmd, args=None, **kw):
+            calls.append((cmd, list(args or []), kw))
+            if cmd == "safegit" and args == ["--version"]:
+                return "safegit 0.22.0"
+            if cmd == "git" and args and args[0] == "ls-remote":
+                return ls_remote_out
+            if cmd == "safegit" and args and args[0] == "scrub":
+                return safegit_result
+            return ""
+
+        mock_run.side_effect = run_effect
+
+        changes_dir = tmp_path / ".rlsbl" / "changes"
+        changes_dir.mkdir(parents=True)
+        (changes_dir / "unreleased.jsonl").write_text("")
+
+        with patch(f"{MOD}.validate_all_hashes_resolve", return_value={}):
+            run_cmd(self._flags(), ctx=_ctx(str(tmp_path)))
+        return calls
+
+    @patch(f"{MOD}.release_lock")
+    @patch(f"{MOD}.acquire_lock")
+    @patch(f"{MOD}.check_gh_auth", return_value=False)
+    @patch(f"{MOD}.check_gh_installed", return_value=False)
+    @patch(f"{MOD}.get_current_branch", return_value="main")
+    @patch(f"{MOD}.get_push_timeout", return_value=120)
+    @patch(f"{MOD}.generate_changelog")
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_disagreement_warns_but_ls_remote_stays_lease_authority(
+        self, mock_run, _req_tool, _gen_cl, _push_timeout, _get_branch,
+        _gh_installed, _gh_auth, _acquire_lock, _release_lock,
+        tmp_path, capsys,
+    ):
+        calls = self._run(tmp_path, mock_run, tracking_sha=self.STALE)
+
+        err = capsys.readouterr().err
+        assert "pre_rewrite_remotes" in err
+        assert "refs/heads/main" in err
+        assert self.STALE[:12] in err
+
+        # Lease expectation comes from the ls-remote snapshot (the ACTUAL
+        # remote), never from the possibly-stale local tracking ref.
+        push_calls = [
+            args for cmd, args, _ in calls
+            if cmd == "git" and args[:1] == ["push"]
+        ]
+        assert len(push_calls) == 1
+        assert (
+            f"--force-with-lease=refs/heads/main:{self.OLD_HEAD}"
+            in push_calls[0]
+        )
+        assert not any(self.STALE in a for a in push_calls[0])
+
+    @patch(f"{MOD}.release_lock")
+    @patch(f"{MOD}.acquire_lock")
+    @patch(f"{MOD}.check_gh_auth", return_value=False)
+    @patch(f"{MOD}.check_gh_installed", return_value=False)
+    @patch(f"{MOD}.get_current_branch", return_value="main")
+    @patch(f"{MOD}.get_push_timeout", return_value=120)
+    @patch(f"{MOD}.generate_changelog")
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_agreement_stays_silent(
+        self, mock_run, _req_tool, _gen_cl, _push_timeout, _get_branch,
+        _gh_installed, _gh_auth, _acquire_lock, _release_lock,
+        tmp_path, capsys,
+    ):
+        self._run(tmp_path, mock_run, tracking_sha=self.OLD_HEAD)
+        assert "pre_rewrite_remotes" not in capsys.readouterr().err
+
+
+# ===========================================================================
 # cleanup_ok consumption: validation depends on old objects being pruned
 # ===========================================================================
 
