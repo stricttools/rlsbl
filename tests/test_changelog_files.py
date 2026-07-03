@@ -656,3 +656,149 @@ class TestValidateAllHashesResolve:
         # ...and pointing repo_root at the wrong repo must report it.
         failures = validate_all_hashes_resolve([str(changes)], repo_root=str(other))
         assert failures == {str(changes / "unreleased.jsonl"): [good]}
+
+
+# ---------------------------------------------------------------------------
+# changelog_remap_globs / can_remap_hash (safegit --remap-shas-in support)
+# ---------------------------------------------------------------------------
+
+
+def _go_path_match(pattern, path):
+    """Faithful model of Go path.Match for the glob shapes rlsbl emits.
+
+    Go's path.Match matches per-segment: ``*`` never crosses ``/`` and the
+    pattern must consume the whole path (same number of segments). safegit's
+    matchScope tries the full path first, then the basename.
+    """
+    import fnmatch
+
+    def segments_match(pat, p):
+        pat_segs = pat.split("/")
+        p_segs = p.split("/")
+        if len(pat_segs) != len(p_segs):
+            return False
+        return all(fnmatch.fnmatchcase(s, ps) for ps, s in zip(pat_segs, p_segs))
+
+    if segments_match(pattern, path):
+        return True
+    return segments_match(pattern, path.rsplit("/", 1)[-1])
+
+
+class TestChangelogRemapGlobs:
+    """changelog_remap_globs builds the safegit --remap-shas-in glob list.
+
+    It must be derived from the same enumeration as validation
+    (enumerate_changelog_dirs) so remap coverage and validation coverage
+    can never diverge, and every glob must be an exact per-directory
+    pattern (Go path.Match: ``*`` never crosses ``/``).
+    """
+
+    def test_standalone(self, tmp_path):
+        from rlsbl.changelog.files import changelog_remap_globs
+
+        # Emitted even when the dir does not exist yet: HISTORICAL commits
+        # may still contain .rlsbl/changes/ files that need remapping.
+        assert changelog_remap_globs(str(tmp_path), None) == [
+            ".rlsbl/changes/*.jsonl"
+        ]
+
+    def test_monorepo_per_project_and_releasable_wildcard(self, tmp_path):
+        from rlsbl.changelog.files import changelog_remap_globs
+
+        ws = tmp_path / "ws"
+        proj_changes = ws / "packages" / "alpha" / ".rlsbl" / "changes"
+        proj_changes.mkdir(parents=True)
+        rel_changes = ws / ".rlsbl-monorepo" / "releasables" / "core" / "changes"
+        rel_changes.mkdir(parents=True)
+        (ws / ".rlsbl-monorepo" / "workspace.toml").write_text(
+            'projects = [{ path = "packages/alpha", name = "alpha" }]\n'
+        )
+
+        globs = changelog_remap_globs(str(ws / "packages" / "alpha"), str(ws))
+
+        # Releasable dirs are covered by ONE wildcard segment glob so that
+        # releasables deleted from the working tree but present in history
+        # are still remapped. Per-project dirs get exact per-directory globs.
+        assert ".rlsbl-monorepo/releasables/*/changes/*.jsonl" in globs
+        assert "packages/alpha/.rlsbl/changes/*.jsonl" in globs
+        # No literal releasable glob: the wildcard already covers it, and a
+        # duplicate would just repeat work in safegit's walk.
+        assert ".rlsbl-monorepo/releasables/core/changes/*.jsonl" not in globs
+
+    def test_globs_cover_every_enumerated_dir(self, tmp_path):
+        """Invariant: every dir validation checks is matched by some glob
+        under Go path.Match semantics (as used by safegit's matchScope)."""
+        from rlsbl.changelog.files import (
+            changelog_remap_globs,
+            enumerate_changelog_dirs,
+        )
+
+        ws = tmp_path / "ws"
+        for d in [
+            ws / "packages" / "alpha" / ".rlsbl" / "changes",
+            ws / "libs" / "deep" / "beta" / ".rlsbl" / "changes",
+            ws / ".rlsbl-monorepo" / "releasables" / "core" / "changes",
+            ws / ".rlsbl-monorepo" / "releasables" / "extra" / "changes",
+        ]:
+            d.mkdir(parents=True)
+        (ws / ".rlsbl-monorepo" / "workspace.toml").write_text(
+            "projects = ["
+            '{ path = "packages/alpha", name = "alpha" },'
+            '{ path = "libs/deep/beta", name = "beta" },'
+            "]\n"
+        )
+
+        dirs = enumerate_changelog_dirs(str(ws / "packages" / "alpha"), str(ws))
+        globs = changelog_remap_globs(str(ws / "packages" / "alpha"), str(ws))
+
+        assert len(dirs) == 4
+        for d in dirs:
+            rel = os.path.relpath(d, str(ws)).replace(os.sep, "/")
+            sample = rel + "/unreleased.jsonl"
+            assert any(_go_path_match(g, sample) for g in globs), (
+                f"no glob covers {sample}: {globs}"
+            )
+
+    def test_globs_do_not_match_scrub_archives_or_caches(self, tmp_path):
+        """DECISION: committed scrub archives (.rlsbl/scrubs/*.json and the
+        releasable equivalent) are records of what WAS -- their recorded SHAs
+        intentionally reference pre-rewrite objects and already dangle the
+        moment the original scrub prunes them. Remapping them on a later
+        scrub would falsify the record, so they are EXCLUDED from the remap
+        globs; validation likewise never reads them. The .validated caches
+        are deleted by the scrub flow and must not be remapped either."""
+        from rlsbl.changelog.files import changelog_remap_globs
+
+        globs = changelog_remap_globs(str(tmp_path), None)
+        for path in [
+            ".rlsbl/scrubs/scrub-deadbeef1234.json",
+            ".rlsbl/changes/.validated",
+        ]:
+            assert not any(_go_path_match(g, path) for g in globs), (
+                f"{path} must not be covered by remap globs: {globs}"
+            )
+
+
+class TestCanRemapHash:
+    """can_remap_hash reports whether the recovery remap could fix a hash."""
+
+    def test_exact_match(self):
+        from rlsbl.changelog.files import can_remap_hash
+
+        assert can_remap_hash("a" * 40, {"a" * 40: "b" * 40})
+
+    def test_unique_prefix(self):
+        from rlsbl.changelog.files import can_remap_hash
+
+        assert can_remap_hash("abcd12", {"abcd12" + "a" * 34: "b" * 40})
+
+    def test_ambiguous_prefix_not_fixable(self):
+        from rlsbl.changelog.files import can_remap_hash
+
+        sha_map = {"abcd12" + "a" * 34: "1" * 40, "abcd12" + "b" * 34: "2" * 40}
+        assert not can_remap_hash("abcd12", sha_map)
+
+    def test_unknown_hash_not_fixable(self):
+        from rlsbl.changelog.files import can_remap_hash
+
+        assert not can_remap_hash("f" * 40, {"a" * 40: "b" * 40})

@@ -73,6 +73,17 @@ def _map_hash(h: str, sha_map: dict) -> "tuple[str | None, bool]":
     return None, False
 
 
+def can_remap_hash(h: str, sha_map: dict) -> bool:
+    """Whether ``remap_jsonl_hashes`` could fix hash ``h`` with ``sha_map``.
+
+    True when the (possibly abbreviated) hash matches exactly one key of the
+    map. Used by the scrub recovery path to decide whether a rewrite journal
+    can repair a dangling changelog hash before mutating any files.
+    """
+    new_sha, _ambiguous = _map_hash(h, sha_map)
+    return new_sha is not None
+
+
 def _parse_semver(filename: str) -> _SemverKey | None:
     """Extract a sort key from a versioned filename, or None.
 
@@ -137,6 +148,51 @@ def enumerate_changelog_dirs(project_root, workspace_root=None, workspace_projec
         if os.path.isdir(d):
             dirs.append(d)
     return dirs
+
+
+def changelog_remap_globs(project_root, workspace_root=None, workspace_projects=None):
+    """Build the safegit ``--remap-shas-in`` glob list for a scrub.
+
+    The globs are repo-relative and use Go ``path.Match`` semantics (safegit's
+    matchScope): ``*`` never crosses ``/``, so every glob is an exact
+    per-directory pattern. Coverage is derived from the SAME enumeration as
+    hash validation (``enumerate_changelog_dirs``) so remap coverage and
+    validation coverage can never diverge:
+
+    - Standalone: ``.rlsbl/changes/*.jsonl`` -- emitted unconditionally, since
+      historical commits may contain changelog files even when the working
+      tree currently has none.
+    - Monorepo: one exact glob per enumerated per-project changes dir, plus a
+      single wildcard glob ``.rlsbl-monorepo/releasables/*/changes/*.jsonl``
+      that also covers releasables deleted from the working tree but still
+      present in history.
+
+    DELIBERATELY EXCLUDED: committed scrub archives (``.rlsbl/scrubs/*.json``
+    and the releasable-level equivalent). They are records of what WAS -- the
+    old-side SHAs they record dangle by design as soon as the original scrub
+    prunes the old objects, so remapping them on a later scrub would falsify
+    the record without ever making the old side resolvable. Validation
+    (``validate_all_hashes_resolve``) likewise never reads them, so remap and
+    validation agree on the exclusion. ``.validated`` caches carry no
+    extension match and are deleted by the scrub flow anyway.
+    """
+    if not workspace_root:
+        # Mirrors get_changes_dir(project_root) relative to the repo root.
+        return [".rlsbl/changes/*.jsonl"]
+
+    from ..workspace import RELEASABLES_DIR, WORKSPACE_DIR
+
+    releasable_prefix = f"{WORKSPACE_DIR}/{RELEASABLES_DIR}/"
+    globs = [f"{WORKSPACE_DIR}/{RELEASABLES_DIR}/*/changes/*.jsonl"]
+    for d in enumerate_changelog_dirs(
+        project_root, workspace_root, workspace_projects=workspace_projects,
+    ):
+        rel = os.path.relpath(d, str(workspace_root)).replace(os.sep, "/")
+        if rel.startswith(releasable_prefix):
+            # Already covered by the wildcard glob above.
+            continue
+        globs.append(rel + "/*.jsonl")
+    return globs
 
 
 def _list_jsonl_files(changes_dir):
