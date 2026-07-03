@@ -439,10 +439,15 @@ def spawn_detached_watcher(commit_sha, run_ids=None):
     When run_ids is given, the child watches those workflow run IDs instead
     of searching by SHA (the pidfile/log are still keyed by the commit SHA).
 
-    Refuses to spawn while a live watcher for the same SHA exists; a stale
-    pidfile from a dead process is cleaned up and spawning proceeds.
+    Refuses to spawn while a live watcher for the same SHA exists, but the
+    conflict is non-fatal: a loud warning is printed and a conflict result
+    is returned. The callers are release success epilogues that run AFTER
+    release state cleanup, so exiting non-zero here would misreport an
+    otherwise-successful release. A stale pidfile from a dead process is
+    cleaned up and spawning proceeds.
 
-    Returns a dict with pid, pidfile, and logfile.
+    Returns a dict with conflict (bool), pid, pidfile, and logfile; on
+    conflict, pid is the already-running watcher's PID.
     """
     try:
         full_sha = run("git", ["rev-parse", commit_sha])
@@ -454,12 +459,16 @@ def spawn_detached_watcher(commit_sha, run_ids=None):
     existing_pid = _read_pidfile(pidfile)
     if existing_pid is not None:
         if _pid_alive(existing_pid):
+            logfile = _logfile_path(full_sha)
             print(
-                f"Error: a detached watcher for {sha12} is already running "
-                f"(pid {existing_pid}). Stop it first: rlsbl watch --stop {sha12}",
+                f"rlsbl: WARNING: a detached watcher for {sha12} is already "
+                f"running (pid {existing_pid}) -- not spawning another.",
                 file=sys.stderr,
             )
-            sys.exit(1)
+            print(f"rlsbl:   log:  {logfile}", file=sys.stderr)
+            print(f"rlsbl:   stop: rlsbl watch --stop {sha12}", file=sys.stderr)
+            return {"conflict": True, "pid": existing_pid,
+                    "pidfile": pidfile, "logfile": logfile}
         print(
             f"rlsbl: removing stale pidfile for {sha12} "
             f"(pid {existing_pid} is not running)",
@@ -498,7 +507,8 @@ def spawn_detached_watcher(commit_sha, run_ids=None):
     print(f"rlsbl: detached watcher started for {sha12} (pid {proc.pid})")
     print(f"rlsbl:   log:  {logfile}")
     print(f"rlsbl:   stop: rlsbl watch --stop {sha12}")
-    return {"pid": proc.pid, "pidfile": pidfile, "logfile": logfile}
+    return {"conflict": False, "pid": proc.pid, "pidfile": pidfile,
+            "logfile": logfile}
 
 
 def _sha12_from_pidfile(path):

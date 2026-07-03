@@ -166,21 +166,41 @@ class TestSpawnDetachedWatcher:
         assert "11" in cmd and "22" in cmd
         assert "--as-daemon-child" in cmd
 
-    def test_refuses_when_live_watcher_exists(self, tmp_project, capsys):
+    def test_live_watcher_conflict_is_nonfatal(self, tmp_project, capsys):
+        """A live watcher for the same SHA must not abort the caller: the
+        release success epilogues call this after state cleanup, so a
+        sys.exit(1) here would fail an otherwise-successful release.
+        Warn loudly, spawn nothing, return a conflict result."""
         _setup_repo(tmp_project)
         with open(_pidfile_path(SHA), "w") as f:
             f.write(f"{os.getpid()}\n")  # our own pid: definitely alive
 
         with patch("rlsbl.commands.watch.run", side_effect=_mock_sha_run), \
              patch("rlsbl.commands.watch.subprocess.Popen") as mock_popen:
-            with pytest.raises(SystemExit) as exc:
-                spawn_detached_watcher(SHA12)
+            info = spawn_detached_watcher(SHA12)
             mock_popen.assert_not_called()
 
-        assert exc.value.code == 1
+        assert info["conflict"] is True
+        assert info["pid"] == os.getpid()
+        assert info["logfile"] == _logfile_path(SHA)
         err = capsys.readouterr().err
         assert "already running" in err
+        assert str(os.getpid()) in err
+        assert _logfile_path(SHA) in err
         assert f"rlsbl watch --stop {SHA12}" in err
+        # The pidfile still belongs to the live watcher: untouched
+        with open(_pidfile_path(SHA)) as f:
+            assert f.read().strip() == str(os.getpid())
+
+    def test_normal_spawn_reports_no_conflict(self, tmp_project):
+        _setup_repo(tmp_project)
+
+        with patch("rlsbl.commands.watch.run", side_effect=_mock_sha_run), \
+             patch("rlsbl.commands.watch.subprocess.Popen") as mock_popen:
+            mock_popen.return_value = MagicMock(pid=4246)
+            info = spawn_detached_watcher(SHA12)
+
+        assert info["conflict"] is False
 
     def test_cleans_stale_pidfile_and_proceeds(self, tmp_project, capsys):
         _setup_repo(tmp_project)

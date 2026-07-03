@@ -327,6 +327,59 @@ class TestExecuteEpilogueWatchAsync:
         captured = capsys.readouterr()
         assert "Watch CI: rlsbl watch" not in captured.out + captured.err
 
+    def test_watch_async_conflict_does_not_fail_release(self, tmp_project, capsys):
+        """A live watcher for the pushed SHA must not turn a successful
+        release into a failure: the epilogue runs AFTER release state
+        cleanup, so an exit(1) there would misreport a release that
+        actually completed. Real spawn_detached_watcher, simulated live
+        conflict: run_cmd must return normally with a loud warning."""
+        from rlsbl.commands.release import run_cmd
+        from rlsbl.context import ProjectContext
+        from rlsbl.release_file import ReleaseConfig
+        from rlsbl.utils import run as real_run
+
+        _setup_releasable_npm_project(tmp_project)
+
+        def fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
+            if cmd == "gh":
+                return ""
+            if cmd == "git" and args and args[0] in ("push", "fetch"):
+                return ""
+            if (cmd == "git" and args and args[:2] == ["rev-list", "--count"]
+                    and any("origin/" in a for a in args)):
+                return "0"
+            return real_run(cmd, args=args, timeout=timeout, env=env, cwd=cwd)
+
+        ctx = ProjectContext(project_root=Path(str(tmp_project)),
+                             workspace_root=None,
+                             config={"private": False, "pipelines": {}})
+
+        with (
+            patch("rlsbl.commands.release.check_gh_installed", return_value=True),
+            patch("rlsbl.commands.release.check_gh_auth", return_value=True),
+            patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.run_gh", return_value=""),
+            patch("rlsbl.commands.release.run", side_effect=fake_run),
+            patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
+            # Simulate a live watcher for every pidfile lookup. Patch the
+            # watch module's subprocess binding (not subprocess.Popen
+            # globally, which would break the release's own git calls).
+            patch("rlsbl.commands.watch._read_pidfile", return_value=12345),
+            patch("rlsbl.commands.watch._pid_alive", return_value=True),
+            patch("rlsbl.commands.watch.subprocess") as mock_subprocess,
+        ):
+            # Must return normally -- a SystemExit here is the bug
+            run_cmd(
+                ReleaseConfig(bump="patch", include=["npm"], exclude=[]),
+                {"yes": True, "quiet": True, "watch": False, "watch-async": True},
+                ctx=ctx,
+            )
+
+        mock_subprocess.Popen.assert_not_called()
+        err = capsys.readouterr().err
+        assert "already running" in err
+        assert "12345" in err
+
 
 # ---------------------------------------------------------------------------
 # Call sites: batch_release.py end-of-batch watch blocks (source-level, same
