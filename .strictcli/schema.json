@@ -48,7 +48,7 @@
   },
   "project_id": "rlsbl",
   "name": "rlsbl",
-  "version": "0.96.0",
+  "version": "0.97.0",
   "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 49 commands organized into 15 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
   "global_flags": [
     {
@@ -411,7 +411,7 @@
             {
               "name": "description",
               "type": "str",
-              "help": "Release description (required with --bump)",
+              "help": "Short release description summarizing the changes (required with --bump)",
               "default": ""
             },
             {
@@ -769,7 +769,7 @@
             {
               "name": "auto-commit",
               "type": "bool",
-              "help": "Auto-commit the edited JSONL file",
+              "help": "Automatically commit the edited JSONL changelog file to git after modification",
               "default": true,
               "negatable": true
             }
@@ -788,7 +788,7 @@
             {
               "name": "auto-commit",
               "type": "bool",
-              "help": "Auto-commit workspace.toml after creating it",
+              "help": "Automatically commit the generated workspace.toml configuration file to git",
               "default": true,
               "negatable": true
             }
@@ -1016,7 +1016,7 @@
             },
             {
               "name": "package_name",
-              "help": "Name of the package in workspace.toml to extract"
+              "help": "Name of the package as defined in workspace.toml to extract into a standalone repo"
             }
           ]
         },
@@ -1034,7 +1034,7 @@
           "args": [
             {
               "name": "package_name",
-              "help": "Name for the package in the monorepo workspace"
+              "help": "Name to assign to the absorbed package in the monorepo workspace.toml"
             },
             {
               "name": "source_path",
