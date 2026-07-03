@@ -14,7 +14,7 @@ from .exemptions import (
     is_changelog_path,
 )
 from .files import list_versioned_files, read_unreleased
-from .resolve import resolve_hash, resolve_hashes, _get_last_version_tag, _git_log_hashes, _unreleased_range
+from .resolve import resolve_hash, resolve_hashes, _git_log_hashes, _unreleased_range
 from .schema import ChangelogEntry, parse_jsonl, validate_schema
 from ..config import get_changelog_validation_config
 from ..git_util import filter_commits_for_project, filter_commits_for_releasable
