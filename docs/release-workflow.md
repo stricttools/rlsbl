@@ -122,7 +122,9 @@ Steps 9 and 10 are conditionally skipped — see the hooks override mechanism be
 
 ### Release state and resume
 
-From the version bump onward, every step records a success or failure marker in an in-progress state file (`.rlsbl/releases/in-progress.json`; for releasable releases, `.rlsbl-monorepo/releasables/<name>/releases/in-progress.json`). If a fatal step fails (anything through pipeline publish), the state file is preserved and `rlsbl release resume` continues from where the release stopped, skipping already-completed steps — including post-release steps such as asset upload. Non-fatal failures (deploy, post-release hook, snapshot) are recorded and loudly named in the completion summary, and the release completes. The state file is cleared only when every step carries a marker and no fatal step failed; `rlsbl release run` auto-clears a provably-complete leftover state file instead of blocking.
+From the version bump onward, every step records a success or failure marker in an in-progress state file (`.rlsbl/releases/in-progress.json`; for releasable releases, `.rlsbl-monorepo/releasables/<name>/releases/in-progress.json`). If a fatal step fails (anything through pipeline publish), the state file is preserved and `rlsbl release resume` continues from where the release stopped, skipping already-completed steps including post-release steps such as asset upload.
+
+Non-fatal failures (deploy, post-release hook, snapshot) are recorded and loudly named in the completion summary, and the release completes. The state file is cleared only when every step carries a marker and no fatal step failed; `rlsbl release run` auto-clears a provably-complete leftover state file instead of blocking.
 
 ## Publish gating
 
@@ -145,7 +147,7 @@ Timeout, grace window, and poll interval are job env values (`GATE_TIMEOUT_MINUT
 
 ### Retry contract
 
-To retry a publish after fixing CI, re-run CI to green **on the same commit** (`gh run rerun <run-id>`), then dispatch the publish workflow **at the tag ref**:
+To retry a publish after fixing CI, first re-run the CI workflow to green **on the same release commit** using `gh run rerun <run-id>` so that the checks API shows a passing run for that SHA. Then dispatch the publish workflow **at the tag ref** rather than a branch ref, so the gate and all version reads resolve to the tagged release commit:
 
 ```bash
 gh workflow run publish.yml --ref <tag>
@@ -155,7 +157,9 @@ Because the gate, all job conditions, and all version reads are ref-based, a dis
 
 ### Monorepo router
 
-The generated publish router emits ONE shared gate. Member gate jobs are stripped during inlining and every inlined job is rewired to the shared gate. The gate resolves the releasing project from the tag ref prefix (the same prefix used in job `if:` conditions, which match `github.ref_name` -- never the release payload) and waits only for that project's CI check runs, named `<router job key> / <ci job name>` because the CI router invokes member CI as reusable workflows. Sibling projects' paths-filtered (skipped) CI checks are outside the filter and never block a release.
+The generated publish router emits 1 shared gate job. Member gate jobs are stripped during inlining and every inlined job is rewired to the shared gate. The gate resolves the releasing project from the tag ref prefix (the same prefix used in job `if:` conditions, which match `github.ref_name`) and waits only for that project's CI check runs.
+
+Sibling projects' paths-filtered (skipped) CI checks are outside the filter and never block a release. CI check runs are named `<router job key> / <ci job name>` because the CI router invokes member CI as reusable workflows.
 
 ### Publish concurrency
 

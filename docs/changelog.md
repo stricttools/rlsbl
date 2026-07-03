@@ -35,7 +35,7 @@ This system provides:
 
 Each line in a JSONL file is a self-contained JSON object with 2-4 fields depending on whether the change is user-facing. User-facing entries require a description and type for generated output; non-user-facing entries need only commit hashes and the boolean flag:
 
-```json
+```jsonl
 {"commits":["a1b2c3d"],"user_facing":true,"description":"**New feature.** What it does for users.","type":"feature"}
 {"commits":["e4f5g6h","i7j8k9l"],"user_facing":false}
 ```

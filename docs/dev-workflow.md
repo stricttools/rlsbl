@@ -1,5 +1,5 @@
 ---
-description: "Local development workflow: editable installs across 8 targets, local editable overlays via dev sync, CI watching with auto-retry, and pre-push hook enforcement."
+description: "Local development workflow: editable installs across 8 targets, local overlays via dev sync, CI watching with auto-retry, and pre-push enforcement."
 ---
 
 # Development workflow
@@ -63,7 +63,7 @@ The overlay file also feeds the release-time **version-skew guard**: `rlsbl rele
 
 ### Why a wrapper is required
 
-Verified against uv 0.9.17, no native uv mechanism suffices:
+A wrapper command is required because, as of uv 0.9.17, no single native uv mechanism can install an editable sibling checkout and prevent subsequent sync operations from reverting it back to the locked registry wheel. Each partial solution has a gap that the wrapper fills by orchestrating multiple uv invocations together:
 
 - `uv pip install -e ../x` alone is wiped by the next `uv sync`: exact sync reinstalls the locked registry wheel even at equal versions.
 - `uv sync --inexact --no-install-package <name>` preserves a pre-existing editable install (even under version conflict, and with `--frozen`), but neither flag has an environment-variable equivalent.
@@ -93,7 +93,7 @@ Every problem is a hard error, never a silent no-op: missing file (the error sho
 
 ### The UV_NO_SYNC=1 gate
 
-Without `UV_NO_SYNC=1`, any bare `uv run` silently reinstalls the locked registry wheels over the overlays just created. `rlsbl dev sync` therefore refuses to run until it is set permanently:
+Without `UV_NO_SYNC=1`, any bare `uv run` silently reinstalls the locked registry wheels over the editable overlays just created by the sync command. The result is that overlays would be silently reverted on every uv run invocation, undoing the entire dev sync setup. `rlsbl dev sync` therefore refuses to run until `UV_NO_SYNC=1` is set permanently in the shell profile or direnv configuration:
 
 ```bash
 # shell profile (~/.bashrc / ~/.zshrc) or the project's .envrc (direnv)
