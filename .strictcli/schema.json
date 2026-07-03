@@ -556,7 +556,7 @@
         },
         "scrub": {
           "name": "scrub",
-          "help": "Scrub sensitive content from git history and update release metadata to match the rewritten commits. Wraps safegit scrub in one of three modes: match (--pattern with --replace or --mangle), file (--file, which replaces the file throughout history with its current on-disk content or removes it if absent; requires --from-commit), or recipe (--recipe, a scrub recipe TOML executed via safegit scrub run). Afterwards remaps commit hashes in all JSONL changelog files, regenerates CHANGELOG.md, force-pushes the rewritten history, and recreates GitHub Releases on the new tags. A scrub-result.json file records the SHA mapping for recovery if any post-rewrite step fails.",
+          "help": "Scrub sensitive content from git history and update release metadata to match the rewritten commits. Supports 3 modes: match (--pattern), file (--file), or recipe (--recipe). After rewriting, remaps commit hashes in JSONL changelog files, regenerates CHANGELOG.md, force-pushes, and recreates GitHub Releases on the new tags.",
           "flags": [
             {
               "name": "replace",
@@ -1181,7 +1181,7 @@
         },
         "sync": {
           "name": "sync",
-          "help": "Overlay local editable checkouts of sibling projects onto this project's locked environment, driven by a git-invisible dev-sources.toml.local-only file at the project root (one [[overlay]] block with 'package' and 'path' per checkout). Runs a single 'uv sync --inexact' excluding every overlaid package, then 'uv pip install -e <path>' per entry, so the locked registry wheels never clobber the local checkouts and no [tool.uv.sources] path dependency ever needs to be committed. Requires UV_NO_SYNC=1 in the environment (a bare 'uv run' would otherwise auto-sync and silently wipe the overlays); a bare 'uv sync' still reverts overlays harmlessly -- re-run this command to restore them. In monorepo mode, run it from within a sub-project."
+          "help": "Overlay local editable checkouts of sibling projects onto this project's locked environment. Reads dev-sources.toml.local-only for overlay entries, runs uv sync --inexact excluding overlaid packages, then uv pip install -e per entry. Requires UV_NO_SYNC=1 in the environment to prevent bare uv run from reverting overlays."
         }
       }
     }
