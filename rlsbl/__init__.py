@@ -240,7 +240,13 @@ release_group = app.group("release", help="Release orchestration commands. Provi
 @strictcli.flag(name="description", type=str, help="Release description (required with --bump)", default="")
 @strictcli.flag(name="preid", type=str, help="Pre-release identifier: alpha, beta, rc, stable. Only valid with --bump.", default="")
 def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, watch_async, bump, description, preid, **_kwargs):
-    root = _require_sub_project_root()
+    root = _require_sub_project_root(
+        workspace_root_guidance=(
+            "Error: `rlsbl release run` must run inside a sub-project, not "
+            "at the monorepo workspace root. cd into the sub-project you "
+            "want to release."
+        )
+    )
 
     from .release_file import read_release_file, get_release_file_path, ReleaseConfig, VALID_BUMP_TYPES
     from .workspace import find_workspace_root, resolve_project
@@ -459,7 +465,13 @@ def cmd_release_resume(dry_run, yes, quiet, watch, watch_async, **_kwargs):
 
 @release_group.command(name="init", help="Scaffold a .rlsbl/releases/unreleased.toml file by auto-detecting project targets. The generated file contains a default bump type (patch), an include list of all detected targets, and per-target configuration sections for Flutter targets.")
 def cmd_release_init(**_kwargs):
-    root = _require_sub_project_root()
+    root = _require_sub_project_root(
+        workspace_root_guidance=(
+            "Error: `rlsbl release init` must run inside a sub-project, not "
+            "at the monorepo workspace root. cd into the sub-project you "
+            "want to release."
+        )
+    )
     from .commands.release_init import run_cmd
     run_cmd(project_root=root)
 
@@ -475,7 +487,13 @@ def cmd_release_init(**_kwargs):
     ],
 )
 def cmd_release_retry(dry_run, yes, quiet, watch, watch_async, **_kwargs):
-    root = _require_sub_project_root()
+    root = _require_sub_project_root(
+        workspace_root_guidance=(
+            "Error: `rlsbl release retry` must run inside a sub-project, "
+            "not at the monorepo workspace root. cd into the sub-project "
+            "you want to retry."
+        )
+    )
 
     from .release_file import get_retry_file_path, read_retry_file
 
@@ -526,7 +544,13 @@ def cmd_release_retry(dry_run, yes, quiet, watch, watch_async, **_kwargs):
 @strictcli.flag(name="json", type=bool, default=False, help="Output version, branch, tag, and coverage as machine-readable JSON")
 @strictcli.flag(name="registry", type=bool, default=False, help="Query the package registry for the latest published version")
 def cmd_status(target, json, registry, **_kwargs):
-    root = _require_sub_project_root()
+    root = _require_sub_project_root(
+        workspace_root_guidance=(
+            "Error: `rlsbl status` must run inside a sub-project, not at "
+            "the monorepo workspace root. cd into a sub-project, or use "
+            "`rlsbl monorepo status` for workspace-wide status."
+        )
+    )
     from .workspace import find_workspace_root
     ws_root = find_workspace_root(str(root))
     ctx = create_context(root, workspace_root=Path(ws_root) if ws_root else None)
@@ -699,7 +723,13 @@ def cmd_claim_name(target, yes, **_kwargs):
 @release_group.command(name="edit", help="Sync the GitHub Release notes for a given version with the corresponding CHANGELOG.md entry. Defaults to the current version if none is specified. Use --dry-run to preview changes without updating GitHub.")
 @strictcli.arg(name="version", help="Version whose GitHub Release notes to sync (defaults to current version)", required=False)
 def cmd_release_edit(dry_run, version=None, **_kwargs):
-    root = _require_sub_project_root()
+    root = _require_sub_project_root(
+        workspace_root_guidance=(
+            "Error: `rlsbl release edit` must run inside a sub-project, not "
+            "at the monorepo workspace root. cd into the sub-project whose "
+            "release notes you want to edit."
+        )
+    )
     args = [version] if version else []
     flags = {"dry-run": dry_run}
     from .commands.edit_release import run_cmd
@@ -732,7 +762,13 @@ def cmd_release_undo(target, yes, **_kwargs):
 @strictcli.flag(name="hard", type=bool, help="Delete the release instead of marking as pre-release")
 @strictcli.arg(name="version", help="Semver string of the release to yank, with or without v prefix (e.g. 0.9.1)")
 def cmd_release_yank(reason, use, hard, dry_run, yes, version, **_kwargs):
-    root = _require_sub_project_root()
+    root = _require_sub_project_root(
+        workspace_root_guidance=(
+            "Error: `rlsbl release yank` must run inside a sub-project, not "
+            "at the monorepo workspace root. cd into the sub-project whose "
+            "release you want to yank."
+        )
+    )
     args = [version]
     flags = {
         "reason": reason or None,
@@ -870,7 +906,13 @@ def cmd_prs(**_kwargs):
 @app.command(name="unreleased", help="List commits between the latest release tag and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain text or JSON to help prepare the next release.")
 @strictcli.flag(name="json", type=bool, default=False, help="Output the unreleased commit list and coverage status as machine-readable JSON")
 def cmd_unreleased(json, **_kwargs):
-    root = _require_sub_project_root()
+    root = _require_sub_project_root(
+        workspace_root_guidance=(
+            "Error: `rlsbl unreleased` must run inside a sub-project, not "
+            "at the monorepo workspace root. cd into a sub-project, or use "
+            "`rlsbl monorepo status` for workspace-wide status."
+        )
+    )
     flags = {"json": json}
     from .commands.unreleased import run_cmd
     run_cmd(None, [], flags, project_root=root)
@@ -882,7 +924,12 @@ def cmd_unreleased(json, **_kwargs):
 
 @app.command(name="targets", help="List all release targets detected in the current project directory, showing which ecosystems (npm, PyPI, Go, Cargo, etc.) are active based on manifest files found.")
 def cmd_targets(**_kwargs):
-    root = _require_sub_project_root()
+    root = _require_sub_project_root(
+        workspace_root_guidance=(
+            "Error: `rlsbl targets` must run inside a sub-project, not at "
+            "the monorepo workspace root. cd into a sub-project."
+        )
+    )
     from .commands.targets_cmd import run_cmd
     run_cmd(None, [], {}, project_root=root)
 
@@ -897,7 +944,12 @@ def cmd_targets(**_kwargs):
 @strictcli.flag(name="font-size", type=str, help="Terminal font size in pixels for the recording (default: 24)", default="24")
 @strictcli.flag(name="duration", type=str, help="Total recording duration in seconds before auto-stop (default: 10)", default="10")
 def cmd_record_gif(width, height, font_size, duration, **_kwargs):
-    root = _require_sub_project_root()
+    root = _require_sub_project_root(
+        workspace_root_guidance=(
+            "Error: `rlsbl record-gif` must run inside a sub-project, not "
+            "at the monorepo workspace root. cd into a sub-project."
+        )
+    )
     ctx = create_context(root)
     flags = {"width": width, "height": height, "font-size": font_size, "duration": duration}
     from .commands.record_gif import run_cmd
@@ -924,7 +976,13 @@ def cmd_migrate(dry_run, status, **_kwargs):
 @strictcli.flag(name="target", type=str, help="Registry whose deploy pipeline to run (auto-detected if omitted)", default="")
 @strictcli.arg(name="target_name", help="Named deploy target from the project's deploy configuration to execute", required=False)
 def cmd_deploy(target, dry_run, target_name=None, **_kwargs):
-    root = _require_sub_project_root()
+    root = _require_sub_project_root(
+        workspace_root_guidance=(
+            "Error: `rlsbl deploy` must run inside a sub-project, not at "
+            "the monorepo workspace root. cd into the sub-project you want "
+            "to deploy."
+        )
+    )
     ctx = create_context(root)
     args = [target_name] if target_name else []
     flags = {"dry-run": dry_run}
@@ -963,7 +1021,13 @@ chlog = app.group("changelog", help="Structured changelog management using JSONL
 @strictcli.flag(name="auto-commit", type=bool, default=True, help="Auto-commit unreleased.jsonl after appending the entry")
 @strictcli.flag(name="allow-batch", type=bool, default=False, help="Auto-create an exclusion if this entry exceeds the commit batch limit")
 def cmd_chlog_add(commits, description, type, user_facing, auto_commit, allow_batch, dry_run, **_kwargs):
-    root = _require_sub_project_root()
+    root = _require_sub_project_root(
+        workspace_root_guidance=(
+            "Error: `rlsbl changelog add` must run inside a sub-project, "
+            "not at the monorepo workspace root. cd into the sub-project "
+            "whose changelog you want to modify."
+        )
+    )
     flags = {
         "commits": commits,
         "description": description,
@@ -981,7 +1045,13 @@ def cmd_chlog_add(commits, description, type, user_facing, auto_commit, allow_ba
 @chlog.command(name="generate", help="Compile all validated JSONL changelog entries into a formatted CHANGELOG.md file. Groups entries by type (features, fixes, breaking changes) under the appropriate version heading, preserving existing changelog content for previous releases. Use --dry-run to preview the generated Markdown output without writing to disk, which is useful for reviewing before committing.")
 @strictcli.flag(name="auto-commit", type=bool, default=True, help="Auto-commit generated CHANGELOG.md and per-version .md files")
 def cmd_chlog_generate(dry_run, auto_commit, **_kwargs):
-    root = _require_sub_project_root()
+    root = _require_sub_project_root(
+        workspace_root_guidance=(
+            "Error: `rlsbl changelog generate` must run inside a "
+            "sub-project, not at the monorepo workspace root. cd into the "
+            "sub-project whose changelog you want to generate."
+        )
+    )
     flags = {"dry-run": dry_run, "auto-commit": auto_commit}
     from .commands.changelog_cmd import cmd_generate
     cmd_generate(flags, project_root=root)
@@ -995,7 +1065,13 @@ def cmd_chlog_generate(dry_run, auto_commit, **_kwargs):
 @strictcli.flag(name="user-facing", type=bool, default=True, help="Mark the amended entry as user-facing (included in CHANGELOG.md output)")
 @strictcli.flag(name="validate-hashes", type=bool, default=True, help="Validate commit hashes via git rev-parse before appending")
 def cmd_chlog_amend(version, commits, description, type, user_facing, validate_hashes, dry_run, **_kwargs):
-    root = _require_sub_project_root()
+    root = _require_sub_project_root(
+        workspace_root_guidance=(
+            "Error: `rlsbl changelog amend` must run inside a sub-project, "
+            "not at the monorepo workspace root. cd into the sub-project "
+            "whose changelog you want to amend."
+        )
+    )
     flags = {
         "version": version,
         "commits": commits,
@@ -1016,7 +1092,13 @@ def cmd_chlog_amend(version, commits, description, type, user_facing, validate_h
 @strictcli.flag(name="user-facing", type=bool, default=None, help="Set user_facing status on the matched entry (--user-facing to set true, --no-user-facing to set false)")
 @strictcli.flag(name="auto-commit", type=bool, default=True, help="Auto-commit the edited JSONL file")
 def cmd_chlog_edit(commits, type, description, user_facing, auto_commit, dry_run, **_kwargs):
-    root = _require_sub_project_root()
+    root = _require_sub_project_root(
+        workspace_root_guidance=(
+            "Error: `rlsbl changelog edit` must run inside a sub-project, "
+            "not at the monorepo workspace root. cd into the sub-project "
+            "whose changelog you want to edit."
+        )
+    )
     flags = {
         "commits": commits,
         "type": type,
