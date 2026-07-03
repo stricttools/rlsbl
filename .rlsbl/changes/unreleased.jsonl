@@ -29,3 +29,4 @@
 {"commits":["cbbebf58da613c9db31cff4e1504d9340c9801e7"],"user_facing":true,"description":"**New release guard: version skew.** `rlsbl release run` now reads `dev-sources.toml.local-only` and hard-errors when an overlaid dependency's local checkout is ahead of its latest PyPI release (\"release the dependency first\"). Unpublished overlay packages and registry failures are hard errors too -- never a silent skip.","type":"feature"}
 {"commits":["8370dbbabda3e5a2095f9f0597cffa0108dadb44"],"user_facing":false}
 {"commits":["5c4c504b65606f19179ab476d6e9bfffeddf3b99"],"user_facing":false}
+{"commits":["a685c0f924fab1b8af748f9257c3d28d742191c2"],"user_facing":false}
