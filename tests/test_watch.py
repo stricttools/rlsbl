@@ -58,6 +58,27 @@ class TestHasPublishWorkflowOnDisk:
     def test_returns_false_when_no_workflows_dir(self, tmp_project):
         assert _has_publish_workflow_on_disk() is False
 
+    def test_resolves_workflows_from_git_repo_root(self, tmp_project, monkeypatch):
+        """Regression: the audit must find .github/workflows at the git repo
+        root even when watch runs from a subdirectory (monorepo package dir)."""
+        subprocess.run(["git", "init", "-q"], cwd=str(tmp_project), check=True)
+        wf_dir = tmp_project / ".github" / "workflows"
+        wf_dir.mkdir(parents=True)
+        (wf_dir / "publish.yml").write_text("name: Publish\n")
+        pkg_dir = tmp_project / "packages" / "core"
+        pkg_dir.mkdir(parents=True)
+        monkeypatch.chdir(pkg_dir)
+        assert _has_publish_workflow_on_disk() is True
+
+    def test_subdir_without_git_falls_back_to_cwd(self, tmp_project, monkeypatch):
+        """Outside a git repo, the audit keeps checking the current directory."""
+        pkg_dir = tmp_project / "pkg"
+        wf_dir = pkg_dir / ".github" / "workflows"
+        wf_dir.mkdir(parents=True)
+        (wf_dir / "deploy.yml").write_text("name: Deploy\n")
+        monkeypatch.chdir(pkg_dir)
+        assert _has_publish_workflow_on_disk() is True
+
 
 class TestPrintWorkflowAudit:
     """Tests for _print_workflow_audit summary and warning output."""

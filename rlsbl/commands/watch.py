@@ -227,9 +227,21 @@ def _watch_runs(runs, label, repo_slug, retried_lock=None, retried_workflows=Non
 _PUBLISH_KEYWORDS = ("publish", "deploy", "release")
 
 
+def _repo_root():
+    """Best-effort git toplevel; falls back to cwd when not in a git repo."""
+    try:
+        return run("git", ["rev-parse", "--show-toplevel"])
+    except Exception:
+        return os.getcwd()
+
+
 def _has_publish_workflow_on_disk():
-    """Check if any .github/workflows file looks like a publish workflow."""
-    workflow_dir = os.path.join(".github", "workflows")
+    """Check if any .github/workflows file looks like a publish workflow.
+
+    Resolved from the git repo root (not cwd) so monorepo package-dir
+    invocations still find the repo-level workflow files.
+    """
+    workflow_dir = os.path.join(_repo_root(), ".github", "workflows")
     if not os.path.isdir(workflow_dir):
         return False
     for filename in os.listdir(workflow_dir):
