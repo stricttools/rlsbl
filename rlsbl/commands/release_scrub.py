@@ -427,8 +427,17 @@ def run_cmd(flags, *, ctx):
             if modified_files:
                 reason = flags.get("reason", "scrub")
                 commit_msg = f"scrub: {reason}"
+                commit_args = ["commit", "-m", commit_msg]
+                old_head = scrub_data.get("old_head")
+                new_head = scrub_data.get("new_head")
+                if old_head and new_head:
+                    # Machine-greppable audit trailer linking the scrub
+                    # commit to the exact head remap.
+                    commit_args.extend(
+                        ["--trailer", f"Scrub-remap: {old_head}..{new_head}"]
+                    )
                 try:
-                    run("safegit", ["commit", "-m", commit_msg, "--"] + modified_files)
+                    run("safegit", commit_args + ["--"] + modified_files)
                 except Exception as e:
                     # Never proceed to force-push without the metadata
                     # repairs committed -- that would publish inconsistent

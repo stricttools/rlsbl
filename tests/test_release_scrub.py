@@ -477,6 +477,7 @@ class TestFullScrubFlow:
         safegit_result = json.dumps({
             "rewrites": {"old_hash_1": "new_hash_1", "old_hash_2": "new_hash_2"},
             "tags": [{"refname": "refs/tags/v1.0.0"}],
+            "old_head": "cafebabe5678",
             "new_head": "deadbeef1234",
         })
 
@@ -538,6 +539,11 @@ class TestFullScrubFlow:
             "deleted .validated must be included in the scrub commit"
         assert str(unreleased) in commit_args
         assert str(versioned) in commit_args
+
+        # Machine-greppable audit trailer on the scrub commit
+        assert "--trailer" in commit_args
+        trailer_val = commit_args[commit_args.index("--trailer") + 1]
+        assert trailer_val == "Scrub-remap: cafebabe5678..deadbeef1234"
 
         # 4. scrub-result.json created during flow then deleted at the end
         scrub_result = releases_dir / "scrub-result.json"
