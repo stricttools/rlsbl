@@ -59,20 +59,20 @@ TARGETS = {
 def resolve_releasable_config_dir_for_ctx(ctx):
     """Resolve the releasable config directory from a check context.
 
-    When ``ctx`` is a WorkspaceCheckContext and the current project
-    belongs to a releasable, returns the releasable config dir path.
+    When ``ctx`` has workspace_root and project attributes (i.e. is a
+    WorkspaceCheckContext), returns the releasable config dir path.
     Otherwise returns None.
 
-    Uses the project attribute on the context to determine releasable
-    membership.
+    Uses duck typing to avoid importing check_context (which would
+    create a circular dependency).
     """
-    from ..check_context import WorkspaceCheckContext
-
-    if not isinstance(ctx, WorkspaceCheckContext):
+    workspace_root = getattr(ctx, "workspace_root", None)
+    if workspace_root is None:
         return None
-    if ctx.project is None:
+    project = getattr(ctx, "project", None)
+    if project is None:
         return None
-    return resolve_releasable_config_dir(ctx.project, ctx.workspace_root)
+    return resolve_releasable_config_dir(project, workspace_root)
 
 
 def resolve_releasable_config_dir(proj, workspace_root):
