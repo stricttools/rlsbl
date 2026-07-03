@@ -580,6 +580,81 @@ class TestJournalRecoveryE2E:
 
 
 # ===========================================================================
+# No-match scrub repairs prior damage via the journal (no fabricated state)
+# ===========================================================================
+
+
+class TestNoMatchJournalRepairE2E:
+    def test_no_match_scrub_repairs_dangling_hashes_from_prior_direct_scrub(
+        self, e2e_env, monkeypatch, capsys,
+    ):
+        """The realistic damage scenario end-to-end: a DIRECT orchestrated
+        scrub (no --remap-shas-in) already removed the secret and pruned the
+        old commits, leaving the JSONL changelog dangling. A later
+        `rlsbl release scrub` for the same pattern finds NOTHING to rewrite
+        -- and must still validate, repair the JSONL from the persisted
+        rewrite journal, and commit the repair (no force-push: nothing was
+        rewritten on this run)."""
+        repo = e2e_env / "repo"
+        _init_repo(repo)
+        c1 = _commit_file(repo, "config.env", f"token={SECRET}\n", "add config")
+
+        changes = repo / ".rlsbl" / "changes"
+        changes.mkdir(parents=True)
+        (changes / "unreleased.jsonl").write_text(_jsonl_line([c1]))
+        _git(repo, "add", ".rlsbl/changes/unreleased.jsonl")
+        _git(repo, "commit", "-q", "-m", "changelog")
+        _generate_and_commit_changelog(repo)
+        _add_remote(repo, e2e_env / "remote")
+        old_remote_head = _remote_ref(repo, "refs/heads/main")
+
+        # Direct orchestrated scrub WITHOUT remap globs: prunes c1, leaves
+        # the worktree JSONL dangling, persists the rewrite journal.
+        env = {**os.environ, "RLSBL_SCRUB_ORCHESTRATED": "1"}
+        subprocess.run(
+            ["safegit", "scrub", "match", "--json",
+             "--pattern", SECRET, "--replace", REPLACEMENT,
+             "--entire-history", "--reason", "direct scrub"],
+            cwd=str(repo), env=env,
+            capture_output=True, text=True, check=True,
+        )
+        assert _git(
+            repo, "rev-parse", "--verify", f"{c1}^{{commit}}", check=False,
+        ) == "", "old commit must be pruned after the direct scrub"
+        line = (changes / "unreleased.jsonl").read_text().splitlines()[0]
+        assert json.loads(line)["commits"] == [c1], "JSONL must be dangling"
+
+        # Later scrub for the SAME pattern: the secret is already gone, so
+        # safegit finds nothing to rewrite.
+        monkeypatch.chdir(repo)
+        ctx = ProjectContext(project_root=repo, workspace_root=None, config={})
+        flags = {
+            "pattern": SECRET, "replace": REPLACEMENT,
+            "reason": "second pass", "entire-history": True, "yes": True,
+        }
+        with patch(f"{MOD}.check_gh_installed", return_value=False):
+            run_cmd(flags, ctx=ctx)
+
+        out = capsys.readouterr().out
+        assert "No matches found" in out
+        assert "rewrite journal" in out
+
+        # Repaired to a resolvable full SHA and COMMITTED.
+        line = (changes / "unreleased.jsonl").read_text().splitlines()[0]
+        new_hash = json.loads(line)["commits"][0]
+        assert new_hash != c1 and len(new_hash) == 40
+        _git(repo, "rev-parse", "--verify", f"{new_hash}^{{commit}}")
+        assert _git(repo, "status", "--porcelain") == ""
+        assert _git(repo, "log", "-1", "--format=%s").startswith("scrub:")
+        assert ".rlsbl/changes/unreleased.jsonl" in _scrub_commit_files(repo)
+
+        # No push happened: nothing was rewritten on this run.
+        assert _remote_ref(repo, "refs/heads/main") == old_remote_head
+        # No leftover resume state either.
+        assert not (repo / ".rlsbl" / "releases" / "scrub-result.json").exists()
+
+
+# ===========================================================================
 # Unorchestrated-scrub guard: the handshake is real end-to-end
 # ===========================================================================
 
