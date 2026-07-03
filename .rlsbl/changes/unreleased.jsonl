@@ -10,3 +10,4 @@
 {"commits":["4c20b6a79d7287fe207b8cce7e8fdd16eb851106"],"user_facing":false}
 {"commits":["963508ed495dec4e808f79003bf5a8ba29d6a1de"],"user_facing":false}
 {"commits":["05b95b2cd3ffb6c5cbcfd3dc5eefa4ff1672bb42"],"user_facing":true,"description":"**`rlsbl watch` publish-workflow audit works from subdirectories.** The audit now looks for `.github/workflows` at the git repo root instead of the current directory, so watching from a monorepo package directory no longer falsely warns that a publish workflow is missing.","type":"fix"}
+{"commits":["77b1359a7d7d2cb75a07042fc04e331ace4933db"],"user_facing":false}
