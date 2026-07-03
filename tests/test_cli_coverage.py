@@ -1598,8 +1598,9 @@ class TestWatchRunsSingleRun:
         results = _watch_runs(runs, "test", "user/repo")
         assert len(results) == 1
         # Even a single run goes through the pool path with the shared
-        # retry-dedup state (retried_lock, retried_workflows, known_ids)
-        assert len(mock_single.call_args[0]) == 6
+        # retry-dedup state (retried_lock, retried_workflows, known_ids,
+        # known_ids_lock)
+        assert len(mock_single.call_args[0]) == 7
 
 
 class TestWatchRunCmdRunIdRepoError:

@@ -1100,6 +1100,50 @@ class TestRetryAttachment:
 
     @patch("rlsbl.commands.watch.time")
     @patch("rlsbl.commands.watch.run_gh")
+    def test_retry_uses_shared_known_ids_lock(self, mock_run_gh, mock_time, capsys):
+        """A caller-provided known_ids_lock is honored: known_ids reads and
+        writes happen under it (lock discipline for pool-thread mutation)."""
+        import threading
+
+        def run_gh_side_effect(args, **kwargs):
+            if args[:2] == ["workflow", "run"]:
+                return ""
+            if args[:2] == ["run", "list"]:
+                return json.dumps(
+                    [{"databaseId": 500, "name": "CI", "status": "queued", "createdAt": "2026-01-02"}]
+                )
+            if args[:2] == ["run", "watch"]:
+                return ""
+            return ""
+
+        mock_run_gh.side_effect = run_gh_side_effect
+
+        class TrackingLock:
+            def __init__(self):
+                self._lock = threading.Lock()
+                self.acquisitions = 0
+
+            def __enter__(self):
+                self.acquisitions += 1
+                return self._lock.__enter__()
+
+            def __exit__(self, *exc):
+                return self._lock.__exit__(*exc)
+
+        known_ids = {"100"}
+        lock = TrackingLock()
+        result = _retry_workflow("CI", "main", "user/repo", "test-label", "100",
+                                 known_ids, lock)
+
+        assert result is not None
+        assert result["run_id"] == "500"
+        assert "500" in known_ids
+        # At least two guarded accesses: the unknown-candidate read and the
+        # retry-id write.
+        assert lock.acquisitions >= 2
+
+    @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.run_gh")
     def test_retry_not_found_when_only_original_appears(self, mock_run_gh, mock_time, capsys):
         """If every poll only ever shows the original failed run, the retry
         is reported as not found instead of attaching to the original."""
