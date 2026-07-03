@@ -124,6 +124,43 @@ Steps 9 and 10 are conditionally skipped — see the hooks override mechanism be
 
 From the version bump onward, every step records a success or failure marker in an in-progress state file (`.rlsbl/releases/in-progress.json`; for releasable releases, `.rlsbl-monorepo/releasables/<name>/releases/in-progress.json`). If a fatal step fails (anything through pipeline publish), the state file is preserved and `rlsbl release resume` continues from where the release stopped, skipping already-completed steps — including post-release steps such as asset upload. Non-fatal failures (deploy, post-release hook, snapshot) are recorded and loudly named in the completion summary, and the release completes. The state file is cleared only when every step carries a marker and no fatal step failed; `rlsbl release run` auto-clears a provably-complete leftover state file instead of blocking.
 
+## Publish gating
+
+Scaffolded publish workflows trigger on `release: published` and `workflow_dispatch`, which means they used to race CI on the same commit -- a broken artifact could publish before CI reported. Every scaffolded publish workflow (all targets, merged multi-target workflows, and the monorepo publish router) now begins with a `gate` job, and every publish job depends on it (`needs: gate`). No artifact is built or published until the gate passes.
+
+The gate resolves the release commit ref-based: it uses the workflow run's own `GITHUB_SHA`, which is the tag's commit both for release-triggered runs and for `workflow_dispatch` runs at the tag ref. It never reads the release event payload (dispatch retries have none). It then polls the GitHub checks API (`repos/{owner}/{repo}/commits/{sha}/check-runs`) until this project's CI check runs -- matched by job name via the `CI_CHECK_REGEX` job env -- complete. The gate's own workflow run is excluded from the poll so it cannot deadlock on itself.
+
+### Conclusion semantics
+
+| CI check conclusion | Gate behavior |
+| --- | --- |
+| `success` (all matching checks) | Gate passes; publish jobs run |
+| `failure` / `timed_out` | Hard error: CI did not pass on the release commit |
+| `cancelled` | Hard error with explanation -- a cancelled run proves nothing about the commit; the gate never waits for a conclusion that will never come |
+| `skipped` | Hard error with explanation -- the project's own CI must actually run on the release commit |
+| No matching check runs after a grace window (default 5 minutes) | Hard error -- a scaffolded repository always has CI, so the release commit must produce check runs |
+| Checks still running past the timeout (default 20 minutes) | Hard error listing each pending check |
+
+Timeout, grace window, and poll interval are job env values (`GATE_TIMEOUT_MINUTES`, `GATE_GRACE_MINUTES`, `GATE_POLL_SECONDS`) -- edit them in the generated workflow if a repository's CI needs different limits. The gate job carries its own `permissions: checks: read`.
+
+### Retry contract
+
+To retry a publish after fixing CI, re-run CI to green **on the same commit** (`gh run rerun <run-id>`), then dispatch the publish workflow **at the tag ref**:
+
+```bash
+gh workflow run publish.yml --ref <tag>
+```
+
+Because the gate, all job conditions, and all version reads are ref-based, a dispatch at the tag ref behaves identically to the original release-triggered run. `rlsbl release retry` and the watch auto-retry already dispatch at the tag ref. A bare dispatch from a branch gates on that branch head's CI instead (standalone repos) or hard-errors (monorepo router, where the ref selects the releasing project).
+
+### Monorepo router
+
+The generated publish router emits ONE shared gate. Member gate jobs are stripped during inlining and every inlined job is rewired to the shared gate. The gate resolves the releasing project from the tag ref prefix (the same prefix used in job `if:` conditions, which match `github.ref_name` -- never the release payload) and waits only for that project's CI check runs, named `<router job key> / <ci job name>` because the CI router invokes member CI as reusable workflows. Sibling projects' paths-filtered (skipped) CI checks are outside the filter and never block a release.
+
+### Publish concurrency
+
+Publish workflows carry a per-ref concurrency group with `cancel-in-progress: false`: a dispatch retry at the same tag queues behind an in-flight run instead of racing it, and a publish run is never cancelled mid-flight.
+
 ## Hooks
 
 Three shell scripts in `.rlsbl/hooks/` provide extension points at different stages of the release pipeline. Each hook runs in the project root directory with the new version available as `$RLSBL_VERSION`. A non-zero exit code from `pre-checks.sh` or `pre-release.sh` aborts the release immediately, while `post-release.sh` failures are logged but do not roll back the already-published release.
