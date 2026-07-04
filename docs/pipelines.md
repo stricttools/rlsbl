@@ -6,7 +6,7 @@ description: "Pipeline architecture for publish orchestration — types, auth pa
 
 ## Overview
 
-Pipelines handle **publishing** — where and how a release is distributed. They are configured in `.rlsbl/config.json` under the `pipelines` key, which supports 9 built-in pipeline types across 3 authentication patterns (token, credential, and unauthenticated). Each pipeline entry has a user-chosen name and specifies its type, auth mechanism, and optional asset configuration.
+Pipelines handle **publishing** — where and how a release is distributed. They are configured in `.rlsbl/config.json` under the `pipelines` key, which supports 10 built-in pipeline types across 3 authentication patterns (token, credential, and unauthenticated). Each pipeline entry has a user-chosen name and specifies its type, auth mechanism, and optional asset configuration.
 
 Pipelines are distinct from targets: targets determine which files get version-bumped (auto-detected from manifests), while pipelines determine where the release artifact is published (explicitly configured). A project can have an npm target for versioning but a cloudflare-pages pipeline for publishing, or multiple pipelines publishing to different registries.
 
@@ -24,7 +24,7 @@ A project with no pipelines configured simply does not publish anywhere — vers
 
 ## Configuration
 
-Pipelines are configured in `.rlsbl/config.json` under the `pipelines` key. Each entry is keyed by a user-chosen name (any valid JSON string) and requires at minimum a `type` field (one of 9 built-in types) and a `local` boolean field indicating whether publishing happens on the developer machine or in CI:
+Pipelines are configured in `.rlsbl/config.json` under the `pipelines` key. Each entry is keyed by a user-chosen name (any valid JSON string) and requires at minimum a `type` field (one of 10 built-in types) and a `local` boolean field indicating whether publishing happens on the developer machine or in CI:
 
 ```json
 {
@@ -52,17 +52,17 @@ Pipelines are configured in `.rlsbl/config.json` under the `pipelines` key. Each
 
 ## Pipeline types
 
-There are 9 built-in pipeline types covering all major package registries and deployment platforms. Each type implements ecosystem-specific authentication, build commands, and publish logic while sharing the common `BasePipeline` interface for custom assets and lifecycle hooks.
+There are 10 built-in pipeline types covering all major package registries and deployment platforms. Each type implements ecosystem-specific authentication, build commands, and publish logic while sharing the common `BasePipeline` interface for custom assets and lifecycle hooks.
 
 :-: table-pipelines
 
 ## Class hierarchy
 
-All 9 pipeline implementations inherit from `BasePipeline`, which provides no-op defaults for publish and build steps plus the shared `build_custom_assets()` implementation. Two intermediate mixins add authentication patterns: `TokenPipeline` for single-token auth (5 pipelines) and `CredentialPipeline` for username/password pairs (1 pipeline).
+All 10 pipeline implementations inherit from `BasePipeline`, which provides no-op defaults for publish and build steps plus the shared `build_custom_assets()` implementation. Two intermediate mixins add authentication patterns: `TokenPipeline` for single-token auth (5 pipelines) and `CredentialPipeline` for username/password pairs (1 pipeline).
 
 | Class | Auth pattern | Pipelines |
 | --- | --- | --- |
-| `BasePipeline` | None (direct subclass) | go (proxy notification), maven (flexible auth), cloudflare-pages (selfdoc CLI) |
+| `BasePipeline` | None (direct subclass) | go (proxy notification), maven (flexible auth), maven-central (Central Portal credentials), cloudflare-pages (selfdoc CLI) |
 | `TokenPipeline(BasePipeline)` | Single env var token | npm, pypi, cargo, deno, hex |
 | `CredentialPipeline(BasePipeline)` | Username + password env vars | docker |
 
@@ -265,6 +265,15 @@ PyPI publishing happens in CI; docs deploy happens locally in a post-release hoo
 - **Publish command:** Detects gradle vs maven build system. Runs `./gradlew publish` for Gradle projects or `mvn deploy` for Maven projects.
 - **CI template:** Generates appropriate publish steps based on detected build system and target registry.
 - **Quirks:** Build system detection is based on the presence of a `gradlew` script (Gradle) or `pom.xml` (Maven) in the project directory. Errors if neither is found. Does not check for `build.gradle` or `build.gradle.kts` directly.
+
+### maven-central
+
+- **Class:** `BasePipeline` (own credential resolution)
+- **Default credential env vars:** `ORG_GRADLE_PROJECT_mavenCentralUsername`, `ORG_GRADLE_PROJECT_mavenCentralPassword`, `ORG_GRADLE_PROJECT_signingInMemoryKey`, `ORG_GRADLE_PROJECT_signingInMemoryKeyPassword`
+- **Auth pattern:** Four env vars for Central Portal user tokens and GPG signing. All four must be set for local publish. Optional: `ORG_GRADLE_PROJECT_signingInMemoryKeyId` (for specific GPG subkey selection).
+- **Publish command:** Detects gradle vs maven build system. Runs `./gradlew publishAndReleaseToMavenCentral` for Gradle projects (delegates to the vanniktech/gradle-maven-publish-plugin) or `mvn deploy` for Maven projects with Central Portal configuration.
+- **CI template:** Uses `publish-central.yml.tpl` (separate from the maven pipeline's `publish.yml.tpl`). Passes credentials as GitHub secrets.
+- **Quirks:** Subclasses `BasePipeline` directly (not `TokenPipeline` or `CredentialPipeline`) because it requires four env vars rather than the standard one or two. Build system detection is identical to the `maven` pipeline (presence of `gradlew` or `pom.xml`). A `maven-central-metadata` quality check validates POM metadata (name, description, url, licenses, developers, scm), sources/javadoc jar generation, and signing configuration when a `maven-central` pipeline is configured.
 
 ### docker
 
