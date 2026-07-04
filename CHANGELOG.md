@@ -2,6 +2,21 @@
 
 # Changelog
 
+## 0.100.1
+
+Fix CI_CHECK_REGEX in publish router to match actual GitHub check-run names
+
+<details>
+<summary>Context</summary>
+
+The monorepo CI router generates job keys from CI workflow filenames (e.g. core-ci from core-ci.yml), but the publish router gate was using project names (e.g. core) in the regex. This caused the gate to never find matching check runs, timing out after the grace window.
+
+</details>
+
+### Fixes
+
+- **Fixed CI_CHECK_REGEX in publish router.** The gate job regex now matches actual GitHub check-run names (CI filename-based, e.g. `name-ci / test`) instead of project-name-based names that never matched.
+
 ## 0.100.0
 
 Remove vestigial hashes.json from scaffold metadata
