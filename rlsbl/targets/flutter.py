@@ -12,7 +12,7 @@ class FlutterTarget(DartTarget):
 
     # Shares pubspec.yaml with dart; no unique detection files.
     detection_files = ()
-    capabilities = frozenset({"read_name", "read_metadata"})
+    capabilities = frozenset({"read_name", "read_metadata", "ci_templates"})
     ecosystem = "Flutter"
 
     @property
@@ -29,3 +29,13 @@ class FlutterTarget(DartTarget):
         if not isinstance(data, dict):
             return False
         return "flutter" in data
+
+    def template_dir(self):
+        return os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "templates", "flutter"
+        )
+
+    def template_mappings(self, ctx):
+        return [
+            {"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"},
+        ]

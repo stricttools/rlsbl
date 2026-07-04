@@ -12,7 +12,7 @@ class NativeAndroidTarget(BaseTarget):
 
     # Content-based detection — no manifest conflicts with maven's detection_files.
     detection_files = ()
-    capabilities = frozenset({"read_name"})
+    capabilities = frozenset({"read_name", "ci_templates"})
     ecosystem = "Android"
     auto_detectable = "yes"
 
@@ -114,7 +114,11 @@ class NativeAndroidTarget(BaseTarget):
         return os.path.basename(os.path.abspath(dir_path))
 
     def template_dir(self):
-        return None
+        return os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "templates", "native-android"
+        )
 
     def template_mappings(self, ctx):
-        return []
+        return [
+            {"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"},
+        ]

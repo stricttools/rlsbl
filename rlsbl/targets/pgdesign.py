@@ -20,7 +20,7 @@ class PgdesignTarget(BaseTarget):
 
     detection_files = ("pgdesign.toml",)
     BUILD_TIMEOUT_DEFAULT = 60
-    capabilities = frozenset({"read_name"})
+    capabilities = frozenset({"read_name", "ci_templates"})
     ecosystem = "PostgreSQL"
 
     @property
@@ -127,3 +127,13 @@ class PgdesignTarget(BaseTarget):
             "name": dir_name,
             "version": version,
         })
+
+    def template_dir(self):
+        return os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "templates", "pgdesign"
+        )
+
+    def template_mappings(self, ctx):
+        return [
+            {"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"},
+        ]

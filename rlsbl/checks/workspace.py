@@ -37,9 +37,32 @@ def register_workspace_checks(app):
     @app.check("workspace-ci-synced")
     def check_workspace_ci_synced(ctx):
         """Each project must have a synced CI workflow at the repo root."""
+        from ..targets import detect_targets, TARGETS, resolve_releasable_config_dir
+
         missing = []
+        skipped = 0
         for proj in ctx.projects:
             name = proj["name"]
+
+            # Skip projects whose detected targets all lack ci_templates.
+            # If detection fails or returns nothing, assume CI is needed
+            # (conservative: don't skip checks we can't evaluate).
+            proj_dir = os.path.join(str(ctx.workspace_root), proj["path"])
+            rel_dir = resolve_releasable_config_dir(proj, ctx.workspace_root)
+            try:
+                entries = detect_targets(proj_dir, releasable_config_dir=rel_dir)
+            except Exception:
+                entries = []
+            if entries:
+                has_ci = any(
+                    "ci_templates" in TARGETS[e.name].capabilities
+                    for e in entries
+                    if e.name in TARGETS
+                )
+                if not has_ci:
+                    skipped += 1
+                    continue
+
             workflow = os.path.join(
                 str(ctx.workspace_root), ".github", "workflows", f"{name}-ci.yml"
             )
@@ -52,7 +75,11 @@ def register_workspace_checks(app):
                 f"missing workflows: {', '.join(missing)}",
                 details=[f"{n}: {n}-ci.yml not found" for n in missing],
             )
-        return CheckResult("pass", f"all {len(ctx.projects)} project(s) have synced workflows")
+        checked = len(ctx.projects) - skipped
+        msg = f"all {checked} project(s) have synced workflows"
+        if skipped:
+            msg += f" ({skipped} skipped, no ci_templates capability)"
+        return CheckResult("pass", msg)
 
     @app.check("workspace-targets")
     def check_workspace_targets(ctx):

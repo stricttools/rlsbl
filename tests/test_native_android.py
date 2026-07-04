@@ -223,7 +223,7 @@ class TestNativeAndroidProperties:
 
     def test_capabilities(self):
         target = NativeAndroidTarget()
-        assert target.capabilities == frozenset({"read_name"})
+        assert target.capabilities == frozenset({"read_name", "ci_templates"})
 
     def test_detection_files_empty(self):
         target = NativeAndroidTarget()
@@ -239,13 +239,18 @@ class TestNativeAndroidProperties:
             _write(os.path.join(d, "build.gradle.kts"), "")
             assert target.version_file(d) == "build.gradle.kts"
 
-    def test_template_dir_none(self):
+    def test_template_dir(self):
         target = NativeAndroidTarget()
-        assert target.template_dir() is None
+        tpl_dir = target.template_dir()
+        assert tpl_dir is not None
+        assert tpl_dir.endswith(os.path.join("templates", "native-android"))
 
-    def test_template_mappings_empty(self):
+    def test_template_mappings(self):
         target = NativeAndroidTarget()
-        assert target.template_mappings(ctx=None) == []
+        mappings = target.template_mappings(ctx=None)
+        assert len(mappings) == 1
+        assert mappings[0]["template"] == "ci.yml.tpl"
+        assert mappings[0]["target"] == ".github/workflows/ci.yml"
 
     def test_registered_in_targets(self):
         assert "native-android" in TARGETS

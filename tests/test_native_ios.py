@@ -234,13 +234,18 @@ class TestProperties:
         target = NativeIosTarget()
         assert isinstance(target, ReleaseTarget)
 
-    def test_template_dir_returns_none(self):
+    def test_template_dir(self):
         target = NativeIosTarget()
-        assert target.template_dir() is None
+        tpl_dir = target.template_dir()
+        assert tpl_dir is not None
+        assert tpl_dir.endswith(os.path.join("templates", "native-ios"))
 
-    def test_template_mappings_empty(self):
+    def test_template_mappings(self):
         target = NativeIosTarget()
-        assert target.template_mappings(ctx=make_ctx(".")) == []
+        mappings = target.template_mappings(ctx=make_ctx("."))
+        assert len(mappings) == 1
+        assert mappings[0]["template"] == "ci.yml.tpl"
+        assert mappings[0]["target"] == ".github/workflows/ci.yml"
 
     def test_ecosystem(self):
         target = NativeIosTarget()
@@ -252,7 +257,7 @@ class TestProperties:
 
     def test_capabilities(self):
         target = NativeIosTarget()
-        assert target.capabilities == frozenset({"read_name"})
+        assert target.capabilities == frozenset({"read_name", "ci_templates"})
 
 
 class TestRegistration:

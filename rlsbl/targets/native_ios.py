@@ -13,7 +13,7 @@ class NativeIosTarget(BaseTarget):
     """Release target for native iOS apps using Xcode or Tuist."""
 
     detection_files = ()  # Content-based detection
-    capabilities = frozenset({"read_name"})
+    capabilities = frozenset({"read_name", "ci_templates"})
     ecosystem = "iOS"
     auto_detectable = "yes"
 
@@ -161,10 +161,14 @@ class NativeIosTarget(BaseTarget):
         return os.path.basename(os.path.abspath(dir_path))
 
     def template_dir(self):
-        return None
+        return os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "templates", "native-ios"
+        )
 
     def template_mappings(self, ctx):
-        return []
+        return [
+            {"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"},
+        ]
 
 
 def _atomic_write(path, content):

@@ -12,7 +12,7 @@ class DartTarget(BaseTarget):
     """Release target for Dart packages (pubspec.yaml)."""
 
     detection_files = ("pubspec.yaml",)
-    capabilities = frozenset({"read_name", "read_metadata"})
+    capabilities = frozenset({"read_name", "read_metadata", "ci_templates"})
     ecosystem = "Dart / pub.dev"
 
     @property
@@ -126,3 +126,13 @@ class DartTarget(BaseTarget):
         if license_val:
             result["license"] = license_val
         return result
+
+    def template_dir(self):
+        return os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "templates", "dart"
+        )
+
+    def template_mappings(self, ctx):
+        return [
+            {"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"},
+        ]
