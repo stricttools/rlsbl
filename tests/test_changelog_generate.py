@@ -189,6 +189,59 @@ class TestGenerateVersionSection:
         assert "<details>" not in md
 
 
+class TestPackagesPrefixRendered:
+    """Tests for packages prefix rendering in generate_version_section."""
+
+    def test_packages_prefix_rendered(self):
+        """When an entry has packages=['auth'], it renders as '[auth] description'."""
+        entries = [
+            ChangelogEntry(
+                commits=["a"], user_facing=True,
+                description="Login feature", type="feature",
+                packages=["auth"],
+            ),
+        ]
+        md = generate_version_section("1.0.0", entries)
+        assert "[auth] Login feature" in md
+
+    def test_packages_prefix_multiple_packages(self):
+        """When an entry has multiple packages, they are sorted and comma-separated."""
+        entries = [
+            ChangelogEntry(
+                commits=["a"], user_facing=True,
+                description="Shared utility", type="feature",
+                packages=["api", "auth"],
+            ),
+        ]
+        md = generate_version_section("1.0.0", entries)
+        assert "[api, auth] Shared utility" in md
+
+    def test_no_packages_prefix_when_packages_is_none(self):
+        """When packages is None, no prefix is rendered."""
+        entries = [
+            ChangelogEntry(
+                commits=["a"], user_facing=True,
+                description="Simple feature", type="feature",
+                packages=None,
+            ),
+        ]
+        md = generate_version_section("1.0.0", entries)
+        assert "- Simple feature" in md
+        assert "[" not in md.split("Simple feature")[0].split("\n")[-1]
+
+    def test_no_packages_prefix_when_packages_is_empty(self):
+        """When packages is empty list, no prefix is rendered."""
+        entries = [
+            ChangelogEntry(
+                commits=["a"], user_facing=True,
+                description="Simple feature", type="feature",
+                packages=[],
+            ),
+        ]
+        md = generate_version_section("1.0.0", entries)
+        assert "- Simple feature" in md
+
+
 class TestGenerateVersionFile:
     """Tests for generate_version_file."""
 
