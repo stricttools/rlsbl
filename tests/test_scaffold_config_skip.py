@@ -409,3 +409,300 @@ class TestSafermInvocation:
         # Verify the orphan shows up in created list
         orphan_entries = [e for e in created if e[1] == "removed (orphan)"]
         assert len(orphan_entries) == 1
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: scaffold cleanup (orphan base sweep, stale hash pruning, empty dirs)
+# ---------------------------------------------------------------------------
+
+
+class TestOrphanBaseSweep:
+    """Phase 2.1: sweep orphaned merge bases not caught by the managed-file orphan loop."""
+
+    def test_orphan_base_without_managed_file_is_removed(self, mock_git_repo, monkeypatch):
+        """A base file with no corresponding managed file in the current run is deleted."""
+        from unittest.mock import patch
+        import subprocess as real_subprocess
+        from rlsbl.commands.init_cmd import (
+            _finalize_scaffold,
+            BASES_DIR,
+            save_managed_files,
+            save_hashes,
+        )
+
+        monkeypatch.chdir(mock_git_repo)
+        rlsbl_dir = mock_git_repo / ".rlsbl"
+        rlsbl_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create a stale base file for a managed file that no longer exists in
+        # the current scaffold run.  There is no corresponding managed file on
+        # disk and it is not in managed-files.json either -- it's purely a
+        # leftover base.
+        bases_dir = mock_git_repo / BASES_DIR
+        stale_base = bases_dir / "old" / "workflow.yml"
+        stale_base.parent.mkdir(parents=True, exist_ok=True)
+        stale_base.write_text("stale base content\n")
+
+        # No managed files from previous or current run
+        save_managed_files({})
+        save_hashes({})
+
+        saferm_calls = []
+        original_run = real_subprocess.run
+
+        def tracking_run(cmd, *args, **kwargs):
+            if isinstance(cmd, list) and cmd and cmd[0] == "saferm":
+                saferm_calls.append(list(cmd))
+                target_file = cmd[-1]
+                if os.path.exists(target_file):
+                    os.unlink(target_file)
+                return real_subprocess.CompletedProcess(args=cmd, returncode=0)
+            return original_run(cmd, *args, **kwargs)
+
+        with patch("rlsbl.commands.init_cmd.subprocess.run", side_effect=tracking_run):
+            config = {"targets": ["plain"], "private": False}
+            _finalize_scaffold(
+                existing_hashes={},
+                all_hash_dicts=[{}],
+                created=[],
+                skipped=[],
+                warnings=[],
+                flags={"auto-commit": False, "auto-tag": False, "skip-shared": False},
+                project_root=str(mock_git_repo),
+                config=config,
+            )
+
+        # The stale base should have been removed via saferm
+        assert len(saferm_calls) == 1
+        assert saferm_calls[0][0] == "saferm"
+        assert saferm_calls[0][1] == "delete"
+        # _finalize_scaffold operates from cwd, so paths are relative
+        assert saferm_calls[0][-1] == os.path.join(BASES_DIR, "old", "workflow.yml")
+
+    def test_orphan_base_sweep_respects_dry_run(self, mock_git_repo, monkeypatch, capsys):
+        """In dry-run mode, orphan bases are reported but not deleted."""
+        from unittest.mock import patch
+        import subprocess as real_subprocess
+        from rlsbl.commands.init_cmd import (
+            _finalize_scaffold,
+            BASES_DIR,
+            save_managed_files,
+            save_hashes,
+        )
+
+        monkeypatch.chdir(mock_git_repo)
+        rlsbl_dir = mock_git_repo / ".rlsbl"
+        rlsbl_dir.mkdir(parents=True, exist_ok=True)
+
+        bases_dir = mock_git_repo / BASES_DIR
+        stale_base = bases_dir / "old_file.yml"
+        stale_base.parent.mkdir(parents=True, exist_ok=True)
+        stale_base.write_text("stale\n")
+
+        save_managed_files({})
+        save_hashes({})
+
+        saferm_calls = []
+        original_run = real_subprocess.run
+
+        def tracking_run(cmd, *args, **kwargs):
+            if isinstance(cmd, list) and cmd and cmd[0] == "saferm":
+                saferm_calls.append(list(cmd))
+                return real_subprocess.CompletedProcess(args=cmd, returncode=0)
+            return original_run(cmd, *args, **kwargs)
+
+        with patch("rlsbl.commands.init_cmd.subprocess.run", side_effect=tracking_run):
+            config = {"targets": ["plain"], "private": False}
+            _finalize_scaffold(
+                existing_hashes={},
+                all_hash_dicts=[{}],
+                created=[],
+                skipped=[],
+                warnings=[],
+                flags={"auto-commit": False, "auto-tag": False, "skip-shared": False,
+                       "dry-run": True},
+                project_root=str(mock_git_repo),
+                config=config,
+            )
+
+        # No saferm calls in dry-run
+        assert len(saferm_calls) == 0
+        # File should still exist
+        assert stale_base.exists()
+        # Output should mention it
+        captured = capsys.readouterr()
+        assert "Would remove orphaned base:" in captured.out
+
+    def test_current_bases_are_not_removed(self, mock_git_repo, monkeypatch):
+        """Base files that correspond to current managed files are left alone."""
+        from unittest.mock import patch
+        import subprocess as real_subprocess
+        from rlsbl.commands.init_cmd import (
+            _finalize_scaffold,
+            BASES_DIR,
+            save_managed_files,
+            save_hashes,
+            file_hash,
+        )
+
+        monkeypatch.chdir(mock_git_repo)
+        rlsbl_dir = mock_git_repo / ".rlsbl"
+        rlsbl_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create a managed file and its base -- both current
+        managed_rel = os.path.join(".github", "workflows", "ci.yml")
+        managed_abs = mock_git_repo / ".github" / "workflows" / "ci.yml"
+        managed_abs.parent.mkdir(parents=True, exist_ok=True)
+        managed_abs.write_text("current content\n")
+        managed_hash = file_hash(managed_rel)
+
+        bases_dir = mock_git_repo / BASES_DIR
+        base_file = bases_dir / ".github" / "workflows" / "ci.yml"
+        base_file.parent.mkdir(parents=True, exist_ok=True)
+        base_file.write_text("base content\n")
+
+        save_managed_files({managed_rel: managed_hash})
+        save_hashes({managed_rel: managed_hash})
+
+        saferm_calls = []
+        original_run = real_subprocess.run
+
+        def tracking_run(cmd, *args, **kwargs):
+            if isinstance(cmd, list) and cmd and cmd[0] == "saferm":
+                saferm_calls.append(list(cmd))
+                target_file = cmd[-1]
+                if os.path.exists(target_file):
+                    os.unlink(target_file)
+                return real_subprocess.CompletedProcess(args=cmd, returncode=0)
+            return original_run(cmd, *args, **kwargs)
+
+        # The current scaffold run still produces this file
+        current_hashes = {managed_rel: managed_hash}
+
+        with patch("rlsbl.commands.init_cmd.subprocess.run", side_effect=tracking_run):
+            config = {"targets": ["plain"], "private": False}
+            _finalize_scaffold(
+                existing_hashes={managed_rel: managed_hash},
+                all_hash_dicts=[current_hashes],
+                created=[],
+                skipped=[],
+                warnings=[],
+                flags={"auto-commit": False, "auto-tag": False, "skip-shared": False},
+                project_root=str(mock_git_repo),
+                config=config,
+            )
+
+        # No saferm calls -- the base is current, not orphaned
+        assert len(saferm_calls) == 0
+        assert base_file.exists()
+
+
+class TestStaleHashPruning:
+    """Phase 2.2: stale entries in hashes.json are pruned when the file no longer exists."""
+
+    def test_stale_hash_entries_pruned(self, mock_git_repo, monkeypatch):
+        """Entries in hashes.json for non-existent files are removed."""
+        from unittest.mock import patch
+        import subprocess as real_subprocess
+        from rlsbl.commands.init_cmd import (
+            _finalize_scaffold,
+            save_managed_files,
+            save_hashes,
+            load_hashes,
+        )
+
+        monkeypatch.chdir(mock_git_repo)
+        rlsbl_dir = mock_git_repo / ".rlsbl"
+        rlsbl_dir.mkdir(parents=True, exist_ok=True)
+
+        # Pre-populate hashes.json with an entry for a file that doesn't exist
+        stale_key = "gone/file.yml"
+        existing_key = ".rlsbl/version"
+
+        save_managed_files({})
+        save_hashes({stale_key: "abc123", existing_key: "def456"})
+
+        original_run = real_subprocess.run
+
+        def tracking_run(cmd, *args, **kwargs):
+            if isinstance(cmd, list) and cmd and cmd[0] == "saferm":
+                return real_subprocess.CompletedProcess(args=cmd, returncode=0)
+            return original_run(cmd, *args, **kwargs)
+
+        with patch("rlsbl.commands.init_cmd.subprocess.run", side_effect=tracking_run):
+            config = {"targets": ["plain"], "private": False}
+            _finalize_scaffold(
+                existing_hashes={stale_key: "abc123", existing_key: "def456"},
+                all_hash_dicts=[{}],
+                created=[],
+                skipped=[],
+                warnings=[],
+                flags={"auto-commit": False, "auto-tag": False, "skip-shared": False},
+                project_root=str(mock_git_repo),
+                config=config,
+            )
+
+        # Reload hashes.json and check
+        hashes = load_hashes()
+        assert stale_key not in hashes, "Stale entry should be pruned"
+        # .rlsbl/version exists (written by _finalize_scaffold), so it should remain
+        assert existing_key in hashes or ".rlsbl/version" in hashes
+
+
+class TestEmptyDirectoryCleanup:
+    """Phase 2.3: empty parent directories are pruned after base file deletion."""
+
+    def test_empty_parent_dirs_pruned_after_orphan_base_deletion(self, mock_git_repo, monkeypatch):
+        """After deleting an orphan base, empty parent directories are removed."""
+        from unittest.mock import patch
+        import subprocess as real_subprocess
+        from rlsbl.commands.init_cmd import (
+            _finalize_scaffold,
+            BASES_DIR,
+            save_managed_files,
+            save_hashes,
+        )
+
+        monkeypatch.chdir(mock_git_repo)
+        rlsbl_dir = mock_git_repo / ".rlsbl"
+        rlsbl_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create a deeply nested stale base
+        bases_dir = mock_git_repo / BASES_DIR
+        deep_base = bases_dir / "deep" / "nested" / "dir" / "file.yml"
+        deep_base.parent.mkdir(parents=True, exist_ok=True)
+        deep_base.write_text("stale\n")
+
+        save_managed_files({})
+        save_hashes({})
+
+        original_run = real_subprocess.run
+
+        def tracking_run(cmd, *args, **kwargs):
+            if isinstance(cmd, list) and cmd and cmd[0] == "saferm":
+                target_file = cmd[-1]
+                if os.path.exists(target_file):
+                    os.unlink(target_file)
+                return real_subprocess.CompletedProcess(args=cmd, returncode=0)
+            return original_run(cmd, *args, **kwargs)
+
+        with patch("rlsbl.commands.init_cmd.subprocess.run", side_effect=tracking_run):
+            config = {"targets": ["plain"], "private": False}
+            _finalize_scaffold(
+                existing_hashes={},
+                all_hash_dicts=[{}],
+                created=[],
+                skipped=[],
+                warnings=[],
+                flags={"auto-commit": False, "auto-tag": False, "skip-shared": False},
+                project_root=str(mock_git_repo),
+                config=config,
+            )
+
+        # The deep/nested/dir/ hierarchy should be pruned
+        assert not (bases_dir / "deep").exists(), (
+            "Empty parent directories should be removed after base deletion"
+        )
+        # But .rlsbl/bases/ itself should still exist (or be removed if empty --
+        # os.removedirs stops at the first non-empty parent, and BASES_DIR has
+        # nothing left, so it may be removed too -- that's fine).

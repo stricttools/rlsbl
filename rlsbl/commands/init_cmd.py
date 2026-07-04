@@ -1007,6 +1007,11 @@ def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnin
                     capture_output=True,
                     text=True,
                 )
+                # Prune empty parent directories up to BASES_DIR
+                try:
+                    os.removedirs(os.path.dirname(base_path))
+                except OSError:
+                    pass
             created.append((orphan_path, "removed (orphan)"))
         else:
             print(
@@ -1015,11 +1020,50 @@ def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnin
                 file=sys.stderr,
             )
 
+    # Sweep orphaned merge bases: base files whose corresponding managed file
+    # is no longer in the current scaffold run (e.g., target changed, file
+    # template removed).  The first pass above handles bases for orphaned managed
+    # files; this second pass catches bases that linger after the managed file
+    # was removed outside the orphan loop (e.g., manually deleted or renamed).
+    if os.path.isdir(BASES_DIR):
+        for dirpath, _dirnames, filenames in os.walk(BASES_DIR):
+            for fname in filenames:
+                base_abs = os.path.join(dirpath, fname)
+                managed_rel = os.path.relpath(base_abs, BASES_DIR)
+                if managed_rel not in all_new_hashes:
+                    if dry_run:
+                        print(f"Would remove orphaned base: {base_abs}")
+                    else:
+                        subprocess.run(
+                            [
+                                "saferm", "delete",
+                                "--description",
+                                f"Removing orphaned scaffold merge base: {base_abs}",
+                                base_abs,
+                            ],
+                            check=True,
+                            capture_output=True,
+                            text=True,
+                        )
+                        print(f"Removing orphaned scaffold merge base: {base_abs}")
+                        # Prune empty parent directories up to BASES_DIR
+                        try:
+                            os.removedirs(os.path.dirname(base_abs))
+                        except OSError:
+                            pass
+
     # Save managed-files registry (template-derived files for orphan tracking)
     save_managed_files(all_new_hashes)
 
     # Save hashes (all files for change detection)
     existing_hashes.update(all_new_hashes)
+
+    # Prune stale entries from hashes.json: if a tracked file no longer exists
+    # on disk (deleted outside scaffold, target removed, etc.), drop it so the
+    # hashes file stays in sync with reality.
+    for stale_key in list(existing_hashes.keys()):
+        if not os.path.exists(stale_key):
+            del existing_hashes[stale_key]
 
     # Purge hashes for files removed by _skip_redundant_releasable_configs.
     # removed_paths are absolute; existing_hashes keys are relative to CWD.
