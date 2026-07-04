@@ -13,7 +13,8 @@ import logging
 import os
 import subprocess
 
-from .changelog.files import get_changes_dir, read_unreleased, list_versioned_files
+from .changelog.files import get_changes_dir, list_versioned_files, read_unreleased
+from .changelog.generate import generate_version_file, _read_release_metadata
 from .changelog.schema import ChangelogEntry, parse_jsonl, serialize_entry
 from .config import read_json_config
 from .errors import WorkspaceError
@@ -228,6 +229,17 @@ def consolidate_changelogs(workspace_root, releasable_name, member_projects,
     # Copy release .toml metadata for versioned files from member projects.
     rel_dir = get_releasable_dir(workspace_root, releasable_name)
     _copy_release_metadata(workspace_root, member_projects, rel_dir)
+
+    # Regenerate per-version .md files from the merged JSONL files.
+    rel_releases_dir = os.path.join(rel_dir, "releases")
+    for version, _jsonl_path in list_versioned_files(dest_changes_dir):
+        desc, ctx = _read_release_metadata(
+            workspace_root, version, releases_dir=rel_releases_dir,
+        )
+        generate_version_file(
+            dest_changes_dir, version,
+            description=desc, context=ctx,
+        )
 
     # Bug 2 fix: collect batch_limits exclusions from per-package configs
     # and auto-create exclusions for entries exceeding max_commits_per_entry.
