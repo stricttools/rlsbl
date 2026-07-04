@@ -444,29 +444,28 @@ class TestMavenTestExecutionMaven:
 # ---------------------------------------------------------------------------
 
 class TestVersionCatalogDetection:
-    """Gradle version catalog detection requires version_catalog_key config."""
+    """Gradle version catalog detection with optional version_catalog_key config."""
 
     def test_version_catalog_requires_config_key(self, tmp_project):
-        """Presence of gradle/libs.versions.toml without config raises VersionError."""
+        """Without config key, catalog is skipped and version comes from build.gradle.kts."""
         gradle_dir = tmp_project / "gradle"
         gradle_dir.mkdir()
         (gradle_dir / "libs.versions.toml").write_text("[versions]\n")
         (tmp_project / "build.gradle.kts").write_text('version = "1.0.0"\n')
 
         target = MavenTarget()
-        with pytest.raises(VersionError, match="version_catalog_key"):
-            target.read_version(str(tmp_project))
+        assert target.read_version(str(tmp_project)) == "1.0.0"
 
     def test_version_catalog_requires_config_key_on_write(self, tmp_project):
-        """write_version also requires config when version catalog is present."""
+        """Without config key, write_version falls through to build.gradle.kts."""
         gradle_dir = tmp_project / "gradle"
         gradle_dir.mkdir()
         (gradle_dir / "libs.versions.toml").write_text("[versions]\n")
         (tmp_project / "build.gradle.kts").write_text('version = "1.0.0"\n')
 
         target = MavenTarget()
-        with pytest.raises(VersionError, match="version_catalog_key"):
-            target.write_version(str(tmp_project), "2.0.0", None)
+        target.write_version(str(tmp_project), "2.0.0", None)
+        assert target.read_version(str(tmp_project)) == "2.0.0"
 
     def test_no_catalog_no_error(self, tmp_project):
         """No error when gradle/libs.versions.toml does not exist."""

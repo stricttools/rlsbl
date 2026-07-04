@@ -157,33 +157,34 @@ class TestVersionCatalogKeyMissing:
     """Error when version_catalog_key not in config."""
 
     def test_no_config_file(self, tmp_project):
+        """Without config, catalog is skipped and version is read from build.gradle.kts."""
         gradle_dir = tmp_project / "gradle"
         gradle_dir.mkdir()
         (gradle_dir / "libs.versions.toml").write_text('[versions]\nv = "1.0"\n')
-        (tmp_project / "build.gradle.kts").write_text("")
+        (tmp_project / "build.gradle.kts").write_text('version = "3.0.0"\n')
 
         target = MavenTarget()
-        with pytest.raises(VersionError, match="version_catalog_key"):
-            target.read_version(str(tmp_project))
+        assert target.read_version(str(tmp_project)) == "3.0.0"
 
     def test_config_without_key(self, tmp_project):
+        """Config exists but no version_catalog_key -- catalog skipped, falls through."""
         gradle_dir = tmp_project / "gradle"
         gradle_dir.mkdir()
         (gradle_dir / "libs.versions.toml").write_text('[versions]\nv = "1.0"\n')
-        (tmp_project / "build.gradle.kts").write_text("")
+        (tmp_project / "build.gradle.kts").write_text('version = "4.0.0"\n')
         rlsbl_dir = tmp_project / ".rlsbl"
         rlsbl_dir.mkdir()
         (rlsbl_dir / "config.json").write_text('{"private": false}')
 
         target = MavenTarget()
-        with pytest.raises(VersionError, match="version_catalog_key"):
-            target.read_version(str(tmp_project))
+        assert target.read_version(str(tmp_project)) == "4.0.0"
 
     def test_config_with_empty_key(self, tmp_project):
+        """Empty version_catalog_key treated as unconfigured -- catalog skipped."""
         gradle_dir = tmp_project / "gradle"
         gradle_dir.mkdir()
         (gradle_dir / "libs.versions.toml").write_text('[versions]\nv = "1.0"\n')
-        (tmp_project / "build.gradle.kts").write_text("")
+        (tmp_project / "build.gradle.kts").write_text('version = "5.0.0"\n')
         rlsbl_dir = tmp_project / ".rlsbl"
         rlsbl_dir.mkdir()
         (rlsbl_dir / "config.json").write_text(
@@ -191,18 +192,18 @@ class TestVersionCatalogKeyMissing:
         )
 
         target = MavenTarget()
-        with pytest.raises(VersionError, match="version_catalog_key"):
-            target.read_version(str(tmp_project))
+        assert target.read_version(str(tmp_project)) == "5.0.0"
 
 
 class TestPhase6eHardErrorRemoved:
     """Phase 6e hard error removed -- catalog now supported."""
 
     def test_catalog_no_longer_raises_unsupported_error(self, tmp_project):
-        """The old Phase 6e error about catalogs not being supported is gone.
+        """Without version_catalog_key, catalog is silently skipped.
 
-        Instead of a blanket rejection, the error is now about missing
-        version_catalog_key config (which is the actionable next step).
+        The old Phase 6e error ("not yet supported") and the Phase 8a
+        config-required error are both gone. The catalog is simply
+        ignored and the next priority source is used.
         """
         gradle_dir = tmp_project / "gradle"
         gradle_dir.mkdir()
@@ -210,12 +211,8 @@ class TestPhase6eHardErrorRemoved:
         (tmp_project / "build.gradle.kts").write_text('version = "1.0.0"\n')
 
         target = MavenTarget()
-        # The old error was "not yet supported...Phase 8a"
-        # Now we get a config-related error instead
-        with pytest.raises(VersionError) as exc_info:
-            target.read_version(str(tmp_project))
-        assert "not yet supported" not in str(exc_info.value)
-        assert "Phase 8a" not in str(exc_info.value)
+        # Falls through to build.gradle.kts -- no error at all
+        assert target.read_version(str(tmp_project)) == "1.0.0"
 
     def test_catalog_works_with_proper_config(self, tmp_project):
         """With proper config, version catalog reads and writes correctly."""
