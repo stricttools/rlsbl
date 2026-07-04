@@ -79,11 +79,17 @@ COMPLETE_POM_NO_NS = textwrap.dedent("""\
 GRADLE_BUILD_WITH_JARS = textwrap.dedent("""\
     plugins {
         id("java-library")
+        id("signing")
     }
 
     java {
         withSourcesJar()
         withJavadocJar()
+    }
+
+    signing {
+        useInMemoryPgpKeys(findProperty("signingKey") as String?, findProperty("signingPassword") as String?)
+        sign(publishing.publications)
     }
 
     group = "com.example"
