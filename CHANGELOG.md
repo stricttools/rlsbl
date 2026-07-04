@@ -2,6 +2,14 @@
 
 # Changelog
 
+## 0.98.1
+
+Fix scaffold hash pruning that broke CI by over-aggressively deleting hashes.json entries.
+
+### Fixes
+
+- Scaffold hash pruning no longer removes entries for files not actively deleted during the scaffold run.
+
 ## 0.98.0
 
 JVM monorepo analysis, maven-central pipeline, CI templates for 5 targets, build hardening
