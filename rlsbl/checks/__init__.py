@@ -85,7 +85,7 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "deps-dev-in-lib": frozenset({"pypi", "dart", "npm", "go", "maven"}),
     # --- target-specific quality checks ---
     "dead-modules": frozenset({"pypi", "go", "npm", "dart", "maven"}),
-    "circular-deps": frozenset({"pypi", "npm", "dart"}),
+    "circular-deps": frozenset({"pypi", "npm", "dart", "maven"}),
     "library-lint": frozenset({"pypi", "go", "npm", "maven"}),
     # --- quality tag (universal) ---
     "scaffold-unreplaced-vars": None,
