@@ -233,36 +233,24 @@ class MavenTarget(BaseTarget):
         )
 
     @staticmethod
-    def _load_version_catalog_key(dir_path):
-        """Load the version_catalog_key from .rlsbl/config.json.
-
-        Returns the key string or raises VersionError if not configured.
-        """
+    def _resolve_version_catalog_key(dir_path):
+        """Return the version_catalog_key from config, or None if not configured."""
         config_path = os.path.join(dir_path, ".rlsbl", "config.json")
         if not os.path.exists(config_path):
-            raise VersionError(
-                "Gradle version catalog detected but no .rlsbl/config.json found. "
-                'Set "version_catalog_key" in config to specify which [versions] '
-                "entry holds the project version."
-            )
+            return None
         with open(config_path, "r", encoding="utf-8") as f:
             config = json.load(f)
         key = config.get("version_catalog_key")
-        if not key:
-            raise VersionError(
-                "Gradle version catalog detected but version_catalog_key is not set "
-                "in .rlsbl/config.json. Add a version_catalog_key field specifying "
-                "which [versions] entry holds the project version "
-                '(e.g., "version_catalog_key": "app-version").'
-            )
-        return key
+        return key if key else None  # treat empty string as unconfigured
 
     def _find_version_file(self, dir_path):
-        """Return (filepath, format) tuple for the version source."""
-        # Priority 0: Gradle version catalog
+        """Return (filepath, format, catalog_key) tuple for the version source."""
+        # Priority 0: Gradle version catalog (only if version_catalog_key is configured)
         catalog_path = os.path.join(dir_path, "gradle", "libs.versions.toml")
         if os.path.exists(catalog_path):
-            return catalog_path, "version_catalog"
+            key = self._resolve_version_catalog_key(dir_path)
+            if key is not None:
+                return catalog_path, "version_catalog", key
 
         # Priority 1: gradle.properties
         gp = os.path.join(dir_path, "gradle.properties")
@@ -270,32 +258,31 @@ class MavenTarget(BaseTarget):
             with open(gp, "r", encoding="utf-8") as f:
                 content = f.read()
             if re.search(r"^(?:VERSION_NAME|version)\s*=", content, re.MULTILINE):
-                return gp, "gradle_properties"
+                return gp, "gradle_properties", None
 
         # Priority 2: build.gradle.kts
         kts = os.path.join(dir_path, "build.gradle.kts")
         if os.path.exists(kts):
-            return kts, "gradle_kts"
+            return kts, "gradle_kts", None
 
         # Priority 3: build.gradle
         groovy = os.path.join(dir_path, "build.gradle")
         if os.path.exists(groovy):
-            return groovy, "gradle_groovy"
+            return groovy, "gradle_groovy", None
 
         # Priority 4: pom.xml
         pom = os.path.join(dir_path, "pom.xml")
         if os.path.exists(pom):
-            return pom, "pom"
+            return pom, "pom", None
 
-        return None, None
+        return None, None, None
 
-    def _read_version_catalog(self, dir_path, catalog_path):
+    def _read_version_catalog(self, catalog_path, key):
         """Read version from a Gradle version catalog (libs.versions.toml).
 
-        Requires version_catalog_key in .rlsbl/config.json to specify which
-        [versions] entry holds the project version.
+        The key parameter specifies which [versions] entry holds the project
+        version (resolved from .rlsbl/config.json by the caller).
         """
-        key = self._load_version_catalog_key(dir_path)
 
         with open(catalog_path, "r", encoding="utf-8") as f:
             doc = tomlkit.load(f)
@@ -323,12 +310,12 @@ class MavenTarget(BaseTarget):
 
         return str(value)
 
-    def _write_version_catalog(self, dir_path, catalog_path, version):
+    def _write_version_catalog(self, dir_path, catalog_path, version, key):
         """Write version to a Gradle version catalog (libs.versions.toml).
 
-        Returns the relative path of the modified file.
+        Returns the relative path of the modified file. The key parameter
+        specifies which [versions] entry to update.
         """
-        key = self._load_version_catalog_key(dir_path)
 
         with open(catalog_path, "r", encoding="utf-8") as f:
             doc = tomlkit.load(f)
@@ -365,12 +352,12 @@ class MavenTarget(BaseTarget):
 
     def read_version(self, dir_path):
         """Read version from the detected version source."""
-        filepath, fmt = self._find_version_file(dir_path)
+        filepath, fmt, catalog_key = self._find_version_file(dir_path)
         if filepath is None:
             raise VersionError(f"No version source found in {dir_path}")
 
         if fmt == "version_catalog":
-            return self._read_version_catalog(dir_path, filepath)
+            return self._read_version_catalog(filepath, catalog_key)
 
         with open(filepath, "r", encoding="utf-8") as f:
             content = f.read()
@@ -419,12 +406,12 @@ class MavenTarget(BaseTarget):
         Returns a list of relative file paths (relative to dir_path) that
         were modified.
         """
-        filepath, fmt = self._find_version_file(dir_path)
+        filepath, fmt, catalog_key = self._find_version_file(dir_path)
         if filepath is None:
             raise VersionError(f"No version source found in {dir_path}")
 
         if fmt == "version_catalog":
-            rel = self._write_version_catalog(dir_path, filepath, version)
+            rel = self._write_version_catalog(dir_path, filepath, version, catalog_key)
             return [rel]
 
         rel_path = os.path.relpath(filepath, dir_path)
