@@ -1,9 +1,20 @@
 # Version bump type: patch, minor, major, hotfix, or prerelease
-bump = ""
+bump = "minor"
 # Short description of this release (required)
-description = ""
+description = "JVM monorepo analysis, maven-central pipeline, CI templates for 5 targets, build hardening"
 # Optional context explaining why these changes were made
-context = ""
+context = """
+Major additions for JVM/Android monorepo support: dead-module detection, circular
+dependency analysis, Gradle version catalog parsing, GPG signing validation, and
+maven-central pipeline scoping with preflight checks. CI template coverage expanded
+to dart, flutter, pgdesign, native-android, and native-ios targets, with a capability
+filter so the workspace-ci-synced check skips targets that lack template support.
+
+Build checks are now pre-push (not post-push) and fatal -- build failures abort the
+release instead of being warnings. Version catalog resolution uses fallthrough
+instead of hard errors for missing keys. Scaffold now cleans up orphaned bases,
+stale hashes, and empty directories.
+"""
 # Pre-release identifier: alpha, beta, rc, or stable
 # preid = ""
 # Set to true to generate a blog post for this release
