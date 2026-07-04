@@ -225,6 +225,10 @@ def consolidate_changelogs(workspace_root, releasable_name, member_projects,
         workspace_root, releasable_name, member_projects, dest_changes_dir,
     )
 
+    # Copy release .toml metadata for versioned files from member projects.
+    rel_dir = get_releasable_dir(workspace_root, releasable_name)
+    _copy_release_metadata(workspace_root, member_projects, rel_dir)
+
     # Bug 2 fix: collect batch_limits exclusions from per-package configs
     # and auto-create exclusions for entries exceeding max_commits_per_entry.
     exclusions_created = _migrate_batch_exclusions(
@@ -378,6 +382,67 @@ def _merge_versioned_files(workspace_root, releasable_name, member_projects,
         files_written += 1
 
     return files_written
+
+
+def _copy_release_metadata(workspace_root, member_projects, releasable_dir):
+    """Copy release .toml metadata from member projects to the releasable.
+
+    For each versioned JSONL file that was migrated, checks if the member
+    has a corresponding ``v{version}.toml`` in their ``.rlsbl/releases/``
+    directory. If found, copies it to the releasable's ``releases/``
+    directory. When two members have the same version's ``.toml``, their
+    descriptions are merged into a combined historical note.
+    """
+    import tomlkit
+
+    version_tomls: dict[str, list[tuple[str, dict]]] = {}
+
+    for proj in sorted(member_projects, key=lambda p: p.name):
+        proj_path = os.path.join(workspace_root, proj.path)
+        releases_dir = os.path.join(proj_path, ".rlsbl", "releases")
+        if not os.path.isdir(releases_dir):
+            continue
+        for name in os.listdir(releases_dir):
+            if not name.startswith("v") or not name.endswith(".toml"):
+                continue
+            version = name[1:-5]
+            toml_path = os.path.join(releases_dir, name)
+            try:
+                with open(toml_path, "r", encoding="utf-8") as f:
+                    data = tomlkit.load(f)
+            except (OSError, tomlkit.exceptions.ParseError):
+                continue
+            version_tomls.setdefault(version, []).append(
+                (proj.name, dict(data))
+            )
+
+    if not version_tomls:
+        return
+
+    dest_releases_dir = os.path.join(releasable_dir, "releases")
+    os.makedirs(dest_releases_dir, exist_ok=True)
+
+    for version, tomls in version_tomls.items():
+        if len(tomls) == 1:
+            _member_name, merged = tomls[0]
+        else:
+            member_labels = [
+                f"{member_name} {version}" for member_name, _data in tomls
+            ]
+            merged_desc = "Historical: " + ", ".join(member_labels)
+            merged = dict(tomls[0][1])
+            merged["description"] = merged_desc
+            contexts = [
+                data.get("context", "")
+                for _name, data in tomls
+                if data.get("context", "")
+            ]
+            if contexts:
+                merged["context"] = "\n\n".join(contexts)
+
+        dest_path = os.path.join(dest_releases_dir, f"v{version}.toml")
+        with open(dest_path, "w", encoding="utf-8") as f:
+            tomlkit.dump(merged, f)
 
 
 def _migrate_batch_exclusions(workspace_root, releasable_name,
@@ -648,24 +713,28 @@ def create_migration_tag(workspace_root, releasable_name, tag_format,
     # Format the new releasable tag
     new_tag = tag_format.format(name=releasable_name, version=version)
 
-    # Create the tag
-    try:
-        subprocess.run(
-            ["git", "tag", new_tag, commit],
-            cwd=workspace_root,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-    except subprocess.CalledProcessError:
-        return {
-            "status": "error",
-            "tag": new_tag,
-            "commit": commit,
-            "source_tag": most_recent_tag,
-            "member_tags": member_tags,
-            "skipped_members": skipped_members,
-        }
+    # Create the tag. If it already exists (e.g., from a consolidation-point
+    # tag created during changelog merge), treat it as success -- the tag
+    # serves the same range-boundary purpose regardless of which step created it.
+    tag_exists = _git_rev_parse(new_tag, workspace_root) is not None
+    if not tag_exists:
+        try:
+            subprocess.run(
+                ["git", "tag", new_tag, commit],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError:
+            return {
+                "status": "error",
+                "tag": new_tag,
+                "commit": commit,
+                "source_tag": most_recent_tag,
+                "member_tags": member_tags,
+                "skipped_members": skipped_members,
+            }
 
     return {
         "status": "created",
@@ -998,27 +1067,12 @@ def cmd_migrate_releasable(workspace_root, releasable_name, *, dry_run=False,
     )
     result["changelogs"] = changelog_result
 
-    # Step 4: create migration tag.
-    # Skip if the consolidation-point tag already covers this -- the
-    # consolidation tag at HEAD is a superset of the migration tag's purpose
-    # (range boundary) and sits at a better commit (after the merged entries).
-    consolidation_tag = changelog_result.get("consolidation_tag")
-    if consolidation_tag:
-        result["tag"] = {
-            "status": "created",
-            "tag": consolidation_tag,
-            "commit": None,
-            "source_tag": None,
-            "member_tags": {},
-            "skipped_members": [],
-            "consolidation_tag": True,
-        }
-    else:
-        tag_result = create_migration_tag(
-            workspace_root, releasable_name,
-            target_releasable.tag_format, member_projects,
-        )
-        result["tag"] = tag_result
+    # Step 4: create migration tag
+    tag_result = create_migration_tag(
+        workspace_root, releasable_name,
+        target_releasable.tag_format, member_projects,
+    )
+    result["tag"] = tag_result
 
     # Step 5: cleanup per-package release state
     removed = cleanup_per_package_release_state(
