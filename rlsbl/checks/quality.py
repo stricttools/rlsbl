@@ -88,9 +88,9 @@ def register_quality_checks(app):
         target_entries = detect_targets(root_str, releasable_config_dir=rel_dir)
         target_names = {e.name for e in target_entries}
 
-        supported = {"pypi", "go", "npm", "dart"} & target_names
+        supported = {"pypi", "go", "npm", "dart", "maven"} & target_names
         if not supported:
-            return CheckResult("skip", "not a Python, Go, npm, or Dart project")
+            return CheckResult("skip", "not a Python, Go, npm, Dart, or Maven project")
 
         # In workspace context, exclude sibling project directories
         exclude = None
@@ -143,6 +143,16 @@ def register_quality_checks(app):
                 for path in dart_dead
             )
 
+        if "maven" in target_names:
+            from ..dep_validation import find_dead_jvm_modules
+
+            jvm_dead = find_dead_jvm_modules(root_str, exclude_dirs=exclude)
+            all_dead.extend(jvm_dead)
+            details.extend(
+                f"{path}: not reachable from any entry point"
+                for path in jvm_dead
+            )
+
         if all_dead:
             return CheckResult(
                 "warn",
@@ -161,9 +171,9 @@ def register_quality_checks(app):
         target_entries = detect_targets(root_str, releasable_config_dir=rel_dir)
         target_names = {e.name for e in target_entries}
 
-        supported = {"pypi", "npm", "dart"} & target_names
+        supported = {"pypi", "npm", "dart", "maven"} & target_names
         if not supported:
-            return CheckResult("skip", "not a Python, npm, or Dart project")
+            return CheckResult("skip", "not a Python, npm, Dart, or Maven project")
 
         # In workspace context, exclude sibling project directories
         exclude = None
@@ -194,6 +204,12 @@ def register_quality_checks(app):
 
             dart_cycles = find_circular_dart_deps(root_str, exclude_dirs=exclude)
             all_cycles.extend(dart_cycles)
+
+        if "maven" in target_names:
+            from ..dep_validation import find_circular_jvm_deps
+
+            jvm_cycles = find_circular_jvm_deps(root_str, exclude_dirs=exclude)
+            all_cycles.extend(jvm_cycles)
 
         if not all_cycles:
             return CheckResult("pass", "no circular dependencies")
