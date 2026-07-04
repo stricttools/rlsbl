@@ -2,6 +2,48 @@
 
 # Changelog
 
+## 0.98.0
+
+JVM monorepo analysis, maven-central pipeline, CI templates for 5 targets, build hardening
+
+<details>
+<summary>Context</summary>
+
+Major additions for JVM/Android monorepo support: dead-module detection, circular
+dependency analysis, Gradle version catalog parsing, GPG signing validation, and
+maven-central pipeline scoping with preflight checks. CI template coverage expanded
+to dart, flutter, pgdesign, native-android, and native-ios targets, with a capability
+filter so the workspace-ci-synced check skips targets that lack template support.
+
+Build checks are now pre-push (not post-push) and fatal -- build failures abort the
+release instead of being warnings. Version catalog resolution uses fallthrough
+instead of hard errors for missing keys. Scaffold now cleans up orphaned bases,
+stale hashes, and empty directories.
+
+</details>
+
+### Breaking
+
+- **Build failures abort releases.** Build checks are now pre-push (not post-push) and failures are fatal. Build timeout is configurable via `build_timeout` in config.
+- **Version catalog fallthrough.** Missing keys in Gradle version catalogs now fall through to raw string resolution instead of raising errors.
+
+### Features
+
+- **New helper.** Extracted `tag_exists_locally` and `tag_exists_on_remote` helpers from duplicated tag-probe logic across release flows.
+- **Scaffold cleanup.** Orphan base sweep, stale hash pruning, and empty directory cleanup during scaffold operations.
+- **Maven-central pipeline.** Preflight validation tag, pipeline-scoping gate, publishSetup hints with maven-central requirements, and pipeline documentation.
+- **Gradle catalog parsing.** Resolve `libs.<alias>` references from Gradle version catalogs when scanning Maven dependencies.
+- **Dead JVM module detection.** Build class-to-file index from JVM sources and detect modules with no inbound references.
+- **Circular JVM dependency detection.** Detect circular dependencies between JVM modules in the workspace dependency graph.
+- **CI templates.** Added CI template support for dart, flutter, pgdesign, native-android, and native-ios targets. The workspace-ci-synced check now filters by target capability so projects with unsupported targets are skipped.
+- **Signing check.** GPG signing configuration validation for maven-central metadata.
+
+### Fixes
+
+- **Fix false-pass.** Maven-publish source/javadoc detection no longer matches bare `maven-publish` plugin references, preventing false positives.
+- **Fix warn-cascade.** Self-gating logic no longer suppresses its own warnings. Monorepo init now rejects directories inside an existing rlsbl-managed repo.
+- **Fix test-suite-workspace.** Maven is now a recognized target in workspace test validation.
+
 ## 0.97.1
 
 Internal quality pass: circular-dep cycle resolution, CLI help expansion, selfdoc-check zero warnings, dev-group UX fixes.
