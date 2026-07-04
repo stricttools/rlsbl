@@ -14,7 +14,7 @@ import os
 import subprocess
 
 from .changelog.files import get_changes_dir, read_unreleased, list_versioned_files
-from .changelog.schema import ChangelogEntry, serialize_entry
+from .changelog.schema import ChangelogEntry, parse_jsonl, serialize_entry
 from .config import read_json_config
 from .errors import WorkspaceError
 from .git_util import get_commit_files, file_matches_project
@@ -218,6 +218,13 @@ def consolidate_changelogs(workspace_root, releasable_name, member_projects,
     with open(dest_path, "w", encoding="utf-8") as f:
         f.writelines(lines)
 
+    # Merge versioned JSONL files from member projects into the releasable.
+    # Collect entries per version across all members, tag with packages,
+    # dedup, and write to the releasable's changes dir.
+    versioned_merged = _merge_versioned_files(
+        workspace_root, releasable_name, member_projects, dest_changes_dir,
+    )
+
     # Bug 2 fix: collect batch_limits exclusions from per-package configs
     # and auto-create exclusions for entries exceeding max_commits_per_entry.
     exclusions_created = _migrate_batch_exclusions(
@@ -240,6 +247,7 @@ def consolidate_changelogs(workspace_root, releasable_name, member_projects,
         "duplicates_merged": duplicates_merged,
         "exclusions_created": exclusions_created,
         "consolidation_tag": consolidation_tag,
+        "versioned_files_merged": versioned_merged,
     }
 
 
@@ -316,6 +324,60 @@ def _dedup_entries(entries):
         deduped.append(merged)
 
     return deduped, total_merged
+
+
+def _merge_versioned_files(workspace_root, releasable_name, member_projects,
+                           dest_changes_dir):
+    """Merge versioned JSONL files from all member projects into the releasable.
+
+    For each version found across any member, reads entries from all members
+    that have that version, tags each entry with ``packages: [member_name]``
+    (if not already set), deduplicates, and writes to the releasable's
+    ``changes/{version}.jsonl``. The output file is set read-only (chmod 444).
+
+    Members are processed alphabetically for deterministic output order.
+
+    Returns the number of versioned files written.
+    """
+    version_entries: dict[str, list[tuple[str, ChangelogEntry]]] = {}
+
+    for proj in sorted(member_projects, key=lambda p: p.name):
+        proj_path = os.path.join(workspace_root, proj.path)
+        changes_dir = get_changes_dir(proj_path)
+        for version, jsonl_path in list_versioned_files(changes_dir):
+            entries = parse_jsonl(jsonl_path)
+            for entry in entries:
+                version_entries.setdefault(version, []).append(
+                    (proj.name, entry)
+                )
+
+    if not version_entries:
+        return 0
+
+    files_written = 0
+    for version, member_entries in version_entries.items():
+        tagged = []
+        for member_name, entry in member_entries:
+            packages = entry.packages if entry.packages else [member_name]
+            tagged.append(ChangelogEntry(
+                commits=entry.commits,
+                user_facing=entry.user_facing,
+                description=entry.description,
+                type=entry.type,
+                release_type=entry.release_type,
+                packages=packages,
+            ))
+
+        deduped, _ = _dedup_entries(tagged)
+
+        dest_path = os.path.join(dest_changes_dir, f"{version}.jsonl")
+        lines = [serialize_entry(e) + "\n" for e in deduped]
+        with open(dest_path, "w", encoding="utf-8") as f:
+            f.writelines(lines)
+        os.chmod(dest_path, 0o444)
+        files_written += 1
+
+    return files_written
 
 
 def _migrate_batch_exclusions(workspace_root, releasable_name,
@@ -725,6 +787,90 @@ def _extract_version_from_tag(tag):
 
 
 # ---------------------------------------------------------------------------
+# Pre-migration validation
+# ---------------------------------------------------------------------------
+
+
+def _validate_no_changelog_collisions(workspace_root, releasable_name,
+                                       member_projects):
+    """Validate that member changelogs don't collide with existing releasable state.
+
+    Checks two conditions:
+
+    1. **Versioned file collision**: if a member's per-package ``changes/``
+       has a versioned JSONL file (e.g., ``0.1.0.jsonl``) and the releasable's
+       ``changes/`` already has that same version, the merge would overwrite
+       or duplicate historical entries.
+
+    2. **Unreleased entry conflict**: if the releasable's ``unreleased.jsonl``
+       already has entries AND any member also has unreleased entries, the
+       merge would duplicate or lose entries.
+
+    Both conditions raise ``WorkspaceError`` with details about the conflict.
+
+    Args:
+        workspace_root: path to the monorepo root.
+        releasable_name: name of the target releasable.
+        member_projects: list of WorkspaceProject instances in this releasable.
+
+    Raises:
+        WorkspaceError: if any collision is detected.
+    """
+    rel_changes_dir = get_releasable_changes_dir(workspace_root, releasable_name)
+
+    # Collect releasable's existing versioned files
+    rel_versions = set()
+    if os.path.isdir(rel_changes_dir):
+        for ver_str, _path in list_versioned_files(rel_changes_dir):
+            rel_versions.add(ver_str)
+
+    # Check 1: versioned file collisions
+    collisions = []
+    for proj in member_projects:
+        proj_path = os.path.join(workspace_root, proj.path)
+        proj_changes_dir = get_changes_dir(proj_path)
+        if not os.path.isdir(proj_changes_dir):
+            continue
+        for ver_str, _path in list_versioned_files(proj_changes_dir):
+            if ver_str in rel_versions:
+                collisions.append((proj.name, ver_str))
+
+    if collisions:
+        details = ", ".join(
+            f"{name}: {ver}" for name, ver in collisions
+        )
+        raise WorkspaceError(
+            f"Versioned changelog collision: releasable '{releasable_name}' "
+            f"already has JSONL files for versions that members also have. "
+            f"Conflicts: {details}. "
+            f"Resolve by removing or renaming the conflicting files before "
+            f"migrating."
+        )
+
+    # Check 2: unreleased entry conflict
+    rel_unreleased = read_unreleased(rel_changes_dir)
+    if rel_unreleased:
+        members_with_unreleased = []
+        for proj in member_projects:
+            proj_path = os.path.join(workspace_root, proj.path)
+            proj_changes_dir = get_changes_dir(proj_path)
+            proj_unreleased = read_unreleased(proj_changes_dir)
+            if proj_unreleased:
+                members_with_unreleased.append(proj.name)
+
+        if members_with_unreleased:
+            raise WorkspaceError(
+                f"Unreleased changelog conflict: releasable "
+                f"'{releasable_name}' already has "
+                f"{len(rel_unreleased)} unreleased entries, and "
+                f"members {', '.join(members_with_unreleased)} also have "
+                f"unreleased entries. Consolidation would duplicate or "
+                f"overwrite entries. Clear the releasable's unreleased.jsonl "
+                f"or member entries before migrating."
+            )
+
+
+# ---------------------------------------------------------------------------
 # 10.6: cmd_migrate_releasable -- orchestrate full migration
 # ---------------------------------------------------------------------------
 
@@ -735,8 +881,10 @@ def cmd_migrate_releasable(workspace_root, releasable_name, *, dry_run=False,
 
     Steps:
     1. ``detect_migration_state()`` -- show current state
-    2. ``consolidate_changelogs()`` -- merge per-package changelogs into per-releasable
-    3. ``consolidate_versions()`` -- write releasable version from member versions
+    2. ``consolidate_versions()`` -- write releasable version from member versions
+       (before changelogs so the version is available for the consolidation tag)
+    3. ``consolidate_changelogs()`` -- merge per-package changelogs into per-releasable,
+       creating a consolidation-point tag that resets the unreleased range
     4. ``create_migration_tag()`` -- create releasable-format tag
     5. ``cleanup_per_package_release_state()`` -- remove orphaned per-package state
 
@@ -788,6 +936,11 @@ def cmd_migrate_releasable(workspace_root, releasable_name, *, dry_run=False,
             f"Releasable '{releasable_name}' has no member packages"
         )
 
+    # Pre-migration validation: check for changelog collisions
+    _validate_no_changelog_collisions(
+        workspace_root, releasable_name, member_projects,
+    )
+
     # Step 1: detect migration state
     state = detect_migration_state(workspace_root)
 
@@ -822,13 +975,8 @@ def cmd_migrate_releasable(workspace_root, releasable_name, *, dry_run=False,
         if response not in ("y", "yes"):
             raise WorkspaceError("Migration cancelled by user")
 
-    # Step 2: consolidate changelogs
-    changelog_result = consolidate_changelogs(
-        workspace_root, releasable_name, member_projects,
-    )
-    result["changelogs"] = changelog_result
-
-    # Step 3: consolidate versions
+    # Step 2: consolidate versions (before changelogs, so we have the
+    # version string for the consolidation-point tag)
     version_result = consolidate_versions(
         workspace_root, releasable_name, member_projects,
     )
@@ -840,12 +988,37 @@ def cmd_migrate_releasable(workspace_root, releasable_name, *, dry_run=False,
             "Resolve version differences before migrating."
         )
 
-    # Step 4: create migration tag
-    tag_result = create_migration_tag(
-        workspace_root, releasable_name,
-        target_releasable.tag_format, member_projects,
+    # Step 3: consolidate changelogs (with tag_format + version for the
+    # consolidation-point tag that resets the unreleased range)
+    consolidated_version = version_result["version"]
+    changelog_result = consolidate_changelogs(
+        workspace_root, releasable_name, member_projects,
+        tag_format=target_releasable.tag_format,
+        version=consolidated_version,
     )
-    result["tag"] = tag_result
+    result["changelogs"] = changelog_result
+
+    # Step 4: create migration tag.
+    # Skip if the consolidation-point tag already covers this -- the
+    # consolidation tag at HEAD is a superset of the migration tag's purpose
+    # (range boundary) and sits at a better commit (after the merged entries).
+    consolidation_tag = changelog_result.get("consolidation_tag")
+    if consolidation_tag:
+        result["tag"] = {
+            "status": "created",
+            "tag": consolidation_tag,
+            "commit": None,
+            "source_tag": None,
+            "member_tags": {},
+            "skipped_members": [],
+            "consolidation_tag": True,
+        }
+    else:
+        tag_result = create_migration_tag(
+            workspace_root, releasable_name,
+            target_releasable.tag_format, member_projects,
+        )
+        result["tag"] = tag_result
 
     # Step 5: cleanup per-package release state
     removed = cleanup_per_package_release_state(
