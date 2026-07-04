@@ -475,7 +475,7 @@ scope = "workspace:non_dev_only"
 # ---------------------------------------------------------------------------
 
 [checks.maven-central-metadata]
-tags = ["quality", "maven"]
+tags = ["quality", "maven", "preflight"]
 severity = "error"
 fast = false
 pure = false

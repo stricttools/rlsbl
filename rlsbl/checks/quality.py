@@ -312,6 +312,10 @@ def register_quality_checks(app):
         if not any(name == "maven" for name, _path in target_entries):
             return CheckResult("skip", "not a maven project")
 
+        pipelines = ctx.config.get("pipelines", {})
+        if not any(p.get("type") == "maven-central" for p in pipelines.values()):
+            return CheckResult("skip", "no maven-central pipeline configured")
+
         errors = validate_maven_central_metadata(str(ctx.project_root))
         if errors:
             return CheckResult(
