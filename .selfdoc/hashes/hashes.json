@@ -181,7 +181,7 @@
     "description": "92c829699be90c4ea09e05c6e0ff3830b755bdd05be47a9427e51074cedcb831"
   },
   "en/cli-index.md": {
-    "content": "01f9a9fe91be043a348c7c584537bed7fef6b1d6fa871a7cd812c0a7fded5c5d",
+    "content": "d21f25dffd87edffcb7435d2196dcfcde1c0a24e5d0ee3b4696ccb41b0f92dc6",
     "description": "3e97def3f73b8e72ae1147e1ad3b8c31a9459f8426045a2079b68028733fccd2"
   },
   "en/cli-migrate.md": {
@@ -484,7 +484,7 @@
     "source_docstring": "a786931280c9ec12aa637d910741545058e7cdf219bbab288c0f8c8e0a241fe3"
   },
   "en/rlsbl-commands-monorepo-publish_inline.md": {
-    "content": "6861ff39c30861aefdde51a1003f85d43d15ec9026788000e8cce1fc89510fd3",
+    "content": "f30572cfb9ad5e4979ca38cce9544ff41fecb070a12b4ec7382450c69deddbcb",
     "description": "0ea13ae499797664bff8500852b75eb5995ed98f902f36a73408a507c34d979f",
     "source_docstring": "8b5fb07ec2355d9afaf9edf054499367372c39d96d5a29a5b32e559c3a81146e"
   },
