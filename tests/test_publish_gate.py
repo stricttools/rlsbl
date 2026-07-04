@@ -442,8 +442,10 @@ class TestRouterGate:
         resolver = gate["steps"][0]["run"]
         assert '"pkga@v"*)' in resolver
         assert '"pkgb@v"*)' in resolver
-        assert "^(pkga) / " in resolver
-        # re.escape escapes hyphens; the jq regex engine treats \- as -.
+        # CI check-run names match the CI workflow filenames (minus .yml),
+        # not the project name. re.escape escapes hyphens; the jq regex
+        # engine treats \- as -.
+        assert r"^(pkga\-ci) / " in resolver
         assert r"^(pkgb\-ci\-pypi|pkgb\-ci\-go) / " in resolver
         assert "GITHUB_ENV" in resolver
         # Unmatched refs (e.g. a bare dispatch from main) are a hard error.

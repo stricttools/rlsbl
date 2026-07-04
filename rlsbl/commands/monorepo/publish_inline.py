@@ -238,17 +238,14 @@ def transform_project_jobs(
 def _router_ci_job_keys(project) -> list[str]:
     """Return the CI router's job keys for *project*.
 
-    Mirrors ``sync._generate_router``: a single CI file uses the project
-    name as the job key; multiple CI files use one key per file (the file
-    name minus ``.yml``). Reusable-workflow check runs are named
+    Mirrors ``sync._generate_router``: every CI file uses the file name
+    minus ``.yml`` as its job key. Reusable-workflow check runs are named
     ``<job key> / <ci job name>``, which is what the shared gate matches.
     """
     name = project["name"]
     ci_files = project.get("_ci_files") if isinstance(project, dict) else None
     if not ci_files:
         ci_files = [f"{name}-ci.yml"]
-    if len(ci_files) == 1:
-        return [name]
     return [ci_file.removesuffix(".yml") for ci_file in ci_files]
 
 

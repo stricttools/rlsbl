@@ -271,7 +271,8 @@ class TestCIRouterScale:
         parsed = _parse_workflow_yaml(content)
         for proj in projects:
             name = proj["name"]
-            job = parsed["jobs"][name]
+            job_key = f"{name}-ci"
+            job = parsed["jobs"][job_key]
             assert job["uses"] == f"./.github/workflows/{name}-ci.yml"
 
     def test_detect_outputs(self):
@@ -291,7 +292,8 @@ class TestCIRouterScale:
         parsed = _parse_workflow_yaml(content)
         for proj in projects:
             name = proj["name"]
-            job = parsed["jobs"][name]
+            job_key = f"{name}-ci"
+            job = parsed["jobs"][job_key]
             assert job["if"] == f"needs.detect.outputs.{name} == 'true'"
 
     def test_with_watch_paths(self):

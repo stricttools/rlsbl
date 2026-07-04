@@ -275,7 +275,7 @@ class TestRouterMultipleCIFiles:
         assert "uses: ./.github/workflows/core-ci.yml" in content
 
     def test_router_single_ci_with_ci_files(self):
-        """Project with one _ci_files entry uses project name as job key."""
+        """Project with one _ci_files entry uses CI filename as job key."""
         projects = [
             {"name": "core", "path": "core", "_ci_files": ["core-ci.yml"]},
         ]

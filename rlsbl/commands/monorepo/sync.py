@@ -180,22 +180,13 @@ def _generate_router(projects):
     jobs = {'detect': detect_job}
     for p in projects:
         ci_files = p.get('_ci_files', [f"{p['name']}-ci.yml"])
-        if len(ci_files) == 1:
-            # Single CI file: use project name as job key (backward compat)
-            jobs[p['name']] = {
+        for ci_file in ci_files:
+            job_key = ci_file.removesuffix('.yml')
+            jobs[job_key] = {
                 'needs': 'detect',
                 'if': f"needs.detect.outputs.{p['name']} == 'true'",
-                'uses': f"./.github/workflows/{ci_files[0]}",
+                'uses': f"./.github/workflows/{ci_file}",
             }
-        else:
-            # Multiple CI files: one job per file
-            for ci_file in ci_files:
-                job_key = ci_file.removesuffix('.yml')
-                jobs[job_key] = {
-                    'needs': 'detect',
-                    'if': f"needs.detect.outputs.{p['name']} == 'true'",
-                    'uses': f"./.github/workflows/{ci_file}",
-                }
 
     workflow = {
         'name': 'CI Router',
