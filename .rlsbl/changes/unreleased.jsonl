@@ -1,2 +1,3 @@
 {"commits":["f4b7df8f429441992a5c422472e67548f237d843"],"user_facing":true,"description":"**Fixed CI_CHECK_REGEX in publish router.** The gate job regex now matches actual GitHub check-run names (CI filename-based, e.g. `name-ci / test`) instead of project-name-based names that never matched.","type":"fix"}
 {"commits":["d464427ef81342333b7c3ebeca8b1fd4fbfeb51f"],"user_facing":false}
+{"commits":["9f57691d93ef131d876d69d84f78c3dde6e8caa4"],"user_facing":false}
