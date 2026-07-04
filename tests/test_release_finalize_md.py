@@ -110,7 +110,7 @@ class TestReleaseFinalizeMd:
         from rlsbl.commands.release import run_cmd
         from rlsbl.utils import run as real_run
 
-        def fake_run(cmd, args=None, timeout=120, env=None):
+        def fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
             """Intercept gh and git-push calls; let everything else through."""
             full = [cmd] + (args or [])
             # Skip gh CLI calls
@@ -119,7 +119,7 @@ class TestReleaseFinalizeMd:
             # Skip git push
             if cmd == "git" and args and args[0] == "push":
                 return ""
-            return real_run(cmd, args=args, timeout=timeout, env=env)
+            return real_run(cmd, args=args, timeout=timeout, env=env, cwd=cwd)
 
         with (
             patch("rlsbl.commands.release.check_gh_installed", return_value=True),

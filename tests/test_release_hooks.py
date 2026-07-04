@@ -233,7 +233,7 @@ class TestPostReleaseHookOutput:
         """A failing post-release hook prints a warning but does not abort."""
         _setup_project(tmp_project, "post-release.sh", "#!/bin/bash\nexit 3\n")
 
-        def fake_run(cmd, args=None, timeout=120, env=None):
+        def fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
             """Return sensible defaults for all run() calls in the release flow."""
             full = [cmd] + (args or [])
             joined = " ".join(full)
@@ -316,7 +316,7 @@ class TestWatchSHABeforePostHook:
         post_hook_sha = "bbb222"
         rev_parse_call_count = 0
 
-        def fake_run(cmd, args=None, timeout=120, env=None):
+        def fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
             nonlocal rev_parse_call_count
             full = [cmd] + (args or [])
             joined = " ".join(full)
@@ -574,7 +574,7 @@ class TestHookCwdStandalone:
         """In standalone mode, post-release hook subprocess.run gets cwd=project_dir."""
         _setup_project(tmp_project, "post-release.sh", "#!/bin/bash\necho ok\n")
 
-        def fake_run(cmd, args=None, timeout=120, env=None):
+        def fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
             full = [cmd] + (args or [])
             joined = " ".join(full)
             if "rev-list" in joined:
@@ -789,7 +789,7 @@ class TestHookCwdMonorepo:
 
         monkeypatch.chdir(ns.python_dir)
 
-        def fake_run(cmd, args=None, timeout=120, env=None):
+        def fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
             full = [cmd] + (args or [])
             joined = " ".join(full)
             if "rev-list" in joined:
@@ -932,13 +932,13 @@ def _setup_releasable_project_with_hook(repo, hook_name, hook_body):
     )
 
 
-def _fake_run_intercepting_remote(cmd, args=None, timeout=120, env=None):
+def _fake_run_intercepting_remote(cmd, args=None, timeout=120, env=None, cwd=None):
     """Intercept gh and git-push calls; let everything else through."""
     if cmd == "gh":
         return ""
     if cmd == "git" and args and args[0] == "push":
         return ""
-    return real_run(cmd, args=args, timeout=timeout, env=env)
+    return real_run(cmd, args=args, timeout=timeout, env=env, cwd=cwd)
 
 
 class TestHookGeneratedFiles:

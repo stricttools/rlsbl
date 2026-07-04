@@ -45,6 +45,8 @@ from ...utils import (
     require_tool,
     run,
     run_gh,
+    tag_exists_locally,
+    tag_exists_on_remote,
 )
 from .rollback import _cleanup_release_artifacts
 from .publish import _run_selfdoc_post_generate, _print_stale_dep_advisory, upload_release_assets, _upload_assets_for_config

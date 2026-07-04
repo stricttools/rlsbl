@@ -229,6 +229,8 @@ class TestPrivatePublishGuardrail:
     @patch("rlsbl.commands.release.acquire_lock")
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
+    @patch("rlsbl.commands.release.tag_exists_on_remote", return_value=False)
+    @patch("rlsbl.commands.release.tag_exists_locally")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -250,7 +252,8 @@ class TestPrivatePublishGuardrail:
         self, _run_checks, _vrt, mock_upload_assets,
         _changes_dir, _extract, _finalize, _gen_ver_file,
         _validate, _gen_cl, _deploy, _tag, _gh_inst, _gh_auth,
-        _clean, _branch, _commit_files, mock_run, _run_gh, _push, _lock, _unlock,
+        _clean, _branch, _commit_files, mock_run, mock_tag_local, _tag_remote,
+        _run_gh, _push, _lock, _unlock,
         _remote_exists, capsys,
     ):
         """When private=true with assets: true, asset upload still runs."""
@@ -262,12 +265,11 @@ class TestPrivatePublishGuardrail:
 
         from rlsbl.commands.release import run_cmd
 
+        mock_tag_local.side_effect = [True, False, False]
         mock_run.side_effect = [
             # run_cmd phase:
             "",                 # git fetch origin --quiet
             "0",                # git rev-list --count HEAD..origin/main
-            "v1.0.0",           # git tag -l v1.0.0 (exists -> bump)
-            "",                 # git tag -l v1.0.1 (doesn't exist)
             "",                 # git status --porcelain (pre-hook snapshot)
             "",                 # git status --porcelain (pre-selfdoc snapshot)
             "",                 # git status --porcelain (post-selfdoc snapshot)
@@ -279,11 +281,9 @@ class TestPrivatePublishGuardrail:
             "",                 # git status --porcelain (re-check guard)
             "",                 # git log -1 --format=%s (COMMITTED guard)
             "",                 # git status --porcelain (backfilled .md detection)
-            "",                 # git tag -l (TAGGED guard)
             "",                 # git tag v1.0.1
             "abc123",           # rev-parse HEAD (PUSHED guard _local_head)
             "abc123",           # rev-parse origin/main (PUSHED guard _remote_head)
-            "",                 # ls-remote (PUSHED guard tag check)
             "",                 # git push origin v1.0.1
             "def456",           # git rev-parse HEAD (pushed_sha)
         ]

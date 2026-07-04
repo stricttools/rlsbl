@@ -16,30 +16,26 @@ def register_release_checks(app):
     @app.check("local-tag")
     def check_local_tag(ctx):
         """Git tag for the current version must exist locally."""
-        from ..utils import run
+        from ..utils import tag_exists_locally
 
         _version, tag = _resolve_version_and_tag(ctx)
         if not tag:
             return CheckResult("skip", "no version detected")
 
-        output = run("git", ["tag", "-l", tag], cwd=str(ctx.project_root))
-
-        if output:
+        if tag_exists_locally(tag, cwd=str(ctx.project_root)):
             return CheckResult("pass", f"{tag} exists")
         return CheckResult("warn", f"{tag} not found locally")
 
     @app.check("remote-tag")
     def check_remote_tag(ctx):
         """Git tag for the current version must exist on origin."""
-        from ..utils import run
+        from ..utils import tag_exists_on_remote
 
         _version, tag = _resolve_version_and_tag(ctx)
         if not tag:
             return CheckResult("skip", "no version detected")
 
-        output = run("git", ["ls-remote", "--tags", "origin", tag], cwd=str(ctx.project_root))
-
-        if output:
+        if tag_exists_on_remote(tag, cwd=str(ctx.project_root)):
             return CheckResult("pass", f"{tag} on origin")
         return CheckResult("warn", f"{tag} not found on origin")
 
