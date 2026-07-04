@@ -2044,6 +2044,36 @@ class TestWorkspaceCiSynced:
         result = app._check_defs["workspace-ci-synced"].impl(ctx)
         assert result.status == "pass"
 
+    def test_plain_target_skipped_no_ci_required(self, tmp_path, monkeypatch):
+        """A project whose only detected target is 'plain' is skipped
+        because plain has no ci_templates capability."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+        _init_repo(repo)
+
+        # Create project directory (no workflow file)
+        proj_dir = repo / "myplain"
+        proj_dir.mkdir()
+
+        from rlsbl.targets import TargetEntry
+        from rlsbl.workspace import WorkspaceProject
+
+        projects = [
+            WorkspaceProject({"name": "myplain", "path": "myplain"}),
+        ]
+        ctx = _make_ws_ctx(repo, projects)
+
+        # Mock detect_targets to return plain for this project
+        with patch(
+            "rlsbl.targets.detect_targets",
+            return_value=[TargetEntry("plain", str(proj_dir))],
+        ):
+            result = app._check_defs["workspace-ci-synced"].impl(ctx)
+
+        assert result.status == "pass"
+        assert "1 skipped" in result.message
+
 
 class TestWorkspaceTargets:
     """workspace-targets check: lines 69-83."""
