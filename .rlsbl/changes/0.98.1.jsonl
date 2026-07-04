@@ -1,0 +1,6 @@
+{"commits":["3e906f67056d0342f78bb8a4d61f02c11505da51"],"user_facing":false}
+{"commits":["658dfae00571164d4ee59f5edde2ce9a16b754a0"],"user_facing":false}
+{"commits":["19313388daeb9398d11f443a2061b25035788629"],"user_facing":true,"description":"Scaffold hash pruning no longer removes entries for files not actively deleted during the scaffold run.","type":"fix"}
+{"commits":["09016b31914f033168288217d96fb81e9f15bbd3"],"user_facing":false}
+{"commits":["7cc47c42f797103587ff306b193a598e2580795c"],"user_facing":false}
+{"commits":["b9dfabe69c2c908149793ca87e58ca660da9fedf"],"user_facing":false}
