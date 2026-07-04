@@ -598,10 +598,13 @@ class TestOrphanBaseSweep:
 
 
 class TestStaleHashPruning:
-    """Phase 2.2: stale entries in hashes.json are pruned when the file no longer exists."""
+    """Phase 2.2: hashes.json entries are pruned only for files actively removed
+    during this scaffold run (orphan cleanup or removed_paths), not via blanket
+    disk-existence checks."""
 
-    def test_stale_hash_entries_pruned(self, mock_git_repo, monkeypatch):
-        """Entries in hashes.json for non-existent files are removed."""
+    def test_non_removed_stale_entries_preserved(self, mock_git_repo, monkeypatch):
+        """Entries in hashes.json for non-existent files that were NOT actively
+        removed during this scaffold run are preserved (no blanket pruning)."""
         from unittest.mock import patch
         import subprocess as real_subprocess
         from rlsbl.commands.init_cmd import (
@@ -616,6 +619,7 @@ class TestStaleHashPruning:
         rlsbl_dir.mkdir(parents=True, exist_ok=True)
 
         # Pre-populate hashes.json with an entry for a file that doesn't exist
+        # but was NOT actively removed by this scaffold run
         stale_key = "gone/file.yml"
         existing_key = ".rlsbl/version"
 
@@ -644,8 +648,67 @@ class TestStaleHashPruning:
 
         # Reload hashes.json and check
         hashes = load_hashes()
-        assert stale_key not in hashes, "Stale entry should be pruned"
-        # .rlsbl/version exists (written by _finalize_scaffold), so it should remain
+        # Stale entry is preserved -- it was not actively removed by this run
+        assert stale_key in hashes, "Non-removed stale entry should be preserved"
+        assert existing_key in hashes or ".rlsbl/version" in hashes
+
+    def test_orphan_removed_entries_pruned(self, mock_git_repo, monkeypatch):
+        """Entries in hashes.json for files actively removed via orphan cleanup
+        are pruned from hashes.json."""
+        from unittest.mock import patch
+        import subprocess as real_subprocess
+        from rlsbl.commands.init_cmd import (
+            _finalize_scaffold,
+            save_managed_files,
+            save_hashes,
+            load_hashes,
+        )
+
+        monkeypatch.chdir(mock_git_repo)
+        rlsbl_dir = mock_git_repo / ".rlsbl"
+        rlsbl_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create a file that was previously managed but is no longer produced
+        orphan_key = "old_managed/file.yml"
+        orphan_path = mock_git_repo / orphan_key
+        orphan_path.parent.mkdir(parents=True, exist_ok=True)
+        orphan_path.write_text("content")
+        from rlsbl.commands.init_cmd import file_hash
+        orphan_hash = file_hash(str(orphan_path))
+
+        existing_key = ".rlsbl/version"
+
+        # Register the file in managed-files so orphan detection finds it
+        save_managed_files({orphan_key: orphan_hash})
+        save_hashes({orphan_key: orphan_hash, existing_key: "def456"})
+
+        original_run = real_subprocess.run
+
+        def tracking_run(cmd, *args, **kwargs):
+            if isinstance(cmd, list) and cmd and cmd[0] == "saferm":
+                # Simulate saferm by actually deleting the file
+                for arg in cmd:
+                    if os.path.exists(arg):
+                        os.remove(arg)
+                return real_subprocess.CompletedProcess(args=cmd, returncode=0)
+            return original_run(cmd, *args, **kwargs)
+
+        with patch("rlsbl.commands.init_cmd.subprocess.run", side_effect=tracking_run):
+            config = {"targets": ["plain"], "private": False}
+            _finalize_scaffold(
+                existing_hashes={orphan_key: orphan_hash, existing_key: "def456"},
+                all_hash_dicts=[{}],  # empty = orphan_key is no longer produced
+                created=[],
+                skipped=[],
+                warnings=[],
+                flags={"auto-commit": False, "auto-tag": False, "skip-shared": False},
+                project_root=str(mock_git_repo),
+                config=config,
+            )
+
+        # Reload hashes.json and check
+        hashes = load_hashes()
+        assert orphan_key not in hashes, "Orphan-removed entry should be pruned"
         assert existing_key in hashes or ".rlsbl/version" in hashes
 
 

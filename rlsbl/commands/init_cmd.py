@@ -974,6 +974,7 @@ def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnin
     orphan_keys = set(old_managed.keys()) - set(all_new_hashes.keys())
     dry_run = flags.get("dry-run", False)
     force = flags.get("force", False)
+    orphan_removed: set[str] = set()
     for orphan_path in sorted(orphan_keys):
         if dry_run:
             print(f"Would remove: {orphan_path}")
@@ -993,6 +994,7 @@ def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnin
                 capture_output=True,
                 text=True,
             )
+            orphan_removed.add(orphan_path)
             # Also clean up the merge base if it exists
             base_path = os.path.join(BASES_DIR, orphan_path)
             if os.path.exists(base_path):
@@ -1058,15 +1060,11 @@ def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnin
     # Save hashes (all files for change detection)
     existing_hashes.update(all_new_hashes)
 
-    # Prune stale entries from hashes.json: if a tracked file no longer exists
-    # on disk (deleted outside scaffold, target removed, etc.), drop it so the
-    # hashes file stays in sync with reality.
-    for stale_key in list(existing_hashes.keys()):
-        if not os.path.exists(stale_key):
-            del existing_hashes[stale_key]
-
-    # Purge hashes for files removed by _skip_redundant_releasable_configs.
-    # removed_paths are absolute; existing_hashes keys are relative to CWD.
+    # Prune hashes for files actively removed during this scaffold run.
+    # Two removal sources: orphan cleanup (relative paths) and
+    # _skip_redundant_releasable_configs (absolute paths in removed_paths).
+    for orphan_key in orphan_removed:
+        existing_hashes.pop(orphan_key, None)
     if removed_paths:
         for abs_path in removed_paths:
             rel_key = os.path.relpath(abs_path, project_root)
