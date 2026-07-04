@@ -16,17 +16,14 @@ from rlsbl.errors import ConfigError
 
 from rlsbl.commands.init_cmd import (
     BASES_DIR,
-    HASHES_FILE,
     USER_OWNED,
     _load_base,
     _save_base,
     _three_way_merge,
     file_hash,
-    load_hashes,
     process_mappings,
     process_template,
     run_cmd,
-    save_hashes,
 )
 from rlsbl.release_file import ReleaseConfig
 
@@ -435,24 +432,6 @@ class TestScaffold:
         # Content should match (template hasn't changed)
         assert ci_base_before == ci_base_after
 
-    # -- Hash tests --
-
-    def test_hashes_saved_after_scaffolding(self):
-        """After scaffolding, .rlsbl/hashes.json should exist with entries."""
-        self._run_scaffold()
-        assert os.path.exists(HASHES_FILE)
-        hashes = load_hashes()
-        assert isinstance(hashes, dict)
-        assert len(hashes) > 0
-
-    def test_hashes_match_actual_file_contents(self):
-        """Stored hashes should match SHA-256 of the generated files."""
-        self._run_scaffold()
-        hashes = load_hashes()
-        for path, stored_hash in hashes.items():
-            if os.path.exists(path):
-                assert stored_hash == file_hash(path), f"Hash mismatch for {path}"
-
     # -- merge tests --
 
     def test_update_processes_managed_files(self):
@@ -460,8 +439,7 @@ class TestScaffold:
         self._run_scaffold()
 
         ci_path = ".github/workflows/ci.yml"
-        hashes_before = load_hashes()
-        assert ci_path in hashes_before
+        assert os.path.exists(ci_path)
 
         with patch("sys.stdout", new_callable=StringIO):
             run_cmd("npm", [], {}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
@@ -661,14 +639,6 @@ class TestHashFunctions:
         expected = hashlib.sha256(b"hello world").hexdigest()
         assert file_hash("test.txt") == expected
 
-    def test_save_and_load_hashes_roundtrip(self):
-        data = {"file1.txt": "abc123", "dir/file2.txt": "def456"}
-        save_hashes(data)
-        loaded = load_hashes()
-        assert loaded == data
-
-    def test_load_hashes_returns_empty_dict_when_no_file(self):
-        assert load_hashes() == {}
 
 
 # ---------------------------------------------------------------------------

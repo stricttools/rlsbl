@@ -160,16 +160,6 @@ class TestRunCmdMulti:
         with open(marker) as f:
             assert f.read().strip() == __version__
 
-    def test_hashes_saved(self, dual_registry_project):
-        """File hashes are persisted after multi-registry scaffold."""
-        with patch("sys.stdout", new_callable=StringIO):
-            run_cmd_multi(["npm", "pypi"], [], {}, ctx=_ctx())
-
-        from rlsbl.commands.init_cmd import HASHES_FILE, load_hashes
-        assert os.path.exists(HASHES_FILE)
-        hashes = load_hashes()
-        assert len(hashes) > 0
-
     def test_force_flag_overwrites(self, dual_registry_project):
         """Running with --force overwrites existing managed files."""
         with patch("sys.stdout", new_callable=StringIO):

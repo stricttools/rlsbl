@@ -189,7 +189,7 @@ def _setup_standalone_npm(repo, scaffolded):
     )
     if scaffolded:
         # Scaffold metadata marks the project as actually scaffolded
-        (repo / ".rlsbl" / "hashes.json").write_text("{}\n")
+        (repo / ".rlsbl" / "managed-files.json").write_text('{"version":1,"files":{}}\n')
         (repo / ".rlsbl" / "version").write_text("0.0.1\n")
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "initial")

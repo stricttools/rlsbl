@@ -136,7 +136,7 @@ def test_conflict_tip_printed_for_ci_yml(mock_git_repo, capsys):
     full_path.write_text("<<<<<<< ours\nours\n=======\ntheirs\n>>>>>>> theirs\n")
 
     _finalize_scaffold(
-        existing_hashes={},
+
         all_hash_dicts=[{}],
         created=[(ci_path, "CONFLICTS -- resolve manually")],
         skipped=[],
@@ -160,7 +160,7 @@ def test_conflict_tip_printed_for_publish_yml(mock_git_repo, capsys):
     full_path.write_text("<<<<<<<\n=======\n>>>>>>>\n")
 
     _finalize_scaffold(
-        existing_hashes={},
+
         all_hash_dicts=[{}],
         created=[(pub_path, "CONFLICTS -- resolve manually")],
         skipped=[],
@@ -183,7 +183,7 @@ def test_conflict_tip_not_printed_when_no_conflict(mock_git_repo, capsys):
     full_path.write_text("name: CI\n")
 
     _finalize_scaffold(
-        existing_hashes={},
+
         all_hash_dicts=[{}],
         created=[(ci_path, "merged")],
         skipped=[],
@@ -205,7 +205,7 @@ def test_conflict_tip_not_printed_for_other_conflicts(mock_git_repo, capsys):
     (mock_git_repo / other).write_text("<<<<<<< ours\n=======\n>>>>>>> theirs\n")
 
     _finalize_scaffold(
-        existing_hashes={},
+
         all_hash_dicts=[{}],
         created=[(other, "CONFLICTS -- resolve manually")],
         skipped=[],

@@ -174,7 +174,7 @@ def test_scaffold_auto_commits_files(mock_git_repo, capsys):
     # Run _finalize_scaffold which should auto-commit
     # no-tag prevents tagging side effects in test
     _finalize_scaffold(
-        existing_hashes={},
+
         all_hash_dicts=[new_hashes],
         created=created,
         skipped=skipped,
@@ -216,7 +216,7 @@ def test_scaffold_no_commit_flag_skips_commit(mock_git_repo, capsys):
 
     # Run _finalize_scaffold with --no-commit flag
     _finalize_scaffold(
-        existing_hashes={},
+
         all_hash_dicts=[new_hashes],
         created=created,
         skipped=skipped,
@@ -243,7 +243,7 @@ def test_pre_push_hook_does_not_pass_args(mock_git_repo, capsys):
     """The installed pre-push hook must not pass $@ to avoid strictcli arg rejection."""
     # Run _finalize_scaffold to install the hook
     _finalize_scaffold(
-        existing_hashes={},
+
         all_hash_dicts=[{}],
         created=[],
         skipped=[],
@@ -458,7 +458,7 @@ def test_scaffold_auto_commits_from_subdirectory(mock_git_repo, monkeypatch, cap
     assert created[0][1] == "created"
 
     _finalize_scaffold(
-        existing_hashes={},
+
         all_hash_dicts=[new_hashes],
         created=created,
         skipped=skipped,
@@ -498,7 +498,7 @@ def test_pre_push_hook_installed_from_subdirectory(mock_git_repo, monkeypatch, c
     monkeypatch.chdir(subdir)
 
     _finalize_scaffold(
-        existing_hashes={},
+
         all_hash_dicts=[{}],
         created=[],
         skipped=[],

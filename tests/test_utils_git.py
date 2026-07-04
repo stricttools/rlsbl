@@ -102,7 +102,7 @@ class TestRemoteBranchExists:
         mock_run.return_value = "abc123def456"
         assert remote_branch_exists("main") is True
         mock_run.assert_called_once_with(
-            "git", ["rev-parse", "--verify", "origin/main"]
+            "git", ["rev-parse", "--verify", "origin/main"], cwd=None
         )
 
     @patch("rlsbl.utils.run")

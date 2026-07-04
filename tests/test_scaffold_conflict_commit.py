@@ -38,7 +38,7 @@ def test_finalize_excludes_conflicted_files_from_commit(mock_git_repo, capsys):
     (mock_git_repo / clean_file).write_text("clean content\n")
 
     _finalize_scaffold(
-        existing_hashes={},
+
         all_hash_dicts=[{}],
         created=[
             (conflict_file, "CONFLICTS -- resolve manually"),
@@ -76,7 +76,7 @@ def test_finalize_handles_only_conflicted_files(mock_git_repo, capsys):
     (mock_git_repo / cf).write_text("<<<<<<< ours\n=======\n>>>>>>> theirs\n")
 
     _finalize_scaffold(
-        existing_hashes={},
+
         all_hash_dicts=[{}],
         created=[(cf, "CONFLICTS -- resolve manually")],
         skipped=[],
@@ -111,7 +111,7 @@ def test_finalize_commits_only_clean_files_when_mix(mock_git_repo, capsys):
         (mock_git_repo / name).write_text(f"content of {name}\n")
 
     _finalize_scaffold(
-        existing_hashes={},
+
         all_hash_dicts=[{}],
         created=files,
         skipped=[],

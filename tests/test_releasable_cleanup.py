@@ -465,7 +465,7 @@ class TestVerifyMinimalCleanState:
         pkg = tmp_project / "pkg"
         _make_rlsbl_dir(
             pkg,
-            files=["config.json", "hashes.json", "managed-files.json"],
+            files=["config.json", "managed-files.json"],
         )
         result = verify_minimal_rlsbl(str(pkg))
         assert result == []
@@ -489,7 +489,6 @@ class TestVerifyMinimalCleanState:
         """EXPECTED_RLSBL_CONTENTS has the documented set."""
         assert EXPECTED_RLSBL_CONTENTS == {
             "config.json",
-            "hashes.json",
             "managed-files.json",
             "hooks",
         }
@@ -649,7 +648,7 @@ releasable = "core"
     def test_passes_on_minimal_state_with_hooks(self, tmp_project):
         pkg = tmp_project / "pkg"
         _make_rlsbl_dir(pkg, subdirs=["hooks"],
-                        files=["config.json", "hashes.json"])
+                        files=["config.json", "managed-files.json"])
         _write_workspace(tmp_project, """\
 [[releasables]]
 name = "core"

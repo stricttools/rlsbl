@@ -1,4 +1,4 @@
-"""Tests for the managed-files registry and hashes.json: separate concerns for orphan detection and change tracking."""
+"""Tests for the managed-files registry: orphan detection and change tracking."""
 
 import json
 import os
@@ -11,12 +11,9 @@ import pytest
 
 from rlsbl.commands.init_cmd import (
     BASES_DIR,
-    HASHES_FILE,
     MANAGED_FILES,
     file_hash,
-    load_hashes,
     load_managed_files,
-    save_hashes,
     save_managed_files,
 )
 from rlsbl.context import ProjectContext
@@ -30,49 +27,6 @@ def _make_npm_project(repo):
     """Create a minimal npm project."""
     pkg = {"name": "testpkg", "version": "0.1.0"}
     (repo / "package.json").write_text(json.dumps(pkg, indent=2) + "\n")
-
-
-class TestHashesJson:
-    """Tests for hashes.json (flat {path: hash} dict for change detection)."""
-
-    def test_hashes_written_on_scaffold(self, mock_git_repo):
-        """Scaffold writes hashes.json as a flat dict."""
-        from rlsbl.commands.init_cmd import run_cmd
-
-        _make_npm_project(mock_git_repo)
-        run_cmd("npm", [], {"auto-tag": False, "auto-commit": False}, ctx=_ctx())
-
-        assert os.path.exists(HASHES_FILE)
-        with open(HASHES_FILE) as f:
-            data = json.load(f)
-        # Flat dict, not wrapped in a versioned envelope
-        assert isinstance(data, dict)
-        assert "version" not in data
-        assert "files" not in data
-        assert len(data) > 0
-
-    def test_save_hashes_writes_flat_dict(self, tmp_project):
-        """save_hashes writes a flat {path: hash} dict."""
-        os.makedirs(".rlsbl", exist_ok=True)
-        save_hashes({"a.txt": "abc123"})
-
-        with open(HASHES_FILE) as f:
-            data = json.load(f)
-        assert data == {"a.txt": "abc123"}
-
-    def test_load_hashes_reads_flat_dict(self, tmp_project):
-        """load_hashes reads a flat {path: hash} dict."""
-        os.makedirs(".rlsbl", exist_ok=True)
-        with open(HASHES_FILE, "w") as f:
-            json.dump({"b.txt": "def456"}, f)
-
-        result = load_hashes()
-        assert result == {"b.txt": "def456"}
-
-    def test_load_hashes_empty_when_no_file(self, tmp_project):
-        """load_hashes returns empty dict when file doesn't exist."""
-        result = load_hashes()
-        assert result == {}
 
 
 class TestManagedFilesJson:
@@ -116,54 +70,10 @@ class TestManagedFilesJson:
         assert result == {}
 
 
-class TestBothFilesCoexist:
-    """Tests that hashes.json and managed-files.json coexist independently."""
-
-    def test_scaffold_creates_both_files(self, mock_git_repo):
-        """Scaffold creates both hashes.json and managed-files.json."""
-        from rlsbl.commands.init_cmd import run_cmd
-
-        _make_npm_project(mock_git_repo)
-        run_cmd("npm", [], {"auto-tag": False, "auto-commit": False}, ctx=_ctx())
-
-        assert os.path.exists(HASHES_FILE), "hashes.json should exist"
-        assert os.path.exists(MANAGED_FILES), "managed-files.json should exist"
-
-    def test_hashes_and_managed_files_independent(self, tmp_project):
-        """Writing to one file doesn't affect the other."""
-        os.makedirs(".rlsbl", exist_ok=True)
-
-        save_hashes({"x.txt": "hash1"})
-        save_managed_files({"y.txt": "hash2"})
-
-        assert load_hashes() == {"x.txt": "hash1"}
-        assert load_managed_files() == {"y.txt": "hash2"}
-
-    def test_hashes_flat_managed_files_versioned(self, tmp_project):
-        """hashes.json is a flat dict, managed-files.json has a versioned envelope."""
-        os.makedirs(".rlsbl", exist_ok=True)
-
-        save_hashes({"a.txt": "h1"})
-        save_managed_files({"a.txt": "h1"})
-
-        with open(HASHES_FILE) as f:
-            hashes_data = json.load(f)
-        with open(MANAGED_FILES) as f:
-            managed_data = json.load(f)
-
-        # hashes.json: flat dict
-        assert "version" not in hashes_data
-        assert hashes_data == {"a.txt": "h1"}
-
-        # managed-files.json: versioned envelope
-        assert managed_data["version"] == 1
-        assert managed_data["files"] == {"a.txt": "h1"}
-
-
 class TestOrphanDetection:
     """Tests for orphan detection using managed-files.json in _finalize_scaffold."""
 
-    def _run_finalize(self, existing_hashes, new_hashes_dict, mock_git_repo,
+    def _run_finalize(self, new_hashes_dict, mock_git_repo,
                       flags=None, managed_files=None):
         """Helper to run _finalize_scaffold with orphan detection.
 
@@ -200,7 +110,7 @@ class TestOrphanDetection:
                 with patch("rlsbl.commands.init_cmd.subprocess.run",
                            side_effect=mock_subprocess_run):
                     _finalize_scaffold(
-                        existing_hashes, [new_hashes_dict],
+                        [new_hashes_dict],
                         created, skipped, [],
                         flags=flags,
                         project_root=mock_git_repo,
@@ -221,11 +131,10 @@ class TestOrphanDetection:
 
         # Orphan is in managed-files (was template-derived), not in new hashes
         managed = {orphan: orphan_hash}
-        existing_hashes = {orphan: orphan_hash}
         new_hashes = {}
 
         created, _, _ = self._run_finalize(
-            existing_hashes, new_hashes, mock_git_repo, managed_files=managed
+            new_hashes, mock_git_repo, managed_files=managed
         )
 
         assert not os.path.exists(orphan)
@@ -246,7 +155,7 @@ class TestOrphanDetection:
         orphan_hash = file_hash(orphan)
 
         managed = {orphan: orphan_hash}
-        self._run_finalize({}, {}, mock_git_repo, managed_files=managed)
+        self._run_finalize({}, mock_git_repo, managed_files=managed)
 
         assert not os.path.exists(orphan)
         assert not os.path.exists(base_path)
@@ -266,7 +175,7 @@ class TestOrphanDetection:
             f.write("# user modified this\n")
 
         managed = {orphan: original_hash}
-        self._run_finalize({}, {}, mock_git_repo, managed_files=managed)
+        self._run_finalize({}, mock_git_repo, managed_files=managed)
 
         # File must still exist (protected by hash mismatch)
         assert os.path.exists(orphan)
@@ -291,7 +200,7 @@ class TestOrphanDetection:
 
         managed = {orphan: original_hash}
         created, _, _ = self._run_finalize(
-            {}, {}, mock_git_repo, flags={"force": True}, managed_files=managed
+            {}, mock_git_repo, flags={"force": True}, managed_files=managed
         )
 
         assert not os.path.exists(orphan)
@@ -309,7 +218,7 @@ class TestOrphanDetection:
 
         managed = {orphan: orphan_hash}
         _, _, stdout = self._run_finalize(
-            {}, {}, mock_git_repo, flags={"dry-run": True}, managed_files=managed
+            {}, mock_git_repo, flags={"dry-run": True}, managed_files=managed
         )
 
         # File must still exist
@@ -324,7 +233,7 @@ class TestOrphanDetection:
         ghost = ".github/workflows/ghost.yml"
         managed = {ghost: "deadbeef"}
         # Should not crash even though file doesn't exist
-        self._run_finalize({}, {}, mock_git_repo, managed_files=managed)
+        self._run_finalize({}, mock_git_repo, managed_files=managed)
 
     def test_non_template_files_never_orphaned(self, mock_git_repo):
         """Files not in managed-files.json (e.g., CLAUDE.md, .gitignore) are never orphaned.
@@ -343,18 +252,12 @@ class TestOrphanDetection:
         claude_dir.mkdir(exist_ok=True)
         (claude_dir / "settings.json").write_text("{}\n")
 
-        # These files are in hashes.json (scaffold touched them) but NOT in managed-files
-        existing_hashes = {
-            "CLAUDE.md": file_hash("CLAUDE.md"),
-            ".gitignore": file_hash(".gitignore"),
-            ".claude/settings.json": file_hash(".claude/settings.json"),
-        }
         # managed-files is empty (these files never went through apply_plans)
         managed = {}
         new_hashes = {}
 
         self._run_finalize(
-            existing_hashes, new_hashes, mock_git_repo, managed_files=managed
+            new_hashes, mock_git_repo, managed_files=managed
         )
 
         # All files must still exist -- they were never in managed-files.json
@@ -378,10 +281,9 @@ class TestOrphanDetection:
         user_hash = file_hash(user_file)
 
         managed = {user_file: user_hash}
-        existing_hashes = {user_file: user_hash}
 
         created, _, _ = self._run_finalize(
-            existing_hashes, {}, mock_git_repo, managed_files=managed
+            {}, mock_git_repo, managed_files=managed
         )
 
         # With the new design, if it's in managed-files and hash matches, it gets deleted

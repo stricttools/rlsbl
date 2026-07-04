@@ -334,7 +334,7 @@ class TestVerifyMinimalAfterFullCleanup:
             pkg,
             subdirs=["changes", "releases", "hooks", "bases", "lint"],
             files=[
-                "config.json", "hashes.json",
+                "config.json",
                 "managed-files.json", "version",
             ],
         )
@@ -348,11 +348,11 @@ class TestVerifyMinimalAfterFullCleanup:
         assert result == []
 
     def test_minimal_set_only(self, tmp_project):
-        """Only hashes.json, managed-files.json is clean."""
+        """Only managed-files.json is clean."""
         pkg = tmp_project / "pkg"
         _make_rlsbl_dir(
             pkg,
-            files=["hashes.json", "managed-files.json"],
+            files=["managed-files.json"],
         )
         result = verify_minimal_rlsbl(str(pkg))
         assert result == []
@@ -362,7 +362,7 @@ class TestVerifyMinimalAfterFullCleanup:
         pkg = tmp_project / "pkg"
         _make_rlsbl_dir(
             pkg,
-            files=["hashes.json", "managed-files.json", "config.json"],
+            files=["managed-files.json", "config.json"],
         )
         result = verify_minimal_rlsbl(str(pkg))
         assert result == []
@@ -434,7 +434,6 @@ class TestVerifyMinimalFlagsUnexpected:
         """EXPECTED_RLSBL_CONTENTS contains only the minimal set."""
         assert EXPECTED_RLSBL_CONTENTS == {
             "config.json",
-            "hashes.json",
             "managed-files.json",
             "hooks",
         }
