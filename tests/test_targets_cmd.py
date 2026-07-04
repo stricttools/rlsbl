@@ -114,6 +114,8 @@ class TestMultiTargetRelease:
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
+    @patch("rlsbl.commands.release.tag_exists_on_remote", return_value=False)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -131,19 +133,16 @@ class TestMultiTargetRelease:
     @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
     @patch("rlsbl.app.run_checks", return_value=([], 0))
     def test_secondary_targets_called_when_detected(
-        self, _run_checks, _vrt, _selfdoc_gen, _selfdoc_check, _changes_dir, _extract, _finalize, _gen_ver_file, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, _commit_files, mock_run, _run_gh, _push, _remote_exists, monkeypatch
+        self, _run_checks, _vrt, _selfdoc_gen, _selfdoc_check, _changes_dir, _extract, _finalize, _gen_ver_file, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, _commit_files, mock_run, _tag_local, _tag_remote, _run_gh, _push, _remote_exists, monkeypatch
     ):
         """When a secondary target (spec) is detected, its build is called."""
         # Create version.json so spec target is detected
         with open("version.json", "w") as f:
             json.dump({"version": "1.0.0"}, f)
 
-        # Mock run() responses (gh release create goes through run_gh):
         mock_run.side_effect = [
             "",               # fetch
             "0",              # rev-list
-            "v1.0.0",         # tag -l current
-            "",               # tag -l new
             "",               # pre-hook snapshot
             "",               # pre-selfdoc snapshot
             "",               # post-selfdoc snapshot
@@ -154,11 +153,9 @@ class TestMultiTargetRelease:
             "",               # re-check dirty
             "",               # git log -1 (COMMITTED guard)
             "",               # status --porcelain (backfilled .md)
-            "",               # tag -l (TAGGED guard)
             "",               # git tag
             "pre123",         # rev-parse HEAD (PUSHED guard)
             "pre123",         # rev-parse origin/main (PUSHED guard)
-            "",               # ls-remote (PUSHED guard)
             "",               # git push tag
             "pre123",         # rev-parse HEAD (pushed sha)
         ]
@@ -179,6 +176,7 @@ class TestMultiTargetRelease:
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -196,21 +194,16 @@ class TestMultiTargetRelease:
     @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
     @patch("rlsbl.app.run_checks", return_value=([], 0))
     def test_secondary_target_failure_aborts_release(
-        self, _run_checks, _vrt, _selfdoc_gen, _selfdoc_check, _changes_dir, _extract, _finalize, _gen_ver_file, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, _commit_files, mock_run, _run_gh, _push, _remote_exists, monkeypatch
+        self, _run_checks, _vrt, _selfdoc_gen, _selfdoc_check, _changes_dir, _extract, _finalize, _gen_ver_file, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, _commit_files, mock_run, _tag_local, _run_gh, _push, _remote_exists, monkeypatch
     ):
         """If a secondary target's build raises, release aborts with rollback."""
         # Create version.json so spec target is detected
         with open("version.json", "w") as f:
             json.dump({"version": "1.0.0"}, f)
 
-        # Mock run() responses: build failure happens pre-push (after
-        # pre_release_sha), so we need calls up to that point, then rollback
-        # calls (tag -d attempt + git reset --hard).
         mock_run.side_effect = [
             "",               # fetch
             "0",              # rev-list
-            "v1.0.0",         # tag -l current
-            "",               # tag -l new
             "",               # pre-hook snapshot
             "",               # pre-selfdoc snapshot
             "",               # post-selfdoc snapshot

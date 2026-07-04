@@ -57,6 +57,7 @@ class TestReleaseAllowDirty:
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -67,7 +68,7 @@ class TestReleaseAllowDirty:
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
     def test_allow_dirty_skips_clean_tree_check(self, _vrt, _validate, _gen_cl, _gh_inst, _gh_auth, _clean,
-                                                 _branch, _commit_files, mock_run, _run_gh, _push,
+                                                 _branch, _commit_files, mock_run, _tag_local, _run_gh, _push,
                                                  _remote_exists):
         """With --allow-dirty, a dirty tree should not block the release (dry-run)."""
         from rlsbl.commands.release import run_cmd
@@ -75,11 +76,9 @@ class TestReleaseAllowDirty:
         # 1. git status --porcelain (capture pre-existing dirty files)
         # 2. git fetch origin --quiet
         # 3. git rev-list --count HEAD..origin/main
-        # 4. tag -l for current version (exists -> bump)
-        # 5. tag -l for bumped version (doesn't exist -> proceed)
-        # 6. git status --porcelain (pre-hook snapshot)
-        # 7. git status --porcelain (post-hook snapshot)
-        mock_run.side_effect = [" M notes.txt", "", "0", "v1.0.0", "", " M notes.txt", " M notes.txt"]
+        # 4. git status --porcelain (pre-hook snapshot)
+        # 5. git status --porcelain (post-hook snapshot)
+        mock_run.side_effect = [" M notes.txt", "", "0", " M notes.txt", " M notes.txt"]
 
         with patch("sys.stdout", new_callable=StringIO):
             # Should not raise SystemExit
@@ -96,6 +95,8 @@ class TestReleaseAllowDirty:
     @patch("rlsbl.commands.release.acquire_lock")
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
+    @patch("rlsbl.commands.release.tag_exists_on_remote", return_value=False)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -117,7 +118,8 @@ class TestReleaseAllowDirty:
                                                      _gen_ver_file, _validate, _gen_cl,
                                                      _deploy, _tag, _gh_inst,
                                                      _gh_auth, _clean, _branch,
-                                                     _commit_files, mock_run, _run_gh, _push,
+                                                     _commit_files, mock_run, _tag_local,
+                                                     _tag_remote, _run_gh, _push,
                                                      _lock, _unlock, _remote_exists):
         """With --allow-dirty (non-dry-run), pre-existing dirty files pass the re-check guard."""
         from rlsbl.commands.release import run_cmd
@@ -134,8 +136,6 @@ class TestReleaseAllowDirty:
             porcelain_dirty,    # git status --porcelain (capture pre-existing dirty)
             "",                 # git fetch origin --quiet
             "0",                # git rev-list --count HEAD..origin/main
-            "v1.0.0",           # git tag -l v1.0.0 (exists -> bump)
-            "",                 # git tag -l v1.0.1 (doesn't exist -> proceed)
             porcelain_dirty,    # git status --porcelain (pre-hook snapshot)
             porcelain_dirty,    # git status --porcelain (pre-selfdoc snapshot)
             porcelain_dirty,    # git status --porcelain (post-selfdoc snapshot)
@@ -149,11 +149,9 @@ class TestReleaseAllowDirty:
             # commit_files is mocked separately (no git add/commit calls here)
             "",                 # git log -1 --format=%s (COMMITTED guard)
             "M package.json",   # status --porcelain (backfilled .md detection)
-            "",                 # git tag -l (TAGGED guard)
             "",                 # git tag v1.0.1
             "abc123def456",     # rev-parse HEAD (PUSHED guard _local_head)
             "abc123def456",     # rev-parse origin/main (PUSHED guard _remote_head)
-            "",                 # ls-remote (PUSHED guard tag check)
             "",                 # git push origin v1.0.1
             "",                 # git rev-parse HEAD (pushed_sha)
         ]
@@ -174,6 +172,7 @@ class TestReleaseAllowDirty:
     @patch("rlsbl.commands.release.acquire_lock")
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -192,6 +191,7 @@ class TestReleaseAllowDirty:
                                                              _gh_inst, _gh_auth,
                                                              _clean, _branch,
                                                              _commit_files, mock_run,
+                                                             _tag_local,
                                                              _run_gh, _push, _lock, _unlock,
                                                              _remote_exists):
         """With --allow-dirty, genuinely new unexpected files still abort the release."""
@@ -207,8 +207,6 @@ class TestReleaseAllowDirty:
             porcelain_dirty,    # git status --porcelain (capture pre-existing dirty)
             "",                 # git fetch origin --quiet
             "0",                # git rev-list --count HEAD..origin/main
-            "v1.0.0",           # git tag -l v1.0.0 (exists -> bump)
-            "",                 # git tag -l v1.0.1 (doesn't exist -> proceed)
             porcelain_dirty,    # git status --porcelain (pre-hook snapshot)
             porcelain_dirty,    # git status --porcelain (pre-selfdoc snapshot)
             porcelain_dirty,    # git status --porcelain (post-selfdoc snapshot)

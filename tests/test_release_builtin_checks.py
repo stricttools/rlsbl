@@ -264,6 +264,7 @@ class TestTwoHookModel:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -282,6 +283,7 @@ class TestTwoHookModel:
         _branch,
         _commit_files,
         mock_run,
+        _tag_local,
         _push,
         _remote_exists,
         tmp_project,
@@ -296,7 +298,7 @@ class TestTwoHookModel:
         )
         (hooks_dir / "pre-checks.sh").chmod(0o755)
 
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
+        mock_run.side_effect = ["", "0", "", ""]
 
         from rlsbl.commands.release import run_cmd
 
@@ -307,6 +309,7 @@ class TestTwoHookModel:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -325,6 +328,7 @@ class TestTwoHookModel:
         _branch,
         _commit_files,
         mock_run,
+        _tag_local,
         _push,
         _remote_exists,
         tmp_project,
@@ -339,7 +343,7 @@ class TestTwoHookModel:
         )
         (hooks_dir / "pre-release.sh").chmod(0o755)
 
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
+        mock_run.side_effect = ["", "0", "", ""]
 
         from rlsbl.commands.release import run_cmd
 
@@ -352,6 +356,7 @@ class TestTwoHookModel:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -370,6 +375,7 @@ class TestTwoHookModel:
         _branch,
         _commit_files,
         mock_run,
+        _tag_local,
         _push,
         _remote_exists,
         tmp_project,
@@ -381,7 +387,7 @@ class TestTwoHookModel:
         (hooks_dir / "pre-checks.sh").write_text("#!/bin/bash\nexit 1\n")
         (hooks_dir / "pre-checks.sh").chmod(0o755)
 
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
+        mock_run.side_effect = ["", "0", "", ""]
 
         with patch("rlsbl.app.run_checks", return_value=([], 0)) as mock_checks:
             from rlsbl.commands.release import run_cmd

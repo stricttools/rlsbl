@@ -1281,7 +1281,7 @@ def _run_release_mutating(state: ReleaseState):
             _tag_already_exists = True
             log("Skipping tag creation (already done)")
         else:
-            _existing_tag = tag_exists_locally(tag, _run=run)
+            _existing_tag = tag_exists_locally(tag)
             if _existing_tag:
                 # Tag exists -- verify it points to HEAD
                 _tag_sha = run("git", ["rev-parse", f"refs/tags/{tag}^{{}}"]).strip()
@@ -1345,7 +1345,7 @@ def _run_release_mutating(state: ReleaseState):
             # Check if tag push is needed
             _tag_needs_push = True
             try:
-                if tag_exists_on_remote(tag, _run=run):
+                if tag_exists_on_remote(tag):
                     _tag_needs_push = False
                     log("Skipping tag push (remote tag already exists)")
             except Exception:

@@ -60,6 +60,7 @@ class TestPreReleaseHookOutput:
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -80,6 +81,7 @@ class TestPreReleaseHookOutput:
         _branch,
         _commit_files,
         mock_run,
+        _tag_local,
         _run_gh,
         _push,
         _remote_exists,
@@ -88,7 +90,7 @@ class TestPreReleaseHookOutput:
         """A successful hook is called via subprocess.run without capture_output."""
         _setup_project(tmp_project, "pre-release.sh", "#!/bin/bash\necho hello\n")
         # mock_run side effects: fetch, rev-list, tag -l current, tag -l bumped
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
+        mock_run.side_effect = ["", "0", "", ""]
 
         with patch("rlsbl.commands.release.subprocess") as mock_sp:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -111,6 +113,7 @@ class TestPreReleaseHookOutput:
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -133,6 +136,7 @@ class TestPreReleaseHookOutput:
         _branch,
         _commit_files,
         mock_run,
+        _tag_local,
         _run_gh,
         _push,
         _remote_exists,
@@ -141,7 +145,7 @@ class TestPreReleaseHookOutput:
     ):
         """A hook exiting with code 2 produces an error mentioning 'exited with code 2'."""
         _setup_project(tmp_project, "pre-release.sh", "#!/bin/bash\nexit 2\n")
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", ""]
+        mock_run.side_effect = ["", "0", "", "", ""]
 
         with patch("rlsbl.commands.release.subprocess") as mock_sp:
             mock_sp.run.side_effect = subprocess.CalledProcessError(2, "bash")
@@ -177,6 +181,7 @@ class TestPreReleaseHookOutput:
             patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
             patch("rlsbl.commands.release.push_if_needed"),
             patch("rlsbl.commands.release.run_gh", return_value=""),
+            patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False]),
             patch("rlsbl.commands.release.run") as mock_run,
             patch("rlsbl.commands.release.commit_files", return_value=True),
             patch("rlsbl.commands.release.get_current_branch", return_value="main"),
@@ -187,7 +192,7 @@ class TestPreReleaseHookOutput:
             patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}}),
             patch("rlsbl.commands.release.subprocess") as mock_sp,
         ):
-            mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
+            mock_run.side_effect = ["", "0", "", ""]
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
 
@@ -261,6 +266,8 @@ class TestPostReleaseHookOutput:
         with (
             patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
             patch("rlsbl.commands.release.run_gh", return_value=""),
+            patch("rlsbl.commands.release.tag_exists_on_remote", return_value=False),
+            patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False, False]),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
             patch("rlsbl.commands.release.subprocess") as mock_sp,
         ):
@@ -358,6 +365,8 @@ class TestWatchSHABeforePostHook:
         with (
             patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
             patch("rlsbl.commands.release.run_gh", return_value=""),
+            patch("rlsbl.commands.release.tag_exists_on_remote", return_value=False),
+            patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False, False]),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
             patch("rlsbl.commands.release.subprocess") as mock_sp,
         ):
@@ -399,6 +408,7 @@ class TestHookTimeout:
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -421,6 +431,7 @@ class TestHookTimeout:
         _branch,
         _commit_files,
         mock_run,
+        _tag_local,
         _run_gh,
         _push,
         _remote_exists,
@@ -431,7 +442,7 @@ class TestHookTimeout:
         """When a pre-release hook times out, the error message includes the configured seconds."""
         monkeypatch.setenv("RLSBL_HOOK_TIMEOUT", "45")
         _setup_project(tmp_project, "pre-release.sh", "#!/bin/bash\nsleep 999\n")
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", "", ""]
+        mock_run.side_effect = ["", "0", "", "", ""]
 
         with patch("rlsbl.commands.release.subprocess") as mock_sp:
             mock_sp.run.side_effect = subprocess.TimeoutExpired("bash", 45)
@@ -454,6 +465,7 @@ class TestHookCwdStandalone:
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -474,6 +486,7 @@ class TestHookCwdStandalone:
         _branch,
         _commit_files,
         mock_run,
+        _tag_local,
         _run_gh,
         _push,
         _remote_exists,
@@ -481,7 +494,7 @@ class TestHookCwdStandalone:
     ):
         """In standalone mode, pre-checks hook subprocess.run gets cwd=project_dir."""
         _setup_project(tmp_project, "pre-checks.sh", "#!/bin/bash\necho ok\n")
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
+        mock_run.side_effect = ["", "0", "", ""]
 
         with patch("rlsbl.commands.release.subprocess") as mock_sp:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -500,6 +513,7 @@ class TestHookCwdStandalone:
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -520,6 +534,7 @@ class TestHookCwdStandalone:
         _branch,
         _commit_files,
         mock_run,
+        _tag_local,
         _run_gh,
         _push,
         _remote_exists,
@@ -527,7 +542,7 @@ class TestHookCwdStandalone:
     ):
         """In standalone mode, pre-release hook subprocess.run gets cwd=project_dir."""
         _setup_project(tmp_project, "pre-release.sh", "#!/bin/bash\necho ok\n")
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
+        mock_run.side_effect = ["", "0", "", ""]
 
         with patch("rlsbl.commands.release.subprocess") as mock_sp:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -594,6 +609,8 @@ class TestHookCwdStandalone:
         with (
             patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
             patch("rlsbl.commands.release.run_gh", return_value=""),
+            patch("rlsbl.commands.release.tag_exists_on_remote", return_value=False),
+            patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False, False]),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
             patch("rlsbl.commands.release.subprocess") as mock_sp,
         ):
@@ -620,6 +637,7 @@ class TestHookCwdMonorepo:
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -640,6 +658,7 @@ class TestHookCwdMonorepo:
         _branch,
         _commit_files,
         mock_run,
+        _tag_local,
         _run_gh,
         _push,
         _remote_exists,
@@ -661,7 +680,7 @@ class TestHookCwdMonorepo:
         # chdir to the python subproject (run_cmd detects monorepo from here)
         monkeypatch.chdir(ns.python_dir)
 
-        mock_run.side_effect = ["", "0", "mypylib@v0.1.0", "", "", ""]
+        mock_run.side_effect = ["", "0", "", ""]
 
         with patch("rlsbl.commands.release.subprocess") as mock_sp:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -687,6 +706,7 @@ class TestHookCwdMonorepo:
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -707,6 +727,7 @@ class TestHookCwdMonorepo:
         _branch,
         _commit_files,
         mock_run,
+        _tag_local,
         _run_gh,
         _push,
         _remote_exists,
@@ -725,7 +746,7 @@ class TestHookCwdMonorepo:
 
         monkeypatch.chdir(ns.python_dir)
 
-        mock_run.side_effect = ["", "0", "mypylib@v0.1.0", "", "", ""]
+        mock_run.side_effect = ["", "0", "", ""]
 
         with patch("rlsbl.commands.release.subprocess") as mock_sp:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -809,6 +830,8 @@ class TestHookCwdMonorepo:
         with (
             patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
             patch("rlsbl.commands.release.run_gh", return_value=""),
+            patch("rlsbl.commands.release.tag_exists_on_remote", return_value=False),
+            patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False, False]),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
             patch("rlsbl.commands.release.subprocess") as mock_sp,
         ):

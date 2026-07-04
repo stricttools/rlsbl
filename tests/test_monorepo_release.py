@@ -148,6 +148,7 @@ class TestMonorepoRelease:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.run_gh", return_value="")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
     @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
@@ -157,7 +158,7 @@ class TestMonorepoRelease:
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
     def test_dry_run_bump_shows_monorepo_tag(
-        self, _vrt, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run, _run_gh, _remote_exists,
+        self, _vrt, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run, _tag_local, _run_gh, _remote_exists,
         mock_git_repo, monkeypatch, capsys,
     ):
         """When bumping an existing version in monorepo, tag is name@vX.Y.Z."""
@@ -167,11 +168,7 @@ class TestMonorepoRelease:
         monkeypatch.chdir(str(proj_dir))
 
         # Current tag exists -> bump
-        # 1. git fetch origin --quiet
-        # 2. git rev-list --count -> 0
-        # 3. git tag -l tooling@v1.0.0 -> exists
-        # 4. git tag -l tooling@v1.0.1 -> doesn't exist
-        mock_run.side_effect = ["", "0", "tooling@v1.0.0", "", "", ""]
+        mock_run.side_effect = ["", "0", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
             run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False, "pipelines": {}}))
@@ -248,6 +245,7 @@ class TestMonorepoRelease:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.run_gh", return_value="")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
     @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
@@ -257,7 +255,7 @@ class TestMonorepoRelease:
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
     def test_standalone_release_unchanged(
-        self, _vrt, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run, _run_gh, _remote_exists,
+        self, _vrt, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run, _tag_local, _run_gh, _remote_exists,
         mock_git_repo, capsys,
     ):
         """Non-monorepo release still uses plain tag format."""
@@ -280,11 +278,7 @@ class TestMonorepoRelease:
             cwd=str(mock_git_repo), check=True,
         )
 
-        # 1. git fetch
-        # 2. git rev-list -> 0
-        # 3. tag -l v2.0.0 -> exists
-        # 4. tag -l v2.0.1 -> doesn't exist
-        mock_run.side_effect = ["", "0", "v2.0.0", "", "", ""]
+        mock_run.side_effect = ["", "0", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
             run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))

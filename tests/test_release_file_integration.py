@@ -70,6 +70,7 @@ class TestRunCmdWithReleaseConfig:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -91,6 +92,7 @@ class TestRunCmdWithReleaseConfig:
         _branch,
         _commit_files,
         mock_run,
+        _tag_local,
         _push,
         _remote_exists,
         tmp_project,
@@ -100,7 +102,7 @@ class TestRunCmdWithReleaseConfig:
         _setup_npm_project(tmp_project)
         # mock_run: fetch, rev-list, tag -l (current), tag -l (bumped),
         # pre/post hook snapshots
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
+        mock_run.side_effect = ["", "0", "", ""]
 
         config = ReleaseConfig(
             bump="patch",
@@ -116,6 +118,7 @@ class TestRunCmdWithReleaseConfig:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -137,6 +140,7 @@ class TestRunCmdWithReleaseConfig:
         _branch,
         _commit_files,
         mock_run,
+        _tag_local,
         _push,
         _remote_exists,
         tmp_project,
@@ -144,7 +148,7 @@ class TestRunCmdWithReleaseConfig:
     ):
         """A ReleaseConfig with bump=minor produces a minor version bump."""
         _setup_npm_project(tmp_project)
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
+        mock_run.side_effect = ["", "0", "", ""]
 
         config = ReleaseConfig(
             bump="minor",
@@ -159,6 +163,7 @@ class TestRunCmdWithReleaseConfig:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -180,6 +185,7 @@ class TestRunCmdWithReleaseConfig:
         _branch,
         _commit_files,
         mock_run,
+        _tag_local,
         _push,
         _remote_exists,
         tmp_project,
@@ -187,7 +193,7 @@ class TestRunCmdWithReleaseConfig:
     ):
         """A ReleaseConfig with bump=major produces a major version bump."""
         _setup_npm_project(tmp_project)
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
+        mock_run.side_effect = ["", "0", "", ""]
 
         config = ReleaseConfig(
             bump="major",
@@ -240,6 +246,7 @@ class TestTargetExhaustivenessValidation:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -261,6 +268,7 @@ class TestTargetExhaustivenessValidation:
         _branch,
         _commit_files,
         mock_run,
+        _tag_local,
         _push,
         _remote_exists,
         tmp_project,
@@ -268,7 +276,7 @@ class TestTargetExhaustivenessValidation:
     ):
         """No error when all detected targets appear in include + exclude combined."""
         _setup_multi_target_project(tmp_project, ["npm", "pypi"])
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
+        mock_run.side_effect = ["", "0", "", ""]
 
         config = ReleaseConfig(
             bump="patch",
@@ -304,6 +312,7 @@ class TestTargetExhaustivenessValidation:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -325,6 +334,7 @@ class TestTargetExhaustivenessValidation:
         _branch,
         _commit_files,
         mock_run,
+        _tag_local,
         _push,
         _remote_exists,
         tmp_project,
@@ -332,7 +342,7 @@ class TestTargetExhaustivenessValidation:
     ):
         """Warning when release file lists targets not detected in project."""
         _setup_npm_project(tmp_project)
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
+        mock_run.side_effect = ["", "0", "", ""]
 
         config = ReleaseConfig(
             bump="patch",
@@ -445,6 +455,7 @@ class TestReleaseConfigSignature:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -466,6 +477,7 @@ class TestReleaseConfigSignature:
         _branch,
         _commit_files,
         mock_run,
+        _tag_local,
         _push,
         _remote_exists,
         tmp_project,
@@ -473,7 +485,7 @@ class TestReleaseConfigSignature:
     ):
         """run_cmd(ReleaseConfig, flags, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}})) works in dry-run mode."""
         _setup_npm_project(tmp_project)
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
+        mock_run.side_effect = ["", "0", "", ""]
 
         run_cmd(
             ReleaseConfig(bump="patch", include=["npm"], exclude=[]),
@@ -605,6 +617,7 @@ class TestMonorepoDirectoryScoping:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -623,6 +636,7 @@ class TestMonorepoDirectoryScoping:
         _branch,
         _commit_files,
         mock_run,
+        _tag_local,
         _push,
         _remote_exists,
         monorepo_fixture,
@@ -632,7 +646,7 @@ class TestMonorepoDirectoryScoping:
         _mock_validate.return_value = {"passed": True, "checks": {}}
         # mock_run: fetch, rev-list, tag -l (current), tag -l (bumped),
         # pre/post hook snapshots
-        mock_run.side_effect = ["", "0", "mypylib@v0.1.0", "", "", ""]
+        mock_run.side_effect = ["", "0", "", ""]
 
         # Create CHANGELOG.md so the post-validation fallback path succeeds
         (monorepo_fixture.python_dir / "CHANGELOG.md").write_text(

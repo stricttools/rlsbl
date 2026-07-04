@@ -64,6 +64,7 @@ class TestNoWatchPrintsHint:
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -87,6 +88,7 @@ class TestNoWatchPrintsHint:
         _branch,
         _commit_files,
         mock_run,
+        _tag_local,
         _run_gh,
         _push,
         _remote_exists,
@@ -95,7 +97,7 @@ class TestNoWatchPrintsHint:
     ):
         """In dry-run mode with --no-watch, the watch hint is printed."""
         _setup_npm_project(tmp_project)
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
+        mock_run.side_effect = ["", "0", "", ""]
 
         run_cmd(
             _rc(),
@@ -120,6 +122,7 @@ class TestWatchInvokesWatchCmd:
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -143,6 +146,7 @@ class TestWatchInvokesWatchCmd:
         _branch,
         _commit_files,
         mock_run,
+        _tag_local,
         _run_gh,
         _push,
         _remote_exists,
@@ -151,7 +155,7 @@ class TestWatchInvokesWatchCmd:
     ):
         """In dry-run mode, --watch doesn't invoke watch (dry-run exits early)."""
         _setup_npm_project(tmp_project)
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
+        mock_run.side_effect = ["", "0", "", ""]
 
         run_cmd(
             _rc(),
@@ -170,6 +174,8 @@ class TestWatchInvokedAfterRelease:
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
+    @patch("rlsbl.commands.release.tag_exists_on_remote", return_value=False)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.commit_files_if_changed")
@@ -209,6 +215,8 @@ class TestWatchInvokedAfterRelease:
         _commit_if,
         _commit_files,
         mock_run,
+        _tag_local,
+        _tag_remote,
         _run_gh,
         _push,
         _remote_exists,
@@ -226,26 +234,9 @@ class TestWatchInvokedAfterRelease:
         )
 
         fake_sha = "abc123def456"
-        # mock_run calls: fetch, rev-list, tag-l (current tag exists),
-        # tag-l (new tag), pre-hook status, post-selfdoc status,
-        # post-hook status,
-        # status --porcelain (baseline),
-        # rev-parse --show-toplevel, re-check dirty snapshot,
-        # rev-parse HEAD (pre-release sha),
-        # git log -1 (COMMITTED guard),
-        # status --porcelain (backfilled .md detection),
-        # tag -l (TAGGED guard), git tag, git tag (push tag),
-        # rev-parse HEAD (PUSHED guard _local_head),
-        # rev-parse origin/main (PUSHED guard _remote_head),
-        # ls-remote (PUSHED guard tag check),
-        # git push origin tag,
-        # rev-parse HEAD (pushed sha)
-        # (gh release create goes through run_gh, not run)
         mock_run.side_effect = [
             "",       # fetch
             "0",      # rev-list (not behind)
-            "v1.0.0", # tag -l current (exists)
-            "",       # tag -l new (doesn't exist)
             "",       # pre-hook dirty snapshot
             "",       # pre-selfdoc dirty snapshot
             "",       # post-selfdoc dirty snapshot
@@ -256,11 +247,9 @@ class TestWatchInvokedAfterRelease:
             "pre123", # rev-parse HEAD (pre-release)
             "",       # git log -1 (COMMITTED guard)
             "",       # status --porcelain (backfilled .md detection)
-            "",       # tag -l (TAGGED guard -- tag doesn't exist yet)
             "",       # git tag (create tag)
             "pre123", # rev-parse HEAD (PUSHED guard _local_head)
             "pre123", # rev-parse origin/main (PUSHED guard _remote_head)
-            "",       # ls-remote (PUSHED guard tag check)
             "",       # git push origin tag
             fake_sha, # rev-parse HEAD (pushed sha)
         ]
@@ -281,6 +270,8 @@ class TestWatchInvokedAfterRelease:
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
+    @patch("rlsbl.commands.release.tag_exists_on_remote", return_value=False)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.commit_files_if_changed")
@@ -320,6 +311,8 @@ class TestWatchInvokedAfterRelease:
         _commit_if,
         _commit_files,
         mock_run,
+        _tag_local,
+        _tag_remote,
         _run_gh,
         _push,
         _remote_exists,
@@ -339,8 +332,6 @@ class TestWatchInvokedAfterRelease:
         mock_run.side_effect = [
             "",       # fetch
             "0",      # rev-list
-            "v1.0.0", # tag -l current
-            "",       # tag -l new
             "",       # pre-hook status
             "",       # pre-selfdoc status
             "",       # post-selfdoc status
@@ -351,11 +342,9 @@ class TestWatchInvokedAfterRelease:
             "pre123", # rev-parse HEAD (pre-release)
             "",       # git log -1 (COMMITTED guard)
             "",       # status --porcelain (backfilled .md detection)
-            "",       # tag -l (TAGGED guard -- tag doesn't exist yet)
             "",       # git tag (create tag)
             "pre123", # rev-parse HEAD (PUSHED guard _local_head)
             "pre123", # rev-parse origin/main (PUSHED guard _remote_head)
-            "",       # ls-remote (PUSHED guard tag check)
             "",       # git push origin tag
             fake_sha, # rev-parse HEAD (pushed sha)
         ]

@@ -290,19 +290,13 @@ class TestReleasableReleaseOrder:
 
 class TestComputeReleaseVersionReleasable:
 
-    @patch("rlsbl.commands.release.run")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.bump_version")
-    def test_uses_releasable_tag_format(self, mock_bump, mock_run):
+    def test_uses_releasable_tag_format(self, mock_bump, _tag_local):
         """compute_release_version uses releasable tag format when provided."""
         from rlsbl.commands.release.validate import compute_release_version
 
         mock_target = MagicMock()
-        mock_run.side_effect = [
-            # git tag -l for current tag: exists
-            "www@v1.0.0\n",
-            # git tag -l for new tag: doesn't exist
-            "",
-        ]
         mock_bump.return_value = "1.1.0"
 
         # Patch read_releasable_version to return the version

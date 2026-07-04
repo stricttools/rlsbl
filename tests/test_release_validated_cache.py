@@ -58,6 +58,8 @@ class TestReleaseValidatedCache:
     @patch("rlsbl.commands.release.acquire_lock")
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
+    @patch("rlsbl.commands.release.tag_exists_on_remote", return_value=False)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -78,7 +80,8 @@ class TestReleaseValidatedCache:
                                                     _gen_ver_file, _validate, _gen_cl,
                                                     _deploy, _tag, _gh_inst,
                                                     _gh_auth, _clean, _branch,
-                                                    _commit_files, mock_run, _run_gh, _push,
+                                                    _commit_files, mock_run, _tag_local,
+                                                    _tag_remote, _run_gh, _push,
                                                     _lock, _unlock, _remote_exists):
         """The .validated file modified by validation must not trigger the dirty-tree abort."""
         from rlsbl.commands.release import run_cmd
@@ -91,8 +94,6 @@ class TestReleaseValidatedCache:
             # run_cmd phase:
             "",               # git fetch origin --quiet
             "0",              # git rev-list --count HEAD..origin/main
-            "v1.0.0",         # git tag -l v1.0.0 (exists -> bump)
-            "",               # git tag -l v1.0.1 (doesn't exist -> proceed)
             "",               # git status --porcelain (pre-hook snapshot)
             "",               # git status --porcelain (pre-selfdoc snapshot)
             "",               # git status --porcelain (post-selfdoc snapshot)
@@ -106,11 +107,9 @@ class TestReleaseValidatedCache:
             # commit_files is mocked separately
             "",                 # git log -1 --format=%s (COMMITTED guard)
             "M package.json",   # status --porcelain (backfilled .md detection)
-            "",                 # git tag -l (TAGGED guard)
             "",                 # git tag v1.0.1
             "abc123def456",     # rev-parse HEAD (PUSHED guard _local_head)
             "abc123def456",     # rev-parse origin/main (PUSHED guard _remote_head)
-            "",                 # ls-remote (PUSHED guard tag check)
             "",                 # git push origin v1.0.1
             "",                 # git rev-parse HEAD (pushed_sha)
         ]
@@ -129,6 +128,7 @@ class TestReleaseValidatedCache:
     @patch("rlsbl.commands.release.acquire_lock")
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -145,7 +145,8 @@ class TestReleaseValidatedCache:
                                                           _validate, _gen_cl,
                                                           _deploy, _tag, _gh_inst,
                                                           _gh_auth, _clean, _branch,
-                                                          _commit_files, mock_run, _run_gh, _push,
+                                                          _commit_files, mock_run, _tag_local,
+                                                          _run_gh, _push,
                                                           _lock, _unlock, _remote_exists):
         """An unexpected file (not .validated, not package.json) still aborts the release."""
         from rlsbl.commands.release import run_cmd
@@ -157,8 +158,6 @@ class TestReleaseValidatedCache:
             # run_cmd phase:
             "",               # git fetch origin --quiet
             "0",              # git rev-list --count HEAD..origin/main
-            "v1.0.0",         # git tag -l v1.0.0 (exists -> bump)
-            "",               # git tag -l v1.0.1 (doesn't exist -> proceed)
             "",               # git status --porcelain (pre-hook snapshot)
             "",               # git status --porcelain (pre-selfdoc snapshot)
             "",               # git status --porcelain (post-selfdoc snapshot)

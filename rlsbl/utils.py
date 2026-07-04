@@ -263,17 +263,15 @@ def remote_branch_exists(branch):
         return False
 
 
-def tag_exists_locally(tag, cwd=None, *, _run=None):
+def tag_exists_locally(tag, cwd=None):
     """Check whether a git tag exists in the local repository."""
-    _fn = _run or run
-    output = _fn("git", ["tag", "-l", tag], cwd=cwd)
+    output = run("git", ["tag", "-l", tag], cwd=cwd)
     return bool(output.strip())
 
 
-def tag_exists_on_remote(tag, cwd=None, *, _run=None):
+def tag_exists_on_remote(tag, cwd=None):
     """Check whether a git tag exists on the origin remote."""
-    _fn = _run or run
-    output = _fn("git", ["ls-remote", "--tags", "origin", tag], cwd=cwd)
+    output = run("git", ["ls-remote", "--tags", "origin", tag], cwd=cwd)
     return bool(output.strip())
 
 

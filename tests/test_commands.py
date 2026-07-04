@@ -700,6 +700,7 @@ class TestRelease:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -709,15 +710,13 @@ class TestRelease:
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_release_dry_run(self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch,
-                             _commit_files, mock_run, _push, _remote_exists):
+                             _commit_files, mock_run, _tag_local, _push, _remote_exists):
         """Dry run should not modify any files."""
         # 1. git fetch origin --quiet (remote-ahead check)
         # 2. git rev-list --count HEAD..origin/main (0 commits behind)
-        # 3. tag -l for current version (exists -> bump)
-        # 4. tag -l for bumped version (doesn't exist -> proceed)
-        # 5. git status --porcelain (pre-hook snapshot)
-        # 6. git status --porcelain (post-hook snapshot)
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
+        # 3. git status --porcelain (pre-hook snapshot)
+        # 4. git status --porcelain (post-hook snapshot)
+        mock_run.side_effect = ["", "0", "", ""]
 
         from rlsbl.commands.release import run_cmd
 
@@ -768,6 +767,7 @@ class TestRelease:
             run_cmd(_rc(), {"quiet": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
         assert exc_info.value.code == 1
 
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
     @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
@@ -777,15 +777,14 @@ class TestRelease:
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_release_fetch_failure_warns_but_continues(self, _validate, _gen_cl,
                                                         _gh_inst, _gh_auth,
-                                                        _clean, _branch, mock_run):
+                                                        _clean, _branch, mock_run,
+                                                        _tag_local):
         """If git fetch fails, warn but don't block the release."""
         from rlsbl.commands.release import run_cmd
 
-        # git fetch raises (no network), then tag -l calls for version checks
+        # git fetch raises (no network), then porcelain snapshots
         mock_run.side_effect = [
             subprocess.CalledProcessError(1, "git"),  # git fetch fails
-            "v1.0.0",  # tag -l for current version (exists)
-            "",         # tag -l for bumped version (doesn't exist)
             "",         # git status --porcelain (pre-hook snapshot)
             "",         # git status --porcelain (post-hook snapshot)
         ]
@@ -795,6 +794,7 @@ class TestRelease:
             run_cmd(_rc(), {"quiet": False, "dry-run": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
 
     @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -807,17 +807,15 @@ class TestRelease:
     def test_release_empty_remote_continues(self, _remote_exists, _validate,
                                             _gen_cl, _gh_inst, _gh_auth,
                                             _clean, _branch, _commit_files,
-                                            mock_run, _push):
+                                            mock_run, _tag_local, _push):
         """Empty remote (first push) should skip rev-list and continue."""
         from rlsbl.commands.release import run_cmd
 
         # With remote_branch_exists=False, rev-list is skipped entirely.
         # 1. git fetch origin --quiet
-        # 2. tag -l for current version (exists -> bump)
-        # 3. tag -l for bumped version (doesn't exist -> proceed)
-        # 4. git status --porcelain (pre-hook snapshot)
-        # 5. git status --porcelain (post-hook snapshot)
-        mock_run.side_effect = ["", "v1.0.0", "", "", ""]
+        # 2. git status --porcelain (pre-hook snapshot)
+        # 3. git status --porcelain (post-hook snapshot)
+        mock_run.side_effect = ["", "", ""]
 
         with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
             with patch("sys.stdout", new_callable=StringIO):
@@ -877,6 +875,8 @@ class TestReleaseCommitTrailers:
     @patch("rlsbl.commands.release.release_lock")
     @patch("rlsbl.commands.release.acquire_lock")
     @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.tag_exists_on_remote", return_value=False)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -899,6 +899,7 @@ class TestReleaseCommitTrailers:
                                                     _deploy, _tag,
                                                     _gh_inst, _gh_auth, _clean, _branch,
                                                     mock_commit_files, _run_gh, mock_run,
+                                                    _tag_local, _tag_remote,
                                                     _push, _lock, _unlock, _remote_exists):
         """The version-bump commit should be marked autogenerated."""
         from rlsbl.commands.release import run_cmd
@@ -906,8 +907,6 @@ class TestReleaseCommitTrailers:
         mock_run.side_effect = [
             "",               # git fetch origin --quiet
             "0",              # git rev-list --count HEAD..origin/main
-            "v1.0.0",         # git tag -l v1.0.0 (exists -> bump)
-            "",               # git tag -l v1.0.1 (doesn't exist)
             "",               # git status --porcelain (pre-hook snapshot)
             "",               # git status --porcelain (pre-selfdoc snapshot)
             "",               # git status --porcelain (post-selfdoc snapshot)
@@ -920,11 +919,9 @@ class TestReleaseCommitTrailers:
             "M package.json", # git status --porcelain -- package.json
             "",               # git log -1 --format=%s (COMMITTED guard)
             "",               # status --porcelain (backfilled .md detection)
-            "",               # git tag -l (TAGGED guard)
             "",               # git tag v1.0.1
             "",               # rev-parse HEAD (PUSHED guard _local_head)
             "",               # rev-parse origin/main (PUSHED guard _remote_head)
-            "",               # ls-remote (PUSHED guard tag check)
             "",               # git push origin v1.0.1
             "abc123def",      # git rev-parse HEAD (pushed sha)
         ]
@@ -941,6 +938,8 @@ class TestReleaseCommitTrailers:
     @patch("rlsbl.commands.release.release_lock")
     @patch("rlsbl.commands.release.acquire_lock")
     @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.tag_exists_on_remote", return_value=False)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -963,6 +962,7 @@ class TestReleaseCommitTrailers:
                                                _deploy, _tag,
                                                _gh_inst, _gh_auth, _clean, _branch,
                                                mock_commit_files, _run_gh, mock_run,
+                                               _tag_local, _tag_remote,
                                                _push, _lock, _unlock, _remote_exists):
         """The changelog finalization commit should be marked autogenerated."""
         from rlsbl.commands.release import run_cmd
@@ -970,8 +970,6 @@ class TestReleaseCommitTrailers:
         mock_run.side_effect = [
             "",               # git fetch origin --quiet
             "0",              # git rev-list --count HEAD..origin/main
-            "v1.0.0",         # git tag -l v1.0.0 (exists -> bump)
-            "",               # git tag -l v1.0.1 (doesn't exist)
             "",               # git status --porcelain (pre-hook snapshot)
             "",               # git status --porcelain (pre-selfdoc snapshot)
             "",               # git status --porcelain (post-selfdoc snapshot)
@@ -984,11 +982,9 @@ class TestReleaseCommitTrailers:
             "M package.json", # git status --porcelain -- package.json
             "",               # git log -1 --format=%s (COMMITTED guard)
             "",               # status --porcelain (backfilled .md detection)
-            "",               # git tag -l (TAGGED guard)
             "",               # git tag v1.0.1
             "",               # rev-parse HEAD (PUSHED guard _local_head)
             "",               # rev-parse origin/main (PUSHED guard _remote_head)
-            "",               # ls-remote (PUSHED guard tag check)
             "",               # git push origin v1.0.1
             "abc123def",      # git rev-parse HEAD (pushed sha)
         ]

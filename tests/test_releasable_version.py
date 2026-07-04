@@ -313,9 +313,7 @@ class TestComputeReleaseVersionReleasable:
 
         from rlsbl.commands.release.validate import compute_release_version
 
-        with patch("rlsbl.commands.release.run") as mock_run:
-            mock_run.return_value = ""
-
+        with patch("rlsbl.commands.release.tag_exists_locally", return_value=False):
             current, new, bump, tag = compute_release_version(
                 mock_target, str(tmp_path), None,
                 None, None, lambda msg: None,
@@ -335,11 +333,7 @@ class TestComputeReleaseVersionReleasable:
 
         from rlsbl.commands.release.validate import compute_release_version
 
-        with patch("rlsbl.commands.release.run") as mock_run:
-            # First call: tag exists (current tag check)
-            # Second call: new tag doesn't exist
-            mock_run.side_effect = ["v1.0.0\n", ""]
-
+        with patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False]):
             current, new, bump, tag = compute_release_version(
                 mock_target, str(tmp_path), "minor",
                 None, None, lambda msg: None,

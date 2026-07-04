@@ -424,7 +424,7 @@ def compute_release_version(target, primary_path, bump_arg, monorepo_name,
     Returns (current_version, new_version, bump_type, tag).
     Raises ReleaseValidationError on invalid bump type or duplicate tag.
     """
-    from . import run, bump_version, tag_exists_locally
+    from . import bump_version, tag_exists_locally
 
     if workspace_root is not None and releasable_name is not None:
         from ...workspace import read_releasable_version
@@ -445,7 +445,7 @@ def compute_release_version(target, primary_path, bump_arg, monorepo_name,
             return target.tag_format(version)
 
     current_tag = _make_tag(current_version)
-    current_tag_exists = tag_exists_locally(current_tag, _run=run)
+    current_tag_exists = tag_exists_locally(current_tag)
 
     if not current_tag_exists:
         new_version = current_version
@@ -466,7 +466,7 @@ def compute_release_version(target, primary_path, bump_arg, monorepo_name,
         log(f"New version: {new_version} ({bump_type})")
 
     # Check tag doesn't already exist
-    if tag_exists_locally(tag, _run=run):
+    if tag_exists_locally(tag):
         raise ReleaseValidationError(f'tag "{tag}" already exists.')
 
     return current_version, new_version, bump_type, tag

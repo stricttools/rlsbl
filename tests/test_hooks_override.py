@@ -168,6 +168,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -186,6 +187,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         _branch,
         _commit_files,
         mock_run,
+        _tag_local,
         _push,
         _remote_exists,
         tmp_project,
@@ -197,7 +199,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
             tmp_project,
             hook_body=_V1_TEMPLATE + "uv run pytest\n",
         )
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
+        mock_run.side_effect = ["", "0", "", ""]
 
         with patch("rlsbl.commands.release.subprocess") as mock_sp, \
              patch("rlsbl.app.run_checks", return_value=([], 0)) as mock_checks:
@@ -222,6 +224,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -240,6 +243,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         _branch,
         _commit_files,
         mock_run,
+        _tag_local,
         _push,
         _remote_exists,
         tmp_project,
@@ -248,7 +252,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         """When the pre-release hook is the unmodified scaffold template,
         preflight checks are skipped in dry-run mode."""
         _setup_project(tmp_project, hook_body=_V1_TEMPLATE)
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
+        mock_run.side_effect = ["", "0", "", ""]
 
         with patch("rlsbl.commands.release.subprocess") as mock_sp, \
              patch("rlsbl.app.run_checks", return_value=([], 0)) as mock_checks:
@@ -274,6 +278,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -292,6 +297,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         _branch,
         _commit_files,
         mock_run,
+        _tag_local,
         _push,
         _remote_exists,
         tmp_project,
@@ -299,7 +305,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         """When no pre-release hook exists, preflight checks are still
         skipped in dry-run mode."""
         _setup_project(tmp_project, hook_body=None)  # no hook
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
+        mock_run.side_effect = ["", "0", "", ""]
 
         with patch("rlsbl.commands.release.subprocess") as mock_sp, \
              patch("rlsbl.app.run_checks", return_value=([], 0)) as mock_checks:
@@ -322,6 +328,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -340,6 +347,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         _branch,
         _commit_files,
         mock_run,
+        _tag_local,
         _push,
         _remote_exists,
         tmp_project,
@@ -350,7 +358,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
             tmp_project,
             hook_body="#!/bin/bash\necho 'custom tests'\n",
         )
-        mock_run.side_effect = ["", "0", "v1.0.0", "", "", ""]
+        mock_run.side_effect = ["", "0", "", ""]
 
         with patch("rlsbl.commands.release.subprocess") as mock_sp, \
              patch("rlsbl.app.run_checks", return_value=([], 0)) as mock_checks:
