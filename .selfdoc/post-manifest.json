@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "name": "rlsbl",
+  "slug": "rlsbl",
+  "version": "0.97.1",
+  "description": "",
+  "language": "python",
+  "base_url": "https://rlsbl.smmh.dev",
+  "pages": [],
+  "posts": [
+    {
+      "path": "2026-06-29-release-orchestration-tools-compared.md",
+      "title": "Release Orchestration Tools Compared",
+      "date": "2026-06-29",
+      "slug": "release-orchestration-tools-compared",
+      "tags": [
+        "comparison",
+        "release-tools"
+      ]
+    }
+  ],
+  "last_gen": "2026-07-04T10:19:51.456502+00:00"
+}
