@@ -376,7 +376,38 @@ class TestUnrecognizedGradlePatterns:
     """Unrecognized Gradle dependency patterns produce warnings."""
 
     def test_kts_variable_reference_warns(self, tmp_path, capsys):
-        """Variable reference in KTS dependency emits warning."""
+        """libs.<alias> in KTS resolves via version catalog when available."""
+        workspace_root = tmp_path / "workspace"
+        workspace_root.mkdir()
+        catalog_dir = workspace_root / "gradle"
+        catalog_dir.mkdir()
+        (catalog_dir / "libs.versions.toml").write_text(textwrap.dedent("""\
+            [libraries]
+            someLib = "com.example:core:1.0.0"
+        """))
+
+        proj_dir = workspace_root / "app"
+        proj_dir.mkdir()
+        (proj_dir / "build.gradle.kts").write_text(textwrap.dedent("""\
+            dependencies {
+                implementation(project(":core"))
+                implementation(libs.someLib)
+            }
+        """))
+
+        scanner = MavenScanner()
+        deps = scanner.scan(str(proj_dir), {"app", "core"}, workspace_root=str(workspace_root))
+        assert len(deps) == 2
+        dep_by_type = {d.dep_type: d for d in deps}
+        assert "project" in dep_by_type
+        assert "catalog" in dep_by_type
+        assert dep_by_type["catalog"].name == "core"
+        assert dep_by_type["catalog"].constraint == "com.example:core"
+        captured = capsys.readouterr()
+        assert "unrecognized" not in captured.err.lower()
+
+    def test_kts_variable_reference_warns_without_catalog(self, tmp_path, capsys):
+        """Variable reference in KTS without catalog still emits warning."""
         proj_dir = tmp_path / "app"
         proj_dir.mkdir()
         (proj_dir / "build.gradle.kts").write_text(textwrap.dedent("""\
@@ -410,6 +441,172 @@ class TestUnrecognizedGradlePatterns:
         captured = capsys.readouterr()
         assert "unrecognized" in captured.err.lower()
         assert "deps.someLib" in captured.err
+
+    def test_groovy_catalog_reference_resolves(self, tmp_path, capsys):
+        """libs.<alias> in Groovy resolves via version catalog."""
+        workspace_root = tmp_path / "workspace"
+        workspace_root.mkdir()
+        catalog_dir = workspace_root / "gradle"
+        catalog_dir.mkdir()
+        (catalog_dir / "libs.versions.toml").write_text(textwrap.dedent("""\
+            [libraries]
+            someLib = { module = "com.example:shared", version = "2.0" }
+        """))
+
+        proj_dir = workspace_root / "app"
+        proj_dir.mkdir()
+        (proj_dir / "build.gradle").write_text(textwrap.dedent("""\
+            dependencies {
+                implementation project(':core')
+                implementation libs.someLib
+            }
+        """))
+
+        scanner = MavenScanner()
+        deps = scanner.scan(str(proj_dir), {"app", "core", "shared"}, workspace_root=str(workspace_root))
+        assert len(deps) == 2
+        catalog_deps = [d for d in deps if d.dep_type == "catalog"]
+        assert len(catalog_deps) == 1
+        assert catalog_deps[0].name == "shared"
+        assert catalog_deps[0].constraint == "com.example:shared"
+        captured = capsys.readouterr()
+        assert "unrecognized" not in captured.err.lower()
+
+
+class TestVersionCatalogParsing:
+    """Version catalog parsing and alias resolution edge cases."""
+
+    def test_explicit_group_name_form(self, tmp_path, capsys):
+        """Catalog entry with explicit group/name fields resolves."""
+        workspace_root = tmp_path / "ws"
+        workspace_root.mkdir()
+        catalog_dir = workspace_root / "gradle"
+        catalog_dir.mkdir()
+        (catalog_dir / "libs.versions.toml").write_text(textwrap.dedent("""\
+            [libraries]
+            myLib = { group = "com.example", name = "core", version = "1.0" }
+        """))
+
+        proj_dir = workspace_root / "app"
+        proj_dir.mkdir()
+        (proj_dir / "build.gradle.kts").write_text(textwrap.dedent("""\
+            dependencies {
+                implementation(libs.myLib)
+            }
+        """))
+
+        scanner = MavenScanner()
+        deps = scanner.scan(str(proj_dir), {"app", "core"}, workspace_root=str(workspace_root))
+        assert len(deps) == 1
+        assert deps[0].name == "core"
+        assert deps[0].dep_type == "catalog"
+        assert deps[0].constraint == "com.example:core"
+        captured = capsys.readouterr()
+        assert "unrecognized" not in captured.err.lower()
+
+    def test_alias_normalization_dashes(self, tmp_path, capsys):
+        """Catalog alias with dashes matches dotted reference."""
+        workspace_root = tmp_path / "ws"
+        workspace_root.mkdir()
+        catalog_dir = workspace_root / "gradle"
+        catalog_dir.mkdir()
+        (catalog_dir / "libs.versions.toml").write_text(textwrap.dedent("""\
+            [libraries]
+            some-lib = "com.example:core:1.0"
+        """))
+
+        proj_dir = workspace_root / "app"
+        proj_dir.mkdir()
+        (proj_dir / "build.gradle.kts").write_text(textwrap.dedent("""\
+            dependencies {
+                implementation(libs.some.lib)
+            }
+        """))
+
+        scanner = MavenScanner()
+        deps = scanner.scan(str(proj_dir), {"app", "core"}, workspace_root=str(workspace_root))
+        assert len(deps) == 1
+        assert deps[0].name == "core"
+        captured = capsys.readouterr()
+        assert "unrecognized" not in captured.err.lower()
+
+    def test_catalog_external_no_warn(self, tmp_path, capsys):
+        """Catalog reference to non-workspace dep does not warn."""
+        workspace_root = tmp_path / "ws"
+        workspace_root.mkdir()
+        catalog_dir = workspace_root / "gradle"
+        catalog_dir.mkdir()
+        (catalog_dir / "libs.versions.toml").write_text(textwrap.dedent("""\
+            [libraries]
+            guava = "com.google.guava:guava:31.1-jre"
+        """))
+
+        proj_dir = workspace_root / "app"
+        proj_dir.mkdir()
+        (proj_dir / "build.gradle.kts").write_text(textwrap.dedent("""\
+            dependencies {
+                implementation(libs.guava)
+            }
+        """))
+
+        scanner = MavenScanner()
+        deps = scanner.scan(str(proj_dir), {"app", "core"}, workspace_root=str(workspace_root))
+        assert len(deps) == 0  # guava is not a workspace project
+        captured = capsys.readouterr()
+        assert "unrecognized" not in captured.err.lower()
+
+    def test_per_project_catalog(self, tmp_path, capsys):
+        """Per-project catalog (no workspace root) resolves."""
+        proj_dir = tmp_path / "app"
+        proj_dir.mkdir()
+        catalog_dir = proj_dir / "gradle"
+        catalog_dir.mkdir()
+        (catalog_dir / "libs.versions.toml").write_text(textwrap.dedent("""\
+            [libraries]
+            myLib = "com.example:core:1.0"
+        """))
+        (proj_dir / "build.gradle.kts").write_text(textwrap.dedent("""\
+            dependencies {
+                implementation(libs.myLib)
+            }
+        """))
+
+        scanner = MavenScanner()
+        # No workspace_root passed -- falls back to per-project catalog
+        deps = scanner.scan(str(proj_dir), {"app", "core"})
+        assert len(deps) == 1
+        assert deps[0].name == "core"
+        assert deps[0].dep_type == "catalog"
+        captured = capsys.readouterr()
+        assert "unrecognized" not in captured.err.lower()
+
+    def test_catalog_caching(self, tmp_path):
+        """Catalog is parsed once per workspace root, not per project."""
+        workspace_root = tmp_path / "ws"
+        workspace_root.mkdir()
+        catalog_dir = workspace_root / "gradle"
+        catalog_dir.mkdir()
+        (catalog_dir / "libs.versions.toml").write_text(textwrap.dedent("""\
+            [libraries]
+            myLib = "com.example:core:1.0"
+        """))
+
+        for name in ("app1", "app2"):
+            proj_dir = workspace_root / name
+            proj_dir.mkdir()
+            (proj_dir / "build.gradle.kts").write_text(textwrap.dedent("""\
+                dependencies {
+                    implementation(libs.myLib)
+                }
+            """))
+
+        scanner = MavenScanner()
+        deps1 = scanner.scan(str(workspace_root / "app1"), {"app1", "app2", "core"}, workspace_root=str(workspace_root))
+        deps2 = scanner.scan(str(workspace_root / "app2"), {"app1", "app2", "core"}, workspace_root=str(workspace_root))
+        assert len(deps1) == 1
+        assert len(deps2) == 1
+        # Only one cache entry
+        assert len(scanner._catalog_cache) == 1
 
 
 class TestMixedProjectAndExternalDeps:

@@ -242,19 +242,24 @@ class MavenScanner:
     # Maven scopes that map to dev
     _MAVEN_DEV_SCOPES = frozenset({"test", "provided"})
 
-    def scan(self, project_dir: str, workspace_names: set[str]) -> list[Dependency]:
+    def __init__(self):
+        # Cache: workspace_root -> {alias -> "group:artifact"}
+        self._catalog_cache: dict[str, dict[str, str]] = {}
+
+    def scan(self, project_dir: str, workspace_names: set[str], *, workspace_root: str | None = None) -> list[Dependency]:
+        catalog = self._load_catalog(project_dir, workspace_root)
         deps = []
 
         # Try Gradle Kotlin DSL first
         kts_path = os.path.join(project_dir, "build.gradle.kts")
         if os.path.isfile(kts_path):
-            deps.extend(self._scan_gradle_kts(kts_path, workspace_names))
+            deps.extend(self._scan_gradle_kts(kts_path, workspace_names, catalog))
             return deps
 
         # Try Gradle Groovy DSL
         groovy_path = os.path.join(project_dir, "build.gradle")
         if os.path.isfile(groovy_path):
-            deps.extend(self._scan_gradle_groovy(groovy_path, workspace_names))
+            deps.extend(self._scan_gradle_groovy(groovy_path, workspace_names, catalog))
             return deps
 
         # Try Maven pom.xml
@@ -264,7 +269,81 @@ class MavenScanner:
 
         return deps
 
-    def _scan_gradle_kts(self, filepath: str, workspace_names: set[str]) -> list[Dependency]:
+    def _load_catalog(self, project_dir: str, workspace_root: str | None) -> dict[str, str]:
+        """Load Gradle version catalog, returning alias -> 'group:artifact' map.
+
+        Checks workspace root first (shared catalog), then project dir.
+        Results are cached per workspace root.
+        """
+        candidates = []
+        if workspace_root:
+            candidates.append(os.path.join(workspace_root, "gradle", "libs.versions.toml"))
+        candidates.append(os.path.join(project_dir, "gradle", "libs.versions.toml"))
+
+        for catalog_path in candidates:
+            if not os.path.isfile(catalog_path):
+                continue
+            # Use directory containing gradle/ as cache key
+            cache_key = os.path.dirname(os.path.dirname(catalog_path))
+            if cache_key in self._catalog_cache:
+                return self._catalog_cache[cache_key]
+            catalog = self._parse_version_catalog(catalog_path)
+            self._catalog_cache[cache_key] = catalog
+            return catalog
+
+        return {}
+
+    @staticmethod
+    def _parse_version_catalog(catalog_path: str) -> dict[str, str]:
+        """Parse libs.versions.toml and return alias -> 'group:artifact' map."""
+        try:
+            with open(catalog_path, "r", encoding="utf-8") as f:
+                data = tomlkit.parse(f.read())
+        except Exception as exc:
+            print(f"Warning: failed to parse {catalog_path}: {exc}", file=sys.stderr)
+            return {}
+
+        libraries = data.get("libraries", {})
+        result: dict[str, str] = {}
+        for alias, value in libraries.items():
+            if isinstance(value, str):
+                # String shorthand: "group:artifact:version"
+                parts = value.split(":")
+                if len(parts) >= 2:
+                    result[alias] = f"{parts[0]}:{parts[1]}"
+            elif isinstance(value, dict):
+                if "module" in value:
+                    # Table form: { module = "group:artifact", ... }
+                    result[alias] = value["module"]
+                elif "group" in value and "name" in value:
+                    # Explicit form: { group = "group", name = "artifact", ... }
+                    result[alias] = f"{value['group']}:{value['name']}"
+        return result
+
+    @staticmethod
+    def _resolve_catalog_alias(ref: str, catalog: dict[str, str]) -> str | None:
+        """Resolve a libs.<alias> reference to 'group:artifact' using the catalog.
+
+        Gradle normalizes dashes, underscores, and dots in alias names,
+        so libs.someLib, libs.some-lib, libs.some_lib, libs.some.lib
+        all refer to the same catalog entry.
+        """
+        # Strip "libs." prefix
+        if not ref.startswith("libs."):
+            return None
+        alias_part = ref[5:]  # everything after "libs."
+
+        # Gradle normalizes separators: '-', '_', '.' are all equivalent
+        def normalize_alias(s: str) -> str:
+            return s.replace("-", ".").replace("_", ".")
+
+        normalized = normalize_alias(alias_part)
+        for key, coords in catalog.items():
+            if normalize_alias(key) == normalized:
+                return coords
+        return None
+
+    def _scan_gradle_kts(self, filepath: str, workspace_names: set[str], catalog: dict[str, str] | None = None) -> list[Dependency]:
         """Parse build.gradle.kts for dependency declarations."""
         try:
             with open(filepath, "r", encoding="utf-8") as f:
@@ -346,6 +425,24 @@ class MavenScanner:
             # Skip project(...) calls (already handled by project_re)
             if arg.startswith("project("):
                 continue
+            # Try to resolve version catalog references (libs.<alias>)
+            if catalog and arg.startswith("libs."):
+                coords = self._resolve_catalog_alias(arg, catalog)
+                if coords:
+                    parts = coords.split(":")
+                    if len(parts) >= 2:
+                        artifact = parts[1]
+                        if artifact in workspace_names:
+                            config = match.group(1)
+                            scope = "dev" if config in self._DEV_CONFIGS else "runtime"
+                            deps.append(Dependency(
+                                name=artifact,
+                                dep_type="catalog",
+                                constraint=coords,
+                                scope=scope,
+                            ))
+                    # Resolved (even if not a workspace dep) -- don't warn
+                    continue
             # This is an unrecognized pattern
             line_start = content.rfind("\n", 0, match.start()) + 1
             line_end = content.find("\n", match.end())
@@ -365,7 +462,7 @@ class MavenScanner:
 
         return deps
 
-    def _scan_gradle_groovy(self, filepath: str, workspace_names: set[str]) -> list[Dependency]:
+    def _scan_gradle_groovy(self, filepath: str, workspace_names: set[str], catalog: dict[str, str] | None = None) -> list[Dependency]:
         """Parse build.gradle (Groovy DSL) for dependency declarations."""
         try:
             with open(filepath, "r", encoding="utf-8") as f:
@@ -448,7 +545,49 @@ class MavenScanner:
             for match in regex.finditer(content):
                 matched_spans.add((match.start(), match.end()))
 
-        # General pattern: config followed by something
+        # Parenthesized catch-all: config(...) with non-string arguments
+        # (e.g., implementation(libs.someLib))
+        paren_catch_re = re.compile(
+            rf'({config_pattern})\s*\((.+?)\)',
+        )
+        for match in paren_catch_re.finditer(content):
+            span = (match.start(), match.end())
+            if any(
+                s[0] <= span[0] < s[1] or s[0] < span[1] <= s[1]
+                for s in matched_spans
+            ):
+                continue
+            arg = match.group(2).strip()
+            if re.match(r"""^['"][^'"]+['"]$""", arg):
+                continue
+            if arg.startswith("project(") or arg.startswith("project '") or arg.startswith('project "'):
+                continue
+            if catalog and arg.startswith("libs."):
+                coords = self._resolve_catalog_alias(arg, catalog)
+                if coords:
+                    parts = coords.split(":")
+                    if len(parts) >= 2:
+                        artifact = parts[1]
+                        if artifact in workspace_names:
+                            config = match.group(1)
+                            scope = "dev" if config in self._DEV_CONFIGS else "runtime"
+                            deps.append(Dependency(
+                                name=artifact,
+                                dep_type="catalog",
+                                constraint=coords,
+                                scope=scope,
+                            ))
+                    continue
+            line_start = content.rfind("\n", 0, match.start()) + 1
+            line_end = content.find("\n", match.end())
+            if line_end == -1:
+                line_end = len(content)
+            line = content[line_start:line_end].strip()
+            if line:
+                unrecognized.append(line)
+            matched_spans.add(span)
+
+        # General pattern: config followed by something (space-separated)
         general_re = re.compile(
             rf"({config_pattern})\s+(\S.+?)$",
             re.MULTILINE,
@@ -466,6 +605,24 @@ class MavenScanner:
                 continue
             if arg.startswith("project(") or arg.startswith("project '") or arg.startswith('project "'):
                 continue
+            # Try to resolve version catalog references (libs.<alias>)
+            if catalog and arg.startswith("libs."):
+                coords = self._resolve_catalog_alias(arg, catalog)
+                if coords:
+                    parts = coords.split(":")
+                    if len(parts) >= 2:
+                        artifact = parts[1]
+                        if artifact in workspace_names:
+                            config = match.group(1)
+                            scope = "dev" if config in self._DEV_CONFIGS else "runtime"
+                            deps.append(Dependency(
+                                name=artifact,
+                                dep_type="catalog",
+                                constraint=coords,
+                                scope=scope,
+                            ))
+                    # Resolved (even if not a workspace dep) -- don't warn
+                    continue
             line = match.group(0).strip()
             if line:
                 unrecognized.append(line)
@@ -569,6 +726,8 @@ class WorkspaceGraph:
             for scanner in SCANNERS:
                 if isinstance(scanner, PypiScanner):
                     found_deps.extend(scanner.scan(project_dir, workspace_names, pypi_name_map=pypi_name_map))
+                elif isinstance(scanner, MavenScanner):
+                    found_deps.extend(scanner.scan(project_dir, workspace_names, workspace_root=root))
                 else:
                     found_deps.extend(scanner.scan(project_dir, workspace_names))
 
