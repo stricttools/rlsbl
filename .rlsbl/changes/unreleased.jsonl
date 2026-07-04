@@ -1,7 +1,0 @@
-{"commits":["e5d833040519d3cb376107441e9080c9d18908a7"],"user_facing":false}
-{"commits":["cb754a16ae1931a3ae0c6974109a04ecae8f9690"],"user_facing":false}
-{"commits":["6b21cca10b8887596035cfc12fef2eaf6e81d8cc"],"user_facing":false}
-{"commits":["bc8021be266b8400f3abfe494530a20d7a668ad8"],"user_facing":false}
-{"commits":["e2a863f5ddd4d313d6b820390b56f602bad36666","a2c0020187887f7aadf3d4e78bd23d017f2cb07e","073d4aa8d1075ce0653b6b3ff91a4f6c1ae71f05"],"user_facing":true,"description":"**Versioned JSONL merge during migrate-releasable.** Released changelog files are now consolidated into the releasable directory alongside unreleased entries, preserving full version history after migration.","type":"feature"}
-{"commits":["0ce2dfe4ed60752eb60bfb5420c0221f69e8e77b"],"user_facing":true,"description":"**Packages prefix in CHANGELOG rendering.** Version sections for releasable members now include the package name prefix (e.g., `core/0.5.0`) so multi-package changelogs are unambiguous.","type":"feature"}
-{"commits":["e5e6550deff06511d49ee2abafd5e90527349f15"],"user_facing":true,"description":"**Absorb routes changelogs to releasable directory.** When absorbing a project into a monorepo with a releasable name, changelog files are placed in the releasable's changes directory instead of the package-level directory.","type":"fix"}
