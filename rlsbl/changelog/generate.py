@@ -132,7 +132,11 @@ def generate_version_section(
     buckets: dict[str, list[str]] = {}
     for entry in user_facing:
         key = entry.type if entry.type in ("breaking", "feature", "fix") else "_other"
-        buckets.setdefault(key, []).append(entry.description or "")
+        desc = entry.description or ""
+        if entry.packages:
+            prefix = "[" + ", ".join(sorted(entry.packages)) + "] "
+            desc = prefix + desc
+        buckets.setdefault(key, []).append(desc)
 
     parts: list[str] = [f"## {version}{release_marker}"]
 
