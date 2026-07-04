@@ -16,6 +16,7 @@ from ...changelog.files import get_changes_dir, read_unreleased, list_versioned_
 from ...changelog.schema import parse_jsonl, serialize_entry
 from ...errors import RlsblError
 from ...workspace import (
+    get_releasable_changes_dir,
     load_workspace,
     load_releasables,
     members_of,
@@ -485,10 +486,17 @@ def cmd_absorb(
     projects.append(WorkspaceProject(new_project))
     save_workspace(workspace_root, projects)
 
-    # Migrate changelog from source repo
-    target_changes_dir = get_changes_dir(
-        os.path.join(workspace_root, package_name)
-    )
+    # Migrate changelog from source repo.
+    # When absorbing into a releasable, route entries to the releasable's
+    # changes dir instead of the per-package dir.
+    if releasable_name is not None:
+        target_changes_dir = get_releasable_changes_dir(
+            workspace_root, releasable_name
+        )
+    else:
+        target_changes_dir = get_changes_dir(
+            os.path.join(workspace_root, package_name)
+        )
     files_written, entries_migrated = _migrate_changelog_from_source(
         source_repo_path, target_changes_dir
     )
