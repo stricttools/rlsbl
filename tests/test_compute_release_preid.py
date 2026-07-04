@@ -18,10 +18,10 @@ class TestComputeReleaseVersionPreid:
         mock_target.read_version.return_value = "0.42.0"
         mock_target.tag_format.side_effect = lambda v: f"v{v}"
 
-        with patch("rlsbl.commands.release.run") as mock_run:
+        with patch("rlsbl.commands.release.tag_exists_locally") as mock_tag_exists:
             # First call: current tag exists (so bump path is taken)
             # Second call: new tag does not exist
-            mock_run.side_effect = ["v0.42.0\n", ""]
+            mock_tag_exists.side_effect = [True, False]
 
             current, new, bump, tag = compute_release_version(
                 mock_target, "/fake/path", "minor",
