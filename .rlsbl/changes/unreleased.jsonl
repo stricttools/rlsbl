@@ -1,2 +1,0 @@
-{"commits":["93a830665a263dc898bf26283035c0a92ccc419a"],"user_facing":true,"description":"**Removed hashes.json from scaffold metadata.** The file was vestigial (never read for any decision). Existing hashes.json files are automatically deleted on next scaffold run.","type":"breaking"}
-{"commits":["18032a760c4e69f35cd7bd00491fa09b313109d1","bbdc8ec696c07ba2e40ee5e448fa01a34f067a8a"],"user_facing":false}
