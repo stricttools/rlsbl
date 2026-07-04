@@ -957,7 +957,7 @@ def _run_release_mutating(state: ReleaseState):
         rlsbl_version_marker = vpath(os.path.join(".rlsbl", "version"))
         _scaffold_meta_present = any(
             os.path.exists(os.path.join(project_dir, ".rlsbl", meta))
-            for meta in ("hashes.json", "managed-files.json")
+            for meta in ("managed-files.json",)
         )
         if _releasable_cfg_dir is None and _scaffold_meta_present:
             try:

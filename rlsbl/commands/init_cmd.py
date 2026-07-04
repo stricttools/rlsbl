@@ -22,7 +22,6 @@ from ..targets import TARGETS, detect_targets
 from ..tagging import ensure_tags
 from ..utils import commit_files, is_private_repo
 
-HASHES_FILE = os.path.join(".rlsbl", "hashes.json")
 MANAGED_FILES = os.path.join(".rlsbl", "managed-files.json")
 BASES_DIR = os.path.join(".rlsbl", "bases")
 
@@ -259,28 +258,11 @@ def file_hash(path):
         return hashlib.sha256(f.read()).hexdigest()
 
 
-def load_hashes():
-    """Load stored file hashes from .rlsbl/hashes.json."""
-    if os.path.exists(HASHES_FILE):
-        with open(HASHES_FILE) as f:
-            return json.load(f)
-    return {}
-
-
-def save_hashes(hashes):
-    """Write file hashes to .rlsbl/hashes.json."""
-    os.makedirs(os.path.dirname(HASHES_FILE), exist_ok=True)
-    with open(HASHES_FILE, "w") as f:
-        json.dump(hashes, f, indent=2)
-        f.write("\n")
-
-
 def load_managed_files():
     """Load the managed-files registry from .rlsbl/managed-files.json.
 
     The managed-files registry tracks template-derived files from apply_plans
-    for orphan detection. Separate from hashes.json which tracks content hashes
-    for change detection.
+    for orphan detection.
 
     Returns the files dict ({path: hash}), or {} if the file is missing.
     """
@@ -774,8 +756,7 @@ def apply_plans(plans):
     return created, skipped, warnings, new_hashes
 
 
-def process_mappings(template_dir, mappings, vars_dict, force,
-                     existing_hashes=None):
+def process_mappings(template_dir, mappings, vars_dict, force):
     """Process a list of template mappings: read each template, apply vars, write target files.
 
     Uses a universal three-way merge (via git merge-file) for existing files:
@@ -805,7 +786,7 @@ def _print_file_status_table(created, skipped):
         print(f"  {target}{dots}{status}")
 
 
-def _print_dry_run_report(plans_groups, registry=None, registries=None, existing_hashes=None):
+def _print_dry_run_report(plans_groups, registry=None, registries=None):
     """Print the file status table from plans without applying them.
 
     plans_groups is a list of plan lists (registry plans, shared plans, etc.).
@@ -838,7 +819,7 @@ def _print_dry_run_report(plans_groups, registry=None, registries=None, existing
             print(f"  {w}", file=sys.stderr)
 
     # Show orphans that would be removed
-    if existing_hashes:
+    if os.path.exists(MANAGED_FILES):
         planned_targets = set()
         for plans in plans_groups:
             for plan in plans:
@@ -922,13 +903,13 @@ def _install_or_update_pre_push_hook():
     )
 
 
-def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnings, *,
+def _finalize_scaffold(all_hash_dicts, created, skipped, warnings, *,
                        registry=None, flags=None, registries=None,
                        npm_lockfile_missing=False, target_paths=None,
-                       project_root, config, removed_paths=None):
-    """Shared post-processing for scaffold: chmod, hooks, version marker, hashes, tagging, summary.
+                       project_root, config):
+    """Shared post-processing for scaffold: chmod, hooks, version marker, tagging, summary.
 
-    all_hash_dicts is a list of dicts to merge into existing_hashes.
+    all_hash_dicts is a list of dicts to merge for managed-files tracking.
     flags is the CLI flags dict (used for tagging check).
     registries is a list of registry names (used for tagging).
     npm_lockfile_missing: if True, prepend a lockfile step to npm next steps.
@@ -968,8 +949,7 @@ def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnin
         all_new_hashes.update(h)
 
     # Detect and clean up orphaned managed files
-    # Orphan detection uses managed-files.json (template-derived files only),
-    # not hashes.json (which tracks all files scaffold touches).
+    # Orphan detection uses managed-files.json (template-derived files only).
     old_managed = load_managed_files()
     orphan_keys = set(old_managed.keys()) - set(all_new_hashes.keys())
     dry_run = flags.get("dry-run", False)
@@ -1057,20 +1037,20 @@ def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnin
     # Save managed-files registry (template-derived files for orphan tracking)
     save_managed_files(all_new_hashes)
 
-    # Save hashes (all files for change detection)
-    existing_hashes.update(all_new_hashes)
-
-    # Prune hashes for files actively removed during this scaffold run.
-    # Two removal sources: orphan cleanup (relative paths) and
-    # _skip_redundant_releasable_configs (absolute paths in removed_paths).
-    for orphan_key in orphan_removed:
-        existing_hashes.pop(orphan_key, None)
-    if removed_paths:
-        for abs_path in removed_paths:
-            rel_key = os.path.relpath(abs_path, project_root)
-            existing_hashes.pop(rel_key, None)
-
-    save_hashes(existing_hashes)
+    # Clean up legacy hashes.json if present
+    legacy_hashes = os.path.join(".rlsbl", "hashes.json")
+    if os.path.exists(legacy_hashes):
+        subprocess.run(
+            [
+                "saferm", "delete",
+                "--description",
+                "legacy hashes.json no longer used by scaffold",
+                legacy_hashes,
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
 
     # Ecosystem tagging
     if should_tag(flags, config):
@@ -1139,7 +1119,7 @@ def _finalize_scaffold(existing_hashes, all_hash_dicts, created, skipped, warnin
             print(f"  {cf}", file=sys.stderr)
     # Include .rlsbl/ internal files written during scaffold
     config_file = os.path.join(".rlsbl", "config.json")
-    for rlsbl_file in [HASHES_FILE, MANAGED_FILES, os.path.join(".rlsbl", "version"), config_file]:
+    for rlsbl_file in [MANAGED_FILES, os.path.join(".rlsbl", "version"), config_file]:
         if os.path.exists(rlsbl_file) and rlsbl_file not in files_to_commit:
             files_to_commit.append(rlsbl_file)
     # Include any base files that were saved for the created targets
@@ -1379,8 +1359,6 @@ def run_cmd(registry, args, flags, ctx):
 
         force = flags.get("force", False)
 
-        existing_hashes = load_hashes()
-
         # Process registry-specific templates (CI only, no publish).
         # Workspace roots skip CI templates -- the ci-router handles
         # per-package CI, and root-level import checks would fail.
@@ -1429,8 +1407,7 @@ def run_cmd(registry, args, flags, ctx):
 
         if dry_run:
             _print_dry_run_report([reg_plans, pipeline_plans, shared_plans],
-                                   registry=registry, registries=[registry],
-                                   existing_hashes=existing_hashes)
+                                   registry=registry, registries=[registry])
             return
 
         reg_created, reg_skipped, reg_warnings, reg_hashes = apply_plans(reg_plans)
@@ -1459,17 +1436,16 @@ def run_cmd(registry, args, flags, ctx):
                 )
 
         # Remove per-package config.json that duplicates releasable config
-        removed_paths = _skip_redundant_releasable_configs(project_root, warnings)
+        _skip_redundant_releasable_configs(project_root, warnings)
 
         _finalize_scaffold(
-            existing_hashes, [reg_hashes, pipe_hashes, shared_hashes],
+            [reg_hashes, pipe_hashes, shared_hashes],
             created, skipped, warnings, registry=registry,
             flags=flags, registries=[registry],
             npm_lockfile_missing=npm_lockfile_missing,
             target_paths={registry: "."},
             project_root=project_root,
             config=ctx.config,
-            removed_paths=removed_paths,
         )
 
         if private:
@@ -2047,7 +2023,6 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         vars_dict["year"] = str(datetime.now().year)
 
         force = flags.get("force", False)
-        existing_hashes = load_hashes()
 
         # Process per-target CI templates: each target gets its own ci-{name}.yml.
         # Workspace roots skip CI templates -- the ci-router handles
@@ -2137,7 +2112,6 @@ def run_cmd_multi(registries_list, args, flags, ctx):
             _print_dry_run_report(
                 [ci_plans, extra_plans, merged_plans, shared_plans],
                 registries=registries_list,
-                existing_hashes=existing_hashes,
             )
             return
 
@@ -2151,16 +2125,15 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         warnings = ci_warnings + extra_warnings + merged_warnings + shared_warnings
 
         # Remove per-package config.json that duplicates releasable config
-        removed_paths = _skip_redundant_releasable_configs(project_root, warnings)
+        _skip_redundant_releasable_configs(project_root, warnings)
 
         _finalize_scaffold(
-            existing_hashes, [ci_hashes, extra_hashes, merged_hashes, shared_hashes],
+            [ci_hashes, extra_hashes, merged_hashes, shared_hashes],
             created, skipped, warnings,
             flags=flags, registries=registries_list,
             target_paths=target_paths,
             project_root=project_root,
             config=ctx.config,
-            removed_paths=removed_paths,
         )
 
         if private:

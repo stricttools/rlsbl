@@ -254,10 +254,10 @@ def get_hook_timeout():
         return None
 
 
-def remote_branch_exists(branch):
+def remote_branch_exists(branch, cwd=None):
     """Check whether origin/{branch} exists as a valid ref."""
     try:
-        run("git", ["rev-parse", "--verify", f"origin/{branch}"])
+        run("git", ["rev-parse", "--verify", f"origin/{branch}"], cwd=cwd)
         return True
     except subprocess.CalledProcessError:
         return False

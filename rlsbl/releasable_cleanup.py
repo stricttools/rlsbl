@@ -30,7 +30,6 @@ from .workspace import (
 # releases/, and the version marker are all removed during cleanup.
 EXPECTED_RLSBL_CONTENTS = frozenset({
     "config.json",
-    "hashes.json",
     "managed-files.json",
     "hooks",
 })
@@ -218,7 +217,6 @@ def verify_minimal_rlsbl(project_path):
 
     After cleanup, a per-package ``.rlsbl/`` should contain only:
 
-    - ``hashes.json`` (scaffold metadata)
     - ``managed-files.json`` (scaffold metadata)
     - ``config.json`` (only if it has overrides differing from releasable config)
     - ``hooks/`` (per-package script hooks are a live feature)
