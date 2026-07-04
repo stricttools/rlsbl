@@ -1,9 +1,9 @@
 # Version bump type: patch, minor, major, hotfix, or prerelease
-bump = ""
+bump = "minor"
 # Short description of this release (required)
-description = ""
+description = "Remove vestigial hashes.json from scaffold metadata"
 # Optional context explaining why these changes were made
-context = ""
+context = "hashes.json was never read for any scaffold decision -- it was write-only dead state. This release removes all production code that maintained it, adds automatic cleanup of existing hashes.json files on next scaffold run, and deletes the associated tests."
 # Pre-release identifier: alpha, beta, rc, or stable
 # preid = ""
 # Set to true to generate a blog post for this release
