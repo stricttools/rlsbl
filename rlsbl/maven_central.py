@@ -2,7 +2,8 @@
 
 Validates that a Maven/Gradle project meets Maven Central's artifact
 requirements: complete POM metadata (name, description, url, licenses,
-developers, scm) and source/javadoc jar generation.
+developers, scm), source/javadoc jar generation, and GPG signing
+configuration.
 """
 
 import os
@@ -152,6 +153,50 @@ def _check_source_javadoc_jars(dir_path):
     return errors
 
 
+def _check_signing_configuration(dir_path):
+    """Check that GPG signing is configured for Maven Central publishing.
+
+    Looks for:
+    - vanniktech maven-publish plugin (handles signing automatically)
+    - Gradle signing plugin + useInMemoryPgpKeys or signAllPublications
+    - Maven GPG plugin (maven-gpg-plugin)
+
+    Returns a list of error strings (empty if signing is detected).
+    """
+    signing_patterns = [
+        r"com\.vanniktech\.maven\.publish",  # vanniktech plugin auto-handles signing
+        r"useInMemoryPgpKeys",               # Gradle in-memory PGP signing
+        r"signAllPublications",              # Gradle signing DSL
+        r"maven-gpg-plugin",                 # Maven GPG plugin
+    ]
+
+    build_content = ""
+    for name in ("build.gradle.kts", "build.gradle"):
+        path = os.path.join(dir_path, name)
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                build_content += f.read() + "\n"
+
+    # Also check pom.xml for Maven GPG plugin
+    pom_path = os.path.join(dir_path, "pom.xml")
+    if os.path.exists(pom_path):
+        with open(pom_path, "r", encoding="utf-8") as f:
+            build_content += f.read() + "\n"
+
+    if not build_content.strip():
+        return ["No build file found to check for GPG signing configuration"]
+
+    has_signing = any(re.search(p, build_content) for p in signing_patterns)
+    if not has_signing:
+        return [
+            "No GPG signing configuration detected (add vanniktech maven-publish "
+            "plugin, signing { useInMemoryPgpKeys(...); sign(publishing.publications) }, "
+            "or maven-gpg-plugin)"
+        ]
+
+    return []
+
+
 def _try_generate_pom(dir_path):
     """Try to generate POM via Gradle and return the path to the generated POM.
 
@@ -192,6 +237,7 @@ def validate_maven_central_metadata(dir_path):
     Checks:
     1. POM metadata (name, description, url, licenses, developers, scm)
     2. Sources and javadoc jar generation
+    3. GPG signing configuration
     """
     errors = []
 
@@ -209,8 +255,9 @@ def validate_maven_central_metadata(dir_path):
                 "No POM available for validation (no pom.xml and "
                 "Gradle POM generation failed or unavailable)"
             )
-            # Still check for source/javadoc jars
+            # Still check for source/javadoc jars and signing
             errors.extend(_check_source_javadoc_jars(dir_path))
+            errors.extend(_check_signing_configuration(dir_path))
             return errors
 
     # Validate POM metadata
@@ -218,5 +265,8 @@ def validate_maven_central_metadata(dir_path):
 
     # Check for source/javadoc jar generation
     errors.extend(_check_source_javadoc_jars(dir_path))
+
+    # Check for GPG signing configuration
+    errors.extend(_check_signing_configuration(dir_path))
 
     return errors
