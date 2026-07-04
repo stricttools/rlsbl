@@ -2,6 +2,14 @@
 
 # Changelog
 
+## 0.98.2
+
+Fix CI test failure: preid test no longer depends on local git tag history.
+
+### Fixes
+
+- **Fix.** CI test reliability: preid test now mocks tag_exists_locally directly instead of depending on local git tag history.
+
 ## 0.98.1
 
 Fix scaffold hash pruning that broke CI by over-aggressively deleting hashes.json entries.
