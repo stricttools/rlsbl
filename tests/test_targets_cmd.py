@@ -173,8 +173,8 @@ class TestMultiTargetRelease:
         with patch("sys.stdout", StringIO()):
             run_cmd(_rc(include=["npm", "spec"]), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
 
-        # Verify spec target build was called
-        build_mock.assert_called_once_with(".", "1.0.1")
+        # Verify spec target build was called with config kwarg
+        build_mock.assert_called_once_with(".", "1.0.1", config={"private": False, "pipelines": {}})
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
@@ -195,15 +195,17 @@ class TestMultiTargetRelease:
     @patch("rlsbl.commands.release._run_selfdoc_gen", return_value=True)
     @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
     @patch("rlsbl.app.run_checks", return_value=([], 0))
-    def test_secondary_target_failure_is_non_fatal(
+    def test_secondary_target_failure_aborts_release(
         self, _run_checks, _vrt, _selfdoc_gen, _selfdoc_check, _changes_dir, _extract, _finalize, _gen_ver_file, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, _commit_files, mock_run, _run_gh, _push, _remote_exists, monkeypatch
     ):
-        """If a secondary target's build raises, release still completes."""
+        """If a secondary target's build raises, release aborts with rollback."""
         # Create version.json so spec target is detected
         with open("version.json", "w") as f:
             json.dump({"version": "1.0.0"}, f)
 
-        # Mock run() responses (gh release create goes through run_gh):
+        # Mock run() responses: build failure happens pre-push (after
+        # pre_release_sha), so we need calls up to that point, then rollback
+        # calls (tag -d attempt + git reset --hard).
         mock_run.side_effect = [
             "",               # fetch
             "0",              # rev-list
@@ -216,16 +218,10 @@ class TestMultiTargetRelease:
             "",               # baseline snapshot
             "/tmp/fake-repo", # show-toplevel
             "pre123",         # rev-parse HEAD (pre_release_sha)
-            "",               # re-check dirty
-            "",               # git log -1 (COMMITTED guard)
-            "",               # status --porcelain (backfilled .md)
-            "",               # tag -l (TAGGED guard)
-            "",               # git tag
-            "pre123",         # rev-parse HEAD (PUSHED guard)
-            "pre123",         # rev-parse origin/main (PUSHED guard)
-            "",               # ls-remote (PUSHED guard)
-            "",               # git push tag
-            "pre123",         # rev-parse HEAD (pushed sha)
+            # Secondary build failure happens here.
+            # Rollback:
+            "",               # git tag -d (best-effort, may fail)
+            "",               # git reset --hard pre_release_sha
         ]
 
         from rlsbl.targets import TARGETS
@@ -233,11 +229,6 @@ class TestMultiTargetRelease:
 
         from rlsbl.commands.release import run_cmd
 
-        # Should not raise -- secondary failures are non-fatal
-        buf = StringIO()
-        with patch("sys.stdout", StringIO()), patch("sys.stderr", buf):
+        # Secondary build failure now aborts the release
+        with pytest.raises((RuntimeError, SystemExit)):
             run_cmd(_rc(include=["npm", "spec"]), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
-
-        # Verify warnings were emitted
-        stderr_output = buf.getvalue()
-        assert "spec target build failed" in stderr_output

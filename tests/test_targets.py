@@ -427,6 +427,86 @@ class TestTargetRegistryIntegration:
             # Should complete without raising
             TARGETS["npm"].build(d, "1.0.0")
 
+    def test_build_accepts_config_kwarg(self):
+        """All targets' build() must accept config as a keyword argument."""
+        with tempfile.TemporaryDirectory() as d:
+            TARGETS["npm"].build(d, "1.0.0", config={"build_timeout": 30})
+
+
+class TestBuildTimeoutResolution:
+    """Tests for BaseTarget._resolve_build_timeout 4-level precedence."""
+
+    def test_level4_class_default(self):
+        """With no config or env, falls back to BUILD_TIMEOUT_DEFAULT."""
+        from rlsbl.targets.base import BaseTarget
+        t = BaseTarget()
+        assert t._resolve_build_timeout(None) == 120
+
+    def test_level4_subclass_override(self):
+        """Subclass BUILD_TIMEOUT_DEFAULT overrides the base."""
+        from rlsbl.targets.maven import MavenTarget
+        t = MavenTarget()
+        assert t._resolve_build_timeout(None) == 300
+
+    def test_level3_config_int(self):
+        """Config build_timeout as int overrides class default."""
+        from rlsbl.targets.base import BaseTarget
+        t = BaseTarget()
+        assert t._resolve_build_timeout({"build_timeout": 60}) == 60
+
+    def test_level3_config_dict_target_name(self):
+        """Config build_timeout as dict with target name key."""
+        t = TARGETS["npm"]
+        config = {"build_timeout": {"npm": 45, "default": 90}}
+        assert t._resolve_build_timeout(config) == 45
+
+    def test_level3_config_dict_default_fallback(self):
+        """Config build_timeout dict falls back to 'default' key."""
+        t = TARGETS["npm"]
+        config = {"build_timeout": {"pypi": 45, "default": 90}}
+        assert t._resolve_build_timeout(config) == 90
+
+    def test_level3_config_dict_no_match(self):
+        """Config build_timeout dict with no matching key falls back to class default."""
+        t = TARGETS["npm"]
+        config = {"build_timeout": {"pypi": 45}}
+        assert t._resolve_build_timeout(config) == t.BUILD_TIMEOUT_DEFAULT
+
+    def test_level2_generic_env(self, monkeypatch):
+        """RLSBL_BUILD_TIMEOUT env var overrides config."""
+        t = TARGETS["npm"]
+        monkeypatch.setenv("RLSBL_BUILD_TIMEOUT", "200")
+        assert t._resolve_build_timeout({"build_timeout": 60}) == 200
+
+    def test_level1_target_specific_env(self, monkeypatch):
+        """RLSBL_BUILD_TIMEOUT_NPM env var overrides generic env."""
+        t = TARGETS["npm"]
+        monkeypatch.setenv("RLSBL_BUILD_TIMEOUT", "200")
+        monkeypatch.setenv("RLSBL_BUILD_TIMEOUT_NPM", "30")
+        assert t._resolve_build_timeout({"build_timeout": 60}) == 30
+
+    def test_precedence_order(self, monkeypatch):
+        """Full 4-level precedence: specific env > generic env > config > class default."""
+        from rlsbl.targets.maven import MavenTarget
+        t = MavenTarget()
+        # Level 4 alone
+        assert t._resolve_build_timeout(None) == 300
+        # Level 3 overrides 4
+        assert t._resolve_build_timeout({"build_timeout": 150}) == 150
+        # Level 2 overrides 3
+        monkeypatch.setenv("RLSBL_BUILD_TIMEOUT", "200")
+        assert t._resolve_build_timeout({"build_timeout": 150}) == 200
+        # Level 1 overrides 2
+        monkeypatch.setenv("RLSBL_BUILD_TIMEOUT_MAVEN", "50")
+        assert t._resolve_build_timeout({"build_timeout": 150}) == 50
+
+    def test_pgdesign_default(self):
+        """PgdesignTarget has BUILD_TIMEOUT_DEFAULT = 60."""
+        from rlsbl.targets.pgdesign import PgdesignTarget
+        t = PgdesignTarget()
+        assert t.BUILD_TIMEOUT_DEFAULT == 60
+        assert t._resolve_build_timeout(None) == 60
+
 
 class TestDetectionFiles:
     """Tests that detection_files is the single source of truth for PROJECT_MANIFESTS."""

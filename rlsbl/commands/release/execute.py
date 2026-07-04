@@ -1003,11 +1003,21 @@ def _run_release_mutating(state: ReleaseState):
                     files_to_commit.append(hf)
                     log(f"Including hook-generated file: {hf}")
 
-        # Build step (no-op for npm/pypi/go targets)
-        try:
-            target.build(primary_path, new_version)
-        except Exception as e:
-            print(f"Warning: target build step failed: {e}", file=sys.stderr)
+        # Build step: primary target (e.g. pypi builds a wheel, maven runs
+        # gradle/mvn, pgdesign validates the schema).  Failures propagate to
+        # the outer rollback handler.
+        _build_config = ctx.config if ctx else None
+        target.build(primary_path, new_version, config=_build_config)
+
+        # Build step: secondary targets (multi-target projects).
+        if secondary_targets:
+            from ...targets import TARGETS as ALL_TARGETS
+            for sec_name in sorted(secondary_targets):
+                sec_target = ALL_TARGETS.get(sec_name)
+                if sec_target is None:
+                    continue
+                sec_path = secondary_targets[sec_name]
+                sec_target.build(sec_path, new_version, config=_build_config)
 
         # Re-check working tree: abort if files outside our expected set were modified
         # (guards against concurrent processes dirtying the tree after our initial check)
@@ -1731,19 +1741,6 @@ def _run_release_mutating(state: ReleaseState):
                             f"run `rlsbl release resume` to re-attempt the publish."
                         ) from e
 
-            # Multi-target: run build for secondary targets (build stays on
-            # targets, not pipelines). Build failures remain warnings.
-            if secondary_targets:
-                from ...targets import TARGETS as ALL_TARGETS
-                for sec_name in sorted(secondary_targets):
-                    sec_target = ALL_TARGETS.get(sec_name)
-                    if sec_target is None:
-                        continue
-                    sec_path = secondary_targets[sec_name]
-                    try:
-                        sec_target.build(sec_path, new_version)
-                    except Exception as e:
-                        print(f"Warning: {sec_name} target build failed: {e}", file=sys.stderr)
         save_step(_state_path, "PIPELINES_PUBLISHED")
         _completed.add("PIPELINES_PUBLISHED")
 

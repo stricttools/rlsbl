@@ -97,7 +97,7 @@ class ReleaseTarget(Protocol):
 
     # --- Optional: Build ---
 
-    def build(self, dir_path: str, version: str) -> None:
+    def build(self, dir_path: str, version: str, *, config: dict | None = None) -> None:
         """Pre-publish build step (e.g. generate docs). No-op by default."""
         pass
 

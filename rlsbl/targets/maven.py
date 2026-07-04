@@ -16,6 +16,7 @@ class MavenTarget(BaseTarget):
     """Release target for Maven/Gradle (Java/Kotlin) projects."""
 
     detection_files = ("build.gradle.kts", "build.gradle", "pom.xml")
+    BUILD_TIMEOUT_DEFAULT = 300
     capabilities = frozenset({"read_name", "read_metadata", "ci_templates"})
     ecosystem = "Java / Maven"
 
@@ -522,16 +523,18 @@ class MavenTarget(BaseTarget):
     def get_project_init_hint(self):
         return 'Run "gradle init" or create a pom.xml first'
 
-    def build(self, dir_path, version):
+    def build(self, dir_path, version, *, config=None):
         """Run the project build step.
 
         Uses ./gradlew build for Gradle projects, mvn package for Maven.
         """
+        timeout = self._resolve_build_timeout(config)
         gradlew = os.path.join(dir_path, "gradlew")
         if os.path.exists(gradlew):
             result = subprocess.run(
                 ["./gradlew", "build"], cwd=dir_path,
                 capture_output=True, text=True,
+                timeout=timeout,
             )
             if result.returncode != 0:
                 raise RuntimeError(
@@ -545,6 +548,7 @@ class MavenTarget(BaseTarget):
             result = subprocess.run(
                 ["mvn", "package"], cwd=dir_path,
                 capture_output=True, text=True,
+                timeout=timeout,
             )
             if result.returncode != 0:
                 raise RuntimeError(

@@ -346,7 +346,7 @@ class PypiTarget(BaseTarget):
             {"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"},
         ]
 
-    def build(self, dir_path, version):
+    def build(self, dir_path, version, *, config=None):
         """Build the package, rewriting path deps if in a monorepo context.
 
         When the project has path dependencies (e.g., sibling packages in a
@@ -358,6 +358,7 @@ class PypiTarget(BaseTarget):
         from ..workspace import find_workspace_root, load_workspace
         from ..workspace_graph import WorkspaceGraph
 
+        timeout = self._resolve_build_timeout(config)
         pyproject_path = os.path.join(dir_path, "pyproject.toml")
         workspace_root = find_workspace_root(dir_path)
 
@@ -368,16 +369,16 @@ class PypiTarget(BaseTarget):
             rewrite_map = build_rewrite_map(workspace_root, projects, graph)
 
             if rewrite_map:
-                self._build_with_rewrite(dir_path, pyproject_path, rewrite_map)
+                self._build_with_rewrite(dir_path, pyproject_path, rewrite_map, timeout=timeout)
                 return
 
         # No monorepo or no path deps -- build in place
-        run("uv", ["build", "--out-dir", "dist"], env=os.environ, cwd=dir_path)
+        run("uv", ["build", "--out-dir", "dist"], env=os.environ, cwd=dir_path, timeout=timeout)
 
     # Directories excluded when copying the project to a temp build dir
     _COPY_EXCLUDE = {".git", "__pycache__", ".rlsbl", ".rlsbl-monorepo", "dist"}
 
-    def _build_with_rewrite(self, dir_path, pyproject_path, rewrite_map):
+    def _build_with_rewrite(self, dir_path, pyproject_path, rewrite_map, *, timeout=120):
         """Copy project to a temp dir with rewritten deps, then build."""
         from ..dep_rewrite import rewrite_pyproject_deps
 
@@ -413,6 +414,7 @@ class PypiTarget(BaseTarget):
                 capture_output=True,
                 text=True,
                 env=os.environ,
+                timeout=timeout,
             )
         finally:
             shutil.rmtree(tmp_dir, ignore_errors=True)

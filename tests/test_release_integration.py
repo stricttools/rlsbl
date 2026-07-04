@@ -11,7 +11,7 @@ import json
 import os
 import subprocess
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 import pytest
 
@@ -415,3 +415,46 @@ class TestReleaseGhReleaseCreateFailure:
         assert len(view_calls) == 3, (
             f"Expected 3 gh release view checks, got {len(view_calls)}: {view_calls}"
         )
+
+
+class TestBuildFailureAbortsRelease:
+    """Build failures must abort the release pre-push and trigger rollback."""
+
+    def test_primary_build_failure_aborts_release(self, mock_git_repo):
+        """A RuntimeError from target.build() must prevent commit/tag/push."""
+        _setup_releasable_npm_project(mock_git_repo)
+        fake_run = _fake_run_factory()
+
+        head_before = _git_output(mock_git_repo, "rev-parse", "HEAD")
+
+        # Mock target.build to raise RuntimeError (simulating a build failure)
+        from rlsbl.targets.npm import NpmTarget
+        original_build = NpmTarget.build
+
+        def failing_build(self, dir_path, version, *, config=None):
+            raise RuntimeError("build failed: compile error")
+
+        with (
+            patch("rlsbl.commands.release.run", side_effect=fake_run),
+            patch("rlsbl.commands.release.run_gh", return_value=""),
+            patch("rlsbl.commands.release.check_gh_installed", return_value=True),
+            patch("rlsbl.commands.release.check_gh_auth", return_value=True),
+            patch.object(NpmTarget, "build", failing_build),
+        ):
+            with pytest.raises((RuntimeError, SystemExit)):
+                run_cmd(
+                    _rc(),
+                    {"yes": True, "quiet": True},
+                    ctx=_make_ctx(mock_git_repo),
+                )
+
+        # HEAD must not have moved (rollback should have run)
+        head_after = _git_output(mock_git_repo, "rev-parse", "HEAD")
+        assert head_after == head_before, (
+            f"HEAD moved from {head_before[:10]} to {head_after[:10]}; "
+            f"build failure should have triggered rollback"
+        )
+
+        # No tag should have been created
+        tags = _git_output(mock_git_repo, "tag", "-l")
+        assert "v1.0.1" not in tags, "v1.0.1 tag should not exist after build failure"

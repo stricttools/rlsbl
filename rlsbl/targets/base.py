@@ -39,6 +39,7 @@ class BaseTarget:
     capabilities: ClassVar[frozenset[str]] = frozenset()
     ecosystem: ClassVar[str] = ""
     auto_detectable: ClassVar[str] = "yes"
+    BUILD_TIMEOUT_DEFAULT: ClassVar[int] = 120
 
     @property
     def name(self):
@@ -140,7 +141,37 @@ class BaseTarget:
         """
         return []
 
-    def build(self, dir_path, version):
+    def _resolve_build_timeout(self, config):
+        """Resolve build timeout through 4-level precedence.
+
+        1. ``RLSBL_BUILD_TIMEOUT_{TARGET_NAME}`` env var
+        2. ``RLSBL_BUILD_TIMEOUT`` env var
+        3. ``config["build_timeout"]`` (int or dict with target-name / "default" keys)
+        4. ``self.BUILD_TIMEOUT_DEFAULT`` class variable
+        """
+        # Level 1: target-specific env var
+        env_specific = os.environ.get(f"RLSBL_BUILD_TIMEOUT_{self.name.upper()}")
+        if env_specific is not None:
+            return int(env_specific)
+
+        # Level 2: generic env var
+        env_generic = os.environ.get("RLSBL_BUILD_TIMEOUT")
+        if env_generic is not None:
+            return int(env_generic)
+
+        # Level 3: config file
+        if config is not None:
+            bt = config.get("build_timeout")
+            if bt is not None:
+                if isinstance(bt, int):
+                    return bt
+                if isinstance(bt, dict):
+                    return bt.get(self.name, bt.get("default", self.BUILD_TIMEOUT_DEFAULT))
+
+        # Level 4: class default
+        return self.BUILD_TIMEOUT_DEFAULT
+
+    def build(self, dir_path, version, *, config=None):
         pass
 
     def companion_tags(self, name, version, path=None):

@@ -19,6 +19,7 @@ class PgdesignTarget(BaseTarget):
     """
 
     detection_files = ("pgdesign.toml",)
+    BUILD_TIMEOUT_DEFAULT = 60
     capabilities = frozenset({"read_name"})
     ecosystem = "PostgreSQL"
 
@@ -98,14 +99,15 @@ class PgdesignTarget(BaseTarget):
     def version_file(self, dir_path=None):
         return "pgdesign.toml"
 
-    def build(self, dir_path, version):
+    def build(self, dir_path, version, *, config=None):
         """Validate the pgdesign schema. Fails the release if errors exist."""
+        timeout = self._resolve_build_timeout(config)
         schema_dir = self._schema_dir(dir_path)
         result = subprocess.run(
             ["pgdesign", "validate", schema_dir],
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=timeout,
         )
         if result.returncode != 0:
             print(
