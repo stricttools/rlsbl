@@ -127,6 +127,23 @@ class TestRemoteTagCheck:
         result = app._check_defs["remote-tag"].impl(ctx)
         assert result.status == "skip"
 
+    def test_local_tag_missing_skips(self, tmp_path, monkeypatch):
+        """remote-tag skips when the local tag doesn't exist yet."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+        _setup_changelog_repo(repo, tag=None, targets=["pypi"])
+        (repo / "pyproject.toml").write_text(
+            '[project]\nname = "test"\nversion = "0.1.0"\n'
+        )
+        run_git(repo, "add", "pyproject.toml")
+        run_git(repo, "commit", "-q", "-m", "add pyproject")
+
+        ctx = make_ctx(repo)
+        result = app._check_defs["remote-tag"].impl(ctx)
+        assert result.status == "skip"
+        assert "not created yet" in result.message
+
     def test_remote_tag_not_found_warns(self, tmp_path, monkeypatch):
         repo = tmp_path / "repo"
         repo.mkdir()
@@ -176,6 +193,25 @@ class TestGithubReleaseCheck:
         ctx = make_ctx(repo)
         result = app._check_defs["github-release"].impl(ctx)
         assert result.status == "skip"
+
+    def test_local_tag_missing_skips(self, tmp_path, monkeypatch):
+        """github-release skips when the local tag doesn't exist yet (even without gh)."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+        _setup_changelog_repo(repo, tag=None, targets=["pypi"])
+        (repo / "pyproject.toml").write_text(
+            '[project]\nname = "test"\nversion = "0.1.0"\n'
+        )
+        run_git(repo, "add", "pyproject.toml")
+        run_git(repo, "commit", "-q", "-m", "add pyproject")
+
+        ctx = make_ctx(repo)
+        # No gh mocking needed -- the check should skip before reaching gh calls
+        with patch("rlsbl.utils.check_gh_installed", side_effect=AssertionError("should not be called")):
+            result = app._check_defs["github-release"].impl(ctx)
+        assert result.status == "skip"
+        assert "not created yet" in result.message
 
     def test_gh_not_installed_fails(self, tmp_path, monkeypatch):
         repo = tmp_path / "repo"
@@ -229,7 +265,7 @@ class TestGithubReleaseCheck:
         with (
             patch("rlsbl.utils.check_gh_installed", return_value=True),
             patch("rlsbl.utils.check_gh_auth", return_value=True),
-            patch("rlsbl.utils.run", return_value="release info"),
+            patch("rlsbl.utils.run_gh", return_value="release info"),
         ):
             result = app._check_defs["github-release"].impl(ctx)
         assert result.status == "pass"
@@ -249,7 +285,7 @@ class TestGithubReleaseCheck:
         with (
             patch("rlsbl.utils.check_gh_installed", return_value=True),
             patch("rlsbl.utils.check_gh_auth", return_value=True),
-            patch("rlsbl.utils.run", side_effect=subprocess.CalledProcessError(1, "gh")),
+            patch("rlsbl.utils.run_gh", side_effect=subprocess.CalledProcessError(1, "gh")),
         ):
             result = app._check_defs["github-release"].impl(ctx)
         assert result.status == "warn"

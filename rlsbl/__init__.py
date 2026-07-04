@@ -1135,6 +1135,12 @@ def cmd_mono_init(auto_commit, **_kwargs):
             file=sys.stderr,
         )
         sys.exit(1)
+    from .utils import find_project_root
+    existing_project = find_project_root(str(root))
+    if existing_project is not None and Path(existing_project) != root:
+        print(f"Error: CWD is inside existing project at {existing_project}. "
+              f"Use monorepo init from {existing_project} to convert it.", file=sys.stderr)
+        sys.exit(1)
     from .commands.monorepo import _cmd_init
     _cmd_init({"auto-commit": auto_commit}, project_root=root)
 

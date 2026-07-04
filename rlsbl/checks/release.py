@@ -29,11 +29,14 @@ def register_release_checks(app):
     @app.check("remote-tag")
     def check_remote_tag(ctx):
         """Git tag for the current version must exist on origin."""
-        from ..utils import tag_exists_on_remote
+        from ..utils import tag_exists_locally, tag_exists_on_remote
 
         _version, tag = _resolve_version_and_tag(ctx)
         if not tag:
             return CheckResult("skip", "no version detected")
+
+        if not tag_exists_locally(tag, cwd=str(ctx.project_root)):
+            return CheckResult("skip", f"{tag} not created yet")
 
         if tag_exists_on_remote(tag, cwd=str(ctx.project_root)):
             return CheckResult("pass", f"{tag} on origin")
@@ -42,11 +45,14 @@ def register_release_checks(app):
     @app.check("github-release")
     def check_github_release(ctx):
         """GitHub Release must exist for the current version tag."""
-        from ..utils import check_gh_auth, check_gh_installed, run_gh
+        from ..utils import check_gh_auth, check_gh_installed, run_gh, tag_exists_locally
 
         _version, tag = _resolve_version_and_tag(ctx)
         if not tag:
             return CheckResult("skip", "no version detected")
+
+        if not tag_exists_locally(tag, cwd=str(ctx.project_root)):
+            return CheckResult("skip", f"{tag} not created yet")
 
         if not check_gh_installed():
             return CheckResult("fail", "gh CLI is not installed")
