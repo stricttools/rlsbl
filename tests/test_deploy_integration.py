@@ -94,7 +94,7 @@ class TestReleaseWithDeployTargets:
             target=type("FakeTarget", (), {
                 "version_file": lambda self, dir_path=None: None,
                 "write_version": lambda self, p, v, ctx=None: [],
-                "build": lambda self, p, v: None,
+                "build": lambda self, p, v, *, config=None: None,
                 "tag_format": lambda self, v: f"v{v}",
             })(),
             flags={"yes": True, "auto-tag": False},
@@ -185,7 +185,7 @@ class TestReleaseDeployFailureContinues:
             target=type("FakeTarget", (), {
                 "version_file": lambda self, dir_path=None: None,
                 "write_version": lambda self, p, v, ctx=None: [],
-                "build": lambda self, p, v: None,
+                "build": lambda self, p, v, *, config=None: None,
                 "tag_format": lambda self, v: f"v{v}",
             })(),
             flags={"yes": True, "auto-tag": False},
@@ -251,7 +251,7 @@ class TestReleaseNoDeployConfig:
             target=type("FakeTarget", (), {
                 "version_file": lambda self, dir_path=None: None,
                 "write_version": lambda self, p, v, ctx=None: [],
-                "build": lambda self, p, v: None,
+                "build": lambda self, p, v, *, config=None: None,
                 "tag_format": lambda self, v: f"v{v}",
             })(),
             flags={"yes": True, "auto-tag": False},
@@ -318,7 +318,7 @@ class TestReleaseDeployConfigErrors:
             target=type("FakeTarget", (), {
                 "version_file": lambda self, dir_path=None: None,
                 "write_version": lambda self, p, v, ctx=None: [],
-                "build": lambda self, p, v: None,
+                "build": lambda self, p, v, *, config=None: None,
                 "tag_format": lambda self, v: f"v{v}",
             })(),
             flags={"yes": True, "auto-tag": False},
@@ -388,7 +388,7 @@ class TestReleaseStopsAtFirstDeployFailure:
             target=type("FakeTarget", (), {
                 "version_file": lambda self, dir_path=None: None,
                 "write_version": lambda self, p, v, ctx=None: [],
-                "build": lambda self, p, v: None,
+                "build": lambda self, p, v, *, config=None: None,
                 "tag_format": lambda self, v: f"v{v}",
             })(),
             flags={"yes": True, "auto-tag": False},
