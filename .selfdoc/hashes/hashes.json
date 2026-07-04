@@ -181,7 +181,7 @@
     "description": "92c829699be90c4ea09e05c6e0ff3830b755bdd05be47a9427e51074cedcb831"
   },
   "en/cli-index.md": {
-    "content": "6c7cbe1c199c991bdc233886add43b15298eda1f12d10db0e419e6fc9c022d34",
+    "content": "01f9a9fe91be043a348c7c584537bed7fef6b1d6fa871a7cd812c0a7fded5c5d",
     "description": "3e97def3f73b8e72ae1147e1ad3b8c31a9459f8426045a2079b68028733fccd2"
   },
   "en/cli-migrate.md": {
@@ -439,7 +439,7 @@
     "source_docstring": "77349d50382ca6c0faf97553b8abf8c24bb360c895f32005f7de62abdf1bbe75"
   },
   "en/rlsbl-commands-init_cmd.md": {
-    "content": "fb144335f58fa5e803389043303226a87d62ee11af40594fa733d1ff1ec5d955",
+    "content": "b67fcd89f9a1d184ac11279a5eddaf1ce833fd694b4c9c5d541a7f008127022e",
     "description": "b4a7db2e3882de4af592870ee977b98522a4635188b12262d78e7441b533611c",
     "source_docstring": "ac73a657ec7256d7c0c8c1f7b1ad359d3673262242500bdb32944a51dddafb30"
   },
@@ -831,7 +831,7 @@
     "source_docstring": "b5cab5067fa547d733c2183c4d8b8c42c8a3f4c9e0e436c8b521afa3e0fb0194"
   },
   "en/rlsbl-releasable_cleanup.md": {
-    "content": "2d9c5f9602e12f632a93046f05f021456606bddc3278c95aa90eec2ed3c4eeaf",
+    "content": "b54f234c4d29a8a992f61c5ae7a2b859adca9b205f0d4e64d5e04a591732b1df",
     "description": "603d5bf3df4556574a680c7d1052ee6037f41e48a57d8ff1682a4c3b05dbc21a",
     "source_docstring": "b3ea5f9839b686d98d92e621fbb7f00aa85df9e8e621921ecdaaea79a256a0df"
   },
@@ -1003,7 +1003,7 @@
     "source_docstring": "832bd4a6a4e17081aa955b5cd23dca00e16c8807676827c44402f4f27d76fe93"
   },
   "en/rlsbl-utils.md": {
-    "content": "bde6d9043dbdf0c085ce0452d6ab23e639a4e42455c66bc15cf879defb088028",
+    "content": "47567477433b791bd8b02f10f9a8f3563cec2b6ee7c096bd377c8e27a1d6740c",
     "description": "792fe47ae6871b00df2974a48b8915720f762635cbeb8b6c18cf43451966abe8",
     "source_docstring": "42d9cf2bc7400397bd0711f5f758dad6f285ed1a2aaf911fec9c690666011cfb"
   },
