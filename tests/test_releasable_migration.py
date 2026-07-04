@@ -537,6 +537,74 @@ class TestConsolidateChangelogsPackagesField:
 
 
 # ---------------------------------------------------------------------------
+# consolidate_changelogs: versioned file merge
+# ---------------------------------------------------------------------------
+
+
+class TestConsolidateChangelogsVersionedFiles:
+    """consolidate_changelogs merges versioned JSONL files across members."""
+
+    def test_consolidate_changelogs_merges_versioned_files(self, tmp_project):
+        """Versioned JSONL files from members are merged into the releasable,
+        with entries tagged by packages field."""
+        proj_auth = _make_pypi_project(tmp_project, "auth", "0.2.0")
+        proj_api = _make_pypi_project(tmp_project, "api", "0.2.0")
+
+        # Both have 0.1.0.jsonl with different entries
+        _write_versioned_jsonl(proj_auth, "0.1.0", [
+            ChangelogEntry(commits=["aaa1111"], user_facing=True,
+                           description="Auth login feature", type="feature"),
+        ])
+        _write_versioned_jsonl(proj_api, "0.1.0", [
+            ChangelogEntry(commits=["bbb2222"], user_facing=True,
+                           description="API endpoint added", type="feature"),
+        ])
+
+        # Only api has 0.2.0.jsonl
+        _write_versioned_jsonl(proj_api, "0.2.0", [
+            ChangelogEntry(commits=["ccc3333"], user_facing=True,
+                           description="API rate limiting", type="feature"),
+        ])
+
+        # Both have empty unreleased
+        _write_unreleased_jsonl(proj_auth, [])
+        _write_unreleased_jsonl(proj_api, [])
+
+        members = [
+            WorkspaceProject({"name": "api", "path": "api"}),
+            WorkspaceProject({"name": "auth", "path": "auth"}),
+        ]
+
+        result = consolidate_changelogs(str(tmp_project), "core", members)
+
+        # Check the releasable's changes dir for versioned files
+        from rlsbl.changelog.schema import parse_jsonl
+        dest_changes = get_releasable_changes_dir(str(tmp_project), "core")
+
+        # 0.1.0.jsonl should exist with entries from BOTH members
+        merged_010_path = os.path.join(dest_changes, "0.1.0.jsonl")
+        assert os.path.isfile(merged_010_path), \
+            f"Expected merged 0.1.0.jsonl at {merged_010_path}"
+        entries_010 = parse_jsonl(merged_010_path)
+        assert len(entries_010) == 2
+        descriptions = {e.description for e in entries_010}
+        assert "Auth login feature" in descriptions
+        assert "API endpoint added" in descriptions
+        # Entries should be tagged with packages
+        for entry in entries_010:
+            assert entry.packages is not None
+
+        # 0.2.0.jsonl should exist with api's entry
+        merged_020_path = os.path.join(dest_changes, "0.2.0.jsonl")
+        assert os.path.isfile(merged_020_path), \
+            f"Expected merged 0.2.0.jsonl at {merged_020_path}"
+        entries_020 = parse_jsonl(merged_020_path)
+        assert len(entries_020) == 1
+        assert entries_020[0].description == "API rate limiting"
+        assert entries_020[0].packages == ["api"]
+
+
+# ---------------------------------------------------------------------------
 # _derive_packages_for_entry (unit tests)
 # ---------------------------------------------------------------------------
 
