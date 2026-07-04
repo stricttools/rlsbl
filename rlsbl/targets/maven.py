@@ -505,11 +505,26 @@ class MavenTarget(BaseTarget):
         except (VersionError, FileNotFoundError):
             version = "0.0.0"
 
+        # Build publishSetup hint based on configured pipelines
+        config = ctx.config if ctx else {}
+        pipelines = config.get("pipelines", {})
+        has_maven_central = any(
+            p.get("type") == "maven-central" for p in pipelines.values()
+        )
+        if has_maven_central:
+            publish_setup = (
+                "Maven Central: requires SONATYPE_USERNAME, SONATYPE_PASSWORD, "
+                "GPG_SIGNING_KEY, GPG_SIGNING_KEY_PASSWORD secrets. "
+                "Uses vanniktech maven-publish plugin (Gradle) or Central Portal config (Maven)"
+            )
+        else:
+            publish_setup = "Requires GITHUB_TOKEN secret (auto-provided for GitHub Packages)"
+
         return TemplateVars(self.name, {
             "name": name,
             "version": version,
             "author": author,
-            "publishSetup": "Requires GITHUB_TOKEN secret (auto-provided for GitHub Packages)",
+            "publishSetup": publish_setup,
         })
 
     def template_mappings(self, ctx):
