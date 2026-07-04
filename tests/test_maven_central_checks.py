@@ -314,6 +314,32 @@ class TestSourceJavadocJars:
         assert errors == []
 
 
+class TestMavenPublishFalsePass:
+    """Bare maven-publish plugin must NOT satisfy sources/javadoc checks.
+
+    Only the vanniktech plugin (com.vanniktech.maven.publish) auto-handles
+    sources and javadoc. The plain maven-publish plugin does not.
+    """
+
+    def test_bare_maven_publish_fails_sources_and_javadoc(self, tmp_project):
+        content = textwrap.dedent("""\
+            plugins {
+                id("maven-publish")
+            }
+
+            group = "com.example"
+            version = "1.0.0"
+        """)
+        (tmp_project / "build.gradle.kts").write_text(content)
+        errors = _check_source_javadoc_jars(str(tmp_project))
+        assert any("sources" in e.lower() for e in errors), (
+            "bare maven-publish should NOT satisfy sources jar requirement"
+        )
+        assert any("javadoc" in e.lower() for e in errors), (
+            "bare maven-publish should NOT satisfy javadoc jar requirement"
+        )
+
+
 class TestValidateMavenCentralMetadata:
     """Integration test for the full validate_maven_central_metadata function."""
 

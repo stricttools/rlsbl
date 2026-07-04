@@ -105,8 +105,7 @@ def _check_source_javadoc_jars(dir_path):
         r"withSourcesJar\b",           # Gradle DSL property
         r"java\s*\{[^}]*withSourcesJar",  # java { withSourcesJar() }
         r"sourcesJar",                 # Custom task name
-        r"maven-publish",             # vanniktech plugin auto-handles this
-        r"com\.vanniktech\.maven\.publish",  # vanniktech plugin
+        r"com\.vanniktech\.maven\.publish",  # vanniktech plugin auto-handles sources
         r"maven-source-plugin",        # Maven source plugin
     ]
 
@@ -116,8 +115,7 @@ def _check_source_javadoc_jars(dir_path):
         r"java\s*\{[^}]*withJavadocJar",  # java { withJavadocJar() }
         r"javadocJar",                 # Custom task name / Dokka
         r"dokka",                      # Dokka plugin for Kotlin docs
-        r"maven-publish",             # vanniktech plugin auto-handles this
-        r"com\.vanniktech\.maven\.publish",  # vanniktech plugin
+        r"com\.vanniktech\.maven\.publish",  # vanniktech plugin auto-handles javadoc
         r"maven-javadoc-plugin",       # Maven javadoc plugin
     ]
 
