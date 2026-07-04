@@ -1460,3 +1460,325 @@ def find_circular_dart_deps(
             graph[rel_path] = targets
 
     return find_circular_deps(graph)
+
+
+# ---------------------------------------------------------------------------
+# JVM (Java/Kotlin) intra-project analysis
+# ---------------------------------------------------------------------------
+
+# Regex to extract package declarations from Java/Kotlin source files.
+_JVM_PACKAGE_RE = re.compile(r"^\s*package\s+([\w.]+)", re.MULTILINE)
+
+# Regex to extract type declarations from Java source files.
+# Matches class, interface, @interface, enum, record with optional modifiers.
+_JAVA_TYPE_RE = re.compile(
+    r"(?:(?:public|private|protected|abstract|sealed|static|final|non-sealed)\s+)*"
+    r"(?:class|interface|@interface|enum|record)\s+(\w+)"
+)
+
+# Regex to extract type declarations from Kotlin source files.
+# Matches class, object, interface with optional modifiers.
+_KOTLIN_TYPE_RE = re.compile(
+    r"(?:(?:data|sealed|value|inline|inner|open|annotation|abstract|fun|enum|"
+    r"companion|private|internal|protected|public)\s+)*"
+    r"(?:class|object|interface)\s+(\w+)"
+)
+
+# JVM source directories in standard Maven/Gradle layout.
+_JVM_SOURCE_DIRS = ("src/main/java", "src/main/kotlin")
+
+# JVM source file extensions.
+_JVM_SOURCE_EXTENSIONS = (".java", ".kt")
+
+
+def _build_jvm_class_index(project_dir: str) -> dict[str, str]:
+    """Build a mapping of fully-qualified class names to source file paths.
+
+    Walks src/main/java and src/main/kotlin directories, reads package
+    declarations and type declarations from each file, and builds a
+    mapping of fully-qualified names to relative file paths.
+
+    Known limitations:
+    - Inner classes map to their outer class file (only top-level
+      declarations are indexed).
+    - Kotlin file-level functions compile to FileNameKt classes, which
+      are not indexed here.
+    - Multi-class Java files only index visible declarations (the regex
+      captures all top-level type keywords but may miss unusual formats).
+
+    Args:
+        project_dir: absolute path to the project root.
+
+    Returns:
+        dict mapping e.g. "com.example.Foo" -> "src/main/java/com/example/Foo.java"
+    """
+    project_dir = os.path.realpath(project_dir)
+    index: dict[str, str] = {}
+
+    for src_dir_rel in _JVM_SOURCE_DIRS:
+        src_dir = os.path.join(project_dir, src_dir_rel)
+        if not os.path.isdir(src_dir):
+            continue
+
+        for dirpath, _dirs, filenames in os.walk(src_dir):
+            for filename in filenames:
+                if not filename.endswith(_JVM_SOURCE_EXTENSIONS):
+                    continue
+
+                filepath = os.path.join(dirpath, filename)
+                try:
+                    with open(filepath, "r", encoding="utf-8") as f:
+                        content = f.read()
+                except (OSError, UnicodeDecodeError):
+                    continue
+
+                # Extract package declaration
+                pkg_match = _JVM_PACKAGE_RE.search(content)
+                package = pkg_match.group(1) if pkg_match else ""
+
+                # Choose type regex based on file extension
+                if filename.endswith(".java"):
+                    type_re = _JAVA_TYPE_RE
+                else:
+                    type_re = _KOTLIN_TYPE_RE
+
+                # Extract all type declarations
+                rel_path = os.path.relpath(filepath, project_dir)
+                for m in type_re.finditer(content):
+                    type_name = m.group(1)
+                    if package:
+                        fqn = f"{package}.{type_name}"
+                    else:
+                        fqn = type_name
+                    index[fqn] = rel_path
+
+    return index
+
+
+def _build_jvm_import_graph(
+    project_dir: str,
+    class_index: dict[str, str],
+    exclude_dirs: list[str] | None = None,
+) -> dict[str, set[str]]:
+    """Build a file-level import graph for a JVM project.
+
+    Reads each source file, extracts import statements via _JVM_IMPORT_RE,
+    resolves them against the class index, and builds a mapping of
+    source file -> set of imported source files.
+
+    For unresolvable imports (class not in the index), falls back to
+    package-level: marks all files in the matching package directory as
+    dependencies.
+
+    Args:
+        project_dir: absolute path to the project root.
+        class_index: mapping of FQN -> relative file path (from _build_jvm_class_index).
+        exclude_dirs: directory paths to skip during the walk.
+
+    Returns:
+        dict mapping relative file path -> set of relative file paths it imports.
+    """
+    from .import_scanners import _JVM_IMPORT_RE as JVM_IMPORT_RE
+
+    project_dir = os.path.realpath(project_dir)
+
+    # Build reverse lookup: package -> set of files in that package
+    package_to_files: dict[str, set[str]] = {}
+    for fqn, rel_path in class_index.items():
+        # Package is everything before the last dot
+        dot_idx = fqn.rfind(".")
+        if dot_idx > 0:
+            pkg = fqn[:dot_idx]
+            package_to_files.setdefault(pkg, set()).add(rel_path)
+
+    # Collect all source files
+    all_files = walk_source_files(
+        project_dir, _JVM_SOURCE_EXTENSIONS, [], exclude_dirs=exclude_dirs,
+    )
+    # Filter to production files only (exclude tests)
+    production_files = [
+        f for f in all_files
+        if not _is_non_production_path(f, project_dir)
+    ]
+
+    graph: dict[str, set[str]] = {}
+    for filepath in production_files:
+        rel_path = os.path.relpath(filepath, project_dir)
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                content = f.read()
+        except (OSError, UnicodeDecodeError):
+            continue
+
+        targets: set[str] = set()
+        for line in content.splitlines():
+            m = JVM_IMPORT_RE.match(line.strip())
+            if not m:
+                continue
+
+            import_path = m.group(1)
+            # Strip trailing .* for wildcard imports
+            clean_path = import_path.rstrip(".*").rstrip(".")
+            if not clean_path:
+                continue
+
+            # Try direct class resolution
+            if clean_path in class_index:
+                target = class_index[clean_path]
+                if target != rel_path:
+                    targets.add(target)
+                continue
+
+            # Try stripping the last component (might be a method or constant
+            # from a static import like com.example.Foo.bar)
+            dot_idx = clean_path.rfind(".")
+            if dot_idx > 0:
+                parent = clean_path[:dot_idx]
+                if parent in class_index:
+                    target = class_index[parent]
+                    if target != rel_path:
+                        targets.add(target)
+                    continue
+
+            # Package-level fallback: if the import matches a known package,
+            # mark all files in that package as reachable
+            if clean_path in package_to_files:
+                for pkg_file in package_to_files[clean_path]:
+                    if pkg_file != rel_path:
+                        targets.add(pkg_file)
+
+        if targets:
+            graph[rel_path] = targets
+
+    return graph
+
+
+def find_dead_jvm_modules(
+    project_root: str,
+    exclude_dirs: list[str] | None = None,
+) -> list[str]:
+    """Find JVM source files unreachable from any entry point.
+
+    A source file is "dead" if there is no path through the import graph
+    from any entry point to that file. Entry points are:
+    - Java files containing public static void main(String
+    - Kotlin files containing top-level fun main(
+
+    Args:
+        project_root: absolute path to the project root.
+        exclude_dirs: directory paths to skip during the walk.
+
+    Returns:
+        sorted list of relative paths of dead source files.
+    """
+    project_root = os.path.realpath(project_root)
+
+    # Check this is a JVM project (has pom.xml or build.gradle*)
+    has_jvm_build = any(
+        os.path.isfile(os.path.join(project_root, f))
+        for f in ("pom.xml", "build.gradle", "build.gradle.kts")
+    )
+    if not has_jvm_build:
+        return []
+
+    class_index = _build_jvm_class_index(project_root)
+    if not class_index:
+        return []
+
+    import_graph = _build_jvm_import_graph(
+        project_root, class_index, exclude_dirs=exclude_dirs,
+    )
+
+    # Collect all production source files
+    all_files = walk_source_files(
+        project_root, _JVM_SOURCE_EXTENSIONS, [], exclude_dirs=exclude_dirs,
+    )
+    production_files = {
+        os.path.relpath(f, project_root)
+        for f in all_files
+        if not _is_non_production_path(f, project_root)
+    }
+
+    if not production_files:
+        return []
+
+    # Find entry points
+    entry_points: set[str] = set()
+    for rel_path in production_files:
+        filepath = os.path.join(project_root, rel_path)
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                content = f.read()
+        except (OSError, UnicodeDecodeError):
+            continue
+
+        if rel_path.endswith(".java"):
+            if "public static void main(String" in content:
+                entry_points.add(rel_path)
+        elif rel_path.endswith(".kt"):
+            # Match top-level fun main( -- must be at the start of a line
+            if re.search(r"^fun\s+main\s*\(", content, re.MULTILINE):
+                entry_points.add(rel_path)
+
+    if not entry_points:
+        # No entry points found -- cannot determine reachability
+        return []
+
+    # BFS from entry points
+    reachable: set[str] = set()
+    queue: deque[str] = deque()
+    for ep in entry_points:
+        if ep not in reachable:
+            reachable.add(ep)
+            queue.append(ep)
+
+    while queue:
+        current = queue.popleft()
+        for neighbor in import_graph.get(current, set()):
+            if neighbor not in reachable:
+                reachable.add(neighbor)
+                queue.append(neighbor)
+
+    # Dead = production files not reachable from any entry point
+    dead = sorted(
+        f for f in production_files
+        if f not in reachable
+    )
+    return dead
+
+
+def find_circular_jvm_deps(
+    project_root: str,
+    exclude_dirs: list[str] | None = None,
+) -> list[list[str]]:
+    """Find circular dependencies in a JVM project.
+
+    Builds a file-level import graph from Java/Kotlin source files and
+    runs Tarjan's SCC algorithm to detect cycles.
+
+    Args:
+        project_root: absolute path to the project root.
+        exclude_dirs: directory paths to skip during the walk.
+
+    Returns:
+        list of cycles, each a sorted list of relative file paths.
+    """
+    project_root = os.path.realpath(project_root)
+
+    # Check this is a JVM project
+    has_jvm_build = any(
+        os.path.isfile(os.path.join(project_root, f))
+        for f in ("pom.xml", "build.gradle", "build.gradle.kts")
+    )
+    if not has_jvm_build:
+        return []
+
+    class_index = _build_jvm_class_index(project_root)
+    if not class_index:
+        return []
+
+    import_graph = _build_jvm_import_graph(
+        project_root, class_index, exclude_dirs=exclude_dirs,
+    )
+
+    return find_circular_deps(import_graph)
