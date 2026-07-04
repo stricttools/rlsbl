@@ -14,7 +14,7 @@ import subprocess
 
 from strictcli import CheckResult
 
-from ..utils import get_check_timeout
+from ..utils import get_check_timeout, tag_exists_locally
 from ..workspace import WorkspaceProject, members_of, project_is_dev_only
 from ._common import (
     RLSBL_CONFIG,
@@ -644,7 +644,7 @@ def register_workspace_checks(app):
         if not affected:
             return CheckResult("pass", "no affected projects need testing")
 
-        recognized = {"pypi", "go", "npm"}
+        recognized = {"pypi", "go", "npm", "maven"}
         failed_projects = []
         passed_count = 0
 
@@ -828,11 +828,7 @@ def register_workspace_checks(app):
                 # Check if the companion tag exists
                 sep = "" if pkg_path.endswith("/") else "/"
                 expected_tag = f"{pkg_path}{sep}v{version}"
-                result = subprocess.run(
-                    ["git", "tag", "-l", expected_tag],
-                    capture_output=True, text=True, cwd=root,
-                )
-                if not result.stdout.strip():
+                if not tag_exists_locally(expected_tag, cwd=root):
                     missing.append(
                         f"{rel.name}/{proj['name']}: missing companion tag {expected_tag}"
                     )
