@@ -1341,7 +1341,7 @@ class TestGoMonorepoTagFormat:
         assert result == "auth-gateway/v*"
 
 
-VALID_CAPABILITIES = {"read_name", "read_metadata", "ci_templates", "dev_install"}
+VALID_CAPABILITIES = {"read_name", "read_metadata", "ci_templates", "dev_install", "publication_probe"}
 VALID_AUTO_DETECTABLE = {"yes", "no", "conditional"}
 
 
