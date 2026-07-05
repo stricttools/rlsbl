@@ -278,45 +278,167 @@ def validate_clean_tree(flags):
     return pre_existing_dirty
 
 
-def validate_branch_and_remote(flags):
-    """Validate branch is main/master and not behind origin.
+class BranchValidation:
+    """Result of :func:`validate_branch_and_remote`.
 
-    Returns the current branch name.
-    Raises ReleaseValidationError if local branch is behind origin.
+    Attributes:
+        branch: the branch the release will happen on (always a release
+            branch -- main/master or configured ``release_branches``).
+        dev_branch: the dev branch we started from, or ``None`` when the
+            release is already on a release branch.
+        needs_ff_merge: ``True`` when the release was initiated from a dev
+            branch and the release branch must be fast-forward merged to
+            the dev branch HEAD before releasing.
+    """
+
+    __slots__ = ("branch", "dev_branch", "needs_ff_merge")
+
+    def __init__(self, branch, *, dev_branch=None, needs_ff_merge=False):
+        self.branch = branch
+        self.dev_branch = dev_branch
+        self.needs_ff_merge = needs_ff_merge
+
+    # Make it behave like a string for backward compatibility with code
+    # that treats the return value as a plain branch name.
+    def __str__(self):
+        return self.branch
+
+    def __eq__(self, other):
+        if isinstance(other, str):
+            return self.branch == other
+        if isinstance(other, BranchValidation):
+            return (
+                self.branch == other.branch
+                and self.dev_branch == other.dev_branch
+                and self.needs_ff_merge == other.needs_ff_merge
+            )
+        return NotImplemented
+
+    def __hash__(self):
+        return hash(self.branch)
+
+
+def validate_branch_and_remote(flags, *, config=None):
+    """Validate branch state and determine the release branch.
+
+    When invoked from a **release branch** (listed in ``release_branches``
+    config, default ``["main", "master"]``): validates local is not behind
+    origin, returns a :class:`BranchValidation` with the branch name and
+    ``needs_ff_merge=False``.
+
+    When invoked from a **dev branch** (any branch NOT in the release
+    branches list): fetches origin, verifies the first release branch is
+    an ancestor of HEAD (i.e. the dev branch can be fast-forward merged
+    to the release branch), and returns a :class:`BranchValidation` with
+    ``branch`` set to the release branch, ``dev_branch`` set to the
+    current branch, and ``needs_ff_merge=True``.  The actual ff-merge
+    is deferred to the caller.
+
+    Returns :class:`BranchValidation`.
+    Raises :class:`ReleaseValidationError` on failure.
     """
     from . import run, get_current_branch, remote_branch_exists
+    from ...prepush_utils import _get_release_branches
 
     branch = get_current_branch()
 
-    if branch not in ("main", "master"):
-        print(f'Warning: you are on branch "{branch}", not main/master.', file=sys.stderr)
+    # Determine which branches are release-only
+    if config is not None:
+        from ...context import ProjectContext
+        # Build a minimal context to pass to _get_release_branches
+        _ctx = ProjectContext(project_root=None, workspace_root=None, config=config)
+        release_branches = _get_release_branches(_ctx)
+    else:
+        from ...prepush_utils import DEFAULT_RELEASE_BRANCHES
+        release_branches = list(DEFAULT_RELEASE_BRANCHES)
+
+    on_release_branch = branch in release_branches
 
     try:
         run("git", ["fetch", "origin", "--quiet"])
     except Exception:
         print("Warning: could not fetch from origin. Skipping remote-ahead check.", file=sys.stderr)
-        return branch
-
-    if not remote_branch_exists(branch):
-        print(
-            f"Remote branch origin/{branch} does not exist yet. Skipping remote-ahead check.",
-            file=sys.stderr,
+        if on_release_branch:
+            return BranchValidation(branch)
+        # Cannot verify ff-ability without fetching
+        raise ReleaseValidationError(
+            f"could not fetch from origin. Releasing from dev branch "
+            f'"{branch}" requires fetching origin to verify '
+            f"fast-forward ability."
         )
-        return branch
 
+    if on_release_branch:
+        # Normal release from a release branch
+        if not remote_branch_exists(branch):
+            print(
+                f"Remote branch origin/{branch} does not exist yet. Skipping remote-ahead check.",
+                file=sys.stderr,
+            )
+            return BranchValidation(branch)
+
+        try:
+            behind_count = int(run("git", ["rev-list", "--count", f"HEAD..origin/{branch}"]))
+        except Exception as e:
+            raise ReleaseValidationError(
+                f"could not check if local branch is behind origin: {e}\n"
+                "Cannot verify remote-ahead status. Aborting for safety."
+            ) from e
+        if behind_count > 0:
+            raise ReleaseValidationError(
+                f"local branch is {behind_count} commit(s) behind origin/{branch}. Pull before releasing."
+            )
+
+        return BranchValidation(branch)
+
+    # --- Release from dev branch ---
+    # Target the first release branch (typically "main").
+    target_branch = release_branches[0]
+
+    # Verify the target release branch exists locally
     try:
-        behind_count = int(run("git", ["rev-list", "--count", f"HEAD..origin/{branch}"]))
-    except Exception as e:
+        run("git", ["rev-parse", "--verify", f"refs/heads/{target_branch}"])
+    except Exception:
         raise ReleaseValidationError(
-            f"could not check if local branch is behind origin: {e}\n"
-            "Cannot verify remote-ahead status. Aborting for safety."
-        ) from e
-    if behind_count > 0:
-        raise ReleaseValidationError(
-            f"local branch is {behind_count} commit(s) behind origin/{branch}. Pull before releasing."
+            f'release branch "{target_branch}" does not exist locally. '
+            f"Create it or configure release_branches in .rlsbl/config.json."
         )
 
-    return branch
+    # Fetch and update the local tracking branch
+    if remote_branch_exists(target_branch):
+        # Update the local release branch to match origin (fast-forward only)
+        try:
+            run("git", ["fetch", "origin", f"{target_branch}:{target_branch}"])
+        except Exception:
+            # Non-fatal: the local branch might already be up to date,
+            # or it might be checked out (can't update checked-out branch
+            # with fetch). We'll verify ancestry below regardless.
+            pass
+
+    # Verify dev branch HEAD is a descendant of the release branch
+    # (i.e. the release branch can be fast-forwarded to dev HEAD).
+    import subprocess as _subprocess
+    result = _subprocess.run(
+        ["git", "merge-base", "--is-ancestor", target_branch, "HEAD"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise ReleaseValidationError(
+            f'cannot fast-forward {target_branch} to {branch}: '
+            f'{target_branch} has diverged. '
+            f'Rebase {branch} onto {target_branch} first, or merge '
+            f'{target_branch} into {branch}.'
+        )
+
+    print(
+        f'Releasing from dev branch "{branch}": will fast-forward '
+        f'"{target_branch}" to HEAD before releasing.',
+        file=sys.stderr,
+    )
+
+    return BranchValidation(
+        target_branch, dev_branch=branch, needs_ff_merge=True,
+    )
 
 
 def resolve_monorepo_context(monorepo_root, project_root, log):
