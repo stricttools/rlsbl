@@ -359,9 +359,21 @@ class TestCmdReleaseUndo:
     @patch("rlsbl.context.create_context")
     @patch("rlsbl.commands.undo.run_cmd")
     def test_delegates(self, mock_run, *_):
-        rlsbl.cmd_release_undo(target="npm", yes=True)
+        rlsbl.cmd_release_undo(target="npm", version="", yes=True)
         mock_run.assert_called_once()
         assert mock_run.call_args[1]["ctx"] is not None
+        flags = mock_run.call_args[0][2]
+        assert flags["version"] is None  # empty string -> None
+
+    @patch("rlsbl._require_project_root", return_value=Path("/fake"))
+    @patch("rlsbl.workspace.find_workspace_root", return_value=None)
+    @patch("rlsbl.context.create_context")
+    @patch("rlsbl.commands.undo.run_cmd")
+    def test_delegates_with_version(self, mock_run, *_):
+        rlsbl.cmd_release_undo(target="", version="0.9.0", yes=True)
+        mock_run.assert_called_once()
+        flags = mock_run.call_args[0][2]
+        assert flags["version"] == "0.9.0"
 
 
 # ============================================================================

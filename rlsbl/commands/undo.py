@@ -120,6 +120,12 @@ def run_cmd(registry, args, flags, *, ctx):
         print("Error: working tree is not clean. Commit your changes first.", file=sys.stderr)
         sys.exit(1)
 
+    # Non-latest undo: --version flag triggers the stillborn undo path
+    version_flag = flags.get("version")
+    if version_flag:
+        _run_non_latest_undo(version_flag, flags, ctx=ctx)
+        return
+
     # Monorepo detection
     monorepo_name = None
     monorepo_project_path = None
@@ -385,3 +391,207 @@ def run_cmd(registry, args, flags, *, ctx):
         _print_summary(results)
     else:
         print("\nUndo complete.")
+
+
+def _run_non_latest_undo(version_str, flags, *, ctx):
+    """Undo a non-latest release that is provably unpublished.
+
+    Uses the layered evidence gate to determine whether the release was
+    published. Only proceeds if the gate clears.
+
+    For non-latest releases:
+    - Delete GitHub Release + tag only (no commit revert -- history moved on)
+    - Un-finalize changelog (rename x.y.z.jsonl back to unreleased.jsonl)
+    - Write undo-audit.json with evidence
+    """
+    from ..evidence_gate import Verdict, run_evidence_gate, write_undo_audit
+    from ..member_context import resolve_member_context
+    from ..targets import resolve_releasable_config_dir
+
+    version = version_str.lstrip("v")
+
+    # Monorepo detection (same as latest undo)
+    monorepo_name = None
+    monorepo_project_path = None
+    releasable_name = None
+    releasable_config_dir = None
+    start_path = str(ctx.project_root)
+    ws_root = find_workspace_root(start_path)
+    if ws_root:
+        project = resolve_project(ws_root, start_path)
+        if project is None:
+            print("Error: current directory is inside a monorepo but not inside any project.", file=sys.stderr)
+            sys.exit(1)
+        monorepo_name = project["name"]
+        monorepo_project_path = project["path"]
+        releasable_config_dir = resolve_releasable_config_dir(project, ws_root)
+
+        from ..workspace import is_explicit_mode, load_releasables, load_workspace as _load_ws, resolve_releasable_for_project
+        if is_explicit_mode(ws_root):
+            ws_projects = _load_ws(ws_root)
+            releasables = load_releasables(ws_root, ws_projects)
+            rel = resolve_releasable_for_project(project, releasables)
+            if rel:
+                releasable_name = rel.name
+
+    # Resolve targets and build tag
+    project_dir = start_path
+    member = resolve_member_context(
+        project_dir, releasable_config_dir=releasable_config_dir,
+    )
+    entries = member.targets
+    if entries:
+        target_obj = TARGETS[entries[0].name]
+        if releasable_name and ws_root:
+            from ..workspace import load_releasables as _lr, load_workspace as _lw, is_explicit_mode as _ie
+            if _ie(ws_root):
+                _ws_p = _lw(ws_root)
+                _rels = _lr(ws_root, _ws_p)
+                _rel = next((r for r in _rels if r.name == releasable_name), None)
+                if _rel and _rel.tag_format:
+                    from .release.validate import _format_releasable_tag
+                    tag = _format_releasable_tag(_rel.tag_format, releasable_name, version)
+                else:
+                    tag = target_obj.monorepo_tag_format(monorepo_name, version, path=monorepo_project_path)
+            else:
+                tag = target_obj.monorepo_tag_format(monorepo_name, version, path=monorepo_project_path)
+        elif monorepo_name:
+            tag = target_obj.monorepo_tag_format(monorepo_name, version, path=monorepo_project_path)
+        else:
+            tag = target_obj.tag_format(version)
+    else:
+        tag = f"v{version}"
+
+    project_path = os.path.join(ws_root, monorepo_project_path) if monorepo_name else str(ctx.project_root or ".")
+
+    # Run evidence gate
+    target_objects = [TARGETS[e.name] for e in entries] if entries else []
+    gate_result = run_evidence_gate(target_objects, project_dir, version, ctx)
+
+    if gate_result.verdict == Verdict.BLOCKED:
+        print(f"Error: cannot undo {tag} -- {gate_result.reason}", file=sys.stderr)
+        for e in gate_result.evidence:
+            print(f"  {e.source}/{e.target}: {e.kind.value} -- {e.message}", file=sys.stderr)
+        sys.exit(1)
+
+    # Display plan
+    print(f"Non-latest undo of {tag} (provably unpublished):")
+    print(f"  - Delete git tag {tag} (local + remote)")
+    print(f"  - Delete the GitHub Release for {tag}")
+    print(f"  - Un-finalize changelog for {version}")
+    print(f"\nEvidence:")
+    for e in gate_result.evidence:
+        print(f"  {e.source}/{e.target}: {e.kind.value} -- {e.message}")
+
+    if not flags.get("yes"):
+        try:
+            answer = input("\nThis is destructive. Proceed? [y/N] ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print("\nAborted.")
+            sys.exit(1)
+        if answer != "y":
+            print("Aborted.")
+            sys.exit(0)
+
+    results = []
+
+    # Delete GitHub Release
+    try:
+        run_gh(["release", "view", tag], config=ctx.config)
+    except Exception:
+        results.append(("Delete GitHub Release", SKIPPED, "no GitHub Release found"))
+    else:
+        try:
+            run_gh(["release", "delete", tag, "--yes"], config=ctx.config)
+            results.append(("Delete GitHub Release", OK, "-"))
+        except Exception:
+            traceback.print_exc()
+            results.append(("Delete GitHub Release", FAILED, f"gh release delete {tag} --yes"))
+
+    # Delete remote tag
+    try:
+        undo_push_env = {**os.environ, "RLSBL_RELEASE_PUSH": "1"}
+        run("git", ["push", "origin", f":{tag}"], timeout=get_push_timeout(ctx.config), env=undo_push_env)
+        results.append(("Delete remote tag", OK, "-"))
+    except Exception:
+        traceback.print_exc()
+        results.append(("Delete remote tag", FAILED, f"git push origin :{tag}"))
+
+    # Delete local tag
+    try:
+        run("git", ["tag", "-d", tag])
+        results.append(("Delete local tag", OK, "-"))
+    except Exception:
+        traceback.print_exc()
+        results.append(("Delete local tag", FAILED, f"git tag -d {tag}"))
+
+    # Un-finalize changelog
+    try:
+        changes_dir, regenerate_changelog, changelog_add_paths = (
+            _resolve_undo_changelog_paths(project_path, ws_root, releasable_name)
+        )
+        changed = unfinalize_version(changes_dir, version)
+        if changed:
+            regenerate_changelog()
+            run("git", ["add", *changelog_add_paths])
+            run("git", ["commit", "-m", f"chore: un-finalize changelog for {tag} (non-latest undo)"])
+            results.append(("Un-finalize changelog", OK, "-"))
+        else:
+            results.append(("Un-finalize changelog", SKIPPED, f"no {version}.jsonl found"))
+    except Exception:
+        traceback.print_exc()
+        results.append(("Un-finalize changelog", FAILED, "manually restore changelog"))
+
+    # Un-finalize release file
+    try:
+        releases_dir = _resolve_undo_releases_dir(
+            project_path, ws_root, releasable_name,
+        )
+        release_file_changed = unfinalize_release_file(releases_dir, version)
+        if release_file_changed:
+            run("git", ["add", releases_dir])
+            run("git", ["commit", "-m", f"chore: restore release file after non-latest undo of {tag}"])
+            results.append(("Restore release file", OK, "-"))
+    except Exception:
+        traceback.print_exc()
+        results.append(("Restore release file", FAILED, "manually restore release file"))
+
+    # Write audit record
+    try:
+        if releasable_name and ws_root:
+            from ..workspace import get_releasable_dir
+            audit_dir = get_releasable_dir(str(ws_root), releasable_name)
+        else:
+            audit_dir = os.path.join(project_path, ".rlsbl")
+        audit_path = write_undo_audit(audit_dir, version, tag, gate_result)
+        run("git", ["add", audit_path])
+        run("git", ["commit", "-m", f"chore: audit record for non-latest undo of {tag}"])
+        results.append(("Write audit record", OK, "-"))
+    except Exception:
+        traceback.print_exc()
+        results.append(("Write audit record", FAILED, "manually write undo-audit.json"))
+
+    # Push
+    should_push = flags.get("yes")
+    if not should_push:
+        try:
+            answer = input("\nPush changes to remote? [y/N] ").strip().lower()
+            should_push = answer == "y"
+        except (EOFError, KeyboardInterrupt):
+            should_push = False
+
+    if should_push:
+        try:
+            branch = get_current_branch()
+            push_env = {**os.environ, "RLSBL_RELEASE_PUSH": "1"}
+            push_if_needed(branch, env=push_env, config=ctx.config)
+            results.append(("Push", OK, "-"))
+        except Exception:
+            traceback.print_exc()
+            results.append(("Push", FAILED, "git push"))
+
+    has_failure = any(status == FAILED for _, status, _ in results)
+    if has_failure:
+        _print_summary(results)
+    else:
+        print(f"\nNon-latest undo of {tag} complete.")

@@ -740,14 +740,15 @@ def cmd_release_edit(dry_run, version=None, **_kwargs):
 # release undo (was: undo)
 # ---------------------------------------------------------------------------
 
-@release_group.command(name="undo", help="Revert the most recent release by deleting the GitHub Release, removing the git tag from local and remote, and reverting the version bump commit. Requires a manual git push afterward to finalize.")
+@release_group.command(name="undo", help="Revert a release. Without --version, reverts the latest release (deletes GitHub Release, removes git tag, reverts version bump commit). With --version, reverts a non-latest release if it is provably unpublished (probes registries for evidence, deletes GitHub Release + tag only, un-finalizes changelog).")
 @strictcli.flag(name="target", type=str, help="Target a specific registry for version detection (auto-detected if omitted)", default="")
-def cmd_release_undo(target, yes, **_kwargs):
+@strictcli.flag(name="version", type=str, help="Version to undo (for non-latest releases that are provably unpublished)", default="")
+def cmd_release_undo(target, version, yes, **_kwargs):
     root = _require_project_root()
     from .workspace import find_workspace_root
     monorepo_root = find_workspace_root(str(root))
     ctx = create_context(root, workspace_root=Path(monorepo_root) if monorepo_root else None)
-    flags = {"yes": yes}
+    flags = {"yes": yes, "version": version or None}
     from .commands.undo import run_cmd
     run_cmd(target or None, [], flags, ctx=ctx)
 
