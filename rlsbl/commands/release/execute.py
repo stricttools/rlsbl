@@ -912,6 +912,14 @@ def _run_release_mutating(state: ReleaseState):
                 sec_path = secondary_targets[sec_name]
                 sec_target.build(sec_path, new_version, config=_build_config)
 
+        # Secret scan gate: scan built artifacts for leaked secrets before
+        # any push or publish. This is a hard, non-bypassable gate.
+        from ...secret_scan import scan_artifacts_for_secrets, SecretScanError
+        try:
+            scan_artifacts_for_secrets(project_dir, log=log)
+        except SecretScanError as e:
+            raise ReleaseAbortError(str(e))
+
         # Re-check working tree: abort if files outside our expected set were modified
         # (guards against concurrent processes dirtying the tree after our initial check)
         dirty_output = run("git", ["status", "--porcelain"])
