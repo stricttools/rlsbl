@@ -248,7 +248,7 @@ class TestOrphanPartialStaleness:
         assert "all commits are stale" in details[0]
         assert "1 unresolvable" in details[0]
         assert "1 out of range" in details[0]
-        assert "consider removing this entry" in details[0]
+        assert "rlsbl changelog remap" in details[0]
 
     def test_partial_valid_in_range_not_flagged(self, git_repo):
         """Entry with some bad hashes but at least one in-range: NOT flagged."""
@@ -270,7 +270,11 @@ class TestOrphanPartialStaleness:
         assert "entry 1 in unreleased.jsonl" in details[0]
         assert "all commits are stale" in details[0]
         assert "2 unresolvable" in details[0]
-        assert "consider removing this entry" in details[0]
+        assert "rlsbl changelog remap" in details[0]
+        assert "genuinely obsolete" in details[0]
+        # Stale SHAs are named in the message
+        assert fake1 in details[0]
+        assert fake2 in details[0]
 
 
 class TestCheckSchema:

@@ -336,12 +336,23 @@ def check_no_orphans(
 
         if n_unresolvable == len(entry.commits):
             # Fully orphaned: all hashes unresolvable
+            stale_list = ", ".join(entry.commits)
             details.append(
                 f"entry {i + 1} in unreleased.jsonl: all commits are stale "
-                f"({n_unresolvable} unresolvable) — consider removing this entry"
+                f"({n_unresolvable} unresolvable: {stale_list}) — run "
+                f"`rlsbl changelog remap` to update stale SHAs, or "
+                f"`rlsbl changelog edit --commits <hash> --remove` if "
+                f"the entry is genuinely obsolete"
             )
         elif n_in_range == 0 and (n_unresolvable > 0 or n_out_of_range > 0):
             # Effectively orphaned: mix of unresolvable and out-of-range
+            stale_hashes = [h for h in entry.commits if resolved.get(h) is None]
+            stale_hashes.extend(
+                h for h in entry.commits
+                if resolved.get(h) is not None
+                and resolved[h] not in unreleased_commits
+            )
+            stale_list = ", ".join(stale_hashes)
             parts = []
             if n_unresolvable > 0:
                 parts.append(f"{n_unresolvable} unresolvable")
@@ -349,7 +360,10 @@ def check_no_orphans(
                 parts.append(f"{n_out_of_range} out of range")
             details.append(
                 f"entry {i + 1} in unreleased.jsonl: all commits are stale "
-                f"({', '.join(parts)}) — consider removing this entry"
+                f"({', '.join(parts)}: {stale_list}) — run "
+                f"`rlsbl changelog remap` to update stale SHAs, or "
+                f"`rlsbl changelog edit --commits <hash> --remove` if "
+                f"the entry is genuinely obsolete"
             )
 
     return (len(details) == 0, details)
