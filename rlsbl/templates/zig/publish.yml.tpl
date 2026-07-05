@@ -25,6 +25,13 @@ jobs:
       - uses: {{action "mlugg/setup-zig"}}
         with:
           version: {{zig.minRequiredZig}}
+      - name: Install gitleaks
+        run: |
+          GITLEAKS_VERSION=8.24.3
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar xz -C /usr/local/bin gitleaks
+      - name: Scan source for secrets
+        run: |
+          gitleaks dir .
 
       - name: Build x86_64-linux
         run: |

@@ -20,6 +20,13 @@ jobs:
     steps:
       - uses: {{action "actions/checkout"}}
       - uses: {{action "dtolnay/rust-toolchain"}}
+      - name: Install gitleaks
+        run: |
+          GITLEAKS_VERSION=8.24.3
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar xz -C /usr/local/bin gitleaks
+      - name: Scan source for secrets
+        run: |
+          gitleaks dir .
       - name: Check if already published
         id: check-cargo
         run: |

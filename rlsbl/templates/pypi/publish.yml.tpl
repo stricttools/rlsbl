@@ -24,7 +24,14 @@ jobs:
     steps:
       - uses: {{action "actions/checkout"}}
       - uses: {{action "astral-sh/setup-uv"}}
+      - name: Install gitleaks
+        run: |
+          GITLEAKS_VERSION=8.24.3
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar xz -C /usr/local/bin gitleaks
       - run: uv build --out-dir dist
+      - name: Scan artifacts for secrets
+        run: |
+          gitleaks dir dist/
       - uses: {{action "pypa/gh-action-pypi-publish"}}
         with:
           skip-existing: true

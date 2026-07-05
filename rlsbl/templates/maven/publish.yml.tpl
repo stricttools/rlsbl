@@ -27,6 +27,13 @@ jobs:
           distribution: temurin
           java-version: "25"
       - uses: {{action "gradle/actions/setup-gradle"}}
+      - name: Install gitleaks
+        run: |
+          GITLEAKS_VERSION=8.24.3
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar xz -C /usr/local/bin gitleaks
+      - name: Scan source for secrets
+        run: |
+          gitleaks dir .
       # GitHub Packages allows re-publishing the same version (overwrites),
       # so this step is inherently idempotent -- no pre-check needed.
       - run: ./gradlew publish
