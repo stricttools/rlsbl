@@ -21,7 +21,8 @@ def get_commit_files(sha):
     """
     try:
         result = subprocess.run(
-            ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", sha],
+            ["git", "diff-tree", "--no-commit-id", "--name-only", "-r",
+             "-m", "--first-parent", sha],
             capture_output=True,
             text=True,
             timeout=10,

@@ -149,6 +149,23 @@ class TestGetCommitFiles:
         files = get_commit_files(sha)
         assert sorted(files) == ["go/main.go", "python/lib.py"]
 
+    def test_returns_files_for_merge_commit(self, monorepo_fixture):
+        """Returns files introduced by a merge commit (first-parent diff)."""
+        root = monorepo_fixture.root
+        # Create a feature branch with a new file
+        run_git(root, "checkout", "-b", "feature")
+        sha_feature = make_commit(root, "go/feature.go", "feature work")
+        # Switch back to main and make a diverging commit
+        run_git(root, "checkout", "main")
+        make_commit(root, "python/main_work.py", "main work")
+        # Merge feature into main (creates a merge commit)
+        run_git(root, "merge", "--no-ff", "feature", "-m", "merge feature")
+        merge_sha = git_head(root)
+        files = get_commit_files(merge_sha)
+        # The merge introduced go/feature.go to mainline
+        assert files is not None
+        assert "go/feature.go" in files
+
 
 class TestFilterCommitsForProject:
     """Unit tests for filter_commits_for_project."""
