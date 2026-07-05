@@ -30,8 +30,10 @@ jobs:
         run: |
           if [ -f pnpm-lock.yaml ]; then
             pnpm install --frozen-lockfile
+          elif [ -f "$GITHUB_WORKSPACE/pnpm-lock.yaml" ]; then
+            cd "$GITHUB_WORKSPACE" && pnpm install --frozen-lockfile --filter {{npm.name}}
           else
-            pnpm install
+            echo "::error::No pnpm-lock.yaml found in project dir or repo root" && exit 1
           fi
       - run: pnpm test
       - run: pnpm audit --audit-level=moderate || true

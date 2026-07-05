@@ -176,10 +176,29 @@ class TestNpmCILockfileConditional:
         with open(tpl_path) as f:
             raw = f.read()
 
-        content, _ = process_template(raw, {"npm.minRequiredNode": "20"})
+        content, _ = process_template(raw, {"npm.minRequiredNode": "20", "npm.name": "my-pkg"})
         assert "if [ -f pnpm-lock.yaml ]" in content
         assert "pnpm install --frozen-lockfile" in content
-        assert "pnpm install" in content
+        # Workspace root fallback: --filter for workspace lockfile
+        assert 'GITHUB_WORKSPACE/pnpm-lock.yaml' in content
+        assert "--frozen-lockfile --filter" in content
+        # Hard error when no lockfile found
+        assert "::error::" in content
+
+    def test_pnpm_ci_template_workspace_filter_uses_package_name(self):
+        """pnpm workspace fallback uses the correct package name in --filter."""
+        from rlsbl.commands.init_cmd import process_template
+        from rlsbl.targets.npm import NpmTarget
+
+        target = NpmTarget()
+        tpl_dir = target.template_dir()
+        tpl_path = os.path.join(tpl_dir, "ci-pnpm.yml.tpl")
+
+        with open(tpl_path) as f:
+            raw = f.read()
+
+        content, _ = process_template(raw, {"npm.name": "@scope/my-package"})
+        assert "--filter @scope/my-package" in content
 
     def test_yarn_ci_template_has_lockfile_conditional(self):
         """yarn ci template renders with conditional lockfile check."""
