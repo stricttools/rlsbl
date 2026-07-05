@@ -96,7 +96,7 @@ class PypiTarget(BaseTarget):
     """Release target for Python projects (pyproject.toml)."""
 
     detection_files = ("pyproject.toml",)
-    capabilities = frozenset({"read_name", "read_metadata", "ci_templates", "dev_install"})
+    capabilities = frozenset({"read_name", "read_metadata", "ci_templates", "dev_install", "publication_probe"})
     ecosystem = "Python / PyPI"
 
     @property
@@ -133,6 +133,58 @@ class PypiTarget(BaseTarget):
         if description:
             result["description"] = description
         return result
+
+    def publication_probe(self, dir_path, version, ctx=None):
+        """Probe PyPI for a specific version of this package."""
+        from ..publication_probe import PublicationProbeResult, PublicationStatus
+
+        pkg_name = self.read_name(dir_path, ctx)
+        if not pkg_name:
+            return PublicationProbeResult(
+                status=PublicationStatus.UNPROBEABLE,
+                registry="pypi",
+                version=version,
+                message="no project name in pyproject.toml",
+            )
+
+        # PyPI uses PEP 440 versions, so translate if needed
+        pep440_version = self.format_version(version)
+
+        import json as _json
+        import urllib.error
+        from ..commands.check import _request_with_backoff
+
+        url = f"https://pypi.org/pypi/{pkg_name}/{pep440_version}/json"
+        try:
+            with _request_with_backoff(url) as resp:
+                _json.loads(resp.read())
+            return PublicationProbeResult(
+                status=PublicationStatus.PUBLISHED,
+                registry="pypi",
+                version=version,
+                message=f"{pkg_name}=={pep440_version} found on PyPI",
+            )
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return PublicationProbeResult(
+                    status=PublicationStatus.UNPUBLISHED,
+                    registry="pypi",
+                    version=version,
+                    message=f"{pkg_name}=={pep440_version} not found on PyPI",
+                )
+            return PublicationProbeResult(
+                status=PublicationStatus.UNPROBEABLE,
+                registry="pypi",
+                version=version,
+                message=f"PyPI API error: HTTP {e.code}",
+            )
+        except Exception as e:
+            return PublicationProbeResult(
+                status=PublicationStatus.UNPROBEABLE,
+                registry="pypi",
+                version=version,
+                message=f"PyPI API error: {e}",
+            )
 
     def format_version(self, version):
         """Translate semver pre-release to PEP 440 format.

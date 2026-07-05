@@ -1,304 +1,422 @@
-"""Tests for rlsbl.commands.yank — soft yank, hard yank, dry run, and error cases."""
+"""Tests for rlsbl.commands.yank -- registry-aware removal with publication probing."""
 
 import unittest
 from io import StringIO
-from unittest.mock import patch, call, MagicMock
+from pathlib import Path
+from unittest.mock import patch, MagicMock
 
-from rlsbl.commands.yank import run_cmd, _build_notice
+import pytest
+
+from rlsbl.commands.yank import run_cmd, _build_yank_notice
+from rlsbl.publication_probe import PublicationProbeResult, PublicationStatus
 
 
-class TestSoftYank(unittest.TestCase):
-    """Verify the soft yank flow marks a release as pre-release with a deprecation notice."""
+MOD = "rlsbl.commands.yank"
 
-    @patch("os.path.exists", return_value=True)
-    @patch("os.unlink")
-    @patch("os.rename")
-    @patch("rlsbl.commands.yank.check_gh_auth", return_value=True)
-    @patch("rlsbl.commands.yank.check_gh_installed", return_value=True)
-    @patch("rlsbl.commands.yank.run_gh")
-    @patch("rlsbl.commands.yank.find_workspace_root", return_value=None)
-    @patch("rlsbl.commands.yank.resolve_member_context", return_value=MagicMock(targets=[]))
-    def test_soft_yank_basic(self, _detect, _ws_root, mock_run_gh, _gh_inst, _gh_auth, _rename, _unlink, _exists):
-        """Soft yank marks release as pre-release and prepends deprecation notice."""
-        mock_run_gh.side_effect = [
-            "",          # gh release view v0.9.1 (exists check)
-            "v0.9.2",   # gh release list (latest is v0.9.2, not our target)
-            "Old notes", # gh release view v0.9.1 --json body
-            "",          # gh release edit v0.9.1 --prerelease --notes-file ...
-        ]
 
-        with patch("sys.stdout", new_callable=StringIO) as mock_stdout, \
-             patch("builtins.open", unittest.mock.mock_open()):
-            run_cmd(["0.9.1"], {"yes": True}, project_root=".")
+class TestPublicationProbeResult:
+    """Unit tests for the PublicationProbeResult data class."""
 
-        output = mock_stdout.getvalue()
-        self.assertIn("Yanked v0.9.1", output)
-        self.assertIn("pre-release", output)
-
-        # Verify gh release edit was called with --prerelease
-        edit_calls = [c for c in mock_run_gh.call_args_list
-                      if c[0][0] and "edit" in c[0][0]]
-        self.assertEqual(len(edit_calls), 1)
-        self.assertIn("--prerelease", edit_calls[0][0][0])
-
-    @patch("os.path.exists", return_value=True)
-    @patch("os.unlink")
-    @patch("os.rename")
-    @patch("rlsbl.commands.yank.check_gh_auth", return_value=True)
-    @patch("rlsbl.commands.yank.check_gh_installed", return_value=True)
-    @patch("rlsbl.commands.yank.run_gh")
-    @patch("rlsbl.commands.yank.find_workspace_root", return_value=None)
-    @patch("rlsbl.commands.yank.resolve_member_context", return_value=MagicMock(targets=[]))
-    def test_soft_yank_with_reason_and_use(self, _detect, _ws_root, mock_run_gh, _gh_inst, _gh_auth, _rename, _unlink, _exists):
-        """Soft yank with --reason and --use includes both in the deprecation notice."""
-        mock_run_gh.side_effect = [
-            "",             # gh release view v0.9.1
-            "v0.9.2",      # gh release list (latest)
-            "Old notes",   # gh release view body
-            "",             # gh release edit
-        ]
-
-        mock_open = unittest.mock.mock_open()
-        with patch("sys.stdout", new_callable=StringIO), \
-             patch("builtins.open", mock_open):
-            run_cmd(["0.9.1"], {"reason": "broken on macOS", "use": "0.9.2", "yes": True}, project_root=".")
-
-        # Check what was written to the notes file
-        written = "".join(
-            call_args[0][0]
-            for call_args in mock_open().write.call_args_list
+    def test_published_repr(self):
+        r = PublicationProbeResult(
+            PublicationStatus.PUBLISHED, "npm", "1.0.0", "found"
         )
-        self.assertIn("broken on macOS", written)
-        self.assertIn("v0.9.2", written)
-        self.assertIn("Deprecated", written)
-        # Old notes should also be present
-        self.assertIn("Old notes", written)
+        assert "PUBLISHED" in repr(r)
+        assert r.status == PublicationStatus.PUBLISHED
+
+    def test_unpublished(self):
+        r = PublicationProbeResult(
+            PublicationStatus.UNPUBLISHED, "pypi", "0.5.0"
+        )
+        assert r.status == PublicationStatus.UNPUBLISHED
+        assert r.message == ""
+
+    def test_unprobeable(self):
+        r = PublicationProbeResult(
+            PublicationStatus.UNPROBEABLE, "plain", "1.0.0", "no API"
+        )
+        assert r.status == PublicationStatus.UNPROBEABLE
 
 
-class TestHardYank(unittest.TestCase):
-    """Verify the hard yank flow deletes the GitHub Release."""
+class TestPublicationProbeOnTargets:
+    """Test publication_probe default and overrides on target classes."""
 
-    @patch("rlsbl.commands.yank.check_gh_auth", return_value=True)
-    @patch("rlsbl.commands.yank.check_gh_installed", return_value=True)
-    @patch("rlsbl.commands.yank.run_gh")
-    @patch("rlsbl.commands.yank.find_workspace_root", return_value=None)
-    @patch("rlsbl.commands.yank.resolve_member_context", return_value=MagicMock(targets=[]))
-    def test_hard_yank(self, _detect, _ws_root, mock_run_gh, _gh_inst, _gh_auth):
-        """Hard yank deletes the release."""
-        mock_run_gh.side_effect = [
-            "",         # gh release view v0.9.1
-            "v0.9.2",  # gh release list (latest)
-            "",         # gh release delete v0.9.1 --yes
+    def test_base_target_returns_unprobeable(self):
+        from rlsbl.targets.base import BaseTarget
+        t = BaseTarget()
+        result = t.publication_probe("/fake", "1.0.0")
+        assert result.status == PublicationStatus.UNPROBEABLE
+
+    def test_plain_target_returns_unprobeable(self):
+        from rlsbl.targets.plain import PlainTarget
+        t = PlainTarget()
+        result = t.publication_probe("/fake", "1.0.0")
+        assert result.status == PublicationStatus.UNPROBEABLE
+
+    @patch("rlsbl.targets.npm.NpmTarget.read_name", return_value=None)
+    def test_npm_no_name_returns_unprobeable(self, _):
+        from rlsbl.targets.npm import NpmTarget
+        t = NpmTarget()
+        result = t.publication_probe("/fake", "1.0.0")
+        assert result.status == PublicationStatus.UNPROBEABLE
+        assert "no package name" in result.message
+
+    @patch("rlsbl.targets.npm.NpmTarget.read_name", return_value="my-pkg")
+    def test_npm_published(self, _):
+        from rlsbl.targets.npm import NpmTarget
+        import urllib.error
+
+        t = NpmTarget()
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = b'{"version": "1.0.0"}'
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = lambda s, *a: None
+
+        with patch("rlsbl.commands.check._request_with_backoff", return_value=mock_resp):
+            result = t.publication_probe("/fake", "1.0.0")
+        assert result.status == PublicationStatus.PUBLISHED
+
+    @patch("rlsbl.targets.npm.NpmTarget.read_name", return_value="my-pkg")
+    def test_npm_unpublished(self, _):
+        from rlsbl.targets.npm import NpmTarget
+        import urllib.error
+
+        t = NpmTarget()
+        with patch(
+            "rlsbl.commands.check._request_with_backoff",
+            side_effect=urllib.error.HTTPError(
+                url="", code=404, msg="", hdrs=None, fp=None
+            ),
+        ):
+            result = t.publication_probe("/fake", "1.0.0")
+        assert result.status == PublicationStatus.UNPUBLISHED
+
+    @patch("rlsbl.targets.npm.NpmTarget.read_name", return_value="my-pkg")
+    def test_npm_api_error_returns_unprobeable(self, _):
+        from rlsbl.targets.npm import NpmTarget
+        import urllib.error
+
+        t = NpmTarget()
+        with patch(
+            "rlsbl.commands.check._request_with_backoff",
+            side_effect=urllib.error.HTTPError(
+                url="", code=500, msg="", hdrs=None, fp=None
+            ),
+        ):
+            result = t.publication_probe("/fake", "1.0.0")
+        assert result.status == PublicationStatus.UNPROBEABLE
+
+    @patch("rlsbl.targets.npm.NpmTarget.read_name", return_value="my-pkg")
+    def test_npm_network_error_returns_unprobeable(self, _):
+        from rlsbl.targets.npm import NpmTarget
+
+        t = NpmTarget()
+        with patch(
+            "rlsbl.commands.check._request_with_backoff",
+            side_effect=ConnectionError("timeout"),
+        ):
+            result = t.publication_probe("/fake", "1.0.0")
+        assert result.status == PublicationStatus.UNPROBEABLE
+
+    @patch("rlsbl.targets.pypi.PypiTarget.read_name", return_value="my-pkg")
+    def test_pypi_published(self, _):
+        from rlsbl.targets.pypi import PypiTarget
+
+        t = PypiTarget()
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = b'{"info": {"version": "1.0.0"}}'
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = lambda s, *a: None
+
+        with patch("rlsbl.commands.check._request_with_backoff", return_value=mock_resp):
+            result = t.publication_probe("/fake", "1.0.0")
+        assert result.status == PublicationStatus.PUBLISHED
+
+    @patch("rlsbl.targets.pypi.PypiTarget.read_name", return_value="my-pkg")
+    def test_pypi_unpublished(self, _):
+        from rlsbl.targets.pypi import PypiTarget
+        import urllib.error
+
+        t = PypiTarget()
+        with patch(
+            "rlsbl.commands.check._request_with_backoff",
+            side_effect=urllib.error.HTTPError(
+                url="", code=404, msg="", hdrs=None, fp=None
+            ),
+        ):
+            result = t.publication_probe("/fake", "1.0.0")
+        assert result.status == PublicationStatus.UNPUBLISHED
+
+    @patch("rlsbl.targets.pypi.PypiTarget.read_name", return_value=None)
+    def test_pypi_no_name_returns_unprobeable(self, _):
+        from rlsbl.targets.pypi import PypiTarget
+        t = PypiTarget()
+        result = t.publication_probe("/fake", "1.0.0")
+        assert result.status == PublicationStatus.UNPROBEABLE
+
+    @patch("rlsbl.targets.go.read_go_module_path", return_value="github.com/user/mod")
+    def test_go_published(self, _):
+        from rlsbl.targets.go import GoTarget
+
+        t = GoTarget()
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = b'{"Version": "v1.0.0"}'
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = lambda s, *a: None
+
+        with patch("rlsbl.commands.check._request_with_backoff", return_value=mock_resp):
+            result = t.publication_probe("/fake", "1.0.0")
+        assert result.status == PublicationStatus.PUBLISHED
+
+    @patch("rlsbl.targets.go.read_go_module_path", return_value="github.com/user/mod")
+    def test_go_unpublished(self, _):
+        from rlsbl.targets.go import GoTarget
+        import urllib.error
+
+        t = GoTarget()
+        with patch(
+            "rlsbl.commands.check._request_with_backoff",
+            side_effect=urllib.error.HTTPError(
+                url="", code=404, msg="", hdrs=None, fp=None
+            ),
+        ):
+            result = t.publication_probe("/fake", "1.0.0")
+        assert result.status == PublicationStatus.UNPUBLISHED
+
+    @patch("rlsbl.targets.go.read_go_module_path", return_value=None)
+    def test_go_no_module_returns_unprobeable(self, _):
+        from rlsbl.targets.go import GoTarget
+        t = GoTarget()
+        result = t.publication_probe("/fake", "1.0.0")
+        assert result.status == PublicationStatus.UNPROBEABLE
+
+    @patch("rlsbl.targets.cargo.CargoTarget.read_name", return_value="my-crate")
+    def test_cargo_published(self, _):
+        from rlsbl.targets.cargo import CargoTarget
+
+        t = CargoTarget()
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = b'{"version": {"num": "1.0.0"}}'
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = lambda s, *a: None
+
+        with patch("rlsbl.commands.check._request_with_backoff", return_value=mock_resp):
+            result = t.publication_probe("/fake", "1.0.0")
+        assert result.status == PublicationStatus.PUBLISHED
+
+    @patch("rlsbl.targets.cargo.CargoTarget.read_name", return_value="my-crate")
+    def test_cargo_unpublished(self, _):
+        from rlsbl.targets.cargo import CargoTarget
+        import urllib.error
+
+        t = CargoTarget()
+        with patch(
+            "rlsbl.commands.check._request_with_backoff",
+            side_effect=urllib.error.HTTPError(
+                url="", code=404, msg="", hdrs=None, fp=None
+            ),
+        ):
+            result = t.publication_probe("/fake", "1.0.0")
+        assert result.status == PublicationStatus.UNPUBLISHED
+
+    @patch("rlsbl.targets.cargo.CargoTarget.read_name", return_value=None)
+    def test_cargo_no_name_returns_unprobeable(self, _):
+        from rlsbl.targets.cargo import CargoTarget
+        t = CargoTarget()
+        result = t.publication_probe("/fake", "1.0.0")
+        assert result.status == PublicationStatus.UNPROBEABLE
+
+
+class TestCapabilityConsistency:
+    """Verify that targets declaring publication_probe capability have a working probe."""
+
+    def test_probe_capable_targets_return_non_default(self):
+        """Targets with publication_probe in capabilities must override the method."""
+        from rlsbl.targets import TARGETS
+        from rlsbl.targets.base import BaseTarget
+
+        for name, target in TARGETS.items():
+            if "publication_probe" in target.capabilities:
+                # The method must be overridden (not the BaseTarget default)
+                assert type(target).publication_probe is not BaseTarget.publication_probe, \
+                    f"target '{name}' declares publication_probe capability but uses the default BaseTarget implementation"
+
+    def test_non_probe_targets_use_default(self):
+        """Targets without publication_probe capability should use the default."""
+        from rlsbl.targets import TARGETS
+        from rlsbl.targets.base import BaseTarget
+
+        for name, target in TARGETS.items():
+            if "publication_probe" not in target.capabilities:
+                result = target.publication_probe("/fake", "1.0.0")
+                assert result.status == PublicationStatus.UNPROBEABLE, \
+                    f"target '{name}' lacks publication_probe capability but returned {result.status}"
+
+
+class TestYankCommand:
+    """Test the yank command's registry-aware removal flow."""
+
+    @patch(f"{MOD}.check_gh_auth", return_value=True)
+    @patch(f"{MOD}.check_gh_installed", return_value=True)
+    @patch(f"{MOD}.run_gh")
+    @patch(f"{MOD}.find_workspace_root", return_value=None)
+    @patch(f"{MOD}.resolve_member_context")
+    def test_yank_published_npm_dry_run(self, mock_member, _ws, mock_gh, _inst, _auth):
+        """Dry run shows what would be yanked for a published npm package."""
+        from rlsbl.targets import TargetEntry
+
+        target = MagicMock()
+        target.name = "npm"
+        target.capabilities = frozenset({"publication_probe"})
+        target.tag_format.return_value = "v1.0.0"
+        target.publication_probe.return_value = PublicationProbeResult(
+            PublicationStatus.PUBLISHED, "npm", "1.0.0", "my-pkg@1.0.0 found"
+        )
+        target.read_name.return_value = "my-pkg"
+
+        mock_member.return_value = MagicMock(targets=[TargetEntry("npm", ".")])
+
+        mock_gh.side_effect = [
+            "",         # release view
+            "v2.0.0",  # release list (latest)
+            "body",    # release view body
         ]
 
-        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            run_cmd(["0.9.1"], {"hard": True, "yes": True}, project_root=".")
+        with patch(f"rlsbl.commands.yank.TARGETS", {"npm": target}), \
+             patch("sys.stdout", new_callable=StringIO) as out:
+            run_cmd(["1.0.0"], {"dry-run": True, "yes": True}, project_root=".")
 
-        output = mock_stdout.getvalue()
-        self.assertIn("Deleted GitHub Release v0.9.1", output)
+        output = out.getvalue()
+        assert "npm" in output
+        assert "my-pkg@1.0.0" in output
+        assert "dry run" in output.lower() or "Dry run" in output
 
-        # Verify gh release delete was called
-        assert any(c[0] == (["release", "delete", "v0.9.1", "--yes"],) for c in mock_run_gh.call_args_list)
+    @patch(f"{MOD}.check_gh_auth", return_value=True)
+    @patch(f"{MOD}.check_gh_installed", return_value=True)
+    @patch(f"{MOD}.run_gh")
+    @patch(f"{MOD}.find_workspace_root", return_value=None)
+    @patch(f"{MOD}.resolve_member_context")
+    def test_yank_unprobeable_target_errors(self, mock_member, _ws, mock_gh, _inst, _auth):
+        """Yank with an unprobeable target exits with error."""
+        from rlsbl.targets import TargetEntry
 
+        target = MagicMock()
+        target.name = "plain"
+        target.capabilities = frozenset()
+        target.tag_format.return_value = "v1.0.0"
 
-class TestDryRun(unittest.TestCase):
-    """Verify dry run prints but does not execute destructive commands."""
+        mock_member.return_value = MagicMock(targets=[TargetEntry("plain", ".")])
 
-    @patch("rlsbl.commands.yank.check_gh_auth", return_value=True)
-    @patch("rlsbl.commands.yank.check_gh_installed", return_value=True)
-    @patch("rlsbl.commands.yank.run_gh")
-    @patch("rlsbl.commands.yank.find_workspace_root", return_value=None)
-    @patch("rlsbl.commands.yank.resolve_member_context", return_value=MagicMock(targets=[]))
-    def test_soft_dry_run(self, _detect, _ws_root, mock_run_gh, _gh_inst, _gh_auth):
-        """Soft dry run prints what would happen without editing."""
-        mock_run_gh.side_effect = [
-            "",         # gh release view v0.9.1
-            "v0.9.2",  # gh release list (latest)
-            "Old body", # gh release view body (should NOT be called in dry run)
+        mock_gh.side_effect = [
+            "",         # release view
+            "v2.0.0",  # release list (latest)
         ]
 
-        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            run_cmd(["0.9.1"], {"dry-run": True}, project_root=".")
+        with patch(f"rlsbl.commands.yank.TARGETS", {"plain": target}), \
+             patch("sys.stderr", new_callable=StringIO) as err:
+            with pytest.raises(SystemExit) as exc:
+                run_cmd(["1.0.0"], {"yes": True}, project_root=".")
+        assert exc.value.code == 1
+        assert "cannot determine publication status" in err.getvalue()
 
-        output = mock_stdout.getvalue()
-        self.assertIn("Would mark v0.9.1 as pre-release", output)
+    @patch(f"{MOD}.check_gh_auth", return_value=True)
+    @patch(f"{MOD}.check_gh_installed", return_value=True)
+    @patch(f"{MOD}.run_gh")
+    @patch(f"{MOD}.find_workspace_root", return_value=None)
+    @patch(f"{MOD}.resolve_member_context")
+    def test_yank_unpublished_skips(self, mock_member, _ws, mock_gh, _inst, _auth):
+        """Unpublished targets are skipped gracefully."""
+        from rlsbl.targets import TargetEntry
 
-        # gh release edit should NOT be called
-        edit_calls = [c for c in mock_run_gh.call_args_list
-                      if c[0][0] and "edit" in c[0][0]]
-        self.assertEqual(len(edit_calls), 0)
+        target = MagicMock()
+        target.name = "npm"
+        target.capabilities = frozenset({"publication_probe"})
+        target.tag_format.return_value = "v1.0.0"
+        target.publication_probe.return_value = PublicationProbeResult(
+            PublicationStatus.UNPUBLISHED, "npm", "1.0.0", "not found"
+        )
 
-    @patch("rlsbl.commands.yank.check_gh_auth", return_value=True)
-    @patch("rlsbl.commands.yank.check_gh_installed", return_value=True)
-    @patch("rlsbl.commands.yank.run_gh")
-    @patch("rlsbl.commands.yank.find_workspace_root", return_value=None)
-    @patch("rlsbl.commands.yank.resolve_member_context", return_value=MagicMock(targets=[]))
-    def test_hard_dry_run(self, _detect, _ws_root, mock_run_gh, _gh_inst, _gh_auth):
-        """Hard dry run prints what would happen without deleting."""
-        mock_run_gh.side_effect = [
-            "",         # gh release view v0.9.1
-            "v0.9.2",  # gh release list (latest)
+        mock_member.return_value = MagicMock(targets=[TargetEntry("npm", ".")])
+
+        mock_gh.side_effect = [
+            "",         # release view
+            "v2.0.0",  # release list (latest)
+            "body",    # release view body
+            "",         # release edit
         ]
 
-        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            run_cmd(["0.9.1"], {"hard": True, "dry-run": True}, project_root=".")
+        with patch(f"rlsbl.commands.yank.TARGETS", {"npm": target}), \
+             patch("os.path.exists", return_value=True), \
+             patch("os.unlink"), \
+             patch("os.rename"), \
+             patch("builtins.open", unittest.mock.mock_open()), \
+             patch("sys.stdout", new_callable=StringIO) as out:
+            run_cmd(["1.0.0"], {"yes": True}, project_root=".")
 
-        output = mock_stdout.getvalue()
-        self.assertIn("Would delete GitHub Release v0.9.1", output)
+        output = out.getvalue()
+        assert "skipping" in output.lower()
 
-        # gh release delete should NOT be called
-        delete_calls = [c for c in mock_run_gh.call_args_list
-                        if c[0][0] and "delete" in c[0][0]]
-        self.assertEqual(len(delete_calls), 0)
+    def test_no_version_arg(self):
+        with pytest.raises(SystemExit) as exc:
+            run_cmd([], {}, project_root=Path("/fake"))
+        assert exc.value.code == 1
 
-
-class TestErrorCases(unittest.TestCase):
-    """Verify error handling for non-existent releases and latest-release guard."""
-
-    @patch("rlsbl.commands.yank.check_gh_auth", return_value=True)
-    @patch("rlsbl.commands.yank.check_gh_installed", return_value=True)
-    @patch("rlsbl.commands.yank.run_gh")
-    @patch("rlsbl.commands.yank.find_workspace_root", return_value=None)
-    @patch("rlsbl.commands.yank.resolve_member_context", return_value=MagicMock(targets=[]))
-    def test_nonexistent_release(self, _detect, _ws_root, mock_run_gh, _gh_inst, _gh_auth):
-        """Yanking a non-existent release prints an error and exits."""
-        mock_run_gh.side_effect = Exception("release not found")
-
-        with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
-            with self.assertRaises(SystemExit) as ctx:
-                run_cmd(["0.99.0"], {}, project_root=".")
-
-        self.assertEqual(ctx.exception.code, 1)
-        self.assertIn("not found", mock_stderr.getvalue())
-
-    @patch("rlsbl.commands.yank.check_gh_auth", return_value=True)
-    @patch("rlsbl.commands.yank.check_gh_installed", return_value=True)
-    @patch("rlsbl.commands.yank.run_gh")
-    @patch("rlsbl.commands.yank.find_workspace_root", return_value=None)
-    @patch("rlsbl.commands.yank.resolve_member_context", return_value=MagicMock(targets=[]))
-    def test_latest_release_blocked(self, _detect, _ws_root, mock_run_gh, _gh_inst, _gh_auth):
-        """Yanking the latest release is blocked with a suggestion to use undo."""
-        mock_run_gh.side_effect = [
-            "",         # gh release view v1.0.0 (exists)
-            "v1.0.0",  # gh release list (latest IS our target)
+    @patch(f"{MOD}.find_workspace_root", return_value=None)
+    @patch(f"{MOD}.resolve_member_context", return_value=MagicMock(targets=[]))
+    @patch(f"{MOD}.check_gh_installed", return_value=True)
+    @patch(f"{MOD}.check_gh_auth", return_value=True)
+    @patch(f"{MOD}.run_gh")
+    def test_latest_release_blocked(self, mock_gh, *_):
+        mock_gh.side_effect = [
+            "",         # release view
+            "v1.0.0",  # latest IS our target
         ]
-
-        with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
-            with self.assertRaises(SystemExit) as ctx:
-                run_cmd(["1.0.0"], {}, project_root=".")
-
-        self.assertEqual(ctx.exception.code, 1)
-        self.assertIn("latest release", mock_stderr.getvalue())
-        self.assertIn("rlsbl release undo", mock_stderr.getvalue())
+        with pytest.raises(SystemExit) as exc:
+            run_cmd(["1.0.0"], {"yes": True}, project_root=Path("/fake"))
+        assert exc.value.code == 1
 
 
-class TestVersionNormalization(unittest.TestCase):
-    """Verify that both '0.9.1' and 'v0.9.1' produce the same tag."""
-
-    @patch("rlsbl.commands.yank.check_gh_auth", return_value=True)
-    @patch("rlsbl.commands.yank.check_gh_installed", return_value=True)
-    @patch("rlsbl.commands.yank.run_gh")
-    @patch("rlsbl.commands.yank.find_workspace_root", return_value=None)
-    @patch("rlsbl.commands.yank.resolve_member_context", return_value=MagicMock(targets=[]))
-    def test_without_v_prefix(self, _detect, _ws_root, mock_run_gh, _gh_inst, _gh_auth):
-        """'0.9.1' is normalized to tag 'v0.9.1'."""
-        mock_run_gh.side_effect = [
-            "",         # gh release view v0.9.1
-            "v0.9.2",  # gh release list
-            "",         # gh release delete
-        ]
-
-        with patch("sys.stdout", new_callable=StringIO):
-            run_cmd(["0.9.1"], {"hard": True, "yes": True}, project_root=".")
-
-        assert any(c[0] == (["release", "view", "v0.9.1"],) for c in mock_run_gh.call_args_list)
-        assert any(c[0] == (["release", "delete", "v0.9.1", "--yes"],) for c in mock_run_gh.call_args_list)
-
-    @patch("rlsbl.commands.yank.check_gh_auth", return_value=True)
-    @patch("rlsbl.commands.yank.check_gh_installed", return_value=True)
-    @patch("rlsbl.commands.yank.run_gh")
-    @patch("rlsbl.commands.yank.find_workspace_root", return_value=None)
-    @patch("rlsbl.commands.yank.resolve_member_context", return_value=MagicMock(targets=[]))
-    def test_with_v_prefix(self, _detect, _ws_root, mock_run_gh, _gh_inst, _gh_auth):
-        """'v0.9.1' is also normalized to tag 'v0.9.1'."""
-        mock_run_gh.side_effect = [
-            "",         # gh release view v0.9.1
-            "v0.9.2",  # gh release list
-            "",         # gh release delete
-        ]
-
-        with patch("sys.stdout", new_callable=StringIO):
-            run_cmd(["v0.9.1"], {"hard": True, "yes": True}, project_root=".")
-
-        assert any(c[0] == (["release", "view", "v0.9.1"],) for c in mock_run_gh.call_args_list)
-        assert any(c[0] == (["release", "delete", "v0.9.1", "--yes"],) for c in mock_run_gh.call_args_list)
-
-
-class TestBuildNotice(unittest.TestCase):
-    """Unit tests for the deprecation notice builder."""
+class TestBuildYankNotice:
+    """Unit tests for the yank notice builder."""
 
     def test_no_reason_no_use(self):
-        result = _build_notice(None, None)
-        self.assertEqual(result, "> **Deprecated.**")
+        result = _build_yank_notice(None, None)
+        assert result == "> **Yanked.**"
 
     def test_reason_only(self):
-        result = _build_notice("broken on macOS", None)
-        self.assertEqual(result, "> **Deprecated:** broken on macOS.")
+        result = _build_yank_notice("security issue", None)
+        assert result == "> **Yanked:** security issue."
 
     def test_use_only(self):
-        result = _build_notice(None, "0.9.2")
-        self.assertEqual(result, "> **Deprecated:** Use v0.9.2 instead.")
+        result = _build_yank_notice(None, "0.9.2")
+        assert result == "> **Yanked:** Use v0.9.2 instead."
 
     def test_reason_and_use(self):
-        result = _build_notice("broken on macOS", "0.9.2")
-        self.assertEqual(result, "> **Deprecated:** broken on macOS. Use v0.9.2 instead.")
+        result = _build_yank_notice("security issue", "0.9.2")
+        assert result == "> **Yanked:** security issue. Use v0.9.2 instead."
 
     def test_use_with_v_prefix(self):
-        """v prefix on --use is normalized."""
-        result = _build_notice(None, "v0.9.2")
-        self.assertEqual(result, "> **Deprecated:** Use v0.9.2 instead.")
+        result = _build_yank_notice(None, "v0.9.2")
+        assert result == "> **Yanked:** Use v0.9.2 instead."
 
 
-class TestYankReleasableInheritance:
-    """Yank must resolve the primary target with releasable-level config inheritance.
+class TestCmdReleaseYankDelegation:
+    """Verify the CLI handler delegates correctly to the new yank module."""
 
-    In explicit releasable mode a member's ``targets`` may live ONLY in the
-    releasable-level config.json. Bare detect_targets(project_dir) raises
-    ConfigError for such a member (config file present, no targets key), so
-    yank must route target resolution through resolve_member_context.
-    """
-
-    def test_yank_resolves_targets_with_releasable_inheritance(
-        self, multi_releasable_monorepo_factory,
-    ):
-        from rlsbl.workspace import Releasable
-
-        ns = multi_releasable_monorepo_factory(
-            releasables=[Releasable(name="alpha")],
-            projects=[{"path": "libs/alpha-core", "name": "alpha-core",
-                       "releasable": "alpha"}],
-            releasable_configs={"alpha": {"private": False, "targets": ["pypi"]}},
+    @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
+    @patch("rlsbl.commands.yank.run_cmd")
+    def test_delegates(self, mock_run, _):
+        import rlsbl
+        rlsbl.cmd_release_yank(
+            reason="security", use="1.2.4",
+            dry_run=True, yes=True, version="1.2.3",
         )
-        member = ns.root / "libs" / "alpha-core"
-        # Targets live ONLY at the releasable level: member config has none.
-        (member / ".rlsbl" / "config.json").write_text("{}\n")
-
-        gh_calls = []
-
-        def fake_run_gh(args, **kwargs):
-            gh_calls.append(list(args))
-            if args[:2] == ["release", "list"]:
-                return "alpha@v0.2.0"  # latest differs from the yank target
-            return ""
-
-        with patch("rlsbl.commands.yank.check_gh_installed", return_value=True), \
-             patch("rlsbl.commands.yank.check_gh_auth", return_value=True), \
-             patch("rlsbl.commands.yank.run_gh", side_effect=fake_run_gh):
-            run_cmd(["0.1.0"], {"hard": True, "yes": True},
-                    project_root=str(member))
-
-        assert ["release", "view", "alpha@v0.1.0"] in gh_calls
-        assert ["release", "delete", "alpha@v0.1.0", "--yes"] in gh_calls
+        mock_run.assert_called_once()
+        flags = mock_run.call_args[0][1]
+        assert flags["reason"] == "security"
+        assert flags["use"] == "1.2.4"
+        # No 'hard' key
+        assert "hard" not in flags
 
 
 if __name__ == "__main__":

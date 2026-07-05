@@ -13,7 +13,7 @@ class CargoTarget(BaseTarget):
     """Release target for Rust/Cargo projects (Cargo.toml)."""
 
     detection_files = ("Cargo.toml",)
-    capabilities = frozenset({"read_name", "read_metadata", "ci_templates", "dev_install"})
+    capabilities = frozenset({"read_name", "read_metadata", "ci_templates", "dev_install", "publication_probe"})
     ecosystem = "Rust / crates.io"
 
     @property
@@ -47,6 +47,56 @@ class CargoTarget(BaseTarget):
         if description:
             result["description"] = str(description)
         return result
+
+    def publication_probe(self, dir_path, version, ctx=None):
+        """Probe crates.io for a specific version of this crate."""
+        from ..publication_probe import PublicationProbeResult, PublicationStatus
+
+        crate_name = self.read_name(dir_path, ctx)
+        if not crate_name:
+            return PublicationProbeResult(
+                status=PublicationStatus.UNPROBEABLE,
+                registry="cargo",
+                version=version,
+                message="no package name in Cargo.toml",
+            )
+
+        import json as _json
+        import urllib.error
+        from ..commands.check import _request_with_backoff
+
+        url = f"https://crates.io/api/v1/crates/{crate_name}/{version}"
+        headers = {"User-Agent": "rlsbl-cli"}
+        try:
+            with _request_with_backoff(url, headers=headers) as resp:
+                _json.loads(resp.read())
+            return PublicationProbeResult(
+                status=PublicationStatus.PUBLISHED,
+                registry="cargo",
+                version=version,
+                message=f"{crate_name}@{version} found on crates.io",
+            )
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return PublicationProbeResult(
+                    status=PublicationStatus.UNPUBLISHED,
+                    registry="cargo",
+                    version=version,
+                    message=f"{crate_name}@{version} not found on crates.io",
+                )
+            return PublicationProbeResult(
+                status=PublicationStatus.UNPROBEABLE,
+                registry="cargo",
+                version=version,
+                message=f"crates.io API error: HTTP {e.code}",
+            )
+        except Exception as e:
+            return PublicationProbeResult(
+                status=PublicationStatus.UNPROBEABLE,
+                registry="cargo",
+                version=version,
+                message=f"crates.io API error: {e}",
+            )
 
     def detect(self, dir_path):
         """Detect if dir has a Cargo.toml with a [package] section (not workspace-only)."""

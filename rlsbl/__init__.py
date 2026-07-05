@@ -779,6 +779,31 @@ def cmd_release_deprecate(reason, use, dry_run, yes, version, **_kwargs):
     run_cmd(args, flags, project_root=root)
 
 
+# ---------------------------------------------------------------------------
+# release yank (registry-aware removal)
+# ---------------------------------------------------------------------------
+
+@release_group.command(name="yank", help="Remove a published version from package registries. Probes each configured target's registry to determine publication status, then executes registry-specific removal: npm deprecate, cargo yank, Go retract, or PyPI manual checklist. Also marks the GitHub Release as pre-release with a yank notice.")
+@strictcli.flag(name="reason", type=str, help="Human-readable explanation of why this version is being yanked", default="")
+@strictcli.flag(name="use", type=str, help="Suggest this version as a replacement in the yank notice", default="")
+@strictcli.arg(name="version", help="Semver string of the release to yank, with or without v prefix (e.g. 0.9.1)")
+def cmd_release_yank(reason, use, dry_run, yes, version, **_kwargs):
+    root = _require_sub_project_root(
+        workspace_root_guidance=(
+            "Error: `rlsbl release yank` must run inside a sub-project, not "
+            "at the monorepo workspace root. cd into the sub-project whose "
+            "release you want to yank."
+        )
+    )
+    args = [version]
+    flags = {
+        "reason": reason or None,
+        "use": use or None,
+        "dry-run": dry_run,
+        "yes": yes,
+    }
+    from .commands.yank import run_cmd
+    run_cmd(args, flags, project_root=root)
 
 
 # ---------------------------------------------------------------------------

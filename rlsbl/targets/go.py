@@ -47,7 +47,7 @@ class GoTarget(BaseTarget):
     """Release target for Go projects (go.mod + VERSION file)."""
 
     detection_files = ("go.mod",)
-    capabilities = frozenset({"read_name", "ci_templates", "dev_install"})
+    capabilities = frozenset({"read_name", "ci_templates", "dev_install", "publication_probe"})
     ecosystem = "Go modules"
 
     @property
@@ -67,6 +67,55 @@ class GoTarget(BaseTarget):
     def read_metadata(self, dir_path):
         """Go modules have no license/description in go.mod."""
         return {}
+
+    def publication_probe(self, dir_path, version, ctx=None):
+        """Probe Go module proxy for a specific version of this module."""
+        from ..publication_probe import PublicationProbeResult, PublicationStatus
+
+        module_path = read_go_module_path(dir_path)
+        if not module_path:
+            return PublicationProbeResult(
+                status=PublicationStatus.UNPROBEABLE,
+                registry="go",
+                version=version,
+                message="no module path in go.mod",
+            )
+
+        import json as _json
+        import urllib.error
+        from ..commands.check import _request_with_backoff
+
+        url = f"https://proxy.golang.org/{module_path}/@v/v{version}.info"
+        try:
+            with _request_with_backoff(url) as resp:
+                _json.loads(resp.read())
+            return PublicationProbeResult(
+                status=PublicationStatus.PUBLISHED,
+                registry="go",
+                version=version,
+                message=f"{module_path}@v{version} found on Go proxy",
+            )
+        except urllib.error.HTTPError as e:
+            if e.code in (404, 410):
+                return PublicationProbeResult(
+                    status=PublicationStatus.UNPUBLISHED,
+                    registry="go",
+                    version=version,
+                    message=f"{module_path}@v{version} not found on Go proxy",
+                )
+            return PublicationProbeResult(
+                status=PublicationStatus.UNPROBEABLE,
+                registry="go",
+                version=version,
+                message=f"Go proxy error: HTTP {e.code}",
+            )
+        except Exception as e:
+            return PublicationProbeResult(
+                status=PublicationStatus.UNPROBEABLE,
+                registry="go",
+                version=version,
+                message=f"Go proxy error: {e}",
+            )
 
     def _is_library(self, dir_path):
         """Return True if the project has no `package main` package anywhere."""

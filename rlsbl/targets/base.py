@@ -204,6 +204,25 @@ class BaseTarget:
         """
         return version
 
+    def publication_probe(self, dir_path, version, ctx=None):
+        """Probe the registry to determine if a specific version is published.
+
+        Returns a PublicationProbeResult with one of three statuses:
+            PUBLISHED: the version exists on the registry.
+            UNPUBLISHED: the version does not exist on the registry.
+            UNPROBEABLE: this target cannot probe (no API, no name, etc.).
+
+        The default implementation returns UNPROBEABLE. Targets with registry
+        APIs (npm, pypi, go, cargo) override this to query the registry.
+        """
+        from ..publication_probe import PublicationProbeResult, PublicationStatus
+        return PublicationProbeResult(
+            status=PublicationStatus.UNPROBEABLE,
+            registry=self.name,
+            version=version,
+            message=f"target '{self.name}' does not support publication probing",
+        )
+
     def dev_install_command(self, project_dir):
         """Specs for local install via `rlsbl dev install`, keyed by mode.
 

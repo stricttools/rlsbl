@@ -95,6 +95,16 @@ class ReleaseTarget(Protocol):
         """Human-readable hint for initializing a project for this target."""
         return ""
 
+    # --- Optional: Publication probe ---
+
+    def publication_probe(self, dir_path: str, version: str, ctx=None):
+        """Probe the registry to determine if a specific version is published.
+
+        Returns a PublicationProbeResult (PUBLISHED, UNPUBLISHED, or UNPROBEABLE).
+        Default: UNPROBEABLE.
+        """
+        ...
+
     # --- Optional: Build ---
 
     def build(self, dir_path: str, version: str, *, config: dict | None = None) -> None:

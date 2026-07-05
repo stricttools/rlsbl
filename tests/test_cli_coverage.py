@@ -1287,13 +1287,13 @@ class TestCmdScaffold:
 
 
 # ============================================================================
-# yank.py -- cover uncovered lines
+# yank.py -- registry-aware removal
 # ============================================================================
 
 MOD_YANK = "rlsbl.commands.yank"
 
 
-class TestYankNoArgs:
+class TestYankCoverageNoArgs:
     def test_exits_without_version(self):
         from rlsbl.commands.yank import run_cmd
         with pytest.raises(SystemExit) as exc:
@@ -1301,8 +1301,8 @@ class TestYankNoArgs:
         assert exc.value.code == 1
 
 
-class TestYankMonorepoContext:
-    """Cover monorepo detection and tag formatting in yank (lines 47-74)."""
+class TestYankCoverageMonorepoContext:
+    """Cover monorepo detection and tag formatting in the new yank."""
 
     @patch(f"{MOD_YANK}.find_workspace_root", return_value="/ws")
     @patch(f"{MOD_YANK}.resolve_project")
@@ -1320,7 +1320,7 @@ class TestYankMonorepoContext:
         ]
         with pytest.raises(SystemExit):
             from rlsbl.commands.yank import run_cmd
-            run_cmd(["1.0.0"], {"hard": False, "yes": True}, project_root=Path("/ws/packages/mylib"))
+            run_cmd(["1.0.0"], {"yes": True}, project_root=Path("/ws/packages/mylib"))
 
     @patch(f"{MOD_YANK}.find_workspace_root", return_value="/ws")
     @patch(f"{MOD_YANK}.resolve_project")
@@ -1345,8 +1345,8 @@ class TestYankMonorepoContext:
         assert exc.value.code == 1
 
 
-class TestYankLatestRefused:
-    """Cover the 'latest release' guard (lines 93-104)."""
+class TestYankCoverageLatestRefused:
+    """Cover the 'latest release' guard."""
 
     @patch(f"{MOD_YANK}.find_workspace_root", return_value=None)
     @patch(f"{MOD_YANK}.resolve_member_context", return_value=MagicMock(targets=[]))
@@ -1379,91 +1379,148 @@ class TestYankLatestRefused:
         assert exc.value.code == 1
 
 
-class TestYankConfirmation:
-    """Cover confirmation prompt (lines 108-119)."""
+class TestYankCoverageConfirmation:
+    """Cover confirmation prompt for registry-aware yank."""
 
     @patch(f"{MOD_YANK}.find_workspace_root", return_value=None)
     @patch(f"{MOD_YANK}.resolve_member_context", return_value=MagicMock(targets=[]))
     @patch(f"{MOD_YANK}.check_gh_installed", return_value=True)
     @patch(f"{MOD_YANK}.check_gh_auth", return_value=True)
     @patch(f"{MOD_YANK}.run_gh")
-    def test_hard_yank_prompt_declined(self, mock_run, *_):
+    def test_yank_prompt_eof(self, mock_run, *_):
         mock_run.side_effect = [
             "",  # gh release view
             "v2.0.0",  # latest is different
         ]
         from rlsbl.commands.yank import run_cmd
-        with patch("builtins.input", return_value="n"):
-            with pytest.raises(SystemExit) as exc:
-                run_cmd(["1.0.0"], {"hard": True}, project_root=Path("/fake"))
-            assert exc.value.code == 0
-
-    @patch(f"{MOD_YANK}.find_workspace_root", return_value=None)
-    @patch(f"{MOD_YANK}.resolve_member_context", return_value=MagicMock(targets=[]))
-    @patch(f"{MOD_YANK}.check_gh_installed", return_value=True)
-    @patch(f"{MOD_YANK}.check_gh_auth", return_value=True)
-    @patch(f"{MOD_YANK}.run_gh")
-    def test_soft_yank_prompt_eof(self, mock_run, *_):
-        mock_run.side_effect = [
-            "",  # gh release view
-            "v2.0.0",  # latest is different
-        ]
-        from rlsbl.commands.yank import run_cmd
+        # No targets means no probes, so it goes straight to the confirmation
         with patch("builtins.input", side_effect=EOFError):
             with pytest.raises(SystemExit) as exc:
-                run_cmd(["1.0.0"], {"hard": False}, project_root=Path("/fake"))
+                run_cmd(["1.0.0"], {}, project_root=Path("/fake"))
             assert exc.value.code == 1
 
 
-class TestYankSoftYank:
-    """Cover _soft_yank (lines 137-168)."""
+class TestYankCoverageBuildNotice:
+    """Cover _build_yank_notice."""
 
-    @patch(f"{MOD_YANK}.find_workspace_root", return_value=None)
-    @patch(f"{MOD_YANK}.resolve_member_context", return_value=MagicMock(targets=[]))
-    @patch(f"{MOD_YANK}.check_gh_installed", return_value=True)
-    @patch(f"{MOD_YANK}.check_gh_auth", return_value=True)
-    @patch(f"{MOD_YANK}.run_gh")
-    def test_soft_yank_succeeds(self, mock_run, _auth, _inst, _targets, _ws, capsys):
+    def test_notice_with_reason_and_use(self):
+        from rlsbl.commands.yank import _build_yank_notice
+        result = _build_yank_notice("security fix", "1.2.4")
+        assert "security fix" in result
+        assert "v1.2.4" in result
+        assert "Yanked" in result
+
+    def test_notice_no_reason_no_use(self):
+        from rlsbl.commands.yank import _build_yank_notice
+        result = _build_yank_notice(None, None)
+        assert result == "> **Yanked.**"
+
+
+# ============================================================================
+# deprecate.py -- cover uncovered lines (was yank.py soft-yank)
+# ============================================================================
+
+MOD_DEPRECATE = "rlsbl.commands.deprecate"
+
+
+class TestDeprecateCoverageNoArgs:
+    def test_exits_without_version(self):
+        from rlsbl.commands.deprecate import run_cmd
+        with pytest.raises(SystemExit) as exc:
+            run_cmd([], {}, project_root=Path("/fake"))
+        assert exc.value.code == 1
+
+
+class TestDeprecateCoverageMonorepoContext:
+    """Cover monorepo detection and tag formatting in deprecate."""
+
+    @patch(f"{MOD_DEPRECATE}.find_workspace_root", return_value="/ws")
+    @patch(f"{MOD_DEPRECATE}.resolve_project")
+    @patch(f"{MOD_DEPRECATE}.resolve_member_context", return_value=MagicMock(targets=[]))
+    @patch(f"{MOD_DEPRECATE}.check_gh_installed", return_value=True)
+    @patch(f"{MOD_DEPRECATE}.check_gh_auth", return_value=True)
+    @patch(f"{MOD_DEPRECATE}.run_gh")
+    def test_monorepo_plain_tag(self, mock_run, _auth, _inst, _targets, mock_resolve, _ws):
+        proj = {"name": "mylib", "path": "packages/mylib"}
+        mock_resolve.return_value = proj
+        mock_run.side_effect = [
+            "",  # gh release view
+            Exception("latest check fails"),
+        ]
+        with pytest.raises(SystemExit):
+            from rlsbl.commands.deprecate import run_cmd
+            run_cmd(["1.0.0"], {"yes": True}, project_root=Path("/ws/packages/mylib"))
+
+    @patch(f"{MOD_DEPRECATE}.find_workspace_root", return_value="/ws")
+    @patch(f"{MOD_DEPRECATE}.resolve_project")
+    @patch(f"{MOD_DEPRECATE}.resolve_member_context", return_value=MagicMock(targets=[]))
+    @patch(f"{MOD_DEPRECATE}.check_gh_installed", return_value=False)
+    def test_gh_not_installed(self, *_):
+        from rlsbl.commands.deprecate import run_cmd
+        proj = {"name": "mylib", "path": "packages/mylib"}
+        with patch(f"{MOD_DEPRECATE}.resolve_project", return_value=proj):
+            with pytest.raises(SystemExit) as exc:
+                run_cmd(["1.0.0"], {}, project_root=Path("/ws/packages/mylib"))
+            assert exc.value.code == 1
+
+    @patch(f"{MOD_DEPRECATE}.find_workspace_root", return_value=None)
+    @patch(f"{MOD_DEPRECATE}.resolve_member_context", return_value=MagicMock(targets=[]))
+    @patch(f"{MOD_DEPRECATE}.check_gh_installed", return_value=True)
+    @patch(f"{MOD_DEPRECATE}.check_gh_auth", return_value=False)
+    def test_gh_not_authed(self, *_):
+        from rlsbl.commands.deprecate import run_cmd
+        with pytest.raises(SystemExit) as exc:
+            run_cmd(["1.0.0"], {}, project_root=Path("/fake"))
+        assert exc.value.code == 1
+
+
+class TestDeprecateCoverageSoftDeprecate:
+    """Cover _soft_deprecate."""
+
+    @patch(f"{MOD_DEPRECATE}.find_workspace_root", return_value=None)
+    @patch(f"{MOD_DEPRECATE}.resolve_member_context", return_value=MagicMock(targets=[]))
+    @patch(f"{MOD_DEPRECATE}.check_gh_installed", return_value=True)
+    @patch(f"{MOD_DEPRECATE}.check_gh_auth", return_value=True)
+    @patch(f"{MOD_DEPRECATE}.run_gh")
+    def test_deprecate_succeeds(self, mock_run, _auth, _inst, _targets, _ws, capsys):
         mock_run.side_effect = [
             "",  # gh release view
             "v2.0.0",  # latest is different
             "existing body",  # gh release view --json body
             "",  # gh release edit
         ]
-        from rlsbl.commands.yank import run_cmd
-        run_cmd(["1.0.0"], {"hard": False, "yes": True}, project_root=Path("/fake"))
-        assert "Yanked v1.0.0" in capsys.readouterr().out
+        from rlsbl.commands.deprecate import run_cmd
+        run_cmd(["1.0.0"], {"yes": True}, project_root=Path("/fake"))
+        assert "Deprecated v1.0.0" in capsys.readouterr().out
 
-
-class TestYankHardYank:
-    """Cover _hard_yank (lines 127-134)."""
-
-    @patch(f"{MOD_YANK}.find_workspace_root", return_value=None)
-    @patch(f"{MOD_YANK}.resolve_member_context", return_value=MagicMock(targets=[]))
-    @patch(f"{MOD_YANK}.check_gh_installed", return_value=True)
-    @patch(f"{MOD_YANK}.check_gh_auth", return_value=True)
-    @patch(f"{MOD_YANK}.run_gh")
-    def test_hard_yank_dry_run(self, mock_run, _auth, _inst, _targets, _ws, capsys):
+    @patch(f"{MOD_DEPRECATE}.find_workspace_root", return_value=None)
+    @patch(f"{MOD_DEPRECATE}.resolve_member_context", return_value=MagicMock(targets=[]))
+    @patch(f"{MOD_DEPRECATE}.check_gh_installed", return_value=True)
+    @patch(f"{MOD_DEPRECATE}.check_gh_auth", return_value=True)
+    @patch(f"{MOD_DEPRECATE}.run_gh")
+    def test_deprecate_prompt_eof(self, mock_run, *_):
         mock_run.side_effect = [
             "",  # gh release view
             "v2.0.0",  # latest is different
         ]
-        from rlsbl.commands.yank import run_cmd
-        run_cmd(["1.0.0"], {"hard": True, "dry-run": True, "yes": True}, project_root=Path("/fake"))
-        assert "Would delete" in capsys.readouterr().out
+        from rlsbl.commands.deprecate import run_cmd
+        with patch("builtins.input", side_effect=EOFError):
+            with pytest.raises(SystemExit) as exc:
+                run_cmd(["1.0.0"], {}, project_root=Path("/fake"))
+            assert exc.value.code == 1
 
 
-class TestYankBuildNotice:
-    """Cover _build_notice (lines 171-182)."""
+class TestDeprecateCoverageBuildNotice:
+    """Cover _build_notice in deprecate module."""
 
     def test_notice_with_reason_and_use(self):
-        from rlsbl.commands.yank import _build_notice
+        from rlsbl.commands.deprecate import _build_notice
         result = _build_notice("security fix", "1.2.4")
         assert "security fix" in result
         assert "v1.2.4" in result
 
     def test_notice_no_reason_no_use(self):
-        from rlsbl.commands.yank import _build_notice
+        from rlsbl.commands.deprecate import _build_notice
         result = _build_notice(None, None)
         assert result == "> **Deprecated.**"
 

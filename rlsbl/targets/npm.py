@@ -14,7 +14,7 @@ class NpmTarget(BaseTarget):
     """Release target for npm/Node.js projects (package.json)."""
 
     detection_files = ("package.json",)
-    capabilities = frozenset({"read_name", "read_metadata", "ci_templates", "dev_install"})
+    capabilities = frozenset({"read_name", "read_metadata", "ci_templates", "dev_install", "publication_probe"})
     ecosystem = "Node.js / npm"
 
     @property
@@ -48,6 +48,57 @@ class NpmTarget(BaseTarget):
         if description:
             result["description"] = description
         return result
+
+    def publication_probe(self, dir_path, version, ctx=None):
+        """Probe npm registry for a specific version of this package."""
+        from ..publication_probe import PublicationProbeResult, PublicationStatus
+        from ..registry import query_npm_version
+
+        pkg_name = self.read_name(dir_path, ctx)
+        if not pkg_name:
+            return PublicationProbeResult(
+                status=PublicationStatus.UNPROBEABLE,
+                registry="npm",
+                version=version,
+                message="no package name in package.json",
+            )
+
+        # Query the registry for this specific version
+        import json as _json
+        import urllib.error
+        from ..commands.check import _request_with_backoff
+
+        url = f"https://registry.npmjs.org/{pkg_name}/{version}"
+        try:
+            with _request_with_backoff(url) as resp:
+                _json.loads(resp.read())
+            return PublicationProbeResult(
+                status=PublicationStatus.PUBLISHED,
+                registry="npm",
+                version=version,
+                message=f"{pkg_name}@{version} found on npm",
+            )
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return PublicationProbeResult(
+                    status=PublicationStatus.UNPUBLISHED,
+                    registry="npm",
+                    version=version,
+                    message=f"{pkg_name}@{version} not found on npm",
+                )
+            return PublicationProbeResult(
+                status=PublicationStatus.UNPROBEABLE,
+                registry="npm",
+                version=version,
+                message=f"npm API error: HTTP {e.code}",
+            )
+        except Exception as e:
+            return PublicationProbeResult(
+                status=PublicationStatus.UNPROBEABLE,
+                registry="npm",
+                version=version,
+                message=f"npm API error: {e}",
+            )
 
     def _detect_package_manager(self, dir_path):
         """Detect the package manager by walking up from dir_path to the git root.
