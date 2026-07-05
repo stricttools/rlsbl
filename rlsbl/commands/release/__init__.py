@@ -376,6 +376,10 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             raise ReleaseValidationError("".join(_parts))
 
     # --- Validate inputs and environment ---
+    # Consolidated config schema validation (banned keys, structural invariants).
+    from ...config import validate_config_schema
+    validate_config_schema(config, project_dir=str(project_root))
+
     # Target validation is deferred until after releasable context is resolved
     # so that member_dirs can be passed for releasable target union.
     validate_ota_mode(release_config, project_root, config)
@@ -394,10 +398,9 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     # mode. Standalone/implicit mode validates the single representative.
     # (Moved below, after member_package_paths is known.)
 
-    # Validate and resolve release mode (imperative or pr)
-    from ...config import validate_release_mode, get_release_mode
-    validate_release_mode(config)
-    release_mode = get_release_mode(config)
+    # Release mode is always "imperative" now (PR mode removed).
+    # validate_config_schema above already bans release.mode.
+    release_mode = "imperative"
 
     # In batch mode the batch orchestrator already validated gh CLI,
     # clean tree, and branch/remote upfront -- skip redundant checks.

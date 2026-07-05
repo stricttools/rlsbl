@@ -217,6 +217,75 @@ def validate_release_mode(config):
         )
 
 
+def validate_config_schema(config, *, project_dir=None):
+    """Consolidated config schema validation -- single entry point for all
+    banned keys and structural invariants.
+
+    Checks:
+    1. ``targets: []`` -- hard error if targets key exists and is an empty
+       list.  Use ``private: true`` to suppress publishing instead.
+    2. ``release.mode`` -- hard error if the key exists.  PR mode is
+       removed; even ``mode = "imperative"`` is dead config.
+    3. Stale PR-mode state -- hard error if ``in-progress.json`` contains
+       ``release_mode: "pr"`` (pointing to cleanup).
+
+    Called early in the release flow before any mutations.
+
+    Args:
+        config: the project config dict.
+        project_dir: optional project directory path.  When provided,
+            checks for stale in-progress.json with PR-mode state.
+
+    Raises:
+        ConfigError on any violation.
+    """
+    # 1. Ban targets: []
+    targets = config.get("targets")
+    if isinstance(targets, list) and len(targets) == 0:
+        raise ConfigError(
+            'targets is an empty list in config. '
+            'Remove the "targets" key entirely, or set "private": true '
+            'to suppress publishing.'
+        )
+
+    # 2. Ban release.mode key entirely
+    release_section = config.get("release")
+    if isinstance(release_section, dict) and "mode" in release_section:
+        raise ConfigError(
+            'release.mode is no longer supported (PR mode has been removed). '
+            'Remove the "release" section from .rlsbl/config.json.'
+        )
+
+    # 3. Ban stale PR-mode state files
+    if project_dir is not None:
+        _check_stale_pr_mode_state(project_dir)
+
+
+def _check_stale_pr_mode_state(project_dir):
+    """Check for in-progress.json containing release_mode: "pr".
+
+    Raises ConfigError if found, pointing the user to cleanup.
+    """
+    import json as _json
+
+    state_path = os.path.join(
+        str(project_dir), ".rlsbl", "releases", "in-progress.json",
+    )
+    if not os.path.isfile(state_path):
+        return
+    try:
+        with open(state_path, "r", encoding="utf-8") as f:
+            state = _json.load(f)
+    except (OSError, _json.JSONDecodeError):
+        return
+    if isinstance(state, dict) and state.get("release_mode") == "pr":
+        raise ConfigError(
+            f'stale PR-mode release state found at {state_path}. '
+            'PR mode has been removed. Delete the file to proceed:\n'
+            f'  rm {state_path}'
+        )
+
+
 def validate_pipelines_config(config):
     """Validate the ``pipelines`` section of a project config.
 
