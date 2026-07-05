@@ -23,7 +23,23 @@ def _get_release_branches(ctx):
     Reads ``release_branches`` from ``.rlsbl/config.json`` if present;
     falls back to ``["main", "master"]`` when the key is absent.
 
-    Raises :class:`ValueError` if the key is present but malformed
+    Branch-role semantics:
+
+    - Branches **in** this list are **release-only**: manual pushes
+      trigger a warning (``prepush-manual-warning``), and
+      ``rlsbl release run`` targets them as the release branch.
+    - Everything else is a **shareable** (dev) branch: sessions push
+      freely; ``rlsbl release run`` from a dev branch fast-forward
+      merges into the first release branch before releasing.
+
+    Changelog coverage (``prepush-changelog-coverage``) is enforced
+    on every push regardless of target branch -- dev branches are not
+    exempt.
+
+    In monorepos the dev branch is workspace-global (no per-project
+    dev branches).
+
+    Raises :class:`ConfigError` if the key is present but malformed
     (empty list or non-list value). An empty list would silently
     disable the manual-release-push warning, which is almost never
     what the user wants; require explicit removal of the key instead.
