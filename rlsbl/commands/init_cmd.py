@@ -926,6 +926,26 @@ def _install_or_update_pre_push_hook():
     )
 
 
+def _install_or_update_post_rewrite_hook():
+    """Install the rlsbl post-rewrite hook, upgrading older versions in place.
+
+    Delegates to the generic ``_install_or_update_hook`` with
+    post-rewrite-specific content and hashes from ``hook_hashes.py``.
+    """
+    from ..hook_hashes import (
+        CURRENT_POST_REWRITE_HOOK,
+        CURRENT_POST_REWRITE_HOOK_HASH,
+        POST_REWRITE_HOOK_HASHES,
+    )
+
+    _install_or_update_hook(
+        "post-rewrite",
+        CURRENT_POST_REWRITE_HOOK,
+        CURRENT_POST_REWRITE_HOOK_HASH,
+        POST_REWRITE_HOOK_HASHES,
+    )
+
+
 def _finalize_scaffold(all_hash_dicts, created, skipped, warnings, *,
                        registry=None, flags=None, registries=None,
                        npm_lockfile_missing=False, target_paths=None,
@@ -956,6 +976,10 @@ def _finalize_scaffold(all_hash_dicts, created, skipped, warnings, *,
     # hash is unknown the user has likely customized it -- leave it alone and
     # show a diff so they can decide.
     _install_or_update_pre_push_hook()
+
+    # Install or update the post-rewrite hook (automatic changelog hash
+    # remapping after amend/rebase). Same content-hash strategy as pre-push.
+    _install_or_update_post_rewrite_hook()
 
     # Write scaffolding version marker so the pre-push hook can detect drift
     from rlsbl import __version__

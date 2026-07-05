@@ -155,3 +155,22 @@ PRE_PUSH_HOOK_HASHES = frozenset({
 
 
 CURRENT_PRE_PUSH_HOOK_HASH = compute_hook_hash(CURRENT_PRE_PUSH_HOOK)
+
+
+# ---------------------------------------------------------------------------
+# post-rewrite hook
+# ---------------------------------------------------------------------------
+
+# The post-rewrite hook pipes git's stdin (old_sha new_sha lines) to
+# ``rlsbl changelog remap --stdin`` so JSONL hashes are automatically
+# updated after amend/rebase operations.
+CURRENT_POST_REWRITE_HOOK = '#!/usr/bin/env bash\nexec rlsbl changelog remap --stdin\n'
+
+# Version 1 (current): pipe stdin to rlsbl changelog remap.
+_POST_REWRITE_HOOK_V1 = CURRENT_POST_REWRITE_HOOK
+
+POST_REWRITE_HOOK_HASHES = frozenset({
+    compute_hook_hash(_POST_REWRITE_HOOK_V1),
+})
+
+CURRENT_POST_REWRITE_HOOK_HASH = compute_hook_hash(CURRENT_POST_REWRITE_HOOK)
