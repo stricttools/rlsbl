@@ -365,23 +365,23 @@ class TestCmdReleaseUndo:
 
 
 # ============================================================================
-# cmd_release_yank
+# cmd_release_deprecate (was: cmd_release_yank)
 # ============================================================================
 
 
-class TestCmdReleaseYank:
+class TestCmdReleaseDeprecate:
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
-    @patch("rlsbl.commands.yank.run_cmd")
+    @patch("rlsbl.commands.deprecate.run_cmd")
     def test_delegates(self, mock_run, _):
-        rlsbl.cmd_release_yank(
-            reason="security", use="1.2.4", hard=True,
+        rlsbl.cmd_release_deprecate(
+            reason="security", use="1.2.4",
             dry_run=True, yes=True, version="1.2.3",
         )
         mock_run.assert_called_once()
         flags = mock_run.call_args[0][1]
         assert flags["reason"] == "security"
         assert flags["use"] == "1.2.4"
-        assert flags["hard"] is True
+        assert "hard" not in flags
 
 
 # ============================================================================

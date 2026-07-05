@@ -1,0 +1,171 @@
+"""Deprecate command that marks a past release as deprecated by setting the GitHub pre-release flag and prepending a deprecation notice to the release notes."""
+
+import os
+import sys
+import time
+
+from ..member_context import resolve_member_context
+from ..targets import TARGETS, resolve_releasable_config_dir
+from ..utils import run_gh, check_gh_installed, check_gh_auth
+from ..workspace import find_workspace_root, resolve_project
+
+
+def run_cmd(args, flags, project_root):
+    """Deprecate a past GitHub Release.
+
+    Marks the release as pre-release and prepends a deprecation notice
+    to the release body.
+
+    In monorepo mode, uses the project's monorepo tag format (e.g.
+    ``mylib@v1.2.3``) instead of the plain ``v1.2.3`` tag.
+
+    Args:
+        args: Positional args; first element is the version to deprecate.
+        flags: dict with keys ``dry-run``, ``yes``, ``reason``, ``use``.
+        project_root: Path to the project root directory, or None for cwd.
+    """
+    dry_run = flags.get("dry-run", False)
+    reason = flags.get("reason")
+    use = flags.get("use")
+
+    if not args:
+        print("Error: version argument is required.", file=sys.stderr)
+        sys.exit(1)
+
+    # Normalize version: strip leading "v" for display
+    raw_version = args[0]
+    version = raw_version.lstrip("v")
+
+    # Detect monorepo context and build tag accordingly
+    monorepo_name = None
+    monorepo_project_path = None
+    releasable_name = None
+    releasable_tag_fmt = None
+    releasable_config_dir = None
+    start_path = str(project_root)
+    monorepo_root = find_workspace_root(start_path)
+    if monorepo_root:
+        project = resolve_project(monorepo_root, start_path)
+        if project is not None:
+            monorepo_name = project["name"]
+            monorepo_project_path = project["path"]
+            releasable_config_dir = resolve_releasable_config_dir(project, monorepo_root)
+
+            # Detect explicit releasable mode
+            from ..workspace import is_explicit_mode, load_releasables, load_workspace as _load_ws, resolve_releasable_for_project
+            if is_explicit_mode(monorepo_root):
+                ws_projects = _load_ws(monorepo_root)
+                releasables = load_releasables(monorepo_root, ws_projects)
+                rel = resolve_releasable_for_project(project, releasables)
+                if rel:
+                    releasable_name = rel.name
+                    releasable_tag_fmt = rel.tag_format
+
+    # Project directory: project_root is already resolved to the sub-project
+    # in monorepo mode (via _require_sub_project_root).
+    project_dir = start_path
+    member = resolve_member_context(
+        project_dir, releasable_config_dir=releasable_config_dir,
+    )
+    entries = member.targets
+    if entries:
+        target = TARGETS[entries[0].name]
+        if releasable_name and releasable_tag_fmt:
+            from .release.validate import _format_releasable_tag
+            tag = _format_releasable_tag(releasable_tag_fmt, releasable_name, version)
+        elif monorepo_name:
+            tag = target.monorepo_tag_format(monorepo_name, version, path=monorepo_project_path)
+        else:
+            tag = target.tag_format(version)
+    else:
+        tag = f"v{version}"
+
+    if not check_gh_installed():
+        print("Error: gh CLI is not installed.", file=sys.stderr)
+        sys.exit(1)
+    if not check_gh_auth():
+        print("Error: gh CLI is not authenticated.", file=sys.stderr)
+        sys.exit(1)
+
+    # Verify the GitHub Release exists
+    try:
+        run_gh(["release", "view", tag])
+    except Exception:
+        print(f"Error: GitHub Release for {tag} not found.", file=sys.stderr)
+        sys.exit(1)
+
+    # Refuse to deprecate the latest release -- suggest rlsbl release undo instead
+    try:
+        latest_line = run_gh(["release", "list", "--limit", "1", "--json", "tagName", "--jq", ".[0].tagName"])
+        if latest_line == tag:
+            print(
+                f"Error: {tag} is the latest release. Use 'rlsbl release undo' to revert it instead.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+    except Exception as e:
+        print(f"Error: could not determine latest release: {e}", file=sys.stderr)
+        print("Cannot verify whether this is the latest release. Aborting for safety.", file=sys.stderr)
+        sys.exit(1)
+
+    # Confirmation prompt (skipped with --yes or --dry-run)
+    if not dry_run and not flags.get("yes"):
+        prompt = f"Will mark {tag} as deprecated. Continue? [y/N] "
+        try:
+            answer = input(prompt).strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print("\nAborted.")
+            sys.exit(1)
+        if answer != "y":
+            print("Aborted.")
+            sys.exit(0)
+
+    _soft_deprecate(tag, reason, use, dry_run)
+
+
+def _soft_deprecate(tag, reason, use, dry_run):
+    """Mark as pre-release and prepend a deprecation notice to the release body."""
+    # Build deprecation notice
+    notice = _build_notice(reason, use)
+
+    # Get current release body
+    try:
+        current_body = run_gh(["release", "view", tag, "--json", "body", "--jq", ".body"])
+    except Exception:
+        current_body = ""
+
+    new_body = notice + "\n\n" + current_body if current_body else notice
+
+    if dry_run:
+        print(f"Would mark {tag} as pre-release with deprecation notice:")
+        print(notice)
+        return
+
+    # Write new body to a temp file to avoid shell escaping issues
+    notes_file = f".rlsbl-deprecate-{int(time.time() * 1000)}.tmp"
+    writing_file = notes_file + ".writing"
+    try:
+        with open(writing_file, "w", encoding="utf-8") as f:
+            f.write(new_body)
+        os.rename(writing_file, notes_file)
+        run_gh(["release", "edit", tag, "--prerelease", "--notes-file", notes_file])
+    finally:
+        for tmp in (notes_file, writing_file):
+            if os.path.exists(tmp):
+                os.unlink(tmp)
+
+    print(f"Deprecated {tag} (marked as pre-release)")
+
+
+def _build_notice(reason, use):
+    """Build the deprecation notice string from optional reason and use fields."""
+    parts = []
+    if reason:
+        parts.append(reason)
+    if use:
+        use_version = use.lstrip("v")
+        parts.append(f"Use v{use_version} instead")
+
+    if parts:
+        return "> **Deprecated:** " + ". ".join(parts) + "."
+    return "> **Deprecated.**"

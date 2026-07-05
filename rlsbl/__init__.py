@@ -222,7 +222,7 @@ register_checks(app)
 # release group
 # ---------------------------------------------------------------------------
 
-release_group = app.group("release", help="Release orchestration commands. Provides 8 subcommands covering the full release lifecycle: run, resume, init, retry, edit, undo, yank, and scrub.")
+release_group = app.group("release", help="Release orchestration commands. Provides 9 subcommands covering the full release lifecycle: run, resume, init, retry, edit, undo, deprecate, yank, and scrub.")
 
 
 @release_group.command(
@@ -753,32 +753,32 @@ def cmd_release_undo(target, yes, **_kwargs):
 
 
 # ---------------------------------------------------------------------------
-# release yank (was: yank)
+# release deprecate (was: release yank)
 # ---------------------------------------------------------------------------
 
-@release_group.command(name="yank", help="Mark a past release as deprecated (soft yank) or delete it (hard yank). Soft yank marks the GitHub Release as pre-release and prepends a deprecation notice. Hard yank deletes the release entirely while preserving the git tag.")
-@strictcli.flag(name="reason", type=str, help="Human-readable explanation of why this version is being yanked", default="")
+@release_group.command(name="deprecate", help="Mark a past release as deprecated. Sets the GitHub Release pre-release flag and prepends a deprecation notice to the release notes. Use --reason to explain why and --use to suggest a replacement version.")
+@strictcli.flag(name="reason", type=str, help="Human-readable explanation of why this version is being deprecated", default="")
 @strictcli.flag(name="use", type=str, help="Suggest this version as a replacement in the deprecation notice", default="")
-@strictcli.flag(name="hard", type=bool, help="Delete the release instead of marking as pre-release")
-@strictcli.arg(name="version", help="Semver string of the release to yank, with or without v prefix (e.g. 0.9.1)")
-def cmd_release_yank(reason, use, hard, dry_run, yes, version, **_kwargs):
+@strictcli.arg(name="version", help="Semver string of the release to deprecate, with or without v prefix (e.g. 0.9.1)")
+def cmd_release_deprecate(reason, use, dry_run, yes, version, **_kwargs):
     root = _require_sub_project_root(
         workspace_root_guidance=(
-            "Error: `rlsbl release yank` must run inside a sub-project, not "
+            "Error: `rlsbl release deprecate` must run inside a sub-project, not "
             "at the monorepo workspace root. cd into the sub-project whose "
-            "release you want to yank."
+            "release you want to deprecate."
         )
     )
     args = [version]
     flags = {
         "reason": reason or None,
         "use": use or None,
-        "hard": hard,
         "dry-run": dry_run,
         "yes": yes,
     }
-    from .commands.yank import run_cmd
+    from .commands.deprecate import run_cmd
     run_cmd(args, flags, project_root=root)
+
+
 
 
 # ---------------------------------------------------------------------------
