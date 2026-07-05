@@ -837,10 +837,18 @@ def _print_dry_run_report(plans_groups, registry=None, registries=None):
     print("DRY RUN -- no files were written, no commits made.")
 
 
-def _install_or_update_pre_push_hook():
-    """Install the rlsbl pre-push hook, upgrading older versions in place.
+def _install_or_update_hook(hook_name, current_content, current_hash, known_hashes):
+    """Install or update a git hook, upgrading older rlsbl versions in place.
 
-    See rlsbl/hook_hashes.py for the historical hash set.
+    Generic hook installer used for any git hook type (pre-push,
+    post-rewrite, etc.).  Each hook type provides its own content,
+    current hash, and set of known historical hashes.
+
+    Args:
+        hook_name: git hook name (e.g. "pre-push", "post-rewrite").
+        current_content: the current template content to install.
+        current_hash: SHA-256 hash of current_content (via compute_hook_hash).
+        known_hashes: frozenset of all historical content hashes for this hook.
 
     Behavior:
       - .git missing                -> no-op
@@ -850,56 +858,71 @@ def _install_or_update_pre_push_hook():
       - hook hash unknown           -> skip, print warning + unified diff
     """
     import difflib
-    from ..hook_hashes import (
-        CURRENT_PRE_PUSH_HOOK,
-        CURRENT_PRE_PUSH_HOOK_HASH,
-        PRE_PUSH_HOOK_HASHES,
-        compute_hook_hash,
-    )
+    from ..hook_hashes import compute_hook_hash
 
     git_dir = _find_git_dir()
     if git_dir is None:
         return
 
     hooks_dir = os.path.join(git_dir, "hooks")
-    hook_target = os.path.join(hooks_dir, "pre-push")
+    hook_target = os.path.join(hooks_dir, hook_name)
 
     if not os.path.exists(hook_target):
         os.makedirs(hooks_dir, exist_ok=True)
         with open(hook_target, "w", encoding="utf-8") as f:
-            f.write(CURRENT_PRE_PUSH_HOOK)
+            f.write(current_content)
         os.chmod(hook_target, 0o755)
-        print("Installed pre-push hook (.git/hooks/pre-push)")
+        print(f"Installed {hook_name} hook (.git/hooks/{hook_name})")
         return
 
     with open(hook_target, "r", encoding="utf-8") as f:
         installed = f.read()
     installed_hash = compute_hook_hash(installed)
 
-    if installed_hash == CURRENT_PRE_PUSH_HOOK_HASH:
+    if installed_hash == current_hash:
         return
 
-    if installed_hash in PRE_PUSH_HOOK_HASHES:
+    if installed_hash in known_hashes:
         with open(hook_target, "w", encoding="utf-8") as f:
-            f.write(CURRENT_PRE_PUSH_HOOK)
+            f.write(current_content)
         os.chmod(hook_target, 0o755)
-        print("Updated pre-push hook (was an older rlsbl version).")
+        print(f"Updated {hook_name} hook (was an older rlsbl version).")
         return
 
     # Unknown content -- assume user-customized. Show a diff so the user can
     # decide whether to delete the hook and re-scaffold to accept ours.
     diff_lines = list(difflib.unified_diff(
         installed.splitlines(keepends=True),
-        CURRENT_PRE_PUSH_HOOK.splitlines(keepends=True),
+        current_content.splitlines(keepends=True),
         fromfile=hook_target,
         tofile="rlsbl template",
     ))
     diff_text = "".join(diff_lines)
     print(
-        "pre-push hook appears customized -- not overwriting. Diff:\n"
+        f"{hook_name} hook appears customized -- not overwriting. Diff:\n"
         f"{diff_text}"
         "  To accept the rlsbl template, delete the hook and re-run scaffold.",
         file=sys.stderr,
+    )
+
+
+def _install_or_update_pre_push_hook():
+    """Install the rlsbl pre-push hook, upgrading older versions in place.
+
+    Delegates to the generic ``_install_or_update_hook`` with pre-push-specific
+    content and hashes from ``hook_hashes.py``.
+    """
+    from ..hook_hashes import (
+        CURRENT_PRE_PUSH_HOOK,
+        CURRENT_PRE_PUSH_HOOK_HASH,
+        PRE_PUSH_HOOK_HASHES,
+    )
+
+    _install_or_update_hook(
+        "pre-push",
+        CURRENT_PRE_PUSH_HOOK,
+        CURRENT_PRE_PUSH_HOOK_HASH,
+        PRE_PUSH_HOOK_HASHES,
     )
 
 
