@@ -319,12 +319,8 @@ class TestPrivateRepresentative:
 
 class TestPrModePendingJsonReleasable:
 
-    def test_pending_json_written_to_releasable_state_dir(self, tmp_project):
-        """PR-mode releasable release writes pending.json into the
-        releasable's releases dir (where the finalize workflow globs for
-        it), never into the representative member's .rlsbl/releases/.
-        Dispatch workflows are collected from the workspace root's
-        .github/workflows/ too (where monorepo sync puts them)."""
+    def test_pr_mode_config_rejected(self, tmp_project):
+        """PR mode config is rejected by the release flow (PR mode removed)."""
         core = _setup_releasable_workspace(
             tmp_project,
             member_config={
@@ -333,28 +329,8 @@ class TestPrModePendingJsonReleasable:
             },
             root_workflows=("publish.yml",),
         )
-        _run_release(core, tmp_project)
-
-        # We're back on main; pending.json lives on the release branch
-        _git(tmp_project, "checkout", "release/v1.0.1")
-        try:
-            rel_dir = get_releasable_dir(str(tmp_project), "alpha")
-            pending_path = Path(rel_dir) / "releases" / "pending.json"
-            assert pending_path.is_file(), (
-                "pending.json must live in the releasable's releases dir"
-            )
-            assert not (core / ".rlsbl" / "releases" / "pending.json").exists(), (
-                "pending.json must not be written into the representative "
-                "member's .rlsbl/releases/"
-            )
-            pending = json.loads(pending_path.read_text())
-            assert pending["releasable_name"] == "alpha"
-            assert "publish.yml" in pending["dispatch"], (
-                "workspace-root publish workflows must be included in "
-                "the dispatch list"
-            )
-        finally:
-            _git(tmp_project, "checkout", "main")
+        with pytest.raises(SystemExit):
+            _run_release(core, tmp_project)
 
 
 # ---------------------------------------------------------------------------

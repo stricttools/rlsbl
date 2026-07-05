@@ -1,9 +1,10 @@
-"""Tests for the PR-based release flow (release.mode = "pr").
+"""Tests for release mode config validation and PR mode rejection.
 
-Validates that PR mode creates a release branch, pushes it (not main),
-creates a PR via gh, writes pending.json, does NOT create tags or GitHub
-Releases, and switches back to the original branch.  Also tests config
-validation for the release.mode key.
+PR mode has been removed. These tests verify:
+- The old validate_release_mode function still works for backward compat
+- The new validate_config_schema rejects release.mode entirely
+- The release flow rejects configs with release.mode
+- Imperative mode (default) works without the release.mode key
 """
 
 import json
@@ -27,6 +28,7 @@ from rlsbl.commands.release.validate import (
 from rlsbl.config import (
     get_release_mode,
     validate_release_mode,
+    validate_config_schema,
     VALID_RELEASE_MODES,
 )
 from rlsbl.context import ProjectContext
@@ -143,16 +145,21 @@ def _setup_pr_mode_project(repo):
     return feature_sha
 
 
-def _make_ctx(repo, release_mode="pr"):
-    """Build a ProjectContext with PR mode config."""
+def _make_ctx(repo, *, config_override=None):
+    """Build a ProjectContext for release tests.
+
+    By default creates an imperative-mode config (no release.mode key,
+    since PR mode is removed).  Use config_override to test specific
+    config shapes.
+    """
+    config = config_override or {
+        "private": False,
+        "pipelines": {},
+    }
     return ProjectContext(
         project_root=Path(str(repo)),
         workspace_root=None,
-        config={
-            "private": False,
-            "pipelines": {},
-            "release": {"mode": release_mode},
-        },
+        config=config,
     )
 
 
@@ -295,251 +302,34 @@ class TestFindPublishWorkflows:
 # PR release flow integration tests
 # ---------------------------------------------------------------------------
 
-class TestPrReleaseCreatesReleaseBranch:
-    """Test 1: PR mode creates branch release/vX.Y.Z."""
+class TestPrModeConfigRejected:
+    """PR mode configs are rejected by validate_config_schema."""
 
-    def test_pr_mode_creates_release_branch(self, mock_git_repo):
+    def test_pr_mode_config_rejected_by_schema_validation(self):
+        config = {"release": {"mode": "pr"}}
+        with pytest.raises(ConfigError, match="release.mode is no longer supported"):
+            validate_config_schema(config)
+
+    def test_imperative_mode_config_also_rejected(self):
+        """Even imperative mode key is banned -- the key itself is dead config."""
+        config = {"release": {"mode": "imperative"}}
+        with pytest.raises(ConfigError, match="release.mode is no longer supported"):
+            validate_config_schema(config)
+
+    def test_release_flow_rejects_pr_mode_config(self, mock_git_repo):
+        """The release flow exits with an error when release.mode is set."""
         _setup_pr_mode_project(mock_git_repo)
-        fake_run = _fake_run_factory()
 
-        with (
-            patch("rlsbl.commands.release.check_gh_installed", return_value=True),
-            patch("rlsbl.commands.release.check_gh_auth", return_value=True),
-            patch("rlsbl.commands.release.push_if_needed"),
-            patch("rlsbl.commands.release.run_gh", return_value=""),
-            patch("rlsbl.commands.release.run", side_effect=fake_run),
-            patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
-        ):
+        with pytest.raises(SystemExit):
             run_cmd(
                 _rc(),
                 {"yes": True, "quiet": False},
-                ctx=_make_ctx(mock_git_repo),
+                ctx=_make_ctx(mock_git_repo, config_override={
+                    "private": False,
+                    "pipelines": {},
+                    "release": {"mode": "pr"},
+                }),
             )
-
-        # The release branch should have been created (though we're back on main now)
-        branches = _git_output(mock_git_repo, "branch", "--list", "release/v1.0.1")
-        assert "release/v1.0.1" in branches, (
-            f"Expected release/v1.0.1 branch, got branches: {branches}"
-        )
-
-
-class TestPrReleasePushesReleaseBranch:
-    """Test 2: PR mode pushes the release branch (not main)."""
-
-    def test_pr_mode_pushes_release_branch(self, mock_git_repo):
-        _setup_pr_mode_project(mock_git_repo)
-        push_calls = []
-
-        def tracking_run(cmd, args=None, timeout=120, env=None, cwd=None):
-            if cmd == "gh":
-                return ""
-            if cmd == "git" and args and args[0] == "push":
-                push_calls.append(args)
-                return ""
-            if cmd == "git" and args and args[0] == "fetch":
-                return ""
-            if cmd == "git" and args and args[:2] == ["rev-list", "--count"] and any("origin/" in a for a in args):
-                return "0"
-            return real_run(cmd, args=args, timeout=timeout, env=env, cwd=cwd)
-
-        with (
-            patch("rlsbl.commands.release.check_gh_installed", return_value=True),
-            patch("rlsbl.commands.release.check_gh_auth", return_value=True),
-            patch("rlsbl.commands.release.push_if_needed"),
-            patch("rlsbl.commands.release.run_gh", return_value=""),
-            patch("rlsbl.commands.release.run", side_effect=tracking_run),
-            patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
-        ):
-            run_cmd(
-                _rc(),
-                {"yes": True, "quiet": True},
-                ctx=_make_ctx(mock_git_repo),
-            )
-
-        # Should have pushed the release branch, not main
-        push_branch_args = [c for c in push_calls if "release/v1.0.1" in c]
-        assert len(push_branch_args) > 0, (
-            f"Expected push of release/v1.0.1, got push calls: {push_calls}"
-        )
-
-        # Should NOT have pushed tags
-        tag_push = [c for c in push_calls if any("v1.0.1" == a for a in c)]
-        # The branch push includes release/v1.0.1 which contains v1.0.1, so filter for tag pushes
-        pure_tag_pushes = [
-            c for c in push_calls
-            if "v1.0.1" in c and "release/v1.0.1" not in c
-        ]
-        assert len(pure_tag_pushes) == 0, (
-            f"PR mode should NOT push tags, got: {pure_tag_pushes}"
-        )
-
-
-class TestPrReleaseCreatesPR:
-    """Test 3: PR mode creates a PR via gh pr create."""
-
-    def test_pr_mode_creates_pr(self, mock_git_repo):
-        _setup_pr_mode_project(mock_git_repo)
-        gh_calls = []
-
-        def tracking_run_gh(args, config=None, **kwargs):
-            gh_calls.append(args)
-            return ""
-
-        fake_run = _fake_run_factory()
-
-        with (
-            patch("rlsbl.commands.release.check_gh_installed", return_value=True),
-            patch("rlsbl.commands.release.check_gh_auth", return_value=True),
-            patch("rlsbl.commands.release.push_if_needed"),
-            patch("rlsbl.commands.release.run_gh", side_effect=tracking_run_gh),
-            patch("rlsbl.commands.release.run", side_effect=fake_run),
-            patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
-        ):
-            run_cmd(
-                _rc(),
-                {"yes": True, "quiet": True},
-                ctx=_make_ctx(mock_git_repo),
-            )
-
-        # Find the gh pr create call
-        pr_create_calls = [c for c in gh_calls if "pr" in c and "create" in c]
-        assert len(pr_create_calls) == 1, (
-            f"Expected exactly one gh pr create call, got: {gh_calls}"
-        )
-        pr_args = pr_create_calls[0]
-        assert "--title" in pr_args
-        assert "--base" in pr_args
-        assert "--head" in pr_args
-        # Verify the head branch
-        head_idx = pr_args.index("--head")
-        assert pr_args[head_idx + 1] == "release/v1.0.1"
-
-
-class TestPrReleaseWritesPendingJson:
-    """Test 4: PR mode writes pending.json with correct fields."""
-
-    def test_pr_mode_writes_pending_json(self, mock_git_repo):
-        _setup_pr_mode_project(mock_git_repo)
-        fake_run = _fake_run_factory()
-
-        with (
-            patch("rlsbl.commands.release.check_gh_installed", return_value=True),
-            patch("rlsbl.commands.release.check_gh_auth", return_value=True),
-            patch("rlsbl.commands.release.push_if_needed"),
-            patch("rlsbl.commands.release.run_gh", return_value=""),
-            patch("rlsbl.commands.release.run", side_effect=fake_run),
-            patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
-        ):
-            run_cmd(
-                _rc(),
-                {"yes": True, "quiet": True},
-                ctx=_make_ctx(mock_git_repo),
-            )
-
-        # pending.json should exist on the release branch
-        # We're on main now, so check out the release branch to verify
-        _git(mock_git_repo, "checkout", "release/v1.0.1")
-        pending_path = mock_git_repo / ".rlsbl" / "releases" / "pending.json"
-        assert pending_path.exists(), "pending.json should exist on the release branch"
-
-        pending = json.loads(pending_path.read_text())
-        assert pending["version"] == "1.0.1"
-        assert pending["tag"] == "v1.0.1"
-        assert isinstance(pending["dispatch"], list)
-        assert isinstance(pending["changelog_entry"], str)
-        assert isinstance(pending["companion_tags"], list)
-        assert pending["releasable_name"] is None
-
-        # Switch back
-        _git(mock_git_repo, "checkout", "main")
-
-
-class TestPrReleaseDoesNotCreateTags:
-    """Test 5: PR mode does NOT create tags."""
-
-    def test_pr_mode_no_tags(self, mock_git_repo):
-        _setup_pr_mode_project(mock_git_repo)
-        fake_run = _fake_run_factory()
-
-        with (
-            patch("rlsbl.commands.release.check_gh_installed", return_value=True),
-            patch("rlsbl.commands.release.check_gh_auth", return_value=True),
-            patch("rlsbl.commands.release.push_if_needed"),
-            patch("rlsbl.commands.release.run_gh", return_value=""),
-            patch("rlsbl.commands.release.run", side_effect=fake_run),
-            patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
-        ):
-            run_cmd(
-                _rc(),
-                {"yes": True, "quiet": True},
-                ctx=_make_ctx(mock_git_repo),
-            )
-
-        # v1.0.1 tag should NOT exist
-        tags = _git_output(mock_git_repo, "tag", "-l", "v1.0.1")
-        assert tags == "", f"PR mode should NOT create tags, but found: {tags}"
-
-
-class TestPrReleaseDoesNotCreateGitHubRelease:
-    """Test 6: PR mode does NOT create a GitHub Release."""
-
-    def test_pr_mode_no_github_release(self, mock_git_repo):
-        _setup_pr_mode_project(mock_git_repo)
-        gh_calls = []
-
-        def tracking_run_gh(args, config=None, **kwargs):
-            gh_calls.append(args)
-            return ""
-
-        fake_run = _fake_run_factory()
-
-        with (
-            patch("rlsbl.commands.release.check_gh_installed", return_value=True),
-            patch("rlsbl.commands.release.check_gh_auth", return_value=True),
-            patch("rlsbl.commands.release.push_if_needed"),
-            patch("rlsbl.commands.release.run_gh", side_effect=tracking_run_gh),
-            patch("rlsbl.commands.release.run", side_effect=fake_run),
-            patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
-        ):
-            run_cmd(
-                _rc(),
-                {"yes": True, "quiet": True},
-                ctx=_make_ctx(mock_git_repo),
-            )
-
-        # Should NOT have called gh release create
-        release_create_calls = [
-            c for c in gh_calls if "release" in c and "create" in c
-        ]
-        assert len(release_create_calls) == 0, (
-            f"PR mode should NOT create GitHub Releases, got: {release_create_calls}"
-        )
-
-
-class TestPrReleaseSwitchesBackToOriginalBranch:
-    """Test 7: PR mode switches back to the original branch after PR creation."""
-
-    def test_pr_mode_switches_back(self, mock_git_repo):
-        _setup_pr_mode_project(mock_git_repo)
-        fake_run = _fake_run_factory()
-
-        with (
-            patch("rlsbl.commands.release.check_gh_installed", return_value=True),
-            patch("rlsbl.commands.release.check_gh_auth", return_value=True),
-            patch("rlsbl.commands.release.push_if_needed"),
-            patch("rlsbl.commands.release.run_gh", return_value=""),
-            patch("rlsbl.commands.release.run", side_effect=fake_run),
-            patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
-        ):
-            run_cmd(
-                _rc(),
-                {"yes": True, "quiet": True},
-                ctx=_make_ctx(mock_git_repo),
-            )
-
-        # Should be back on main
-        current = _git_output(mock_git_repo, "rev-parse", "--abbrev-ref", "HEAD")
-        assert current == "main", f"Expected to be on main, but on {current}"
 
 
 class TestImperativeModeUnchanged:
@@ -605,7 +395,7 @@ class TestImperativeModeUnchanged:
             run_cmd(
                 _rc(description="test"),
                 {"yes": True, "quiet": True},
-                ctx=_make_ctx(mock_git_repo, release_mode="imperative"),
+                ctx=_make_ctx(mock_git_repo),
             )
 
         # Imperative mode should create a tag
@@ -617,21 +407,11 @@ class TestImperativeModeUnchanged:
         assert branches == "", f"Imperative mode should not create release branches, got: {branches}"
 
 
-class TestInvalidReleaseModeErrors:
-    """Test 9: Invalid release.mode value errors during release."""
+class TestAnyReleaseModeKeyErrors:
+    """Any release.mode key (valid or invalid) errors during release."""
 
-    def test_invalid_release_mode_rejects(self, mock_git_repo):
+    def test_any_release_mode_key_rejects(self, mock_git_repo):
         _setup_pr_mode_project(mock_git_repo)
-
-        # Override the config with an invalid mode
-        (mock_git_repo / ".rlsbl" / "config.json").write_text(
-            json.dumps({
-                "private": False,
-                "targets": ["npm"],
-                "release": {"mode": "invalid"},
-                "pipelines": {},
-            }) + "\n"
-        )
 
         with (
             patch("rlsbl.commands.release.check_gh_installed", return_value=True),
@@ -641,13 +421,9 @@ class TestInvalidReleaseModeErrors:
             run_cmd(
                 _rc(),
                 {"yes": True, "quiet": True},
-                ctx=ProjectContext(
-                    project_root=Path(str(mock_git_repo)),
-                    workspace_root=None,
-                    config={
-                        "private": False,
-                        "pipelines": {},
-                        "release": {"mode": "invalid"},
-                    },
-                ),
+                ctx=_make_ctx(mock_git_repo, config_override={
+                    "private": False,
+                    "pipelines": {},
+                    "release": {"mode": "invalid"},
+                }),
             )
