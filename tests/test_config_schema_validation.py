@@ -1,8 +1,5 @@
 """Tests for consolidated config schema validation (validate_config_schema)."""
 
-import json
-import os
-
 import pytest
 
 from rlsbl.config import validate_config_schema
@@ -56,50 +53,6 @@ class TestBanReleaseMode:
         # (other validators handle the structural issue)
         config = {"release": "string_value"}
         validate_config_schema(config)  # no error
-
-
-class TestBanStalePrModeState:
-    """in-progress.json with release_mode: "pr" must be a hard error."""
-
-    def test_pr_mode_state_file_raises(self, tmp_path):
-        releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
-        state_file = releases_dir / "in-progress.json"
-        state_file.write_text(json.dumps({
-            "release_mode": "pr",
-            "completed_steps": ["VERSION_BUMPED"],
-        }))
-        config = {}
-        with pytest.raises(ConfigError, match="stale PR-mode release state"):
-            validate_config_schema(config, project_dir=str(tmp_path))
-
-    def test_imperative_mode_state_file_passes(self, tmp_path):
-        releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
-        state_file = releases_dir / "in-progress.json"
-        state_file.write_text(json.dumps({
-            "release_mode": "imperative",
-            "completed_steps": [],
-        }))
-        config = {}
-        validate_config_schema(config, project_dir=str(tmp_path))  # no error
-
-    def test_no_state_file_passes(self, tmp_path):
-        config = {}
-        validate_config_schema(config, project_dir=str(tmp_path))  # no error
-
-    def test_no_project_dir_skips_state_check(self):
-        config = {}
-        validate_config_schema(config)  # no error without project_dir
-
-    def test_malformed_state_file_passes(self, tmp_path):
-        """Malformed JSON is not treated as a PR-mode violation."""
-        releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
-        state_file = releases_dir / "in-progress.json"
-        state_file.write_text("{not valid json}")
-        config = {}
-        validate_config_schema(config, project_dir=str(tmp_path))  # no error
 
 
 class TestMultipleViolations:

@@ -1,8 +1,7 @@
-"""Tests for release mode config validation and PR mode rejection.
+"""Tests for release.mode config rejection.
 
 PR mode has been removed. These tests verify:
-- The old validate_release_mode function still works for backward compat
-- The new validate_config_schema rejects release.mode entirely
+- validate_config_schema rejects release.mode entirely
 - The release flow rejects configs with release.mode
 - Imperative mode (default) works without the release.mode key
 """
@@ -16,21 +15,7 @@ from unittest.mock import call, patch, MagicMock
 import pytest
 
 from rlsbl.commands.release import run_cmd
-from rlsbl.commands.release.execute import (
-    _find_publish_workflows,
-    _run_pr_release,
-    ReleaseState,
-)
-from rlsbl.commands.release.validate import (
-    ReleaseValidationError,
-    validate_branch_and_remote,
-)
-from rlsbl.config import (
-    get_release_mode,
-    validate_release_mode,
-    validate_config_schema,
-    VALID_RELEASE_MODES,
-)
+from rlsbl.config import validate_config_schema
 from rlsbl.context import ProjectContext
 from rlsbl.errors import ConfigError
 from rlsbl.release_file import ReleaseConfig
@@ -179,127 +164,7 @@ def _fake_run_factory():
 
 
 # ---------------------------------------------------------------------------
-# Config validation tests
-# ---------------------------------------------------------------------------
-
-class TestReleaseModConfig:
-    """Test release.mode config validation."""
-
-    def test_valid_imperative(self):
-        validate_release_mode({"release": {"mode": "imperative"}})
-
-    def test_valid_pr(self):
-        validate_release_mode({"release": {"mode": "pr"}})
-
-    def test_absent_is_ok(self):
-        validate_release_mode({})
-
-    def test_release_section_absent_is_ok(self):
-        validate_release_mode({"other": "stuff"})
-
-    def test_mode_absent_is_ok(self):
-        validate_release_mode({"release": {}})
-
-    def test_invalid_mode_errors(self):
-        with pytest.raises(ConfigError, match="not valid"):
-            validate_release_mode({"release": {"mode": "invalid"}})
-
-    def test_non_string_mode_errors(self):
-        with pytest.raises(ConfigError, match="must be a string"):
-            validate_release_mode({"release": {"mode": 42}})
-
-    def test_non_dict_release_errors(self):
-        with pytest.raises(ConfigError, match="must be a dict"):
-            validate_release_mode({"release": "not-a-dict"})
-
-    def test_get_release_mode_default(self):
-        assert get_release_mode({}) == "imperative"
-
-    def test_get_release_mode_absent_section(self):
-        assert get_release_mode({"other": "stuff"}) == "imperative"
-
-    def test_get_release_mode_absent_key(self):
-        assert get_release_mode({"release": {}}) == "imperative"
-
-    def test_get_release_mode_imperative(self):
-        assert get_release_mode({"release": {"mode": "imperative"}}) == "imperative"
-
-    def test_get_release_mode_pr(self):
-        assert get_release_mode({"release": {"mode": "pr"}}) == "pr"
-
-
-# ---------------------------------------------------------------------------
-# Branch validation tests
-# ---------------------------------------------------------------------------
-
-class TestBranchValidationPrMode:
-    """Test validate_branch_and_remote in PR mode."""
-
-    def test_pr_mode_on_main_ok(self):
-        # validate_branch_and_remote uses late-bound imports from the parent package
-        with (
-            patch("rlsbl.commands.release.get_current_branch", return_value="main"),
-        ):
-            result = validate_branch_and_remote({}, release_mode="pr")
-            assert result == "main"
-
-    def test_pr_mode_on_master_ok(self):
-        with (
-            patch("rlsbl.commands.release.get_current_branch", return_value="master"),
-        ):
-            result = validate_branch_and_remote({}, release_mode="pr")
-            assert result == "master"
-
-    def test_pr_mode_not_on_main_errors(self):
-        with (
-            patch("rlsbl.commands.release.get_current_branch", return_value="feature-branch"),
-        ):
-            with pytest.raises(ReleaseValidationError, match="requires being on main or master"):
-                validate_branch_and_remote({}, release_mode="pr")
-
-    def test_pr_mode_skips_behind_origin_check(self):
-        """PR mode should not try to fetch or check behind-origin status."""
-        with (
-            patch("rlsbl.commands.release.get_current_branch", return_value="main"),
-            patch("rlsbl.commands.release.run") as mock_run,
-        ):
-            result = validate_branch_and_remote({}, release_mode="pr")
-            assert result == "main"
-            # Should NOT have called git fetch
-            for c in mock_run.call_args_list:
-                if c[0][0] == "git" and len(c[0]) > 1 and c[0][1] and c[0][1][0] == "fetch":
-                    pytest.fail("PR mode should not call git fetch")
-
-
-# ---------------------------------------------------------------------------
-# _find_publish_workflows tests
-# ---------------------------------------------------------------------------
-
-class TestFindPublishWorkflows:
-    """Test _find_publish_workflows scanning."""
-
-    def test_finds_publish_yml(self, tmp_path):
-        wf_dir = tmp_path / ".github" / "workflows"
-        wf_dir.mkdir(parents=True)
-        (wf_dir / "publish.yml").write_text("on: push")
-        (wf_dir / "publish-npm.yml").write_text("on: push")
-        (wf_dir / "test.yml").write_text("on: push")  # should NOT match
-        result = _find_publish_workflows(str(tmp_path))
-        assert result == ["publish-npm.yml", "publish.yml"]
-
-    def test_no_workflows_dir(self, tmp_path):
-        result = _find_publish_workflows(str(tmp_path))
-        assert result == []
-
-    def test_empty_workflows_dir(self, tmp_path):
-        wf_dir = tmp_path / ".github" / "workflows"
-        wf_dir.mkdir(parents=True)
-        result = _find_publish_workflows(str(tmp_path))
-        assert result == []
-
-
-# ---------------------------------------------------------------------------
-# PR release flow integration tests
+# PR mode config rejection tests
 # ---------------------------------------------------------------------------
 
 class TestPrModeConfigRejected:

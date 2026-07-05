@@ -8,7 +8,7 @@ workspace check immediately after a release, and inviting
 ``v{x}.toml`` archives.
 
 The release file now lives in the releasable state-dir family (the same
-home as ``in-progress.json``/``pending.json``/``scrub-result.json``):
+home as ``in-progress.json``/``scrub-result.json``):
 ``.rlsbl-monorepo/releasables/<name>/releases/unreleased.toml``.
 
 Covers:

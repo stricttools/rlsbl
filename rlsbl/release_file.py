@@ -42,7 +42,7 @@ def get_releases_dir(project_dir: str = ".", *, releasable_dir: str | None = Non
     ``releasable_dir`` is the releasable's state directory
     (``.rlsbl-monorepo/releasables/<name>/``); when given, release files
     live in its ``releases/`` subdirectory — the same home as
-    in-progress.json/pending.json/scrub-result.json — instead of the
+    in-progress.json/scrub-result.json — instead of the
     project's ``.rlsbl/releases/``. This is the single derivation for the
     releases dir; the release state module delegates here.
     """

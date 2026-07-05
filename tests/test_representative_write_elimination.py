@@ -313,11 +313,11 @@ class TestPrivateRepresentative:
 
 
 # ---------------------------------------------------------------------------
-# 1.3d: PR-mode pending.json goes through the state-dir resolver
+# 1.3d: release.mode config key is rejected
 # ---------------------------------------------------------------------------
 
 
-class TestPrModePendingJsonReleasable:
+class TestReleaseModeConfigRejected:
 
     def test_pr_mode_config_rejected(self, tmp_project):
         """PR mode config is rejected by the release flow (PR mode removed)."""

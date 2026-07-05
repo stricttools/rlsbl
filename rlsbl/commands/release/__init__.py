@@ -270,7 +270,6 @@ def _resume_cmd_inner(saved_state, flags, *, ctx):
             exclude=saved_state.get("exclude", []),
             preid=saved_state.get("preid", ""),
             blog=saved_state.get("blog", False),
-            release_mode=saved_state.get("release_mode", "imperative"),
             flags=flags,
             quiet=quiet,
             log=log,
@@ -398,10 +397,6 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     # mode. Standalone/implicit mode validates the single representative.
     # (Moved below, after member_package_paths is known.)
 
-    # Release mode is always "imperative" now (PR mode removed).
-    # validate_config_schema above already bans release.mode.
-    release_mode = "imperative"
-
     # In batch mode the batch orchestrator already validated gh CLI,
     # clean tree, and branch/remote upfront -- skip redundant checks.
     if flags.get("batch-mode", False):
@@ -411,7 +406,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         validate_gh_cli()
         validate_gh_push_access(config)
         pre_existing_dirty = validate_clean_tree(flags)
-        branch = validate_branch_and_remote(flags, release_mode=release_mode)
+        branch = validate_branch_and_remote(flags)
 
     # --- Resolve context ---
     monorepo_name, monorepo_project_path, is_library, is_non_releasable, releasable_name = resolve_monorepo_context(
@@ -913,7 +908,6 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             quiet=quiet,
             log=log,
             ctx=ctx,
-            release_mode=release_mode,
         ))
     except ReleaseAbortError:
         sys.exit(1)

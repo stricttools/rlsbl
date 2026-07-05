@@ -2,7 +2,6 @@
 
 Covers:
 - Asset filenames are prefixed with member name in releasable mode
-- PR-mode pending.json already collects from workspace root
 """
 
 import os

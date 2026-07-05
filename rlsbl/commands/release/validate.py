@@ -278,7 +278,7 @@ def validate_clean_tree(flags):
     return pre_existing_dirty
 
 
-def validate_branch_and_remote(flags, *, release_mode="imperative"):
+def validate_branch_and_remote(flags):
     """Validate branch is main/master and not behind origin.
 
     Returns the current branch name.
@@ -288,18 +288,6 @@ def validate_branch_and_remote(flags, *, release_mode="imperative"):
 
     branch = get_current_branch()
 
-    # --- PR-mode branch policy (to be removed in Phase 2b) ---
-    if release_mode == "pr":
-        if branch not in ("main", "master"):
-            raise ReleaseValidationError(
-                f'PR release mode requires being on main or master, '
-                f'but currently on "{branch}". '
-                f'Switch to main/master before creating a release PR.'
-            )
-        return branch
-    # --- end PR-mode block ---
-
-    # Imperative mode (default): warn if not on main/master, check behind-origin
     if branch not in ("main", "master"):
         print(f'Warning: you are on branch "{branch}", not main/master.', file=sys.stderr)
 
