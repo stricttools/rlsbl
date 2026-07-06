@@ -73,6 +73,7 @@ RENDER_VARS = {
     "zig.minRequiredZig": "0.13.0",
     # Block-insertion vars: empty so the base template stands alone.
     "npmPublishJobs": "",
+    "cratesPublishJobs": "",
     "homebrewEnv": "",
 }
 
