@@ -5,8 +5,9 @@ import re
 import sys
 import traceback
 
-from ..changelog.files import get_changes_dir, unfinalize_version
+from ..changelog.files import get_changes_dir, unfinalize_changeset_version, unfinalize_version
 from ..changelog.generate import generate_changelog
+from ..config import read_project_config
 from ..release_file import unfinalize_release_file
 from ..targets import TARGETS, detect_targets
 from ..utils import run, run_gh, check_gh_installed, check_gh_auth, get_push_timeout, get_current_branch, push_if_needed, is_clean_tree
@@ -327,7 +328,12 @@ def run_cmd(registry, args, flags, *, ctx):
             changes_dir, regenerate_changelog, changelog_add_paths = (
                 _resolve_undo_changelog_paths(project_path, ws_root, releasable_name)
             )
-            unfinalize_version(changes_dir, bare_version)
+            # Pick the right unfinalize based on coverage mode
+            _cfg = read_project_config(project_path)
+            if _cfg.get("coverage_unit") == "changeset-file":
+                unfinalize_changeset_version(changes_dir, bare_version)
+            else:
+                unfinalize_version(changes_dir, bare_version)
             regenerate_changelog()
             # Commit the restored changelog files
             run("git", ["add", *changelog_add_paths])
@@ -530,7 +536,11 @@ def _run_non_latest_undo(version_str, flags, *, ctx):
         changes_dir, regenerate_changelog, changelog_add_paths = (
             _resolve_undo_changelog_paths(project_path, ws_root, releasable_name)
         )
-        changed = unfinalize_version(changes_dir, version)
+        _cfg = read_project_config(project_path)
+        if _cfg.get("coverage_unit") == "changeset-file":
+            changed = unfinalize_changeset_version(changes_dir, version)
+        else:
+            changed = unfinalize_version(changes_dir, version)
         if changed:
             regenerate_changelog()
             run("git", ["add", *changelog_add_paths])
