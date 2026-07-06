@@ -12,11 +12,18 @@ concurrency:
   group: ${{ github.workflow_ref }}-${{ github.ref }}
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
 {{publishGate}}
   publish:
     needs: gate
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: {{action "actions/checkout"}}
       - uses: {{action "dtolnay/rust-toolchain"}}
@@ -32,11 +39,15 @@ jobs:
         run: |
           PKG_NAME=$(grep '^name' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
           PKG_VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
-          if curl -sf "https://crates.io/api/v1/crates/${PKG_NAME}/${PKG_VERSION}" > /dev/null 2>&1; then
+          if curl -sf "https://crates.io/api/v1/crates/${PKG_NAME}/${PKG_VERSION}" -H "User-Agent: rlsbl-ci" > /dev/null 2>&1; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "Already published: ${PKG_NAME}@${PKG_VERSION}"
           fi
+      - name: Authenticate with crates.io
+        if: steps.check-cargo.outputs.skip != 'true'
+        uses: {{action "rust-lang/crates-io-auth-action"}}
+        id: crates-auth
       - run: cargo publish
         if: steps.check-cargo.outputs.skip != 'true'
         env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-auth.outputs.token }}

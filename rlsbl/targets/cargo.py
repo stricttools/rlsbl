@@ -202,7 +202,7 @@ class CargoTarget(BaseTarget):
             "author": author,
             "repoName": repo_name,
             "binCommand": bin_command,
-            "publishSetup": "Requires CARGO_REGISTRY_TOKEN secret on GitHub (Settings > Secrets > Actions)",
+            "publishSetup": "Configure Trusted Publishing on crates.io (crates.io > Manage > Settings > Trusted Publishing > Add GitHub repo + workflow publish.yml)",
         }
 
         # minRequiredRust from package.rust-version
