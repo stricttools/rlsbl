@@ -1,4 +1,4 @@
-"""Check command to query package name availability across npm, PyPI, Go module proxy (pkg.go.dev), and GitHub repository namespaces."""
+"""Check command to query package name availability across npm, PyPI, crates.io, Go module proxy (pkg.go.dev), and GitHub repository namespaces."""
 
 import json
 import re
@@ -17,7 +17,7 @@ except ImportError:
 
 from itertools import product  # noqa: E402
 
-from rlsbl.targets.utils import normalize_npm, normalize_pypi  # noqa: E402
+from rlsbl.targets.utils import normalize_crates, normalize_npm, normalize_pypi  # noqa: E402
 
 
 def _request_with_backoff(url, timeout=5, max_retries=3, headers=None):
@@ -263,6 +263,58 @@ def get_pypi_variants(name):
     return list(variants)
 
 
+def check_crates_availability(name):
+    """Check if a crate name is available on crates.io.
+
+    Uses ``GET https://crates.io/api/v1/crates/<name>`` -- 200 means taken,
+    404 means available.  crates.io requires a User-Agent header.
+
+    Returns {"status": "available"|"taken"|"error", "message"?: str}.
+    """
+    url = f"https://crates.io/api/v1/crates/{name}"
+    headers = {"User-Agent": "rlsbl-cli (https://github.com/smm-h/rlsbl)"}
+    try:
+        with _request_with_backoff(url, timeout=5, headers=headers) as resp:
+            if resp.status == 200:
+                return {"status": "taken"}
+            return {"status": "error", "message": f"Unexpected status {resp.status}"}
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return {"status": "available"}
+        return {"status": "error", "message": f"Unexpected status {e.code}"}
+    except Exception as e:
+        return {"status": "error", "message": str(e) or "Network error"}
+
+
+def get_crates_variants(name):
+    """Generate crates.io name variants for collision detection.
+
+    crates.io treats hyphens and underscores as equivalent, so ``foo-bar``
+    and ``foo_bar`` collide.  We generate:
+
+    1. All separator-swap variants (replace every hyphen/underscore with
+       each of ``-`` and ``_``).
+    2. The fully stripped form (no separators).
+    """
+    variants = set()
+    lower = name.lower()
+    separators = "-_"
+
+    stripped = re.sub(r"[-_]", "", lower)
+    variants.add(stripped)
+    for sep in separators:
+        variants.add(re.sub(r"[-_]", sep, lower))
+
+    # If name has no separators, insert them at interior positions
+    if stripped == lower:
+        for i in range(1, len(lower)):
+            for sep in separators:
+                variants.add(lower[:i] + sep + lower[i:])
+
+    variants.discard(name)
+    return list(variants)
+
+
 def check_go_availability(name):
     """Check if a Go module path exists on pkg.go.dev.
 
@@ -388,6 +440,11 @@ def _classify_variant_collisions(name, taken_variants, registry):
                 hard.append(variant)
             else:
                 soft.append(variant)
+        elif registry == "crates":
+            if normalize_crates(name) == normalize_crates(variant):
+                hard.append(variant)
+            else:
+                soft.append(variant)
         else:
             soft.append(variant)
     return hard, soft
@@ -483,6 +540,22 @@ def _check_single_name(name, registry, delay_ms=0):
                     result["note"] = f"normalization collision with '{hard[0]}' (registry rejects identical normalized names)"
                 result["variants"] = soft  # only soft similar names shown as informational
 
+    elif registry == "crates":
+        check_result = check_crates_availability(name)
+        result["status"] = check_result["status"]
+        if check_result["status"] == "error":
+            result["error"] = check_result["message"]
+        elif check_result["status"] == "taken":
+            result["reason"] = "registered"
+        elif check_result["status"] == "available":
+            taken_variants = _check_variants(name, check_crates_availability, get_crates_variants, delay_ms=delay_ms)
+            hard, soft = _classify_variant_collisions(name, taken_variants, "crates")
+            if hard:
+                result["status"] = "taken"
+                result["reason"] = "normalized"
+                result["note"] = f"normalization collision with '{hard[0]}' (crates.io treats hyphens and underscores as equivalent)"
+            result["variants"] = soft
+
     elif registry == "go":
         check_result = check_go_availability(name)
         result["status"] = check_result["status"]
@@ -554,6 +627,20 @@ def _format_single_result(result):
         if result.get("note"):
             print(f"  Note: {result['note']}")
 
+    elif registry == "crates":
+        print(f'Checking crates.io for "{name}"...')
+        if status == "error":
+            print(f"Error checking crates.io: {result['error']}", file=sys.stderr)
+            return 2
+        if status == "available":
+            print(f'"{name}" is available on crates.io.')
+        else:
+            print(f'"{name}" is taken on crates.io.')
+        if reason in _REASON_EXPLANATIONS:
+            print(_REASON_EXPLANATIONS[reason])
+        if result.get("note"):
+            print(f"  Note: {result['note']}")
+
     elif registry == "go":
         print(f'Checking pkg.go.dev for "{name}"...')
         if status == "error":
@@ -606,7 +693,7 @@ def _format_single_result(result):
         )
 
     # Steps-run summary
-    _REGISTRY_DISPLAY = {"npm": "npm", "pypi": "PyPI", "go": "pkg.go.dev", "github": "GitHub"}
+    _REGISTRY_DISPLAY = {"npm": "npm", "pypi": "PyPI", "crates": "crates.io", "go": "pkg.go.dev", "github": "GitHub"}
     steps = [_REGISTRY_DISPLAY.get(registry, registry)]
     if registry == "pypi":
         # stdlib check always runs for PyPI (it's local)

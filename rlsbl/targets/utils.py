@@ -92,6 +92,17 @@ def normalize_pypi(name):
     return re.sub(r"[-_.]+", "-", name.lower())
 
 
+def normalize_crates(name):
+    """Normalize a crates.io package name for collision detection.
+
+    crates.io treats hyphens and underscores as equivalent: ``foo-bar``,
+    ``foo_bar``, and ``foobar`` (stripped) are all considered the same name.
+    This function lowercases and replaces both hyphens and underscores with
+    a single hyphen to produce a canonical form.
+    """
+    return re.sub(r"[-_]+", "-", name.lower())
+
+
 def normalize_go(name):
     """Normalize a Go module path to a short name.
 

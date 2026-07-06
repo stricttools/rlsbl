@@ -563,7 +563,7 @@ def _cmd_release_order(flags, project_root):
 def _cmd_check_names(args, flags, project_root):
     target = flags.get("target")
     if not target:
-        print("Error: --target is required. Usage: rlsbl monorepo check-names --target <npm|pypi|go|github>", file=sys.stderr)
+        print("Error: --target is required. Usage: rlsbl monorepo check-names --target <npm|pypi|crates|go|github>", file=sys.stderr)
         sys.exit(1)
 
     prefix = flags.get("prefix", "")

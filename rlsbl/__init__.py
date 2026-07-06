@@ -651,8 +651,8 @@ def cmd_scaffold(target, force_overwrite, private, auto_commit, skip_shared, aut
 # check
 # ---------------------------------------------------------------------------
 
-@app.command(name="check-name", help="Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.")
-@strictcli.flag(name="target", type=str, help="Registry to query for name availability (npm, pypi, go, or github); repeatable", repeatable=True, unique=True)
+@app.command(name="check-name", help="Query npm, PyPI, crates.io, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.")
+@strictcli.flag(name="target", type=str, help="Registry to query for name availability (npm, pypi, crates, go, or github); repeatable", repeatable=True, unique=True)
 @strictcli.flag(name="delay", type=str, help="Milliseconds to wait between consecutive registry API queries (default: 200)", default="200")
 def cmd_check_name(target, delay, **_kwargs):
     # --target is required for check-name; with repeatable=True, target is a list
@@ -660,17 +660,17 @@ def cmd_check_name(target, delay, **_kwargs):
     if not targets:
         print(
             "Error: --target is required. "
-            "Usage: rlsbl check-name <name> [<name2> ...] --target <npm|pypi|go|github>",
+            "Usage: rlsbl check-name <name> [<name2> ...] --target <npm|pypi|crates|go|github>",
             file=sys.stderr,
         )
         sys.exit(1)
     # Validate ALL targets upfront before any network calls
-    valid_targets = {"npm", "pypi", "go", "github"}
+    valid_targets = {"npm", "pypi", "crates", "go", "github"}
     invalid = [t for t in targets if t not in valid_targets]
     if invalid:
         print(
             f"Error: unknown target(s): {', '.join(repr(t) for t in invalid)}. "
-            f"Valid: npm, pypi, go, github",
+            f"Valid: npm, pypi, crates, go, github",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -687,19 +687,19 @@ def cmd_check_name(target, delay, **_kwargs):
 # ---------------------------------------------------------------------------
 
 @app.command(name="claim-name", help="Claim a name on a package registry by publishing a minimal placeholder package. Runs check-name first, then publishes if available.")
-@strictcli.flag(name="target", type=str, help="Target package registry to publish the placeholder to (npm or pypi)", default="")
+@strictcli.flag(name="target", type=str, help="Target package registry to publish the placeholder to (npm, pypi, or crates)", default="")
 def cmd_claim_name(target, yes, **_kwargs):
     if not target:
         print(
             "Error: --target is required. "
-            "Usage: rlsbl claim-name <name> --target <npm|pypi>",
+            "Usage: rlsbl claim-name <name> --target <npm|pypi|crates>",
             file=sys.stderr,
         )
         sys.exit(1)
-    valid_targets = {"npm", "pypi"}
+    valid_targets = {"npm", "pypi", "crates"}
     if target not in valid_targets:
         print(
-            f"Error: unknown target: {target!r}. Valid: npm, pypi",
+            f"Error: unknown target: {target!r}. Valid: npm, pypi, crates",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -707,7 +707,7 @@ def cmd_claim_name(target, yes, **_kwargs):
     if len(names) != 1:
         print(
             "Error: expected exactly one package name. "
-            "Usage: rlsbl claim-name <name> --target <npm|pypi>",
+            "Usage: rlsbl claim-name <name> --target <npm|pypi|crates>",
             file=sys.stderr,
         )
         sys.exit(1)
