@@ -109,6 +109,22 @@ def register_prepush_checks(app):
         if not changes_dir_exists(root_str):
             return CheckResult("skip", "JSONL changelog not set up")
 
+        # Check coverage mode
+        coverage_unit = ctx.config.get("coverage_unit", "commit")
+        if coverage_unit == "changeset-file":
+            from ..changelog.files import get_changes_dir
+            from ..prepush_utils import check_changeset_file_coverage
+            changed_files = get_push_changed_files(refs)
+            if changed_files is None:
+                return CheckResult("skip", "could not determine changed files")
+            changes_dir = get_changes_dir(root_str)
+            error = check_changeset_file_coverage(
+                changed_files, changes_dir=changes_dir,
+            )
+            if error is not None:
+                return CheckResult("fail", error)
+            return CheckResult("pass", "changeset-file coverage satisfied")
+
         error = _check_jsonl_changelog(root_str, refs)
         if error is not None:
             return CheckResult("fail", error)
