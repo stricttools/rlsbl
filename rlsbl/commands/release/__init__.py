@@ -82,7 +82,6 @@ from .execute import (
     ReleaseState,
     resolve_target_paths,
     resolve_release_targets,
-    _refresh_selfdoc_hashes,
     _sync_lockfiles,
     archive_blog_body,
     _run_release_mutating,

@@ -916,38 +916,6 @@ class TestArchiveBlogBody:
         assert result is None
 
 
-class TestRefreshSelfdocHashes:
-    """Covers lines 112-157: _refresh_selfdoc_hashes."""
-
-    def test_no_selfdoc_config(self, tmp_path):
-        from rlsbl.commands.release.execute import _refresh_selfdoc_hashes
-
-        files = []
-        _refresh_selfdoc_hashes(files, print, project_dir=str(tmp_path))
-        assert files == []
-
-    def test_no_hashes_file(self, tmp_path):
-        from rlsbl.commands.release.execute import _refresh_selfdoc_hashes
-
-        (tmp_path / "selfdoc.json").write_text("{}")
-        files = []
-        _refresh_selfdoc_hashes(files, print, project_dir=str(tmp_path))
-        assert files == []
-
-    def test_selfdoc_not_on_path(self, tmp_path):
-        from rlsbl.commands.release.execute import _refresh_selfdoc_hashes
-
-        (tmp_path / "selfdoc.json").write_text("{}")
-        hashes_dir = tmp_path / ".selfdoc" / "hashes"
-        hashes_dir.mkdir(parents=True)
-        (hashes_dir / "hashes.json").write_text("{}")
-
-        files = []
-        with patch("rlsbl.commands.release.require_tool", return_value=False):
-            _refresh_selfdoc_hashes(files, print, project_dir=str(tmp_path))
-        assert files == []
-
-
 # ============================================================================
 # rlsbl.commands.release_scrub -- uncovered lines: 58-59, 77-84, 94-96,
 #   102-103, 106, 117-119, etc.

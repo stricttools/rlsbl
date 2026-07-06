@@ -128,54 +128,6 @@ def resolve_release_targets(primary, flags, project_dir=".", *, config,
     return baseline
 
 
-def _refresh_selfdoc_hashes(files_to_commit, log, project_dir="."):
-    """Re-run selfdoc check after version bump to refresh content hashes.
-
-    The early selfdoc check (before tests) validates documentation correctness,
-    but its hashes are based on pre-bump file contents. After the version bump
-    modifies pyproject.toml, selfdoc.json, etc., the hashes in
-    .selfdoc/hashes/hashes.json become stale. This function re-runs selfdoc
-    check to recalculate hashes based on bumped versions, then adds the hash
-    file to files_to_commit if it changed.
-
-    Non-fatal: errors are warned about but do not abort the release.
-    """
-    from . import require_tool, subprocess
-
-    check_dir = project_dir
-    selfdoc_config = os.path.join(check_dir, "selfdoc.json")
-    if not os.path.exists(selfdoc_config):
-        return
-
-    hashes_file = os.path.join(check_dir, ".selfdoc", "hashes", "hashes.json")
-    if not os.path.exists(hashes_file):
-        return
-
-    if not require_tool("selfdoc", fatal=False):
-        return
-
-    log("Refreshing selfdoc hashes after version bump...")
-    try:
-        subprocess.run(["selfdoc", "check", "--no-auto-commit"], cwd=project_dir, capture_output=True)
-    except Exception as e:
-        log(f"Warning: selfdoc hash refresh failed: {e}")
-        return
-
-    # Check if hashes.json is now dirty
-    try:
-        norm_hashes = os.path.normpath(hashes_file)
-        result = subprocess.run(
-            ["git", "status", "--porcelain", "--", norm_hashes],
-            capture_output=True, text=True,
-        )
-        if result.stdout.strip():
-            if norm_hashes not in files_to_commit:
-                files_to_commit.append(norm_hashes)
-                log("Selfdoc hashes updated after version bump")
-    except Exception as e:
-        log(f"Warning: could not check selfdoc hash status: {e}")
-
-
 # Lockfile specs: (lockfile, tool_name, sync_cmd, guard_file)
 # guard_file: if set, the spec only applies when this file exists in the same directory.
 # This distinguishes e.g. go.sum (per-module) from go.work.sum (workspace root only).
@@ -865,9 +817,6 @@ def _run_release_mutating(state: ReleaseState):
                 from ...utils import warn_exception
                 warn_exception("writing .rlsbl/version marker failed", e)
 
-        # Re-run selfdoc check to refresh hashes after version bump
-        _refresh_selfdoc_hashes(files_to_commit, log, project_dir=project_dir)
-
         # Include the generated CHANGELOG.md files in the commit (dev nodes
         # have no CHANGELOG.md). The canonical location is resolved via
         # rlsbl.changelog.home: releasable dir in releasable mode (plus the
@@ -928,7 +877,7 @@ def _run_release_mutating(state: ReleaseState):
         if dirty_output:
             dirty_files = parse_porcelain_paths(dirty_output)
             # Normalize all files_to_commit to git-relative paths.
-            # Some callers (e.g. _sync_lockfiles, _refresh_selfdoc_hashes)
+            # Some callers (e.g. _sync_lockfiles)
             # add absolute paths via os.path.normpath(); git status
             # --porcelain outputs repo-relative paths, so we must match.
             expected_files = {
