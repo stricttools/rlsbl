@@ -926,6 +926,25 @@ def cmd_prs(**_kwargs):
 
 
 # ---------------------------------------------------------------------------
+# push
+# ---------------------------------------------------------------------------
+
+@app.command(name="push", help="Push the current branch to origin with preflight checks: branch guard (refuses release branches), changelog coverage validation with actionable remediation hints, and behind-remote detection. Use `rlsbl release run` for release branches.")
+def cmd_push(yes, quiet, **_kwargs):
+    root = _require_sub_project_root(
+        workspace_root_guidance=(
+            "Error: `rlsbl push` must run inside a sub-project, not at "
+            "the monorepo workspace root. cd into a sub-project."
+        )
+    )
+    from .workspace import find_workspace_root
+    ws_root = find_workspace_root(str(root))
+    ctx = create_context(root, workspace_root=Path(ws_root) if ws_root else None)
+    from .commands.push_cmd import run_push
+    run_push(ctx, yes=yes, quiet=quiet)
+
+
+# ---------------------------------------------------------------------------
 # unreleased
 # ---------------------------------------------------------------------------
 
