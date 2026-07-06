@@ -2,7 +2,6 @@
 title: rlsbl.secret_scan
 description: "Pre-publish secret scan gate using gitleaks."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 116
 ---

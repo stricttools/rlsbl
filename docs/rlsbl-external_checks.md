@@ -2,7 +2,6 @@
 title: rlsbl.external_checks
 description: "External check providers: config-declared subprocess checks."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 73
 ---

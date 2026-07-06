@@ -2,7 +2,6 @@
 title: rlsbl.commands.deprecate
 description: "Deprecate command that marks a past release as deprecated by setting the GitHub pre-release flag and prepending a deprecation notice to the release notes."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 27
 ---

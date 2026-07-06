@@ -2,7 +2,6 @@
 title: rlsbl.commands.check
 description: "Check command to query package name availability across npm, PyPI, crates.io, Go module proxy (pkg.go.dev), and GitHub repository namespaces."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 23
 ---

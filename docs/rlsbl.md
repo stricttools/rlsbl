@@ -2,7 +2,6 @@
 title: rlsbl
 description: "rlsbl: Release orchestration and project scaffolding for npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, and more, automating version bumps,..."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 1
 ---

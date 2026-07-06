@@ -2,7 +2,6 @@
 title: rlsbl.targets.cargo
 description: "Cargo (Rust) release target that uses tomlkit for round-trip Cargo.toml editing with hybrid publish support via CARGO_REGISTRY_TOKEN."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 122
 ---

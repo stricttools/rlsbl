@@ -2,7 +2,6 @@
 title: rlsbl.targets.npm
 description: "npm release target that manages version tracking in package.json and scaffolds CI workflows for automated publishing to the npm registry."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 134
 ---

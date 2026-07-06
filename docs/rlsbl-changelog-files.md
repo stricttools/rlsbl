@@ -2,7 +2,6 @@
 title: rlsbl.changelog.files
 description: "File management layer for JSONL changelog files including reading, writing, appending entries, and path resolution for .rlsbl directories."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 5
 ---

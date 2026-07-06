@@ -2,7 +2,6 @@
 title: rlsbl.release_file
 description: "Release file reader and validator for file-based releases."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 115
 ---

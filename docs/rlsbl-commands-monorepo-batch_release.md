@@ -2,7 +2,6 @@
 title: rlsbl.commands.monorepo.batch_release
 description: "Batch release command for monorepo workspaces."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 34
 ---

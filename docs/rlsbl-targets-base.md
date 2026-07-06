@@ -2,7 +2,6 @@
 title: rlsbl.targets.base
 description: "Base class for release targets providing shared defaults for version reading, writing, detection, scaffolding, and publish configuration."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 121
 ---

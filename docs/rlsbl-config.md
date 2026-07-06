@@ -2,7 +2,6 @@
 title: rlsbl.config
 description: "Project configuration loading with layered precedence."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 64
 ---

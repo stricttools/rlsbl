@@ -2,7 +2,6 @@
 title: rlsbl.commands.yank
 description: "Yank command that performs registry-level removal of a published version."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 63
 ---

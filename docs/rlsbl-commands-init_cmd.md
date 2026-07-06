@@ -2,7 +2,6 @@
 title: rlsbl.commands.init_cmd
 description: "Init command that scaffolds release infrastructure from templates, creating CI workflows, hooks, changelog, and config files."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 32
 ---

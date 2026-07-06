@@ -2,7 +2,6 @@
 title: rlsbl.publication_probe
 description: "Publication probe protocol for registry-aware version checking."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 110
 ---

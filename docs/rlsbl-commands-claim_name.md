@@ -2,7 +2,6 @@
 title: rlsbl.commands.claim_name
 description: "Claim a package name on npm, PyPI, or crates.io by publishing a minimal placeholder package with version 0.0.0 and an empty description."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 24
 ---

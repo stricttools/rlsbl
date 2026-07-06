@@ -2,7 +2,6 @@
 title: rlsbl.evidence_gate
 description: "Layered evidence gate for determining whether a release was published."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 72
 ---

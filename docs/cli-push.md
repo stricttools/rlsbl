@@ -2,7 +2,6 @@
 title: rlsbl push
 description: "Push the current branch to origin with preflight checks: branch guard (refuses release branches), changelog coverage validation with actionable remediation"
 generated: true
-seeded: true
 nav_group: "CLI Reference"
 nav_order: 13
 ---
