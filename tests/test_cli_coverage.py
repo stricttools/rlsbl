@@ -710,7 +710,7 @@ class TestCmdChlogAmend:
     @patch("rlsbl.commands.changelog_cmd.cmd_amend")
     def test_delegates(self, mock_amend, _):
         rlsbl.cmd_chlog_amend(
-            version="1.0.0", commits="abc", description="fix",
+            version="1.0.0", commits="abc", id="", description="fix",
             type="fix", user_facing=True, validate_hashes=False,
             dry_run=False,
         )
@@ -726,7 +726,7 @@ class TestCmdChlogEdit:
     @patch("rlsbl.commands.changelog_cmd.cmd_edit")
     def test_delegates(self, mock_edit, _):
         rlsbl.cmd_chlog_edit(
-            commits="abc", type="fix", description="updated",
+            commits="abc", id="", type="fix", description="updated",
             user_facing=True, auto_commit=True,
             dry_run=False,
         )

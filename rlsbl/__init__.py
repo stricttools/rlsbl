@@ -1105,11 +1105,12 @@ def cmd_chlog_generate(dry_run, auto_commit, **_kwargs):
 @chlog.command(name="amend", help="Append a changelog entry to a released version's JSONL file. Temporarily unlocks the read-only file, appends the entry, re-locks it, regenerates CHANGELOG.md, and syncs GitHub Release notes. Use --no-validate-hashes to skip hash validation for old or amended commits.")
 @strictcli.flag(name="version", type=str, help="Semver of the already-released version whose JSONL to amend (e.g. 0.39.0)")
 @strictcli.flag(name="commits", type=str, help="Comma-separated commit hashes to associate with the amended changelog entry")
+@strictcli.flag(name="id", type=str, help="Entry ID (ULID) to select the target entry for amendment", default="")
 @strictcli.flag(name="description", type=str, help="Human-readable description for the amended entry in CHANGELOG.md", default="")
 @strictcli.flag(name="type", type=str, help="Classification for the amended entry: feature, fix, or breaking (required if user-facing)", default="")
 @strictcli.flag(name="user-facing", type=bool, default=True, help="Mark the amended entry as user-facing (included in CHANGELOG.md output)")
 @strictcli.flag(name="validate-hashes", type=bool, default=True, help="Validate commit hashes via git rev-parse before appending")
-def cmd_chlog_amend(version, commits, description, type, user_facing, validate_hashes, dry_run, **_kwargs):
+def cmd_chlog_amend(version, commits, id, description, type, user_facing, validate_hashes, dry_run, **_kwargs):
     root = _require_sub_project_root(
         workspace_root_guidance=(
             "Error: `rlsbl changelog amend` must run inside a sub-project, "
@@ -1120,6 +1121,7 @@ def cmd_chlog_amend(version, commits, description, type, user_facing, validate_h
     flags = {
         "version": version,
         "commits": commits,
+        "id": id,
         "description": description,
         "type": type,
         "user-facing": user_facing,
@@ -1130,13 +1132,14 @@ def cmd_chlog_amend(version, commits, description, type, user_facing, validate_h
     cmd_amend(flags, project_root=root)
 
 
-@chlog.command(name="edit", help="Modify an existing changelog entry in unreleased or released JSONL files. Finds the entry by commit hash, applies field changes (type, description, user-facing status), and rewrites the file atomically. For released files, temporarily unlocks the read-only file, regenerates CHANGELOG.md, and syncs GitHub Release notes.")
-@strictcli.flag(name="commits", type=str, help="Comma-separated commit hashes identifying the target entry")
+@chlog.command(name="edit", help="Modify an existing changelog entry in unreleased or released JSONL files. Finds the entry by commit hash or entry ID, applies field changes (type, description, user-facing status), and rewrites the file atomically. For released files, temporarily unlocks the read-only file, regenerates CHANGELOG.md, and syncs GitHub Release notes.")
+@strictcli.flag(name="commits", type=str, help="Comma-separated commit hashes identifying the target entry", default="")
+@strictcli.flag(name="id", type=str, help="Entry ID (ULID) identifying the target entry", default="")
 @strictcli.flag(name="type", type=str, help="New type value (feature, fix, breaking); also disambiguates multi-entry commits", default="")
 @strictcli.flag(name="description", type=str, help="Replacement description text for the matched changelog entry", default="")
 @strictcli.flag(name="user-facing", type=bool, default=None, help="Set user_facing status on the matched entry (--user-facing to set true, --no-user-facing to set false)")
 @strictcli.flag(name="auto-commit", type=bool, default=True, help="Automatically commit the edited JSONL changelog file to git after modification")
-def cmd_chlog_edit(commits, type, description, user_facing, auto_commit, dry_run, **_kwargs):
+def cmd_chlog_edit(commits, id, type, description, user_facing, auto_commit, dry_run, **_kwargs):
     root = _require_sub_project_root(
         workspace_root_guidance=(
             "Error: `rlsbl changelog edit` must run inside a sub-project, "
@@ -1146,6 +1149,7 @@ def cmd_chlog_edit(commits, type, description, user_facing, auto_commit, dry_run
     )
     flags = {
         "commits": commits,
+        "id": id,
         "type": type,
         "description": description,
         "user-facing": user_facing,

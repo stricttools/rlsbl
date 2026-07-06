@@ -5,6 +5,7 @@ Public API re-exported from submodules.
 
 from .schema import (
     ChangelogEntry,
+    generate_entry_id,
     parse_entry,
     parse_jsonl,
     serialize_entry,
@@ -16,13 +17,19 @@ from .files import (
     RemapResult,
     append_entry,
     changes_dir_exists,
+    finalize_changeset_version,
     finalize_version,
     get_changes_dir,
+    get_pending_dir,
     is_read_only,
     list_versioned_files,
+    read_coverage_unit,
+    read_pending_files,
     read_unreleased,
     remap_jsonl_hashes,
+    unfinalize_changeset_version,
     unfinalize_version,
+    write_pending_file,
     writable_jsonl,
 )
 
@@ -35,6 +42,13 @@ from .validate import validate_unreleased
 __all__ = [
     "ChangelogEntry",
     "RemapReport",
+    "finalize_changeset_version",
+    "generate_entry_id",
+    "get_pending_dir",
+    "read_coverage_unit",
+    "read_pending_files",
+    "unfinalize_changeset_version",
+    "write_pending_file",
     "RemapResult",
     "append_entry",
     "changes_dir_exists",

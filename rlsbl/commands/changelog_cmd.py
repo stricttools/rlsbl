@@ -18,7 +18,7 @@ from ..changelog.files import (
 )
 from ..changelog.generate import generate_changelog
 from ..changelog.resolve import resolve_hash
-from ..changelog.schema import ChangelogEntry, parse_jsonl, serialize_entry, validate_schema
+from ..changelog.schema import ChangelogEntry, generate_entry_id, parse_jsonl, serialize_entry, validate_schema
 from ..changelog.validate import _get_batch_limits_config
 from ..config import read_project_config
 from ..git_util import filter_commits_for_project, filter_commits_for_releasable
@@ -202,6 +202,7 @@ def _build_entry(flags, resolved_commits):
         description=description,
         type=entry_type,
         release_type=flags.get("release-type") or None,
+        id=generate_entry_id(),
     )
 
     errors = validate_schema(entry)
@@ -663,43 +664,54 @@ def cmd_edit(flags, project_root):
         )
         sys.exit(1)
 
-    # Parse and resolve commits
+    # Parse selection criteria: --id or --commits
+    id_filter = flags.get("id") or None
     commits_raw = flags.get("commits", "")
-    if not commits_raw:
-        print("Error: --commits is required.", file=sys.stderr)
+
+    if not id_filter and not commits_raw:
+        print("Error: --commits or --id is required.", file=sys.stderr)
         sys.exit(1)
 
-    commits = [h.strip() for h in commits_raw.split(",") if h.strip()]
-    if not commits:
-        print("Error: --commits must contain at least one hash.", file=sys.stderr)
-        sys.exit(1)
-
-    resolved_search = []
-    for h in commits:
-        full = resolve_hash(h)
-        if full is None:
-            print(f"Error: commit hash does not resolve: {h}", file=sys.stderr)
+    search_set = set()
+    if commits_raw:
+        commits = [h.strip() for h in commits_raw.split(",") if h.strip()]
+        if not commits:
+            print("Error: --commits must contain at least one hash.", file=sys.stderr)
             sys.exit(1)
-        resolved_search.append(full)
-    search_set = set(resolved_search)
+
+        resolved_search = []
+        for h in commits:
+            full = resolve_hash(h)
+            if full is None:
+                print(f"Error: commit hash does not resolve: {h}", file=sys.stderr)
+                sys.exit(1)
+            resolved_search.append(full)
+        search_set = set(resolved_search)
 
     # Search for matching entries across all JSONL files
     changes_dir = _resolve_changes_dir(ws_context, project_root)
     matches = []  # list of (file_path, line_index, entry, version_or_none)
+
+    def _entry_matches(entry):
+        if id_filter and entry.id == id_filter:
+            return True
+        if search_set and search_set.intersection(entry.commits):
+            return True
+        return False
 
     # Search unreleased.jsonl first
     unreleased_path = os.path.join(changes_dir, "unreleased.jsonl")
     if os.path.isfile(unreleased_path):
         entries = parse_jsonl(unreleased_path)
         for idx, entry in enumerate(entries):
-            if search_set.intersection(entry.commits):
+            if _entry_matches(entry):
                 matches.append((unreleased_path, idx, entry, None))
 
     # Then search versioned files (newest first)
     for version, jsonl_path in list_versioned_files(changes_dir):
         entries = parse_jsonl(jsonl_path)
         for idx, entry in enumerate(entries):
-            if search_set.intersection(entry.commits):
+            if _entry_matches(entry):
                 matches.append((jsonl_path, idx, entry, version))
 
     if not matches:

@@ -11,8 +11,10 @@ import stat
 import sys
 import tempfile
 
+import json
+
 from .schema import ChangelogEntry, parse_entry, parse_jsonl, serialize_entry
-from ..errors import ChangelogError
+from ..errors import ChangelogError, ConfigError
 
 _VERSION_RE = re.compile(
     r"^(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta|rc)\.(\d+))?\.jsonl$"
@@ -504,6 +506,7 @@ def remap_jsonl_hashes(changes_dir, sha_map) -> RemapReport:
                 description=entry.description,
                 type=entry.type,
                 release_type=entry.release_type,
+                id=entry.id,
                 packages=entry.packages,
             ))
 
@@ -539,3 +542,195 @@ def remap_jsonl_hashes(changes_dir, sha_map) -> RemapReport:
         ))
 
     return RemapReport(results=results, unmapped=unmapped, ambiguous=ambiguous)
+
+
+# ---------------------------------------------------------------------------
+# coverage_unit config reader
+# ---------------------------------------------------------------------------
+
+_VALID_COVERAGE_UNITS = ("commit", "changeset-file")
+
+
+def read_coverage_unit(config: dict) -> str:
+    """Read and validate the coverage_unit from a project config dict.
+
+    Returns ``"commit"`` or ``"changeset-file"``.
+    Raises ``ConfigError`` if the key is missing or has an invalid value.
+    """
+    value = config.get("coverage_unit")
+    if value is None:
+        raise ConfigError(
+            "coverage_unit is missing from .rlsbl/config.json. "
+            "Set it to \"commit\" or \"changeset-file\"."
+        )
+    if value not in _VALID_COVERAGE_UNITS:
+        raise ConfigError(
+            f"coverage_unit must be one of {_VALID_COVERAGE_UNITS!r}, "
+            f"got {value!r}"
+        )
+    return value
+
+
+# ---------------------------------------------------------------------------
+# Pending-file operations (changeset-file mode)
+# ---------------------------------------------------------------------------
+
+def get_pending_dir(changes_dir: str) -> str:
+    """Return the path to the pending/ subdirectory inside changes_dir."""
+    return os.path.join(changes_dir, "pending")
+
+
+def write_pending_file(pending_dir: str, entry: ChangelogEntry) -> str:
+    """Write a single pending file as ``<id>.json`` in pending_dir.
+
+    The file contains the entry fields minus ``commits`` (changeset-file
+    mode entries have no commits).  Creates the directory if needed.
+    Returns the full path to the written file.
+    """
+    os.makedirs(pending_dir, exist_ok=True)
+    if not entry.id:
+        raise ChangelogError("entry must have an id for pending file creation")
+
+    data: dict = {"id": entry.id, "user_facing": entry.user_facing}
+    if entry.description is not None:
+        data["description"] = entry.description
+    if entry.type is not None:
+        data["type"] = entry.type
+    if entry.release_type is not None:
+        data["release_type"] = entry.release_type
+    if entry.packages is not None:
+        data["packages"] = entry.packages
+
+    filepath = os.path.join(pending_dir, f"{entry.id}.json")
+    # Atomic write
+    fd, tmp_path = tempfile.mkstemp(dir=pending_dir, suffix=".tmp")
+    try:
+        content = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+        os.write(fd, content.encode("utf-8"))
+        os.close(fd)
+        os.replace(tmp_path, filepath)
+    except BaseException:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        raise
+    return filepath
+
+
+def read_pending_files(pending_dir: str) -> list[ChangelogEntry]:
+    """Read all ``*.json`` files in pending_dir and return ChangelogEntry objects.
+
+    Returns an empty list if the directory does not exist or is empty.
+    Files are sorted by name (lexicographic, which gives approximate
+    chronological order since IDs are timestamp-prefixed).
+    """
+    if not os.path.isdir(pending_dir):
+        return []
+    entries = []
+    for name in sorted(os.listdir(pending_dir)):
+        if not name.endswith(".json"):
+            continue
+        filepath = os.path.join(pending_dir, name)
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, OSError) as exc:
+            raise ChangelogError(
+                f"malformed pending file {filepath}: {exc}"
+            ) from exc
+        entries.append(ChangelogEntry(
+            id=data.get("id"),
+            user_facing=data.get("user_facing", False),
+            description=data.get("description"),
+            type=data.get("type"),
+            release_type=data.get("release_type"),
+            packages=data.get("packages"),
+            commits=[],  # pending files have no commits
+        ))
+    return entries
+
+
+def finalize_changeset_version(changes_dir: str, version: str) -> None:
+    """Concatenate pending files into ``x.y.z.jsonl`` and clear pending/.
+
+    1. Read all ``pending/*.json`` files.
+    2. Serialize each into a JSONL line (preserving ``id``, ``packages``).
+    3. Write ``x.y.z.jsonl`` (read-only 0o444).
+    4. Remove all files from ``pending/``.
+
+    Raises ``FileNotFoundError`` if the pending directory does not exist.
+    Raises ``ChangelogError`` if the versioned JSONL already exists.
+    """
+    pending_dir = get_pending_dir(changes_dir)
+    if not os.path.isdir(pending_dir):
+        raise FileNotFoundError(f"pending/ not found in {changes_dir}")
+
+    dst = os.path.join(changes_dir, f"{version}.jsonl")
+    if os.path.exists(dst):
+        raise ChangelogError(
+            f"refusing to finalize changelog for {version}: {dst} already "
+            f"exists. Inspect the existing file and remove it manually "
+            f"before re-releasing."
+        )
+
+    entries = read_pending_files(pending_dir)
+
+    # Write JSONL
+    lines = [serialize_entry(e) + "\n" for e in entries]
+    content = "".join(lines)
+
+    fd, tmp_path = tempfile.mkstemp(dir=changes_dir, suffix=".tmp")
+    try:
+        os.write(fd, content.encode("utf-8"))
+        os.close(fd)
+        os.replace(tmp_path, dst)
+    except BaseException:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        raise
+
+    os.chmod(dst, 0o444)
+
+    # Clear pending files
+    for name in os.listdir(pending_dir):
+        filepath = os.path.join(pending_dir, name)
+        if os.path.isfile(filepath):
+            os.unlink(filepath)
+
+
+def unfinalize_changeset_version(changes_dir: str, version: str) -> list[str]:
+    """Reverse a changeset-mode finalization: restore pending files from JSONL.
+
+    1. Read ``x.y.z.jsonl``.
+    2. For each entry with an ``id``, write ``pending/<id>.json``.
+    3. Delete ``x.y.z.jsonl`` and ``x.y.z.md`` if present.
+    4. Return the list of changed file paths.
+
+    Returns an empty list if the versioned file doesn't exist.
+    """
+    versioned = os.path.join(changes_dir, f"{version}.jsonl")
+    versioned_md = os.path.join(changes_dir, f"{version}.md")
+    pending_dir = get_pending_dir(changes_dir)
+
+    if not os.path.isfile(versioned):
+        return []
+
+    # Make writable so we can delete it
+    os.chmod(versioned, 0o644)
+    entries = parse_jsonl(versioned)
+
+    os.makedirs(pending_dir, exist_ok=True)
+    changed: list[str] = []
+
+    for entry in entries:
+        if entry.id:
+            path = write_pending_file(pending_dir, entry)
+            changed.append(path)
+
+    os.unlink(versioned)
+    changed.append(versioned)
+
+    if os.path.isfile(versioned_md):
+        os.unlink(versioned_md)
+        changed.append(versioned_md)
+
+    return changed

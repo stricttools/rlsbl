@@ -264,7 +264,7 @@ class TestWrapperThreading:
         import rlsbl
 
         rlsbl.cmd_chlog_amend(
-            version="0.1.0", commits="abc", description="d", type="fix",
+            version="0.1.0", commits="abc", id="", description="d", type="fix",
             user_facing=True, validate_hashes=True,
             dry_run=True,
         )
@@ -277,7 +277,7 @@ class TestWrapperThreading:
         import rlsbl
 
         rlsbl.cmd_chlog_edit(
-            commits="abc", type="fix", description="d",
+            commits="abc", id="", type="fix", description="d",
             user_facing=None, auto_commit=True,
             dry_run=True,
         )

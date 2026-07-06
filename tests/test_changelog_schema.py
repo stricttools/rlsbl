@@ -165,9 +165,10 @@ class TestParseEntry:
         with pytest.raises(ChangelogError, match="must be a JSON object"):
             parse_entry("[1, 2, 3]")
 
-    def test_missing_commits(self):
-        with pytest.raises(ChangelogError, match="missing required field: commits"):
-            parse_entry('{"user_facing": false}')
+    def test_missing_commits_defaults_to_empty(self):
+        """Entries without commits are valid (changeset-file mode)."""
+        entry = parse_entry('{"user_facing": false}')
+        assert entry.commits == []
 
     def test_missing_user_facing(self):
         with pytest.raises(ChangelogError, match="missing required field: user_facing"):
