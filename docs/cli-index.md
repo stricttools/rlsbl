@@ -1,6 +1,6 @@
 ---
 title: rlsbl CLI Reference
-description: "Complete CLI reference for rlsbl — all available commands, subcommands, flags, arguments, and usage examples with detailed descriptions."
+description: "Complete CLI reference for rlsbl -- all 52 commands across 16 top-level commands and 4 groups, with flags, arguments, and usage details."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 0
@@ -10,21 +10,22 @@ order: 91
 
 # rlsbl CLI Reference
 
-Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 49 commands organized into 15 top-level commands and 4 command groups (release, changelog, monorepo, dev).
+Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 52 commands organized into 16 top-level commands and 4 command groups (release, changelog, monorepo, dev).
 
-Version: 0.100.0
+Version: 0.100.1
 
 ## Commands
 
 - [check](cli-check.html) -- Run project checks registered via the check framework and report results
 - [status](cli-status.html) -- Display the current project version, branch, last release tag, unreleased commit count, and changelog coverage. Outputs plain text by default or structured JSON with the --json flag.
 - [scaffold](cli-scaffold.html) -- Generate or update CI/CD workflows, git hooks, changelog, and license files. Safe to run repeatedly -- merges template changes with your customizations. Use --force-overwrite to overwrite all files.
-- [check-name](cli-check-name.html) -- Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.
+- [check-name](cli-check-name.html) -- Query npm, PyPI, crates.io, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.
 - [claim-name](cli-claim-name.html) -- Claim a name on a package registry by publishing a minimal placeholder package. Runs check-name first, then publishes if available.
 - [discover](cli-discover.html) -- Search GitHub for repositories tagged with the rlsbl topic and list them. Use --mine to filter results to only your own repositories. Requires the gh CLI to be authenticated.
 - [watch](cli-watch.html) -- Poll GitHub Actions CI workflow runs for a specific commit SHA and report pass or fail status. Defaults to HEAD if no SHA is provided. Useful after rlsbl release to monitor the publish pipeline.
 - [pre-push-check](cli-pre-push-check.html) -- Verify that CHANGELOG.md contains an entry matching the current project version. Designed to run as a git pre-push hook to prevent pushing releases without documented changes.
 - [prs](cli-prs.html) -- List all open pull requests for the current repository using the GitHub CLI. Shows PR number, title, author, and branch for a quick overview of pending work.
+- [push](cli-push.html) -- Push the current branch to origin with preflight checks: branch guard (refuses release branches), changelog coverage validation with actionable remediation hints, and behind-remote detection. Use `rlsbl release run` for release branches.
 - [unreleased](cli-unreleased.html) -- List commits between the latest release tag and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain text or JSON to help prepare the next release.
 - [targets](cli-targets.html) -- List all release targets detected in the current project directory, showing which ecosystems (npm, PyPI, Go, Cargo, etc.) are active based on manifest files found.
 - [record-gif](cli-record-gif.html) -- Record an animated GIF demo of rlsbl commands using the vhs terminal recorder. Configurable width, height, font size, and duration for consistent, reproducible demo recordings.
@@ -34,7 +35,7 @@ Version: 0.100.0
 
 ## Command Groups
 
-- [release](cli-release.html) -- Release orchestration commands. Provides 8 subcommands covering the full release lifecycle: run, resume, init, retry, edit, undo, yank, and scrub.
+- [release](cli-release.html) -- Release orchestration commands. Provides 9 subcommands covering the full release lifecycle: run, resume, init, retry, edit, undo, deprecate, yank, and scrub.
 - [changelog](cli-changelog.html) -- Structured changelog management using JSONL entries with 3 entry types (feature, fix, breaking). Add and generate CHANGELOG.md from per-commit changelog entries stored in unreleased.jsonl for precise, auditable release notes.
 - [monorepo](cli-monorepo.html) -- Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Provides 16 monorepo subcommands plus a release subgroup, and supports all 18 release targets in a single workspace.toml.
 - [dev](cli-dev.html) -- Developer utilities for locally working with rlsbl projects, including editable installs that mirror the project's release target (pypi -> uv tool install -e, npm -> npm link, go -> go install).

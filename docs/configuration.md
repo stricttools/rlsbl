@@ -1,5 +1,5 @@
 ---
-description: "Configuration reference for rlsbl: config.json settings, workspace.toml for monorepos, and selfdoc.json for documentation."
+description: "Configuration reference for rlsbl: config.json project settings, workspace.toml for monorepos, selfdoc.json for documentation, and release file format."
 ---
 
 # Configuration reference

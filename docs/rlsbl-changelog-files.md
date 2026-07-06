@@ -1,7 +1,8 @@
 ---
 title: rlsbl.changelog.files
-description: "File management for JSONL changelog files: reading, writing, appending entries, version finalization, stale-entry detection, and path resolution."
+description: "File management layer for JSONL changelog files including reading, writing, appending entries, and path resolution for .rlsbl directories."
 generated: true
+seeded: true
 nav_group: "API Reference"
 nav_order: 5
 ---

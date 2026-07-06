@@ -1,6 +1,6 @@
 ---
 title: rlsbl.changelog.schema
-description: "JSONL changelog entry schema providing the dataclass definition, JSON parsing, serialization, field validation, and type coercion."
+description: "JSONL changelog entry schema with dataclass definition, JSON parsing, serialization, field validation, type coercion, and entry ID generation."
 generated: true
 nav_group: "API Reference"
 nav_order: 9

@@ -1,6 +1,6 @@
 ---
 title: rlsbl check-name
-description: "Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects "
+description: "Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects"
 generated: true
 nav_group: "CLI Reference"
 nav_order: 3
@@ -9,11 +9,11 @@ nav_order: 3
 
 # rlsbl check-name
 
-Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.
+Query npm, PyPI, crates.io, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.
 
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--target` |  | str |  |  | Registry to query for name availability (npm, pypi, go, or github); repeatable |
+| `--target` |  | str |  |  | Registry to query for name availability (npm, pypi, crates, go, or github); repeatable |
 | `--delay` |  | str | 200 |  | Milliseconds to wait between consecutive registry API queries (default: 200) |

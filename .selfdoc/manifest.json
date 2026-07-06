@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.100.0",
+  "version": "0.100.1",
   "description": "",
   "language": "python",
   "base_url": "https://rlsbl.smmh.dev",
@@ -85,6 +85,11 @@
     {
       "path": "cli-prs.md",
       "title": "rlsbl prs",
+      "type": "doc"
+    },
+    {
+      "path": "cli-push.md",
+      "title": "rlsbl push",
       "type": "doc"
     },
     {
@@ -303,6 +308,11 @@
       "type": "doc"
     },
     {
+      "path": "rlsbl-commands-deprecate.md",
+      "title": "rlsbl.commands.deprecate",
+      "type": "doc"
+    },
+    {
       "path": "rlsbl-commands-dev.md",
       "title": "rlsbl.commands.dev",
       "type": "doc"
@@ -385,6 +395,11 @@
     {
       "path": "rlsbl-commands-prs.md",
       "title": "rlsbl.commands.prs",
+      "type": "doc"
+    },
+    {
+      "path": "rlsbl-commands-push_cmd.md",
+      "title": "rlsbl.commands.push_cmd",
       "type": "doc"
     },
     {
@@ -498,6 +513,11 @@
       "type": "doc"
     },
     {
+      "path": "rlsbl-crates_wrapper.md",
+      "title": "rlsbl.crates_wrapper",
+      "type": "doc"
+    },
+    {
       "path": "rlsbl-dep_rewrite.md",
       "title": "rlsbl.dep_rewrite",
       "type": "doc"
@@ -515,6 +535,16 @@
     {
       "path": "rlsbl-errors.md",
       "title": "rlsbl.errors",
+      "type": "doc"
+    },
+    {
+      "path": "rlsbl-evidence_gate.md",
+      "title": "rlsbl.evidence_gate",
+      "type": "doc"
+    },
+    {
+      "path": "rlsbl-external_checks.md",
+      "title": "rlsbl.external_checks",
       "type": "doc"
     },
     {
@@ -698,6 +728,11 @@
       "type": "doc"
     },
     {
+      "path": "rlsbl-publication_probe.md",
+      "title": "rlsbl.publication_probe",
+      "type": "doc"
+    },
+    {
       "path": "rlsbl-publish_gate.md",
       "title": "rlsbl.publish_gate",
       "type": "doc"
@@ -720,6 +755,11 @@
     {
       "path": "rlsbl-release_file.md",
       "title": "rlsbl.release_file",
+      "type": "doc"
+    },
+    {
+      "path": "rlsbl-secret_scan.md",
+      "title": "rlsbl.secret_scan",
       "type": "doc"
     },
     {
@@ -920,5 +960,5 @@
       ]
     }
   ],
-  "last_gen": "2026-07-04T20:59:52.407821+00:00"
+  "last_gen": "2026-07-06T15:04:14.613987+00:00"
 }

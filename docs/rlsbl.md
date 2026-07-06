@@ -1,7 +1,8 @@
 ---
 title: rlsbl
-description: "Top-level rlsbl package: strictcli CLI with 14 top-level commands and 4 groups (release, changelog, monorepo, dev), version detection, and target support."
+description: "rlsbl: Release orchestration and project scaffolding for npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, and more, automating version bumps,..."
 generated: true
+seeded: true
 nav_group: "API Reference"
 nav_order: 1
 ---

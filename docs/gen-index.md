@@ -1,6 +1,6 @@
 ---
 title: API Reference
-description: "Complete auto-generated API reference index — browse all modules, classes, and functions with their signatures and docstrings."
+description: "Auto-generated API reference index -- all rlsbl modules, classes, and functions with signatures and docstrings."
 generated: true
 nav_group: "API Reference"
 nav_order: 0
@@ -36,6 +36,7 @@ order: 90
 - [rlsbl.commands.claim_name](rlsbl-commands-claim_name.html)
 - [rlsbl.commands.commit_cmd](rlsbl-commands-commit_cmd.html)
 - [rlsbl.commands.deploy_cmd](rlsbl-commands-deploy_cmd.html)
+- [rlsbl.commands.deprecate](rlsbl-commands-deprecate.html)
 - [rlsbl.commands.dev](rlsbl-commands-dev.html)
 - [rlsbl.commands.dev_sync](rlsbl-commands-dev_sync.html)
 - [rlsbl.commands.discover](rlsbl-commands-discover.html)
@@ -53,6 +54,7 @@ order: 90
 - [rlsbl.commands.monorepo.snapshot_cmd](rlsbl-commands-monorepo-snapshot_cmd.html)
 - [rlsbl.commands.monorepo.sync](rlsbl-commands-monorepo-sync.html)
 - [rlsbl.commands.prs](rlsbl-commands-prs.html)
+- [rlsbl.commands.push_cmd](rlsbl-commands-push_cmd.html)
 - [rlsbl.commands.record_gif](rlsbl-commands-record_gif.html)
 - [rlsbl.commands.release](rlsbl-commands-release.html)
 - [rlsbl.commands.release.execute](rlsbl-commands-release-execute.html)
@@ -74,10 +76,13 @@ order: 90
 - [rlsbl.config](rlsbl-config.html)
 - [rlsbl.constraints](rlsbl-constraints.html)
 - [rlsbl.context](rlsbl-context.html)
+- [rlsbl.crates_wrapper](rlsbl-crates_wrapper.html)
 - [rlsbl.dep_rewrite](rlsbl-dep_rewrite.html)
 - [rlsbl.dep_validation](rlsbl-dep_validation.html)
 - [rlsbl.deploy](rlsbl-deploy.html)
 - [rlsbl.errors](rlsbl-errors.html)
+- [rlsbl.evidence_gate](rlsbl-evidence_gate.html)
+- [rlsbl.external_checks](rlsbl-external_checks.html)
 - [rlsbl.git_util](rlsbl-git_util.html)
 - [rlsbl.go_introspect](rlsbl-go_introspect.html)
 - [rlsbl.hook_hashes](rlsbl-hook_hashes.html)
@@ -114,11 +119,13 @@ order: 90
 - [rlsbl.pipelines.protocol](rlsbl-pipelines-protocol.html)
 - [rlsbl.pipelines.pypi](rlsbl-pipelines-pypi.html)
 - [rlsbl.prepush_utils](rlsbl-prepush_utils.html)
+- [rlsbl.publication_probe](rlsbl-publication_probe.html)
 - [rlsbl.publish_gate](rlsbl-publish_gate.html)
 - [rlsbl.registry](rlsbl-registry.html)
 - [rlsbl.releasable_cleanup](rlsbl-releasable_cleanup.html)
 - [rlsbl.releasable_migration](rlsbl-releasable_migration.html)
 - [rlsbl.release_file](rlsbl-release_file.html)
+- [rlsbl.secret_scan](rlsbl-secret_scan.html)
 - [rlsbl.snapshot](rlsbl-snapshot.html)
 - [rlsbl.strictcli_detect](rlsbl-strictcli_detect.html)
 - [rlsbl.tagging](rlsbl-tagging.html)

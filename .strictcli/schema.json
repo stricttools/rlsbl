@@ -48,8 +48,8 @@
   },
   "project_id": "rlsbl",
   "name": "rlsbl",
-  "version": "0.100.0",
-  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 49 commands organized into 15 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
+  "version": "0.100.1",
+  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 52 commands organized into 16 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
   "global_flags": [
     {
       "name": "dry-run",
@@ -203,12 +203,12 @@
     },
     "check-name": {
       "name": "check-name",
-      "help": "Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.",
+      "help": "Query npm, PyPI, crates.io, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.",
       "flags": [
         {
           "name": "target",
           "type": "str",
-          "help": "Registry to query for name availability (npm, pypi, go, or github); repeatable",
+          "help": "Registry to query for name availability (npm, pypi, crates, go, or github); repeatable",
           "default": [],
           "repeatable": true,
           "unique": true
@@ -228,7 +228,7 @@
         {
           "name": "target",
           "type": "str",
-          "help": "Target package registry to publish the placeholder to (npm or pypi)",
+          "help": "Target package registry to publish the placeholder to (npm, pypi, or crates)",
           "default": ""
         }
       ]
@@ -294,6 +294,10 @@
     "prs": {
       "name": "prs",
       "help": "List all open pull requests for the current repository using the GitHub CLI. Shows PR number, title, author, and branch for a quick overview of pending work."
+    },
+    "push": {
+      "name": "push",
+      "help": "Push the current branch to origin with preflight checks: branch guard (refuses release branches), changelog coverage validation with actionable remediation hints, and behind-remote detection. Use `rlsbl release run` for release branches."
     },
     "unreleased": {
       "name": "unreleased",
@@ -390,7 +394,7 @@
   "groups": {
     "release": {
       "name": "release",
-      "help": "Release orchestration commands. Provides 8 subcommands covering the full release lifecycle: run, resume, init, retry, edit, undo, yank, and scrub.",
+      "help": "Release orchestration commands. Provides 9 subcommands covering the full release lifecycle: run, resume, init, retry, edit, undo, deprecate, yank, and scrub.",
       "commands": {
         "run": {
           "name": "run",
@@ -514,19 +518,49 @@
         },
         "undo": {
           "name": "undo",
-          "help": "Revert the most recent release by deleting the GitHub Release, removing the git tag from local and remote, and reverting the version bump commit. Requires a manual git push afterward to finalize.",
+          "help": "Revert a release. Without --version, reverts the latest release (deletes GitHub Release, removes git tag, reverts version bump commit). With --version, reverts a non-latest release if it is provably unpublished (probes registries for evidence, deletes GitHub Release + tag only, un-finalizes changelog).",
           "flags": [
             {
               "name": "target",
               "type": "str",
               "help": "Target a specific registry for version detection (auto-detected if omitted)",
               "default": ""
+            },
+            {
+              "name": "version",
+              "type": "str",
+              "help": "Version to undo (for non-latest releases that are provably unpublished)",
+              "default": ""
+            }
+          ]
+        },
+        "deprecate": {
+          "name": "deprecate",
+          "help": "Mark a past release as deprecated. Sets the GitHub Release pre-release flag and prepends a deprecation notice to the release notes. Use --reason to explain why and --use to suggest a replacement version.",
+          "flags": [
+            {
+              "name": "reason",
+              "type": "str",
+              "help": "Human-readable explanation of why this version is being deprecated",
+              "default": ""
+            },
+            {
+              "name": "use",
+              "type": "str",
+              "help": "Suggest this version as a replacement in the deprecation notice",
+              "default": ""
+            }
+          ],
+          "args": [
+            {
+              "name": "version",
+              "help": "Semver string of the release to deprecate, with or without v prefix (e.g. 0.9.1)"
             }
           ]
         },
         "yank": {
           "name": "yank",
-          "help": "Mark a past release as deprecated (soft yank) or delete it (hard yank). Soft yank marks the GitHub Release as pre-release and prepends a deprecation notice. Hard yank deletes the release entirely while preserving the git tag.",
+          "help": "Remove a published version from package registries. Probes each configured target's registry to determine publication status, then executes registry-specific removal: npm deprecate, cargo yank, Go retract, or PyPI manual checklist. Also marks the GitHub Release as pre-release with a yank notice.",
           "flags": [
             {
               "name": "reason",
@@ -537,14 +571,8 @@
             {
               "name": "use",
               "type": "str",
-              "help": "Suggest this version as a replacement in the deprecation notice",
+              "help": "Suggest this version as a replacement in the yank notice",
               "default": ""
-            },
-            {
-              "name": "hard",
-              "type": "bool",
-              "help": "Delete the release instead of marking as pre-release",
-              "negatable": true
             }
           ],
           "args": [
@@ -712,6 +740,12 @@
               "help": "Comma-separated commit hashes to associate with the amended changelog entry"
             },
             {
+              "name": "id",
+              "type": "str",
+              "help": "Entry ID (ULID) to select the target entry for amendment",
+              "default": ""
+            },
+            {
               "name": "description",
               "type": "str",
               "help": "Human-readable description for the amended entry in CHANGELOG.md",
@@ -741,12 +775,19 @@
         },
         "edit": {
           "name": "edit",
-          "help": "Modify an existing changelog entry in unreleased or released JSONL files. Finds the entry by commit hash, applies field changes (type, description, user-facing status), and rewrites the file atomically. For released files, temporarily unlocks the read-only file, regenerates CHANGELOG.md, and syncs GitHub Release notes.",
+          "help": "Modify an existing changelog entry in unreleased or released JSONL files. Finds the entry by commit hash or entry ID, applies field changes (type, description, user-facing status), and rewrites the file atomically. For released files, temporarily unlocks the read-only file, regenerates CHANGELOG.md, and syncs GitHub Release notes.",
           "flags": [
             {
               "name": "commits",
               "type": "str",
-              "help": "Comma-separated commit hashes identifying the target entry"
+              "help": "Comma-separated commit hashes identifying the target entry",
+              "default": ""
+            },
+            {
+              "name": "id",
+              "type": "str",
+              "help": "Entry ID (ULID) identifying the target entry",
+              "default": ""
             },
             {
               "name": "type",
@@ -771,6 +812,32 @@
               "type": "bool",
               "help": "Automatically commit the edited JSONL changelog file to git after modification",
               "default": true,
+              "negatable": true
+            }
+          ]
+        },
+        "remap": {
+          "name": "remap",
+          "help": "Remap stale commit hashes in JSONL changelog files using a mapping of old SHAs to new SHAs. Reads the mapping from a file (--map-file), the safegit rewrite journal (--from-journal), or stdin (--stdin). At least one source is required. Auto-commits with Autogenerated trailer.",
+          "flags": [
+            {
+              "name": "map-file",
+              "type": "str",
+              "help": "Path to a file of 'old_sha new_sha' lines (same format as git's post-rewrite hook)",
+              "default": ""
+            },
+            {
+              "name": "from-journal",
+              "type": "bool",
+              "help": "Read the commit map from safegit's rewrite journal (.git/safegit/rewrite-maps.jsonl)",
+              "default": false,
+              "negatable": true
+            },
+            {
+              "name": "stdin",
+              "type": "bool",
+              "help": "Read the old/new SHA map from stdin (for piping from git's post-rewrite hook)",
+              "default": false,
               "negatable": true
             }
           ]

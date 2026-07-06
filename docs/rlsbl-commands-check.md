@@ -1,7 +1,8 @@
 ---
 title: rlsbl.commands.check
-description: "Query package name availability across npm, PyPI, Go (pkg.go.dev), and GitHub. Detects moniker collisions via separator-insertion variants."
+description: "Check command to query package name availability across npm, PyPI, crates.io, Go module proxy (pkg.go.dev), and GitHub repository namespaces."
 generated: true
+seeded: true
 nav_group: "API Reference"
 nav_order: 23
 ---
