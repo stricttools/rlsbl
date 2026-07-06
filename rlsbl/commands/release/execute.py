@@ -1041,7 +1041,7 @@ def _run_release_mutating(state: ReleaseState):
                 tag_glob = None
 
             # Determine coverage mode for finalization
-            _coverage_unit = ctx.config.get("coverage_unit", "commit")
+            _coverage_unit = read_coverage_unit(ctx.config)
             if _coverage_unit == "changeset-file":
                 finalize_changeset_version(changes_dir, new_version)
             else:

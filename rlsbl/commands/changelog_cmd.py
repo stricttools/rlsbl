@@ -319,7 +319,7 @@ def cmd_add(flags, project_root):
             ws_context.ws_root, ws_context.releasable.name,
         )
     config = read_project_config(project_root, releasable_config_dir=releasable_config_dir)
-    coverage_unit = config.get("coverage_unit", "commit")
+    coverage_unit = read_coverage_unit(config)
 
     if coverage_unit == "changeset-file":
         return _cmd_add_changeset(flags, project_root, ws_context, config, dry_run)
@@ -355,6 +355,11 @@ def _cmd_add_changeset(flags, project_root, ws_context, config, dry_run):
         type=entry_type,
         release_type=flags.get("release-type") or None,
     )
+
+    # Auto-populate packages field in explicit releasable mode
+    if (isinstance(ws_context, _ResolvedContext)
+            and ws_context.releasable is not None):
+        entry.packages = [ws_context.releasable.name]
 
     errors = validate_schema(entry, coverage_unit="changeset-file")
     if errors:

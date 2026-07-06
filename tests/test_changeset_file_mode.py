@@ -500,3 +500,211 @@ class TestUnfinalizeChangesetMode:
 
         # Versioned JSONL should be gone
         assert not os.path.isfile(os.path.join(changes_dir, "2.0.0.jsonl"))
+
+
+# ---------------------------------------------------------------------------
+# 8i: read_coverage_unit enforcement at all callers
+# ---------------------------------------------------------------------------
+
+class TestReadCoverageUnitEnforcement:
+    """Verify that read_coverage_unit is wired into all callers.
+
+    The function hard-errors on missing or invalid coverage_unit values.
+    These tests confirm it is called (not bypassed via config.get defaults).
+    """
+
+    def test_invalid_coverage_unit_errors_in_cmd_add(self, tmp_path, monkeypatch):
+        """cmd_add with an invalid coverage_unit raises ConfigError."""
+        from rlsbl.commands.changelog_cmd import cmd_add
+        from rlsbl.errors import ConfigError
+
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+
+        _run_git(repo, "init", "-q")
+        _run_git(repo, "config", "user.email", "test@test.local")
+        _run_git(repo, "config", "user.name", "Test")
+
+        (repo / "README.md").write_text("# test\n")
+        _run_git(repo, "add", "README.md")
+        _run_git(repo, "commit", "-q", "-m", "initial")
+        _run_git(repo, "tag", "v0.0.0")
+
+        changes = repo / ".rlsbl" / "changes"
+        changes.mkdir(parents=True)
+        (changes / "unreleased.jsonl").write_text("")
+
+        # Write config with INVALID coverage_unit
+        config_path = repo / ".rlsbl" / "config.json"
+        config_path.write_text(json.dumps({
+            "coverage_unit": "bogus-value",
+            "private": True,
+        }, indent=2))
+
+        sha = _make_commit(repo, "file.txt", "change")
+        flags = {
+            "commits": sha,
+            "description": "A fix",
+            "type": "fix",
+            "user-facing": True,
+            "auto-commit": False,
+        }
+        with pytest.raises(ConfigError, match="coverage_unit"):
+            cmd_add(flags, project_root=repo)
+
+    def test_valid_coverage_unit_passes_in_cmd_add(self, tmp_path, monkeypatch):
+        """cmd_add with a valid coverage_unit succeeds normally."""
+        from rlsbl.commands.changelog_cmd import cmd_add
+
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+
+        _run_git(repo, "init", "-q")
+        _run_git(repo, "config", "user.email", "test@test.local")
+        _run_git(repo, "config", "user.name", "Test")
+
+        (repo / "README.md").write_text("# test\n")
+        _run_git(repo, "add", "README.md")
+        _run_git(repo, "commit", "-q", "-m", "initial")
+        _run_git(repo, "tag", "v0.0.0")
+
+        changes = repo / ".rlsbl" / "changes"
+        changes.mkdir(parents=True)
+        (changes / "unreleased.jsonl").write_text("")
+
+        # Write config with VALID coverage_unit
+        config_path = repo / ".rlsbl" / "config.json"
+        config_path.write_text(json.dumps({
+            "coverage_unit": "commit",
+            "private": True,
+        }, indent=2))
+
+        sha = _make_commit(repo, "file.txt", "change")
+        flags = {
+            "commits": sha,
+            "description": "A fix",
+            "type": "fix",
+            "user-facing": True,
+            "auto-commit": False,
+        }
+        # Should succeed without error
+        cmd_add(flags, project_root=repo)
+
+        entries = read_unreleased(get_changes_dir(str(repo)))
+        assert len(entries) == 1
+        assert entries[0].description == "A fix"
+
+    def test_invalid_coverage_unit_errors_in_check(self, tmp_path, monkeypatch):
+        """Changelog checks with invalid coverage_unit raise ConfigError."""
+        from rlsbl.errors import ConfigError
+        from rlsbl.changelog.files import read_coverage_unit
+
+        with pytest.raises(ConfigError, match="coverage_unit"):
+            read_coverage_unit({"coverage_unit": "invalid-mode"})
+
+    def test_read_project_config_defaults_coverage_unit(self, tmp_path):
+        """read_project_config injects coverage_unit='commit' when missing."""
+        from rlsbl.config import read_project_config
+
+        rlsbl_dir = tmp_path / ".rlsbl"
+        rlsbl_dir.mkdir()
+        (rlsbl_dir / "config.json").write_text(json.dumps({"private": True}))
+
+        config = read_project_config(tmp_path)
+        assert config["coverage_unit"] == "commit"
+
+
+# ---------------------------------------------------------------------------
+# 8j: Auto-derive packages in changeset mode for releasables
+# ---------------------------------------------------------------------------
+
+class TestChangesetAutoPackages:
+    """Verify packages field is auto-populated when adding changesets
+    inside a monorepo releasable."""
+
+    def test_changeset_add_in_releasable_sets_packages(self, tmp_path, monkeypatch):
+        """In changeset mode within a releasable, the pending file should
+        have packages = [releasable_name]."""
+        from rlsbl.commands.changelog_cmd import _cmd_add_changeset, _ResolvedContext
+        from rlsbl.changelog.files import get_pending_dir, read_pending_files
+        from rlsbl.workspace import Releasable
+        from rlsbl.workspace_types import get_releasable_changes_dir
+
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+
+        _run_git(repo, "init", "-q")
+        _run_git(repo, "config", "user.email", "test@test.local")
+        _run_git(repo, "config", "user.name", "Test")
+
+        (repo / "README.md").write_text("# test\n")
+        _run_git(repo, "add", "README.md")
+        _run_git(repo, "commit", "-q", "-m", "initial")
+        _run_git(repo, "tag", "v0.0.0")
+
+        # Set up the releasable's changes directory (monorepo layout)
+        releasable_changes = Path(get_releasable_changes_dir(str(repo), "auth"))
+        releasable_changes.mkdir(parents=True)
+        pending = releasable_changes / "pending"
+        pending.mkdir()
+
+        config = {
+            "coverage_unit": "changeset-file",
+            "private": True,
+        }
+
+        # Create a mock releasable
+        releasable = mock.MagicMock(spec=Releasable)
+        releasable.name = "auth"
+
+        ws_context = _ResolvedContext(
+            project=None,
+            releasable=releasable,
+            ws_root=str(repo),
+            member_projects=[],
+        )
+
+        flags = {
+            "description": "New auth feature",
+            "type": "feature",
+            "user-facing": True,
+            "auto-commit": False,
+        }
+
+        _cmd_add_changeset(flags, repo, ws_context, config, dry_run=False)
+
+        # Read back the pending file and verify packages
+        pending_dir = get_pending_dir(str(releasable_changes))
+        entries = read_pending_files(pending_dir)
+        assert len(entries) == 1
+        assert entries[0].packages == ["auth"]
+        assert entries[0].description == "New auth feature"
+
+    def test_changeset_add_standalone_no_packages(self, changeset_repo):
+        """In changeset mode without a releasable, packages should be None."""
+        from rlsbl.commands.changelog_cmd import _cmd_add_changeset
+        from rlsbl.changelog.files import get_pending_dir, read_pending_files, get_changes_dir
+
+        config = {
+            "coverage_unit": "changeset-file",
+            "private": True,
+        }
+
+        flags = {
+            "description": "Standalone fix",
+            "type": "fix",
+            "user-facing": True,
+            "auto-commit": False,
+        }
+
+        _cmd_add_changeset(flags, changeset_repo, None, config, dry_run=False)
+
+        changes_dir = get_changes_dir(str(changeset_repo))
+        pending_dir = get_pending_dir(changes_dir)
+        entries = read_pending_files(pending_dir)
+        assert len(entries) == 1
+        assert entries[0].packages is None
+        assert entries[0].description == "Standalone fix"

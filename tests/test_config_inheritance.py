@@ -130,11 +130,11 @@ class TestReadProjectConfigNoReleasable:
     def test_per_package_config_only(self, tmp_path):
         _write_json(tmp_path / ".rlsbl" / "config.json", {"private": False, "push_timeout": 300})
         result = read_project_config(tmp_path)
-        assert result == {"private": False, "push_timeout": 300}
+        assert result == {"private": False, "push_timeout": 300, "coverage_unit": "commit"}
 
     def test_per_package_absent_returns_empty(self, tmp_path):
         result = read_project_config(tmp_path)
-        assert result == {}
+        assert result == {"coverage_unit": "commit"}
 
 
 class TestReadProjectConfigReleasableInheritance:
@@ -150,7 +150,7 @@ class TestReadProjectConfigReleasableInheritance:
         pkg_dir.mkdir(parents=True)
 
         result = read_project_config(pkg_dir, releasable_config_dir=str(rel_dir))
-        assert result == {"private": False, "push_timeout": 120}
+        assert result == {"private": False, "push_timeout": 120, "coverage_unit": "commit"}
 
     def test_per_package_merges_on_top_of_releasable(self, tmp_path):
         """Per-package config present -> merged on top of releasable."""
@@ -171,6 +171,7 @@ class TestReadProjectConfigReleasableInheritance:
         assert result == {
             "private": False,
             "push_timeout": 300,
+            "coverage_unit": "commit",
             "batch_limits": {
                 "max_commits_per_entry": 5,
                 "max_entries_per_commit": 2,
@@ -198,7 +199,7 @@ class TestReadProjectConfigReleasableInheritance:
         _write_json(pkg_dir / ".rlsbl" / "config.json", {"private": True})
 
         result = read_project_config(pkg_dir, releasable_config_dir=str(rel_dir))
-        assert result == {"private": True}
+        assert result == {"private": True, "coverage_unit": "commit"}
 
 
 # ---------------------------------------------------------------------------
@@ -295,7 +296,7 @@ class TestCreateContextReleasable:
         _write_json(tmp_path / ".rlsbl" / "config.json", {"private": True})
 
         ctx = create_context(Path(tmp_path))
-        assert ctx.config == {"private": True}
+        assert ctx.config == {"private": True, "coverage_unit": "commit"}
 
 
 # ---------------------------------------------------------------------------

@@ -37,7 +37,7 @@ class TestUndoHappyPath(unittest.TestCase):
 
         # Run with --yes to skip interactive prompts; suppress stdout
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
+            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"coverage_unit": "commit"}))
 
         # Verify git subprocess commands were issued via run()
         expected_run_calls = [
@@ -51,11 +51,11 @@ class TestUndoHappyPath(unittest.TestCase):
         self.assertEqual(mock_run.call_count, 5)
 
         # Verify gh commands went through run_gh
-        mock_run_gh.assert_any_call(["release", "view", "v1.0.0"], config={})
-        mock_run_gh.assert_any_call(["release", "delete", "v1.0.0", "--yes"], config={})
+        mock_run_gh.assert_any_call(["release", "view", "v1.0.0"], config={"coverage_unit": "commit"})
+        mock_run_gh.assert_any_call(["release", "delete", "v1.0.0", "--yes"], config={"coverage_unit": "commit"})
 
         # Verify push_if_needed was called with the current branch
-        mock_push.assert_called_once_with("main", env=ANY, config={})
+        mock_push.assert_called_once_with("main", env=ANY, config={"coverage_unit": "commit"})
 
 
 class TestUndoMonorepo(unittest.TestCase):
@@ -85,7 +85,7 @@ class TestUndoMonorepo(unittest.TestCase):
         ]
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
+            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"coverage_unit": "commit"}))
 
         # Verify tag discovery uses project-scoped match pattern
         expected_run_calls = [
@@ -99,9 +99,9 @@ class TestUndoMonorepo(unittest.TestCase):
         self.assertEqual(mock_run.call_count, 5)
 
         # Verify gh commands went through run_gh
-        mock_run_gh.assert_any_call(["release", "view", "mylib@v2.1.0"], config={})
-        mock_run_gh.assert_any_call(["release", "delete", "mylib@v2.1.0", "--yes"], config={})
-        mock_push.assert_called_once_with("main", env=ANY, config={})
+        mock_run_gh.assert_any_call(["release", "view", "mylib@v2.1.0"], config={"coverage_unit": "commit"})
+        mock_run_gh.assert_any_call(["release", "delete", "mylib@v2.1.0", "--yes"], config={"coverage_unit": "commit"})
+        mock_push.assert_called_once_with("main", env=ANY, config={"coverage_unit": "commit"})
 
     @patch("rlsbl.commands.undo.find_workspace_root", return_value="/fake/monorepo")
     @patch("rlsbl.commands.undo.resolve_project", return_value={"name": "mylib", "path": "packages/mylib"})
@@ -126,7 +126,7 @@ class TestUndoMonorepo(unittest.TestCase):
         ]
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
+            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"coverage_unit": "commit"}))
 
         # Only 4 git calls: no revert issued (gh calls go through run_gh)
         self.assertEqual(mock_run.call_count, 4)
@@ -143,7 +143,7 @@ class TestUndoMonorepo(unittest.TestCase):
 
         with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
             with self.assertRaises(SystemExit) as ctx:
-                run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
+                run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"coverage_unit": "commit"}))
 
         self.assertEqual(ctx.exception.code, 1)
         self.assertIn("not inside any project", mock_stderr.getvalue())
@@ -170,7 +170,7 @@ class TestUndoMonorepo(unittest.TestCase):
         ]
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
+            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"coverage_unit": "commit"}))
 
         # Only 4 git calls: no revert issued (gh calls go through run_gh)
         self.assertEqual(mock_run.call_count, 4)
@@ -215,7 +215,7 @@ class TestUndoTwoCommitPattern(unittest.TestCase):
         ]
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
+            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"coverage_unit": "commit"}))
 
         expected_run_calls = [
             call("git", ["describe", "--tags", "--abbrev=0", "--match", "v*"]),
@@ -235,7 +235,7 @@ class TestUndoTwoCommitPattern(unittest.TestCase):
         mock_generate.assert_called_once()
 
         # Push should still be called after reverting
-        mock_push.assert_called_once_with("main", env=ANY, config={})
+        mock_push.assert_called_once_with("main", env=ANY, config={"coverage_unit": "commit"})
 
 
 class TestUndoReleaseFileRestore(unittest.TestCase):
@@ -268,7 +268,7 @@ class TestUndoReleaseFileRestore(unittest.TestCase):
         ]
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
+            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"coverage_unit": "commit"}))
 
         releases_dir = os.path.join(".", ".rlsbl", "releases")
         mock_unfinalize.assert_called_once_with(releases_dir, "1.0.0")
@@ -302,7 +302,7 @@ class TestUndoReleaseFileRestore(unittest.TestCase):
         ]
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
+            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"coverage_unit": "commit"}))
 
         mock_unfinalize.assert_called_once()
         self.assertEqual(mock_run.call_count, 5)
@@ -341,7 +341,7 @@ class TestUndoNoGitHubRelease(unittest.TestCase):
         ]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
+            run_cmd("npm", [], {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"coverage_unit": "commit"}))
 
         output = mock_stdout.getvalue()
 
@@ -363,7 +363,7 @@ class TestUndoNoGitHubRelease(unittest.TestCase):
         self.assertEqual(mock_run_gh.call_count, 1)
 
         # Push should still happen (undo completed successfully)
-        mock_push.assert_called_once_with("main", env=ANY, config={})
+        mock_push.assert_called_once_with("main", env=ANY, config={"coverage_unit": "commit"})
 
 
 if __name__ == "__main__":

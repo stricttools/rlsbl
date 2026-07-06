@@ -5,7 +5,7 @@ import re
 import sys
 import traceback
 
-from ..changelog.files import get_changes_dir, unfinalize_changeset_version, unfinalize_version
+from ..changelog.files import get_changes_dir, read_coverage_unit, unfinalize_changeset_version, unfinalize_version
 from ..changelog.generate import generate_changelog
 from ..config import read_project_config
 from ..release_file import unfinalize_release_file
@@ -330,7 +330,7 @@ def run_cmd(registry, args, flags, *, ctx):
             )
             # Pick the right unfinalize based on coverage mode
             _cfg = read_project_config(project_path)
-            if _cfg.get("coverage_unit") == "changeset-file":
+            if read_coverage_unit(_cfg) == "changeset-file":
                 unfinalize_changeset_version(changes_dir, bare_version)
             else:
                 unfinalize_version(changes_dir, bare_version)
@@ -537,7 +537,7 @@ def _run_non_latest_undo(version_str, flags, *, ctx):
             _resolve_undo_changelog_paths(project_path, ws_root, releasable_name)
         )
         _cfg = read_project_config(project_path)
-        if _cfg.get("coverage_unit") == "changeset-file":
+        if read_coverage_unit(_cfg) == "changeset-file":
             changed = unfinalize_changeset_version(changes_dir, version)
         else:
             changed = unfinalize_version(changes_dir, version)

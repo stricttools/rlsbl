@@ -121,10 +121,14 @@ def read_project_config(project_root, releasable_config_dir=None):
     2. Releasable config.json (lowest)
 
     When ``releasable_config_dir`` is None, loads only the per-package level.
+
+    Ensures ``coverage_unit`` is always present (defaults to ``"commit"``
+    for backward compatibility with configs that predate Phase 8).
     """
     pkg_config = read_json_config(_project_config(project_root))
 
     if releasable_config_dir is None:
+        pkg_config.setdefault("coverage_unit", "commit")
         return pkg_config
 
     # Load releasable level
@@ -132,10 +136,13 @@ def read_project_config(project_root, releasable_config_dir=None):
     rel_config = read_json_config(rel_config_path)
 
     if not rel_config:
+        pkg_config.setdefault("coverage_unit", "commit")
         return pkg_config
 
     # Merge: per-package on top of releasable
-    return merge_config(rel_config, pkg_config)
+    merged = merge_config(rel_config, pkg_config)
+    merged.setdefault("coverage_unit", "commit")
+    return merged
 
 
 def read_deploy_config(config):

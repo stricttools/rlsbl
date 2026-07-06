@@ -21,6 +21,11 @@ class ProjectContext:
     push_stdin: str | None = field(default=None)
     releasable: "Releasable | None" = field(default=None)
 
+    def __post_init__(self):
+        # Ensure coverage_unit is always present so read_coverage_unit()
+        # does not error for configs that predate the Phase 8 addition.
+        self.config.setdefault("coverage_unit", "commit")
+
 
 def _resolve_releasable_config_dir(
     root: Path,

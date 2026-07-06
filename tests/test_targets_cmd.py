@@ -171,7 +171,7 @@ class TestMultiTargetRelease:
             run_cmd(_rc(include=["npm", "spec"]), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
 
         # Verify spec target build was called with config kwarg
-        build_mock.assert_called_once_with(".", "1.0.1", config={"private": False, "pipelines": {}})
+        build_mock.assert_called_once_with(".", "1.0.1", config={"private": False, "pipelines": {}, "coverage_unit": "commit"})
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")

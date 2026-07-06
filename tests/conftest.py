@@ -25,6 +25,10 @@ def make_ctx(project_root, config=None):
 
     If config is not provided, reads .rlsbl/config.json from project_root
     (returning {} if the file doesn't exist).
+
+    Always ensures ``coverage_unit`` is present in the config (defaults to
+    ``"commit"``) so that ``read_coverage_unit()`` does not raise in tests
+    that don't explicitly test coverage_unit behavior.
     """
     if isinstance(project_root, str):
         from pathlib import Path
@@ -35,6 +39,7 @@ def make_ctx(project_root, config=None):
             config = json.loads(config_path.read_text())
         else:
             config = {}
+    config.setdefault("coverage_unit", "commit")
     return ProjectContext(project_root=project_root, workspace_root=None, config=config)
 
 

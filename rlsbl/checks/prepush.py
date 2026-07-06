@@ -110,7 +110,8 @@ def register_prepush_checks(app):
             return CheckResult("skip", "JSONL changelog not set up")
 
         # Check coverage mode
-        coverage_unit = ctx.config.get("coverage_unit", "commit")
+        from ..changelog.files import read_coverage_unit
+        coverage_unit = read_coverage_unit(ctx.config)
         if coverage_unit == "changeset-file":
             from ..changelog.files import get_changes_dir
             from ..prepush_utils import check_changeset_file_coverage
