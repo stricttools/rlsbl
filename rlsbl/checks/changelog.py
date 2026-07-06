@@ -59,6 +59,8 @@ def register_changelog_checks(app):
     @app.check("changelog-hashes")
     def check_changelog_hashes(ctx):
         """Every hash in unreleased.jsonl must resolve via git rev-parse."""
+        if ctx.config.get("coverage_unit") == "changeset-file":
+            return CheckResult("skip", "not applicable in changeset-file mode")
         from ..changelog.validate import check_hashes_resolve
 
         all_contexts = _get_all_changelog_contexts(ctx)
@@ -80,6 +82,8 @@ def register_changelog_checks(app):
     @app.check("changelog-range")
     def check_changelog_range(ctx):
         """Every resolved hash must be in the unreleased commit range."""
+        if ctx.config.get("coverage_unit") == "changeset-file":
+            return CheckResult("skip", "not applicable in changeset-file mode")
         from ..changelog.validate import check_in_range
 
         all_contexts = _get_all_changelog_contexts(ctx)
@@ -101,6 +105,8 @@ def register_changelog_checks(app):
     @app.check("changelog-coverage")
     def check_changelog_coverage(ctx):
         """Every unreleased commit must appear in at least one entry."""
+        if ctx.config.get("coverage_unit") == "changeset-file":
+            return CheckResult("skip", "not applicable in changeset-file mode")
         from ..changelog.validate import check_coverage
 
         all_contexts = _get_all_changelog_contexts(ctx)
@@ -134,6 +140,8 @@ def register_changelog_checks(app):
     @app.check("changelog-orphans")
     def check_changelog_orphans(ctx):
         """No entry should have ALL hashes unresolvable (stale/rebased)."""
+        if ctx.config.get("coverage_unit") == "changeset-file":
+            return CheckResult("skip", "not applicable in changeset-file mode")
         from ..changelog.validate import check_no_orphans
 
         all_contexts = _get_all_changelog_contexts(ctx)
@@ -176,6 +184,19 @@ def register_changelog_checks(app):
     @app.check("changelog-user-facing")
     def check_changelog_user_facing(ctx):
         """At least one entry must be user-facing."""
+        # In changeset-file mode, check pending files instead
+        if ctx.config.get("coverage_unit") == "changeset-file":
+            from ..changelog.files import get_changes_dir, get_pending_dir, read_pending_files
+            changes_dir = get_changes_dir(str(ctx.project_root))
+            pending_dir = get_pending_dir(changes_dir)
+            entries = read_pending_files(pending_dir)
+            if not entries:
+                return CheckResult("warn", "no pending changelog files")
+            has_uf = any(e.user_facing for e in entries)
+            if has_uf:
+                return CheckResult("pass", "has user-facing entries")
+            return CheckResult("warn", "no user-facing entries (use bump = \"hotfix\" for infrastructure-only releases)")
+
         from ..changelog.validate import check_has_user_facing
 
         all_contexts = _get_all_changelog_contexts(ctx)
@@ -207,6 +228,8 @@ def register_changelog_checks(app):
     @app.check("changelog-batch-commits")
     def check_changelog_batch_commits(ctx):
         """No entry should have more commits than max_commits_per_entry."""
+        if ctx.config.get("coverage_unit") == "changeset-file":
+            return CheckResult("skip", "not applicable in changeset-file mode")
         from ..changelog.validate import check_batch_size_commits, _get_batch_limits_config
 
         all_contexts = _get_all_changelog_contexts(ctx)
@@ -230,6 +253,8 @@ def register_changelog_checks(app):
     @app.check("changelog-batch-entries")
     def check_changelog_batch_entries(ctx):
         """No commit should appear in more entries than max_entries_per_commit."""
+        if ctx.config.get("coverage_unit") == "changeset-file":
+            return CheckResult("skip", "not applicable in changeset-file mode")
         from ..changelog.validate import (
             check_batch_size_entries,
             _get_batch_limits_config,
