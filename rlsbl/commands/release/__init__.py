@@ -9,10 +9,12 @@ import time
 
 from ...changelog import (
     changes_dir_exists,
+    finalize_changeset_version,
     finalize_version,
     generate_changelog,
     generate_version_file,
     get_changes_dir,
+    read_coverage_unit,
     validate_unreleased,
 )
 from ...changelog.generate import _read_release_metadata, _read_release_metadata_full
