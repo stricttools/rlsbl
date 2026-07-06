@@ -17,6 +17,10 @@ from ..npm_wrapper import (
     load_platform_config,
     npm_wrapper_template_mappings,
 )
+from ..crates_wrapper import (
+    build_crates_publish_jobs,
+    crates_wrapper_template_mappings,
+)
 from ..utils import read_go_module_path
 
 VERSION_FILE = "VERSION"
@@ -271,6 +275,19 @@ class GoTarget(BaseTarget):
             )
             publish_setup += "\n- Add NPM_TOKEN secret for npm binary wrapper publishing"
 
+        # crates.io wrapper publish job
+        crates_publish_jobs = ""
+        crates_wrapper_config = config.get("crates_wrapper", {}) if config else {}
+        crates_wrapper_enabled = crates_wrapper_config.get("enabled", False)
+        if crates_wrapper_enabled and not is_library and repo_name:
+            crates_publish_jobs = build_crates_publish_jobs(
+                short_name, repo_name,
+            )
+            publish_setup += (
+                "\n- Configure Trusted Publishing on crates.io for the wrapper crate"
+                "\n  (crates.io > Manage > Settings > Trusted Publishing > Add GitHub repo)"
+            )
+
         result = {
             "name": short_name,
             "modulePath": name,
@@ -285,6 +302,7 @@ class GoTarget(BaseTarget):
             "brewsSection": brews_section,
             "homebrewEnv": homebrew_env,
             "npmPublishJobs": npm_publish_jobs,
+            "cratesPublishJobs": crates_publish_jobs,
         }
 
         # Extract minimum required Go version from go.mod
@@ -341,6 +359,9 @@ class GoTarget(BaseTarget):
             npm_wrapper_config = config.get("npm_wrapper", {})
             if npm_wrapper_config.get("scope"):
                 mappings.extend(npm_wrapper_template_mappings())
+            crates_wrapper_config = config.get("crates_wrapper", {})
+            if crates_wrapper_config.get("enabled"):
+                mappings.extend(crates_wrapper_template_mappings())
         return mappings
 
     def check_project_exists(self, dir_path):

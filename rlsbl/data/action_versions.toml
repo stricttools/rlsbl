@@ -10,6 +10,7 @@
 "pypa/gh-action-pypi-publish" = "release/v1"
 "goreleaser/goreleaser-action" = "v7"
 "dtolnay/rust-toolchain" = "stable"
+"rust-lang/crates-io-auth-action" = "v1"
 "dart-lang/setup-dart" = "v1"
 "denoland/setup-deno" = "v2"
 "docker/setup-buildx-action" = "v3"
