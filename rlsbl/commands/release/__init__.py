@@ -537,8 +537,10 @@ def _run_cmd_inner(release_config, flags, *, ctx):
 
     # Changelog preflight: run preflight-changelog checks via the check system
     if not flags.get("dry-run", False):
-        from rlsbl import app as _rlsbl_app
+        from rlsbl import app as _rlsbl_app, _register_external_checks_from_config
         from pathlib import Path as _Path
+
+        _register_external_checks_from_config(config)
 
         if releasable_name and monorepo_root:
             from ...check_context import WorkspaceCheckContext as _WsCtx
@@ -754,9 +756,11 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         elif flags.get("dry-run", False):
             log("Skipping preflight checks (dry-run)")
         else:
-            from rlsbl import app as _rlsbl_app
+            from rlsbl import app as _rlsbl_app, _register_external_checks_from_config
             from ...check_context import WorkspaceCheckContext
             from pathlib import Path as _Path
+
+            _register_external_checks_from_config(ctx.config)
 
             all_failed = []
             for pkg_name, pkg_dir in sorted(_member_tuples):
@@ -813,9 +817,11 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         elif flags.get("dry-run", False):
             log("Skipping preflight checks (dry-run)")
         else:
-            from rlsbl import app as _rlsbl_app
+            from rlsbl import app as _rlsbl_app, _register_external_checks_from_config
             from ...context import ProjectContext as _ProjectContext
             from pathlib import Path as _Path
+
+            _register_external_checks_from_config(config)
 
             standalone_ctx = _ProjectContext(
                 project_root=_Path(project_dir),

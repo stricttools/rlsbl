@@ -1,0 +1,411 @@
+"""Tests for external check providers (config-declared subprocess checks)."""
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+
+import pytest
+
+from rlsbl.external_checks import (
+    ExternalCheckError,
+    _make_external_check_fn,
+    register_external_checks,
+    validate_external_checks,
+)
+
+
+# ---------------------------------------------------------------------------
+# Validation tests
+# ---------------------------------------------------------------------------
+
+
+class TestValidateExternalChecks:
+    def test_no_key_returns_empty(self):
+        assert validate_external_checks({}) == []
+
+    def test_none_value_returns_empty(self):
+        assert validate_external_checks({"external_checks": None}) == []
+
+    def test_not_a_list_raises(self):
+        with pytest.raises(ExternalCheckError, match="must be a list"):
+            validate_external_checks({"external_checks": "bad"})
+
+    def test_entry_not_a_dict_raises(self):
+        with pytest.raises(ExternalCheckError, match="must be a dict"):
+            validate_external_checks({"external_checks": ["bad"]})
+
+    def test_missing_name_raises(self):
+        with pytest.raises(ExternalCheckError, match="missing required key 'name'"):
+            validate_external_checks({
+                "external_checks": [{"command": "echo ok", "tag": "quality"}]
+            })
+
+    def test_missing_command_raises(self):
+        with pytest.raises(ExternalCheckError, match="missing required key 'command'"):
+            validate_external_checks({
+                "external_checks": [{"name": "test", "tag": "quality"}]
+            })
+
+    def test_missing_tag_raises(self):
+        with pytest.raises(ExternalCheckError, match="missing required key 'tag'"):
+            validate_external_checks({
+                "external_checks": [{"name": "test", "command": "echo ok"}]
+            })
+
+    def test_empty_name_raises(self):
+        with pytest.raises(ExternalCheckError, match="must be a non-empty string"):
+            validate_external_checks({
+                "external_checks": [{"name": "", "command": "echo ok", "tag": "q"}]
+            })
+
+    def test_duplicate_name_raises(self):
+        with pytest.raises(ExternalCheckError, match="duplicate name"):
+            validate_external_checks({
+                "external_checks": [
+                    {"name": "dup", "command": "echo 1", "tag": "q"},
+                    {"name": "dup", "command": "echo 2", "tag": "q"},
+                ]
+            })
+
+    def test_depends_on_not_a_list_raises(self):
+        with pytest.raises(ExternalCheckError, match="depends_on must be a list"):
+            validate_external_checks({
+                "external_checks": [{
+                    "name": "test", "command": "echo ok",
+                    "tag": "quality", "depends_on": "bad",
+                }]
+            })
+
+    def test_depends_on_bad_entry_raises(self):
+        with pytest.raises(ExternalCheckError, match="depends_on.*must be a non-empty string"):
+            validate_external_checks({
+                "external_checks": [{
+                    "name": "test", "command": "echo ok",
+                    "tag": "quality", "depends_on": [""],
+                }]
+            })
+
+    def test_cwd_not_a_string_raises(self):
+        with pytest.raises(ExternalCheckError, match="cwd must be a string"):
+            validate_external_checks({
+                "external_checks": [{
+                    "name": "test", "command": "echo ok",
+                    "tag": "quality", "cwd": 123,
+                }]
+            })
+
+    def test_missing_command_binary_raises(self, monkeypatch):
+        monkeypatch.setattr(shutil, "which", lambda name: None)
+        with pytest.raises(ExternalCheckError, match="command binary not found"):
+            validate_external_checks({
+                "external_checks": [{
+                    "name": "test",
+                    "command": "nonexistent-binary --check",
+                    "tag": "quality",
+                }]
+            })
+
+    def test_valid_config_passes(self, monkeypatch):
+        monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/" + name)
+        result = validate_external_checks({
+            "external_checks": [{
+                "name": "my-check",
+                "command": "mycheck --verify",
+                "tag": "preflight",
+                "depends_on": ["test-suite"],
+                "cwd": "subdir",
+            }]
+        })
+        assert len(result) == 1
+        assert result[0]["name"] == "my-check"
+
+
+# ---------------------------------------------------------------------------
+# Check function execution tests
+# ---------------------------------------------------------------------------
+
+
+class TestMakeExternalCheckFn:
+    def test_passing_command(self, tmp_path):
+        """A command that exits 0 produces a pass result."""
+        fn = _make_external_check_fn("echo hello", None, "test-check")
+
+        class FakeCtx:
+            project_root = tmp_path
+
+        result = fn(FakeCtx())
+        assert result.status == "pass"
+        assert "hello" in result.message
+
+    def test_failing_command(self, tmp_path):
+        """A command that exits non-zero produces a fail result."""
+        fn = _make_external_check_fn("false", None, "test-check")
+
+        class FakeCtx:
+            project_root = tmp_path
+
+        result = fn(FakeCtx())
+        assert result.status == "fail"
+        assert "test-check" in result.message
+
+    def test_command_with_stderr(self, tmp_path):
+        """A failing command captures stderr in the fail message."""
+        fn = _make_external_check_fn(
+            "bash -c 'echo bad-stuff >&2; exit 1'",
+            None, "stderr-check",
+        )
+
+        class FakeCtx:
+            project_root = tmp_path
+
+        result = fn(FakeCtx())
+        assert result.status == "fail"
+        assert "bad-stuff" in result.message or any(
+            "bad-stuff" in d for d in result.details
+        )
+
+    def test_cwd_absolute(self, tmp_path):
+        """When cwd is absolute, the command runs in that directory."""
+        sub = tmp_path / "subdir"
+        sub.mkdir()
+        fn = _make_external_check_fn("pwd", str(sub), "cwd-check")
+
+        class FakeCtx:
+            project_root = tmp_path
+
+        result = fn(FakeCtx())
+        assert result.status == "pass"
+        assert str(sub) in result.message
+
+    def test_cwd_relative(self, tmp_path):
+        """When cwd is relative, it is resolved against project_root."""
+        sub = tmp_path / "rel"
+        sub.mkdir()
+        fn = _make_external_check_fn("pwd", "rel", "cwd-check")
+
+        class FakeCtx:
+            project_root = tmp_path
+
+        result = fn(FakeCtx())
+        assert result.status == "pass"
+        assert str(sub) in result.message
+
+
+# ---------------------------------------------------------------------------
+# Registration tests
+# ---------------------------------------------------------------------------
+
+
+class TestRegisterExternalChecks:
+    def test_registers_on_app(self, monkeypatch):
+        """External checks are added to app._check_defs."""
+        monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/" + name)
+
+        # Create a minimal app-like object with _check_defs
+        class FakeApp:
+            _check_defs = {}
+
+        fake_app = FakeApp()
+        config = {
+            "external_checks": [{
+                "name": "ext-quality-check",
+                "command": "mycheck --verify",
+                "tag": "quality",
+                "depends_on": ["test-suite"],
+            }]
+        }
+        register_external_checks(fake_app, config)
+
+        assert "ext-quality-check" in fake_app._check_defs
+        check_def = fake_app._check_defs["ext-quality-check"]
+        assert check_def.tags == ["quality"]
+        assert check_def.depends_on == ["test-suite"]
+        assert check_def.impl is not None
+        assert check_def.severity == "error"
+
+    def test_idempotent_registration(self, monkeypatch):
+        """Calling register twice with the same config does not error."""
+        monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/" + name)
+
+        class FakeApp:
+            _check_defs = {}
+
+        fake_app = FakeApp()
+        config = {
+            "external_checks": [{
+                "name": "ext-check",
+                "command": "mycheck",
+                "tag": "quality",
+            }]
+        }
+        register_external_checks(fake_app, config)
+        register_external_checks(fake_app, config)
+        assert len(fake_app._check_defs) == 1
+
+    def test_no_external_checks_noop(self):
+        """No external_checks key means nothing is registered."""
+        class FakeApp:
+            _check_defs = {}
+
+        register_external_checks(FakeApp(), {})
+        assert len(FakeApp._check_defs) == 0
+
+    def test_invalid_config_raises(self):
+        """Invalid config raises ExternalCheckError."""
+        class FakeApp:
+            _check_defs = {}
+
+        with pytest.raises(ExternalCheckError):
+            register_external_checks(FakeApp(), {"external_checks": "bad"})
+
+
+# ---------------------------------------------------------------------------
+# Integration: external check runs during rlsbl check --tag
+# ---------------------------------------------------------------------------
+
+
+class TestExternalCheckIntegration:
+    def test_external_check_in_preflight_tag(self, mock_git_repo, monkeypatch):
+        """An external check tagged 'preflight' runs via run_checks."""
+        from strictcli import _CheckDef, CheckResult
+
+        import rlsbl
+
+        # Write config with an external check
+        rlsbl_dir = mock_git_repo / ".rlsbl"
+        rlsbl_dir.mkdir(exist_ok=True)
+        config = {
+            "private": False,
+            "targets": ["plain"],
+            "external_checks": [{
+                "name": "ext-test-pass",
+                "command": "echo 'all good'",
+                "tag": "preflight",
+            }],
+        }
+        (rlsbl_dir / "config.json").write_text(json.dumps(config))
+
+        # Register the external check on the real app
+        rlsbl._register_external_checks_from_config(config)
+
+        # Verify it was registered
+        assert "ext-test-pass" in rlsbl.app._check_defs
+
+        # Run checks with preflight tag
+        from rlsbl.context import ProjectContext
+        from pathlib import Path
+
+        ctx = ProjectContext(
+            project_root=Path(str(mock_git_repo)),
+            workspace_root=None,
+            config=config,
+        )
+        results, exit_code = rlsbl.app.run_checks(ctx, tag_expr="preflight")
+
+        # Find our external check result
+        ext_results = [r for r in results if r.name == "ext-test-pass"]
+        assert len(ext_results) == 1
+        assert ext_results[0].result.status == "pass"
+
+        # Cleanup: remove from app._check_defs to not pollute other tests
+        del rlsbl.app._check_defs["ext-test-pass"]
+
+    def test_external_check_failure_aborts(self, mock_git_repo, monkeypatch):
+        """A failing external check causes non-zero exit from run_checks."""
+        import rlsbl
+
+        config = {
+            "private": False,
+            "external_checks": [{
+                "name": "ext-test-fail",
+                "command": "false",
+                "tag": "preflight",
+            }],
+        }
+
+        rlsbl._register_external_checks_from_config(config)
+        assert "ext-test-fail" in rlsbl.app._check_defs
+
+        from rlsbl.context import ProjectContext
+        from pathlib import Path
+
+        ctx = ProjectContext(
+            project_root=Path(str(mock_git_repo)),
+            workspace_root=None,
+            config=config,
+        )
+        results, exit_code = rlsbl.app.run_checks(ctx, tag_expr="preflight")
+
+        ext_results = [r for r in results if r.name == "ext-test-fail"]
+        assert len(ext_results) == 1
+        assert ext_results[0].result.status == "fail"
+        assert exit_code != 0
+
+        # Cleanup
+        del rlsbl.app._check_defs["ext-test-fail"]
+
+    def test_depends_on_ordering(self, mock_git_repo):
+        """depends_on fields are preserved and used in ordering."""
+        import rlsbl
+
+        config = {
+            "private": False,
+            "external_checks": [
+                {
+                    "name": "ext-dep-target",
+                    "command": "echo target",
+                    "tag": "preflight",
+                },
+                {
+                    "name": "ext-dep-dependent",
+                    "command": "echo dependent",
+                    "tag": "preflight",
+                    "depends_on": ["ext-dep-target"],
+                },
+            ],
+        }
+
+        rlsbl._register_external_checks_from_config(config)
+
+        # Verify dependency metadata is preserved
+        dependent_def = rlsbl.app._check_defs["ext-dep-dependent"]
+        assert "ext-dep-target" in dependent_def.depends_on
+
+        # Run checks and verify both ran
+        from rlsbl.context import ProjectContext
+        from pathlib import Path
+
+        ctx = ProjectContext(
+            project_root=Path(str(mock_git_repo)),
+            workspace_root=None,
+            config=config,
+        )
+        results, exit_code = rlsbl.app.run_checks(ctx, tag_expr="preflight")
+
+        names = [r.name for r in results]
+        assert "ext-dep-target" in names
+        assert "ext-dep-dependent" in names
+
+        # Target must appear before dependent in results
+        target_idx = names.index("ext-dep-target")
+        dependent_idx = names.index("ext-dep-dependent")
+        assert target_idx < dependent_idx
+
+        # Cleanup
+        del rlsbl.app._check_defs["ext-dep-target"]
+        del rlsbl.app._check_defs["ext-dep-dependent"]
+
+    def test_missing_command_hard_error_at_registration(self, monkeypatch):
+        """A missing command binary errors at registration, not run time."""
+        monkeypatch.setattr(shutil, "which", lambda name: None)
+
+        with pytest.raises(ExternalCheckError, match="command binary not found"):
+            validate_external_checks({
+                "external_checks": [{
+                    "name": "bad-cmd",
+                    "command": "nonexistent --arg",
+                    "tag": "quality",
+                }]
+            })

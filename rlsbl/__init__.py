@@ -169,6 +169,9 @@ def _check_context_factory():
 
     Returns WorkspaceCheckContext if in a monorepo, otherwise ProjectCheckContext.
     Imports are deferred to avoid circular dependencies and to keep the factory lazy.
+
+    Also registers any external checks declared in the project's config
+    on the strictcli app (idempotent -- safe to call repeatedly).
     """
     import os
     from pathlib import Path
@@ -202,13 +205,30 @@ def _check_context_factory():
             releasables=releasables,
         )
         wctx.push_stdin = push_stdin
+        _register_external_checks_from_config(ctx.config)
         return wctx
     from .workspace import create_standalone_releasable
 
     ctx = create_context(Path.cwd())
     ctx.push_stdin = push_stdin
     ctx.releasable = create_standalone_releasable(ctx.project_root)
+    _register_external_checks_from_config(ctx.config)
     return ctx
+
+
+def _register_external_checks_from_config(config):
+    """Register external checks from project config on the global app.
+
+    Silently returns on validation errors (prints a warning to stderr)
+    so that a misconfigured external_checks section does not crash the
+    entire check system.
+    """
+    from .external_checks import ExternalCheckError, register_external_checks
+
+    try:
+        register_external_checks(app, config)
+    except ExternalCheckError as exc:
+        print(f"Warning: external checks config error: {exc}", file=sys.stderr)
 
 
 app.set_check_context(_check_context_factory)
