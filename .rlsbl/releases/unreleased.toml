@@ -1,9 +1,22 @@
 # Version bump type: patch, minor, major, hotfix, or prerelease
-bump = ""
+bump = "minor"
 # Short description of this release (required)
-description = ""
+description = "Dev-branch workflow, changeset-file coverage mode, crates.io target, yank/deprecate split, secret scan gate, PR-mode removal, external check providers, entry id field, rlsbl push, remap tooling + post-rewrite hook."
 # Optional context explaining why these changes were made
-context = ""
+context = """
+Large feature release spanning multiple areas:
+
+- Dev-branch workflow: support for releasing from non-main branches with branch-aware version management.
+- Changeset-file coverage mode: alternative to commit-based coverage that tracks changes via explicit changeset files.
+- Crates.io target: new pipeline target for Rust crate publishing.
+- Yank/deprecate split: separated yank (registry removal) from deprecate (soft deprecation with messaging).
+- Secret scan gate: pre-push and pre-release checks for accidentally committed secrets.
+- PR-mode removal: removed the PR-based release workflow in favor of direct branch releases.
+- External check providers: pluggable check system allowing third-party validation providers.
+- Entry id field: unique identifiers on changelog entries for stable cross-referencing.
+- rlsbl push: dedicated push command with safety checks replacing raw git push.
+- Remap tooling + post-rewrite hook: SHA remapping infrastructure for commit rewriting workflows.
+"""
 # Pre-release identifier: alpha, beta, rc, or stable
 # preid = ""
 # Set to true to generate a blog post for this release
