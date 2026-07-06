@@ -1,0 +1,10 @@
+# Gitleaks allowlist for false positives
+# The test_secret_scan.py file contains a fake RSA private key
+# used as a test fixture to verify the secret scanning feature itself.
+
+[allowlist]
+  description = "test fixture false positives"
+  regexTarget = "match"
+  regexes = [
+    '''MIIEpAIBAAKCAQEA04up8hoqzS1''',
+  ]
