@@ -1,4 +1,4 @@
-"""Claim a package name on npm or PyPI by publishing a minimal placeholder package with version 0.0.0 and an empty description."""
+"""Claim a package name on npm, PyPI, or crates.io by publishing a minimal placeholder package with version 0.0.0 and an empty description."""
 
 import json
 import os
@@ -8,13 +8,33 @@ import sys
 import tempfile
 
 
+def _read_cargo_token():
+    """Read the crates.io API token from ~/.cargo/credentials.toml.
+
+    Returns the token string, or None if the file does not exist or
+    has no token entry.
+    """
+    creds_path = os.path.expanduser("~/.cargo/credentials.toml")
+    if not os.path.exists(creds_path):
+        return None
+    try:
+        import tomllib
+        with open(creds_path, "rb") as f:
+            data = tomllib.load(f)
+        registry = data.get("registry", {})
+        return registry.get("token")
+    except Exception:
+        return None
+
+
 def run_cmd(target, args, flags):
     """Claim a package name on a registry by publishing a minimal placeholder.
 
     Checks availability first via check-name, then publishes a version 0.0.0
-    placeholder package to reserve the name. Supports npm (via npm publish)
-    and PyPI (via uv build + uv publish). Requires NPM_TOKEN for npm or
-    PYPI_TOKEN / UV_PUBLISH_TOKEN for PyPI to be set in the environment.
+    placeholder package to reserve the name. Supports npm (via npm publish),
+    PyPI (via uv build + uv publish), and crates.io (via cargo publish).
+    Requires NPM_TOKEN for npm, PYPI_TOKEN / UV_PUBLISH_TOKEN for PyPI, or
+    ~/.cargo/credentials.toml for crates.io.
     When --yes is passed, proceeds even if the name appears taken or the
     availability check returns an ambiguous status.
     """
@@ -25,8 +45,8 @@ def run_cmd(target, args, flags):
 
     name = args[0]
 
-    if target not in ("npm", "pypi"):
-        print(f"Unsupported target: {target!r}. Must be 'npm' or 'pypi'.", file=sys.stderr)
+    if target not in ("npm", "pypi", "crates"):
+        print(f"Unsupported target: {target!r}. Must be 'npm', 'pypi', or 'crates'.", file=sys.stderr)
         sys.exit(1)
 
     from rlsbl.commands.check import _check_single_name
@@ -62,6 +82,27 @@ def run_cmd(target, args, flags):
         if "PYPI_TOKEN" not in os.environ and "UV_PUBLISH_TOKEN" not in os.environ:
             print("Neither PYPI_TOKEN nor UV_PUBLISH_TOKEN environment variable is set.", file=sys.stderr)
             sys.exit(1)
+    elif target == "crates":
+        token = _read_cargo_token()
+        if not token:
+            print(
+                "No crates.io token found. Run `cargo login` first to store "
+                "your token in ~/.cargo/credentials.toml.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        # Permanence confirmation: crates.io names are permanent
+        if not flags["yes"]:
+            print(
+                f"WARNING: crates.io names are PERMANENT and cannot be deleted or unpublished.\n"
+                f"Claim '{name}'? [y/N] ",
+                end="",
+                flush=True,
+            )
+            answer = input().strip().lower()
+            if answer not in ("y", "yes"):
+                print("Aborted.", file=sys.stderr)
+                sys.exit(1)
 
     tmpdir = tempfile.mkdtemp()
     try:
@@ -69,6 +110,8 @@ def run_cmd(target, args, flags):
             _claim_npm(name, tmpdir)
         elif target == "pypi":
             _claim_pypi(name, tmpdir)
+        elif target == "crates":
+            _claim_crates(name, tmpdir)
     except subprocess.CalledProcessError as e:
         print(e.stderr, file=sys.stderr)
         sys.exit(1)
@@ -139,3 +182,31 @@ build-backend = "hatchling.build"
         timeout=60,
     )
     print(f"Successfully claimed '{name}' on PyPI: https://pypi.org/project/{name}/")
+
+
+def _claim_crates(name, tmpdir):
+    cargo_toml = f"""\
+[package]
+name = "{name}"
+version = "0.0.0"
+edition = "2021"
+description = "Name placeholder"
+license = "MIT"
+"""
+    with open(os.path.join(tmpdir, "Cargo.toml"), "w") as f:
+        f.write(cargo_toml)
+
+    src_dir = os.path.join(tmpdir, "src")
+    os.makedirs(src_dir)
+    with open(os.path.join(src_dir, "lib.rs"), "w") as f:
+        f.write("//! Name placeholder crate.\n")
+
+    subprocess.run(
+        ["cargo", "publish", "--allow-dirty"],
+        cwd=tmpdir,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=120,
+    )
+    print(f"Successfully claimed '{name}' on crates.io: https://crates.io/crates/{name}")
