@@ -3,7 +3,26 @@
   "env_file": "~/Projects/.env",
   "push_timeout": 120,
   "batch_limits": {
-    "exclusions": []
+    "exclusions": [
+      {
+        "reason": "**crates.io target.** Full release pipeline for Rust crates: `check-name` with hyphen/underscore normalization, `claim-name` with permanence confirmation, CI publish workflow with OIDC Trusted Publishing, and version bump/publish sequencing.",
+        "entries": [
+          {
+            "version": "unreleased",
+            "line": 2
+          }
+        ]
+      },
+      {
+        "reason": "**Changeset-file coverage mode.** New `coverage_unit` config key supports `changeset-file` as an alternative to per-commit coverage. Changelog add writes pending files, prepush uses diff-based coverage, release finalization concatenates pending files, and all commands are mode-aware.",
+        "entries": [
+          {
+            "version": "unreleased",
+            "line": 3
+          }
+        ]
+      }
+    ]
   },
   "targets": [
     "npm",
