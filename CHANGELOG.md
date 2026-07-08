@@ -2,6 +2,22 @@
 
 # Changelog
 
+## 0.101.1
+
+CI fixes: gitleaks install in CI workflows, inline monorepo CI router (GitHub rejects routers with >20 reusable workflow calls), reusable-call guard. Release blog posts now generate via the selfblog CLI.
+
+<details>
+<summary>Context</summary>
+
+A monorepo's CI router had been broken since June 24 because GitHub Actions rejects workflows with more than 20 reusable workflow calls. The router is now inlined per-package, a guard check prevents regenerating routers that exceed the limit, and gitleaks is installed in CI so the secret-scan gate works in workflows.
+
+</details>
+
+### Fixes
+
+- **Bug fix.** Monorepo CI router now inlines jobs instead of reusable workflow calls -- GitHub rejects routers with more than 20 `uses:` calls, which silently broke CI for large monorepos.
+- Release blog posts now generate via the selfblog CLI (`selfblog post generate --from-release`); selfdoc gen/check are unchanged
+
 ## 0.101.0
 
 Dev-branch workflow, changeset-file coverage mode, crates.io target, yank/deprecate split, secret scan gate, PR-mode removal, external check providers, entry id field, rlsbl push, remap tooling + post-rewrite hook.
