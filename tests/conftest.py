@@ -215,29 +215,35 @@ def bypass_upfront_validation():
 
 @pytest.fixture(autouse=True)
 def _mock_saferm():
-    """Mock saferm subprocess calls in rlsbl.commands.init_cmd and monorepo sync.
+    """Mock saferm and selfdoc subprocess calls across rlsbl modules.
 
-    Intercepts subprocess.run calls where the first arg is 'saferm',
-    performs the actual file deletion via os.unlink, and passes through
-    all other subprocess calls to the real subprocess.run.
+    Intercepts subprocess.run calls where the first arg is 'saferm'
+    (performs actual file deletion via os.unlink) or 'selfdoc' (no-op),
+    and passes through all other subprocess calls to the real subprocess.run.
 
-    Applied automatically to all tests so that any code path triggering
-    _skip_redundant_releasable_configs(), _finalize_scaffold(), or monorepo
-    sync's stale-workflow cleanup works without saferm being installed.
+    Applied automatically to all tests so that:
+    - saferm-dependent code paths work without saferm being installed
+    - selfdoc subprocess calls don't fail when tests blanket-patch
+      os.path.exists to True (which makes _run_root_selfdoc think
+      selfdoc.json exists at a fake workspace root like /ws)
     """
     import subprocess as real_subprocess
     original_run = real_subprocess.run
 
     def _mock_run(cmd, *args, **kwargs):
-        if isinstance(cmd, list) and cmd and cmd[0] == "saferm":
-            target_file = cmd[-1]
-            if os.path.exists(target_file):
-                os.unlink(target_file)
-            return real_subprocess.CompletedProcess(args=cmd, returncode=0)
+        if isinstance(cmd, list) and cmd:
+            if cmd[0] == "saferm":
+                target_file = cmd[-1]
+                if os.path.exists(target_file):
+                    os.unlink(target_file)
+                return real_subprocess.CompletedProcess(args=cmd, returncode=0)
+            if cmd[0] == "selfdoc":
+                return real_subprocess.CompletedProcess(args=cmd, returncode=0)
         return original_run(cmd, *args, **kwargs)
 
     with patch("rlsbl.commands.init_cmd.subprocess.run", side_effect=_mock_run), \
-         patch("rlsbl.commands.monorepo.sync.subprocess.run", side_effect=_mock_run):
+         patch("rlsbl.commands.monorepo.sync.subprocess.run", side_effect=_mock_run), \
+         patch("rlsbl.commands.release.subprocess.run", side_effect=_mock_run):
         yield
 
 
