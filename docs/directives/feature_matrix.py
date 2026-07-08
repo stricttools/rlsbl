@@ -6,7 +6,7 @@ data, then renders it via ``selfdoc.tables.render_markdown_table()``.
 """
 
 from rlsbl.checks import generate_feature_matrix_data
-from selfdoc.tables import render_markdown_table
+from selfdoc_core.tables import render_markdown_table
 
 
 def resolve(attrs, config, body):

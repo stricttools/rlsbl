@@ -6,7 +6,7 @@ table data, then renders it via ``selfdoc.tables.render_markdown_table()``.
 """
 
 from rlsbl.pipelines.introspect import generate_pipeline_table_data
-from selfdoc.tables import render_markdown_table
+from selfdoc_core.tables import render_markdown_table
 
 
 def resolve(attrs, config, body):
