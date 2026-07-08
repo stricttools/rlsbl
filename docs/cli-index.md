@@ -1,6 +1,6 @@
 ---
 title: rlsbl CLI Reference
-description: "Complete CLI reference for rlsbl -- all 52 commands across 16 top-level commands and 4 groups, with flags, arguments, and usage details."
+description: "CLI reference for rlsbl 0.101 -- all 52 commands across 16 top-level commands and 4 groups, with flags, arguments, defaults, and usage details."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 0
@@ -12,7 +12,7 @@ order: 91
 
 Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 52 commands organized into 16 top-level commands and 4 command groups (release, changelog, monorepo, dev).
 
-Version: 0.100.1
+Version: 0.101.0
 
 ## Commands
 

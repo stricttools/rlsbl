@@ -1,6 +1,6 @@
 ---
 title: rlsbl monorepo
-description: "Manage a monorepo workspace of independently-versioned projects: init, add or remove projects, sync CI, list, lint, and compute release order."
+description: "Manage a monorepo workspace of independently-versioned projects: init, add or remove projects, generate the inlined CI router, and compute release order."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 10
@@ -61,7 +61,7 @@ Display all projects registered in the monorepo workspace.toml file. For each pr
 
 ## monorepo sync
 
-Copy and merge CI workflow files from each project's individual scaffold into the shared .github/workflows directory at the repository root. This ensures that every project in the workspace has its publish and test pipelines properly configured as GitHub Actions workflows, even when projects use different target registries or have custom workflow steps.
+Inline every project's CI jobs into a single generated ci-router.yml (and publish jobs into publish.yml) in the shared .github/workflows directory at the repository root. Jobs are inlined rather than routed via reusable-workflow calls because GitHub rejects workflows that reference 20 or more reusable workflows. Stale per-project workflow copies at the root are removed via saferm.
 
 ### Flags
 
