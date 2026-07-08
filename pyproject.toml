@@ -18,6 +18,9 @@ dependencies = [
     "tree-sitter-typescript>=0.23",
 ]
 
+[project.optional-dependencies]
+docs = ["selfdoc-core"]
+
 [project.urls]
 Repository = "https://github.com/smm-h/rlsbl"
 
