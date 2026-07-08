@@ -19,7 +19,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-docs = ["selfdoc-core"]
+docs = ["selfdoc-core; python_version >= '3.12'"]
 
 [project.urls]
 Repository = "https://github.com/smm-h/rlsbl"

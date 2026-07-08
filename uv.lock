@@ -1,6 +1,10 @@
 version = 1
 revision = 3
 requires-python = ">=3.11"
+resolution-markers = [
+    "python_full_version >= '3.12'",
+    "python_full_version < '3.12'",
+]
 
 [[package]]
 name = "colorama"
@@ -218,6 +222,11 @@ dependencies = [
     { name = "tree-sitter-typescript" },
 ]
 
+[package.optional-dependencies]
+docs = [
+    { name = "selfdoc-core", marker = "python_full_version >= '3.12'" },
+]
+
 [package.dev-dependencies]
 dev = [
     { name = "pytest" },
@@ -229,6 +238,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "ruamel-yaml" },
+    { name = "selfdoc-core", marker = "python_full_version >= '3.12' and extra == 'docs'" },
     { name = "strictcli" },
     { name = "tomlkit", specifier = ">=0.12" },
     { name = "tree-sitter", specifier = ">=0.24" },
@@ -237,6 +247,7 @@ requires-dist = [
     { name = "tree-sitter-python", specifier = ">=0.23" },
     { name = "tree-sitter-typescript", specifier = ">=0.23" },
 ]
+provides-extras = ["docs"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -278,6 +289,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/10/9b/5f14927848d2fd4aa891fd88d883788c5a7baba561c7874732364045708c/ruff-0.15.20-py3-none-win32.whl", hash = "sha256:ed65ef510e43a137207e0f01cfcf998aeddb1aeeda5c9d35023e910284d7cf21", size = 10857322, upload-time = "2026-06-25T17:20:28.612Z" },
     { url = "https://files.pythonhosted.org/packages/fa/f0/fe47c501f9dea92a26d788ff98bb5d92ed4cb4c88792c5c88af6b697dc8e/ruff-0.15.20-py3-none-win_amd64.whl", hash = "sha256:a525c81c70fb0380344dd1d8745d8cc1c890b7fc94a58d5a07bd8eb9557b8415", size = 11993274, upload-time = "2026-06-25T17:20:31.871Z" },
     { url = "https://files.pythonhosted.org/packages/d7/2b/9555445e1201d92b3195f45cdb153a0b68f24e0a4273f6e3d5ab46e212bb/ruff-0.15.20-py3-none-win_arm64.whl", hash = "sha256:2f5b2a6d614e8700388806a14996c40fab2c47b819ef57d790a34878858ed9ca", size = 11343498, upload-time = "2026-06-25T17:20:35.03Z" },
+]
+
+[[package]]
+name = "selfdoc-core"
+version = "0.1.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f9/8f/6411201ff10bac83b403e4bd520956418c088b55790e39f7c76b424e2251/selfdoc_core-0.1.1.tar.gz", hash = "sha256:ba9b4845abaa3dc7b4896766215a8b60522b9f99bc1b4835c023525bc2802c1d", size = 206987, upload-time = "2026-07-08T19:33:08.976Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/47/5b/d4be11eeec36cbda0736a2a9d6a2f1f93e0e87ca1be0dbd22171899fecef/selfdoc_core-0.1.1-py3-none-any.whl", hash = "sha256:d764d20c5e93a47c1cc4993341166cf025a703dcc2b7a74735d6ab112267ff76", size = 237202, upload-time = "2026-07-08T19:33:07.546Z" },
 ]
 
 [[package]]
