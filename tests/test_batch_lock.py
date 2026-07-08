@@ -67,7 +67,7 @@ class TestSkipLockInRunCmdInner:
     @patch("rlsbl.commands.release._run_strictcli_schema_dump")
     @patch("rlsbl.commands.release._run_selfdoc_gen")
     @patch("rlsbl.commands.release._run_selfdoc_check")
-    @patch("rlsbl.commands.release._run_selfdoc_post_generate")
+    @patch("rlsbl.commands.release._run_selfblog_post_generate")
     def test_skip_lock_true_skips_acquire(
         self, _selfdoc_post, _selfdoc_check, _selfdoc_gen, _schema_dump,
         _hook_empty, _hook_timeout, _hook_env,
@@ -120,7 +120,7 @@ class TestSkipLockInRunCmdInner:
     @patch("rlsbl.commands.release._run_strictcli_schema_dump")
     @patch("rlsbl.commands.release._run_selfdoc_gen")
     @patch("rlsbl.commands.release._run_selfdoc_check")
-    @patch("rlsbl.commands.release._run_selfdoc_post_generate")
+    @patch("rlsbl.commands.release._run_selfblog_post_generate")
     def test_without_skip_lock_calls_acquire(
         self, _selfdoc_post, _selfdoc_check, _selfdoc_gen, _schema_dump,
         _run_checks, _hook_empty, _hook_timeout, _hook_env,

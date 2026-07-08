@@ -1,6 +1,6 @@
 """Tests for blog post generation in monorepo batch releases.
 
-Verifies that the blog wiring (selfdoc post generate) fires per-project
+Verifies that the blog wiring (selfblog post generate) fires per-project
 when run_cmd is invoked from the batch release flow. Since _cmd_batch_release
 delegates to run_cmd with the full ReleaseConfig (including the blog field),
 the blog wiring is already handled by the single-project release flow.

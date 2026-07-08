@@ -57,7 +57,7 @@ _BASE_PATCHES = {
     "_run_strictcli_schema_dump": None,
     "_run_selfdoc_gen": None,
     "_run_selfdoc_check": None,
-    "_run_selfdoc_post_generate": None,
+    "_run_selfblog_post_generate": None,
     "generate_changelog": "# Changelog\n\n## 0.1.1\n\n- test\n",
     "resolve_release_targets": [],
     "_run_release_mutating": None,
@@ -130,13 +130,13 @@ class TestSelfdocCommitOrdering:
     """Verify that the selfdoc commit block is positioned correctly."""
 
     def test_commit_after_selfdoc_post_generate(self):
-        """The commit_files call for selfdoc must appear after _run_selfdoc_post_generate."""
+        """The commit_files call for selfdoc must appear after _run_selfblog_post_generate."""
         from rlsbl.commands.release import _run_cmd_inner
         source = inspect.getsource(_run_cmd_inner)
-        post_gen_pos = source.index("_run_selfdoc_post_generate(")
+        post_gen_pos = source.index("_run_selfblog_post_generate(")
         commit_pos = source.index('"selfdoc: regenerate"')
         assert post_gen_pos < commit_pos, (
-            "selfdoc commit must appear after _run_selfdoc_post_generate"
+            "selfdoc commit must appear after _run_selfblog_post_generate"
         )
 
     def test_commit_before_releasable_hook_branch(self):

@@ -1,4 +1,4 @@
-"""Publishing helpers: selfdoc blog post generation, GitHub Release asset uploads, and stale dependency advisory for post-release notifications."""
+"""Publishing helpers: selfblog blog post generation, GitHub Release asset uploads, and stale dependency advisory for post-release notifications."""
 
 import json
 import os
@@ -14,15 +14,15 @@ from .validate import HookError, ReleaseValidationError
 # test patches on `rlsbl.commands.release.X` are picked up correctly.
 
 
-def _run_selfdoc_post_generate(flags, *, project_dir=None, release_config=None,
+def _run_selfblog_post_generate(flags, *, project_dir=None, release_config=None,
                                 new_version=None, current_version=None,
                                 bump_type=None, changelog_entry=None, tag=None,
                                 releases_dir=None):
-    """Generate a blog post via selfdoc during release.
+    """Generate a blog post via selfblog during release.
 
     Called when release_config.blog is True and selfdoc.json exists.
     Writes the changelog entry to a temp file and invokes
-    ``selfdoc post generate --from-release`` with all release metadata.
+    ``selfblog post generate --from-release`` with all release metadata.
 
     The generated post file and updated manifest are picked up by the
     hook-generated-files mechanism (dirty snapshot diff) and included
@@ -40,16 +40,16 @@ def _run_selfdoc_post_generate(flags, *, project_dir=None, release_config=None,
         return True
 
     if flags.get("dry-run"):
-        print(f"Would run: selfdoc post generate --from-release --version {new_version}")
+        print(f"Would run: selfblog post generate --from-release --version {new_version}")
         return True
 
-    if not require_tool("selfdoc", fatal=False):
+    if not require_tool("selfblog", fatal=False):
         print(
-            "Note: blog = true but selfdoc is not installed. Skipping blog post generation."
+            "Note: blog = true but selfblog is not installed. Skipping blog post generation."
         )
         return True
 
-    print("Generating blog post via selfdoc...")
+    print("Generating blog post via selfblog...")
 
     # Write changelog entry to a temp file
     tmp_changelog = None
@@ -62,7 +62,7 @@ def _run_selfdoc_post_generate(flags, *, project_dir=None, release_config=None,
         tmp_changelog.close()
 
         # Assemble CLI args
-        cmd = ["selfdoc", "post", "generate", "--from-release"]
+        cmd = ["selfblog", "post", "generate", "--from-release"]
         cmd.extend(["--version", new_version or ""])
         if current_version:
             cmd.extend(["--prev-version", current_version])
@@ -103,7 +103,7 @@ def _run_selfdoc_post_generate(flags, *, project_dir=None, release_config=None,
         subprocess.run(cmd, cwd=project_dir, check=True)
     except subprocess.CalledProcessError as e:
         raise HookError(
-            f"selfdoc post generate failed (exit code {e.returncode})."
+            f"selfblog post generate failed (exit code {e.returncode})."
         ) from e
     finally:
         if tmp_changelog and os.path.exists(tmp_changelog.name):

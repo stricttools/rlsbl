@@ -440,7 +440,7 @@ class TestFullFlowOrder:
     @patch("rlsbl.commands.release._run_strictcli_schema_dump")
     @patch("rlsbl.commands.release._run_selfdoc_gen")
     @patch("rlsbl.commands.release._run_selfdoc_check")
-    @patch("rlsbl.commands.release._run_selfdoc_post_generate")
+    @patch("rlsbl.commands.release._run_selfblog_post_generate")
     @patch("rlsbl.commands.release.commit_files_if_changed")
     def test_execution_order(
         self,

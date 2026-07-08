@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 import pytest
 
-from rlsbl.commands.release import _run_selfdoc_post_generate
+from rlsbl.commands.release import _run_selfblog_post_generate
 from rlsbl.release_file import ReleaseConfig
 
 
@@ -79,7 +79,7 @@ class TestRealisticProjectStructure:
 
     def test_full_project_structure(self, tmp_path):
         """A realistic project with selfdoc.json, .rlsbl/config.json, and blog body
-        produces the correct selfdoc invocation."""
+        produces the correct selfblog invocation."""
         selfdoc_config = _realistic_selfdoc_config("cooltools")
         blog_body = "## What's new\n\nThis release adds the widget feature.\n"
         _setup_project(tmp_path, selfdoc_config=selfdoc_config, blog_body=blog_body)
@@ -91,7 +91,7 @@ class TestRealisticProjectStructure:
             patch("subprocess.run", side_effect=_capture_subprocess(captured_cmd)),
             patch("rlsbl.commands.release.run", return_value="git@github.com:acme/cooltools.git"),
         ):
-            result = _run_selfdoc_post_generate(
+            result = _run_selfblog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True, description="Added widget feature"),
@@ -103,7 +103,7 @@ class TestRealisticProjectStructure:
             )
 
         assert result is True
-        assert captured_cmd[:4] == ["selfdoc", "post", "generate", "--from-release"]
+        assert captured_cmd[:4] == ["selfblog", "post", "generate", "--from-release"]
 
 
 class TestChangelogFileContentVerification:
@@ -118,7 +118,7 @@ class TestChangelogFileContentVerification:
         observed_content = []
 
         def inspecting_run(cmd, *args, **kwargs):
-            if "selfdoc" in cmd and "--changelog-file" in cmd:
+            if "selfblog" in cmd and "--changelog-file" in cmd:
                 idx = cmd.index("--changelog-file") + 1
                 filepath = cmd[idx]
                 with open(filepath, "r", encoding="utf-8") as f:
@@ -130,7 +130,7 @@ class TestChangelogFileContentVerification:
             patch("subprocess.run", side_effect=inspecting_run),
             patch("rlsbl.commands.release.run", return_value="git@github.com:owner/repo.git"),
         ):
-            _run_selfdoc_post_generate(
+            _run_selfblog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True),
@@ -151,7 +151,7 @@ class TestChangelogFileContentVerification:
         observed_content = []
 
         def inspecting_run(cmd, *args, **kwargs):
-            if "selfdoc" in cmd and "--changelog-file" in cmd:
+            if "selfblog" in cmd and "--changelog-file" in cmd:
                 idx = cmd.index("--changelog-file") + 1
                 with open(cmd[idx], "r", encoding="utf-8") as f:
                     observed_content.append(f.read())
@@ -162,7 +162,7 @@ class TestChangelogFileContentVerification:
             patch("subprocess.run", side_effect=inspecting_run),
             patch("rlsbl.commands.release.run", return_value="git@github.com:owner/repo.git"),
         ):
-            _run_selfdoc_post_generate(
+            _run_selfblog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True),
@@ -181,7 +181,7 @@ class TestChangelogFileContentVerification:
         observed_content = []
 
         def inspecting_run(cmd, *args, **kwargs):
-            if "selfdoc" in cmd and "--changelog-file" in cmd:
+            if "selfblog" in cmd and "--changelog-file" in cmd:
                 idx = cmd.index("--changelog-file") + 1
                 with open(cmd[idx], "r", encoding="utf-8") as f:
                     observed_content.append(f.read())
@@ -192,7 +192,7 @@ class TestChangelogFileContentVerification:
             patch("subprocess.run", side_effect=inspecting_run),
             patch("rlsbl.commands.release.run", return_value="git@github.com:owner/repo.git"),
         ):
-            _run_selfdoc_post_generate(
+            _run_selfblog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True),
@@ -221,7 +221,7 @@ class TestProjectNameResolution:
             patch("subprocess.run", side_effect=_capture_subprocess(captured_cmd)),
             patch("rlsbl.commands.release.run", return_value="git@github.com:owner/repo.git"),
         ):
-            _run_selfdoc_post_generate(
+            _run_selfblog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True),
@@ -244,7 +244,7 @@ class TestProjectNameResolution:
             patch("subprocess.run", side_effect=_capture_subprocess(captured_cmd)),
             patch("rlsbl.commands.release.run", return_value="git@github.com:owner/repo.git"),
         ):
-            _run_selfdoc_post_generate(
+            _run_selfblog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True),
@@ -267,7 +267,7 @@ class TestProjectNameResolution:
             patch("subprocess.run", side_effect=_capture_subprocess(captured_cmd)),
             patch("rlsbl.commands.release.run", return_value="git@github.com:owner/repo.git"),
         ):
-            _run_selfdoc_post_generate(
+            _run_selfblog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True),
@@ -290,7 +290,7 @@ class TestProjectNameResolution:
             patch("subprocess.run", side_effect=_capture_subprocess(captured_cmd)),
             patch("rlsbl.commands.release.run", return_value="git@github.com:owner/repo.git"),
         ):
-            _run_selfdoc_post_generate(
+            _run_selfblog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True),
@@ -321,7 +321,7 @@ class TestBodyFilePath:
             patch("subprocess.run", side_effect=_capture_subprocess(captured_cmd)),
             patch("rlsbl.commands.release.run", return_value="git@github.com:owner/repo.git"),
         ):
-            _run_selfdoc_post_generate(
+            _run_selfblog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True),
@@ -345,7 +345,7 @@ class TestBodyFilePath:
             patch("subprocess.run", side_effect=_capture_subprocess(captured_cmd)),
             patch("rlsbl.commands.release.run", return_value="git@github.com:owner/repo.git"),
         ):
-            _run_selfdoc_post_generate(
+            _run_selfblog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True),
@@ -371,7 +371,7 @@ class TestReleaseURLWithHTTPS:
             patch("subprocess.run", side_effect=_capture_subprocess(captured_cmd)),
             patch("rlsbl.commands.release.run", return_value="https://github.com/acme/toolkit.git"),
         ):
-            _run_selfdoc_post_generate(
+            _run_selfblog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True),
@@ -393,7 +393,7 @@ class TestReleaseURLWithHTTPS:
             patch("subprocess.run", side_effect=_capture_subprocess(captured_cmd)),
             patch("rlsbl.commands.release.run", return_value="https://github.com/acme/toolkit"),
         ):
-            _run_selfdoc_post_generate(
+            _run_selfblog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True),
@@ -413,7 +413,7 @@ class TestNoneReleaseConfig:
         _setup_project(tmp_path, selfdoc_config=_realistic_selfdoc_config())
 
         with patch("subprocess.run") as mock_run:
-            result = _run_selfdoc_post_generate(
+            result = _run_selfblog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=None,
@@ -428,7 +428,7 @@ class TestNoneReleaseConfig:
         """When release_config is None, selfdoc.json is not even checked."""
         # No selfdoc.json -- but that should not matter because we bail
         # before reaching the selfdoc.json check.
-        result = _run_selfdoc_post_generate(
+        result = _run_selfblog_post_generate(
             {},
             project_dir=str(tmp_path),
             release_config=None,
