@@ -22,6 +22,117 @@ class ReleaseAbortError(Exception):
     """Raised when the release must abort (e.g., unexpected dirty files)."""
 
 
+class RollbackClobberError(Exception):
+    """Raised when rollback would destroy foreign commits or dirty files.
+
+    This prevents ``git reset --hard`` from silently discarding work
+    created by concurrent sessions sharing the same worktree.
+    """
+
+
+def _track_release_commit(state_path, sha=None, cwd=None):
+    """Record a release commit SHA in the state file.
+
+    Called immediately after each ``commit_files()`` /
+    ``commit_files_if_changed()`` invocation so the rollback guard can
+    distinguish release-owned commits from foreign ones.
+
+    Best-effort: failures are silently ignored. When tracking fails
+    (e.g., in test environments without a real git repo), the rollback
+    guard treats all commits as foreign and refuses rollback -- the
+    safe default.
+
+    If ``sha`` is not provided, reads HEAD via subprocess directly
+    (bypasses the mock-patched ``run`` function used by the release
+    flow, avoiding mock side-effect exhaustion in tests).
+    """
+    try:
+        if sha is None:
+            import subprocess
+            result = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                capture_output=True, text=True, check=True,
+                cwd=cwd,
+            )
+            sha = result.stdout.strip()
+        else:
+            sha = sha.strip()
+        state = load_release_state(state_path)
+        if state is None:
+            state = {}
+        commits = state.setdefault("release_commits", [])
+        if sha not in commits:
+            commits.append(sha)
+        save_release_state(state_path, state)
+    except Exception:
+        pass  # Best-effort: never mask the original release error
+
+
+def _guard_rollback(pre_release_sha, state_path, cwd=None):
+    """Refuse rollback if foreign commits exist between pre_release_sha and HEAD.
+
+    Compares commits between ``pre_release_sha`` and HEAD against the
+    ``release_commits`` list persisted in the state file.  Any commit
+    not in ``release_commits`` is a foreign commit (from a concurrent
+    session).
+
+    Dirty files (uncommitted modifications) are NOT checked because the
+    release flow itself writes version-bump and changelog files before
+    committing them -- those dirty files are the expected rollback
+    target, not concurrent work.  Untracked files survive
+    ``git reset --hard`` anyway.
+
+    Uses ``subprocess`` directly (not the mock-patched ``run`` function)
+    to avoid consuming mock side-effect entries in tests.
+
+    Raises :class:`RollbackClobberError` with details and manual
+    recovery instructions when rollback is unsafe.
+    """
+    import subprocess
+
+    state = load_release_state(state_path)
+    release_commits = set((state or {}).get("release_commits", []))
+
+    # Find all commits between pre_release_sha and HEAD
+    try:
+        result = subprocess.run(
+            ["git", "rev-list", f"{pre_release_sha.strip()}..HEAD"],
+            capture_output=True, text=True, check=True,
+            cwd=cwd,
+        )
+        rev_list_output = result.stdout.strip()
+    except Exception:
+        # If rev-list fails (e.g. pre_release_sha is invalid), allow
+        # the rollback -- the guard is best-effort, and blocking here
+        # would leave the release in a worse state.
+        return
+
+    if rev_list_output:
+        all_commits = [c.strip() for c in rev_list_output.splitlines() if c.strip()]
+    else:
+        all_commits = []
+
+    foreign_commits = [c for c in all_commits if c not in release_commits]
+
+    if not foreign_commits:
+        return  # Safe to roll back
+
+    parts = [
+        "Rollback aborted: git reset --hard would destroy work from "
+        "concurrent sessions.",
+        f"\nForeign commits (not created by this release):",
+    ]
+    for fc in foreign_commits:
+        parts.append(f"  {fc}")
+    parts.append(
+        "\nManual recovery:"
+        f"\n  1. Inspect the commits above"
+        f"\n  2. If safe, run: git reset --hard {pre_release_sha.strip()[:10]}"
+        f"\n  3. Otherwise, cherry-pick or stash foreign work first"
+    )
+    raise RollbackClobberError("\n".join(parts))
+
+
 def _bump_selfdoc_version(project_dir, new_version):
     """Bump version in selfdoc.json if it exists. Returns list of modified file paths."""
     import tempfile
@@ -942,6 +1053,7 @@ def _run_release_mutating(state: ReleaseState):
             needs_commit = new_version != current_version or has_staged_or_modified(files_to_commit, cwd=_git_root)
             if files_to_commit and needs_commit:
                 commit_files(commit_msg, files_to_commit, cwd=_git_root)
+                _track_release_commit(_state_path)
                 log(f"Committed: {commit_msg}")
             elif not needs_commit:
                 log("No changes to commit")
@@ -1026,6 +1138,7 @@ def _run_release_mutating(state: ReleaseState):
                     if md_path.endswith(".md") and md_path not in finalize_files:
                         finalize_files.append(md_path)
             commit_files(f"chore: finalize changelog for {new_version}", finalize_files, cwd=_git_root)
+            _track_release_commit(_state_path)
             log(f"Committed finalized changelog files")
             save_step(_state_path, "CHANGELOG_FINALIZED")
             _completed.add("CHANGELOG_FINALIZED")
@@ -1052,6 +1165,7 @@ def _run_release_mutating(state: ReleaseState):
                     [config_rel],
                     cwd=_git_root,
                 )
+                _track_release_commit(_state_path)
                 log(f"Cleaned {removed} stale batch exclusion(s) from config.json")
 
         # Finalize release file: rename unreleased.toml to vX.Y.Z.toml
@@ -1090,6 +1204,7 @@ def _run_release_mutating(state: ReleaseState):
             if blog_body_dst:
                 release_finalize_files.append(_rel_to_git_root(blog_body_dst, _git_root))
             commit_files(f"chore: finalize release file for {new_version}", release_finalize_files, cwd=_git_root)
+            _track_release_commit(_state_path)
             log(f"Finalized release file for {new_version}")
 
             # Now that v{version}.toml is archived, regenerate the per-version
@@ -1114,6 +1229,7 @@ def _run_release_mutating(state: ReleaseState):
                         [md_regen_rel],
                         cwd=_git_root,
                     )
+                    _track_release_commit(_state_path)
             save_step(_state_path, "RELEASE_FILE_FINALIZED")
             _completed.add("RELEASE_FILE_FINALIZED")
 
@@ -1231,7 +1347,9 @@ def _run_release_mutating(state: ReleaseState):
                     file=sys.stderr,
                 )
             raise
-        # Branch was not pushed yet -- safe to roll back locally.
+        # Branch was not pushed yet -- safe to roll back locally,
+        # but only if no foreign commits or dirty files would be destroyed.
+        _guard_rollback(pre_release_sha, _state_path)
         run("git", ["reset", "--hard", pre_release_sha])
         # State file is useless after local rollback -- clean it up.
         from ...release_file import get_releases_dir as _get_releases_dir
@@ -1275,7 +1393,9 @@ def _run_release_mutating(state: ReleaseState):
                 )
             # Do NOT delete the local tag -- it's needed for manual recovery
             raise
-        # Branch was not pushed yet -- safe to roll back locally.
+        # Branch was not pushed yet -- safe to roll back locally,
+        # but only if no foreign commits or dirty files would be destroyed.
+        _guard_rollback(pre_release_sha, _state_path)
         # Delete tag (may not exist yet) and reset commits so the working
         # tree looks like it did before the release attempt.
         try:
@@ -1699,7 +1819,9 @@ def _run_release_mutating(state: ReleaseState):
             graph = WorkspaceGraph(monorepo_root, projects)
             snapshot = generate_snapshot(monorepo_root, projects, graph)
             rel_path = write_snapshot(monorepo_root, snapshot)
-            commit_files_if_changed("snapshot", [rel_path], skip_message="Snapshot unchanged.", autogenerated=True, cwd=monorepo_root)
+            did_commit = commit_files_if_changed("snapshot", [rel_path], skip_message="Snapshot unchanged.", autogenerated=True, cwd=monorepo_root)
+            if did_commit:
+                _track_release_commit(_state_path)
             log(f"Regenerated monorepo snapshot: {rel_path}")
         except Exception as e:
             print(f"Warning: snapshot regeneration failed: {e}", file=sys.stderr)

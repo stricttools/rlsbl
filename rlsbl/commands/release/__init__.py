@@ -79,6 +79,7 @@ from .execute import (
     _bump_selfdoc_version,
     _rel_to_git_root,
     ReleaseAbortError,
+    RollbackClobberError,
     ReleaseState,
     resolve_target_paths,
     resolve_release_targets,
