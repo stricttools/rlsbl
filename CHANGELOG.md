@@ -2,6 +2,15 @@
 
 # Changelog
 
+## 0.102.0
+
+Rollback safety guard and documentation directive extras.
+
+### Features
+
+- **New feature.** Release rollback now detects concurrent commits from other sessions and refuses to proceed, preventing data loss from blanket git reset.
+- **New feature.** Documentation directives require selfdoc-core, installable via `pip install rlsbl[docs]`.
+
 ## 0.101.1
 
 CI fixes: gitleaks install in CI workflows, inline monorepo CI router (GitHub rejects routers with >20 reusable workflow calls), reusable-call guard. Release blog posts now generate via the selfblog CLI.
