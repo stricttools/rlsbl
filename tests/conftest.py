@@ -215,15 +215,15 @@ def bypass_upfront_validation():
 
 @pytest.fixture(autouse=True)
 def _mock_saferm():
-    """Mock saferm subprocess calls in rlsbl.commands.init_cmd.
+    """Mock saferm subprocess calls in rlsbl.commands.init_cmd and monorepo sync.
 
     Intercepts subprocess.run calls where the first arg is 'saferm',
     performs the actual file deletion via os.unlink, and passes through
     all other subprocess calls to the real subprocess.run.
 
     Applied automatically to all tests so that any code path triggering
-    _skip_redundant_releasable_configs() or _finalize_scaffold() works
-    without saferm being installed.
+    _skip_redundant_releasable_configs(), _finalize_scaffold(), or monorepo
+    sync's stale-workflow cleanup works without saferm being installed.
     """
     import subprocess as real_subprocess
     original_run = real_subprocess.run
@@ -236,7 +236,8 @@ def _mock_saferm():
             return real_subprocess.CompletedProcess(args=cmd, returncode=0)
         return original_run(cmd, *args, **kwargs)
 
-    with patch("rlsbl.commands.init_cmd.subprocess.run", side_effect=_mock_run):
+    with patch("rlsbl.commands.init_cmd.subprocess.run", side_effect=_mock_run), \
+         patch("rlsbl.commands.monorepo.sync.subprocess.run", side_effect=_mock_run):
         yield
 
 

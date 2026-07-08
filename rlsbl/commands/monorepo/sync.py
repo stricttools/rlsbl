@@ -1,7 +1,8 @@
-"""Monorepo sync command and all sync helpers: trigger rewriting, working-directory injection, router generation."""
+"""Monorepo sync command and all sync helpers: working-directory injection, inline CI router generation."""
 
 import glob
 import os
+import subprocess
 import sys
 from io import StringIO
 
@@ -11,6 +12,7 @@ from ruamel.yaml.scalarstring import LiteralScalarString
 from ...action_versions import format_action
 from ...commands.init_cmd import check_unreplaced_vars, process_template
 from ...context import create_context
+from ...errors import ConfigError
 from ...utils import commit_files_if_changed
 from ...workspace import find_workspace_root, load_workspace
 from ...targets import detect_targets, resolve_releasable_config_dir, TARGETS
@@ -40,27 +42,6 @@ def emit_ci_workflow(doc):
     stream = StringIO()
     yaml.dump(doc, stream)
     return stream.getvalue()
-
-
-def _rewrite_trigger(doc):
-    """Replace the on: trigger with workflow_call: in a parsed YAML document.
-
-    YAML 1.1 treats bare ``on`` as boolean True, so the key may appear as
-    either the string ``'on'`` or the boolean ``True`` depending on the
-    parser mode.  Round-trip mode preserves the original text, but we
-    check both forms defensively.
-    """
-    # Determine which key form is present
-    if 'on' in doc:
-        key = 'on'
-    elif True in doc:
-        key = True
-    else:
-        print("Warning: no 'on:' trigger found in workflow, skipping rewrite", file=sys.stderr)
-        return doc
-
-    doc[key] = {'workflow_call': None}
-    return doc
 
 
 def _inject_working_directory(doc, path):
@@ -121,28 +102,74 @@ def _inject_packages_dir(doc, project_path):
     return doc
 
 
-def _strip_concurrency(doc):
-    """Remove the workflow-level concurrency block from a called workflow.
+# GitHub rejects a workflow file once it references 20 reusable workflows
+# (job-level ``uses:``): the workflow is silently invalid and never runs.
+# Generated routers inline jobs instead, so any reusable call in a router is
+# a regression; the guard hard-errors well before GitHub would reject it.
+GITHUB_MAX_REUSABLE_CALLS = 20
 
-    Project CI workflows are rewritten to ``workflow_call:`` and invoked by
-    the router. GitHub evaluates a called workflow's top-level concurrency
-    in the CALLER's github context, so the per-SHA group scaffolded into CI
-    templates (``${{ github.workflow_ref }}-${{ github.sha }}``) would
-    resolve identically for every sibling called workflow in one router run
-    -- with ``cancel-in-progress: true`` they would cancel each other. The
-    router's own per-SHA concurrency covers the whole run instead.
 
-    Job-level concurrency (if a user added any) is left untouched.
+def count_reusable_workflow_calls(jobs):
+    """Count job-level ``uses:`` entries (reusable workflow calls) in a jobs mapping.
+
+    Step-level ``uses:`` (actions) are not counted -- only jobs whose mapping
+    carries a top-level ``uses:`` key, which is what GitHub treats as a
+    reusable workflow call.
     """
-    if "concurrency" in doc:
-        del doc["concurrency"]
+    return sum(
+        1 for job in jobs.values() if isinstance(job, dict) and "uses" in job
+    )
+
+
+def validate_router_reusable_calls(jobs, router_name):
+    """Hard-error when a generated router carries >= 20 reusable workflow calls.
+
+    GitHub rejects workflow files with too many reusable-workflow calls
+    outright -- the router never runs and CI silently stops. Generated
+    routers must inline jobs instead of calling reusable workflows.
+
+    Raises:
+        ConfigError: when *jobs* contains ``GITHUB_MAX_REUSABLE_CALLS`` or
+            more job-level ``uses:`` entries.
+    """
+    count = count_reusable_workflow_calls(jobs)
+    if count >= GITHUB_MAX_REUSABLE_CALLS:
+        raise ConfigError(
+            f"{router_name} would contain {count} reusable-workflow calls "
+            f"(job-level 'uses:'). GitHub rejects workflows that reference "
+            f"{GITHUB_MAX_REUSABLE_CALLS} or more reusable workflows -- the "
+            "router would be silently invalid and CI would never run. "
+            "Generated routers must inline jobs instead of calling reusable "
+            "workflows; this is a generator bug, not a workspace-size problem."
+        )
+
+
+def _strip_expression_wrapper(expr):
+    """Strip an optional ``${{ ... }}`` wrapper from a GitHub expression."""
+    expr = str(expr).strip()
+    if expr.startswith("${{") and expr.endswith("}}"):
+        return expr[3:-2].strip()
+    return expr
 
 
 def _generate_router(projects):
-    """Generate ci-router.yml content from project list.
+    """Generate ci-router.yml content with every project's CI jobs inlined.
 
-    Builds the router as a structured dict and serializes with
-    ``emit_ci_workflow`` for consistent YAML output.
+    Each project dict must carry ``_ci_docs``: a list of ``(job_prefix, doc)``
+    pairs where *doc* is a parsed CI workflow (working-directory already
+    injected) and *job_prefix* is the per-file key (``{name}-ci`` or
+    ``{name}-ci-{target}``).
+
+    GitHub rejects workflow files with 20+ reusable-workflow calls, so the
+    router inlines every project's CI jobs directly instead of ``uses:``
+    calls. Each inlined job:
+
+    - gets its key prefixed with the CI file's job prefix (unique per file),
+    - gets an explicit ``name: "{prefix} / {job}"`` so check-run names stay
+      identical to the reusable-workflow era (publish gate regexes and
+      branch protection rules keep matching),
+    - is gated on ``needs: detect`` + ``if: needs.detect.outputs.{project}``,
+    - keeps intra-workflow ``needs:`` (rewritten to the prefixed keys).
     """
     # Build the filters block as a multi-line string (dorny/paths-filter format)
     filter_lines = []
@@ -176,17 +203,67 @@ def _generate_router(projects):
         ],
     }
 
-    # per-project jobs (one job per CI file; projects may have multiple)
+    # Inline every project's CI jobs, prefixed per CI file.
     jobs = {'detect': detect_job}
     for p in projects:
-        ci_files = p.get('_ci_files', [f"{p['name']}-ci.yml"])
-        for ci_file in ci_files:
-            job_key = ci_file.removesuffix('.yml')
-            jobs[job_key] = {
-                'needs': 'detect',
-                'if': f"needs.detect.outputs.{p['name']} == 'true'",
-                'uses': f"./.github/workflows/{ci_file}",
-            }
+        name = p['name']
+        detect_cond = f"needs.detect.outputs.{name} == 'true'"
+        for prefix, doc in p.get('_ci_docs', []):
+            src_jobs = doc.get('jobs') or {}
+            workflow_env = doc.get('env')
+            workflow_defaults_run = (doc.get('defaults') or {}).get('run') or {}
+            key_map = {orig: f"{prefix}-{orig}" for orig in src_jobs}
+
+            for orig_key, job in src_jobs.items():
+                new_key = key_map[orig_key]
+                if new_key in jobs:
+                    raise ConfigError(
+                        f"CI router job key collision: '{new_key}' is produced "
+                        f"by more than one project CI file. Rename the job "
+                        f"'{orig_key}' in the CI workflow of project '{name}'."
+                    )
+
+                # Preserve reusable-workflow-era check-run names so publish
+                # gate regexes and branch protection rules keep matching.
+                display = job.get('name', orig_key)
+                job['name'] = f"{prefix} / {display}"
+
+                # Rewrite intra-workflow needs to prefixed keys, then gate
+                # every job on the detect job.
+                needs = job.get('needs')
+                if needs is None:
+                    rewritten = []
+                elif isinstance(needs, str):
+                    rewritten = [key_map.get(needs, f"{prefix}-{needs}")]
+                else:
+                    rewritten = [key_map.get(n, f"{prefix}-{n}") for n in needs]
+                job['needs'] = ['detect', *rewritten]
+
+                existing_if = job.get('if')
+                if existing_if is None:
+                    job['if'] = detect_cond
+                else:
+                    job['if'] = (
+                        f"{detect_cond} && "
+                        f"({_strip_expression_wrapper(existing_if)})"
+                    )
+
+                # Push workflow-level env/defaults.run down (job keys win) --
+                # they would otherwise be lost when only jobs are extracted.
+                if workflow_env:
+                    job_env = job.setdefault('env', {})
+                    for env_key, env_val in workflow_env.items():
+                        if env_key not in job_env:
+                            job_env[env_key] = env_val
+                if workflow_defaults_run:
+                    run_block = job.setdefault('defaults', {}).setdefault('run', {})
+                    for run_key, run_val in workflow_defaults_run.items():
+                        if run_key not in run_block:
+                            run_block[run_key] = run_val
+
+                jobs[new_key] = job
+
+    validate_router_reusable_calls(jobs, "ci-router.yml")
 
     workflow = {
         'name': 'CI Router',
@@ -343,6 +420,26 @@ def scaffold_releasable_dirs(workspace_root):
     return created_files
 
 
+def _saferm_workflow(filepath, description):
+    """Delete a stale generated workflow file via saferm (audit trail).
+
+    Raises RuntimeError if saferm is not on PATH and propagates
+    subprocess.CalledProcessError if saferm exits non-zero.
+    """
+    try:
+        subprocess.run(
+            ["saferm", "delete", "--description", description, filepath],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        raise RuntimeError(
+            "saferm is not installed or not on PATH. "
+            "Install saferm before running sync."
+        ) from None
+
+
 def _cmd_sync(flags, project_root):
     start = str(project_root)
     root = find_workspace_root(start)
@@ -404,17 +501,17 @@ def _cmd_sync(flags, project_root):
             project_dir = os.path.join(root, path)
             tvars = _build_project_template_vars(project_dir, root)
             ci_dest_names_for_proj = []
+            ci_docs_for_proj = []
 
             for ci_src in ci_sources:
                 ci_basename = os.path.basename(ci_src)
 
-                # Determine destination name
+                # Per-file job prefix: ci.yml -> {name}-ci,
+                # ci-{target}.yml -> {name}-ci-{target}
                 if ci_basename == "ci.yml":
                     ci_dest_name = f"{name}-ci.yml"
                 else:
-                    # ci-{target}.yml -> {name}-ci-{target}.yml
                     ci_dest_name = f"{name}-{ci_basename}"
-                ci_dest = os.path.join(workflows_dir, ci_dest_name)
 
                 # Skip if the source is a generated router (path="." self-reference)
                 ci_src_real = os.path.realpath(ci_src)
@@ -439,29 +536,22 @@ def _cmd_sync(flags, project_root):
                 if doc is None:
                     print(f"Warning: {ci_src} has no jobs: key, skipping", file=sys.stderr)
                     continue
-                _rewrite_trigger(doc)
-                _strip_concurrency(doc)
                 _inject_working_directory(doc, clean_path)
                 _rewrite_version_file_inputs(doc, clean_path)
                 _inject_packages_dir(doc, clean_path)
-                rewritten = emit_ci_workflow(doc)
 
-                header = (
-                    f"# DO NOT EDIT -- generated by rlsbl monorepo sync\n"
-                    f"# Source: {clean_path}/.github/workflows/{ci_basename}\n"
-                )
-                final = header + rewritten
-
-                if os.path.isfile(ci_dest):
-                    os.chmod(ci_dest, 0o644)
-                with open(ci_dest, "w", encoding="utf-8") as f:
-                    f.write(final)
-                os.chmod(ci_dest, 0o444)
-                written_files.append(ci_dest)
+                # No root copy is written: the jobs are inlined into the CI
+                # router (GitHub rejects routers with 20+ reusable-workflow
+                # calls, so ``uses:``-based routing cannot scale).
                 ci_dest_names_for_proj.append(ci_dest_name)
+                ci_docs_for_proj.append((ci_dest_name.removesuffix(".yml"), doc))
 
-            if ci_dest_names_for_proj:
+            if ci_docs_for_proj:
+                # _ci_files feeds the publish gate's check-run name regexes;
+                # inline jobs keep the "{prefix} / {job}" naming, so the
+                # prefix list stays the contract.
                 proj['_ci_files'] = ci_dest_names_for_proj
+                proj['_ci_docs'] = ci_docs_for_proj
                 projects_with_ci.append(proj)
 
         # --- Publish workflow: just verify existence for inline router ---
@@ -520,7 +610,9 @@ def _cmd_sync(flags, project_root):
         else:
             print("Publish router up to date, skipping regeneration")
 
-    # Remove stale workflows
+    # Remove stale workflows. Sync no longer writes per-project CI copies at
+    # the root (their jobs are inlined into ci-router.yml), so every
+    # {name}-ci*.yml and {name}-publish.yml at the root is stale.
     stale_removed = 0
     deleted_files = []
     for filename in os.listdir(workflows_dir):
@@ -531,22 +623,29 @@ def _cmd_sync(flags, project_root):
         # All *-publish.yml files are stale (we no longer generate per-project wrappers)
         if filename.endswith("-publish.yml"):
             os.chmod(filepath, 0o644)
-            os.remove(filepath)
+            _saferm_workflow(
+                filepath,
+                f"Removing stale per-project publish wrapper {filename} "
+                "-- publish jobs are inlined into the root publish.yml router",
+            )
             deleted_files.append(filepath)
             stale_removed += 1
             print(f"Removed stale publish wrapper: {filename}")
             continue
 
-        # Stale CI workflows: any {name}-ci.yml or {name}-ci-{target}.yml not
-        # freshly written this sync. The written_files check above already
-        # skips files that were just written, so anything reaching here is
-        # stale -- either from a removed project or a project whose CI file
-        # set changed (e.g. switched from ci.yml to ci-pypi.yml + ci-go.yml).
+        # Stale CI workflow copies: sync used to write {name}-ci.yml /
+        # {name}-ci-{target}.yml reusable workflows at the root; the router
+        # now inlines all CI jobs, so no such copy is ever current.
         if "-ci" in filename and filename.endswith(".yml"):
             os.chmod(filepath, 0o644)
-            os.remove(filepath)
+            _saferm_workflow(
+                filepath,
+                f"Removing stale per-project CI workflow copy {filename} "
+                "-- CI jobs are inlined into ci-router.yml",
+            )
             deleted_files.append(filepath)
             stale_removed += 1
+            print(f"Removed stale CI workflow copy: {filename}")
 
     # Auto-commit
     all_files = written_files + deleted_files
@@ -557,10 +656,12 @@ def _cmd_sync(flags, project_root):
         else:
             commit_files_if_changed("monorepo: sync CI workflows", all_files, skip_message="No workflow changes to commit.")
 
-    # written_files includes CI workflows + CI router + publish router (if any)
+    inlined_count = sum(len(p.get('_ci_docs', [])) for p in projects_with_ci)
     router_count = 1 + (1 if projects_with_publish else 0)
-    wf_count = len(written_files) - router_count
-    msg = f"Synced {wf_count} workflow(s), generated {router_count} router(s)."
+    msg = (
+        f"Inlined {inlined_count} CI workflow(s) into ci-router.yml, "
+        f"generated {router_count} router(s)."
+    )
     if stale_removed:
         msg += f" Removed {stale_removed} stale workflow(s)."
     print(msg)

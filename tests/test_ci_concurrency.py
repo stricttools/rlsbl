@@ -13,12 +13,10 @@ The group is keyed on ``github.workflow_ref`` (unique per workflow file), NOT
 sibling workflows (ci-pypi.yml, ci-go.yml) that all share ``name: CI``, so a
 name-keyed group would make siblings cancel each other on the same push.
 
-Monorepo sync rewrites project CI workflows to ``workflow_call:`` (called by
-the router). GitHub evaluates a called workflow's top-level concurrency in
-the CALLER's github context, so all sibling called workflows would share one
-group and cancel each other. Sync must therefore strip the concurrency block
-from called workflows -- the router's own per-SHA concurrency covers the
-whole run.
+Monorepo sync inlines project CI jobs directly into the router (GitHub
+rejects routers with 20+ reusable-workflow calls). Workflow-level
+concurrency from project CI files must NOT leak into the router: only the
+router's own per-SHA concurrency block applies, covering the whole run.
 """
 
 import glob
@@ -34,8 +32,6 @@ from rlsbl.commands.monorepo import (
     _cmd_init,
     _cmd_sync,
     _generate_router,
-    _strip_concurrency,
-    emit_ci_workflow,
     parse_ci_workflow,
 )
 from rlsbl.workspace import save_workspace
@@ -161,31 +157,29 @@ jobs:
 """
 
 
-class TestStripConcurrency:
-    """Unit tests for the _strip_concurrency sync transform."""
+class TestInlineDropsWorkflowConcurrency:
+    """Inlining only extracts jobs, so workflow-level concurrency from a
+    project CI file never reaches the router. Job-level concurrency (if a
+    user added any) is carried along with the job."""
 
-    def test_removes_concurrency_block(self):
+    def test_workflow_concurrency_not_inlined(self):
         doc = parse_ci_workflow(CI_WITH_CONCURRENCY)
-        _strip_concurrency(doc)
-        assert "concurrency" not in doc
-        result = emit_ci_workflow(doc)
-        assert "concurrency" not in result
-        assert "cancel-in-progress" not in result
+        projects = [{"name": "core", "path": "core", "_ci_docs": [("core-ci", doc)]}]
+        content = _generate_router(projects)
+        router_doc = parse_ci_workflow(content)
+        # Only the router's own per-SHA block exists
+        assert router_doc["concurrency"]["group"] == EXPECTED_GROUP
+        # The inlined job did not gain a concurrency key
+        assert "concurrency" not in router_doc["jobs"]["core-ci-test"]
 
-    def test_noop_when_absent(self):
-        doc = parse_ci_workflow(CI_WITHOUT_CONCURRENCY)
-        _strip_concurrency(doc)
-        result = emit_ci_workflow(doc)
-        assert "concurrency" not in result
-        assert "jobs:" in result
-
-    def test_job_level_concurrency_untouched(self):
-        """Only the workflow-level block is stripped, not job-level ones."""
+    def test_job_level_concurrency_preserved(self):
         doc = parse_ci_workflow(CI_WITH_CONCURRENCY)
         doc["jobs"]["test"]["concurrency"] = {"group": "job-scope"}
-        _strip_concurrency(doc)
-        assert "concurrency" not in doc
-        assert doc["jobs"]["test"]["concurrency"] == {"group": "job-scope"}
+        projects = [{"name": "core", "path": "core", "_ci_docs": [("core-ci", doc)]}]
+        content = _generate_router(projects)
+        router_doc = parse_ci_workflow(content)
+        job = router_doc["jobs"]["core-ci-test"]
+        assert job["concurrency"] == {"group": "job-scope"}
 
 
 class TestScaffoldedConcurrency:
@@ -228,10 +222,10 @@ class TestScaffoldedConcurrency:
             assert doc["concurrency"]["cancel-in-progress"] is True
 
 
-class TestSyncStripsConcurrency:
-    """Full monorepo sync: called workflows lose concurrency, router keeps it."""
+class TestSyncInlineConcurrency:
+    """Full monorepo sync: only the router's per-SHA concurrency survives."""
 
-    def test_sync_strips_called_workflow_concurrency(self, mock_git_repo, capsys):
+    def test_sync_router_has_single_concurrency(self, mock_git_repo, capsys):
         proj_dir = os.path.join(str(mock_git_repo), "mypylib")
         os.makedirs(proj_dir, exist_ok=True)
         with open(os.path.join(proj_dir, "pyproject.toml"), "w") as f:
@@ -253,16 +247,15 @@ class TestSyncStripsConcurrency:
 
         _cmd_sync({}, project_root=".")
 
-        # Called workflow: concurrency stripped (would be evaluated in the
-        # router's context and collide across sibling projects).
-        dest = mock_git_repo / ".github" / "workflows" / "mypylib-ci.yml"
-        content = dest.read_text()
-        assert "concurrency" not in content
-        assert "workflow_call" in content
+        # No root-level reusable copy is written (jobs are inlined).
+        assert not (mock_git_repo / ".github" / "workflows" / "mypylib-ci.yml").exists()
 
-        # Router: per-SHA concurrency present.
+        # Router: exactly one concurrency block -- its own per-SHA one. The
+        # source workflow's concurrency must not leak in via inlining.
         router = mock_git_repo / ".github" / "workflows" / "ci-router.yml"
         router_content = router.read_text()
+        assert router_content.count("concurrency:") == 1
         doc = parse_ci_workflow(router_content)
         assert doc["concurrency"]["group"] == EXPECTED_GROUP
         assert doc["concurrency"]["cancel-in-progress"] is True
+        assert "concurrency" not in doc["jobs"]["mypylib-ci-test"]

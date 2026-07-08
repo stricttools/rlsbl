@@ -1,4 +1,4 @@
-"""Tests for per-target CI file support in monorepo sync."""
+"""Tests for per-target CI file support in monorepo sync (inline router)."""
 
 import json
 import os
@@ -13,8 +13,8 @@ from rlsbl.commands.monorepo import (
     _cmd_add,
     _cmd_sync,
     _generate_router,
+    parse_ci_workflow,
 )
-from rlsbl.workspace import load_workspace, save_workspace
 
 
 CI_WORKFLOW = """\
@@ -85,11 +85,19 @@ def _make_project_with_ci_files(base_path, subdir, ci_files, name=None):
     return subdir
 
 
+def _router_doc(repo):
+    """Parse the generated CI router in *repo*."""
+    router = repo / ".github" / "workflows" / "ci-router.yml"
+    assert router.exists(), "ci-router.yml not generated"
+    return parse_ci_workflow(router.read_text())
+
+
 class TestPerTargetCIFiles:
-    """Tests for syncing per-target CI files (ci-pypi.yml, ci-go.yml, etc.)."""
+    """Per-target CI files (ci-pypi.yml, ci-go.yml, ...) are inlined into
+    the router with per-file job prefixes; no root copies are written."""
 
     def test_sync_per_target_ci_files(self, mock_git_repo, capsys):
-        """Sub-project with ci-pypi.yml and ci-go.yml (no ci.yml) syncs both."""
+        """Sub-project with ci-pypi.yml and ci-go.yml (no ci.yml) inlines both."""
         _cmd_init({}, project_root=".")
         _make_project_with_ci_files(
             mock_git_repo, "tooling",
@@ -109,15 +117,19 @@ class TestPerTargetCIFiles:
         with patch("rlsbl.utils.find_commit_tool", return_value="git"):
             _cmd_sync({}, project_root=".")
 
-        # Both per-target files should exist in shared workflows dir
+        # No root-level copies are written
         wf_dir = mock_git_repo / ".github" / "workflows"
-        assert (wf_dir / "tooling-ci-pypi.yml").exists()
-        assert (wf_dir / "tooling-ci-go.yml").exists()
-        # Old single-file name should NOT exist
+        assert not (wf_dir / "tooling-ci-pypi.yml").exists()
+        assert not (wf_dir / "tooling-ci-go.yml").exists()
         assert not (wf_dir / "tooling-ci.yml").exists()
 
-    def test_per_target_trigger_rewrite(self, mock_git_repo, capsys):
-        """Per-target CI files get their triggers rewritten to workflow_call."""
+        # Both per-target files' jobs are inlined with per-file prefixes
+        doc = _router_doc(mock_git_repo)
+        assert "tooling-ci-pypi-test-pypi" in doc["jobs"]
+        assert "tooling-ci-go-test-go" in doc["jobs"]
+
+    def test_per_target_jobs_gated_on_detect(self, mock_git_repo, capsys):
+        """Inlined per-target jobs are gated on the project's detect output."""
         _cmd_init({}, project_root=".")
         _make_project_with_ci_files(
             mock_git_repo, "tooling",
@@ -137,13 +149,14 @@ class TestPerTargetCIFiles:
         with patch("rlsbl.utils.find_commit_tool", return_value="git"):
             _cmd_sync({}, project_root=".")
 
-        dest = mock_git_repo / ".github" / "workflows" / "tooling-ci-pypi.yml"
-        content = dest.read_text()
-        assert "workflow_call" in content
-        assert "push:" not in content
+        doc = _router_doc(mock_git_repo)
+        job = doc["jobs"]["tooling-ci-pypi-test-pypi"]
+        assert job["if"] == "needs.detect.outputs.tooling == 'true'"
+        assert list(job["needs"]) == ["detect"]
 
-    def test_per_target_header_comment(self, mock_git_repo, capsys):
-        """Per-target CI files have header referencing the actual source file name."""
+    def test_per_target_check_run_names(self, mock_git_repo, capsys):
+        """Inlined jobs keep the reusable-workflow-era check-run naming
+        ('{prefix} / {job}') so publish gate regexes keep matching."""
         _cmd_init({}, project_root=".")
         _make_project_with_ci_files(
             mock_git_repo, "tooling",
@@ -162,12 +175,12 @@ class TestPerTargetCIFiles:
         with patch("rlsbl.utils.find_commit_tool", return_value="git"):
             _cmd_sync({}, project_root=".")
 
-        dest = mock_git_repo / ".github" / "workflows" / "tooling-ci-pypi.yml"
-        content = dest.read_text()
-        assert "# Source: tooling/.github/workflows/ci-pypi.yml" in content
+        doc = _router_doc(mock_git_repo)
+        job = doc["jobs"]["tooling-ci-pypi-test-pypi"]
+        assert job["name"] == "tooling-ci-pypi / test-pypi"
 
-    def test_per_target_read_only(self, mock_git_repo, capsys):
-        """Per-target CI files are written as read-only."""
+    def test_router_read_only(self, mock_git_repo, capsys):
+        """The generated router is written as read-only."""
         _cmd_init({}, project_root=".")
         _make_project_with_ci_files(
             mock_git_repo, "tooling",
@@ -186,12 +199,12 @@ class TestPerTargetCIFiles:
         with patch("rlsbl.utils.find_commit_tool", return_value="git"):
             _cmd_sync({}, project_root=".")
 
-        dest = mock_git_repo / ".github" / "workflows" / "tooling-ci-go.yml"
-        mode = stat.S_IMODE(os.stat(str(dest)).st_mode)
+        router = mock_git_repo / ".github" / "workflows" / "ci-router.yml"
+        mode = stat.S_IMODE(os.stat(str(router)).st_mode)
         assert mode == 0o444
 
     def test_per_target_working_directory_injected(self, mock_git_repo, capsys):
-        """Per-target CI files get working-directory injected."""
+        """Inlined per-target jobs get working-directory injected."""
         _cmd_init({}, project_root=".")
         _make_project_with_ci_files(
             mock_git_repo, "tooling",
@@ -210,16 +223,16 @@ class TestPerTargetCIFiles:
         with patch("rlsbl.utils.find_commit_tool", return_value="git"):
             _cmd_sync({}, project_root=".")
 
-        dest = mock_git_repo / ".github" / "workflows" / "tooling-ci-pypi.yml"
-        content = dest.read_text()
-        assert "working-directory: tooling" in content
+        doc = _router_doc(mock_git_repo)
+        job = doc["jobs"]["tooling-ci-pypi-test-pypi"]
+        assert job["defaults"]["run"]["working-directory"] == "tooling"
 
 
-class TestSingleCIBackwardCompat:
-    """Verify that the old single ci.yml pattern still works identically."""
+class TestSingleCIInline:
+    """The single ci.yml pattern inlines with the {name}-ci prefix."""
 
-    def test_single_ci_yml_synced_as_before(self, mock_git_repo, capsys):
-        """Sub-project with only ci.yml still produces {name}-ci.yml."""
+    def test_single_ci_yml_inlined(self, mock_git_repo, capsys):
+        """Sub-project with only ci.yml produces {name}-ci-{job} router jobs."""
         _cmd_init({}, project_root=".")
         _make_project_with_ci_files(
             mock_git_repo, "core",
@@ -236,13 +249,13 @@ class TestSingleCIBackwardCompat:
             _cmd_sync({}, project_root=".")
 
         wf_dir = mock_git_repo / ".github" / "workflows"
-        assert (wf_dir / "core-ci.yml").exists()
-        content = (wf_dir / "core-ci.yml").read_text()
-        assert "# Source: core/.github/workflows/ci.yml" in content
-        assert "workflow_call" in content
+        assert not (wf_dir / "core-ci.yml").exists()
+        doc = _router_doc(mock_git_repo)
+        assert "core-ci-test" in doc["jobs"]
+        assert doc["jobs"]["core-ci-test"]["name"] == "core-ci / test"
 
     def test_mixed_single_and_per_target(self, mock_git_repo, capsys):
-        """Project with ci.yml AND ci-pypi.yml produces all expected files."""
+        """Project with ci.yml AND ci-pypi.yml inlines jobs from both files."""
         _cmd_init({}, project_root=".")
         _make_project_with_ci_files(
             mock_git_repo, "hybrid",
@@ -258,83 +271,130 @@ class TestSingleCIBackwardCompat:
         with patch("rlsbl.utils.find_commit_tool", return_value="git"):
             _cmd_sync({}, project_root=".")
 
-        wf_dir = mock_git_repo / ".github" / "workflows"
-        assert (wf_dir / "hybrid-ci.yml").exists()
-        assert (wf_dir / "hybrid-ci-pypi.yml").exists()
+        doc = _router_doc(mock_git_repo)
+        assert "hybrid-ci-test" in doc["jobs"]
+        assert "hybrid-ci-pypi-test-pypi" in doc["jobs"]
 
 
 class TestRouterMultipleCIFiles:
-    """Test that the CI router handles multiple CI files per project."""
+    """The CI router inlines jobs from multiple CI docs per project."""
 
-    def test_router_single_ci_backward_compat(self):
-        """Project without _ci_files still generates a single job."""
+    @staticmethod
+    def _doc(job_key):
+        return {
+            "jobs": {
+                job_key: {
+                    "runs-on": "ubuntu-latest",
+                    "steps": [{"run": "echo test"}],
+                },
+            },
+        }
+
+    def test_router_single_ci_doc(self):
+        """Project with one _ci_docs entry produces one prefixed job."""
         projects = [
-            {"name": "core", "path": "core"},
+            {"name": "core", "path": "core",
+             "_ci_docs": [("core-ci", self._doc("test"))]},
         ]
         content = _generate_router(projects)
-        assert "uses: ./.github/workflows/core-ci.yml" in content
+        doc = parse_ci_workflow(content)
+        assert "core-ci-test" in doc["jobs"]
+        assert "uses" not in doc["jobs"]["core-ci-test"]
 
-    def test_router_single_ci_with_ci_files(self):
-        """Project with one _ci_files entry uses CI filename as job key."""
-        projects = [
-            {"name": "core", "path": "core", "_ci_files": ["core-ci.yml"]},
-        ]
-        content = _generate_router(projects)
-        assert "uses: ./.github/workflows/core-ci.yml" in content
-
-    def test_router_multiple_ci_files(self):
-        """Project with multiple _ci_files generates one job per CI file."""
+    def test_router_multiple_ci_docs(self):
+        """Project with multiple _ci_docs generates jobs per CI file."""
         projects = [
             {
                 "name": "tooling",
                 "path": "tooling",
-                "_ci_files": ["tooling-ci-pypi.yml", "tooling-ci-go.yml"],
+                "_ci_docs": [
+                    ("tooling-ci-pypi", self._doc("test")),
+                    ("tooling-ci-go", self._doc("test")),
+                ],
             },
         ]
         content = _generate_router(projects)
-        assert "uses: ./.github/workflows/tooling-ci-pypi.yml" in content
-        assert "uses: ./.github/workflows/tooling-ci-go.yml" in content
-        # Both jobs should check the same project output
+        doc = parse_ci_workflow(content)
+        assert "tooling-ci-pypi-test" in doc["jobs"]
+        assert "tooling-ci-go-test" in doc["jobs"]
+        # Both jobs check the same project output
         assert content.count("needs.detect.outputs.tooling == 'true'") == 2
 
     def test_router_mixed_single_and_multi(self):
         """Mix of single-CI and multi-CI projects in same router."""
         projects = [
-            {"name": "core", "path": "core", "_ci_files": ["core-ci.yml"]},
+            {"name": "core", "path": "core",
+             "_ci_docs": [("core-ci", self._doc("test"))]},
             {
                 "name": "tooling",
                 "path": "tooling",
-                "_ci_files": ["tooling-ci-pypi.yml", "tooling-ci-go.yml"],
+                "_ci_docs": [
+                    ("tooling-ci-pypi", self._doc("test")),
+                    ("tooling-ci-go", self._doc("test")),
+                ],
             },
         ]
         content = _generate_router(projects)
-        # core: single job
-        assert "uses: ./.github/workflows/core-ci.yml" in content
-        # tooling: two jobs
-        assert "uses: ./.github/workflows/tooling-ci-pypi.yml" in content
-        assert "uses: ./.github/workflows/tooling-ci-go.yml" in content
+        doc = parse_ci_workflow(content)
+        assert "core-ci-test" in doc["jobs"]
+        assert "tooling-ci-pypi-test" in doc["jobs"]
+        assert "tooling-ci-go-test" in doc["jobs"]
+
+    def test_router_rewrites_intra_workflow_needs(self):
+        """Intra-workflow needs are rewritten to prefixed keys + detect."""
+        ci_doc = {
+            "jobs": {
+                "build": {"runs-on": "ubuntu-latest", "steps": []},
+                "test": {
+                    "runs-on": "ubuntu-latest",
+                    "needs": "build",
+                    "steps": [],
+                },
+            },
+        }
+        projects = [
+            {"name": "core", "path": "core", "_ci_docs": [("core-ci", ci_doc)]},
+        ]
+        content = _generate_router(projects)
+        doc = parse_ci_workflow(content)
+        assert list(doc["jobs"]["core-ci-test"]["needs"]) == ["detect", "core-ci-build"]
+        assert list(doc["jobs"]["core-ci-build"]["needs"]) == ["detect"]
+
+    def test_router_job_key_collision_errors(self):
+        """Two CI files producing the same prefixed job key hard-error."""
+        from rlsbl.errors import ConfigError
+        projects = [
+            {
+                "name": "core",
+                "path": "core",
+                "_ci_docs": [
+                    ("core-ci", self._doc("test")),
+                    ("core-ci", self._doc("test")),
+                ],
+            },
+        ]
+        with pytest.raises(ConfigError, match="collision"):
+            _generate_router(projects)
 
 
 class TestCleanupPerTargetCI:
-    """Test that stale per-target CI files are cleaned up when projects are removed."""
+    """Stale root-level per-target CI copies (pre-inline era) are removed."""
 
-    def test_cleanup_removes_per_target_ci(self, mock_git_repo, capsys):
-        """Removing a project cleans up its per-target CI files."""
+    def test_cleanup_removes_legacy_per_target_ci(self, mock_git_repo, capsys):
+        """Legacy {name}-ci-{target}.yml root copies are removed on sync."""
         _cmd_init({}, project_root=".")
-        _make_project_with_ci_files(
-            mock_git_repo, "tooling",
-            {"ci-pypi.yml": CI_PYPI_WORKFLOW, "ci-go.yml": CI_GO_WORKFLOW},
-        )
         _make_project_with_ci_files(
             mock_git_repo, "core",
             {"ci.yml": CI_WORKFLOW},
         )
-        _cmd_add(["tooling"], {}, project_root=".")
         _cmd_add(["core"], {}, project_root=".")
-        # Remove scaffold-generated ci.yml from tooling (only per-target files)
-        scaffold_ci = mock_git_repo / "tooling" / ".github" / "workflows" / "ci.yml"
-        if scaffold_ci.exists():
-            scaffold_ci.unlink()
+        # Plant legacy root copies (as older rlsbl versions wrote them)
+        wf_dir = mock_git_repo / ".github" / "workflows"
+        wf_dir.mkdir(parents=True, exist_ok=True)
+        legacy = [wf_dir / "tooling-ci-pypi.yml", wf_dir / "tooling-ci-go.yml"]
+        for f in legacy:
+            f.write_text("# legacy generated copy\non: workflow_call\njobs: {}\n")
+            os.chmod(str(f), 0o444)
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", "setup"],
@@ -343,34 +403,14 @@ class TestCleanupPerTargetCI:
 
         with patch("rlsbl.utils.find_commit_tool", return_value="git"):
             _cmd_sync({}, project_root=".")
-        capsys.readouterr()
 
-        # Verify all CI files exist
-        wf_dir = mock_git_repo / ".github" / "workflows"
-        assert (wf_dir / "tooling-ci-pypi.yml").exists()
-        assert (wf_dir / "tooling-ci-go.yml").exists()
-        assert (wf_dir / "core-ci.yml").exists()
+        for f in legacy:
+            assert not f.exists(), f"stale workflow {f.name} not removed"
+        # Router untouched by cleanup
+        assert (wf_dir / "ci-router.yml").exists()
 
-        # Remove "tooling" from workspace
-        from rlsbl.commands.monorepo import _cmd_remove
-        _cmd_remove(["tooling"], {}, project_root=".")
-        subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
-        subprocess.run(
-            ["git", "commit", "-q", "-m", "remove tooling"],
-            cwd=str(mock_git_repo), check=True,
-        )
-
-        with patch("rlsbl.utils.find_commit_tool", return_value="git"):
-            _cmd_sync({}, project_root=".")
-
-        # tooling CI files should be removed
-        assert not (wf_dir / "tooling-ci-pypi.yml").exists()
-        assert not (wf_dir / "tooling-ci-go.yml").exists()
-        # core CI file should still exist
-        assert (wf_dir / "core-ci.yml").exists()
-
-    def test_cleanup_does_not_remove_current_project_ci(self, mock_git_repo, capsys):
-        """Cleanup does not touch CI files belonging to current projects."""
+    def test_sync_idempotent(self, mock_git_repo, capsys):
+        """A second sync leaves the router intact and adds no stray files."""
         _cmd_init({}, project_root=".")
         _make_project_with_ci_files(
             mock_git_repo, "tooling",
@@ -386,12 +426,15 @@ class TestCleanupPerTargetCI:
             cwd=str(mock_git_repo), check=True,
         )
 
-        # Sync twice to ensure cleanup doesn't remove active files
         with patch("rlsbl.utils.find_commit_tool", return_value="git"):
             _cmd_sync({}, project_root=".")
             capsys.readouterr()
             _cmd_sync({}, project_root=".")
 
         wf_dir = mock_git_repo / ".github" / "workflows"
-        assert (wf_dir / "tooling-ci-pypi.yml").exists()
-        assert (wf_dir / "tooling-ci-go.yml").exists()
+        doc = _router_doc(mock_git_repo)
+        assert "tooling-ci-pypi-test-pypi" in doc["jobs"]
+        assert "tooling-ci-go-test-go" in doc["jobs"]
+        # No per-project copies appeared
+        stray = [f for f in os.listdir(str(wf_dir)) if "-ci" in f and f.endswith(".yml")]
+        assert stray == []

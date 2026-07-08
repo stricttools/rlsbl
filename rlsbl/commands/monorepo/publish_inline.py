@@ -17,7 +17,7 @@ from ...publish_gate import (
     build_router_gate_job,
     publish_concurrency_block,
 )
-from .sync import _get_monorepo_tag_prefix
+from .sync import _get_monorepo_tag_prefix, validate_router_reusable_calls
 
 
 def parse_publish_workflow(path: str) -> dict:
@@ -302,6 +302,10 @@ def generate_inline_publish_router(projects_with_publish: list, root: str, relea
         GATE_JOB_KEY: build_router_gate_job(prefix_regex_pairs),
         **all_jobs,
     }
+
+    # Generated routers must never route via reusable-workflow calls --
+    # GitHub rejects workflows referencing 20+ of them.
+    validate_router_reusable_calls(all_jobs, "publish.yml (publish router)")
 
     workflow_dict = {
         "name": "Publish Router",

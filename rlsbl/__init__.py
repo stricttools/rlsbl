@@ -1287,7 +1287,7 @@ def cmd_mono_list(**_kwargs):
     _cmd_list({}, project_root=root)
 
 
-@mono.command(name="sync", help="Copy and merge CI workflow files from each project's individual scaffold into the shared .github/workflows directory at the repository root. This ensures that every project in the workspace has its publish and test pipelines properly configured as GitHub Actions workflows, even when projects use different target registries or have custom workflow steps.")
+@mono.command(name="sync", help="Inline every project's CI jobs into a single generated ci-router.yml (and publish jobs into publish.yml) in the shared .github/workflows directory at the repository root. Jobs are inlined rather than routed via reusable-workflow calls because GitHub rejects workflows that reference 20 or more reusable workflows. Stale per-project workflow copies at the root are removed via saferm.")
 @strictcli.flag(name="auto-commit", type=bool, default=True, help="Auto-commit merged workflow files in .github/workflows/")
 def cmd_mono_sync(auto_commit, **_kwargs):
     root = _require_project_root()

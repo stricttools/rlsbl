@@ -153,14 +153,21 @@ class TestSyncSkipsPlain:
         assert not dest.exists(), "Plain project should not have a generated publish workflow"
 
     def test_npm_workflows_generated_normally(self, mock_git_repo, capsys):
-        """The npm project should still get its CI workflow and appear in the inline publish router."""
+        """The npm project's CI jobs are inlined into the router and its
+        publish jobs appear in the inline publish router."""
         self._setup_mixed_workspace(mock_git_repo)
         capsys.readouterr()
         from unittest.mock import patch
         with patch("rlsbl.utils.find_commit_tool", return_value="git"):
             _cmd_sync({}, project_root=".")
+        ci_router = mock_git_repo / ".github" / "workflows" / "ci-router.yml"
+        assert ci_router.exists(), "CI router should be generated"
+        assert "web-app-ci" in ci_router.read_text(), (
+            "npm project CI jobs should be inlined in the router"
+        )
+        # No root-level reusable CI copy is written
         ci_dest = mock_git_repo / ".github" / "workflows" / "web-app-ci.yml"
-        assert ci_dest.exists(), "npm project should have a generated CI workflow"
+        assert not ci_dest.exists(), "Root CI copies are no longer written"
         # Per-project publish wrappers are no longer generated; publish jobs are
         # inlined in publish.yml
         pub_wrapper = mock_git_repo / ".github" / "workflows" / "web-app-publish.yml"
