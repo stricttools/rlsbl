@@ -1,3 +1,4 @@
 {"id":"18c01fb79655c4fdd9e0bea883d343cc9aaf4341abe13677","commits":["79e3c68f6198f0eac7652719c095652e5b2d6680"],"user_facing":false}
 {"id":"18c03bea34e6a899406b8bb689f44c4c8e1c91eb2bcf947c","commits":["e78d6ab7acbe4bd69c9e95354bf07d2a7676ebf8"],"user_facing":true,"description":"**Bug fix.** Monorepo CI router now inlines jobs instead of reusable workflow calls -- GitHub rejects routers with more than 20 `uses:` calls, which silently broke CI for large monorepos.","type":"fix"}
 {"id":"18c03d7b151d4b9e9a3f443101f24ce184804e0296bf41f6","commits":["2ab52035a7d5088c9a3e68daae29efcab92782af"],"user_facing":false}
+{"id":"18c03dee6696e182b9b5899f9c3a4fb2b46012a94cff9d55","commits":["1bd585653e38fe56ebd2e0b04a607126df5c4153"],"user_facing":false}
