@@ -265,8 +265,8 @@
     "description": "f934ebcc70f1b9dc3c86b2020fcfac4db46bd2cd252d78e4d5989f59cc429886"
   },
   "en/configuration.md": {
-    "content": "8b5f0389c829aaef2c51894971d08226630a77512ce6c6c12d03e25b6b092a8d",
-    "description": "41f420007d490a1f88d04a79217d74f888f375c50f769dcd06f55dd16fe614b6",
+    "content": "4851dde44605c95169da8dd4e5f2d438ad333dfc4669e18d255f88eed72064bf",
+    "description": "042bcf973e6829da33417dca69796dbc6b34602e7077be577ab62029d91a32c0",
     "source_docstring": "684f5504ecd819cd27ef806b518e4558c7e77aeb73785c25f6610c47fe0dc9bb"
   },
   "en/dep-validation.md": {
@@ -551,8 +551,8 @@
     "source_docstring": "c7776d190150330f960501da40b144d7eaa95549b77ddb022210aa638d70f571"
   },
   "en/rlsbl-commands-release-execute.md": {
-    "content": "538f4e86ea661a971ccaea551960dfd4d43c94ef80da66f7f6747a066e96d91d",
-    "description": "e53f818234cb489cc33d6bff95eba4112aec81f051f3ca690d768528d3d7b3d1",
+    "content": "abe97515bfdd003f41be607d0b271569ac0ddf0eef46e7eb2326f58614c59ca3",
+    "description": "36f04769d9d3a03e57962052acebef3c6a91a6958cb51f35730ef31ad97019e2",
     "source_docstring": "bd0d7d5d6c99772ecf9e3762552836a4fd700731c8a3321efe428a6f1c330465"
   },
   "en/rlsbl-commands-release-hooks.md": {
