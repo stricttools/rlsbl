@@ -4,84 +4,28 @@ import glob
 import os
 import subprocess
 import sys
-from io import StringIO
-
-from ruamel.yaml import YAML
 from ruamel.yaml.scalarstring import LiteralScalarString
 
+import tomlkit
+
 from ...action_versions import format_action
+from ...ci_yaml import (
+    parse_ci_workflow,
+    emit_ci_workflow,
+    inject_working_directory,
+    rewrite_version_file_inputs,
+)
 from ...commands.init_cmd import check_unreplaced_vars, process_template
 from ...context import create_context
 from ...errors import ConfigError
+from ...targets.utils import detect_python_package_root
 from ...utils import commit_files_if_changed
-from ...workspace import find_workspace_root, load_workspace
+from ...workspace import find_workspace_root, load_workspace, WORKSPACE_DIR, WORKSPACE_FILE
 from ...targets import detect_targets, resolve_releasable_config_dir, TARGETS
 
-
-def parse_ci_workflow(content):
-    """Parse CI workflow YAML content using round-trip mode (preserves comments, ordering).
-
-    Returns the parsed document, or None if the content is empty or has no
-    ``jobs:`` key.
-    """
-    yaml = YAML(typ='rt')
-    doc = yaml.load(content)
-    if doc is None or 'jobs' not in doc:
-        return None
-    return doc
-
-
-def emit_ci_workflow(doc):
-    """Serialize a parsed workflow document back to YAML string.
-
-    Uses round-trip mode to preserve comment annotations and key order
-    from the original parse.
-    """
-    yaml = YAML(typ='rt')
-    yaml.default_flow_style = False
-    stream = StringIO()
-    yaml.dump(doc, stream)
-    return stream.getvalue()
-
-
-def _inject_working_directory(doc, path):
-    """Add defaults.run.working-directory to each job in a parsed YAML document.
-
-    Merges with existing ``defaults.run`` (e.g. preserving ``shell``) rather
-    than overwriting.  Only adds ``working-directory`` if it is not already
-    present.
-    """
-    path = path.rstrip('/')
-    for job_name, job in doc.get('jobs', {}).items():
-        defaults = job.setdefault('defaults', {})
-        run_section = defaults.setdefault('run', {})
-        if 'working-directory' not in run_section:
-            run_section['working-directory'] = path
-    return doc
-
-
-def _rewrite_version_file_inputs(doc, project_path):
-    """Prefix version-file values with project path in setup actions.
-
-    Actions like actions/setup-go resolve ``go-version-file`` relative to
-    the repo root, not ``working-directory``.  When a workflow is copied
-    into a monorepo sub-project we must adjust these inputs so the runner
-    can still find the file.
-
-    Known inputs: go-version-file, python-version-file, node-version-file.
-    """
-    known_inputs = ('go-version-file', 'python-version-file', 'node-version-file')
-    for job in doc.get('jobs', {}).values():
-        for step in job.get('steps', []):
-            with_block = step.get('with', {})
-            if not with_block:
-                continue
-            for inp in known_inputs:
-                if inp in with_block:
-                    val = str(with_block[inp])
-                    if not val.startswith('/') and not val.startswith(project_path + '/'):
-                        with_block[inp] = f"{project_path}/{val}"
-    return doc
+# Backward-compatible aliases (private names used by monorepo __init__.py re-exports)
+_inject_working_directory = inject_working_directory
+_rewrite_version_file_inputs = rewrite_version_file_inputs
 
 
 def _inject_packages_dir(doc, project_path):
@@ -440,6 +384,71 @@ def _saferm_workflow(filepath, description):
         ) from None
 
 
+def _sync_import_names(root, projects):
+    """Auto-populate import_name for Python projects whose import name differs from their project name.
+
+    For each Python project (has pyproject.toml with [project]), detects the
+    package root via detect_python_package_root and compares the derived import
+    name against the underscored project name. When they differ and import_name
+    is not already set in workspace.toml, writes import_name to the project's
+    entry.
+
+    Returns the workspace.toml path if it was modified, or None.
+    """
+    updates: list[tuple[str, str]] = []  # (project_name, import_name)
+
+    for proj in projects:
+        # Skip if already set
+        if proj.import_name:
+            continue
+
+        project_dir = os.path.join(root, proj.path)
+        pyproject_path = os.path.join(project_dir, "pyproject.toml")
+        if not os.path.isfile(pyproject_path):
+            continue
+
+        pkg_root = detect_python_package_root(project_dir)
+        if pkg_root is None:
+            continue
+
+        # Derive import name from detected package root
+        detected_import_name = os.path.basename(pkg_root)
+
+        # Compare against the underscored project name (the default Python
+        # convention: project name "my-package" imports as "my_package")
+        underscored_name = proj.name.replace("-", "_")
+        if detected_import_name != underscored_name:
+            updates.append((proj.name, detected_import_name))
+
+    if not updates:
+        return None
+
+    # Read workspace.toml with tomlkit (preserves formatting)
+    ws_path = os.path.join(root, WORKSPACE_DIR, WORKSPACE_FILE)
+    with open(ws_path, encoding="utf-8") as f:
+        doc = tomlkit.loads(f.read())
+
+    # Build a name -> tomlkit table mapping for efficient lookup
+    projects_array = doc.get("projects", [])
+    name_to_table: dict[str, object] = {}
+    for table in projects_array:
+        name_to_table[table.get("name", "")] = table
+
+    for proj_name, import_name in updates:
+        table = name_to_table.get(proj_name)
+        if table is not None:
+            table["import_name"] = import_name
+            print(f"Auto-detected import_name for {proj_name}: {import_name}")
+
+    # Write back atomically
+    tmp = ws_path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(tomlkit.dumps(doc))
+    os.replace(tmp, ws_path)
+
+    return ws_path
+
+
 def _cmd_sync(flags, project_root):
     start = str(project_root)
     root = find_workspace_root(start)
@@ -451,6 +460,19 @@ def _cmd_sync(flags, project_root):
     if not projects:
         print("No projects in workspace. Nothing to sync.")
         return
+
+    # Auto-populate import_name for Python projects where the import name
+    # differs from the project name (e.g., project "cloudflare" imports as "cf").
+    ws_path = _sync_import_names(root, projects)
+    if ws_path:
+        if flags.get("auto-commit", True):
+            commit_files_if_changed(
+                "monorepo: auto-populate import_name",
+                [ws_path],
+                skip_message=None,
+            )
+        # Re-load projects so the rest of sync sees the updated import_names
+        projects = load_workspace(root)
 
     # Scaffold releasable directory structure (explicit mode only).
     # This runs early so that releasable dirs exist before CI workflow

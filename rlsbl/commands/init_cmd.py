@@ -9,6 +9,12 @@ import sys
 import tempfile
 
 from ..action_versions import format_action, UnknownActionError
+from ..ci_yaml import (
+    parse_ci_workflow,
+    emit_ci_workflow,
+    inject_working_directory,
+    rewrite_version_file_inputs,
+)
 from ..errors import ConfigError
 from ..config import (
     read_deploy_config,
@@ -2103,9 +2109,28 @@ def run_cmd_multi(registries_list, args, flags, ctx):
                     # target is not the primary.
                     ci_vars = dict(vars_dict)
                     _overlay_target_vars(ci_vars, r)
-                    ci_plans.extend(plan_mappings(
+                    new_plans = plan_mappings(
                         target_obj.template_dir(), ci_mappings, ci_vars, force,
-                    ))
+                    )
+
+                    # Inject working-directory for subdirectory targets
+                    target_path = target_paths.get(r, ".")
+                    if target_path != ".":
+                        for plan in new_plans:
+                            if plan.get("content"):
+                                doc = parse_ci_workflow(plan["content"])
+                                if doc is not None:
+                                    inject_working_directory(doc, target_path)
+                                    rewrite_version_file_inputs(doc, target_path.rstrip("/"))
+                                    plan["content"] = emit_ci_workflow(doc)
+                                    if plan.get("base_content") is not None:
+                                        base_doc = parse_ci_workflow(plan["base_content"])
+                                        if base_doc is not None:
+                                            inject_working_directory(base_doc, target_path)
+                                            rewrite_version_file_inputs(base_doc, target_path.rstrip("/"))
+                                            plan["base_content"] = emit_ci_workflow(base_doc)
+
+                    ci_plans.extend(new_plans)
 
                 # Collect non-workflow files (deduplicated)
                 for m in non_wf_mappings:
