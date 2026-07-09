@@ -9,6 +9,7 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 from rlsbl.commands.release import run_cmd, _run_cmd_inner, _run_strictcli_schema_dump
+from rlsbl.commands.release.validate import ReleaseValidationError
 from rlsbl.release_file import ReleaseConfig
 
 
@@ -66,8 +67,8 @@ class TestStrictcliSchemaDumpFunction:
         )
         assert not messages
 
-    def test_command_failure_prints_warning(self, tmp_path, capsys):
-        """When the dump command fails, a warning is printed but no exception raised."""
+    def test_command_failure_raises_error(self, tmp_path):
+        """When the dump command fails, ReleaseValidationError is raised."""
         (tmp_path / "pyproject.toml").write_text(
             '[project]\nname = "myapp"\nversion = "1.0.0"\n'
             'dependencies = ["strictcli"]\n'
@@ -79,16 +80,14 @@ class TestStrictcliSchemaDumpFunction:
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
 
-            _run_strictcli_schema_dump(
-                {}, lambda msg: messages.append(msg),
-                project_dir=str(tmp_path),
-            )
+            with pytest.raises(ReleaseValidationError, match="schema dump failed"):
+                _run_strictcli_schema_dump(
+                    {}, lambda msg: messages.append(msg),
+                    project_dir=str(tmp_path),
+                )
 
-        captured = capsys.readouterr()
-        assert "Warning: strictcli schema dump failed" in captured.err
-
-    def test_timeout_prints_warning(self, tmp_path, capsys):
-        """When the dump command times out, a warning is printed."""
+    def test_timeout_raises_error(self, tmp_path):
+        """When the dump command times out, ReleaseValidationError is raised."""
         (tmp_path / "pyproject.toml").write_text(
             '[project]\nname = "myapp"\nversion = "1.0.0"\n'
             'dependencies = ["strictcli"]\n'
@@ -100,13 +99,11 @@ class TestStrictcliSchemaDumpFunction:
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
 
-            _run_strictcli_schema_dump(
-                {}, lambda msg: messages.append(msg),
-                project_dir=str(tmp_path),
-            )
-
-        captured = capsys.readouterr()
-        assert "timed out" in captured.err
+            with pytest.raises(ReleaseValidationError, match="timed out"):
+                _run_strictcli_schema_dump(
+                    {}, lambda msg: messages.append(msg),
+                    project_dir=str(tmp_path),
+                )
 
     def test_runs_uv_with_correct_args(self, tmp_path):
         """When strictcli is detected, runs uv run <entry_point> --dump-schema."""

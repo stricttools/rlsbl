@@ -982,14 +982,16 @@ def _run_strictcli_schema_dump(flags, log, project_dir="."):
             cmd,
             cwd=project_dir,
             timeout=_SCHEMA_DUMP_TIMEOUT,
+            check=True,
         )
     except _subprocess.TimeoutExpired:
-        print(
-            f"Warning: strictcli schema dump timed out after {_SCHEMA_DUMP_TIMEOUT}s.",
-            file=sys.stderr,
+        raise ReleaseValidationError(
+            f"strictcli schema dump timed out after {_SCHEMA_DUMP_TIMEOUT}s"
         )
     except (_subprocess.CalledProcessError, OSError) as e:
-        print(f"Warning: strictcli schema dump failed: {e}", file=sys.stderr)
+        raise ReleaseValidationError(
+            f"strictcli schema dump failed: {e}"
+        ) from e
 
 
 def validate_blog_body(project_dir, blog_enabled, *, releases_dir=None):
