@@ -1,0 +1,1 @@
+{"id":"18c0927a52d2bbdbcbf1a0bd0ae241b293d035047a388756","commits":["805b57bd69974826df4bd2b740d8a82025638a82"],"user_facing":true,"description":"**Breaking.** Failed or timed-out strictcli schema dumps now abort the release instead of printing a warning.","type":"breaking"}
