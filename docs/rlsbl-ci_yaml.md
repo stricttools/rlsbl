@@ -2,7 +2,6 @@
 title: rlsbl.ci_yaml
 description: "Shared CI workflow YAML helpers: parsing, serialization, and content injection."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 21
 ---
