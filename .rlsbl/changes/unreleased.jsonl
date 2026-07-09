@@ -1,1 +1,2 @@
 {"id":"18c0927a52d2bbdbcbf1a0bd0ae241b293d035047a388756","commits":["805b57bd69974826df4bd2b740d8a82025638a82"],"user_facing":true,"description":"**Breaking.** Failed or timed-out strictcli schema dumps now abort the release instead of printing a warning.","type":"breaking"}
+{"id":"18c0927b9373006029b80dd4eae7486fa12c7e4ddb73e771","commits":["ca3e4881720c0a39b5b79ea7832e290f7e3e5e2f"],"user_facing":true,"description":"**New feature.** Schema dump version field now matches the release being cut, not the previous version.","type":"feature"}
