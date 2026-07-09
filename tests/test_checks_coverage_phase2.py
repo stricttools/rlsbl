@@ -994,7 +994,7 @@ class TestConfigSchema:
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
-        _setup_scaffold(repo, config={"private": False})
+        _setup_scaffold(repo, config={"private": False, "targets": ["pypi"]})
 
         ctx = make_ctx(repo)
         result = app._check_defs["config-schema"].impl(ctx)
@@ -1005,12 +1005,41 @@ class TestConfigSchema:
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
-        _setup_scaffold(repo, config={"some_key": True})
+        _setup_scaffold(repo, config={"some_key": True, "targets": ["pypi"]})
 
         ctx = make_ctx(repo)
         result = app._check_defs["config-schema"].impl(ctx)
         assert result.status == "fail"
         assert any("private" in d for d in result.details)
+
+    def test_empty_targets_config_schema_fails(self, tmp_path, monkeypatch):
+        """validate_config_schema catches targets: [] via config-schema check."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+        _init_repo(repo)
+        _setup_scaffold(repo, config={"private": False, "targets": []})
+
+        ctx = make_ctx(repo)
+        result = app._check_defs["config-schema"].impl(ctx)
+        assert result.status == "fail"
+        assert any("targets is an empty list" in d for d in result.details)
+
+    def test_release_mode_config_schema_fails(self, tmp_path, monkeypatch):
+        """validate_config_schema catches release.mode via config-schema check."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+        _init_repo(repo)
+        _setup_scaffold(repo, config={
+            "private": False, "targets": ["pypi"],
+            "release": {"mode": "imperative"},
+        })
+
+        ctx = make_ctx(repo)
+        result = app._check_defs["config-schema"].impl(ctx)
+        assert result.status == "fail"
+        assert any("release.mode" in d for d in result.details)
 
 
 class TestLicenseFile:

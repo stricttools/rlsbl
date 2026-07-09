@@ -474,12 +474,19 @@ def register_project_checks(app):
 
     @app.check("config-schema")
     def check_config_schema(ctx):
-        """Validate config schema: private key and pipelines."""
+        """Validate config schema: private key, banned keys, and pipelines."""
         config = ctx.config
         errors = []
 
         if "private" not in config:
             errors.append('"private" key missing from config')
+
+        # Validate banned keys and structural invariants
+        from ..config import validate_config_schema as _validate_config_schema
+        try:
+            _validate_config_schema(config, project_dir=str(ctx.project_root))
+        except ConfigError as e:
+            errors.append(str(e))
 
         # Validate pipelines config if present
         from ..config import validate_pipelines_config
