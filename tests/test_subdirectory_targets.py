@@ -2,18 +2,24 @@
 
 Covers: _parse_target_entry, detect_targets with subdirectory config,
 version sync with subdirectory targets, resolve_release_targets with
-structured config, and _merge_template_vars with per-target paths.
+structured config, _merge_template_vars with per-target paths, and
+CI workflow working-directory injection for subdirectory targets.
 """
 
 import json
+import os
+from io import StringIO
+from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 from conftest import make_ctx
+from rlsbl.context import ProjectContext
 from rlsbl.errors import ConfigError
 from rlsbl.targets import TARGETS, TargetEntry, _parse_target_entry, detect_targets
 from rlsbl.commands.release import resolve_release_targets, resolve_target_paths
-from rlsbl.commands.init_cmd import _merge_template_vars
+from rlsbl.commands.init_cmd import _merge_template_vars, run_cmd_multi
 
 
 # ---------------------------------------------------------------------------
@@ -264,3 +270,118 @@ class TestMergeTemplateVarsSubdirectory:
         target_paths = {"npm": str(npm_dir)}
         merged = _merge_template_vars(["npm"], "npm", target_paths, str(tmp_path))
         assert merged["name"] == "subdir-pkg"
+
+
+# ---------------------------------------------------------------------------
+# Test class 7: CI working-directory injection for subdirectory targets
+# ---------------------------------------------------------------------------
+
+
+def _scaffold_ctx(root="."):
+    """Create a ProjectContext for scaffold tests, reading config from disk."""
+    root_path = Path(root)
+    config_path = root_path / ".rlsbl" / "config.json"
+    config = json.loads(config_path.read_text()) if config_path.exists() else {}
+    return ProjectContext(project_root=root_path, workspace_root=None, config=config)
+
+
+class TestCIWorkingDirectoryInjection:
+    """Integration tests for CI workflow working-directory injection on subdir targets.
+
+    When a target lives in a subdirectory (e.g., go/ or npm/), the scaffolded
+    CI workflow must include defaults.run.working-directory so that run steps
+    execute in the correct directory.
+    """
+
+    def _setup_subdir_project(self, root):
+        """Set up a project with pypi at root and go in a go/ subdirectory."""
+        # Primary target at root: pypi
+        (root / "pyproject.toml").write_text(
+            "[project]\n"
+            'name = "subdir-ci-test"\n'
+            'version = "0.1.0"\n'
+            'requires-python = ">=3.11"\n'
+        )
+
+        # Secondary target in subdirectory: go
+        go_dir = root / "go"
+        go_dir.mkdir()
+        (go_dir / "go.mod").write_text(
+            "module github.com/test/subdir-ci-test\n\ngo 1.23\n"
+        )
+        (go_dir / "VERSION").write_text("0.1.0\n")
+
+        # Config declaring the subdirectory target
+        rlsbl_dir = root / ".rlsbl"
+        rlsbl_dir.mkdir(exist_ok=True)
+        config = {"targets": ["pypi", {"name": "go", "path": "go/"}]}
+        (rlsbl_dir / "config.json").write_text(json.dumps(config))
+
+    def test_subdir_ci_has_working_directory(self, mock_git_repo):
+        """CI workflow for a subdirectory target includes working-directory."""
+        self._setup_subdir_project(mock_git_repo)
+
+        with patch("sys.stdout", new_callable=StringIO):
+            run_cmd_multi(["pypi", "go"], [], {}, ctx=_scaffold_ctx())
+
+        ci_go = os.path.join(".github", "workflows", "ci-go.yml")
+        assert os.path.exists(ci_go), "ci-go.yml should be generated"
+
+        with open(ci_go) as f:
+            content = f.read()
+        assert "working-directory:" in content
+        # The path should be the subdirectory (trailing slash stripped)
+        assert "working-directory: ./go" in content or "working-directory: go" in content
+
+    def test_root_ci_has_no_working_directory(self, mock_git_repo):
+        """CI workflow for a root target does not include working-directory."""
+        self._setup_subdir_project(mock_git_repo)
+
+        with patch("sys.stdout", new_callable=StringIO):
+            run_cmd_multi(["pypi", "go"], [], {}, ctx=_scaffold_ctx())
+
+        ci_pypi = os.path.join(".github", "workflows", "ci-pypi.yml")
+        assert os.path.exists(ci_pypi), "ci-pypi.yml should be generated"
+
+        with open(ci_pypi) as f:
+            content = f.read()
+        assert "working-directory:" not in content
+
+    def test_subdir_ci_rewrites_version_file_inputs(self, mock_git_repo):
+        """go-version-file is prefixed with the subdirectory path."""
+        self._setup_subdir_project(mock_git_repo)
+
+        with patch("sys.stdout", new_callable=StringIO):
+            run_cmd_multi(["pypi", "go"], [], {}, ctx=_scaffold_ctx())
+
+        ci_go = os.path.join(".github", "workflows", "ci-go.yml")
+        with open(ci_go) as f:
+            content = f.read()
+        # go-version-file should be prefixed with the subdir path
+        assert "go-version-file: ./go/go.mod" in content or "go-version-file: go/go.mod" in content
+
+    def test_scaffold_idempotent_for_subdir_target(self, mock_git_repo):
+        """Re-scaffold produces no diff for subdirectory target CI workflows."""
+        self._setup_subdir_project(mock_git_repo)
+
+        # First scaffold
+        with patch("sys.stdout", new_callable=StringIO):
+            run_cmd_multi(["pypi", "go"], [], {}, ctx=_scaffold_ctx())
+
+        ci_go = os.path.join(".github", "workflows", "ci-go.yml")
+        with open(ci_go) as f:
+            first_content = f.read()
+
+        # Verify the working-directory was injected
+        assert "working-directory:" in first_content
+
+        # Re-scaffold (simulates re-running rlsbl scaffold)
+        with patch("sys.stdout", new_callable=StringIO):
+            run_cmd_multi(["pypi", "go"], [], {}, ctx=_scaffold_ctx())
+
+        with open(ci_go) as f:
+            second_content = f.read()
+
+        assert first_content == second_content, (
+            "Re-scaffold should produce identical output for subdirectory CI workflows"
+        )
