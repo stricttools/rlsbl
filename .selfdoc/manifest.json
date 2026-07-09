@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.101.1",
+  "version": "0.102.0",
   "description": "",
   "language": "python",
   "base_url": "https://rlsbl.smmh.dev",
@@ -280,6 +280,11 @@
     {
       "path": "rlsbl-checks.md",
       "title": "rlsbl.checks",
+      "type": "doc"
+    },
+    {
+      "path": "rlsbl-ci_yaml.md",
+      "title": "rlsbl.ci_yaml",
       "type": "doc"
     },
     {
@@ -960,5 +965,5 @@
       ]
     }
   ],
-  "last_gen": "2026-07-08T19:48:04.639026+00:00"
+  "last_gen": "2026-07-09T08:43:38.104907+00:00"
 }

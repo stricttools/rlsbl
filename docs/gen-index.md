@@ -1,6 +1,6 @@
 ---
 title: API Reference
-description: "Auto-generated API reference index for the selfdoc package — browse all public modules with their docstrings and source locations."
+description: "Auto-generated API reference index for the rlsbl package — browse all 150 public modules with their docstrings and source locations."
 generated: true
 nav_group: "API Reference"
 nav_order: 0
@@ -30,6 +30,7 @@ order: 90
 - [rlsbl.checks.release](rlsbl-checks-release.html)
 - [rlsbl.checks.scope](rlsbl-checks-scope.html)
 - [rlsbl.checks.workspace](rlsbl-checks-workspace.html)
+- [rlsbl.ci_yaml](rlsbl-ci_yaml.html)
 - [rlsbl.commands](rlsbl-commands.html)
 - [rlsbl.commands.changelog_cmd](rlsbl-commands-changelog_cmd.html)
 - [rlsbl.commands.check](rlsbl-commands-check.html)
