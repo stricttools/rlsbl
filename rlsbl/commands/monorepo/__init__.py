@@ -38,6 +38,7 @@ from .extract import (
 from .sync import (
     _cmd_sync,
     _build_project_template_vars,
+    _sync_import_names,
     parse_ci_workflow,
     emit_ci_workflow,
     _inject_working_directory,
@@ -79,6 +80,7 @@ __all__ = [
     # sync
     "_cmd_sync",
     "_build_project_template_vars",
+    "_sync_import_names",
     "parse_ci_workflow",
     "emit_ci_workflow",
     "_inject_working_directory",
