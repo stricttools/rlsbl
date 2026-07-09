@@ -2,6 +2,21 @@
 
 # Changelog
 
+## 0.103.0
+
+Schema dump correctness, CI working-directory injection, import name auto-detection, and configuration validation in checks.
+
+### Breaking
+
+- **Breaking.** Failed or timed-out strictcli schema dumps now abort the release instead of printing a warning.
+
+### Features
+
+- **New feature.** Schema dump version field now matches the release being cut, not the previous version.
+- **New feature.** Scaffolded CI workflows for subdirectory targets now include the correct working-directory.
+- **New feature.** monorepo sync auto-detects Python import names that differ from package names, populating import_name in workspace.toml.
+- **New feature.** rlsbl check now validates targets and release.mode configuration, catching errors previously only found during release.
+
 ## 0.102.0
 
 Rollback safety guard and documentation directive extras.
