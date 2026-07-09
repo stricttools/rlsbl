@@ -707,7 +707,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         log("Running pre-checks hook...")
         run_release_hook("pre-checks", pre_checks_script, project_dir, hook_env, hook_timeout, config=config)
 
-    _run_strictcli_schema_dump(flags, log, project_dir=project_dir)
+    _run_strictcli_schema_dump(flags, log, project_dir=project_dir, version=new_version)
 
     # Snapshot dirty files before selfdoc runs so we can isolate files that
     # selfdoc generates (excluding anything dirtied by pre-checks hooks or

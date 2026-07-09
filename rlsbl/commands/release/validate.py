@@ -5,8 +5,10 @@ config integrity, pipeline config, gh CLI, clean tree, branch/remote, monorepo c
 version/tag computation, and changelog state validation.
 """
 
+import json
 import os
 import sys
+import tempfile
 
 from ...strictcli_detect import detect_strictcli
 
@@ -943,17 +945,19 @@ def _schema_dump_command(entry_point: str, lang: str) -> list[str]:
         raise ValueError(f"unsupported strictcli language: {lang}")
 
 
-def _run_strictcli_schema_dump(flags, log, project_dir="."):
+def _run_strictcli_schema_dump(flags, log, project_dir=".", version=None):
     """Run --dump-schema for strictcli projects to regenerate .strictcli/schema.json.
 
     Detects strictcli usage via pyproject.toml or go.mod, runs the entry point
     with --dump-schema, and logs the result. The generated file is picked up by
     the hook-generated file mechanism (pre/post hook dirty snapshots).
 
+    When *version* is given, the ``version`` key in the generated schema.json
+    is replaced with *version* after a successful dump (atomic write).
+
     A project that requires strictcli but whose entry point cannot be
     detected aborts validation (ReleaseValidationError) -- a silent skip
-    would ship a stale schema. A failing dump command still only prints
-    a warning.
+    would ship a stale schema.
     """
     from . import subprocess as _subprocess
     from ...strictcli_detect import StrictcliDetectError
@@ -992,6 +996,45 @@ def _run_strictcli_schema_dump(flags, log, project_dir="."):
         raise ReleaseValidationError(
             f"strictcli schema dump failed: {e}"
         ) from e
+
+    if version is not None:
+        _patch_schema_version(project_dir, version)
+
+
+def _patch_schema_version(project_dir, version):
+    """Replace the ``version`` key in .strictcli/schema.json with *version*.
+
+    Writes atomically via a temp file + os.replace.
+    """
+    schema_path = os.path.join(project_dir, ".strictcli", "schema.json")
+    if not os.path.isfile(schema_path):
+        raise ReleaseValidationError(
+            f"strictcli schema dump succeeded but {schema_path} does not exist"
+        )
+
+    with open(schema_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    if "version" not in data:
+        raise ReleaseValidationError(
+            f"{schema_path} has no 'version' key"
+        )
+
+    data["version"] = version
+
+    schema_dir = os.path.dirname(schema_path)
+    fd, tmp_path = tempfile.mkstemp(dir=schema_dir, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+            f.write("\n")
+        os.replace(tmp_path, schema_path)
+    except BaseException:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 
 
 def validate_blog_body(project_dir, blog_enabled, *, releases_dir=None):

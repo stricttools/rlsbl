@@ -129,6 +129,105 @@ class TestStrictcliSchemaDumpFunction:
         assert call_args[1]["cwd"] == str(tmp_path)
         assert call_args[1]["timeout"] == 30
 
+    def test_version_patched_after_successful_dump(self, tmp_path):
+        """When version is provided, schema.json version key is updated after dump."""
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "myapp"\nversion = "1.0.0"\n'
+            'dependencies = ["strictcli"]\n'
+            '\n[project.scripts]\nmyapp = "myapp:main"\n'
+        )
+        schema_dir = tmp_path / ".strictcli"
+        schema_dir.mkdir()
+        schema_path = schema_dir / "schema.json"
+        schema_path.write_text(json.dumps({"version": "1.0.0", "commands": []}))
+
+        messages = []
+        with patch("rlsbl.commands.release.subprocess") as mock_sp:
+            mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+            mock_sp.CalledProcessError = subprocess.CalledProcessError
+            mock_sp.TimeoutExpired = subprocess.TimeoutExpired
+
+            _run_strictcli_schema_dump(
+                {}, lambda msg: messages.append(msg),
+                project_dir=str(tmp_path),
+                version="2.0.0",
+            )
+
+        data = json.loads(schema_path.read_text())
+        assert data["version"] == "2.0.0"
+        assert data["commands"] == []  # other keys preserved
+
+    def test_version_not_patched_when_none(self, tmp_path):
+        """When version is None, schema.json is not touched."""
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "myapp"\nversion = "1.0.0"\n'
+            'dependencies = ["strictcli"]\n'
+            '\n[project.scripts]\nmyapp = "myapp:main"\n'
+        )
+        schema_dir = tmp_path / ".strictcli"
+        schema_dir.mkdir()
+        schema_path = schema_dir / "schema.json"
+        schema_path.write_text(json.dumps({"version": "1.0.0", "commands": []}))
+
+        messages = []
+        with patch("rlsbl.commands.release.subprocess") as mock_sp:
+            mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+            mock_sp.CalledProcessError = subprocess.CalledProcessError
+            mock_sp.TimeoutExpired = subprocess.TimeoutExpired
+
+            _run_strictcli_schema_dump(
+                {}, lambda msg: messages.append(msg),
+                project_dir=str(tmp_path),
+            )
+
+        data = json.loads(schema_path.read_text())
+        assert data["version"] == "1.0.0"  # unchanged
+
+    def test_version_patch_errors_on_missing_schema(self, tmp_path):
+        """When version is provided but schema.json doesn't exist, error is raised."""
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "myapp"\nversion = "1.0.0"\n'
+            'dependencies = ["strictcli"]\n'
+            '\n[project.scripts]\nmyapp = "myapp:main"\n'
+        )
+        messages = []
+        with patch("rlsbl.commands.release.subprocess") as mock_sp:
+            mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+            mock_sp.CalledProcessError = subprocess.CalledProcessError
+            mock_sp.TimeoutExpired = subprocess.TimeoutExpired
+
+            with pytest.raises(ReleaseValidationError, match="does not exist"):
+                _run_strictcli_schema_dump(
+                    {}, lambda msg: messages.append(msg),
+                    project_dir=str(tmp_path),
+                    version="2.0.0",
+                )
+
+    def test_version_patch_errors_on_missing_version_key(self, tmp_path):
+        """When schema.json has no version key, error is raised."""
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "myapp"\nversion = "1.0.0"\n'
+            'dependencies = ["strictcli"]\n'
+            '\n[project.scripts]\nmyapp = "myapp:main"\n'
+        )
+        schema_dir = tmp_path / ".strictcli"
+        schema_dir.mkdir()
+        schema_path = schema_dir / "schema.json"
+        schema_path.write_text(json.dumps({"commands": []}))
+
+        messages = []
+        with patch("rlsbl.commands.release.subprocess") as mock_sp:
+            mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+            mock_sp.CalledProcessError = subprocess.CalledProcessError
+            mock_sp.TimeoutExpired = subprocess.TimeoutExpired
+
+            with pytest.raises(ReleaseValidationError, match="no 'version' key"):
+                _run_strictcli_schema_dump(
+                    {}, lambda msg: messages.append(msg),
+                    project_dir=str(tmp_path),
+                    version="2.0.0",
+                )
+
 
 class TestStrictcliSchemaOrdering:
     """Tests that the schema dump runs in the correct position in the release pipeline."""
