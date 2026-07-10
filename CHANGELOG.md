@@ -2,6 +2,14 @@
 
 # Changelog
 
+## 0.103.1
+
+release init can no longer clobber a filled release file (refuse-unless-pristine + atomic create).
+
+### Fixes
+
+- `release init` and `monorepo release init` can no longer clobber a filled-in release file; they refuse unless the file is a pristine scaffold and no-op idempotently when it is
+
 ## 0.103.0
 
 Schema dump correctness, CI working-directory injection, import name auto-detection, and configuration validation in checks.

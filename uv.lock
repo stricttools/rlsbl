@@ -209,7 +209,7 @@ wheels = [
 
 [[package]]
 name = "rlsbl"
-version = "0.103.0"
+version = "0.103.1"
 source = { editable = "." }
 dependencies = [
     { name = "ruamel-yaml" },
