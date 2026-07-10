@@ -1,7 +1,0 @@
-{"id":"18c0e28f98d20361152b2859fd2a4816888001d798bdc41a","commits":["51cbab3726fd78ac749ce60723e8634f87cd25cd"],"user_facing":false}
-{"id":"18c1028ca5da8fb9b79a55ec037743699bc916407cb9ed9d","commits":["082471dc7c3be38d9b094747dab055416d80850f"],"user_facing":false}
-{"id":"18c1028caed52183f453028036e44f9694f19438bd37d669","commits":["302f016f68d9afd7eca2a2732026f5b1931d1e22"],"user_facing":false}
-{"id":"18c1028cb896ee32734fbe207da34f95a78fa30b8ecf8200","commits":["3539fdd6c52e23d659fe0fdf98f76ee6768c5188"],"user_facing":false}
-{"id":"18c1028cc2a6605ac12604fcaea84f6abb816c453dc42fc1","commits":["6bcf2f9447d4da27456c6ef23349805db8e50bc7"],"user_facing":false}
-{"id":"18c1028ccddb8e5500e6b42173a84bb3887c1fb54e818496","commits":["f2733f57bcca84e7278fd810828b074cdfdd61d2"],"user_facing":false}
-{"id":"18c10378724a7d5538889a44a096408b86f81b3917718949","commits":["deb936a66641f6f8873dd19a1b999b63733e7423"],"user_facing":true,"description":"`release init` and `monorepo release init` can no longer clobber a filled-in release file; they refuse unless the file is a pristine scaffold and no-op idempotently when it is","type":"fix"}
