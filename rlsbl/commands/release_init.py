@@ -15,7 +15,11 @@ def run_cmd(project_root):
     import tomlkit
 
     from ..errors import ReleaseFileError
-    from ..release_file import check_legacy_release_file, get_release_file_path
+    from ..release_file import (
+        check_legacy_release_file,
+        get_release_file_path,
+        is_pristine_release_file,
+    )
     from ..targets import detect_targets
     from ..workspace import find_workspace_root, resolve_project
 
@@ -50,11 +54,33 @@ def run_cmd(project_root):
         sys.exit(1)
 
     release_path = get_release_file_path(project_dir, releasable_dir=releasable_dir)
+
+    def handle_existing() -> None:
+        """Refuse-unless-pristine for an existing release file.
+
+        Returns normally (caller should stop) if the file is a still-pristine
+        scaffold (idempotent no-op). Calls sys.exit(1) if the file has been
+        filled in by an operator -- never overwriting operator data.
+        """
+        with open(release_path, "r", encoding="utf-8") as f:
+            existing = f.read()
+        if is_pristine_release_file(existing):
+            print(
+                f"{release_path} already exists and is pristine "
+                f"(no bump/description filled in); nothing to do."
+            )
+            return
+        print(
+            f"Error: {release_path} already exists and has been filled in. "
+            f"Refusing to overwrite it. Edit it directly, or delete it to "
+            f"re-scaffold.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     if os.path.exists(release_path):
-        content = open(release_path).read().strip()
-        if content:
-            print(f"Error: {release_path} already exists.", file=sys.stderr)
-            sys.exit(1)
+        handle_existing()
+        return
 
     entries = detect_targets(project_dir)
     if not entries:
@@ -90,7 +116,17 @@ def run_cmd(project_root):
     releases_dir = os.path.dirname(release_path)
     os.makedirs(releases_dir, exist_ok=True)
 
-    with open(release_path, "w", encoding="utf-8") as f:
+    # Atomic exclusive-create closes the TOCTOU: the earlier exists() check and
+    # this write are far apart (detect_targets/doc-build run in between), so a
+    # racing init could create and fill the file. O_EXCL guarantees we only
+    # write when the file is truly absent; on collision we re-run the
+    # refuse-unless-pristine check against whatever the racer wrote.
+    try:
+        fd = os.open(release_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+    except FileExistsError:
+        handle_existing()
+        return
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
         tomlkit.dump(doc, f)
 
     commit_files("release: scaffold unreleased.toml", [release_path], allow_failure=True)

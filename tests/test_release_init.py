@@ -136,10 +136,16 @@ class TestReleaseInitAlreadyExists:
             _run_release_init(tmp_path, entries, monkeypatch)
 
 
-class TestReleaseInitEmptyFileAllowed:
-    """Empty or whitespace-only file does not block release-init."""
+class TestReleaseInitEmptyFileNoOp:
+    """Empty or whitespace-only file is pristine: init no-ops (never clobbers).
 
-    def test_empty_file_allows_overwrite(self, tmp_path, monkeypatch):
+    Under refuse-unless-pristine semantics, init never overwrites an existing
+    file. An empty/whitespace file has nothing filled in, so it is pristine
+    and init no-ops successfully -- leaving the file untouched, rather than the
+    old behavior of overwriting it with a fresh scaffold.
+    """
+
+    def test_empty_file_noops(self, tmp_path, monkeypatch, capsys):
         releases_dir = tmp_path / ".rlsbl" / "releases"
         releases_dir.mkdir(parents=True)
         (releases_dir / "unreleased.toml").write_text("")
@@ -148,12 +154,12 @@ class TestReleaseInitEmptyFileAllowed:
         _run_release_init(tmp_path, entries, monkeypatch)
 
         release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
-        assert release_path.exists()
-        data = _read_scaffolded_toml(str(release_path))
-        assert data["bump"] == ""
-        assert list(data["include"]) == ["pypi"]
+        # File is left untouched (still empty), NOT scaffolded
+        assert release_path.read_text() == ""
+        captured = capsys.readouterr()
+        assert "nothing to do" in captured.out
 
-    def test_whitespace_only_file_allows_overwrite(self, tmp_path, monkeypatch):
+    def test_whitespace_only_file_noops(self, tmp_path, monkeypatch, capsys):
         releases_dir = tmp_path / ".rlsbl" / "releases"
         releases_dir.mkdir(parents=True)
         (releases_dir / "unreleased.toml").write_text("   \n\n  \n")
@@ -162,9 +168,9 @@ class TestReleaseInitEmptyFileAllowed:
         _run_release_init(tmp_path, entries, monkeypatch)
 
         release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
-        data = _read_scaffolded_toml(str(release_path))
-        assert data["bump"] == ""
-        assert list(data["include"]) == ["npm"]
+        assert release_path.read_text() == "   \n\n  \n"
+        captured = capsys.readouterr()
+        assert "nothing to do" in captured.out
 
     def test_nonempty_file_still_blocks(self, tmp_path, monkeypatch):
         releases_dir = tmp_path / ".rlsbl" / "releases"
@@ -174,6 +180,74 @@ class TestReleaseInitEmptyFileAllowed:
         entries = [TargetEntry(name="pypi", path=str(tmp_path))]
         with pytest.raises(SystemExit):
             _run_release_init(tmp_path, entries, monkeypatch)
+
+
+class TestReleaseInitRefuseUnlessPristine:
+    """Refuse-unless-pristine: filled files are preserved; pristine re-init no-ops."""
+
+    def test_filled_file_preserved_and_errors(self, tmp_path, monkeypatch):
+        """A second init on an operator-filled file preserves it and errors."""
+        entries = [TargetEntry(name="pypi", path=str(tmp_path))]
+        _run_release_init(tmp_path, entries, monkeypatch)
+
+        release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
+
+        # Operator fills in bump and description
+        doc = _read_scaffolded_toml(str(release_path))
+        doc["bump"] = "minor"
+        doc["description"] = "a real release"
+        filled_text = tomlkit.dumps(doc)
+        release_path.write_text(filled_text)
+
+        # Second init must error and NOT clobber the filled file
+        with pytest.raises(SystemExit) as exc_info:
+            _run_release_init(tmp_path, entries, monkeypatch)
+        assert exc_info.value.code == 1
+        assert release_path.read_text() == filled_text
+
+    def test_pristine_file_noop_success(self, tmp_path, monkeypatch, capsys):
+        """A second init on a still-pristine scaffold no-ops successfully."""
+        entries = [TargetEntry(name="pypi", path=str(tmp_path))]
+        _run_release_init(tmp_path, entries, monkeypatch)
+
+        release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
+        pristine_text = release_path.read_text()
+        capsys.readouterr()  # drop first-init output
+
+        # Second init on the pristine file: no raise, file unchanged
+        _run_release_init(tmp_path, entries, monkeypatch)
+        assert release_path.read_text() == pristine_text
+        captured = capsys.readouterr()
+        assert "nothing to do" in captured.out
+
+    def test_race_stale_writer_does_not_clobber(self, tmp_path, monkeypatch):
+        """The write step refuses to clobber a file filled by a racing init.
+
+        Simulates the TOCTOU stale-writer path: detect_targets runs between the
+        exists() check and the atomic write. A racing init creates and fills
+        the file during that window (modeled as a detect_targets side effect).
+        The exclusive-create write must then refuse rather than clobber.
+        """
+        from unittest.mock import patch as _patch
+
+        rlsbl_dir = tmp_path / ".rlsbl"
+        rlsbl_dir.mkdir(exist_ok=True)
+        release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
+        filled_text = 'bump = "minor"\ndescription = "racer"\ninclude = ["pypi"]\nexclude = []\n'
+
+        def racing_detect_targets(project_dir, **kwargs):
+            # A concurrent init wrote a filled file after our exists() check.
+            release_path.parent.mkdir(parents=True, exist_ok=True)
+            release_path.write_text(filled_text)
+            return [TargetEntry(name="pypi", path=str(tmp_path))]
+
+        monkeypatch.chdir(str(tmp_path))
+        with _patch("rlsbl.targets.detect_targets", side_effect=racing_detect_targets):
+            from rlsbl import cmd_release_init
+            with pytest.raises(SystemExit) as exc_info:
+                cmd_release_init()
+        assert exc_info.value.code == 1
+        assert release_path.read_text() == filled_text
 
 
 class TestReleaseInitRoundTrip:

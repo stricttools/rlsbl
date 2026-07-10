@@ -89,8 +89,14 @@ class TestBatchReleaseInit:
             _cmd_batch_release_init(project_root=mock_git_repo)
         assert exc_info.value.code == 1
 
-    def test_overwrites_empty_existing_file(self, mock_git_repo):
-        """Succeeds if unreleased.toml exists but is empty."""
+    def test_noops_on_empty_existing_file(self, mock_git_repo, capsys):
+        """An empty existing file is treated as pristine: no-op success, left as-is.
+
+        Under the refuse-unless-pristine semantics, init never overwrites an
+        existing file. An empty file has nothing filled in, so it is pristine
+        and init no-ops successfully (rather than the old behavior of
+        overwriting it with a fresh scaffold).
+        """
         make_workspace(mock_git_repo, [
             {"path": "pkg-a", "name": "pkg-a"},
         ])
@@ -110,11 +116,114 @@ class TestBatchReleaseInit:
         with open(batch_path, "w") as f:
             pass
 
-        # Should not raise
+        # Should not raise -- idempotent no-op
         _cmd_batch_release_init(project_root=mock_git_repo)
 
-        data = tomlkit.loads(open(batch_path).read())
-        assert "pkg-a" in data["packages"]
+        # File is left untouched (still empty), NOT scaffolded
+        assert open(batch_path).read() == ""
+        captured = capsys.readouterr()
+        assert "nothing to do" in captured.out
+
+    def test_filled_file_preserved_and_errors(self, mock_git_repo):
+        """A second init on an operator-filled file preserves it and errors."""
+        make_workspace(mock_git_repo, [
+            {"path": "pkg-a", "name": "pkg-a"},
+        ])
+
+        pkg_a = mock_git_repo / "pkg-a"
+        pkg_a.mkdir()
+        (pkg_a / "package.json").write_text(
+            json.dumps({"name": "pkg-a", "version": "1.0.0"}) + "\n"
+        )
+
+        run_git(mock_git_repo, "add", ".")
+        run_git(mock_git_repo, "commit", "-q", "-m", "add workspace")
+
+        # First init scaffolds a pristine file
+        _cmd_batch_release_init(project_root=mock_git_repo)
+        batch_path = get_batch_release_file_path(str(mock_git_repo))
+
+        # Operator fills in bump and description
+        doc = tomlkit.loads(open(batch_path).read())
+        doc["packages"]["pkg-a"]["bump"] = "minor"
+        doc["packages"]["pkg-a"]["description"] = "a real release"
+        filled_text = tomlkit.dumps(doc)
+        with open(batch_path, "w") as f:
+            f.write(filled_text)
+
+        # Second init must error and NOT clobber the filled file
+        with pytest.raises(SystemExit) as exc_info:
+            _cmd_batch_release_init(project_root=mock_git_repo)
+        assert exc_info.value.code == 1
+        assert open(batch_path).read() == filled_text
+
+    def test_pristine_file_noop_success(self, mock_git_repo, capsys):
+        """A second init on a still-pristine file no-ops successfully."""
+        make_workspace(mock_git_repo, [
+            {"path": "pkg-a", "name": "pkg-a"},
+        ])
+
+        pkg_a = mock_git_repo / "pkg-a"
+        pkg_a.mkdir()
+        (pkg_a / "package.json").write_text(
+            json.dumps({"name": "pkg-a", "version": "1.0.0"}) + "\n"
+        )
+
+        run_git(mock_git_repo, "add", ".")
+        run_git(mock_git_repo, "commit", "-q", "-m", "add workspace")
+
+        _cmd_batch_release_init(project_root=mock_git_repo)
+        batch_path = get_batch_release_file_path(str(mock_git_repo))
+        pristine_text = open(batch_path).read()
+
+        capsys.readouterr()  # drop first-init output
+
+        # Second init on the pristine file: no raise, file unchanged
+        _cmd_batch_release_init(project_root=mock_git_repo)
+        assert open(batch_path).read() == pristine_text
+        captured = capsys.readouterr()
+        assert "nothing to do" in captured.out
+
+    def test_race_stale_writer_does_not_clobber(self, mock_git_repo):
+        """The write step refuses to clobber a file filled by a racing init.
+
+        Simulates the TOCTOU stale-writer path: the batch exists() check
+        passed while the file was absent, then a racing init created and
+        filled it before this writer reached its write step. Invoking the
+        write step (``_scaffold_package_sections``) directly against a
+        now-filled file must hit the atomic exclusive-create guard and refuse.
+        """
+        from rlsbl.commands.monorepo.batch_release_init import _scaffold_package_sections
+        from rlsbl.workspace import load_workspace
+
+        make_workspace(mock_git_repo, [
+            {"path": "pkg-a", "name": "pkg-a"},
+        ])
+
+        pkg_a = mock_git_repo / "pkg-a"
+        pkg_a.mkdir()
+        (pkg_a / "package.json").write_text(
+            json.dumps({"name": "pkg-a", "version": "1.0.0"}) + "\n"
+        )
+
+        run_git(mock_git_repo, "add", ".")
+        run_git(mock_git_repo, "commit", "-q", "-m", "add workspace")
+
+        batch_path = get_batch_release_file_path(str(mock_git_repo))
+        os.makedirs(os.path.dirname(batch_path), exist_ok=True)
+
+        # A racing init got here first and wrote a filled file.
+        racer_text = '[packages.pkg-a]\nbump = "minor"\ndescription = "racer"\ninclude = ["npm"]\nexclude = []\n'
+        with open(batch_path, "w") as f:
+            f.write(racer_text)
+
+        projects = load_workspace(str(mock_git_repo))
+
+        # The stale writer reaches its write step; must refuse and preserve.
+        with pytest.raises(SystemExit) as exc_info:
+            _scaffold_package_sections(str(mock_git_repo), projects, batch_path, None)
+        assert exc_info.value.code == 1
+        assert open(batch_path).read() == racer_text
 
     def test_skips_dev_node_projects(self, mock_git_repo):
         """Dev-node projects are excluded from the batch release file."""

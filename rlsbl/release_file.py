@@ -65,6 +65,63 @@ def get_release_file_path(project_dir: str = ".", *, releasable_dir: str | None 
     )
 
 
+def _field_is_blank(value) -> bool:
+    """True if a release-file field is absent or an empty/whitespace string.
+
+    The scaffolder writes ``bump = ""`` and ``description = ""``; an operator
+    "fills in" the file by setting a real value. Anything non-string and
+    non-None (e.g. a number) counts as filled.
+    """
+    if value is None:
+        return True
+    return isinstance(value, str) and value.strip() == ""
+
+
+def is_pristine_release_file(content: str) -> bool:
+    """True if ``content`` is a still-pristine single-project release scaffold.
+
+    Pristine means the operator has not filled in the release: either the file
+    is empty/whitespace-only, or it parses as TOML with a blank ``bump`` and a
+    blank ``description``. Any filled bump/description -- or content that fails
+    to parse as TOML -- is treated as operator data and reported non-pristine
+    so ``release init`` refuses to clobber it.
+    """
+    if content.strip() == "":
+        return True
+    try:
+        data = tomlkit.loads(content)
+    except Exception:
+        return False
+    return _field_is_blank(data.get("bump")) and _field_is_blank(data.get("description"))
+
+
+def is_pristine_batch_release_file(content: str) -> bool:
+    """True if ``content`` is a still-pristine batch (monorepo) release scaffold.
+
+    Pristine means every ``[packages.<name>]`` / ``[releasables.<name>]``
+    section has a blank ``bump`` and blank ``description`` (the scaffold state).
+    Empty/whitespace-only content is pristine. Any filled section, a
+    non-table section entry, or unparseable content is non-pristine so
+    ``monorepo release init`` refuses to clobber it.
+    """
+    if content.strip() == "":
+        return True
+    try:
+        data = tomlkit.loads(content)
+    except Exception:
+        return False
+    for section_key in ("packages", "releasables"):
+        section = data.get(section_key)
+        if not isinstance(section, dict):
+            continue
+        for _name, entry in section.items():
+            if not isinstance(entry, dict):
+                return False
+            if not (_field_is_blank(entry.get("bump")) and _field_is_blank(entry.get("description"))):
+                return False
+    return True
+
+
 def check_legacy_release_file(project_dir: str, releasable_dir: str | None) -> None:
     """Hard-error if a release file sits at the legacy member location.
 

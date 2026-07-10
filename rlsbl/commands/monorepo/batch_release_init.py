@@ -6,10 +6,34 @@ import sys
 
 import tomlkit
 
-from ...release_file import get_batch_release_file_path
+from ...release_file import get_batch_release_file_path, is_pristine_batch_release_file
 from ...targets import collect_releasable_targets, detect_targets, resolve_releasable_config_dir, TARGETS
 from ...utils import commit_files
 from ...workspace import find_workspace_root, load_workspace
+
+
+def _handle_existing_batch(batch_path):
+    """Refuse-unless-pristine for an existing batch release file.
+
+    Returns normally (caller should stop) if the file is a still-pristine
+    scaffold (idempotent no-op). Calls sys.exit(1) if any section has been
+    filled in by an operator -- never overwriting operator data.
+    """
+    with open(batch_path, "r", encoding="utf-8") as f:
+        existing = f.read()
+    if is_pristine_batch_release_file(existing):
+        print(
+            f"{batch_path} already exists and is pristine "
+            f"(no bump/description filled in); nothing to do."
+        )
+        return
+    print(
+        f"Error: {batch_path} already exists and has been filled in. "
+        f"Refusing to overwrite it. Edit it directly, or delete it to "
+        f"re-scaffold.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
 
 def _get_unreleased_commit_count(proj, workspace_root):
@@ -168,10 +192,8 @@ def _cmd_batch_release_init(project_root, packages=None):
 
     batch_path = get_batch_release_file_path(workspace_root)
     if os.path.exists(batch_path):
-        content = open(batch_path).read().strip()
-        if content:
-            print(f"Error: {batch_path} already exists.", file=sys.stderr)
-            sys.exit(1)
+        _handle_existing_batch(batch_path)
+        return
 
     projects = load_workspace(workspace_root)
     if not projects:
@@ -270,7 +292,14 @@ def _scaffold_releasable_sections(workspace_root, projects, batch_path, filter_n
             )
         toml_text = toml_text.rstrip("\n") + "\n\n" + "\n\n".join(comment_blocks) + "\n"
 
-    with open(batch_path, "w", encoding="utf-8") as f:
+    # Atomic exclusive-create closes the TOCTOU (see _cmd_batch_release_init's
+    # exists() check); on collision, re-run refuse-unless-pristine.
+    try:
+        fd = os.open(batch_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+    except FileExistsError:
+        _handle_existing_batch(batch_path)
+        return
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(toml_text)
 
     commit_files(
@@ -354,7 +383,14 @@ def _scaffold_package_sections(workspace_root, projects, batch_path, filter_name
             )
         toml_text = toml_text.rstrip("\n") + "\n\n" + "\n\n".join(comment_blocks) + "\n"
 
-    with open(batch_path, "w", encoding="utf-8") as f:
+    # Atomic exclusive-create closes the TOCTOU (see _cmd_batch_release_init's
+    # exists() check); on collision, re-run refuse-unless-pristine.
+    try:
+        fd = os.open(batch_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+    except FileExistsError:
+        _handle_existing_batch(batch_path)
+        return
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(toml_text)
 
     commit_files(
