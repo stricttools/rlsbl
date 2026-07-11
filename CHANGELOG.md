@@ -2,6 +2,22 @@
 
 # Changelog
 
+## 0.103.2
+
+Fix release-edit CHANGELOG.md lookup for explicit-mode releasables and carry the package prefix on amended releasable changelog entries.
+
+<details>
+<summary>Context</summary>
+
+GitHub Release notes sync (rlsbl release edit) now works for explicit-mode releasables instead of failing with 'CHANGELOG.md not found', and amended releasable changelog entries now render with their [name] prefix like added entries.
+
+</details>
+
+### Fixes
+
+- `rlsbl release edit` now finds CHANGELOG.md for explicit-mode releasables (previously failed with "CHANGELOG.md not found").
+- `rlsbl changelog amend` now sets the `packages` prefix on amended releasable entries, so they render with the `[name]` prefix like added entries.
+
 ## 0.103.1
 
 release init can no longer clobber a filled release file (refuse-unless-pristine + atomic create).
