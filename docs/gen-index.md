@@ -129,6 +129,7 @@ order: 90
 - [rlsbl.secret_scan](rlsbl-secret_scan.html)
 - [rlsbl.snapshot](rlsbl-snapshot.html)
 - [rlsbl.strictcli_detect](rlsbl-strictcli_detect.html)
+- [rlsbl.tag_glob](rlsbl-tag_glob.html)
 - [rlsbl.tagging](rlsbl-tagging.html)
 - [rlsbl.targets](rlsbl-targets.html)
 - [rlsbl.targets.base](rlsbl-targets-base.html)

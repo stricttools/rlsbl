@@ -778,6 +778,11 @@
       "type": "doc"
     },
     {
+      "path": "rlsbl-tag_glob.md",
+      "title": "rlsbl.tag_glob",
+      "type": "doc"
+    },
+    {
       "path": "rlsbl-tagging.md",
       "title": "rlsbl.tagging",
       "type": "doc"
@@ -965,5 +970,5 @@
       ]
     }
   ],
-  "last_gen": "2026-07-11T14:28:16.933926+00:00"
+  "last_gen": "2026-07-11T15:05:46.846250+00:00"
 }
