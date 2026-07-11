@@ -239,23 +239,25 @@ def read_releasable_targets(rel_config_path):
       member-level detection -- backward compat for releasables that haven't
       declared targets yet).
 
-    Raises ``ConfigError`` when ``targets`` is an explicitly empty list --
-    the same ban that ``validate_config_schema`` enforces.  This keeps the
-    two releasable target-resolution paths (``collect_releasable_targets``
-    used by release init, and ``validate_release_targets`` used by release
-    run) behaving identically on the banned config, instead of one
-    short-circuiting to ``[]`` while the other silently falls through.
+    Raises ``ConfigError`` when ``targets`` is an explicitly empty list, or a
+    present-but-non-list value (string, dict, ...) -- the same loud story as
+    ``validate_config_schema``.  A non-list value is never silently treated as
+    absent.  This keeps the two releasable target-resolution paths
+    (``collect_releasable_targets`` used by release init, and
+    ``validate_release_targets`` used by release run) behaving identically on
+    the banned config, instead of one short-circuiting while the other
+    silently falls through.
     """
+    from ..config import empty_targets_ban_message, non_list_targets_ban_message
+
     rel_config = read_json_config(rel_config_path)
     rel_targets = rel_config.get("targets")
-    if rel_targets is None or not isinstance(rel_targets, list):
+    if rel_targets is None:
         return None
+    if not isinstance(rel_targets, list):
+        raise ConfigError(non_list_targets_ban_message(rel_config_path, rel_targets))
     if not rel_targets:
-        raise ConfigError(
-            f'targets is an empty list in {rel_config_path}. '
-            'Remove the "targets" key entirely, or set "private": true '
-            'to suppress publishing.'
-        )
+        raise ConfigError(empty_targets_ban_message(rel_config_path))
     return rel_targets
 
 

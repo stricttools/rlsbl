@@ -178,6 +178,32 @@ def get_changelog_validation_config(config):
 
 
 
+def empty_targets_ban_message(location):
+    """Return the standard error message for a banned empty ``targets`` list.
+
+    *location* describes where the empty list was found (e.g. ``"config"`` or a
+    config file path). Shared so every call site emits an identical message.
+    """
+    return (
+        f'targets is an empty list in {location}. '
+        'Remove the "targets" key entirely, or set "private": true '
+        'to suppress publishing.'
+    )
+
+
+def non_list_targets_ban_message(location, value):
+    """Return the standard error message for a non-list ``targets`` value.
+
+    A present-but-non-list ``targets`` (string, dict, ...) is a hard error --
+    never silently treated as absent.
+    """
+    return (
+        f'targets must be a list in {location}, got {type(value).__name__}. '
+        'Provide a list of target names, remove the "targets" key entirely, '
+        'or set "private": true to suppress publishing.'
+    )
+
+
 def validate_config_schema(config, *, project_dir=None):
     """Consolidated config schema validation -- single entry point for all
     banned keys and structural invariants.
@@ -200,11 +226,7 @@ def validate_config_schema(config, *, project_dir=None):
     # 1. Ban targets: []
     targets = config.get("targets")
     if isinstance(targets, list) and len(targets) == 0:
-        raise ConfigError(
-            'targets is an empty list in config. '
-            'Remove the "targets" key entirely, or set "private": true '
-            'to suppress publishing.'
-        )
+        raise ConfigError(empty_targets_ban_message("config"))
 
     # 2. Ban release.mode key entirely
     release_section = config.get("release")
