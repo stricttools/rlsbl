@@ -17,8 +17,10 @@ from ..ci_yaml import (
 )
 from ..errors import ConfigError
 from ..config import (
+    _project_config,
     read_deploy_config,
     read_json_config,
+    read_project_config,
     should_tag,
     write_project_config,
 )
@@ -288,20 +290,35 @@ def save_managed_files(files):
 
 
 def _ensure_target_in_config(registry_name, ctx):
-    """Add registry_name to the targets array in .rlsbl/config.json if not already present."""
-    targets = ctx.config.get("targets", [])
-    if not isinstance(targets, list):
-        targets = []
-    # Check if name is already in targets (as string or dict)
+    """Add ``registry_name`` to the ``targets`` array in the on-disk per-project
+    ``.rlsbl/config.json`` if not already present.
+
+    Reads the CURRENT targets straight from disk -- the exact same file
+    ``write_project_config`` writes -- rather than from ``ctx.config``.
+    ``ctx.config`` may be empty (a bare ``ProjectContext``) or releasable-merged;
+    using it would clobber structured on-disk entries like
+    ``{"name": "go", "path": "go/"}`` down to plain strings, losing the
+    subdirectory path. Structured dict entries are preserved untouched; the new
+    registry is appended as a plain string only when it is not already present
+    under either representation. The file is written only when something was
+    actually added. ``ctx.config`` is refreshed to a fresh read of the merged
+    project config afterwards so callers observe disk state.
+    """
+    disk_targets = read_json_config(_project_config(ctx.project_root)).get("targets", [])
+    if not isinstance(disk_targets, list):
+        disk_targets = []
+    # Names already present, under either the plain-string or {"name": ...} form.
     existing_names = []
-    for t in targets:
+    for t in disk_targets:
         if isinstance(t, str):
             existing_names.append(t)
         elif isinstance(t, dict):
             existing_names.append(t.get("name", ""))
     if registry_name not in existing_names:
-        targets.append(registry_name)
-    ctx.config = write_project_config("targets", targets, ctx.project_root)
+        new_targets = list(disk_targets) + [registry_name]
+        write_project_config("targets", new_targets, ctx.project_root)
+    # Refresh ctx.config from disk in both branches so it never diverges.
+    ctx.config = read_project_config(ctx.project_root)
 
 
 NEXT_STEPS = {
