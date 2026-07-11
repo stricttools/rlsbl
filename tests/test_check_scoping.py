@@ -311,11 +311,16 @@ def test_ci_synced_skips_dev_node_via_scope(tmp_path):
 
 
 def test_ci_synced_fails_non_dev_node_missing_workflow(tmp_path):
-    """A non-dev-node project missing its CI workflow should still fail
-    workspace-ci-synced even after the scope adapter runs."""
+    """A non-dev-node project whose jobs are absent from ci-router.yml should
+    still fail workspace-ci-synced even after the scope adapter runs."""
     ws = tmp_path / "ws"
     ws.mkdir()
-    (ws / ".github" / "workflows").mkdir(parents=True)
+    wf = ws / ".github" / "workflows"
+    wf.mkdir(parents=True)
+    # Router exists but has no jobs for mylib.
+    (wf / "ci-router.yml").write_text(
+        "name: CI Router\non: push\njobs:\n  detect:\n    runs-on: ubuntu-latest\n"
+    )
 
     projects = [
         {"name": "mylib", "path": "mylib"},

@@ -2033,11 +2033,42 @@ class TestWorkspaceCiSynced:
         result = _run_check("workspace-ci-synced", ctx)
         assert result.status == "skip"
 
-    def test_missing_workflows_fails(self, tmp_path, monkeypatch):
+    @staticmethod
+    def _write_router(repo, job_keys):
+        """Write a minimal ci-router.yml with a detect job plus *job_keys*."""
+        wf = repo / ".github" / "workflows"
+        wf.mkdir(parents=True, exist_ok=True)
+        lines = ["name: CI Router", "on: push", "jobs:", "  detect:", "    runs-on: ubuntu-latest"]
+        for key in job_keys:
+            lines.append(f"  {key}:")
+            lines.append("    runs-on: ubuntu-latest")
+        (wf / "ci-router.yml").write_text("\n".join(lines) + "\n")
+
+    def test_missing_router_fails(self, tmp_path, monkeypatch):
+        """No ci-router.yml at all -> fail."""
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
+
+        from rlsbl.workspace import WorkspaceProject
+
+        projects = [WorkspaceProject({"name": "alpha", "path": "alpha"})]
+        ctx = _make_ws_ctx(repo, projects)
+
+        result = app._check_defs["workspace-ci-synced"].impl(ctx)
+        assert result.status == "fail"
+        assert "ci-router.yml not found" in result.message
+
+    def test_project_jobs_removed_from_router_fails(self, tmp_path, monkeypatch):
+        """A router missing a project's inlined jobs -> fail naming the project."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+        _init_repo(repo)
+
+        # Router has beta's jobs but not alpha's.
+        self._write_router(repo, ["beta-ci-build"])
 
         from rlsbl.workspace import WorkspaceProject
 
@@ -2050,17 +2081,16 @@ class TestWorkspaceCiSynced:
         result = app._check_defs["workspace-ci-synced"].impl(ctx)
         assert result.status == "fail"
         assert "alpha" in result.message
+        assert "beta" not in result.message.replace("beta-ci", "")
 
-    def test_all_workflows_present_passes(self, tmp_path, monkeypatch):
+    def test_freshly_synced_router_passes(self, tmp_path, monkeypatch):
+        """A router with each project's inlined jobs -> pass."""
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
 
-        wf = repo / ".github" / "workflows"
-        wf.mkdir(parents=True)
-        (wf / "alpha-ci.yml").write_text("on: push\n")
-        (wf / "beta-ci.yml").write_text("on: push\n")
+        self._write_router(repo, ["alpha-ci-build", "alpha-ci-test", "beta-ci-build"])
 
         from rlsbl.workspace import WorkspaceProject
 
@@ -2081,7 +2111,10 @@ class TestWorkspaceCiSynced:
         monkeypatch.chdir(repo)
         _init_repo(repo)
 
-        # Create project directory (no workflow file)
+        # Router exists (with an unrelated detect job) so the check reaches the
+        # per-project loop; the plain project must be skipped, not flagged.
+        self._write_router(repo, [])
+
         proj_dir = repo / "myplain"
         proj_dir.mkdir()
 
@@ -2102,6 +2135,30 @@ class TestWorkspaceCiSynced:
 
         assert result.status == "pass"
         assert "1 skipped" in result.message
+
+    def test_dev_node_member_skipped_via_scope(self, tmp_path, monkeypatch):
+        """A dev_node member is filtered out by the workspace:non_dev_node scope,
+        so its absence from the router does not fail the check."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+        _init_repo(repo)
+
+        # Router has alpha's jobs but NOT the dev_node member's.
+        self._write_router(repo, ["alpha-ci-build"])
+
+        from rlsbl.workspace import WorkspaceProject
+
+        projects = [
+            WorkspaceProject({"name": "alpha", "path": "alpha"}),
+            WorkspaceProject({"name": "devtool", "path": "devtool", "dev_node": True}),
+        ]
+        ctx = _make_ws_ctx(repo, projects)
+
+        # Run through the scope adapter (workspace:non_dev_node) as the real
+        # runtime does -- the dev_node member must be filtered before the check.
+        result = _run_check("workspace-ci-synced", ctx)
+        assert result.status == "pass", f"{result.status}: {result.message}"
 
 
 class TestWorkspaceTargets:
@@ -3120,19 +3177,17 @@ class TestDeadWorkspacePackagesFound:
 
 
 class TestWorkspaceCiSyncedEdge:
-    """workspace-ci-synced additional: all workflows present."""
+    """workspace-ci-synced additional: partial inline in the router."""
 
-    def test_partial_missing_workflow(self, tmp_path, monkeypatch):
-        """One workflow present, one missing."""
+    def test_partial_missing_router_jobs(self, tmp_path, monkeypatch):
+        """One project inlined in the router, one missing."""
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
 
-        wf = repo / ".github" / "workflows"
-        wf.mkdir(parents=True)
-        (wf / "alpha-ci.yml").write_text("on: push\n")
-        # beta-ci.yml is missing
+        TestWorkspaceCiSynced._write_router(repo, ["alpha-ci-build"])
+        # beta's jobs are absent from the router
 
         from rlsbl.workspace import WorkspaceProject
 

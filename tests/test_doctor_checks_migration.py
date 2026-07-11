@@ -430,12 +430,17 @@ class TestNewCheckDependencies:
 
     def test_workspace_checks_no_deps(self):
         for name in [
-            "workspace-ci-router", "workspace-ci-synced",
+            "workspace-ci-router",
             "workspace-targets", "workspace-unregistered",
             "workspace-stale-entries", "dev-only-boundary",
             "unversioned-boundary",
         ]:
             assert app._check_defs[name].depends_on == []
+
+    def test_workspace_ci_synced_depends_on_router(self):
+        # workspace-ci-synced parses ci-router.yml, so it depends on the
+        # check that verifies the router exists.
+        assert app._check_defs["workspace-ci-synced"].depends_on == ["workspace-ci-router"]
 
 
 # ---------------------------------------------------------------------------

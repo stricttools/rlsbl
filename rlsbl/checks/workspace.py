@@ -36,17 +36,32 @@ def register_workspace_checks(app):
 
     @app.check("workspace-ci-synced")
     def check_workspace_ci_synced(ctx):
-        """Each project must have a synced CI workflow at the repo root."""
-        from ..targets import detect_targets, TARGETS, resolve_releasable_config_dir
+        """Each project's CI jobs must be inlined into the shared ci-router.yml.
 
-        missing = []
+        Inline sync (``rlsbl monorepo sync``) no longer writes per-project
+        ``{name}-ci.yml`` files at the root -- it inlines every project's CI
+        jobs into a single ``ci-router.yml`` keyed ``<prefix>-<job>`` where the
+        prefixes come from ``_router_ci_job_keys`` (the same source of truth the
+        sync writer and publish gate use). This check parses that router and
+        verifies each project contributes at least one job for every prefix.
+
+        Projects whose detected targets all lack the ``ci_templates`` capability
+        are exempt (they produce no CI workflow). dev_node members are excluded
+        upstream by the ``workspace:non_dev_node`` scope.
+        """
+        from ..targets import detect_targets, TARGETS, resolve_releasable_config_dir
+        from ..commands.monorepo.publish_inline import _router_ci_job_keys
+        from ruamel.yaml import YAML
+
+        # First pass: determine which in-scope projects require inlining,
+        # applying the ci_templates exemption. Only if at least one project
+        # needs inlining do we require the router to exist.
+        required = []  # (name, [prefixes])
         skipped = 0
         for proj in ctx.projects:
-            name = proj["name"]
-
-            # Skip projects whose detected targets all lack ci_templates.
-            # If detection fails or returns nothing, assume CI is needed
-            # (conservative: don't skip checks we can't evaluate).
+            # ci_templates exemption: skip projects whose detected targets all
+            # lack ci_templates. If detection fails or returns nothing, assume
+            # CI is needed (conservative: don't skip checks we can't evaluate).
             proj_dir = os.path.join(str(ctx.workspace_root), proj["path"])
             rel_dir = resolve_releasable_config_dir(proj, ctx.workspace_root)
             try:
@@ -62,21 +77,51 @@ def register_workspace_checks(app):
                 if not has_ci:
                     skipped += 1
                     continue
+            required.append((proj["name"], _router_ci_job_keys(proj)))
 
-            workflow = os.path.join(
-                str(ctx.workspace_root), ".github", "workflows", f"{name}-ci.yml"
+        if not required:
+            msg = "no in-scope projects require CI inlining"
+            if skipped:
+                msg += f" ({skipped} skipped, no ci_templates capability)"
+            return CheckResult("pass", msg)
+
+        router_path = os.path.join(
+            str(ctx.workspace_root), ".github", "workflows", "ci-router.yml"
+        )
+        if not os.path.isfile(router_path):
+            return CheckResult(
+                "fail",
+                "ci-router.yml not found -- run `rlsbl monorepo sync`",
             )
-            if not os.path.isfile(workflow):
-                missing.append(name)
+        try:
+            with open(router_path, "r", encoding="utf-8") as f:
+                router = YAML(typ="safe").load(f)
+        except Exception as e:
+            return CheckResult("fail", f"cannot parse ci-router.yml: {e}")
+
+        router_jobs = set((router or {}).get("jobs", {}).keys())
+
+        missing = []
+        for name, prefixes in required:
+            # Router jobs are keyed <prefix>-<orig>. A project is inlined when,
+            # for every CI-file prefix it contributes, the router has at least
+            # one job under that prefix.
+            for prefix in prefixes:
+                if not any(
+                    k == prefix or k.startswith(prefix + "-") for k in router_jobs
+                ):
+                    missing.append(f"{name} ({prefix})")
 
         if missing:
             return CheckResult(
                 "fail",
-                f"missing workflows: {', '.join(missing)}",
-                details=[f"{n}: {n}-ci.yml not found" for n in missing],
+                f"projects not inlined in ci-router.yml: {', '.join(missing)}",
+                details=[
+                    f"{m}: no jobs keyed for this project in ci-router.yml"
+                    for m in missing
+                ],
             )
-        checked = len(ctx.projects) - skipped
-        msg = f"all {checked} project(s) have synced workflows"
+        msg = f"all {len(required)} project(s) inlined in ci-router.yml"
         if skipped:
             msg += f" ({skipped} skipped, no ci_templates capability)"
         return CheckResult("pass", msg)
