@@ -151,8 +151,8 @@ def register_changelog_checks(app):
 
         all_details = []
         all_passed = True
-        for _changes_dir, _tag_glob, _project, entries in all_contexts:
-            passed, details = check_no_orphans(entries)
+        for _changes_dir, tag_glob, project, entries in all_contexts:
+            passed, details = check_no_orphans(entries, tag_glob, project=project)
             if not passed:
                 all_passed = False
                 all_details.extend(details)
