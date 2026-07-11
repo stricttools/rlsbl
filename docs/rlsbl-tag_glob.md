@@ -1,8 +1,7 @@
 ---
 title: rlsbl.tag_glob
-description: "Shared git tag-glob resolution for monorepo projects and releasables."
+description: "Shared git tag-glob resolution for monorepo projects and releasables, deriving a project's tag match pattern from its releasable tag_format or its detected target."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 120
 ---
