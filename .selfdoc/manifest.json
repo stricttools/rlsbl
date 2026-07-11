@@ -283,6 +283,11 @@
       "type": "doc"
     },
     {
+      "path": "rlsbl-ci_router.md",
+      "title": "rlsbl.ci_router",
+      "type": "doc"
+    },
+    {
       "path": "rlsbl-ci_yaml.md",
       "title": "rlsbl.ci_yaml",
       "type": "doc"
@@ -970,5 +975,5 @@
       ]
     }
   ],
-  "last_gen": "2026-07-11T15:12:27.935181+00:00"
+  "last_gen": "2026-07-11T15:20:18.987501+00:00"
 }

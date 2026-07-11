@@ -30,6 +30,7 @@ order: 90
 - [rlsbl.checks.release](rlsbl-checks-release.html)
 - [rlsbl.checks.scope](rlsbl-checks-scope.html)
 - [rlsbl.checks.workspace](rlsbl-checks-workspace.html)
+- [rlsbl.ci_router](rlsbl-ci_router.html)
 - [rlsbl.ci_yaml](rlsbl-ci_yaml.html)
 - [rlsbl.commands](rlsbl-commands.html)
 - [rlsbl.commands.changelog_cmd](rlsbl-commands-changelog_cmd.html)
