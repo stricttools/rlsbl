@@ -260,9 +260,9 @@ def run_cmd(registry, args, flags, ctx):
     primary_path = target_paths.get(registry, root_str)
 
     if releasable_info:
-        # In explicit mode, use releasable's tag glob
-        from ..commands.release.validate import _releasable_tag_glob
-        tag_glob = _releasable_tag_glob(releasable_info[1], releasable_info[0])
+        # In explicit mode, use the releasable's tag glob (shared resolver).
+        from ..tag_glob import releasable_tag_glob
+        tag_glob = releasable_tag_glob(releasable_info[1], releasable_info[0])
     elif monorepo_project:
         target = TARGETS[registry]
         tag_glob = target.monorepo_tag_glob(monorepo_project["name"], path=monorepo_project["path"])

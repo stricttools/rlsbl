@@ -502,10 +502,11 @@ def _format_releasable_tag(releasable_tag_format, releasable_name, version):
 def _releasable_tag_glob(releasable_tag_format, releasable_name):
     """Derive a glob pattern from a releasable's tag_format.
 
-    Replaces ``{version}`` with ``*`` and fills in ``{name}`` with the
-    literal releasable name so ``git tag -l`` can match all versions.
+    Thin wrapper over the shared :func:`rlsbl.tag_glob.releasable_tag_glob`
+    kept for the many existing callers in the release/status commands.
     """
-    return releasable_tag_format.replace("{version}", "*").format(name=releasable_name)
+    from ...tag_glob import releasable_tag_glob
+    return releasable_tag_glob(releasable_tag_format, releasable_name)
 
 
 def compute_release_version(target, primary_path, bump_arg, monorepo_name,

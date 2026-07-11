@@ -255,6 +255,123 @@ def _cmd_list(flags, project_root):
         print(f"{name_col}  {proj['path']}")
 
 
+def _latest_tag_for_glob(tag_glob):
+    """Return ``(latest_tag, latest_tag_version)`` for a git tag glob.
+
+    ``latest_tag`` is the newest matching tag (``"(none)"`` if none), and
+    ``latest_tag_version`` is the ``x.y.z`` extracted from it (or None).
+    """
+    latest_tag = "(none)"
+    latest_tag_version = None
+    try:
+        result = subprocess.run(
+            ["git", "tag", "-l", tag_glob, "--sort=-v:refname"],
+            capture_output=True, text=True, check=True,
+        )
+        first_line = result.stdout.strip().split("\n")[0].strip() if result.stdout.strip() else ""
+        if first_line:
+            latest_tag = first_line
+            m = re.search(r"v(\d+\.\d+\.\d+)$", first_line)
+            if m:
+                latest_tag_version = m.group(1)
+    except Exception:
+        pass
+    return latest_tag, latest_tag_version
+
+
+def _count_unreleased_from_changelog(changelog_path, latest_tag_version):
+    """Return an Unreleased-column string from a CHANGELOG.md.
+
+    Counts bullet lines above the tagged version heading (or all bullets when
+    there is no tag). Returns ``"no changelog"`` when the file is missing.
+    """
+    if not os.path.isfile(changelog_path):
+        return "no changelog"
+    with open(changelog_path, "r") as f:
+        changelog_text = f.read()
+    if latest_tag_version is None:
+        count = sum(1 for line in changelog_text.splitlines() if line.startswith("- "))
+    else:
+        tag_pattern = re.compile(r"^## " + re.escape(latest_tag_version) + r"(\s|$)", re.MULTILINE)
+        match = tag_pattern.search(changelog_text)
+        if match:
+            above = changelog_text[:match.start()]
+            count = sum(1 for line in above.splitlines() if line.startswith("- "))
+        else:
+            count = sum(1 for line in changelog_text.splitlines() if line.startswith("- "))
+    if count == 0:
+        return "0"
+    if count == 1:
+        return "1 entry"
+    return f"{count} entries"
+
+
+def _cmd_status_explicit(root, projects):
+    """Render per-releasable status rows for an explicit-mode workspace.
+
+    One row per releasable (version, tag, coverage, member count + names),
+    plus one row for each standalone project not belonging to any releasable.
+    Tag globs come from the shared resolver so releasable members resolve
+    their releasable's tag_format instead of a per-member glob.
+    """
+    from ...workspace import (
+        get_releasable_dir,
+        load_releasables,
+        members_of,
+        read_releasable_version,
+    )
+    from ...changelog.home import get_changelog_home
+    from ...tag_glob import resolve_monorepo_tag_glob
+
+    releasables = load_releasables(root, projects)
+    rows = []  # (name, kind, version, tag, unreleased, members)
+    covered = set()
+
+    for rel in releasables:
+        members = members_of(rel.name, projects)
+        for m in members:
+            covered.add(m["name"])
+        try:
+            version = read_releasable_version(root, rel.name) or "?"
+        except Exception:
+            version = "?"
+        tag_glob = resolve_monorepo_tag_glob(None, root, releasable=rel)
+        latest_tag, latest_tag_version = _latest_tag_for_glob(tag_glob)
+        changelog_path = os.path.join(get_releasable_dir(root, rel.name), "CHANGELOG.md")
+        unreleased = _count_unreleased_from_changelog(changelog_path, latest_tag_version)
+        member_names = ", ".join(m["name"] for m in members)
+        members_col = f"{len(members)} ({member_names})" if members else "0"
+        rows.append((rel.name, "releasable", str(version), latest_tag, unreleased, members_col))
+
+    for proj in projects:
+        if proj["name"] in covered:
+            continue
+        name = proj["name"]
+        path = proj["path"]
+        rel_dir = resolve_releasable_config_dir(proj, root)
+        target_entries = detect_targets(os.path.join(root, path), releasable_config_dir=rel_dir)
+        version = "?"
+        if target_entries and target_entries[0].name in TARGETS:
+            try:
+                version = TARGETS[target_entries[0].name].read_version(target_entries[0].path)
+            except Exception:
+                version = "?"
+        tag_glob = resolve_monorepo_tag_glob(proj, root, releasable=None)
+        latest_tag, latest_tag_version = _latest_tag_for_glob(tag_glob)
+        changelog_path = get_changelog_home(os.path.join(root, path), releasable_dir=None)
+        unreleased = _count_unreleased_from_changelog(changelog_path, latest_tag_version)
+        rows.append((name, "project", str(version), latest_tag, unreleased, "-"))
+
+    headers = ("Name", "Kind", "Version", "Tag", "Unreleased", "Members")
+    widths = [len(h) for h in headers]
+    for row in rows:
+        for i in range(len(headers)):
+            widths[i] = max(widths[i], len(str(row[i])))
+    print("  ".join(h.ljust(widths[i]) for i, h in enumerate(headers)))
+    for row in rows:
+        print("  ".join(str(c).ljust(widths[i]) for i, c in enumerate(row)))
+
+
 def _cmd_status(flags, project_root):
     start = str(project_root)
     root = find_workspace_root(start)
@@ -266,6 +383,14 @@ def _cmd_status(flags, project_root):
 
     if not projects:
         print("No projects in workspace.")
+        return
+
+    # Explicit releasable mode: render per-releasable rows (versions, tags,
+    # coverage, members). Standalone projects keep their own rows. Implicit
+    # mode falls through to the rich per-project table below.
+    from ...workspace import is_explicit_mode
+    if is_explicit_mode(root):
+        _cmd_status_explicit(root, projects)
         return
 
     # Build dependency graph
