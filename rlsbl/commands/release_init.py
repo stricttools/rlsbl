@@ -129,6 +129,11 @@ def run_cmd(project_root):
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         tomlkit.dump(doc, f)
 
-    commit_scaffold_file("release: scaffold unreleased.toml", [release_path])
+    # Anchor the git-repo check and the commit to the project directory, not
+    # the process cwd -- the file lives under project_dir/releasable_dir, which
+    # is what determines whether there is a repo to commit into.
+    commit_scaffold_file(
+        "release: scaffold unreleased.toml", [release_path], cwd=project_dir,
+    )
 
     print(release_path)
