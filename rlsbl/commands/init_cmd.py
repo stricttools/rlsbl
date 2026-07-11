@@ -1405,7 +1405,7 @@ def run_cmd(registry, args, flags, ctx):
         from datetime import datetime
         vars_dict["year"] = str(datetime.now().year)
         # npm publish provenance flag, derived from the npm pipeline config.
-        vars_dict["provenance"] = _npm_provenance_var(ctx.config)
+        vars_dict["npm.provenance"] = _npm_provenance_var(ctx.config)
 
         # Publish gate: publish workflows wait for this repo's CI check
         # runs on the release commit. The filter covers every scaffolded
@@ -1908,13 +1908,15 @@ def _rewrite_action_paths_for_jobs(jobs, project_path):
 
 
 def _npm_provenance_var(config):
-    """Return the ``provenance`` template-var value from the npm pipeline config.
+    """Return the ``npm.provenance`` template-var value from the npm pipeline config.
 
-    The ``{{#if provenance}}`` blocks in the npm publish templates treat any
+    The ``{{#if npm.provenance}}`` blocks in the npm publish templates treat any
     non-empty string as truthy, so this returns ``"true"`` when an npm pipeline
     enables provenance and ``""`` (falsy) otherwise. Config validation
     guarantees npm pipelines carry a boolean ``provenance`` key, so a missing
-    value here means there is simply no npm pipeline.
+    value here means there is simply no npm pipeline. Stored under the
+    namespaced key ``npm.provenance`` (target-dir conditionals must be
+    namespaced per the template-lint rules).
     """
     pipelines = (config or {}).get("pipelines") or {}
     if not isinstance(pipelines, dict):
@@ -2101,7 +2103,7 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         from datetime import datetime
         vars_dict["year"] = str(datetime.now().year)
         # npm publish provenance flag, derived from the npm pipeline config.
-        vars_dict["provenance"] = _npm_provenance_var(ctx.config)
+        vars_dict["npm.provenance"] = _npm_provenance_var(ctx.config)
 
         force = flags.get("force", False)
 

@@ -46,7 +46,7 @@ class TestNpmPublishDistTag:
 
     def test_publish_command_includes_tag(self):
         content = _read_template(NPM_TEMPLATE_DIR, "publish.yml.tpl")
-        assert "npm publish {{#if provenance}}--provenance {{/if}}--access public ${{ steps.dist-tag.outputs.tag }}" in content
+        assert "npm publish {{#if npm.provenance}}--provenance {{/if}}--access public ${{ steps.dist-tag.outputs.tag }}" in content
 
     def test_dist_tag_step_before_publish(self):
         content = _read_template(NPM_TEMPLATE_DIR, "publish.yml.tpl")
@@ -77,7 +77,7 @@ class TestPnpmPublishDistTag:
 
     def test_publish_command_includes_tag(self):
         content = _read_template(NPM_TEMPLATE_DIR, "publish-pnpm.yml.tpl")
-        assert "pnpm publish {{#if provenance}}--provenance {{/if}}--access public ${{ steps.dist-tag.outputs.tag }}" in content
+        assert "pnpm publish {{#if npm.provenance}}--provenance {{/if}}--access public ${{ steps.dist-tag.outputs.tag }}" in content
 
     def test_dist_tag_step_before_publish(self):
         content = _read_template(NPM_TEMPLATE_DIR, "publish-pnpm.yml.tpl")
@@ -108,7 +108,7 @@ class TestYarnPublishDistTag:
 
     def test_publish_command_includes_tag(self):
         content = _read_template(NPM_TEMPLATE_DIR, "publish-yarn.yml.tpl")
-        assert "yarn npm publish {{#if provenance}}--provenance {{/if}}--access public ${{ steps.dist-tag.outputs.tag }}" in content
+        assert "yarn npm publish {{#if npm.provenance}}--provenance {{/if}}--access public ${{ steps.dist-tag.outputs.tag }}" in content
 
     def test_dist_tag_step_before_publish(self):
         content = _read_template(NPM_TEMPLATE_DIR, "publish-yarn.yml.tpl")
@@ -212,7 +212,7 @@ class TestDistTagShellLogic:
 
 
 class TestNpmProvenanceRendering:
-    """The {{#if provenance}} block renders --provenance only when enabled.
+    """The {{#if npm.provenance}} block renders --provenance only when enabled.
 
     Covers all three package-manager variants (npm/pnpm/yarn) for both the
     truthy ("true") and falsy ("") provenance template-var values.
@@ -229,7 +229,7 @@ class TestNpmProvenanceRendering:
         from rlsbl.commands.init_cmd import process_template
 
         raw = _read_template(NPM_TEMPLATE_DIR, template_name)
-        content, _ = process_template(raw, {"provenance": provenance_value})
+        content, _ = process_template(raw, {"npm.provenance": provenance_value})
         return content
 
     @pytest.mark.parametrize("template_name,publish_cmd", _VARIANTS)
