@@ -102,8 +102,11 @@ def run_cmd(args, flags, project_root):
     else:
         tag = target.tag_format(version)
 
-    # Extract release notes from CHANGELOG.md
-    changelog_path = os.path.join(project_dir, "CHANGELOG.md")
+    # Extract release notes from CHANGELOG.md. For explicit-mode releasables
+    # the canonical changelog lives in the releasable state dir, not the
+    # member project directory.
+    from ..changelog.home import get_changelog_home
+    changelog_path = get_changelog_home(project_dir, releasable_dir=releasable_config_dir)
     if not os.path.exists(changelog_path):
         print("Error: CHANGELOG.md not found.", file=sys.stderr)
         sys.exit(1)

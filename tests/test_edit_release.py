@@ -238,7 +238,9 @@ class TestEditReleaseReleasableInheritance:
     def test_edit_release_resolves_targets_with_releasable_inheritance(
         self, multi_releasable_monorepo_factory, capsys,
     ):
-        from rlsbl.workspace import Releasable
+        import os
+
+        from rlsbl.workspace import Releasable, get_releasable_dir
 
         ns = multi_releasable_monorepo_factory(
             releasables=[Releasable(name="alpha")],
@@ -249,9 +251,10 @@ class TestEditReleaseReleasableInheritance:
         member = ns.root / "libs" / "alpha-core"
         # Targets live ONLY at the releasable level: member config has none.
         (member / ".rlsbl" / "config.json").write_text("{}\n")
-        (member / "CHANGELOG.md").write_text(
-            "# Changelog\n\n## 0.1.0\n\n- Initial release\n"
-        )
+        # The canonical changelog lives at the releasable state dir.
+        rel_dir = get_releasable_dir(str(ns.root), "alpha")
+        with open(os.path.join(rel_dir, "CHANGELOG.md"), "w", encoding="utf-8") as f:
+            f.write("# Changelog\n\n## 0.1.0\n\n- Initial release\n")
 
         gh_calls = []
 
@@ -269,6 +272,49 @@ class TestEditReleaseReleasableInheritance:
         assert ["release", "view", "alpha@v0.1.0"] in gh_calls
         out = capsys.readouterr().out
         assert "Would update GitHub Release notes for alpha@v0.1.0" in out
+
+    def test_edit_release_reads_changelog_from_releasable_dir(
+        self, multi_releasable_monorepo_factory, capsys,
+    ):
+        """release edit resolves CHANGELOG.md at the releasable state dir.
+
+        For explicit-mode releasables the canonical changelog lives at
+        ``.rlsbl-monorepo/releasables/<name>/CHANGELOG.md``, not in the
+        member project directory. Reading from the member dir (the old
+        behavior) fails with "CHANGELOG.md not found".
+        """
+        import os
+
+        from rlsbl.workspace import Releasable, get_releasable_dir
+
+        ns = multi_releasable_monorepo_factory(
+            releasables=[Releasable(name="alpha")],
+            projects=[{"path": "libs/alpha-core", "name": "alpha-core",
+                       "releasable": "alpha"}],
+            releasable_configs={"alpha": {"private": False, "targets": ["pypi"]}},
+        )
+        member = ns.root / "libs" / "alpha-core"
+        (member / ".rlsbl" / "config.json").write_text("{}\n")
+        # CHANGELOG.md lives ONLY at the releasable dir -- NOT the member dir.
+        rel_dir = get_releasable_dir(str(ns.root), "alpha")
+        with open(os.path.join(rel_dir, "CHANGELOG.md"), "w", encoding="utf-8") as f:
+            f.write("# Changelog\n\n## 0.1.0\n\n- Initial release\n")
+
+        gh_calls = []
+
+        def fake_run_gh(args, **kwargs):
+            gh_calls.append(list(args))
+            return ""
+
+        with patch("rlsbl.commands.edit_release.check_gh_installed", return_value=True), \
+             patch("rlsbl.commands.edit_release.check_gh_auth", return_value=True), \
+             patch("rlsbl.commands.edit_release.run_gh", side_effect=fake_run_gh):
+            run_cmd([], {"dry-run": True}, project_root=str(member))
+
+        assert ["release", "view", "alpha@v0.1.0"] in gh_calls
+        out = capsys.readouterr().out
+        assert "Would update GitHub Release notes for alpha@v0.1.0" in out
+        assert "Initial release" in out
 
 
 if __name__ == "__main__":
