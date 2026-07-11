@@ -1,9 +1,40 @@
 # Version bump type: patch, minor, major, hotfix, or prerelease
-bump = ""
+bump = "minor"
 # Short description of this release (required)
-description = ""
+description = "Mandatory npm provenance declaration with a preflight visibility guard, plus monorepo release-correctness fixes: structured-target scaffold config, loud scaffold-commit failures, virtual-workspace-root check skipping, releasable-aware orphan detection, mode-aware CI-sync check, two-level lint config, and per-releasable status rows."
 # Optional context explaining why these changes were made
-context = ""
+context = """
+This release bundles Phases 4, 5, and 6.
+
+Phase 6 (npm provenance) makes the npm publish pipeline's provenance behaviour
+explicit and safe. npm build-provenance attestations require a PUBLIC GitHub
+source repository and GitHub Actions OIDC, so:
+- npm-type pipelines now require an explicit boolean `provenance` key in
+  `.rlsbl/config.json` (no implicit default -- the correct value depends on
+  repository visibility). This is a breaking config change for existing npm
+  pipelines; add `"provenance": true` for public repos or `false` for private.
+- The scaffolded publish workflow (npm/pnpm/yarn variants) emits `--provenance`
+  only when the pipeline declares it, via a namespaced `{{#if npm.provenance}}`
+  template conditional. `--access public` stays hardcoded on purpose (scoped
+  packages are forbidden in this ecosystem; unscoped public packages require
+  it). The yarn variant, which was previously missing provenance entirely, is
+  now consistent with the others.
+- A pre-mutation preflight guard probes repository visibility via
+  `gh repo view --json isPrivate` when (and only when) an npm pipeline requests
+  provenance, and aborts on a private or non-GitHub repo with the three ways
+  out spelled out. No network call happens when provenance is not requested.
+- Local (non-CI) npm publishes never pass `--provenance`, since OIDC
+  build-provenance is impossible outside GitHub Actions.
+
+Phases 4 and 5 are the monorepo release-correctness fixes already landed on
+main: scaffold no longer downgrades structured publish targets, scaffold-commit
+failures are now loud, virtual uv workspace roots skip inapplicable
+package/publish checks, changelog orphan detection respects a releasable's
+custom tag format, the workspace-ci-synced check validates the inlined
+ci-router.yml, releasable members can share a single releasable-level lint
+config, and `rlsbl monorepo status` shows one row per releasable with its real
+tag, version, coverage, and members.
+"""
 # Pre-release identifier: alpha, beta, rc, or stable
 # preid = ""
 # Set to true to generate a blog post for this release
