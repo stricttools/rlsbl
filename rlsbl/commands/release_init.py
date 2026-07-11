@@ -3,7 +3,7 @@
 import os
 import sys
 
-from ..utils import commit_files
+from ..utils import commit_scaffold_file
 
 
 def run_cmd(project_root):
@@ -129,6 +129,6 @@ def run_cmd(project_root):
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         tomlkit.dump(doc, f)
 
-    commit_files("release: scaffold unreleased.toml", [release_path], allow_failure=True)
+    commit_scaffold_file("release: scaffold unreleased.toml", [release_path])
 
     print(release_path)

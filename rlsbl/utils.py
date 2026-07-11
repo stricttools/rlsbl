@@ -424,6 +424,52 @@ def commit_files(
         raise
 
 
+def is_git_repo(path: str | None = None) -> bool:
+    """Return True if ``path`` (default: process cwd) is inside a git work tree."""
+    try:
+        out = run("git", ["rev-parse", "--is-inside-work-tree"], cwd=path)
+        return out.strip() == "true"
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+
+
+def commit_scaffold_file(
+    message: str,
+    files: list[str],
+    *,
+    cwd: str | None = None,
+) -> None:
+    """Commit a freshly-scaffolded file, failing loudly on commit error.
+
+    The scaffold write has already succeeded by the time this is called.
+    Outside a git repository there is nothing to commit, so this is a no-op
+    (matching the project convention: never commit or git-init in a non-git
+    directory). Inside a git repository, a commit failure is a hard error with
+    an actionable message -- it is never silently swallowed, because a
+    scaffolded release file that is on disk but not committed can silently
+    block or corrupt a later release.
+
+    Args:
+        message: commit message.
+        files: file paths to commit (relative to ``cwd`` or absolute).
+        cwd: directory the commit tool runs from; also the directory whose
+            git-repo membership is checked.
+    """
+    if not is_git_repo(cwd):
+        return
+    try:
+        commit_files(message, files, allow_failure=False, cwd=cwd)
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        joined = ", ".join(files)
+        print(
+            f"Error: scaffolded {joined} but failed to commit it: {e}\n"
+            f"The file was written successfully; commit it manually with "
+            f'\'safegit commit -m "{message}" -- {joined}\'.',
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
 def commit_files_if_changed(
     message: str,
     files: list[str],

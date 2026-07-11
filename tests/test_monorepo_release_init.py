@@ -613,3 +613,33 @@ class TestBatchReleaseInitAutoCommit:
         )
         assert status.stdout.strip() == "", \
             f"batch release file should be clean after auto-commit, got: {status.stdout}"
+
+    def test_commit_failure_is_loud(self, mock_git_repo, monkeypatch, capsys):
+        """A failed auto-commit of the batch release file surfaces loudly
+        (SystemExit + actionable error), not silently swallowed."""
+        import rlsbl.utils as utils
+
+        make_workspace(mock_git_repo, [
+            {"path": "pkg-a", "name": "pkg-a"},
+        ])
+        pkg_a = mock_git_repo / "pkg-a"
+        pkg_a.mkdir()
+        (pkg_a / "package.json").write_text(
+            json.dumps({"name": "pkg-a", "version": "1.0.0"}) + "\n"
+        )
+        run_git(mock_git_repo, "add", ".")
+        run_git(mock_git_repo, "commit", "-q", "-m", "add workspace")
+
+        def boom(*a, **k):
+            raise subprocess.CalledProcessError(1, ["safegit", "commit"])
+
+        monkeypatch.setattr(utils, "commit_files", boom)
+        with pytest.raises(SystemExit) as exc_info:
+            _cmd_batch_release_init(project_root=mock_git_repo)
+
+        assert exc_info.value.code == 1
+        err = capsys.readouterr().err
+        assert "unreleased.toml" in err
+        assert "commit" in err.lower()
+        # File remains on disk (write succeeded, commit failed).
+        assert os.path.exists(get_batch_release_file_path(str(mock_git_repo)))

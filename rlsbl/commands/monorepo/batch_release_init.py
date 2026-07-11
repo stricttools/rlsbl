@@ -8,7 +8,7 @@ import tomlkit
 
 from ...release_file import get_batch_release_file_path, is_pristine_batch_release_file
 from ...targets import collect_releasable_targets, detect_targets, resolve_releasable_config_dir, TARGETS
-from ...utils import commit_files
+from ...utils import commit_scaffold_file
 from ...workspace import find_workspace_root, load_workspace
 
 
@@ -302,9 +302,9 @@ def _scaffold_releasable_sections(workspace_root, projects, batch_path, filter_n
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(toml_text)
 
-    commit_files(
+    commit_scaffold_file(
         "release: scaffold unreleased.toml", [batch_path],
-        allow_failure=True, cwd=workspace_root,
+        cwd=workspace_root,
     )
 
     print(batch_path)
@@ -393,9 +393,9 @@ def _scaffold_package_sections(workspace_root, projects, batch_path, filter_name
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(toml_text)
 
-    commit_files(
+    commit_scaffold_file(
         "release: scaffold unreleased.toml", [batch_path],
-        allow_failure=True, cwd=workspace_root,
+        cwd=workspace_root,
     )
 
     print(batch_path)

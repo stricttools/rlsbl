@@ -376,6 +376,54 @@ class TestReleaseInitAutoCommit:
             f"release file should be clean after auto-commit, got: {status.stdout}"
 
 
+class TestReleaseInitCommitFailureLoud:
+    """A failed auto-commit of the scaffolded file surfaces loudly (no silent swallow)."""
+
+    def _init_git_repo(self, path):
+        subprocess.run(["git", "init", "-q", "-b", "main"], cwd=str(path), check=True)
+        subprocess.run(["git", "config", "user.email", "test@test.local"], cwd=str(path), check=True)
+        subprocess.run(["git", "config", "user.name", "Test"], cwd=str(path), check=True)
+
+    def test_commit_failure_is_loud(self, tmp_path, monkeypatch, capsys):
+        """When the auto-commit fails inside a git repo, init exits with an
+        actionable error mentioning the scaffolded file -- it does not continue
+        as if nothing happened."""
+        import rlsbl.utils as utils
+
+        self._init_git_repo(tmp_path)
+        (tmp_path / ".rlsbl").mkdir(exist_ok=True)
+        monkeypatch.chdir(str(tmp_path))
+
+        entries = [TargetEntry(name="pypi", path=str(tmp_path))]
+
+        def boom(*a, **k):
+            raise subprocess.CalledProcessError(1, ["safegit", "commit"])
+
+        with patch("rlsbl.targets.detect_targets", return_value=entries), \
+             patch.object(utils, "commit_files", side_effect=boom):
+            from rlsbl import cmd_release_init
+            with pytest.raises(SystemExit) as exc_info:
+                cmd_release_init()
+
+        assert exc_info.value.code == 1
+        err = capsys.readouterr().err
+        assert "unreleased.toml" in err
+        assert "commit" in err.lower()
+        # The scaffolded file must remain on disk (write succeeded, commit failed).
+        assert (tmp_path / ".rlsbl" / "releases" / "unreleased.toml").exists()
+
+    def test_non_git_directory_skips_commit_silently(self, tmp_path, monkeypatch):
+        """Outside a git repo, init scaffolds the file and does not attempt a
+        commit (no error) -- there is nothing to commit."""
+        (tmp_path / ".rlsbl").mkdir(exist_ok=True)
+        monkeypatch.chdir(str(tmp_path))
+        entries = [TargetEntry(name="pypi", path=str(tmp_path))]
+        with patch("rlsbl.targets.detect_targets", return_value=entries):
+            from rlsbl import cmd_release_init
+            cmd_release_init()  # must not raise
+        assert (tmp_path / ".rlsbl" / "releases" / "unreleased.toml").exists()
+
+
 class TestReleaseInitMonorepo:
     """In monorepo mode, release-init creates the file in the package directory."""
 
