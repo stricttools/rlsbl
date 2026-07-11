@@ -1,26 +1,21 @@
-# test-suite check: hard ~120 s timeout is not configurable and intermittently fails legitimate suites
+# test-suite check timeout: knob exists — fix discoverability, not the feature
 
-## Context
+## Correction notice (this todo was updated in place)
 
-The `test-suite` check (run by `rlsbl check --all` and as a release-preflight gate) executes the project's test command with a fixed internal timeout of roughly 120 seconds.
+The original version of this todo requested a configurable timeout for the `test-suite` check, claiming it is hardcoded at ~120 s. That premise is WRONG: the knob already exists — `get_check_timeout` (`rlsbl/utils.py:231`) resolves it with precedence `RLSBL_CHECK_TIMEOUT` env var > `check_timeout` key in `.rlsbl/config.json` > default 120 s, with validation of bad values. The feature is done and shipped.
 
-## Problem
+## The remaining, real gap: discoverability
 
-A Go project whose race-enabled test suite legitimately takes ~100 s wall time passes the check on an idle machine but intermittently fails it under concurrent load ("command timed out after 120s") — the margin between legitimate runtime and the hard timeout is too thin, and there is no way to widen it. Because rlsbl checks are hard gates with no bypass (by design, and correctly so), an intermittent timeout aborts otherwise-valid releases nondeterministically. The failure mode is especially confusing because re-running the check standalone usually passes, making it look flaky rather than structural.
+The scenario that prompted the original filing still happened as described: a project whose race-enabled suite legitimately runs ~100 s intermittently failed the check under load, and the operator (an AI session that had just read the check output) concluded the timeout was not configurable. Nothing in the failure path mentions the knob:
 
-## Possible solutions
-
-1. **Config key for the timeout** (e.g. `checks.test_suite.timeout_seconds` in `.rlsbl/config.json`, default 120): explicit, per-project, no bypass semantics changed — the check still hard-fails on real hangs. Pros: minimal, philosophy-compatible (an explicit declared budget is not an escape hatch). Cons: none obvious; a ceiling (e.g. max 600) avoids absurd values.
-2. **Scale timeout to a measured baseline**: store the last successful duration and allow, say, 2x. Pros: adaptive. Cons: hidden state, non-deterministic gate behavior — worse than explicit config.
-3. **Document a convention instead**: projects must keep the gated suite under 120 s (e.g. via `-short` subsets), full suites run outside the gate. Pros: zero code. Cons: pushes every heavy project into maintaining two test tiers, and weakens what the release gate actually verifies.
-
-Option 1 recommended; option 3 can remain the guidance for projects that prefer fast gates.
+1. The timeout failure message ("command timed out after 120s" or similar) does not name `check_timeout` / `RLSBL_CHECK_TIMEOUT` or hint that the budget is configurable. For an agent-first tool, the error message is the documentation that gets read — a one-line remediation hint ("declare a larger budget via check_timeout in .rlsbl/config.json if your suite legitimately needs it") would have prevented the misdiagnosis entirely.
+2. Verify docs coverage: if the key is absent or thin in the config documentation / selfdoc output, add it (what it does, precedence, that it is a declared budget rather than a bypass — the check still hard-fails on real hangs).
 
 ## Affected files
 
-- The test-suite check implementation (timeout constant)
-- Config schema + docs for the new key
+- The test-suite check's timeout-failure message construction (wherever the "timed out after Ns" string is emitted)
+- Config docs for `check_timeout` / `RLSBL_CHECK_TIMEOUT`
 
 ## Effort estimate
 
-Small: thread one configurable value with a default and a sane ceiling through the check, plus a test that a configured value is honored and that absent config keeps 120 s.
+Trivial-to-small: one error-message string with the remediation hint, plus a docs check. A regression test asserting the hint appears in the timeout failure output would lock it in.
