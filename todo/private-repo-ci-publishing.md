@@ -30,6 +30,10 @@ Note: subdirectory wrapper targets already work via explicit target `path` entri
 
 The npm wrapper codegen publishes per-platform packages via optionalDependencies, which requires claiming N extra registry names. Some projects decline extra name claims. Wanted: a single-package variant under the one existing name (single platform with `os`/`cpu` fields initially; multi-platform later = fat tarball with a runtime platform selector shim). Scaffold should make per-platform vs single-package an explicit mandatory choice.
 
+## Note on a sibling todo
+
+`todo/pipeline-dir-field.md` (filed the same day) shares the original wrong premise: its core ask — npm/pypi pipelines operating from a subdirectory — is largely covered today by explicit target `path` entries (e.g. `{"name": "npm", "path": "npm/"}`), which its author did not know about. When triaging it, treat only its secondary findings as live: the `RLSBL_VERSION` pre/post-release timing asymmetry being undocumented, `custom_assets` being GitHub-Release-only, and the pre-publish secret scan scanning stale `dist/` artifacts from older versions.
+
 ## Affected files
 
 `rlsbl/commands/init_cmd.py`, `rlsbl/checks/project.py`, `rlsbl/config.py`, `rlsbl/targets/__init__.py`, `rlsbl/targets/go.py`, `rlsbl/npm_wrapper.py`, `rlsbl/pipelines/npm.py`, `rlsbl/templates/npm/*.tpl`, new PyPI wrapper templates, docs.
