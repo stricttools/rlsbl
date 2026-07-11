@@ -1,0 +1,4 @@
+{"id":"18c1076dfab5ef86ff21355a0883470fa5a3b16a49f2de35","commits":["5d330340326cf0f22b3fc85ec5736776c8486798"],"user_facing":false}
+{"id":"18c138c650ce26aa34656a3e85644dfbbe510ee4ab22ef85","commits":["e352285ae0913e66e5aac6fe927ab3c6844b5ece"],"user_facing":true,"description":"`rlsbl release edit` now finds CHANGELOG.md for explicit-mode releasables (previously failed with \"CHANGELOG.md not found\").","type":"fix"}
+{"id":"18c138e56876d502d0c93f0f6d5e43c4920b376db5536872","commits":["8828d43c58c868d34db9b9dc74d77654dc4148d0"],"user_facing":true,"description":"`rlsbl changelog amend` now sets the `packages` prefix on amended releasable entries, so they render with the `[name]` prefix like added entries.","type":"fix"}
+{"id":"18c138f8d43f3e56b2b01c64671c4c68b0cc3a4f74d35cd7","commits":["24823c9d9653a42bf208a6b9f450282c5159f275"],"user_facing":false}
