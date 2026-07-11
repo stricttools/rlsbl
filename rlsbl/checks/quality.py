@@ -20,6 +20,7 @@ def register_quality_checks(app):
     def check_library_lint(ctx):
         """Library projects must pass boundary lint."""
         from ..lint import lint_library
+        from ..targets import resolve_releasable_config_dir
 
         # scope = "workspace:library" ensures ctx is WorkspaceCheckContext
         # and ctx.projects is pre-filtered to library projects only.
@@ -32,7 +33,18 @@ def register_quality_checks(app):
         total_warnings = 0
         for proj in ctx.projects:
             proj_path = os.path.join(ws_root, proj["path"])
-            results = lint_library(proj_path, allowed_imports=proj.get("lint_allow"), check_timeout=timeout)
+            # Releasable members inherit lint config from the releasable level
+            # when they carry no per-language override of their own.
+            rel_config_dir = resolve_releasable_config_dir(proj, ctx.workspace_root)
+            releasable_lint_dir = (
+                os.path.join(rel_config_dir, "lint") if rel_config_dir else None
+            )
+            results = lint_library(
+                proj_path,
+                allowed_imports=proj.get("lint_allow"),
+                check_timeout=timeout,
+                releasable_lint_dir=releasable_lint_dir,
+            )
             for r in results:
                 if r.severity == "error":
                     total_errors += 1

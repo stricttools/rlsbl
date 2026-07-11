@@ -24,12 +24,14 @@ from .workspace import (
 
 # Files and directories expected to remain in a per-package .rlsbl/ after
 # cleanup.  Anything else is unexpected and flagged by verify_minimal_rlsbl().
-# config.json is kept only when it differs from the releasable-level config;
+# config.json and lint/ are kept only when they differ from the releasable-level
+# config -- both are whitelisted here because a member override is legitimate;
 # hooks/ stays because per-package script hooks are a live feature (run by
-# run_releasable_hooks via get_package_hook_path); bases/, lint/, changes/,
-# releases/, and the version marker are all removed during cleanup.
+# run_releasable_hooks via get_package_hook_path); bases/, changes/, releases/,
+# and the version marker are all removed during cleanup.
 EXPECTED_RLSBL_CONTENTS = frozenset({
     "config.json",
+    "lint",
     "managed-files.json",
     "hooks",
 })
@@ -46,10 +48,10 @@ def cleanup_per_package_release_state(workspace_root, projects=None,
     - ``.rlsbl/changes/`` -- changelog state (moved to releasable level)
     - ``.rlsbl/releases/`` -- release state (moved to releasable level)
     - ``.rlsbl/bases/`` -- merge bases (moved to releasable level)
-    - ``.rlsbl/lint/`` -- lint configs (moved to releasable level)
     - ``.rlsbl/version`` -- rlsbl scaffold version file
     - ``CHANGELOG.md`` -- generated changelog (now per-releasable)
     - ``.rlsbl/config.json`` -- only when identical to the releasable-level config
+    - ``.rlsbl/lint/`` -- only when byte-identical to the releasable-level lint config
 
     Exemptions (never removed):
 
@@ -114,14 +116,28 @@ def cleanup_per_package_release_state(workspace_root, projects=None,
 
         rlsbl_dir = os.path.join(proj_path, ".rlsbl")
 
-        # Remove directories: changes, releases, bases, lint.
-        # hooks/ is exempt (live per-package script hooks feature).
-        for subdir in ("changes", "releases", "bases", "lint"):
+        # Remove directories: changes, releases, bases.
+        # hooks/ is exempt (live per-package script hooks feature); lint/ is
+        # handled conditionally below (like config.json).
+        for subdir in ("changes", "releases", "bases"):
             target = os.path.join(rlsbl_dir, subdir)
             if os.path.isdir(target):
                 if not dry_run:
                     _saferm_dir(target, proj.name, subdir)
                 removed.append(target)
+
+        # Remove .rlsbl/lint/ only when byte-identical to the releasable-level
+        # lint config (mirrors the config.json conditional below). A member lint
+        # dir that overrides the releasable base -- or one with no releasable
+        # base to fall back to -- is preserved.
+        member_lint_dir = os.path.join(rlsbl_dir, "lint")
+        rel_lint_dir = os.path.join(get_releasable_dir(workspace_root, rel_val), "lint")
+        if os.path.isdir(member_lint_dir) and _lint_dirs_identical(
+            member_lint_dir, rel_lint_dir
+        ):
+            if not dry_run:
+                _saferm_dir(member_lint_dir, proj.name, "lint")
+            removed.append(member_lint_dir)
 
         # Remove .rlsbl/version file
         version_file = os.path.join(rlsbl_dir, "version")
@@ -219,6 +235,7 @@ def verify_minimal_rlsbl(project_path):
 
     - ``managed-files.json`` (scaffold metadata)
     - ``config.json`` (only if it has overrides differing from releasable config)
+    - ``lint/`` (only if it has overrides differing from releasable lint config)
     - ``hooks/`` (per-package script hooks are a live feature)
 
     Args:
@@ -238,6 +255,36 @@ def verify_minimal_rlsbl(project_path):
             unexpected.append(entry)
 
     return unexpected
+
+
+def _lint_dirs_identical(member_lint_dir, releasable_lint_dir):
+    """Return True when *member_lint_dir* is byte-identical to the releasable
+    lint dir.
+
+    Both directories must contain the same set of regular files, and every
+    file must match byte-for-byte. Returns False when the releasable-level lint
+    dir does not exist (nothing to fall back to, so the member copy must be
+    preserved).
+    """
+    if not os.path.isdir(member_lint_dir) or not os.path.isdir(releasable_lint_dir):
+        return False
+
+    def _files(d):
+        return {
+            name for name in os.listdir(d)
+            if os.path.isfile(os.path.join(d, name))
+        }
+
+    member_files = _files(member_lint_dir)
+    if member_files != _files(releasable_lint_dir):
+        return False
+
+    for name in member_files:
+        with open(os.path.join(member_lint_dir, name), "rb") as fa, \
+                open(os.path.join(releasable_lint_dir, name), "rb") as fb:
+            if fa.read() != fb.read():
+                return False
+    return True
 
 
 def _get_project_releasable(proj):

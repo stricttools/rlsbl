@@ -90,6 +90,7 @@ def lint_library(
     *,
     allowed_imports: list[str] | None = None,
     check_timeout: int | None = None,
+    releasable_lint_dir: str | None = None,
 ) -> list[LintResult]:
     """Analyze a project for library boundary violations.
 
@@ -104,6 +105,9 @@ def lint_library(
         check_timeout: optional subprocess timeout in seconds. Passed to
             linters that shell out (e.g. MavenLinter). Defaults to 120
             when None.
+        releasable_lint_dir: optional path to the releasable-level ``lint/``
+            directory. When the member has no per-language lint config of its
+            own, the releasable-level config in this directory is used.
 
     Returns a list of LintResult namedtuples.
     """
@@ -116,7 +120,9 @@ def lint_library(
 
     results: list[LintResult] = []
     for language in languages:
-        config = load_language_config(project_path, language)
+        config = load_language_config(
+            project_path, language, releasable_lint_dir=releasable_lint_dir
+        )
         # Merge workspace-level allowed imports with per-project TOML allow-list
         if allowed_imports:
             config.allowed_imports = list(set(config.allowed_imports) | set(allowed_imports))

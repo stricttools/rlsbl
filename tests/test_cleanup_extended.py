@@ -119,20 +119,38 @@ class TestCleanupRemovesBases:
 
 
 # ---------------------------------------------------------------------------
-# Test 3: lint/ directory removed during cleanup
+# Test 3: lint/ directory removed CONDITIONALLY during cleanup
 # ---------------------------------------------------------------------------
 
 
-class TestCleanupRemovesLint:
-    """cleanup_per_package_release_state removes lint/ directory."""
+def _write_member_lint(pkg, files):
+    """Write files into the member .rlsbl/lint/ directory."""
+    lint_dir = pkg / ".rlsbl" / "lint"
+    lint_dir.mkdir(parents=True, exist_ok=True)
+    for name, content in files.items():
+        (lint_dir / name).write_text(content)
+
+
+def _write_releasable_lint(tmp_path, releasable_name, files):
+    """Write files into the releasable-level lint/ directory."""
+    lint_dir = tmp_path / WORKSPACE_DIR / "releasables" / releasable_name / "lint"
+    lint_dir.mkdir(parents=True, exist_ok=True)
+    for name, content in files.items():
+        (lint_dir / name).write_text(content)
+
+
+class TestCleanupRemovesLintConditional:
+    """lint/ is removed only when byte-identical to the releasable-level config."""
 
     @patch("rlsbl.releasable_cleanup.subprocess.run")
-    def test_lint_dir_removed(self, mock_run, tmp_project):
-        """lint/ directory is removed for a releasable member."""
+    def test_lint_removed_when_identical(self, mock_run, tmp_project):
+        """lint/ is removed when byte-identical to the releasable-level lint."""
         pkg = tmp_project / "pkg"
-        _make_rlsbl_dir(pkg, subdirs=["lint"])
+        _make_rlsbl_dir(pkg)
+        _write_member_lint(pkg, {"python.toml": "[forbidden-imports]\nmodules = []\n"})
         _write_workspace(tmp_project, WORKSPACE_WITH_RELEASABLE)
         _write_releasable_config(tmp_project, "core", {})
+        _write_releasable_lint(tmp_project, "core", {"python.toml": "[forbidden-imports]\nmodules = []\n"})
 
         removed = cleanup_per_package_release_state(str(tmp_project))
         removed_names = [os.path.basename(p) for p in removed]
@@ -141,6 +159,37 @@ class TestCleanupRemovesLint:
         lint_calls = [c for c in calls if str(pkg / ".rlsbl" / "lint") in c]
         assert len(lint_calls) == 1
         assert "-r" in lint_calls[0]
+
+    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    def test_lint_preserved_when_different(self, mock_run, tmp_project):
+        """lint/ is preserved when it overrides the releasable-level lint."""
+        pkg = tmp_project / "pkg"
+        _make_rlsbl_dir(pkg)
+        _write_member_lint(pkg, {"python.toml": "[forbidden-imports]\nmodules = [\"flask\"]\n"})
+        _write_workspace(tmp_project, WORKSPACE_WITH_RELEASABLE)
+        _write_releasable_config(tmp_project, "core", {})
+        _write_releasable_lint(tmp_project, "core", {"python.toml": "[forbidden-imports]\nmodules = []\n"})
+
+        removed = cleanup_per_package_release_state(str(tmp_project))
+        removed_names = [os.path.basename(p) for p in removed]
+        assert "lint" not in removed_names
+        assert (pkg / ".rlsbl" / "lint").is_dir()
+
+    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    def test_lint_preserved_when_no_releasable_base(self, mock_run, tmp_project):
+        """lint/ is preserved when there is no releasable-level lint to fall
+        back to (removing it would lose the config)."""
+        pkg = tmp_project / "pkg"
+        _make_rlsbl_dir(pkg)
+        _write_member_lint(pkg, {"python.toml": "[forbidden-imports]\nmodules = []\n"})
+        _write_workspace(tmp_project, WORKSPACE_WITH_RELEASABLE)
+        _write_releasable_config(tmp_project, "core", {})
+        # No releasable-level lint dir written.
+
+        removed = cleanup_per_package_release_state(str(tmp_project))
+        removed_names = [os.path.basename(p) for p in removed]
+        assert "lint" not in removed_names
+        assert (pkg / ".rlsbl" / "lint").is_dir()
 
 
 # ---------------------------------------------------------------------------
@@ -391,12 +440,13 @@ class TestVerifyMinimalFlagsUnexpected:
         result = verify_minimal_rlsbl(str(pkg))
         assert "bases" in result
 
-    def test_lint_is_unexpected(self, tmp_project):
-        """lint/ directory is flagged as unexpected."""
+    def test_lint_is_expected(self, tmp_project):
+        """lint/ directory is NOT flagged: a member lint override is legitimate
+        (whitelisted, like config.json)."""
         pkg = tmp_project / "pkg"
         _make_rlsbl_dir(pkg, subdirs=["lint"])
         result = verify_minimal_rlsbl(str(pkg))
-        assert "lint" in result
+        assert "lint" not in result
 
     def test_version_is_unexpected(self, tmp_project):
         """version file is flagged as unexpected."""
@@ -420,7 +470,8 @@ class TestVerifyMinimalFlagsUnexpected:
         assert "releases" in result
 
     def test_all_non_minimal_flagged(self, tmp_project):
-        """All non-minimal state is flagged in a single call."""
+        """All non-minimal state is flagged in a single call. lint/ is
+        whitelisted (member override is legitimate) and not flagged."""
         pkg = tmp_project / "pkg"
         _make_rlsbl_dir(
             pkg,
@@ -428,12 +479,14 @@ class TestVerifyMinimalFlagsUnexpected:
             files=["version"],
         )
         result = verify_minimal_rlsbl(str(pkg))
-        assert set(result) == {"changes", "releases", "bases", "lint", "version"}
+        assert set(result) == {"changes", "releases", "bases", "version"}
 
     def test_expected_contents_is_minimal(self):
-        """EXPECTED_RLSBL_CONTENTS contains only the minimal set."""
+        """EXPECTED_RLSBL_CONTENTS contains the minimal set plus the
+        conditionally-removed lint/ and config.json overrides."""
         assert EXPECTED_RLSBL_CONTENTS == {
             "config.json",
+            "lint",
             "managed-files.json",
             "hooks",
         }
@@ -454,15 +507,19 @@ class TestCleanupAllNewTargets:
         shared_config = {"private": False}
         _make_rlsbl_dir(
             pkg,
-            subdirs=["changes", "releases", "hooks", "bases", "lint"],
+            subdirs=["changes", "releases", "hooks", "bases"],
             files=["version"],
         )
+        # lint/ is removed only when byte-identical to the releasable-level
+        # lint config, so write matching content in both places.
+        _write_member_lint(pkg, {"python.toml": "[forbidden-imports]\nmodules = []\n"})
         (pkg / ".rlsbl" / "config.json").write_text(
             json.dumps(shared_config, indent=2) + "\n"
         )
         (pkg / "CHANGELOG.md").write_text("# Changelog\n")
         _write_workspace(tmp_project, WORKSPACE_WITH_RELEASABLE)
         _write_releasable_config(tmp_project, "core", shared_config)
+        _write_releasable_lint(tmp_project, "core", {"python.toml": "[forbidden-imports]\nmodules = []\n"})
 
         removed = cleanup_per_package_release_state(str(tmp_project))
         removed_names = [os.path.basename(p) for p in removed]

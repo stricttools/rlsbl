@@ -36,10 +36,28 @@ class LanguageLintConfig:
     exclude_patterns: list[str] = field(default_factory=list)
 
 
-def load_language_config(project_path: str, language: str) -> LanguageLintConfig:
-    """Read .rlsbl/lint/<language>.toml, falling back to defaults if missing."""
-    config_path = os.path.join(project_path, ".rlsbl", "lint", f"{language}.toml")
+def load_language_config(
+    project_path: str,
+    language: str,
+    releasable_lint_dir: str | None = None,
+) -> LanguageLintConfig:
+    """Read the lint config for *language*, falling back to defaults if missing.
+
+    Two-level resolution (member wins wholesale, mirroring the config.json
+    precedent): the member-level ``.rlsbl/lint/<language>.toml`` is used when it
+    exists; otherwise, when the project belongs to a releasable and
+    ``releasable_lint_dir`` is supplied, the releasable-level
+    ``<releasable>/lint/<language>.toml`` is used. If neither exists, the
+    per-language defaults apply.
+    """
+    member_path = os.path.join(project_path, ".rlsbl", "lint", f"{language}.toml")
     defaults = _DEFAULT_FORBIDDEN.get(language, [])
+
+    config_path = member_path
+    if not os.path.isfile(config_path) and releasable_lint_dir:
+        rel_path = os.path.join(releasable_lint_dir, f"{language}.toml")
+        if os.path.isfile(rel_path):
+            config_path = rel_path
 
     if not os.path.isfile(config_path):
         return LanguageLintConfig(forbidden_imports=list(defaults))

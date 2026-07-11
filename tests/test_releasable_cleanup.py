@@ -489,6 +489,7 @@ class TestVerifyMinimalCleanState:
         """EXPECTED_RLSBL_CONTENTS has the documented set."""
         assert EXPECTED_RLSBL_CONTENTS == {
             "config.json",
+            "lint",
             "managed-files.json",
             "hooks",
         }
