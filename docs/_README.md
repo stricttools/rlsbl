@@ -38,7 +38,7 @@ rlsbl watch <sha>       # monitor CI for that release
 
 All commands auto-detect targets (versioning) from project files (`package.json`, `pyproject.toml`, `go.mod`) and pipelines (publishing) from `.rlsbl/config.json`. Targets handle version bumps; pipelines handle where releases are published.
 
-:-: table-commands path="."
+:-: table-commands
 
 Global flags: `--help`, `--version`, `--dry-run`, `--yes`, `--quiet`.
 

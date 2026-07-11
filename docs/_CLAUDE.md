@@ -9,7 +9,7 @@ Built in Python 3.11+ with ruamel-yaml, tomlkit, strictcli, and tree-sitter. Als
 
 ## Commands
 
-:-: table-commands path="."
+:-: table-commands
 
 ## Release workflow
 
