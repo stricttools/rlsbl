@@ -293,6 +293,24 @@ def _derive_packages_from_commits(resolved_commits, member_projects):
     return sorted(affected) if affected else None
 
 
+def _populate_packages_field(entry, resolved_commits, ws_context):
+    """Auto-populate ``entry.packages`` in explicit releasable mode.
+
+    Releasable-scoped: only the current releasable's members are considered,
+    so a commit touching sub-projects of another releasable does not leak
+    those packages into this releasable's changelog entry. No-op outside
+    explicit releasable mode (non-releasable context or no member projects).
+    """
+    if (isinstance(ws_context, _ResolvedContext)
+            and ws_context.releasable is not None
+            and ws_context.member_projects):
+        packages = _derive_packages_from_commits(
+            resolved_commits, ws_context.member_projects,
+        )
+        if packages:
+            entry.packages = packages
+
+
 def cmd_add(flags, project_root):
     """Add a changelog entry.
 
@@ -414,14 +432,7 @@ def _cmd_add_commit(flags, project_root, ws_context, config, dry_run):
     description = entry.description
 
     # Auto-populate packages field in explicit releasable mode
-    if (isinstance(ws_context, _ResolvedContext)
-            and ws_context.releasable is not None
-            and ws_context.member_projects):
-        packages = _derive_packages_from_commits(
-            resolved_commits, ws_context.member_projects,
-        )
-        if packages:
-            entry.packages = packages
+    _populate_packages_field(entry, resolved_commits, ws_context)
 
     # Check batch size limit before writing
     releasable_config_dir = None
@@ -669,18 +680,8 @@ def cmd_amend(flags, project_root):
     user_facing = entry.user_facing
     description = entry.description
 
-    # Auto-populate packages field in explicit releasable mode -- MUST be
-    # releasable-scoped (only the current releasable's members), matching
-    # cmd_add. A commit touching sub-projects of another releasable must not
-    # leak those packages into this releasable's changelog entry.
-    if (isinstance(ws_context, _ResolvedContext)
-            and ws_context.releasable is not None
-            and ws_context.member_projects):
-        packages = _derive_packages_from_commits(
-            resolved_commits, ws_context.member_projects,
-        )
-        if packages:
-            entry.packages = packages
+    # Auto-populate packages field in explicit releasable mode (releasable-scoped).
+    _populate_packages_field(entry, resolved_commits, ws_context)
 
     changes_dir = _resolve_changes_dir(ws_context, project_root)
     jsonl_path = os.path.join(changes_dir, f"{version}.jsonl")
@@ -811,11 +812,17 @@ def cmd_edit(flags, project_root):
                 matches.append((jsonl_path, idx, entry, version))
 
     if not matches:
-        short_hashes = ", ".join(h[:12] for h in resolved_search)
-        print(
-            f"Error: No changelog entry found for commit(s): {short_hashes}",
-            file=sys.stderr,
-        )
+        if commits_raw:
+            short_hashes = ", ".join(h[:12] for h in resolved_search)
+            print(
+                f"Error: No changelog entry found for commit(s): {short_hashes}",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                f"Error: No changelog entry found for id: {id_filter}",
+                file=sys.stderr,
+            )
         sys.exit(1)
 
     # Disambiguate if multiple matches

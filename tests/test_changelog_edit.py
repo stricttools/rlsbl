@@ -180,6 +180,27 @@ class TestCmdEdit:
             cmd_edit(flags, project_root=rlsbl_repo)
         assert exc_info.value.code == 1
 
+    def test_edit_by_id_not_found_clean_error(self, rlsbl_repo, capsys):
+        """Editing by --id with no matching entry must produce a clean error,
+        not a NameError from an undefined resolved_search (which is only bound
+        when --commits is passed)."""
+        _make_commit(rlsbl_repo)
+
+        flags = {
+            "id": "01JNONEXISTENTID000000000",
+            "commits": "",
+            "type": "fix",
+            "description": "",
+            "user-facing": None,
+            "auto-commit": False,
+        }
+        with pytest.raises(SystemExit) as exc_info:
+            cmd_edit(flags, project_root=rlsbl_repo)
+        assert exc_info.value.code == 1
+        err = capsys.readouterr().err
+        assert "01JNONEXISTENTID000000000" in err
+        assert "No changelog entry found" in err
+
     def test_edit_disambiguate_by_type(self, rlsbl_repo):
         """When two entries exist for the same commit with different types, --type disambiguates."""
         sha = _make_commit(rlsbl_repo)
