@@ -1,7 +1,8 @@
 ---
 title: rlsbl CLI Reference
-description: "CLI reference for rlsbl 0.103.0 -- all 52 commands across 16 top-level commands and 4 groups, with flags, arguments, defaults, and usage details."
+description: "Complete CLI reference for rlsbl — all available commands, subcommands, flags, arguments, and usage examples with detailed descriptions."
 generated: true
+seeded: true
 nav_group: "CLI Reference"
 nav_order: 0
 order: 91
