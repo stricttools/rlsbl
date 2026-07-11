@@ -1,6 +1,6 @@
 ---
 title: API Reference
-description: "Auto-generated API reference index for the rlsbl package — browse all 150 public modules with their docstrings and source locations."
+description: "Auto-generated API reference index for the rlsbl package — browse every public module, including the shared tag-glob resolver, with docstrings and source locations."
 generated: true
 nav_group: "API Reference"
 nav_order: 0
