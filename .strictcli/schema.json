@@ -1515,7 +1515,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": [],
+      "depends_on": [
+        "workspace-ci-router"
+      ],
       "scope": "workspace:non_dev_node"
     },
     "workspace-targets": {
