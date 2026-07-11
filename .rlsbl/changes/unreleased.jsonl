@@ -13,3 +13,4 @@
 {"id":"18c144342c4673b872a8ff38d38e4a45a89b80925d0eac9b","commits":["85829e6699602ae5bcce44184595188698991e7f"],"user_facing":false}
 {"id":"18c144588b4b138acd8903ac8dba46d2bfec26def6f904cc","commits":["d2996c4017c094b92d600193aa26641cc7de7dc8"],"user_facing":true,"description":"**`rlsbl monorepo status` now shows one row per releasable with the releasable's real tag, version, changelog coverage, and member list.** Releasable members previously showed Tag `(none)` because the tag glob was derived per-member instead of from the releasable's tag format.","type":"fix"}
 {"id":"18c144708ff0763dd1c40544f28c49a6a8d7171388f7fa65","commits":["e01b5c8e29d7db7b7b0c70ccf5e9b248cdc251fa"],"user_facing":false}
+{"id":"18c1448cfa8d90795e4710ecf2ad4994b690d70c9449ff52","commits":["3802167d8abd3318db4b58a100151f19a3a71891"],"user_facing":false}
