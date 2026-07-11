@@ -270,7 +270,8 @@
   "en/rlsbl-ci_router.md": {
     "content": "e02bcde1535a8b3196cdc1dc88d97a7c652dd0bf30b6a2e5981c8a94b4ab5663",
     "description": "ec8f8084d485d05fb2b97a248b7e06863ec783735a2dcfc49809f3ca48534d8a",
-    "seed_hash": "ec8f8084d485d05fb2b97a248b7e06863ec783735a2dcfc49809f3ca48534d8a"
+    "seed_hash": "ec8f8084d485d05fb2b97a248b7e06863ec783735a2dcfc49809f3ca48534d8a",
+    "source_docstring": "f8d60030a7a7e5da20d77ef919d742c5ad6b53c555f32390283532936e1aceb4"
   },
   "en/rlsbl-ci_yaml.md": {
     "content": "44f4377f0c275cc76f1fac4bdc74112f2a12fd0af010fd77585c1e4f7bfcad1d",
