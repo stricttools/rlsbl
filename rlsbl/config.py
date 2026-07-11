@@ -11,6 +11,7 @@ user-level defaults.
 import json
 import os
 import sys
+import tempfile
 
 from .errors import ConfigError
 
@@ -424,10 +425,21 @@ def write_project_config(key, value, project_root):
     Returns the updated config dict after writing to disk.
     """
     config_path = _project_config(project_root)
-    os.makedirs(os.path.dirname(config_path), exist_ok=True)
+    parent = os.path.dirname(config_path)
+    os.makedirs(parent, exist_ok=True)
     existing = read_json_config(config_path)
     existing[key] = value
-    with open(config_path, "w", encoding="utf-8") as f:
-        json.dump(existing, f, indent=2)
-        f.write("\n")
+    # Atomic write: serialize into a temp file in the same dir, then replace.
+    # A failure mid-write leaves the original config.json untouched, and the
+    # temp file is cleaned up so no residue is left behind.
+    fd, tmp_path = tempfile.mkstemp(dir=parent, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(existing, f, indent=2)
+            f.write("\n")
+        os.replace(tmp_path, config_path)
+    except BaseException:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        raise
     return existing

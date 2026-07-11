@@ -75,3 +75,34 @@ class TestWriteProjectConfig:
         write_project_config("other_key", "hello", str(tmp_path))
         data = json.loads(open(config_path).read())
         assert data == {"tag": False, "other_key": "hello"}
+
+    def test_write_is_atomic_preserves_original_on_failure(self, tmp_path):
+        """A failure mid-write must not corrupt the existing config.json."""
+        from unittest import mock
+
+        config_path = tmp_path / ".rlsbl" / "config.json"
+        config_path.parent.mkdir(parents=True)
+        original = {"tag": True, "existing": "value"}
+        config_path.write_text(json.dumps(original) + "\n")
+
+        with mock.patch("rlsbl.config.json.dump", side_effect=RuntimeError("boom")):
+            with pytest.raises(RuntimeError):
+                write_project_config("new_key", "x", str(tmp_path))
+
+        # Original file must be intact -- not truncated or corrupted.
+        assert json.loads(config_path.read_text()) == original
+        # No leftover tmp files in the .rlsbl dir.
+        leftovers = sorted(
+            p.name for p in config_path.parent.iterdir() if p.name != "config.json"
+        )
+        assert leftovers == []
+
+    def test_write_success_leaves_no_tmp_files(self, tmp_path):
+        """A successful write produces correct content and no tmp residue."""
+        config_path = tmp_path / ".rlsbl" / "config.json"
+
+        write_project_config("tag", False, str(tmp_path))
+
+        assert json.loads(config_path.read_text()) == {"tag": False}
+        leftovers = sorted(p.name for p in config_path.parent.iterdir())
+        assert leftovers == ["config.json"]
