@@ -107,6 +107,8 @@ Libraries are packages consumed by other workspace projects as runtime or dev de
 - `dead-workspace-packages` detection (warns if the library has no dependents)
 - Built-in lint runs during `rlsbl release run` (non-libraries skip built-in lint)
 
+Lint config resolves at two levels: a member's own `.rlsbl/lint/<language>.toml` wins when present, otherwise a releasable member falls back to the shared `.rlsbl-monorepo/releasables/<name>/lint/<language>.toml`. `rlsbl monorepo cleanup` removes a member's `.rlsbl/lint/` only when it is byte-identical to that shared config (a genuine override is preserved).
+
 ### Dev nodes (`dev_node = true`)
 
 Dev nodes are projects at the edge of the dependency graph that nothing user-facing depends on — test infrastructure, conformance suites, dev tooling, and internal utilities consumed only during development. Dev nodes cannot be released:
@@ -300,7 +302,7 @@ Fourteen checks run under `rlsbl check --tag workspace`, covering CI configurati
 | Check | Severity | Description |
 | ----- | -------- | ----------- |
 | `workspace-ci-router` | error | Validates the CI router workflow dispatches to all registered projects |
-| `workspace-ci-synced` | error | Verifies per-project workflows in `.github/workflows/` match their scaffolded source |
+| `workspace-ci-synced` | error | Verifies each in-scope project's CI jobs are inlined into the shared `ci-router.yml` |
 | `workspace-targets` | error | Every project must have at least one detectable release target |
 | `workspace-unregistered` | error | Detects project directories with manifests that are not in workspace.toml |
 | `workspace-stale-entries` | error | Detects workspace.toml entries pointing to non-existent directories |
