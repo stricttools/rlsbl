@@ -2,6 +2,65 @@
 
 # Changelog
 
+## 0.104.0
+
+Mandatory npm provenance declaration with a preflight visibility guard, plus monorepo release-correctness fixes: structured-target scaffold config, loud scaffold-commit failures, virtual-workspace-root check skipping, releasable-aware orphan detection, mode-aware CI-sync check, two-level lint config, and per-releasable status rows.
+
+<details>
+<summary>Context</summary>
+
+This release bundles Phases 4, 5, and 6.
+
+Phase 6 (npm provenance) makes the npm publish pipeline's provenance behaviour
+explicit and safe. npm build-provenance attestations require a PUBLIC GitHub
+source repository and GitHub Actions OIDC, so:
+- npm-type pipelines now require an explicit boolean `provenance` key in
+  `.rlsbl/config.json` (no implicit default -- the correct value depends on
+  repository visibility). This is a breaking config change for existing npm
+  pipelines; add `"provenance": true` for public repos or `false` for private.
+- The scaffolded publish workflow (npm/pnpm/yarn variants) emits `--provenance`
+  only when the pipeline declares it, via a namespaced `{{#if npm.provenance}}`
+  template conditional. `--access public` stays hardcoded on purpose (scoped
+  packages are forbidden in this ecosystem; unscoped public packages require
+  it). The yarn variant, which was previously missing provenance entirely, is
+  now consistent with the others.
+- A pre-mutation preflight guard probes repository visibility via
+  `gh repo view --json isPrivate` when (and only when) an npm pipeline requests
+  provenance, and aborts on a private or non-GitHub repo with the three ways
+  out spelled out. No network call happens when provenance is not requested.
+- Local (non-CI) npm publishes never pass `--provenance`, since OIDC
+  build-provenance is impossible outside GitHub Actions.
+
+Phases 4 and 5 are the monorepo release-correctness fixes already landed on
+main: scaffold no longer downgrades structured publish targets, scaffold-commit
+failures are now loud, virtual uv workspace roots skip inapplicable
+package/publish checks, changelog orphan detection respects a releasable's
+custom tag format, the workspace-ci-synced check validates the inlined
+ci-router.yml, releasable members can share a single releasable-level lint
+config, and `rlsbl monorepo status` shows one row per releasable with its real
+tag, version, coverage, and members.
+
+</details>
+
+### Breaking
+
+- **npm pipelines now require an explicit `provenance` boolean.** The npm publish workflow emits `--provenance` only when `provenance: true`, a pre-release guard blocks `provenance: true` on private or non-GitHub repositories, and local publishes never attest provenance. Add `"provenance": true` (public repos) or `false` (private) to each npm pipeline in `.rlsbl/config.json`.
+
+### Features
+
+- **Releasable member packages can now share a single lint config at the releasable level.** `library-lint` reads `.rlsbl-monorepo/releasables/<name>/lint/<language>.toml` when a member has no lint override of its own, and `rlsbl monorepo cleanup` removes a member's `.rlsbl/lint/` only when it is byte-identical to that shared config -- a genuine per-member override is preserved.
+
+### Fixes
+
+- **Release init now fails loudly when it cannot commit the scaffolded release file.** A failed auto-commit is no longer silently swallowed, which previously left an uncommitted release file that could block later releases.
+- **`rlsbl monorepo release init` now reports an actionable error for a releasable whose config has an empty `targets` list.** The banned empty-targets config surfaces a clear remedy (remove the key or set `private: true`) instead of a confusing no-eligible-releasables error.
+- **`rlsbl init` no longer downgrades structured target entries to plain strings.** Registering a target preserves existing entries such as `{"name": "go", "path": "go/"}`, keeping subdirectory paths intact.
+- **`rlsbl changelog edit --id` now prints a clean error when no entry matches** instead of crashing with an internal error.
+- **Virtual uv workspace roots no longer report spurious check failures.** A `pyproject.toml` with `[tool.uv.workspace]` but no `[project]` table is recognized as a non-package root: version, name, config-schema, and publish-workflow checks now skip with a clear reason instead of failing on a missing version or `private` key.
+- **Changelog orphan detection no longer raises false positives for releasables with a custom tag format.** A changelog entry whose commit is within the releasable's own tag range is no longer flagged as a stale orphan because of an unrelated `v*` tag elsewhere in the repo.
+- **The `workspace-ci-synced` check now validates the inlined `ci-router.yml` instead of looking for per-project `{name}-ci.yml` files.** Monorepos synced with the current inline router no longer report spurious missing-workflow failures; a project is verified present by its inlined router jobs.
+- **`rlsbl monorepo status` now shows one row per releasable with the releasable's real tag, version, changelog coverage, and member list.** Releasable members previously showed Tag `(none)` because the tag glob was derived per-member instead of from the releasable's tag format.
+
 ## 0.103.2
 
 Fix release-edit CHANGELOG.md lookup for explicit-mode releasables and carry the package prefix on amended releasable changelog entries.
