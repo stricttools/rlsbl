@@ -1404,6 +1404,8 @@ def run_cmd(registry, args, flags, ctx):
         vars_dict = reg.template_vars(".", ctx)
         from datetime import datetime
         vars_dict["year"] = str(datetime.now().year)
+        # npm publish provenance flag, derived from the npm pipeline config.
+        vars_dict["provenance"] = _npm_provenance_var(ctx.config)
 
         # Publish gate: publish workflows wait for this repo's CI check
         # runs on the release commit. The filter covers every scaffolded
@@ -1905,6 +1907,25 @@ def _rewrite_action_paths_for_jobs(jobs, project_path):
                             with_block[version_key] = f"{project_path}/{val}"
 
 
+def _npm_provenance_var(config):
+    """Return the ``provenance`` template-var value from the npm pipeline config.
+
+    The ``{{#if provenance}}`` blocks in the npm publish templates treat any
+    non-empty string as truthy, so this returns ``"true"`` when an npm pipeline
+    enables provenance and ``""`` (falsy) otherwise. Config validation
+    guarantees npm pipelines carry a boolean ``provenance`` key, so a missing
+    value here means there is simply no npm pipeline.
+    """
+    pipelines = (config or {}).get("pipelines") or {}
+    if not isinstance(pipelines, dict):
+        return ""
+    for entry in pipelines.values():
+        if isinstance(entry, dict) and entry.get("type") == "npm":
+            if entry.get("provenance") is True:
+                return "true"
+    return ""
+
+
 def _overlay_target_vars(merged_vars, target_name):
     """Promote namespaced ``{target_name}.{key}`` entries to bare ``{key}``.
 
@@ -2079,6 +2100,8 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         vars_dict = _merge_template_vars(registries_list, primary, target_paths, ctx)
         from datetime import datetime
         vars_dict["year"] = str(datetime.now().year)
+        # npm publish provenance flag, derived from the npm pipeline config.
+        vars_dict["provenance"] = _npm_provenance_var(ctx.config)
 
         force = flags.get("force", False)
 

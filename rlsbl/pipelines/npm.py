@@ -56,7 +56,9 @@ class NpmPipeline(TokenPipeline):
 
     def _publish_command(self, dir_path: str, version: str, token: str) -> None:
         try:
-            args = ["publish", "--provenance", "--access", "public"]
+            # No --provenance: npm OIDC build-provenance attestation requires
+            # a GitHub Actions runner and is impossible for a local publish.
+            args = ["publish", "--access", "public"]
             # For pre-release versions, add --tag with the preid so npm
             # doesn't update the "latest" dist-tag.
             if "-" in version:

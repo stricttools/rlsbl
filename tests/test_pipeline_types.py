@@ -143,7 +143,20 @@ class TestNpmPipeline:
         p = NpmPipeline(name="npm", pipeline_type="npm", local=True, config={})
         p.publish(".", "1.0.0", None)
         assert len(calls) == 1
-        assert calls[0] == ("npm", ["publish", "--provenance", "--access", "public"])
+        # Local publish never uses --provenance: OIDC build-provenance
+        # attestation is only possible inside GitHub Actions, never locally.
+        assert calls[0] == ("npm", ["publish", "--access", "public"])
+
+    def test_local_publish_omits_provenance(self, monkeypatch):
+        calls = []
+        monkeypatch.setenv("NPM_TOKEN", "tok123")
+        monkeypatch.setattr(
+            "rlsbl.pipelines.npm.run",
+            lambda cmd, args, **kw: calls.append((cmd, args)),
+        )
+        p = NpmPipeline(name="npm", pipeline_type="npm", local=True, config={})
+        p.publish(".", "2.3.4-beta.1", None)
+        assert "--provenance" not in calls[0][1]
 
     def test_custom_token_var(self):
         p = NpmPipeline(name="npm", pipeline_type="npm", local=True,

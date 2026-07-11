@@ -53,7 +53,10 @@ jobs:
           else
             echo "tag=" >> "$GITHUB_OUTPUT"
           fi
-      - run: npm publish --provenance --access public ${{ steps.dist-tag.outputs.tag }}
+      # --access public is hardcoded on purpose: scoped packages are forbidden
+      # in this ecosystem, and unscoped public packages require --access public.
+      # --provenance is toggled by the pipeline's `provenance` config key.
+      - run: npm publish {{#if provenance}}--provenance {{/if}}--access public ${{ steps.dist-tag.outputs.tag }}
         if: steps.check-npm.outputs.skip != 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

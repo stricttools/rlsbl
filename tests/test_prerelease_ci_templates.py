@@ -46,7 +46,7 @@ class TestNpmPublishDistTag:
 
     def test_publish_command_includes_tag(self):
         content = _read_template(NPM_TEMPLATE_DIR, "publish.yml.tpl")
-        assert "npm publish --provenance --access public ${{ steps.dist-tag.outputs.tag }}" in content
+        assert "npm publish {{#if provenance}}--provenance {{/if}}--access public ${{ steps.dist-tag.outputs.tag }}" in content
 
     def test_dist_tag_step_before_publish(self):
         content = _read_template(NPM_TEMPLATE_DIR, "publish.yml.tpl")
@@ -77,7 +77,7 @@ class TestPnpmPublishDistTag:
 
     def test_publish_command_includes_tag(self):
         content = _read_template(NPM_TEMPLATE_DIR, "publish-pnpm.yml.tpl")
-        assert "pnpm publish --provenance --access public ${{ steps.dist-tag.outputs.tag }}" in content
+        assert "pnpm publish {{#if provenance}}--provenance {{/if}}--access public ${{ steps.dist-tag.outputs.tag }}" in content
 
     def test_dist_tag_step_before_publish(self):
         content = _read_template(NPM_TEMPLATE_DIR, "publish-pnpm.yml.tpl")
@@ -108,7 +108,7 @@ class TestYarnPublishDistTag:
 
     def test_publish_command_includes_tag(self):
         content = _read_template(NPM_TEMPLATE_DIR, "publish-yarn.yml.tpl")
-        assert "yarn npm publish --access public ${{ steps.dist-tag.outputs.tag }}" in content
+        assert "yarn npm publish {{#if provenance}}--provenance {{/if}}--access public ${{ steps.dist-tag.outputs.tag }}" in content
 
     def test_dist_tag_step_before_publish(self):
         content = _read_template(NPM_TEMPLATE_DIR, "publish-yarn.yml.tpl")
@@ -204,3 +204,52 @@ class TestDistTagShellLogic:
     def test_high_counter(self):
         output = _run_dist_tag_script("1.0.0-beta.15")
         assert output == "tag=--tag beta"
+
+
+# ---------------------------------------------------------------------------
+# npm provenance conditional -- rendered output per provenance value
+# ---------------------------------------------------------------------------
+
+
+class TestNpmProvenanceRendering:
+    """The {{#if provenance}} block renders --provenance only when enabled.
+
+    Covers all three package-manager variants (npm/pnpm/yarn) for both the
+    truthy ("true") and falsy ("") provenance template-var values.
+    """
+
+    _VARIANTS = [
+        ("publish.yml.tpl", "npm publish"),
+        ("publish-pnpm.yml.tpl", "pnpm publish"),
+        ("publish-yarn.yml.tpl", "yarn npm publish"),
+    ]
+
+    @staticmethod
+    def _render(template_name, provenance_value):
+        from rlsbl.commands.init_cmd import process_template
+
+        raw = _read_template(NPM_TEMPLATE_DIR, template_name)
+        content, _ = process_template(raw, {"provenance": provenance_value})
+        return content
+
+    @pytest.mark.parametrize("template_name,publish_cmd", _VARIANTS)
+    def test_provenance_true_emits_flag(self, template_name, publish_cmd):
+        rendered = self._render(template_name, "true")
+        assert f"{publish_cmd} --provenance --access public" in rendered
+
+    @pytest.mark.parametrize("template_name,publish_cmd", _VARIANTS)
+    def test_provenance_false_omits_flag(self, template_name, publish_cmd):
+        rendered = self._render(template_name, "")
+        assert f"{publish_cmd} --access public" in rendered
+        # The publish command line itself must not carry --provenance.
+        run_line = next(
+            line for line in rendered.splitlines()
+            if line.lstrip().startswith(f"- run: {publish_cmd}")
+        )
+        assert "--provenance" not in run_line
+
+    @pytest.mark.parametrize("template_name,publish_cmd", _VARIANTS)
+    def test_access_public_always_present(self, template_name, publish_cmd):
+        for value in ("true", ""):
+            rendered = self._render(template_name, value)
+            assert "--access public" in rendered
