@@ -56,6 +56,7 @@ from .validate import (
     parse_porcelain_paths,
     _run_selfdoc_gen, _run_selfdoc_check, _abort_on_scaffold_conflicts,
     _abort_on_cross_repo_sources, _abort_on_version_skew,
+    _abort_on_npm_provenance,
     _run_strictcli_schema_dump, validate_blog_body,
     ReleaseValidationError, HookError, _SCHEMA_DUMP_TIMEOUT,
     validate_release_targets, validate_ota_mode, validate_config_integrity,
@@ -467,6 +468,9 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     # context is available). In releasable mode, validates each non-private
     # publishing member's pipeline config; in standalone/implicit mode,
     # validates the representative's config.
+    # Configs to scan for the npm provenance guard (below). Collected here so
+    # the releasable member contexts are not resolved twice.
+    _provenance_scan_configs = []
     if member_package_paths is not None and monorepo_root and _rel_cfg_dir:
         from ...member_context import resolve_member_context as _rmc
         for _mp in member_package_paths:
@@ -479,8 +483,10 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             _m_pipelines = _m_ctx.config.get("pipelines")
             if _m_pipelines is not None:
                 validate_pipeline_config(_m_ctx.config)
+                _provenance_scan_configs.append(_m_ctx.config)
     else:
         validate_pipeline_config(config)
+        _provenance_scan_configs.append(config)
 
     project_dir = str(project_root)
 
@@ -500,6 +506,11 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         project_dir,
         workspace_root=str(monorepo_root) if monorepo_root else None,
     )
+
+    # npm provenance guard: an npm pipeline with provenance=true requires a
+    # public GitHub repo. Probes repo visibility only when provenance is
+    # requested (pre-mutation). gh_config drives GH_REPO resolution.
+    _abort_on_npm_provenance(_provenance_scan_configs, gh_config=config)
 
     # Resolve target paths (with releasable-level inheritance in explicit
     # mode, so releasable config "targets" drives primary path resolution)

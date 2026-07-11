@@ -11,6 +11,7 @@ import sys
 import tempfile
 
 from ...strictcli_detect import detect_strictcli
+from ...utils import run_gh
 
 
 class ReleaseValidationError(Exception):
@@ -933,6 +934,78 @@ def _abort_on_version_skew(project_dir, *, workspace_root=None):
                 f"release the dependency first: {pkg} local {local_version} "
                 f"> registry {registry_version}"
             )
+
+
+def _npm_provenance_requested(configs):
+    """Return True if any config in *configs* has an npm pipeline with
+    ``provenance: true``.
+
+    Config validation guarantees npm pipelines carry a boolean ``provenance``
+    key, so this reads it directly. *configs* is an iterable of project/member
+    config dicts.
+    """
+    for config in configs:
+        pipelines = (config or {}).get("pipelines") or {}
+        if not isinstance(pipelines, dict):
+            continue
+        for entry in pipelines.values():
+            if (
+                isinstance(entry, dict)
+                and entry.get("type") == "npm"
+                and entry.get("provenance") is True
+            ):
+                return True
+    return False
+
+
+def _abort_on_npm_provenance(configs, *, gh_config):
+    """Abort the release if an npm pipeline requests provenance on a repo
+    that cannot support it.
+
+    npm build-provenance attestations (``npm publish --provenance``) require a
+    PUBLIC GitHub source repository and GitHub Actions OIDC. When any config in
+    *configs* declares an npm pipeline with ``provenance: true``, this probes
+    the repository visibility via ``gh repo view --json isPrivate`` (using
+    *gh_config* for GH_REPO resolution) and aborts when the repo is private or
+    when visibility cannot be resolved (e.g. a non-GitHub remote).
+
+    When no npm pipeline requests provenance, NO network call is made at all.
+
+    Runs PRE-MUTATION: nothing has been modified yet when this aborts.
+    """
+    if not _npm_provenance_requested(configs):
+        return
+
+    try:
+        out = run_gh(["repo", "view", "--json", "isPrivate"], gh_config)
+        data = json.loads(out)
+        is_private = data["isPrivate"]
+    except Exception as exc:
+        raise ReleaseValidationError(
+            "npm provenance check: could not determine repository visibility "
+            f"via 'gh repo view --json isPrivate' ({exc}). npm build-provenance "
+            "requires a public GitHub source repository. If this repository is "
+            "not hosted on GitHub, set \"provenance\": false in the npm "
+            "pipeline config -- provenance is impossible off GitHub Actions."
+        ) from exc
+
+    if not isinstance(is_private, bool):
+        raise ReleaseValidationError(
+            "npm provenance check: 'gh repo view --json isPrivate' returned an "
+            f"unexpected isPrivate value ({is_private!r}). npm build-provenance "
+            "requires a public GitHub source repository; set \"provenance\": "
+            "false in the npm pipeline config for non-GitHub hosts."
+        )
+
+    if is_private:
+        raise ReleaseValidationError(
+            "npm provenance check: the npm pipeline declares \"provenance\": "
+            "true, but this repository is PRIVATE. npm build-provenance "
+            "requires a public source repository. Three ways forward: "
+            "(1) make the repository public; "
+            "(2) set \"provenance\": false in the npm pipeline config; or "
+            "(3) drop the npm pipeline from .rlsbl/config.json."
+        )
 
 
 def _schema_dump_command(entry_point: str, lang: str) -> list[str]:
