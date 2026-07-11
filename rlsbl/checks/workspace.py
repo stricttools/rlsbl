@@ -50,7 +50,7 @@ def register_workspace_checks(app):
         upstream by the ``workspace:non_dev_node`` scope.
         """
         from ..targets import detect_targets, TARGETS, resolve_releasable_config_dir
-        from ..commands.monorepo.publish_inline import _router_ci_job_keys
+        from ..ci_router import _router_ci_job_keys
         from ruamel.yaml import YAML
 
         # First pass: determine which in-scope projects require inlining,

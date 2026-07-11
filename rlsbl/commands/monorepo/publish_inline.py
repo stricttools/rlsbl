@@ -235,24 +235,9 @@ def transform_project_jobs(
 # ---------------------------------------------------------------------------
 
 
-def _router_ci_job_keys(project) -> list[str]:
-    """Return the CI router's job keys for *project*.
-
-    Mirrors ``sync._generate_router``: every CI file uses the file name
-    minus ``.yml`` as its job key. Reusable-workflow check runs are named
-    ``<job key> / <ci job name>``, which is what the shared gate matches.
-    """
-    name = project["name"]
-    ci_files = project.get("_ci_files") if isinstance(project, dict) else None
-    if not ci_files:
-        ci_files = [f"{name}-ci.yml"]
-    return [ci_file.removesuffix(".yml") for ci_file in ci_files]
-
-
-def _router_ci_check_regex(project) -> str:
-    """Regex matching *project*'s prefixed CI check-run names."""
-    alternation = "|".join(re.escape(k) for k in _router_ci_job_keys(project))
-    return f"^({alternation}) / "
+# CI-router job-key helpers live in the low-level rlsbl.ci_router module so the
+# check layer can share them without importing from the command layer.
+from ...ci_router import _router_ci_check_regex  # noqa: E402
 
 
 def generate_inline_publish_router(projects_with_publish: list, root: str, releasables=None) -> str:
