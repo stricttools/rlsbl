@@ -230,13 +230,44 @@ def detect_targets(dir_path=".", releasable_config_dir=None):
     )
 
 
+def read_releasable_targets(rel_config_path):
+    """Read the ``targets`` list from a releasable config, enforcing the ban.
+
+    Returns:
+    - the declared list, when the config has a non-empty ``targets`` list;
+    - ``None``, when the ``targets`` key is absent (callers fall through to
+      member-level detection -- backward compat for releasables that haven't
+      declared targets yet).
+
+    Raises ``ConfigError`` when ``targets`` is an explicitly empty list --
+    the same ban that ``validate_config_schema`` enforces.  This keeps the
+    two releasable target-resolution paths (``collect_releasable_targets``
+    used by release init, and ``validate_release_targets`` used by release
+    run) behaving identically on the banned config, instead of one
+    short-circuiting to ``[]`` while the other silently falls through.
+    """
+    rel_config = read_json_config(rel_config_path)
+    rel_targets = rel_config.get("targets")
+    if rel_targets is None or not isinstance(rel_targets, list):
+        return None
+    if not rel_targets:
+        raise ConfigError(
+            f'targets is an empty list in {rel_config_path}. '
+            'Remove the "targets" key entirely, or set "private": true '
+            'to suppress publishing.'
+        )
+    return rel_targets
+
+
 def collect_releasable_targets(releasable_name, member_projects, workspace_root):
     """Collect targets for a releasable, preferring the releasable config.
 
-    If the releasable's config.json has a ``targets`` key, returns those
-    directly (the releasable is the source of truth for targets in explicit
-    mode).  Falls back to unioning member-level detected targets for
-    backward compatibility with releasables that haven't set targets yet.
+    If the releasable's config.json has a non-empty ``targets`` key, returns
+    those directly (the releasable is the source of truth for targets in
+    explicit mode).  An explicitly empty ``targets`` list is banned and raises
+    ``ConfigError`` (see ``read_releasable_targets``).  When the key is absent,
+    falls back to unioning member-level detected targets for backward
+    compatibility with releasables that haven't set targets yet.
 
     Returns a deduplicated list of target names.
     """
@@ -245,9 +276,8 @@ def collect_releasable_targets(releasable_name, member_projects, workspace_root)
         workspace_root, ".rlsbl-monorepo", "releasables",
         releasable_name, "config.json",
     )
-    rel_config = read_json_config(rel_config_path)
-    rel_targets = rel_config.get("targets")
-    if rel_targets is not None and isinstance(rel_targets, list):
+    rel_targets = read_releasable_targets(rel_config_path)
+    if rel_targets is not None:
         return list(rel_targets)
 
     # Fallback: union member-level targets (backward compat)

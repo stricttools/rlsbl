@@ -107,22 +107,35 @@ def register_workspace_checks(app):
                 missing.append(proj["name"])
 
         # Verify union of targets per releasable is non-empty
+        from ..errors import ConfigError
+
         missing_releasables = []
+        banned_releasables = []  # (name, error message) for banned targets: []
         for rel in ctx.releasables:
             member_projs = members_of(rel.name, ctx.projects)
-            target_names = collect_releasable_targets(rel.name, member_projs, str(ctx.workspace_root))
+            try:
+                target_names = collect_releasable_targets(rel.name, member_projs, str(ctx.workspace_root))
+            except ConfigError as e:
+                banned_releasables.append((rel.name, str(e)))
+                continue
             if not target_names:
                 missing_releasables.append(rel.name)
 
         details = [f"{n}: no release target found" for n in missing]
         details += [f"releasable '{r}': no targets across any member" for r in missing_releasables]
+        details += [f"releasable '{r}': {msg}" for r, msg in banned_releasables]
 
-        if missing or missing_releasables:
+        if missing or missing_releasables or banned_releasables:
             parts = []
             if missing:
                 parts.append(f"no targets detected: {', '.join(missing)}")
             if missing_releasables:
                 parts.append(f"releasable(s) with no targets: {', '.join(missing_releasables)}")
+            if banned_releasables:
+                parts.append(
+                    f"releasable(s) with banned empty targets: "
+                    f"{', '.join(n for n, _ in banned_releasables)}"
+                )
             return CheckResult("fail", "; ".join(parts), details=details)
 
         skipped = len(ctx.projects) - len(checkable)

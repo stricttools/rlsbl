@@ -45,7 +45,7 @@ def validate_release_targets(release_config, project_root, *,
     Raises ReleaseValidationError on failure.
     """
     from . import TARGETS, detect_targets
-    from ...config import read_json_config
+    from ...targets import read_releasable_targets
 
     if not release_config.include:
         raise ReleaseValidationError(
@@ -66,9 +66,8 @@ def validate_release_targets(release_config, project_root, *,
         detected = set()
         if releasable_config_dir is not None:
             rel_config_path = os.path.join(str(releasable_config_dir), "config.json")
-            rel_config = read_json_config(rel_config_path)
-            rel_targets = rel_config.get("targets")
-            if rel_targets is not None and isinstance(rel_targets, list):
+            rel_targets = read_releasable_targets(rel_config_path)
+            if rel_targets is not None:
                 detected = set(rel_targets)
         if not detected:
             for d in member_dirs:

@@ -115,3 +115,74 @@ class TestCollectReleasableTargetsReadsReleasableConfig:
         assert "pypi" in target_names, (
             f"Expected 'pypi' from releasable config, got: {target_names}"
         )
+
+
+class TestReleasableEmptyTargetsIsBanned:
+    """An explicitly empty ``targets`` list in a RELEASABLE config is banned and
+    surfaces as a hard error in BOTH target-resolution paths
+    (collect_releasable_targets used by release init, validate_release_targets
+    used by release run), consistent with validate_config_schema. An absent
+    ``targets`` key still falls through to member detection -- only the empty
+    list is banned."""
+
+    def _make_releasable(self, tmp_path, targets_value):
+        rel_dir = os.path.join(
+            str(tmp_path), ".rlsbl-monorepo", "releasables", "core"
+        )
+        os.makedirs(rel_dir, exist_ok=True)
+        with open(os.path.join(rel_dir, "config.json"), "w") as f:
+            json.dump({"targets": targets_value}, f)
+        return rel_dir
+
+    def test_collect_hard_errors_on_empty(self, tmp_path):
+        from rlsbl.errors import ConfigError
+        from rlsbl.targets import collect_releasable_targets
+
+        self._make_releasable(tmp_path, [])
+        member_projects = [{"path": "pkg-a", "name": "pkg-a", "releasable": "core"}]
+        (tmp_path / "pkg-a").mkdir()
+
+        with pytest.raises(ConfigError, match="empty list"):
+            collect_releasable_targets("core", member_projects, str(tmp_path))
+
+    def test_validate_hard_errors_on_empty(self, tmp_path):
+        from rlsbl.errors import ConfigError
+        from rlsbl.commands.release.validate import validate_release_targets
+        from rlsbl.release_file import ReleaseConfig
+
+        rel_dir = self._make_releasable(tmp_path, [])
+        member_a = tmp_path / "pkg-a"
+        member_a.mkdir()
+        (member_a / "pyproject.toml").write_text(
+            '[project]\nname = "pkg-a"\nversion = "0.1.0"\n'
+        )
+
+        config = ReleaseConfig(bump="patch", include=["pypi"], exclude=[])
+        with pytest.raises(ConfigError, match="empty list"):
+            validate_release_targets(
+                config, tmp_path,
+                member_dirs=[str(member_a)],
+                releasable_config_dir=str(rel_dir),
+            )
+
+    def test_absent_targets_key_still_falls_through(self, tmp_path):
+        """A releasable config WITHOUT a targets key falls through to member
+        detection (not banned) in both paths."""
+        from rlsbl.targets import collect_releasable_targets
+
+        rel_dir = os.path.join(
+            str(tmp_path), ".rlsbl-monorepo", "releasables", "core"
+        )
+        os.makedirs(rel_dir, exist_ok=True)
+        with open(os.path.join(rel_dir, "config.json"), "w") as f:
+            json.dump({"private": True}, f)  # no targets key
+
+        member_a = tmp_path / "pkg-a"
+        member_a.mkdir()
+        (member_a / "pyproject.toml").write_text(
+            '[project]\nname = "pkg-a"\nversion = "0.1.0"\n'
+        )
+        member_projects = [{"path": "pkg-a", "name": "pkg-a", "releasable": "core"}]
+
+        names = collect_releasable_targets("core", member_projects, str(tmp_path))
+        assert names == ["pypi"], f"expected member fallthrough to ['pypi'], got {names}"
