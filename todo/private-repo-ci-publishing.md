@@ -1,37 +1,39 @@
-# Private source repos with CI-automatic public binary-wrapper publishing
+# Private source repos publishing public binary wrappers: fix the misleading `private` semantics and close the remaining gaps
 
-## Context
+## Correction notice (this todo was updated in place)
 
-A project shape rlsbl does not currently model: source code in a PRIVATE GitHub repo, but the compiled binary published to public registries (npm, PyPI) as wrapper packages with the binary EMBEDDED (install-time download from a private repo's releases is impossible for end users). Publishing must be fully CI-automatic and scaffold-generated — nothing hand-maintained, nothing published from a local machine — i.e., exactly the standard rlsbl publish.yml flow, just from a private repo shipping binaries only.
+The original version of this todo claimed the shape "private GitHub repo + CI-automatic public registry publishing" is unsupported. That premise is WRONG: a project in the fleet already does exactly this today — its GitHub repo is private while its `.rlsbl/config.json` says `"private": false`, and its scaffold-generated publish.yml (npm + PyPI, release-triggered, CI-gated, no `--provenance`) has published successfully to both registries. Verified: the `private-publish-workflow` check passes because it reads only the config key (`rlsbl/checks/project.py:539-540`), and nothing anywhere compares the config key to actual GitHub visibility after init.
 
-## Problem: `private` is one boolean carrying two meanings
+So the shape works. What remains are real but smaller issues:
 
-`private: true` currently means both "source repo is private" AND "publish nothing to public registries":
+## Problem 1: the `private` key's name actively misleads
 
-- Scaffold skips publish.yml generation entirely for private projects (`rlsbl/commands/init_cmd.py:1436` single-target guard, `:2163` multi-target guard; `_resolve_private` at `:1237-1253` resolves the single boolean; no second axis exists).
-- The `private-publish-workflow` check (`rlsbl/checks/project.py:531-568`) hard-fails when a private repo contains ANY workflow whose filename contains "publish" or whose content triggers on release-published — so even hand-adding a workflow is blocked at release time.
-- Schema/docs bake in the conflation ("private == suppress publishing": `rlsbl/config.py:187,205`, `rlsbl/targets/__init__.py:256`), and `_print_private_summary` steers private repos to local asset upload.
-- Aligned detail worth keeping: `validate_private_config` (`rlsbl/commands/release/validate.py:144-152`) already forbids `local: true` publishing pipelines for private repos — local publishing should stay forbidden; the missing third state is "CI may publish binary artifacts."
+`private` semantically means "suppress publishing," but it reads as "repo is private on GitHub," and `_resolve_private` (`rlsbl/commands/init_cmd.py:1237-1253`) seeds it from the GitHub API at init — so a private repo that WANTS to publish gets `private: true` scaffolded automatically and publish.yml silently skipped (`init_cmd.py:1436`, `:2163`). The operator must then know to counterintuitively flip the key to `false` on a repo that is, in fact, private. Schema texts reinforce the conflation (`rlsbl/config.py:187,205`, `rlsbl/targets/__init__.py:256`, `_print_private_summary` at `init_cmd.py:1283-1287`).
 
-## Secondary blockers found in the same investigation
+Fix options:
+1. **Rename the key to what it means** (e.g. `suppress_publishing` or `publish: false`), with config migration and updated auto-detect messaging ("repo is private on GitHub; defaulting publish to off — set publish=true to ship binary artifacts from CI"). Most correct.
+2. Keep the key, but make init's auto-detect interactive/explicit for private repos (mandatory choice: "private repo: publish nothing / publish binaries from CI") per the mandatory-flags-over-defaults philosophy, and fix the schema/docs wording.
 
-1. **npm `--provenance` fails on private repos.** The pure-npm publish templates hardcode it (`rlsbl/templates/npm/publish.yml.tpl:56`, `publish-pnpm.yml.tpl:57`, `rlsbl/pipelines/npm.py:59`). The Go-to-npm wrapper jobs already omit it (`rlsbl/npm_wrapper.py:142,176`), so only the standalone npm path needs the flag made conditional on repo visibility.
-2. **No PyPI embedded-binary wrapper exists.** Templates today: `shared/npm-wrapper/` (embeds binaries in per-platform packages — private-safe, staged in CI via `gh release download` from the repo's own release, `npm_wrapper.py:160-162`) and `shared/crates-wrapper/` (build-time download — NOT private-safe for end users). The only PyPI template (`templates/pypi/publish.yml.tpl`) builds a pure-Python package. Missing: per-platform wheels carrying the binary, built in CI, published via Trusted Publishing (which works from private repos), wired as `{{pypiPublishJobs}}` into `targets/go.py` / `templates/go/publish.yml.tpl` analogous to the npm jobs.
-3. **Single-package npm wrapper variant.** The existing npm wrapper model publishes per-platform packages via optionalDependencies — which requires claiming N additional registry names. Some projects decline extra name claims on principle. Needed: a single-package variant under the ONE existing name with the binary embedded directly (initially one platform with `os`/`cpu` fields failing loudly elsewhere; multi-platform later means a fat tarball carrying all binaries with a runtime platform/arch selector shim — the only single-name mechanism npm offers, since tarball selection per platform requires separate packages). The scaffold should let a project choose per-platform or single-package explicitly (mandatory choice, no default, per the agent-experience philosophy).
+Either way, the goal is that "private source, public binary artifacts" is a first-class declared choice, not a knowingly-mislabeled boolean.
 
-## Proposed solution sketch
+## Problem 2: `--provenance` inconsistency in npm templates
 
-1. Split the axis: new explicit config key (e.g. `publish_when_private: true`, mandatory-absent default = current behavior) threaded through the scaffold guards, the `private-publish-workflow` check (allow scaffold-generated publish workflows when set), and validation/summary messaging. Keep forbidding local publish pipelines for private repos.
-2. Make `--provenance` conditional on repo visibility everywhere it is emitted.
-3. Add the PyPI embedded-binary wrapper codegen (per-platform wheels with correct platform tags, CI-built, Trusted Publishing).
-4. Add the single-package npm wrapper variant (explicit choice between per-platform and single-package shapes).
+`rlsbl/templates/npm/publish.yml.tpl:56`, `templates/npm/publish-pnpm.yml.tpl:57`, and `rlsbl/pipelines/npm.py:59` hardcode `npm publish --provenance`, which fails on private repos. Yet the fleet project's generated publish.yml has NO provenance flag, and the Go-to-npm wrapper jobs omit it too (`rlsbl/npm_wrapper.py:142,176`). Reconcile: determine which generation path drops it, then make provenance conditional (config-declared or visibility-derived) so the pure-npm path cannot generate a workflow that fails on private repos.
 
-Version flow (tag-derived in CI) and secret wiring need no changes — verified working for private repos except the provenance flag.
+## Problem 3: no embedded-binary PyPI wrapper codegen
+
+Existing wrapper codegen: `templates/shared/npm-wrapper/` (per-platform packages, binaries embedded in the package tarballs, staged in CI via `gh release download` — private-safe) and `templates/shared/crates-wrapper/` (build-time download at the END USER's machine — not private-safe). For PyPI there is only the pure-Python template (`templates/pypi/publish.yml.tpl`). Missing: per-platform wheels carrying the binary, built in CI (staged from the repo's own release like the npm wrapper does), published via Trusted Publishing, wired as publish jobs analogous to `build_npm_publish_jobs` (`rlsbl/npm_wrapper.py:98,150`, `rlsbl/targets/go.py:268-275,304`).
+
+Note: subdirectory wrapper targets already work via explicit target `path` entries (e.g. `{"name": "pypi", "path": "pypi/"}`), so a project-side wrapper in a subdir is viable today; this item is about scaffold-generated codegen for the EMBEDDED-wheel shape specifically (the generated pypi job must arrange for the binary to be present before the wheel build — currently no template does that).
+
+## Problem 4: single-package npm wrapper variant
+
+The npm wrapper codegen publishes per-platform packages via optionalDependencies, which requires claiming N extra registry names. Some projects decline extra name claims. Wanted: a single-package variant under the one existing name (single platform with `os`/`cpu` fields initially; multi-platform later = fat tarball with a runtime platform selector shim). Scaffold should make per-platform vs single-package an explicit mandatory choice.
 
 ## Affected files
 
-`rlsbl/commands/init_cmd.py`, `rlsbl/checks/project.py`, `rlsbl/commands/release/validate.py`, `rlsbl/config.py`, `rlsbl/targets/__init__.py`, `rlsbl/targets/go.py`, `rlsbl/npm_wrapper.py`, `rlsbl/pipelines/npm.py`, `rlsbl/templates/npm/*.tpl`, new `rlsbl/templates/shared/pypi-wrapper/` (or equivalent), `rlsbl/templates/go/publish.yml.tpl`, docs.
+`rlsbl/commands/init_cmd.py`, `rlsbl/checks/project.py`, `rlsbl/config.py`, `rlsbl/targets/__init__.py`, `rlsbl/targets/go.py`, `rlsbl/npm_wrapper.py`, `rlsbl/pipelines/npm.py`, `rlsbl/templates/npm/*.tpl`, new PyPI wrapper templates, docs.
 
 ## Effort estimate
 
-Medium-large. Item 1 is small-medium (threading one key through three gates plus messaging). Item 2 is small. Item 3 is the largest (new wheel-building codegen + CI jobs + tests). Item 4 is small-medium (template variant + scaffold choice). Independently landable in that order; item 1 alone unblocks the shape with hand-written-but-check-approved workflows as an interim, though the goal is full scaffold generation.
+Problem 1: small-medium (rename/migration or interactive init + docs). Problem 2: small. Problem 3: medium-large (the substantial new piece). Problem 4: small-medium. Independently landable; 1 and 2 first — they fix the misleading semantics the whole confusion stemmed from.
