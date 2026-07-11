@@ -288,6 +288,28 @@ def validate_pipelines_config(config):
                 f"pipeline '{name}'.local must be a boolean, got {type(entry['local']).__name__}"
             )
 
+        # npm pipelines must declare provenance explicitly (boolean). npm
+        # build-provenance attestations are signed via GitHub Actions OIDC and
+        # require a PUBLIC source repository; there is no default because the
+        # correct value depends on repo visibility.
+        if ptype == "npm":
+            if "provenance" not in entry:
+                raise ConfigError(
+                    f"pipeline '{name}' (type npm) is missing required key "
+                    "'provenance'. Set it based on repository visibility: "
+                    '"provenance": true for a PUBLIC repo (npm records a signed '
+                    "build-provenance attestation via GitHub OIDC), or "
+                    '"provenance": false for a PRIVATE repo (provenance is '
+                    "impossible without a public source repo and the publish "
+                    "would fail)."
+                )
+            if not isinstance(entry["provenance"], bool):
+                raise ConfigError(
+                    f"pipeline '{name}' (type npm).provenance must be a boolean, "
+                    f"got {type(entry['provenance']).__name__}. Use true for a "
+                    "public repository or false for a private one."
+                )
+
         # assets validation
         if entry.get("assets"):
             max_size = entry.get("max_asset_size_mb")

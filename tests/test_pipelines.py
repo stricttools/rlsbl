@@ -503,3 +503,54 @@ class TestValidatePipelinesConfig:
                     "max_asset_size_mb": 100,
                 }}}
             )
+
+    # --- npm provenance (mandatory boolean key on npm pipelines) ---
+
+    def test_npm_missing_provenance_fails(self):
+        with pytest.raises(ConfigError, match="missing required key 'provenance'"):
+            validate_pipelines_config(
+                {"pipelines": {"npm": {"type": "npm", "local": False}}}
+            )
+
+    def test_npm_provenance_error_names_key_and_meanings(self):
+        with pytest.raises(ConfigError) as exc:
+            validate_pipelines_config(
+                {"pipelines": {"npm": {"type": "npm", "local": False}}}
+            )
+        msg = str(exc.value).lower()
+        assert "provenance" in msg
+        # names the repo-visibility constraint and both values' meanings
+        assert "public" in msg and "private" in msg
+        assert "true" in msg and "false" in msg
+
+    def test_npm_provenance_not_bool_fails(self):
+        with pytest.raises(ConfigError, match="provenance must be a boolean"):
+            validate_pipelines_config(
+                {"pipelines": {"npm": {
+                    "type": "npm", "local": False, "provenance": "yes",
+                }}}
+            )
+
+    def test_npm_provenance_true_passes(self):
+        validate_pipelines_config(
+            {"pipelines": {"npm": {
+                "type": "npm", "local": False, "provenance": True,
+            }}}
+        )
+
+    def test_npm_provenance_false_passes(self):
+        validate_pipelines_config(
+            {"pipelines": {"npm": {
+                "type": "npm", "local": False, "provenance": False,
+            }}}
+        )
+
+    def test_non_npm_pipeline_does_not_require_provenance(self, monkeypatch):
+        monkeypatch.setattr(
+            _pipelines_mod, "PIPELINE_TYPES",
+            {**PIPELINE_TYPES, "test_token": _TestTokenPipeline},
+        )
+        # No provenance key -- must pass because it is not an npm pipeline.
+        validate_pipelines_config(
+            {"pipelines": {"p": {"type": "test_token", "local": True}}}
+        )
