@@ -370,6 +370,44 @@ class TestCmdEdit:
         assert unreleased_entries[0].type == "feature"
         assert unreleased_entries[0].description == "Unreleased feature"
 
+    def test_edit_preserves_existing_packages(self, rlsbl_repo):
+        """Editing an entry that carries a ``packages`` field preserves it.
+
+        cmd_edit mutates the parsed entry in place (only type/description/
+        user_facing), so the packages field must survive the round-trip.
+        """
+        sha = _make_commit(rlsbl_repo)
+        changes = rlsbl_repo / ".rlsbl" / "changes"
+        jsonl_path = changes / "1.0.0.jsonl"
+        jsonl_path.write_text(json.dumps(
+            {
+                "commits": [sha],
+                "user_facing": True,
+                "description": "Original",
+                "type": "feature",
+                "packages": ["alpha-core", "alpha-web"],
+            },
+            separators=(",", ":"),
+        ) + "\n")
+        os.chmod(str(jsonl_path), 0o444)
+
+        flags = {
+            "commits": sha,
+            "type": "fix",
+            "description": "",
+            "user-facing": None,
+            "auto-commit": False,
+        }
+        with mock.patch("rlsbl.commands.changelog_cmd.commit_files"):
+            with mock.patch("rlsbl.commands.changelog_cmd._sync_github_release"):
+                cmd_edit(flags, project_root=rlsbl_repo)
+
+        entries = parse_jsonl(str(jsonl_path))
+        assert len(entries) == 1
+        assert entries[0].type == "fix"
+        # The packages field must be preserved through the edit.
+        assert entries[0].packages == ["alpha-core", "alpha-web"]
+
     def test_edit_no_changes(self, rlsbl_repo):
         """Passing --commits without any edit flags errors."""
         sha = _make_commit(rlsbl_repo)

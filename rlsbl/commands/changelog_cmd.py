@@ -669,6 +669,19 @@ def cmd_amend(flags, project_root):
     user_facing = entry.user_facing
     description = entry.description
 
+    # Auto-populate packages field in explicit releasable mode -- MUST be
+    # releasable-scoped (only the current releasable's members), matching
+    # cmd_add. A commit touching sub-projects of another releasable must not
+    # leak those packages into this releasable's changelog entry.
+    if (isinstance(ws_context, _ResolvedContext)
+            and ws_context.releasable is not None
+            and ws_context.member_projects):
+        packages = _derive_packages_from_commits(
+            resolved_commits, ws_context.member_projects,
+        )
+        if packages:
+            entry.packages = packages
+
     changes_dir = _resolve_changes_dir(ws_context, project_root)
     jsonl_path = os.path.join(changes_dir, f"{version}.jsonl")
 

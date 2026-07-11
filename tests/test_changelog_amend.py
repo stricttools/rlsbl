@@ -7,7 +7,7 @@ from unittest import mock
 
 import pytest
 
-from conftest import run_git as _run_git, make_commit as _make_commit
+from conftest import git_head as _git_head, run_git as _run_git, make_commit as _make_commit
 from rlsbl.changelog.files import (
     append_entry_to_version,
     get_changes_dir,
@@ -213,4 +213,75 @@ class TestCmdAmend:
                 assert exc_info.value.code == 1
 
         # File MUST be re-locked after the duplicate error
+        assert is_read_only(str(jsonl_path))
+
+
+class TestCmdAmendPackages:
+    """Amend must set the ``packages`` field, releasable-scoped, like add."""
+
+    def _setup(self, factory):
+        from rlsbl.workspace import Releasable, get_releasable_changes_dir
+
+        ns = factory(
+            releasables=[Releasable(name="alpha"), Releasable(name="beta")],
+            projects=[
+                {"path": "libs/alpha-core", "name": "alpha-core",
+                 "releasable": "alpha"},
+                {"path": "libs/beta-core", "name": "beta-core",
+                 "releasable": "beta"},
+            ],
+            releasable_configs={
+                "alpha": {"private": False, "targets": ["pypi"]},
+                "beta": {"private": False, "targets": ["pypi"]},
+            },
+        )
+        root = ns.root
+        member = root / "libs" / "alpha-core"
+
+        # A placeholder released entry (a distinct commit) so the file exists.
+        placeholder_sha = _make_commit(root, "libs/alpha-core/placeholder.py")
+        alpha_changes = get_releasable_changes_dir(str(root), "alpha")
+        jsonl_path = os.path.join(alpha_changes, "1.0.0.jsonl")
+        with open(jsonl_path, "w", encoding="utf-8") as f:
+            f.write(json.dumps(
+                {"commits": [placeholder_sha], "user_facing": False},
+                separators=(",", ":"),
+            ) + "\n")
+        os.chmod(jsonl_path, 0o444)
+
+        # A single commit touching BOTH the alpha member and the beta member.
+        (root / "libs" / "alpha-core" / "x.py").write_text("x\n")
+        (root / "libs" / "beta-core" / "y.py").write_text("y\n")
+        _run_git(root, "add", "libs/alpha-core/x.py", "libs/beta-core/y.py")
+        _run_git(root, "commit", "-q", "-m", "touch both members")
+        cross_sha = _git_head(root)
+
+        return ns, member, jsonl_path, cross_sha
+
+    def test_amend_derives_releasable_scoped_packages(
+        self, multi_releasable_monorepo_factory,
+    ):
+        """A commit touching two sub-projects yields ONLY the current
+        releasable's packages when amending from that releasable."""
+        ns, member, jsonl_path, cross_sha = self._setup(
+            multi_releasable_monorepo_factory,
+        )
+
+        flags = {
+            "version": "1.0.0",
+            "commits": cross_sha,
+            "description": "Cross-cutting fix",
+            "type": "fix",
+            "user-facing": True,
+            "validate-hashes": True,
+        }
+        with mock.patch("rlsbl.commands.changelog_cmd.commit_files"):
+            with mock.patch("rlsbl.commands.changelog_cmd._sync_github_release"):
+                cmd_amend(flags, project_root=str(member))
+
+        entries = parse_jsonl(str(jsonl_path))
+        assert len(entries) == 2
+        # Only alpha's member, NOT beta-core, even though the commit touched both.
+        assert entries[1].packages == ["alpha-core"]
+        # The chmod-444 unlock/relock round-trip still holds.
         assert is_read_only(str(jsonl_path))
