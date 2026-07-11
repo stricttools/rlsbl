@@ -764,7 +764,8 @@
   "en/rlsbl-tag_glob.md": {
     "content": "8972b90adb08eeb7f33baccb12870213c7734c43f8611ba6dbb0fb1af28c6903",
     "description": "a4e07b9f2c0b26acdbad5c705ee6b1f8d4c97a09a7f71bcbfa5fdce8e2834ca9",
-    "seed_hash": "a4e07b9f2c0b26acdbad5c705ee6b1f8d4c97a09a7f71bcbfa5fdce8e2834ca9"
+    "seed_hash": "a4e07b9f2c0b26acdbad5c705ee6b1f8d4c97a09a7f71bcbfa5fdce8e2834ca9",
+    "source_docstring": "ef2d42518dc658626dd3bf77ab198d6bf5206feb196c52e584512e1442eddbe4"
   },
   "en/rlsbl-tagging.md": {
     "content": "0daf0c55a1f900d8fb5368bc19ee43aff0dcf9004438efe696cf1bcbc51d489a",
