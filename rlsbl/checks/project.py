@@ -180,6 +180,25 @@ def _get_releasable_version_for_project(ctx):
         return None
 
 
+def _skip_if_virtual_root(ctx):
+    """Return a SKIP ``CheckResult`` when ``ctx.project_root`` is a virtual uv
+    workspace root (``[tool.uv.workspace]`` but no ``[project]`` table), else
+    None.
+
+    Virtual roots are not packages: they publish nothing, carry no name or
+    version, and have no per-project ``.rlsbl/config.json``. Version, name,
+    and publish-oriented checks do not apply to them, so consumers return this
+    SKIP instead of hard-failing on a missing version or config key.
+    """
+    from ..utils import is_virtual_uv_root
+
+    if is_virtual_uv_root(str(ctx.project_root)):
+        return CheckResult(
+            "skip", "virtual uv workspace root (no [project] table -- not a release target)"
+        )
+    return None
+
+
 def register_project_checks(app):
     """Register project-tag checks on *app*."""
 
@@ -211,6 +230,10 @@ def register_project_checks(app):
         In implicit mode (no [[releasables]]), all targets within the
         project must agree on the same version.
         """
+        skip = _skip_if_virtual_root(ctx)
+        if skip is not None:
+            return skip
+
         # In explicit mode, the releasable version file is authoritative.
         # Published members' manifests must match it.
         releasable_version = _get_releasable_version_for_project(ctx)
@@ -306,6 +329,10 @@ def register_project_checks(app):
     @app.check("name-consistency")
     def check_name_consistency(ctx):
         """All detected targets must report the same package name."""
+        skip = _skip_if_virtual_root(ctx)
+        if skip is not None:
+            return skip
+
         from ..targets import TARGETS, detect_targets, resolve_releasable_config_dir_for_ctx
         from ..targets.utils import normalize_go, normalize_npm, normalize_pypi
 
@@ -475,6 +502,10 @@ def register_project_checks(app):
     @app.check("config-schema")
     def check_config_schema(ctx):
         """Validate config schema: private key, banned keys, and pipelines."""
+        skip = _skip_if_virtual_root(ctx)
+        if skip is not None:
+            return skip
+
         config = ctx.config
         errors = []
 
@@ -531,6 +562,10 @@ def register_project_checks(app):
     @app.check("private-publish-workflow")
     def check_private_publish_workflow(ctx):
         """Private repos must not have publish workflows."""
+        skip = _skip_if_virtual_root(ctx)
+        if skip is not None:
+            return skip
+
         if "private" not in ctx.config:
             return CheckResult(
                 "fail",
@@ -599,6 +634,10 @@ def register_project_checks(app):
     @app.check("target-version-readable")
     def check_target_version_readable(ctx):
         """Every detected target must be able to read its version without error."""
+        skip = _skip_if_virtual_root(ctx)
+        if skip is not None:
+            return skip
+
         from ..targets import TARGETS, detect_targets, resolve_releasable_config_dir_for_ctx
 
         rel_dir = resolve_releasable_config_dir_for_ctx(ctx)

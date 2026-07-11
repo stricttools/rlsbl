@@ -104,7 +104,12 @@ class PypiTarget(BaseTarget):
         return "pypi"
 
     def detect(self, dir_path):
-        return os.path.exists(os.path.join(dir_path, "pyproject.toml"))
+        if not os.path.exists(os.path.join(dir_path, "pyproject.toml")):
+            return False
+        # A virtual uv workspace root (pyproject with [tool.uv.workspace] but
+        # no [project] table) is not a pypi target -- it has no name/version.
+        from ..utils import is_virtual_uv_root
+        return not is_virtual_uv_root(dir_path)
 
     def read_name(self, dir_path, ctx):
         """Read the project name from pyproject.toml."""

@@ -119,6 +119,33 @@ def detect_uv_workspace_root(project_dir: str) -> str | None:
         current = parent
 
 
+def is_virtual_uv_root(project_dir: str) -> bool:
+    """True iff *project_dir* is a virtual uv workspace root.
+
+    A virtual root has a ``pyproject.toml`` declaring a ``[tool.uv.workspace]``
+    but no ``[project]`` table. It aggregates member packages for editable
+    installs but is not itself a distributable package -- it has no name and
+    no version, so ``pypi.detect()`` must not claim it and version/name/
+    publish checks do not apply to it.
+
+    Returns False when there is no pyproject.toml, when it cannot be parsed,
+    when there is no ``[tool.uv.workspace]``, or when a ``[project]`` table is
+    present (a real package that also happens to define a workspace).
+    """
+    pyproject_path = os.path.join(project_dir, "pyproject.toml")
+    if not os.path.isfile(pyproject_path):
+        return False
+    try:
+        with open(pyproject_path, "rb") as f:
+            data = tomllib.load(f)
+    except (OSError, tomllib.TOMLDecodeError):
+        return False
+    has_workspace = (
+        data.get("tool", {}).get("uv", {}).get("workspace") is not None
+    )
+    return has_workspace and "project" not in data
+
+
 def is_clean_tree():
     """Returns True if the git working tree is clean (no uncommitted changes)."""
     status = run("git", ["status", "--porcelain"])
