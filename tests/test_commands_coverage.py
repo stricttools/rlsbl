@@ -1986,10 +1986,11 @@ class TestBatchReleasePackageFailure:
         mock_graph.return_value = graph_inst
 
         with patch("os.path.exists", return_value=True):
-            with patch("rlsbl.context.create_context", return_value=_ctx()):
-                with patch("rlsbl.commands.release.run_cmd", side_effect=SystemExit(1)):
-                    with pytest.raises(SystemExit):
-                        _cmd_batch_release({"yes": True, "quiet": True}, Path("/ws/pkg"))
+            with patch(f"{MOD_BATCH}._resolve_fresh_plan", return_value=None):
+                with patch("rlsbl.context.create_context", return_value=_ctx()):
+                    with patch("rlsbl.commands.release.run_cmd", side_effect=SystemExit(1)):
+                        with pytest.raises(SystemExit):
+                            _cmd_batch_release({"yes": True, "quiet": True}, Path("/ws/pkg"))
 
 
 class TestBatchReleaseReleasablesMissing:
@@ -2082,10 +2083,11 @@ class TestBatchReleaseReleasableNoMembers:
         mock_graph.return_value = graph_inst
 
         with patch("os.path.exists", return_value=True):
-            with patch("rlsbl.workspace.load_releasables", return_value=[rel]):
-                with patch("rlsbl.workspace.members_of", return_value=[]):
-                    with pytest.raises(SystemExit) as exc:
-                        _cmd_batch_release({"yes": True, "quiet": True}, Path("/ws/pkg"))
+            with patch(f"{MOD_BATCH}._resolve_fresh_plan", return_value=None):
+                with patch("rlsbl.workspace.load_releasables", return_value=[rel]):
+                    with patch("rlsbl.workspace.members_of", return_value=[]):
+                        with pytest.raises(SystemExit) as exc:
+                            _cmd_batch_release({"yes": True, "quiet": True}, Path("/ws/pkg"))
         assert exc.value.code == 1
 
 
@@ -2122,12 +2124,13 @@ class TestBatchReleaseReleasableFailure:
         member.__getitem__ = lambda self, k: {"name": "pkg-a", "path": "packages/pkg-a"}[k]
 
         with patch("os.path.exists", return_value=True):
-            with patch("rlsbl.workspace.load_releasables", return_value=[rel]):
-                with patch("rlsbl.workspace.members_of", return_value=[member]):
-                    with patch("rlsbl.context.create_context", return_value=_ctx()):
-                        with patch("rlsbl.commands.release.run_cmd", side_effect=SystemExit(1)):
-                            with pytest.raises(SystemExit):
-                                _cmd_batch_release({"yes": True, "quiet": True}, Path("/ws/pkg"))
+            with patch(f"{MOD_BATCH}._resolve_fresh_plan", return_value=None):
+                with patch("rlsbl.workspace.load_releasables", return_value=[rel]):
+                    with patch("rlsbl.workspace.members_of", return_value=[member]):
+                        with patch("rlsbl.context.create_context", return_value=_ctx()):
+                            with patch("rlsbl.commands.release.run_cmd", side_effect=SystemExit(1)):
+                                with pytest.raises(SystemExit):
+                                    _cmd_batch_release({"yes": True, "quiet": True}, Path("/ws/pkg"))
 
 
 class TestFinalizeBatchFile:

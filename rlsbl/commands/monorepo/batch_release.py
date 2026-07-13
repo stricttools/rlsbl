@@ -27,6 +27,18 @@ from ...lock import rlsbl_lock
 from ...utils import commit_files, run
 from ...workspace import find_workspace_root, load_workspace, is_explicit_mode
 from ...workspace_graph import CycleError, WorkspaceGraph
+from .batch_plan import (
+    PLAN_FILENAME,
+    BatchPlanError,
+    archive_plan_file,
+    compute_batch_plan,
+    get_batch_plan_path,
+    item_is_released,
+    plan_all_released,
+    read_batch_plan,
+    validate_plan_against_config,
+    write_batch_plan,
+)
 from ..release.validate import (
     ReleaseValidationError,
     HookError,
@@ -135,6 +147,51 @@ def _cmd_batch_release(flags, project_root):
         print(f"Error in batch release file: {e}", file=sys.stderr)
         sys.exit(1)
 
+    quiet = flags.get("quiet", False)
+    dry_run = flags.get("dry-run", False)
+
+    def log(msg):
+        if not quiet:
+            print(msg)
+
+    projects = load_workspace(workspace_root)
+    explicit = is_explicit_mode(workspace_root)
+
+    if batch_config.section_type == "releasables" and not explicit:
+        print(
+            "Error: batch release file uses [releasables] sections but the "
+            "workspace is in implicit mode (no [[releasables]] in workspace.toml).",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    # --- Repair pass / resolved-plan handling ---
+    # If a plan sidecar already exists, this is not a fresh batch: validate it
+    # against the current batch file (never regenerate) and, if every item is
+    # provably released, archive both files and stop -- the batch is complete
+    # and the on-disk unreleased.toml is a stale leftover from a mid-loop crash.
+    plan_path = get_batch_plan_path(workspace_root)
+    plan = None
+    try:
+        plan = read_batch_plan(plan_path)
+    except FileNotFoundError:
+        plan = None
+    if plan is not None:
+        try:
+            validate_plan_against_config(plan, batch_config)
+        except BatchPlanError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+
+        if not dry_run and plan_all_released(workspace_root, plan, projects):
+            with rlsbl_lock(".rlsbl-monorepo", project_root=workspace_root):
+                _finalize_batch_file(batch_path, log)
+            log(
+                "Batch release already complete (all items released per plan); "
+                "archived the stale batch file and plan."
+            )
+            return
+
     # Upfront validation: fail before releasing anything
     try:
         validate_gh_cli()
@@ -145,12 +202,6 @@ def _cmd_batch_release(flags, project_root):
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
-    quiet = flags.get("quiet", False)
-
-    def log(msg):
-        if not quiet:
-            print(msg)
-
     # Root-level selfdoc: run once before per-member releases so generated
     # files are committed and the tree is clean for per-member validation.
     try:
@@ -159,27 +210,79 @@ def _cmd_batch_release(flags, project_root):
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
-    projects = load_workspace(workspace_root)
-    explicit = is_explicit_mode(workspace_root)
-
+    # The plan (possibly None here) is passed to the mode functions. When it is
+    # None and this is not a dry-run, the mode function resolves and persists a
+    # fresh plan AFTER validating item membership (so version/tag computation
+    # only runs for items that actually exist in the workspace).
     if batch_config.section_type == "releasables":
-        if not explicit:
-            print(
-                "Error: batch release file uses [releasables] sections but the "
-                "workspace is in implicit mode (no [[releasables]] in workspace.toml).",
-                file=sys.stderr,
-            )
-            sys.exit(1)
         _batch_release_releasables(
             flags, workspace_root, batch_path, batch_config, projects,
+            plan, plan_path,
         )
     else:
         _batch_release_packages(
             flags, workspace_root, batch_path, batch_config, projects,
+            plan, plan_path,
         )
 
 
-def _batch_release_releasables(flags, workspace_root, batch_path, batch_config, projects):
+def _resolve_fresh_plan(workspace_root, batch_config, projects, plan_path, log):
+    """Compute, persist, and commit a fresh resolved plan.
+
+    Called by the mode functions after item membership has been validated.
+    A plan-less batch whose target tags already exist predates resolved-plan
+    tracking -- that is a hard error (no guessing about partial legacy runs).
+    Returns the BatchPlan.
+    """
+    try:
+        plan = compute_batch_plan(workspace_root, batch_config, projects)
+    except ReleaseValidationError as e:
+        if "already exists" in str(e):
+            _abort_legacy_plan_less_batch(
+                get_batch_release_file_path(workspace_root), plan_path, str(e)
+            )
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    write_batch_plan(plan_path, plan)
+    commit_files(
+        "chore: resolve batch release plan",
+        [os.path.normpath(plan_path)],
+        autogenerated=True,
+        allow_failure=True,
+    )
+    log("Resolved batch release plan (base/target versions, tags).")
+    return plan
+
+
+def _abort_legacy_plan_less_batch(batch_path, plan_path, detail):
+    """Hard error for a plan-less batch file that was already (partly) released.
+
+    A batch ``unreleased.toml`` with no plan sidecar whose target tags already
+    exist predates resolved-plan tracking: it was partially executed by an
+    older rlsbl that never persisted base versions, so there is no safe way to
+    decide which items still need releasing. Refuse to guess.
+    """
+    print(
+        "Error: found a batch release file that predates resolved-plan "
+        "tracking and appears to have been partially released.\n"
+        f"  Batch file: {os.path.relpath(batch_path)}\n"
+        f"  Missing plan sidecar: {os.path.relpath(plan_path)}\n"
+        f"  Detail: {detail}\n"
+        "Without a resolved plan, rlsbl cannot tell which items are already "
+        "released. Resolve manually:\n"
+        "  1. For each item in the batch file, verify whether its release "
+        "already completed (check `git tag` and the published version).\n"
+        "  2. If the batch is fully released, archive the batch file manually "
+        "(move it out of .rlsbl-monorepo/releases/).\n"
+        "  3. Otherwise, delete the batch file and re-run "
+        "`rlsbl monorepo release init` to start a fresh, plan-tracked batch.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+
+def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
+                               projects, plan=None, plan_path=None):
     """Execute batch release in releasable mode."""
     from ...workspace import load_releasables, members_of
 
@@ -216,6 +319,12 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config, 
         if not quiet:
             print(msg)
 
+    # Resolve a fresh plan now that membership is validated (skip in dry-run).
+    if plan is None and not dry_run and plan_path is not None:
+        plan = _resolve_fresh_plan(
+            workspace_root, batch_config, projects, plan_path, log,
+        )
+
     log(f"Batch release: {len(release_order)} releasable(s)")
     log(f"Release order: {', '.join(release_order)}")
 
@@ -227,6 +336,7 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config, 
     log("")
 
     released = []
+    last_sha = None
     with rlsbl_lock(".rlsbl-monorepo", project_root=workspace_root):
         for rel_name in release_order:
             release_config = batch_config.packages[rel_name]
@@ -234,6 +344,18 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config, 
             if not member_projs:
                 print(f"Error: releasable '{rel_name}' has no member projects.", file=sys.stderr)
                 sys.exit(1)
+
+            # Per-item idempotency: skip a releasable that is already released
+            # per the resolved plan (live version == target and tag exists).
+            if plan is not None and not dry_run:
+                plan_item = plan.items[rel_name]
+                if item_is_released(workspace_root, plan_item, projects, "releasables"):
+                    log(
+                        f"--- Skipping releasable {rel_name}: already released "
+                        f"at {plan_item.target_version} (tag {plan_item.tag}) ---"
+                    )
+                    log("")
+                    continue
 
             # Pick the first member as the representative for the release flow
             representative = member_projs[0]
@@ -271,13 +393,14 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config, 
 
             log("")
 
-        if not dry_run and released:
-            _finalize_batch_file(batch_path, log)
+        # Archive is state-driven: only fires when every plan item is released.
+        if not dry_run:
+            _archive_batch_if_complete(batch_path, plan, workspace_root, projects, log)
 
     # Log completion BEFORE watch, because watch_run_cmd() calls sys.exit().
     log(f"Batch release complete: {', '.join(released)}")
 
-    if not dry_run and released:
+    if not dry_run and last_sha:
         # Watch CI or print hint for the last release's commit
         if flags.get("watch"):
             log(f"Watching CI for {last_sha}...")
@@ -290,7 +413,8 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config, 
             log(f"Watch CI: rlsbl watch {last_sha}")
 
 
-def _batch_release_packages(flags, workspace_root, batch_path, batch_config, projects):
+def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
+                            projects, plan=None, plan_path=None):
     """Execute batch release in package mode (implicit, original behavior)."""
     project_names = {p["name"] for p in projects}
     project_by_name = {p["name"]: p for p in projects}
@@ -340,6 +464,12 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config, pro
         if not quiet:
             print(msg)
 
+    # Resolve a fresh plan now that membership is validated (skip in dry-run).
+    if plan is None and not dry_run and plan_path is not None:
+        plan = _resolve_fresh_plan(
+            workspace_root, batch_config, projects, plan_path, log,
+        )
+
     log(f"Batch release: {len(release_order)} package(s)")
     log(f"Release order: {', '.join(release_order)}")
 
@@ -352,11 +482,24 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config, pro
 
     # Release each package in order
     released = []
+    last_sha = None
     with rlsbl_lock(".rlsbl-monorepo", project_root=workspace_root):
         for pkg_name in release_order:
             release_config = batch_config.packages[pkg_name]
             project = project_by_name[pkg_name]
             project_dir = os.path.join(workspace_root, project["path"])
+
+            # Per-item idempotency: skip a package already released per the
+            # resolved plan (live version == target and tag exists).
+            if plan is not None and not dry_run:
+                plan_item = plan.items[pkg_name]
+                if item_is_released(workspace_root, plan_item, projects, "packages"):
+                    log(
+                        f"--- Skipping {pkg_name}: already released at "
+                        f"{plan_item.target_version} (tag {plan_item.tag}) ---"
+                    )
+                    log("")
+                    continue
 
             log(f"--- Releasing {pkg_name} ({release_config.bump}) ---")
 
@@ -390,14 +533,14 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config, pro
 
             log("")
 
-        # Finalize the batch release file (skip in dry-run)
-        if not dry_run and released:
-            _finalize_batch_file(batch_path, log)
+        # Archive is state-driven: only fires when every plan item is released.
+        if not dry_run:
+            _archive_batch_if_complete(batch_path, plan, workspace_root, projects, log)
 
     # Log completion BEFORE watch, because watch_run_cmd() calls sys.exit().
     log(f"Batch release complete: {', '.join(released)}")
 
-    if not dry_run and released:
+    if not dry_run and last_sha:
         # Watch CI or print hint for the last release's commit
         if flags.get("watch"):
             log(f"Watching CI for {last_sha}...")
@@ -410,11 +553,39 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config, pro
             log(f"Watch CI: rlsbl watch {last_sha}")
 
 
+def _archive_batch_if_complete(batch_path, plan, workspace_root, projects, log):
+    """State-driven archive gate: finalize iff every plan item is released.
+
+    This is the idempotent guard around :func:`_finalize_batch_file`. It is
+    called both at the batch-loop tail and (via the repair pass) at the start
+    of the command. When no plan exists (dry-run never reaches here), it is a
+    no-op.
+    """
+    if plan is None:
+        return
+    if not plan_all_released(workspace_root, plan, projects):
+        log(
+            "Not archiving batch file: some plan items are not yet released."
+        )
+        return
+    _finalize_batch_file(batch_path, log)
+
+
 def _finalize_batch_file(batch_path, log):
-    """Rename the batch release file to a timestamped name and lock it."""
+    """Rename the batch release file (and its plan sidecar) and lock them.
+
+    Idempotent: a no-op when the batch file has already been archived. The plan
+    sidecar, when present, is archived alongside under the same timestamped
+    stem so the two always travel together.
+    """
+    if not os.path.exists(batch_path):
+        log("Batch release file already archived; nothing to finalize.")
+        return
+
     releases_dir = os.path.dirname(batch_path)
     timestamp = time.strftime("%Y%m%d-%H%M%S")
-    versioned_name = f"batch-{timestamp}.toml"
+    versioned_stem = f"batch-{timestamp}"
+    versioned_name = f"{versioned_stem}.toml"
     versioned_path = os.path.join(releases_dir, versioned_name)
 
     os.rename(batch_path, versioned_path)
@@ -425,6 +596,11 @@ def _finalize_batch_file(batch_path, log):
         os.path.normpath(versioned_path),
         os.path.normpath(batch_path),
     ]
+
+    # Archive the resolved-plan sidecar alongside, under the same stem.
+    plan_path = os.path.join(releases_dir, PLAN_FILENAME)
+    finalize_files.extend(archive_plan_file(plan_path, versioned_stem))
+
     commit_files(
         f"chore: finalize batch release file ({versioned_name})",
         finalize_files,

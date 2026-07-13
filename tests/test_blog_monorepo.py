@@ -93,6 +93,7 @@ blog = false
 
         with patch("rlsbl.commands.release.run_cmd", mock_run_cmd), \
              patch("rlsbl.commands.monorepo.batch_release.run", return_value="abc123"), \
+             patch("rlsbl.commands.monorepo.batch_release._resolve_fresh_plan", return_value=None), \
              patch("rlsbl.commands.monorepo.batch_release._finalize_batch_file"):
             _cmd_batch_release(
                 {"dry-run": False, "yes": True, "quiet": True},
@@ -142,6 +143,7 @@ description = "Solo release"
 
         with patch("rlsbl.commands.release.run_cmd", mock_run_cmd), \
              patch("rlsbl.commands.monorepo.batch_release.run", return_value="abc123"), \
+             patch("rlsbl.commands.monorepo.batch_release._resolve_fresh_plan", return_value=None), \
              patch("rlsbl.commands.monorepo.batch_release._finalize_batch_file"):
             _cmd_batch_release(
                 {"dry-run": False, "yes": True, "quiet": True},
@@ -224,6 +226,7 @@ blog = true
 
         with patch("rlsbl.commands.release.run_cmd", mock_run_cmd), \
              patch("rlsbl.commands.monorepo.batch_release.run", return_value="abc123"), \
+             patch("rlsbl.commands.monorepo.batch_release._resolve_fresh_plan", return_value=None), \
              patch("rlsbl.commands.monorepo.batch_release._finalize_batch_file"):
             _cmd_batch_release(
                 {"dry-run": False, "yes": True, "quiet": True},
