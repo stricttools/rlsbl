@@ -145,12 +145,14 @@ class TestCiTemplateYamlStructure:
     def test_probe_positive_parses_with_pytest_step(self):
         content = self._render({"pypi.hasPytest": "true", "importName": "mylib"})
         runs = self._run_steps(content)
-        assert "uv run pytest" in runs
+        # The pytest invocation pins --rootdir . so monorepo members never let
+        # rootdir escape to the workspace root.
+        assert "uv run pytest --rootdir ." in runs
         # pytest step comes after the import smoke test in the parsed steps
         smoke_idx = next(
             i for i, r in enumerate(runs) if r.startswith("uv run python -c")
         )
-        assert runs.index("uv run pytest") > smoke_idx
+        assert runs.index("uv run pytest --rootdir .") > smoke_idx
 
     def test_probe_negative_parses_without_pytest_step(self):
         content = self._render({"importName": "mylib"})

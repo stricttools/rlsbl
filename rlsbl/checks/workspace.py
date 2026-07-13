@@ -966,3 +966,83 @@ def register_workspace_checks(app):
                 details=findings,
             )
         return CheckResult("pass", "no per-package release-state residue")
+
+    @app.check("member-pytest-config")
+    def check_member_pytest_config(ctx):
+        """Members with tests must pin their own pytest rootdir when the root
+        has a conftest.py.
+
+        pytest resolves ``rootdir`` by walking upward from the test paths
+        looking for a config file (``pyproject.toml`` with
+        ``[tool.pytest.ini_options]``, ``pytest.ini``, ``tox.ini``, or
+        ``setup.cfg``). A workspace member whose ``pyproject.toml`` declares NO
+        ``[tool.pytest.ini_options]`` provides no such anchor, so rootdir
+        escapes UP to the workspace root -- where a ``conftest.py`` lives. The
+        member then silently loads the root ``conftest.py`` (fixtures,
+        plugins, options) and any root pytest config, changing test behaviour
+        without the member declaring it.
+
+        The fix: give the member its own ``[tool.pytest.ini_options]`` table
+        (even empty, with ``testpaths = ["tests"]``) so pytest's rootdir stays
+        pinned to the member.
+
+        Hard error, no bypass. Skips entirely when the workspace root has no
+        ``conftest.py`` (no hazard exists).
+        """
+        import tomllib
+
+        root = str(ctx.workspace_root)
+        if not os.path.isfile(os.path.join(root, "conftest.py")):
+            return CheckResult(
+                "skip",
+                "workspace root has no conftest.py; no pytest rootdir-escape hazard",
+            )
+
+        findings = []
+        for proj in ctx.projects:
+            abs_pkg = os.path.join(root, proj["path"])
+            # Root-path members share the workspace root's conftest -- exempt.
+            if os.path.realpath(abs_pkg) == os.path.realpath(root):
+                continue
+
+            pyproject = os.path.join(abs_pkg, "pyproject.toml")
+            # Only Python members can escape via pytest rootdir, and the fix
+            # (a [tool.pytest.ini_options] table) requires a pyproject.toml.
+            if not os.path.isfile(pyproject):
+                continue
+
+            # Does the member ship tests pytest would collect?
+            if not os.path.isdir(os.path.join(abs_pkg, "tests")):
+                continue
+
+            try:
+                with open(pyproject, "rb") as f:
+                    data = tomllib.load(f)
+            except (OSError, tomllib.TOMLDecodeError):
+                # Unparseable member pyproject: cannot confirm the anchor
+                # exists -- treat as a finding rather than silently passing.
+                findings.append(proj["name"])
+                continue
+
+            has_config = "ini_options" in data.get("tool", {}).get("pytest", {})
+            if not has_config:
+                findings.append(proj["name"])
+
+        if findings:
+            return CheckResult(
+                "fail",
+                f"{len(findings)} member(s) with tests but no own "
+                "[tool.pytest.ini_options] while the workspace root has a "
+                "conftest.py -- pytest's rootdir escapes to the workspace "
+                "root, silently loading the root conftest and its config",
+                details=[
+                    f"{name}: add a [tool.pytest.ini_options] table to "
+                    f"{name}/pyproject.toml (e.g. testpaths = [\"tests\"]) to "
+                    "pin pytest's rootdir to the member"
+                    for name in findings
+                ],
+            )
+        return CheckResult(
+            "pass",
+            "all members with tests pin their own pytest config",
+        )

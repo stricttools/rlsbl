@@ -90,6 +90,8 @@ EXPECTED_CHECKS = [
     "go-companion-tags",
     # Releasable member residue
     "releasable-residue",
+    # Member pytest rootdir-escape guard
+    "member-pytest-config",
 ]
 
 

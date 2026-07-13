@@ -114,6 +114,8 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "go-companion-tags": "workspace",
     # --- releasable member residue ---
     "releasable-residue": "workspace",
+    # --- member pytest rootdir-escape guard ---
+    "member-pytest-config": "workspace",
 }
 
 # Excluded targets: checks where a target is deliberately excluded because
