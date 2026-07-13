@@ -44,6 +44,9 @@ class BatchPlanError(Exception):
 
 @dataclass
 class PlanItem:
+    """A single item in a resolved batch plan, capturing the frozen
+    base version, target version, tag, registry, and bump intent."""
+
     name: str
     base_version: str
     target_version: str
@@ -54,6 +57,9 @@ class PlanItem:
 
 @dataclass
 class BatchPlan:
+    """The full resolved plan for a batch release, containing the
+    section type and a mapping of item names to their PlanItem entries."""
+
     section_type: str  # "packages" or "releasables"
     items: dict[str, PlanItem]  # name -> PlanItem
 
@@ -66,6 +72,7 @@ def get_batch_plan_path(workspace_root: str = ".") -> str:
 
 
 def plan_exists(workspace_root: str) -> bool:
+    """Return True if a resolved plan sidecar exists on disk."""
     return os.path.exists(get_batch_plan_path(workspace_root))
 
 
