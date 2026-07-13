@@ -2,6 +2,28 @@
 
 # Changelog
 
+## 0.104.1
+
+Root-publisher publish gate, pytest rootdir pin, batch release idempotency, push-timeout resume resilience
+
+<details>
+<summary>Context</summary>
+
+Four bug fixes addressing release-flow reliability:
+- Monorepo sync now generates a gated publish router for root-only publishers (was silently skipped)
+- Member CI pytest invocations pin --rootdir . to prevent workspace-root escape
+- Batch releases persist a resolved plan sidecar for idempotent resume
+- Post-TAGGED push failures are now resumable instead of triggering destructive rollback
+
+</details>
+
+### Fixes
+
+- **Fix.** Monorepo sync now generates a gated publish router for workspaces whose sole publisher is the root package. New required `publish_gate_check_regex` config key specifies which CI check the gate matches. Previously, root-only publishers silently skipped gate generation and publishes ran ungated.
+- **Fix.** Member CI jobs now pin `--rootdir .` on pytest invocations, preventing rootdir from escaping to the workspace root. New `member-pytest-config` workspace check hard-errors when a member lacks its own pytest config while a workspace-root conftest exists.
+- **Fix.** Batch releases now persist a resolved plan sidecar; on resume, already-released items are skipped and a stale-but-complete batch file is auto-archived. Previously, a mid-batch resume re-released completed items and a stale batch file persisted across releases.
+- **Fix.** A push failure after the TAGGED step is now classified as resumable -- the local tag, release state, and finalized files are preserved, and the exact resume command is printed. Previously, push timeouts triggered a full rollback that deleted the tag, state file, and committed changelog files, making `release resume` unusable.
+
 ## 0.104.0
 
 Mandatory npm provenance declaration with a preflight visibility guard, plus monorepo release-correctness fixes: structured-target scaffold config, loud scaffold-commit failures, virtual-workspace-root check skipping, releasable-aware orphan detection, mode-aware CI-sync check, two-level lint config, and per-releasable status rows.
