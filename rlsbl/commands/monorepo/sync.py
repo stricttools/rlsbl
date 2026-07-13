@@ -268,6 +268,29 @@ def _get_monorepo_tag_prefix(project, root, releasables=None):
     return f"{project['name']}@v"
 
 
+def _root_is_publisher(project, root):
+    """Return True when the root project (path='.') actually publishes.
+
+    A root publisher is non-private and has at least one detectable publish
+    target. Detection is config-based (not based on the on-disk publish.yml,
+    which is the generated router itself). A ConfigError during target
+    detection means the root is not a resolvable publisher -- treat it as a
+    non-publisher rather than crashing sync.
+    """
+    from ...config import read_project_config
+
+    rel_dir = resolve_releasable_config_dir(project, root)
+    project_dir = os.path.join(root, project["path"])
+    config = read_project_config(project_dir, releasable_config_dir=rel_dir)
+    if config.get("private"):
+        return False
+    try:
+        entries = detect_targets(project_dir, releasable_config_dir=rel_dir)
+    except ConfigError:
+        return False
+    return any(e.name in TARGETS for e in entries)
+
+
 def _build_project_template_vars(project_dir, root):
     """Build a template vars dict for a project, with both namespaced and un-namespaced keys.
 
@@ -576,9 +599,25 @@ def _cmd_sync(flags, project_root):
                 proj['_ci_docs'] = ci_docs_for_proj
                 projects_with_ci.append(proj)
 
-        # --- Publish workflow: just verify existence for inline router ---
+        # --- Publish workflow: verify existence / detect root publisher ---
         publish_src = os.path.join(root, path, ".github", "workflows", "publish.yml")
-        if os.path.isfile(publish_src):
+        if clean_path == ".":
+            # Root publisher: its publish.yml IS the router output
+            # (source==destination). It must NOT be read as a source (the
+            # transform pipeline is non-idempotent on its own output).
+            # Instead, when the root actually publishes, mark it so the
+            # router generates its jobs from config/templates. Previously
+            # this project self-excluded here, leaving projects_with_publish
+            # empty so the gated router was never generated and the
+            # hand-authored ungated publish.yml survived (a security bug).
+            #
+            # A publish.yml must already exist (hand-authored on first sync,
+            # or the generated router thereafter): its presence is the signal
+            # that the root publishes, exactly as for member projects.
+            if os.path.isfile(publish_src) and _root_is_publisher(proj, root):
+                proj['_root_publisher'] = True
+                projects_with_publish.append(proj)
+        elif os.path.isfile(publish_src):
             publish_src_real = os.path.realpath(publish_src)
             if publish_src_real == ci_router_output or publish_src_real == publish_router_output:
                 print(

@@ -1,6 +1,7 @@
 """Tests for publish_inline: workflow parser and YAML emitter."""
 
 import copy
+import json
 import os
 import textwrap
 from unittest.mock import patch
@@ -738,6 +739,118 @@ class TestGenerateInlinePublishRouter:
         parsed = _safe_load(result)
         job = parsed["jobs"]["mypkg-pypi"]
         assert job["defaults"]["run"]["working-directory"] == "packages/mypkg"
+
+
+# ---------------------------------------------------------------------------
+# Root-publisher (path=".") gated router tests
+# ---------------------------------------------------------------------------
+
+
+def _setup_root_publisher(root, *, gate_regex, targets=("pypi",), name="orxtra"):
+    """Set up a root (path='.') publisher belonging to a releasable.
+
+    Writes the root ``pyproject.toml``, an explicit-mode ``workspace.toml``,
+    and the releasable ``config.json`` carrying ``targets`` and (optionally)
+    the mandatory ``publish_gate_check_regex`` key. Returns the workspace
+    project dict as sync would build it for a root publisher.
+    """
+    with open(os.path.join(root, "pyproject.toml"), "w") as f:
+        f.write(f'[project]\nname = "{name}"\nversion = "1.2.3"\n')
+
+    mono = os.path.join(root, ".rlsbl-monorepo")
+    rel_dir = os.path.join(mono, "releasables", name)
+    os.makedirs(rel_dir, exist_ok=True)
+    cfg = {"private": False, "targets": list(targets)}
+    if gate_regex is not None:
+        cfg["publish_gate_check_regex"] = gate_regex
+    with open(os.path.join(rel_dir, "config.json"), "w") as f:
+        json.dump(cfg, f)
+
+    with open(os.path.join(mono, "workspace.toml"), "w") as f:
+        f.write(
+            f'[[releasables]]\nname = "{name}"\n\n'
+            f'[[projects]]\npath = "."\nreleasable = "{name}"\n'
+        )
+    return {"name": name, "path": ".", "releasable": name, "_root_publisher": True}
+
+
+class TestRootPublisher:
+    """A root (path='.') publisher gets a config-driven gated router.
+
+    The old behaviour self-excluded the root (its publish.yml realpath equals
+    the router output), leaving projects_with_publish empty so the gated
+    router was never generated and the hand-authored ungated publish.yml
+    survived. The router must instead generate the root's publish jobs from
+    config/templates and wire them to the shared gate.
+    """
+
+    def test_root_publisher_generates_gated_jobs(self, tmp_path):
+        root = str(tmp_path)
+        regex = r"^(test|lint)( \(.*\))?$"
+        proj = _setup_root_publisher(root, gate_regex=regex)
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            return_value="orxtra@v",
+        ):
+            result = generate_inline_publish_router([proj], root)
+
+        parsed = _safe_load(result)
+        jobs = parsed["jobs"]
+        assert "gate" in jobs
+        pub_keys = [k for k in jobs if k.startswith("orxtra-")]
+        assert pub_keys, f"no root publish jobs generated: {list(jobs)}"
+        for k in pub_keys:
+            needs = jobs[k]["needs"]
+            assert needs == "gate" or "gate" in needs
+            assert jobs[k]["if"] == "startsWith(github.ref_name, 'orxtra@v')"
+        # The mandatory configured regex is baked into the shared gate.
+        assert regex in result
+
+    def test_root_publisher_missing_gate_key_errors(self, tmp_path):
+        root = str(tmp_path)
+        proj = _setup_root_publisher(root, gate_regex=None)
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            return_value="orxtra@v",
+        ):
+            with pytest.raises(ConfigError) as exc:
+                generate_inline_publish_router([proj], root)
+        assert "publish_gate_check_regex" in str(exc.value)
+
+    def test_root_publisher_idempotent(self, tmp_path):
+        root = str(tmp_path)
+        regex = r"^(test|lint)( \(.*\))?$"
+        proj = _setup_root_publisher(root, gate_regex=regex)
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            return_value="orxtra@v",
+        ):
+            first = generate_inline_publish_router([proj], root)
+            second = generate_inline_publish_router([proj], root)
+        assert first == second
+
+    def test_root_publisher_alongside_member(self, tmp_path):
+        root = str(tmp_path)
+        regex = r"^(test)( \(.*\))?$"
+        root_proj = _setup_root_publisher(root, gate_regex=regex)
+        _setup_publish_project(root, "packages/mylib", NPM_PUBLISH_WF)
+        member = {"name": "mylib", "path": "packages/mylib"}
+
+        def _prefix(proj, _root, **kw):
+            return "orxtra@v" if proj.get("_root_publisher") else "mylib@v"
+
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            side_effect=_prefix,
+        ):
+            result = generate_inline_publish_router([root_proj, member], root)
+
+        parsed = _safe_load(result)
+        jobs = parsed["jobs"]
+        assert "gate" in jobs and "no-op" in jobs
+        assert "mylib-npm" in jobs
+        assert any(k.startswith("orxtra-") for k in jobs)
+        assert regex in result
 
 
 # ---------------------------------------------------------------------------

@@ -775,46 +775,65 @@ class TestDotPathSelfReference:
     """Bug fix: path='.' must not wrap the generated router as a source workflow."""
 
     def test_publish_router_not_used_as_source(self, mock_git_repo, capsys):
-        """When path='.', the publish router at .github/workflows/publish.yml
-        must not be picked up as the project's publish workflow source."""
-        # Create a root-level project with CI workflow
+        """When path='.', the generated publish router must never be read back
+        as its own source. The root publisher now regenerates from config
+        templates, so its publish.yml (which IS the router output) is never
+        parsed as a source workflow -- proven by byte-stability across syncs
+        and by the hand-authored source content being gone after the first
+        sync.
+        """
+        # Root pypi package with a hand-authored, ungated publish.yml.
         wf_dir = os.path.join(str(mock_git_repo), ".github", "workflows")
         os.makedirs(wf_dir, exist_ok=True)
-        with open(os.path.join(wf_dir, "ci.yml"), "w") as f:
-            f.write(CI_WORKFLOW)
-
-        # Create a real publish workflow that is NOT the router
         with open(os.path.join(wf_dir, "publish.yml"), "w") as f:
-            f.write(PUBLISH_WORKFLOW)
-
-        # Also need a package.json at root for target detection
-        with open(os.path.join(str(mock_git_repo), "package.json"), "w") as f:
-            json.dump({"name": "rootpkg", "version": "0.1.0"}, f)
+            f.write(PUBLISH_WORKFLOW)  # contains `run: echo publish`
+        with open(os.path.join(str(mock_git_repo), "pyproject.toml"), "w") as f:
+            f.write('[project]\nname = "orxtra"\nversion = "1.2.3"\n')
 
         _cmd_init({}, project_root=".")
-        from rlsbl.workspace import save_workspace
-        save_workspace(".", [{"path": ".", "name": "rootpkg"}])
-        subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
+        mono = os.path.join(str(mock_git_repo), ".rlsbl-monorepo")
+        rel_dir = os.path.join(mono, "releasables", "orxtra")
+        os.makedirs(rel_dir, exist_ok=True)
+        with open(os.path.join(rel_dir, "config.json"), "w") as f:
+            json.dump(
+                {
+                    "private": False,
+                    "targets": ["pypi"],
+                    "publish_gate_check_regex": r"^(test)( \(.*\))?$",
+                },
+                f,
+            )
+        with open(os.path.join(mono, "workspace.toml"), "w") as f:
+            f.write(
+                '[[releasables]]\nname = "orxtra"\n\n'
+                '[[projects]]\npath = "."\nreleasable = "orxtra"\n'
+            )
+        subprocess.run(["git", "add", "-A"], cwd=str(mock_git_repo), check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", "setup"],
             cwd=str(mock_git_repo), check=True,
         )
 
-        # First sync: the real publish.yml is used as source for the inline
-        # router, which overwrites publish.yml at the same path.
+        publish = mock_git_repo / ".github" / "workflows" / "publish.yml"
+
+        # First sync: the hand-authored ungated publish.yml is replaced by the
+        # config-generated gated router.
         _cmd_sync({}, project_root=".")
-        capsys.readouterr()  # discard first sync output
+        first = publish.read_text()
+        assert "# DO NOT EDIT" in first
+        # The hand-authored source content is gone (regenerated from config).
+        assert "echo publish" not in first
+        # The router is gated.
+        assert "\n  gate:\n" in first
 
-        # Second sync: now publish.yml IS the router. It must be skipped.
+        # Second sync: the router is regenerated from config, NEVER read back
+        # as a source. Idempotent by construction -> byte-identical.
         _cmd_sync({}, project_root=".")
-        captured = capsys.readouterr()
+        second = publish.read_text()
+        assert first == second
 
-        # The warning should fire for the publish workflow
-        assert "router itself" in captured.err
-        assert "rootpkg" in captured.err
-
-        # Per-project publish wrappers are never generated in the inline flow
-        assert not (mock_git_repo / ".github" / "workflows" / "rootpkg-publish.yml").exists()
+        # Per-project publish wrappers are never generated in the inline flow.
+        assert not (mock_git_repo / ".github" / "workflows" / "orxtra-publish.yml").exists()
 
     def test_ci_router_not_used_as_source(self, mock_git_repo, capsys):
         """When path='.', the CI router at .github/workflows/ci-router.yml
@@ -1048,3 +1067,69 @@ class TestBuildProjectTemplateVars:
         os.makedirs(proj_dir, exist_ok=True)
         tvars = _build_project_template_vars(proj_dir, str(mock_git_repo))
         assert tvars == {}
+
+
+class TestRootPublisherSync:
+    """End-to-end: `_cmd_sync` on a root (path='.') pypi publisher generates a
+    gated publish.yml router from config instead of leaving the hand-authored
+    ungated publish.yml in place."""
+
+    def _setup_root_publisher_workspace(self, repo, *, gate_regex):
+        root = str(repo)
+        # Root package pyproject.toml
+        with open(os.path.join(root, "pyproject.toml"), "w") as f:
+            f.write('[project]\nname = "orxtra"\nversion = "1.2.3"\n')
+
+        # Hand-authored (ungated) root publish.yml -- its presence is the
+        # signal that the root publishes (it becomes the router output).
+        wf_dir = os.path.join(root, ".github", "workflows")
+        os.makedirs(wf_dir, exist_ok=True)
+        with open(os.path.join(wf_dir, "publish.yml"), "w") as f:
+            f.write(PUBLISH_WORKFLOW)
+
+        mono = os.path.join(root, ".rlsbl-monorepo")
+        rel_dir = os.path.join(mono, "releasables", "orxtra")
+        os.makedirs(rel_dir, exist_ok=True)
+        cfg = {"private": False, "targets": ["pypi"]}
+        if gate_regex is not None:
+            cfg["publish_gate_check_regex"] = gate_regex
+        with open(os.path.join(rel_dir, "config.json"), "w") as f:
+            json.dump(cfg, f)
+
+        with open(os.path.join(mono, "workspace.toml"), "w") as f:
+            f.write(
+                '[[releasables]]\nname = "orxtra"\n\n'
+                '[[projects]]\npath = "."\nreleasable = "orxtra"\n'
+            )
+        subprocess.run(["git", "add", "-A"], cwd=root, check=True)
+        subprocess.run(
+            ["git", "commit", "-q", "-m", "setup root publisher"],
+            cwd=root, check=True,
+        )
+
+    def test_root_publisher_generates_gated_router(self, mock_git_repo, capsys):
+        regex = r"^(test)( \(.*\))?$"
+        self._setup_root_publisher_workspace(mock_git_repo, gate_regex=regex)
+        _cmd_sync({}, project_root=".")
+
+        publish = mock_git_repo / ".github" / "workflows" / "publish.yml"
+        assert publish.exists()
+        content = publish.read_text()
+        assert "# DO NOT EDIT" in content
+        doc = parse_ci_workflow(content)
+        jobs = doc["jobs"]
+        assert "gate" in jobs
+        assert any(k.startswith("orxtra-") for k in jobs)
+        # The mandatory configured gate regex is baked into the router.
+        assert regex in content
+        # Generated router is read-only.
+        mode = stat.S_IMODE(os.stat(str(publish)).st_mode)
+        assert mode == 0o444
+
+    def test_root_publisher_missing_gate_key_errors(self, mock_git_repo, capsys):
+        self._setup_root_publisher_workspace(mock_git_repo, gate_regex=None)
+        from rlsbl.errors import ConfigError
+
+        with pytest.raises(ConfigError) as exc:
+            _cmd_sync({}, project_root=".")
+        assert "publish_gate_check_regex" in str(exc.value)

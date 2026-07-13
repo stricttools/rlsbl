@@ -6,7 +6,6 @@ import copy
 import hashlib
 import json
 import os
-import re
 from io import StringIO
 
 from ruamel.yaml import YAML
@@ -34,10 +33,21 @@ def parse_publish_workflow(path: str) -> dict:
         name       -- workflow ``name`` string, or None
     """
     with open(path) as f:
-        data = YAML(typ='safe').load(f)
+        content = f.read()
+    return parse_publish_workflow_content(content, source=path)
+
+
+def parse_publish_workflow_content(content: str, source: str = "<string>") -> dict:
+    """Parse a publish workflow from a YAML string.
+
+    Same contract as :func:`parse_publish_workflow` but reads from an
+    in-memory string. Used when the workflow is rendered from templates
+    (root publisher) rather than read from disk.
+    """
+    data = YAML(typ='safe').load(content)
 
     if not isinstance(data, dict) or "jobs" not in data:
-        raise ConfigError(f"Workflow file {path} is missing a 'jobs' key")
+        raise ConfigError(f"Workflow {source} is missing a 'jobs' key")
 
     return {
         "jobs": data["jobs"],
@@ -203,14 +213,36 @@ def transform_project_jobs(
     Returns a dict of transformed jobs ready for merging into the root workflow.
     """
     workflow = parse_publish_workflow(workflow_path)
-    jobs = dict(workflow["jobs"])
+    return transform_parsed_jobs(
+        project_name,
+        project_path,
+        tag_prefix,
+        workflow["jobs"],
+        workflow.get("permissions"),
+    )
 
-    # The member workflow's gate polls the member's standalone CI check
-    # names, which do not exist in a monorepo (CI runs via the router as
-    # reusable workflows). The router's shared gate replaces it.
+
+def transform_parsed_jobs(
+    project_name: str,
+    project_path: str,
+    tag_prefix: str,
+    jobs: dict,
+    permissions: dict | None,
+) -> dict:
+    """Transform already-parsed publish jobs for the monorepo router.
+
+    Shared by :func:`transform_project_jobs` (member workflows read from
+    disk) and the root-publisher path (jobs rendered from templates). See
+    :func:`transform_project_jobs` for the full ordered transform contract.
+    """
+    jobs = dict(jobs)
+
+    # The source workflow's gate polls its standalone CI check names, which
+    # do not exist in the monorepo (CI runs via the router as reusable
+    # workflows). The router's shared gate replaces it.
     jobs.pop(GATE_JOB_KEY, None)
 
-    jobs = resolve_permissions(jobs, workflow.get("permissions"))
+    jobs = resolve_permissions(jobs, permissions)
     jobs = rewrite_action_paths(jobs, project_path)
     jobs = inject_job_metadata(jobs, tag_prefix, project_path)
     jobs = prefix_jobs(project_name, jobs)
@@ -238,6 +270,117 @@ def transform_project_jobs(
 # CI-router job-key helpers live in the low-level rlsbl.ci_router module so the
 # check layer can share them without importing from the command layer.
 from ...ci_router import _router_ci_check_regex  # noqa: E402
+
+
+def _require_root_publish_gate_regex(project: dict, root: str) -> str:
+    """Return the mandatory ``publish_gate_check_regex`` for a root publisher.
+
+    Unlike sub-project members -- whose CI runs through the generated
+    ``ci-router.yml`` with known ``<prefix> / <job>`` check-run names -- the
+    root package's CI lives in a hand-authored workflow whose check-run names
+    rlsbl cannot infer. The gate must match check runs that actually execute
+    at the release SHA, so the regex is a REQUIRED config key with no default
+    (this is a security gate; a wrong or absent regex would let publishes run
+    ungated).
+
+    Raises ConfigError (hard error) when the key is missing.
+    """
+    from ...config import read_project_config
+    from ...targets import resolve_releasable_config_dir
+
+    rel_dir = resolve_releasable_config_dir(project, root)
+    project_dir = os.path.join(root, project["path"])
+    config = read_project_config(project_dir, releasable_config_dir=rel_dir)
+
+    regex = config.get("publish_gate_check_regex")
+    if not isinstance(regex, str) or not regex:
+        # Name the config surface the value belongs in.
+        if rel_dir is not None:
+            surface = os.path.join(rel_dir, "config.json")
+        else:
+            surface = os.path.join(project_dir, ".rlsbl", "config.json")
+        raise ConfigError(
+            "Root publisher (path='.') requires the config key "
+            "'publish_gate_check_regex'.\n"
+            "The monorepo publish gate must wait for the root package's CI "
+            "check runs to succeed on the release commit before publishing. "
+            "The root package's CI lives in a hand-authored workflow whose "
+            "check-run names rlsbl cannot infer (unlike sub-project members "
+            "routed through ci-router.yml), so you must declare the regex "
+            "that matches those check-run names -- there is no default.\n"
+            f"Add it to {surface}, e.g.:\n"
+            '  "publish_gate_check_regex": "^(test|lint)( \\\\(.*\\\\))?$"\n'
+            "The regex must match the check-run names that actually execute "
+            "at the release SHA."
+        )
+    return regex
+
+
+def _render_root_publisher_jobs(
+    project: dict, root: str, tag_prefix: str
+) -> dict:
+    """Render the root publisher's publish jobs from config/templates.
+
+    The root's publish.yml IS the router output, so it must never be read as
+    a source (source==destination, and the transform pipeline is not
+    idempotent on its own output). Instead the jobs are rendered from the
+    project's pipeline config using the SAME standalone publish-template
+    rendering the scaffold uses (``_generate_merged_publish``), then fed
+    through the shared transform pipeline like every other member. This makes
+    subsequent syncs regenerate from config, never from the router output --
+    idempotent by construction.
+    """
+    from datetime import datetime
+
+    from ...targets import TARGETS, detect_targets, resolve_releasable_config_dir
+    from ...commands.init_cmd import _generate_merged_publish
+    from .sync import _build_project_template_vars
+
+    project_path = project["path"].rstrip("/")
+    project_dir = os.path.join(root, project["path"])
+    rel_dir = resolve_releasable_config_dir(project, root)
+
+    entries = detect_targets(project_dir, releasable_config_dir=rel_dir)
+    targets = [e.name for e in entries if e.name in TARGETS]
+    if not targets:
+        raise ConfigError(
+            f"Root publisher '{project['name']}' (path='.') has no publish "
+            "targets; cannot generate publish jobs."
+        )
+
+    tvars = _build_project_template_vars(project_dir, root)
+    tvars["year"] = str(datetime.now().year)
+
+    # target_paths={} -> every target's path defaults to "." (repo root),
+    # so no working-directory/packages-dir subdir rewriting occurs here.
+    merged_yaml = _generate_merged_publish(targets, tvars, target_paths={})
+    workflow = parse_publish_workflow_content(
+        merged_yaml, source=f"<rendered root publisher {project['name']}>"
+    )
+    return transform_parsed_jobs(
+        _root_job_prefix(project, root),
+        project_path,
+        tag_prefix,
+        workflow["jobs"],
+        workflow.get("permissions"),
+    )
+
+
+def _root_job_prefix(project: dict, root: str) -> str:
+    """Return a valid GitHub job-key prefix for the root publisher.
+
+    A root project's derived name is the basename of its path (".") -- not a
+    valid job ID (GitHub job IDs must match ``[A-Za-z_][A-Za-z0-9_-]*``). Use
+    the releasable name when the root belongs to one (explicit mode), else the
+    repository directory name.
+    """
+    name = project.get("name")
+    if isinstance(name, str) and name not in (".", "", "/", "./"):
+        return name
+    rel = project.get("releasable")
+    if isinstance(rel, str) and rel:
+        return rel
+    return os.path.basename(os.path.realpath(root)) or "root"
 
 
 def generate_inline_publish_router(projects_with_publish: list, root: str, releasables=None) -> str:
@@ -271,16 +414,25 @@ def generate_inline_publish_router(projects_with_publish: list, root: str, relea
     prefix_regex_pairs: list = []
     for project in projects_with_publish:
         tag_prefix = _get_monorepo_tag_prefix(project, root, releasables=releasables)
-        prefix_regex_pairs.append((tag_prefix, _router_ci_check_regex(project)))
-        workflow_path = os.path.join(
-            root, project["path"], ".github", "workflows", "publish.yml"
-        )
-        jobs = transform_project_jobs(
-            project["name"],
-            project["path"].rstrip("/"),
-            tag_prefix,
-            workflow_path,
-        )
+        if project.get("_root_publisher"):
+            # Root publisher: source==destination, so generate jobs from config
+            # templates and take the gate check-regex from a mandatory config
+            # key (the root's real CI check names are unknowable to rlsbl).
+            prefix_regex_pairs.append(
+                (tag_prefix, _require_root_publish_gate_regex(project, root))
+            )
+            jobs = _render_root_publisher_jobs(project, root, tag_prefix)
+        else:
+            prefix_regex_pairs.append((tag_prefix, _router_ci_check_regex(project)))
+            workflow_path = os.path.join(
+                root, project["path"], ".github", "workflows", "publish.yml"
+            )
+            jobs = transform_project_jobs(
+                project["name"],
+                project["path"].rstrip("/"),
+                tag_prefix,
+                workflow_path,
+            )
         all_jobs.update(jobs)
 
     all_jobs = {
