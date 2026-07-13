@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.103.2",
+  "version": "0.104.0",
   "description": "",
   "language": "python",
   "base_url": "https://rlsbl.smmh.dev",
@@ -350,6 +350,11 @@
     {
       "path": "rlsbl-commands-migrate.md",
       "title": "rlsbl.commands.migrate",
+      "type": "doc"
+    },
+    {
+      "path": "rlsbl-commands-monorepo-batch_plan.md",
+      "title": "rlsbl.commands.monorepo.batch_plan",
       "type": "doc"
     },
     {
@@ -975,5 +980,5 @@
       ]
     }
   ],
-  "last_gen": "2026-07-11T16:37:46.292825+00:00"
+  "last_gen": "2026-07-13T18:30:33.754685+00:00"
 }

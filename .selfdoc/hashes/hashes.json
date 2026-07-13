@@ -54,7 +54,7 @@
     "schema_hash": "e94a74f595e95db44dea31614d5117ba1e387be38cba93c026ce73ae90a796d9"
   },
   "en/cli-index.md": {
-    "content": "9206fa8c0a8cc2eff196efc44fe5a2771de3602e85936217e2f33893b1223cad",
+    "content": "1baa4cff6eedc83380a060aa30601d0a6d58a79efc3f0840de9f71fa1dd8088b",
     "description": "3e97def3f73b8e72ae1147e1ad3b8c31a9459f8426045a2079b68028733fccd2",
     "seed_hash": "3e97def3f73b8e72ae1147e1ad3b8c31a9459f8426045a2079b68028733fccd2"
   },
@@ -139,8 +139,8 @@
     "description": "e64f9af5d7c999d82057449cf5f5e82b882e20ce163434b532ef26e1aa2f8d98"
   },
   "en/gen-index.md": {
-    "content": "e5b3e4c13dbd2c397e2a232b37fca41fabc0f5ba4297b455182e9c1e04072fea",
-    "description": "7be616b0ac617cd5235a1aada09955e45cf93052ffed1783678a5b844c8fb9ed"
+    "content": "70c6bf4541e33a1171688348de5589562e6be5f065c4dadf20277d5d788fd3cf",
+    "description": "dd8cf0d199c7b9c0543b8529bb7b4ccc42f5127334920d8883d9767a8056b6db"
   },
   "en/import-scanning.md": {
     "content": "59e73f7a20b3d50d588e9f1b25ed98c749400234cecf7778f59dfb159197429c",
@@ -338,6 +338,12 @@
     "content": "e81ca701678789ed20063d71bb0089a0ce7f2636a149e2157601fd91a2e17da6",
     "description": "36a8a7ab4fbb66028d91fee058eba7458c15d4ffa4c4da5600181e469864aba0",
     "source_docstring": "36a8a7ab4fbb66028d91fee058eba7458c15d4ffa4c4da5600181e469864aba0"
+  },
+  "en/rlsbl-commands-monorepo-batch_plan.md": {
+    "content": "f6d7429a12a68692153fa564636bdfe67753d763059a8395055077badc39920e",
+    "description": "dbdc4926b6ae544d4d69329c9f79f642987f590bf092ec57003ddd5f372ded6d",
+    "seed_hash": "dbdc4926b6ae544d4d69329c9f79f642987f590bf092ec57003ddd5f372ded6d",
+    "source_docstring": "90ebdcd3c45b2e1314efc5f2ec140578387a6b54b14f5d433f6d2b54d5f2f967"
   },
   "en/rlsbl-commands-monorepo-batch_release.md": {
     "content": "b781b0f60d282be08131cd33eb8554093021e8a7a503c0d1347611b5b0c00d3d",

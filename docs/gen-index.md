@@ -1,6 +1,6 @@
 ---
 title: API Reference
-description: "Auto-generated API reference index for the rlsbl package — browse every public module, including the shared tag-glob resolver and CI-router helpers, with docstrings and source locations."
+description: "Auto-generated API reference index for the rlsbl package — browse every public module, including the batch-plan sidecar, tag-glob resolver, and CI-router helpers, with docstrings and source locations."
 generated: true
 nav_group: "API Reference"
 nav_order: 0
@@ -45,6 +45,7 @@ order: 90
 - [rlsbl.commands.edit_release](rlsbl-commands-edit_release.html)
 - [rlsbl.commands.init_cmd](rlsbl-commands-init_cmd.html)
 - [rlsbl.commands.migrate](rlsbl-commands-migrate.html)
+- [rlsbl.commands.monorepo.batch_plan](rlsbl-commands-monorepo-batch_plan.html)
 - [rlsbl.commands.monorepo.batch_release](rlsbl-commands-monorepo-batch_release.html)
 - [rlsbl.commands.monorepo.batch_release_init](rlsbl-commands-monorepo-batch_release_init.html)
 - [rlsbl.commands.monorepo.commands](rlsbl-commands-monorepo-commands.html)

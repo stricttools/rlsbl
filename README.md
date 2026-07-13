@@ -167,7 +167,7 @@ See [docs/ci-customization.md](docs/ci-customization.md) for an example.
 
 ## Check system
 
-rlsbl includes 59 checks across 9 tags.
+rlsbl includes 60 checks across 9 tags.
 
 | Tag | Checks | Description |
 |-----|--------|-------------|
