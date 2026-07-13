@@ -7,3 +7,4 @@
 {"id":"18c1de94206e37bd34a6f03749a6461fb1c14e177a07aa62","commits":["b99d0db5548710f940e9c450a079a3b112c493fa"],"user_facing":false}
 {"id":"18c1de94287834c862993221f81c4442a0563c8182155e0c","commits":["1a956fb830a7530d5ae3ab9f4b7aaab843526eeb"],"user_facing":false}
 {"id":"18c1e70a47568fd607b79e03714f416c951de1011c7e5b8b","commits":["11aaf32c04a72972a8c21e59e1525625c7441ba3"],"user_facing":false}
+{"id":"18c1ecc8169aee1615b7761f9efb4d3188a3f8c7c928f0cc","commits":["9c73ed469f41f01813ab984178d93c77fc70d56f"],"user_facing":true,"description":"**Fix.** Monorepo sync now generates a gated publish router for workspaces whose sole publisher is the root package. New required `publish_gate_check_regex` config key specifies which CI check the gate matches. Previously, root-only publishers silently skipped gate generation and publishes ran ungated.","type":"fix"}
