@@ -761,6 +761,83 @@ def _run_release_mutating(state: ReleaseState):
     # Set to True after push_if_needed() returns successfully.
     branch_pushed = False
 
+    def _is_push_timeout(_exc):
+        """True when a push failure was a timeout.
+
+        Both the branch push (via ``push_if_needed``) and the tag push
+        surface timeouts as :class:`GitError` whose message contains
+        "timed out"; a raw :class:`subprocess.TimeoutExpired` counts too
+        (belt-and-braces in case conversion is bypassed).
+        """
+        import subprocess as _sp
+        from ...errors import GitError
+        if isinstance(_exc, _sp.TimeoutExpired):
+            return True
+        return isinstance(_exc, GitError) and "timed out" in str(_exc).lower()
+
+    def _handle_resumable_push_failure(_exc):
+        """Classify a post-TAGGED push failure as RESUMABLE (no rollback).
+
+        Once the release is TAGGED and its changelog / release-file
+        artifacts are finalized on disk, a push failure is the canonical
+        resumable state: the tag exists, the finalized files are committed,
+        and ``rlsbl release resume`` re-attempts the push with idempotent
+        guards. We therefore skip the entire rollback family — no clobber
+        guard, no ``git reset --hard``, no tag deletion, no artifact
+        cleanup, no state clearing — record a failed PUSHED marker, and
+        print the resume command. When the branch is already on the remote,
+        a best-effort tag-push retry is attempted first (transient stalls
+        often clear on retry); a recovered tag push marks PUSHED complete so
+        resume picks up at GITHUB_RELEASE.
+        """
+        _timed_out = _is_push_timeout(_exc)
+        _retry_env = {**os.environ, "RLSBL_RELEASE_PUSH": "1"}
+        _retry_timeout = get_push_timeout(ctx.config)
+        if branch_pushed:
+            # Branch commits are already on the remote; only the tag push
+            # is outstanding. Retry it a couple of times before giving up.
+            for _attempt in range(2):
+                time.sleep(1)
+                try:
+                    run(
+                        "git",
+                        ["push", "origin", tag] + list(state.companion_tags),
+                        timeout=_retry_timeout, env=_retry_env,
+                    )
+                    log(f"Tag push succeeded on retry {_attempt + 1}")
+                    save_step(_state_path, "PUSHED")
+                    _completed.add("PUSHED")
+                    break
+                except Exception:
+                    pass
+        if "PUSHED" not in _completed:
+            # Record the failed PUSHED step (fatal + resumable). This does
+            # NOT gate resume-skip; resume re-attempts PUSHED via its own
+            # idempotent branch/tag guards.
+            save_step_failure(
+                _state_path, "PUSHED", str(_exc) or _exc.__class__.__name__,
+            )
+        if hasattr(_exc, "stderr") and _exc.stderr:
+            print(f"Command error: {_exc.stderr.strip()}", file=sys.stderr)
+        print(
+            f"Error: push failed after the release was tagged ({tag}). "
+            f"Local state is intact and fully resumable — nothing was rolled "
+            f"back; the tag and finalized changelog files are preserved.",
+            file=sys.stderr,
+        )
+        if _timed_out:
+            print(
+                f"The push timed out (limit: {_retry_timeout}s). Raise the "
+                f"timeout and resume:\n"
+                f"  RLSBL_PUSH_TIMEOUT=300 rlsbl release resume",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                "Fix the issue and resume:\n  rlsbl release resume",
+                file=sys.stderr,
+            )
+
     # Everything from version-bump writes through commit/tag/push is wrapped
     # in a single try block so that any failure (including ReleaseAbortError
     # from the unexpected-files check) triggers rollback of version-bumped
@@ -1316,38 +1393,28 @@ def _run_release_mutating(state: ReleaseState):
                 pass
 
             if _tag_needs_push:
-                run("git", ["push", "origin", tag] + state.companion_tags, timeout=push_timeout, env=push_env)
+                import subprocess as _subprocess
+                try:
+                    run("git", ["push", "origin", tag] + state.companion_tags, timeout=push_timeout, env=push_env)
+                except _subprocess.TimeoutExpired as _e:
+                    from ...errors import GitError
+                    raise GitError(
+                        f"Tag push timed out after {push_timeout}s — remote "
+                        f"state may be inconsistent. Check with: "
+                        f"git ls-remote --tags origin {tag}"
+                    ) from _e
 
             log(f"Pushed to origin/{branch}")
             save_step(_state_path, "PUSHED")
             _completed.add("PUSHED")
     except ReleaseAbortError as e:
-        if branch_pushed:
-            # Commits are already on the remote. Do NOT roll back locally --
-            # that would create divergent local/remote state. State file
-            # is preserved for future resume.
-            # Retry tag push before giving up.
-            _tag_recovered = False
-            for _attempt in range(2):
-                time.sleep(1)
-                try:
-                    run("git", ["push", "origin", tag] + state.companion_tags, timeout=push_timeout, env=push_env)
-                    _tag_recovered = True
-                    log(f"Tag push succeeded on retry {_attempt + 1}")
-                    break
-                except Exception:
-                    pass
-            if not _tag_recovered:
-                all_tags = [tag] + list(state.companion_tags)
-                tag_list = " ".join(all_tags)
-                print(
-                    f"Commits pushed successfully but tag push failed.\n"
-                    f"To complete the release manually:\n"
-                    f"  git push origin {tag_list}",
-                    file=sys.stderr,
-                )
+        if "TAGGED" in _completed:
+            # Post-TAGGED failure: canonical resumable state. Preserve
+            # everything and record a failed PUSHED marker instead of
+            # rolling back (which would destroy exactly what resume needs).
+            _handle_resumable_push_failure(e)
             raise
-        # Branch was not pushed yet -- safe to roll back locally,
+        # Pre-TAGGED failure -- safe to roll back locally,
         # but only if no foreign commits or dirty files would be destroyed.
         _guard_rollback(pre_release_sha, _state_path)
         run("git", ["reset", "--hard", pre_release_sha])
@@ -1365,35 +1432,13 @@ def _run_release_mutating(state: ReleaseState):
         )
         raise
     except Exception as e:
-        if branch_pushed:
-            # Commits are already on the remote. Do NOT roll back locally --
-            # that would create divergent local/remote state. State file
-            # is preserved for future resume.
-            # Retry tag push before giving up.
-            _tag_recovered = False
-            for _attempt in range(2):
-                time.sleep(1)
-                try:
-                    run("git", ["push", "origin", tag] + state.companion_tags, timeout=push_timeout, env=push_env)
-                    _tag_recovered = True
-                    log(f"Tag push succeeded on retry {_attempt + 1}")
-                    break
-                except Exception:
-                    pass
-            if not _tag_recovered:
-                all_tags = [tag] + list(state.companion_tags)
-                tag_list = " ".join(all_tags)
-                if hasattr(e, 'stderr') and e.stderr:
-                    print(f"Command error: {e.stderr.strip()}", file=sys.stderr)
-                print(
-                    f"Commits pushed successfully but tag push failed.\n"
-                    f"To complete the release manually:\n"
-                    f"  git push origin {tag_list}",
-                    file=sys.stderr,
-                )
-            # Do NOT delete the local tag -- it's needed for manual recovery
+        if "TAGGED" in _completed:
+            # Post-TAGGED failure (push failed / timed out): canonical
+            # resumable state. Preserve everything and record a failed
+            # PUSHED marker instead of rolling back.
+            _handle_resumable_push_failure(e)
             raise
-        # Branch was not pushed yet -- safe to roll back locally,
+        # Pre-TAGGED failure -- safe to roll back locally,
         # but only if no foreign commits or dirty files would be destroyed.
         _guard_rollback(pre_release_sha, _state_path)
         # Delete tag (may not exist yet) and reset commits so the working

@@ -1472,12 +1472,24 @@ class TestReleaseRollbackOnPushFailure:
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.app.run_checks", return_value=([], 0))
-    def test_rollback_on_push_failure(self, _run_checks, _gh_inst, _gh_auth, _validate,
-                                      _gen_cl, _extract, _tag, _deploy, _push):
-        """When git push fails, local commits and tag from the release must be undone."""
-        from rlsbl.commands.release import run_cmd
+    def test_push_failure_after_tag_is_resumable_not_rolled_back(
+        self, _run_checks, _gh_inst, _gh_auth, _validate,
+        _gen_cl, _extract, _tag, _deploy, _push,
+    ):
+        """A push failure AFTER tagging must be classified RESUMABLE.
 
-        # Run release -- push_if_needed raises CalledProcessError
+        The release is already TAGGED with finalized changelog files on disk,
+        so a failed branch push must NOT trigger a destructive rollback
+        (which would destroy exactly the state `release resume` needs).
+        Instead the tag and commits are preserved and a failed PUSHED marker
+        is recorded. (Previously this rolled back -- the bug this fixes.)
+        """
+        from rlsbl.commands.release import run_cmd
+        from rlsbl.commands.release.release_state import (
+            get_state_path, load_release_state,
+        )
+
+        # Run release -- push_if_needed raises CalledProcessError post-TAGGED
         with pytest.raises(subprocess.CalledProcessError):
             with patch("sys.stdout", new_callable=StringIO):
                 run_cmd(_rc(), {
@@ -1487,19 +1499,24 @@ class TestReleaseRollbackOnPushFailure:
                 ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}),
 )
 
-        # After push failure, HEAD should be at the pre-release SHA
-        # (version-bump and finalize commits should have been rolled back)
+        # HEAD must NOT be rolled back -- the release commits are preserved.
         post_sha = subprocess.run(
             ["git", "rev-parse", "HEAD"],
             capture_output=True, text=True, check=True,
         ).stdout.strip()
-        assert post_sha == self.pre_release_sha, \
-            "HEAD should be rolled back to pre-release position"
+        assert post_sha != self.pre_release_sha, \
+            "HEAD must NOT be rolled back after a post-TAGGED push failure"
 
-        # The tag for the attempted version should not exist locally
+        # The tag must be preserved for resume.
         tag_check = subprocess.run(
             ["git", "tag", "-l", "v1.0.1"],
             capture_output=True, text=True, check=True,
         ).stdout.strip()
-        assert tag_check == "", \
-            "Tag v1.0.1 should not exist after failed push"
+        assert tag_check == "v1.0.1", \
+            "Tag v1.0.1 must be preserved after a post-TAGGED push failure"
+
+        # State preserved with a failed PUSHED marker.
+        state = load_release_state(get_state_path("."))
+        assert state is not None, "in-progress.json must be preserved"
+        assert "TAGGED" in state["completed_steps"]
+        assert "PUSHED" in state.get("failed_steps", {})

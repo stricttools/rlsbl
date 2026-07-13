@@ -9,7 +9,6 @@ from unittest.mock import patch
 import pytest
 
 from rlsbl.commands.release import resume_cmd, run_cmd
-from rlsbl.commands.release.execute import ReleaseState
 from rlsbl.commands.release.release_state import (
     get_state_path,
     load_release_state,
@@ -237,6 +236,64 @@ class TestResumeAfterTagPushFailure:
             )
 
         # State file should be cleared on success
+        assert not os.path.exists(state_path), \
+            "in-progress.json should be deleted after successful resume"
+
+
+class TestResumeAfterPostTaggedPushTimeout:
+    """Resume completes a release left in the canonical post-timeout state:
+    completed-through-TAGGED plus a failed PUSHED marker (as written by the
+    resumable-classification path). Resume must re-attempt the push (branch +
+    tags), continue, and clear the state."""
+
+    def test_resume_completes_with_failed_pushed_marker(self, mock_git_repo):
+        _setup_releasable_npm_project(mock_git_repo)
+
+        # Simulate a partial release through TAGGED whose push timed out.
+        pkg = json.loads((mock_git_repo / "package.json").read_text())
+        pkg["version"] = "1.0.1"
+        (mock_git_repo / "package.json").write_text(json.dumps(pkg, indent=2) + "\n")
+        _git(mock_git_repo, "add", "package.json")
+        _git(mock_git_repo, "commit", "-q", "-m", "v1.0.1")
+        _git(mock_git_repo, "tag", "v1.0.1")
+
+        state_path = _make_in_progress_state(
+            mock_git_repo,
+            completed_steps=[
+                "VERSION_BUMPED", "COMMITTED", "CHANGELOG_FINALIZED",
+                "RELEASE_FILE_FINALIZED", "TAGGED",
+            ],
+            extra={"failed_steps": {"PUSHED": "Push timed out after 120s"}},
+        )
+
+        pushed_refs = []
+
+        def tracking_run(cmd, args=None, timeout=120, env=None, cwd=None):
+            if cmd == "gh":
+                return ""
+            if cmd == "git" and args and args[0] == "push":
+                pushed_refs.append(list(args))
+                return ""
+            if cmd == "git" and args and args[0] == "fetch":
+                return ""
+            return real_run(cmd, args=args, timeout=timeout, env=env, cwd=cwd)
+
+        with (
+            patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.run_gh", return_value=""),
+            patch("rlsbl.commands.release.run", side_effect=tracking_run),
+        ):
+            resume_cmd(
+                load_release_state(state_path),
+                {"yes": True, "quiet": True},
+                ctx=_make_ctx(mock_git_repo),
+            )
+
+        # The tag push was re-attempted (branch push is push_if_needed, mocked).
+        assert any(any(str(r).startswith("v") for r in refs[1:]) for refs in pushed_refs), \
+            f"resume must re-attempt the tag push; saw pushes: {pushed_refs}"
+
+        # State cleared on successful completion.
         assert not os.path.exists(state_path), \
             "in-progress.json should be deleted after successful resume"
 

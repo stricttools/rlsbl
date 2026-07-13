@@ -9,9 +9,8 @@ See todo/partial-push-rollback-bug.md for the original bug report.
 """
 
 import json
-import os
 import subprocess
-from unittest.mock import patch, call, MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -159,3 +158,157 @@ class TestPartialPushRollback:
             "git reset --hard must NOT be called when branch push succeeded "
             "but tag push failed -- the commits are already on the remote"
         )
+
+
+def _tag_exists(repo, tag):
+    result = subprocess.run(
+        ["git", "tag", "-l", tag],
+        cwd=str(repo), capture_output=True, text=True, check=True,
+    )
+    return bool(result.stdout.strip())
+
+
+class TestPostTaggedPushResumable:
+    """Post-TAGGED push failures must be classified RESUMABLE, not rolled back.
+
+    Once the release is TAGGED and its finalized changelog / release-file
+    artifacts are on disk, ANY push failure (branch push OR tag push, plain
+    failure OR timeout) is the canonical resumable state. The executor must
+    skip the entire rollback family (no `git reset --hard`, no tag deletion,
+    no artifact cleanup, no state clearing), record a failed PUSHED marker,
+    and print the resume command.
+
+    Red-green regression for the push-timeout resumable-classification bug:
+    a transient branch-push stall AFTER tagging previously triggered a
+    destructive rollback (classification was keyed on `branch_pushed` instead
+    of `TAGGED`), destroying exactly the state `release resume` needs.
+
+    Two timeout-surfacing forms are covered:
+      1. Branch push timeout -> `push_if_needed` raises `GitError` ("timed out").
+      2. Tag push timeout -> raw `run()` raises `subprocess.TimeoutExpired`,
+         which the executor converts to `GitError` at the call site.
+    """
+
+    def _assert_resumable_state(self, repo, pre_sha):
+        """Common post-conditions: tag + commits + finalized files + state
+        all preserved, PUSHED recorded as a failed step."""
+        from rlsbl.commands.release.release_state import (
+            get_state_path, load_release_state,
+        )
+
+        assert _tag_exists(repo, "v1.0.1"), \
+            "tag must be preserved after a post-TAGGED push failure"
+        assert _git_head(repo) != pre_sha, \
+            "release commits must NOT be rolled back post-TAGGED"
+
+        state = load_release_state(get_state_path(str(repo)))
+        assert state is not None, "in-progress.json must be preserved"
+        assert "TAGGED" in state["completed_steps"]
+        assert "PUSHED" not in state["completed_steps"]
+        assert "PUSHED" in state.get("failed_steps", {}), \
+            "a failed PUSHED marker must be recorded"
+
+        assert (repo / ".rlsbl" / "changes" / "1.0.1.jsonl").exists(), \
+            "finalized changelog file must remain on disk"
+
+    def test_branch_push_timeout_after_tag_is_resumable(self, tmp_project, capsys):
+        """Form 1: branch push times out (GitError) after the tag is created."""
+        _setup_releasable_npm_project(tmp_project)
+
+        from rlsbl.commands.release import run_cmd
+        from rlsbl.errors import GitError
+        from rlsbl.utils import run as real_run
+
+        pre_sha = _git_head(tmp_project)
+        reset_hard_called = False
+
+        def fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
+            nonlocal reset_hard_called
+            if cmd == "gh":
+                return ""
+            if (cmd == "git" and args and len(args) >= 2
+                    and args[0] == "reset" and args[1] == "--hard"):
+                reset_hard_called = True
+            return real_run(cmd, args=args, timeout=timeout, env=env, cwd=cwd)
+
+        branch_timeout = GitError(
+            "Push timed out after 120s — remote state may be inconsistent. "
+            "Check with: git push --dry-run"
+        )
+
+        with (
+            patch("rlsbl.commands.release.check_gh_installed", return_value=True),
+            patch("rlsbl.commands.release.check_gh_auth", return_value=True),
+            patch("rlsbl.commands.release.push_if_needed", side_effect=branch_timeout),
+            patch("rlsbl.commands.release.run", side_effect=fake_run),
+        ):
+            with pytest.raises(GitError):
+                run_cmd(
+                    _rc(),
+                    {"yes": True, "quiet": False},
+                    ctx=ProjectContext(
+                        project_root=Path("."), workspace_root=None,
+                        config={"private": False, "pipelines": {}},
+                    ),
+                )
+
+        assert not reset_hard_called, \
+            "git reset --hard must NOT run for a post-TAGGED branch-push timeout"
+        self._assert_resumable_state(tmp_project, pre_sha)
+
+        captured = capsys.readouterr()
+        assert "rlsbl release resume" in captured.err
+        assert "RLSBL_PUSH_TIMEOUT" in captured.err, \
+            "a timeout failure must suggest raising RLSBL_PUSH_TIMEOUT"
+
+    def test_tag_push_raw_timeout_after_tag_is_resumable(self, tmp_project, capsys):
+        """Form 2: tag push raises raw subprocess.TimeoutExpired (branch OK)."""
+        _setup_releasable_npm_project(tmp_project)
+
+        from rlsbl.commands.release import run_cmd
+        from rlsbl.errors import GitError
+        from rlsbl.utils import run as real_run
+
+        pre_sha = _git_head(tmp_project)
+        reset_hard_called = False
+
+        def fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
+            nonlocal reset_hard_called
+            if cmd == "gh":
+                return ""
+            if cmd == "git" and args:
+                if (len(args) >= 2 and args[0] == "reset" and args[1] == "--hard"):
+                    reset_hard_called = True
+                # Raw tag push times out (tag refs start with "v").
+                if (args[0] == "push" and len(args) >= 3
+                        and args[1] == "origin" and args[2].startswith("v")):
+                    raise subprocess.TimeoutExpired(
+                        cmd=["git", "push", "origin", args[2]], timeout=timeout,
+                    )
+            return real_run(cmd, args=args, timeout=timeout, env=env, cwd=cwd)
+
+        with (
+            patch("rlsbl.commands.release.check_gh_installed", return_value=True),
+            patch("rlsbl.commands.release.check_gh_auth", return_value=True),
+            # Branch push succeeds (no-op) -> branch_pushed becomes True.
+            patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.run", side_effect=fake_run),
+        ):
+            # Raw TimeoutExpired is converted to GitError at the call site.
+            with pytest.raises(GitError):
+                run_cmd(
+                    _rc(),
+                    {"yes": True, "quiet": False},
+                    ctx=ProjectContext(
+                        project_root=Path("."), workspace_root=None,
+                        config={"private": False, "pipelines": {}},
+                    ),
+                )
+
+        assert not reset_hard_called, \
+            "git reset --hard must NOT run for a post-TAGGED tag-push timeout"
+        self._assert_resumable_state(tmp_project, pre_sha)
+
+        captured = capsys.readouterr()
+        assert "rlsbl release resume" in captured.err
+        assert "RLSBL_PUSH_TIMEOUT" in captured.err
