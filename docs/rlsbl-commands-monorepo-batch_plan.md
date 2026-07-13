@@ -2,7 +2,6 @@
 title: rlsbl.commands.monorepo.batch_plan
 description: "Resolved-plan sidecar for monorepo batch releases."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 36
 ---
