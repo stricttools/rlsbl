@@ -399,11 +399,15 @@ class TestHookTimeout:
         monkeypatch.setenv("RLSBL_HOOK_TIMEOUT", "60")
         assert get_hook_timeout() == 60
 
-    def test_get_hook_timeout_invalid_warns(self, monkeypatch, capsys):
+    def test_get_hook_timeout_invalid_raises(self, monkeypatch):
+        from rlsbl.errors import ConfigError
+
         monkeypatch.setenv("RLSBL_HOOK_TIMEOUT", "abc")
-        assert get_hook_timeout() is None
-        captured = capsys.readouterr()
-        assert "invalid RLSBL_HOOK_TIMEOUT" in captured.err
+        with pytest.raises(ConfigError) as exc_info:
+            get_hook_timeout()
+        msg = str(exc_info.value)
+        assert "RLSBL_HOOK_TIMEOUT" in msg
+        assert "abc" in msg
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
