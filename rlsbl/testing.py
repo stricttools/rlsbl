@@ -13,6 +13,13 @@ import tomllib
 from .errors import ConfigError
 from .utils import detect_uv_workspace_root, get_check_timeout, require_tool
 
+# Shared remediation hint appended to every "command timed out" failure message
+# so agents know which knob controls the budget. Kept identical across all sites.
+CHECK_TIMEOUT_HINT = (
+    "(budget configurable: check_timeout in .rlsbl/config.json or "
+    "RLSBL_CHECK_TIMEOUT — the check still hard-fails on real hangs)"
+)
+
 
 def sync_workspace(
     workspace_root: str, *, verbose: bool = False, check_timeout: int = 120
@@ -33,7 +40,7 @@ def sync_workspace(
     try:
         result = subprocess.run(sync_cmd, cwd=workspace_root, timeout=check_timeout)
     except subprocess.TimeoutExpired:
-        print(f"Error: command timed out after {check_timeout}s: {sync_cmd}", file=sys.stderr)
+        print(f"Error: command timed out after {check_timeout}s: {sync_cmd} {CHECK_TIMEOUT_HINT}", file=sys.stderr)
         return False
     if result.returncode != 0:
         print("Error: uv sync failed.", file=sys.stderr)
@@ -90,15 +97,15 @@ def _resolve_pytest_invocation(
 ) -> list[str]:
     """Build the pytest command for a project based on its environment.
 
-    For workspace members, returns plain ``uv run pytest`` (the workspace
-    venv has everything). For standalone projects, probes pyproject.toml
-    to determine the correct uv flags.
+    For workspace members, returns plain ``uv run python -m pytest`` (the
+    workspace venv has everything). For standalone projects, probes
+    pyproject.toml to determine the correct uv flags.
 
     Raises ConfigError if pytest is not declared anywhere in pyproject.toml.
     """
     uv_ws_root = detect_uv_workspace_root(project_dir)
     if uv_ws_root is not None:
-        return ["uv", "run", "pytest"]
+        return ["uv", "run", "python", "-m", "pytest"]
 
     location = _probe_pytest_location(project_dir)
     if location is None:
@@ -110,13 +117,13 @@ def _resolve_pytest_invocation(
     source_type, name = location
     if source_type == "dependency-group":
         if name == "dev":
-            return ["uv", "run", "pytest"]
-        return ["uv", "run", "--group", name, "pytest"]
+            return ["uv", "run", "python", "-m", "pytest"]
+        return ["uv", "run", "--group", name, "python", "-m", "pytest"]
     elif source_type == "optional-dep":
-        return ["uv", "run", "--extra", name, "pytest"]
+        return ["uv", "run", "--extra", name, "python", "-m", "pytest"]
     else:
         # uv-dev: uv syncs dev deps by default
-        return ["uv", "run", "pytest"]
+        return ["uv", "run", "python", "-m", "pytest"]
 
 
 def run_project_tests(
@@ -178,10 +185,10 @@ def _run_pypi_tests(
 ) -> bool:
     """Run Python tests via uv or bare pytest.
 
-    For workspace members: syncs at workspace root, then runs ``uv run pytest``.
-    For standalone projects: skips sync (``uv run`` handles it),
-    uses ``_resolve_pytest_invocation`` to build the correct command.
-    Falls back to bare ``pytest`` when uv is not installed.
+    For workspace members: syncs at workspace root, then runs
+    ``uv run python -m pytest``. For standalone projects: skips sync
+    (``uv run`` handles it), uses ``_resolve_pytest_invocation`` to build the
+    correct command. Falls back to ``python -m pytest`` when uv is not installed.
     """
     uv_verbose = config.get("uv_sync_verbose", False)
     effective_dir = project_dir or "."
@@ -193,7 +200,7 @@ def _run_pypi_tests(
         )
 
         if is_workspace_member:
-            # Workspace member: sync at workspace root, run plain uv run pytest
+            # Workspace member: sync at workspace root, run uv run python -m pytest
             if not skip_sync:
                 if not sync_workspace(
                     workspace_root, verbose=uv_verbose, check_timeout=check_timeout
@@ -207,13 +214,14 @@ def _run_pypi_tests(
         try:
             result = subprocess.run(cmd, cwd=project_dir, timeout=check_timeout)
         except subprocess.TimeoutExpired:
-            print(f"Error: command timed out after {check_timeout}s: {cmd}", file=sys.stderr)
+            print(f"Error: command timed out after {check_timeout}s: {cmd} {CHECK_TIMEOUT_HINT}", file=sys.stderr)
             return False
     elif require_tool("pytest", fatal=False):
+        fallback_cmd = ["python", "-m", "pytest"]
         try:
-            result = subprocess.run(["pytest"], cwd=project_dir, timeout=check_timeout)
+            result = subprocess.run(fallback_cmd, cwd=project_dir, timeout=check_timeout)
         except subprocess.TimeoutExpired:
-            print(f"Error: command timed out after {check_timeout}s: ['pytest']", file=sys.stderr)
+            print(f"Error: command timed out after {check_timeout}s: {fallback_cmd} {CHECK_TIMEOUT_HINT}", file=sys.stderr)
             return False
     else:
         print("Warning: neither uv nor pytest found, skipping tests.", file=sys.stderr)
@@ -228,7 +236,7 @@ def _run_go_tests(*, project_dir: str | None, check_timeout: int = 120) -> bool:
     try:
         result = subprocess.run(cmd, cwd=project_dir, timeout=check_timeout)
     except subprocess.TimeoutExpired:
-        print(f"Error: command timed out after {check_timeout}s: {cmd}", file=sys.stderr)
+        print(f"Error: command timed out after {check_timeout}s: {cmd} {CHECK_TIMEOUT_HINT}", file=sys.stderr)
         return False
     return result.returncode == 0
 
@@ -246,7 +254,7 @@ def _run_maven_tests(*, project_dir: str | None, check_timeout: int = 120) -> bo
         try:
             result = subprocess.run(cmd, cwd=project_dir, timeout=check_timeout)
         except subprocess.TimeoutExpired:
-            print(f"Error: command timed out after {check_timeout}s: {cmd}", file=sys.stderr)
+            print(f"Error: command timed out after {check_timeout}s: {cmd} {CHECK_TIMEOUT_HINT}", file=sys.stderr)
             return False
         return result.returncode == 0
 
@@ -256,7 +264,7 @@ def _run_maven_tests(*, project_dir: str | None, check_timeout: int = 120) -> bo
         try:
             result = subprocess.run(cmd, cwd=project_dir, timeout=check_timeout)
         except subprocess.TimeoutExpired:
-            print(f"Error: command timed out after {check_timeout}s: {cmd}", file=sys.stderr)
+            print(f"Error: command timed out after {check_timeout}s: {cmd} {CHECK_TIMEOUT_HINT}", file=sys.stderr)
             return False
         return result.returncode == 0
 
@@ -272,10 +280,11 @@ def _run_npm_tests(*, project_dir: str | None, check_timeout: int = 120) -> bool
             with open(pkg_path, "r", encoding="utf-8") as f:
                 pkg = json.load(f)
             if pkg.get("scripts", {}).get("test"):
+                npm_cmd = ["npm", "test"]
                 try:
-                    result = subprocess.run(["npm", "test"], cwd=project_dir, timeout=check_timeout)
+                    result = subprocess.run(npm_cmd, cwd=project_dir, timeout=check_timeout)
                 except subprocess.TimeoutExpired:
-                    print(f"Error: command timed out after {check_timeout}s: ['npm', 'test']", file=sys.stderr)
+                    print(f"Error: command timed out after {check_timeout}s: {npm_cmd} {CHECK_TIMEOUT_HINT}", file=sys.stderr)
                     return False
                 return result.returncode == 0
             else:

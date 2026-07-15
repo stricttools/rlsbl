@@ -2,6 +2,7 @@
 
 import subprocess
 
+from ..testing import CHECK_TIMEOUT_HINT
 from .config import LanguageLintConfig
 from .result import LintResult
 
@@ -46,7 +47,7 @@ class MavenLinter:
                     line=0,
                     rule="maven-lint",
                     severity="error",
-                    message=f"Lint command timed out after {check_timeout}s: {cmd}",
+                    message=f"Lint command timed out after {check_timeout}s: {cmd} {CHECK_TIMEOUT_HINT}",
                 )
             ]
 

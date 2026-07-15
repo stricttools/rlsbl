@@ -1,11 +1,13 @@
 """Tests for MavenLinter -- subprocess-based lint for Maven/Gradle projects."""
 
+import subprocess
 from unittest.mock import patch, MagicMock
 
 from rlsbl.lint import lint_library, _detect_languages, _create_linter
 from rlsbl.lint.config import LanguageLintConfig
 from rlsbl.lint.maven import MavenLinter
 from rlsbl.lint.result import LintResult
+from rlsbl.testing import CHECK_TIMEOUT_HINT
 
 
 class TestMavenLinterLint:
@@ -39,6 +41,27 @@ class TestMavenLinterLint:
             text=True,
             timeout=120,
         )
+
+    def test_timeout_message_includes_budget_hint(self, tmp_path):
+        """A lint timeout surfaces the configurable-budget remediation hint."""
+        linter = MavenLinter()
+        config = LanguageLintConfig()
+
+        with (
+            patch(
+                "rlsbl.targets.maven.MavenTarget.detect_lint_command",
+                return_value=["./gradlew", "detekt"],
+            ),
+            patch(
+                "rlsbl.lint.maven.subprocess.run",
+                side_effect=subprocess.TimeoutExpired(cmd=["./gradlew", "detekt"], timeout=1),
+            ),
+        ):
+            results = linter.lint(str(tmp_path), config)
+
+        assert len(results) == 1
+        assert "timed out" in results[0].message
+        assert CHECK_TIMEOUT_HINT in results[0].message
 
     def test_returns_lint_result_on_failure(self, tmp_path):
         """Subprocess exits non-zero -> one LintResult with error output."""

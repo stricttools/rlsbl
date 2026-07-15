@@ -8,6 +8,7 @@ import pytest
 
 from rlsbl.errors import ConfigError
 from rlsbl.testing import (
+    CHECK_TIMEOUT_HINT,
     _probe_pytest_location,
     _resolve_pytest_invocation,
     run_project_tests,
@@ -53,7 +54,7 @@ class TestPypiTarget:
             assert result is True
             # Standalone: no sync, just uv run pytest
             assert mock_run.call_count == 1
-            assert mock_run.call_args_list[0][0][0] == ["uv", "run", "pytest"]
+            assert mock_run.call_args_list[0][0][0] == ["uv", "run", "python", "-m", "pytest"]
 
     def test_pypi_workspace_member_syncs_and_runs(self, tmp_project):
         """pypi workspace member runs uv sync + uv run pytest."""
@@ -78,7 +79,7 @@ class TestPypiTarget:
             assert mock_run.call_args_list[0][0][0] == ["uv", "sync", "--all-packages", "--quiet"]
             assert mock_run.call_args_list[0].kwargs.get("cwd") == str(ws_root)
             # Second call: uv run pytest at project dir
-            assert mock_run.call_args_list[1][0][0] == ["uv", "run", "pytest"]
+            assert mock_run.call_args_list[1][0][0] == ["uv", "run", "python", "-m", "pytest"]
 
     def test_pypi_uv_sync_verbose(self, tmp_project):
         """When uv_sync_verbose is set, uv sync runs without --quiet (workspace member)."""
@@ -145,7 +146,7 @@ class TestPypiTarget:
 
             assert result is True
             assert mock_run.call_count == 1
-            assert mock_run.call_args[0][0] == ["pytest"]
+            assert mock_run.call_args[0][0] == ["python", "-m", "pytest"]
 
 
 # ---------------------------------------------------------------------------
@@ -321,7 +322,7 @@ class TestWorkspaceRoot:
             assert sync_call.kwargs.get("cwd") == workspace
             # uv run pytest runs at project dir
             pytest_call = mock_run.call_args_list[1]
-            assert pytest_call[0][0] == ["uv", "run", "pytest"]
+            assert pytest_call[0][0] == ["uv", "run", "python", "-m", "pytest"]
             assert pytest_call.kwargs.get("cwd") == project
 
     def test_pypi_workspace_skip_sync(self, tmp_project):
@@ -344,7 +345,7 @@ class TestWorkspaceRoot:
             assert result is True
             # Only pytest should run, not uv sync
             assert mock_run.call_count == 1
-            assert mock_run.call_args[0][0] == ["uv", "run", "pytest"]
+            assert mock_run.call_args[0][0] == ["uv", "run", "python", "-m", "pytest"]
             assert mock_run.call_args.kwargs.get("cwd") == project
 
     def test_pypi_standalone_no_sync(self, tmp_project):
@@ -368,7 +369,7 @@ class TestWorkspaceRoot:
             assert result is True
             # No sync call -- only pytest
             assert mock_run.call_count == 1
-            assert mock_run.call_args[0][0] == ["uv", "run", "pytest"]
+            assert mock_run.call_args[0][0] == ["uv", "run", "python", "-m", "pytest"]
             assert mock_run.call_args.kwargs.get("cwd") == project
 
 
@@ -540,7 +541,7 @@ class TestResolvePytestInvocation:
         """Workspace members get plain uv run pytest."""
         with patch("rlsbl.testing.detect_uv_workspace_root", return_value="/ws"):
             result = _resolve_pytest_invocation(str(tmp_project), "/ws")
-        assert result == ["uv", "run", "pytest"]
+        assert result == ["uv", "run", "python", "-m", "pytest"]
 
     def test_standalone_dev_group(self, tmp_project):
         """Standalone with pytest in [dependency-groups].dev gets uv run pytest."""
@@ -550,7 +551,7 @@ class TestResolvePytestInvocation:
         )
         with patch("rlsbl.testing.detect_uv_workspace_root", return_value=None):
             result = _resolve_pytest_invocation(str(tmp_project), None)
-        assert result == ["uv", "run", "pytest"]
+        assert result == ["uv", "run", "python", "-m", "pytest"]
 
     def test_standalone_named_group(self, tmp_project):
         """Standalone with pytest in a named group gets --group flag."""
@@ -560,7 +561,7 @@ class TestResolvePytestInvocation:
         )
         with patch("rlsbl.testing.detect_uv_workspace_root", return_value=None):
             result = _resolve_pytest_invocation(str(tmp_project), None)
-        assert result == ["uv", "run", "--group", "test", "pytest"]
+        assert result == ["uv", "run", "--group", "test", "python", "-m", "pytest"]
 
     def test_standalone_optional_dep(self, tmp_project):
         """Standalone with pytest in optional-dependencies gets --extra flag."""
@@ -570,7 +571,7 @@ class TestResolvePytestInvocation:
         )
         with patch("rlsbl.testing.detect_uv_workspace_root", return_value=None):
             result = _resolve_pytest_invocation(str(tmp_project), None)
-        assert result == ["uv", "run", "--extra", "test", "pytest"]
+        assert result == ["uv", "run", "--extra", "test", "python", "-m", "pytest"]
 
     def test_standalone_uv_dev(self, tmp_project):
         """Standalone with pytest in [tool.uv].dev-dependencies gets uv run pytest."""
@@ -580,7 +581,7 @@ class TestResolvePytestInvocation:
         )
         with patch("rlsbl.testing.detect_uv_workspace_root", return_value=None):
             result = _resolve_pytest_invocation(str(tmp_project), None)
-        assert result == ["uv", "run", "pytest"]
+        assert result == ["uv", "run", "python", "-m", "pytest"]
 
     def test_standalone_not_declared_raises(self, tmp_project):
         """Standalone with no pytest declaration raises ConfigError."""
@@ -596,6 +597,87 @@ class TestResolvePytestInvocation:
 # ---------------------------------------------------------------------------
 # Integration tests: run_project_tests end-to-end flow
 # ---------------------------------------------------------------------------
+
+class TestTimeoutHint:
+    """Timeout-failure messages name the configurable budget knob.
+
+    Every ``command timed out`` message must append CHECK_TIMEOUT_HINT so an
+    agent hitting a timeout learns which knob (check_timeout / RLSBL_CHECK_TIMEOUT)
+    controls the budget -- while making clear the check still hard-fails on hangs.
+    """
+
+    def _timeout(self, *args, **kwargs):
+        raise subprocess.TimeoutExpired(cmd=kwargs.get("args", ["cmd"]), timeout=1)
+
+    def test_hint_is_grounded(self):
+        """The hint names the config key, the env var, and the hard-fail caveat."""
+        assert "check_timeout in .rlsbl/config.json" in CHECK_TIMEOUT_HINT
+        assert "RLSBL_CHECK_TIMEOUT" in CHECK_TIMEOUT_HINT
+        assert "hard-fail" in CHECK_TIMEOUT_HINT
+
+    def test_pypi_uv_timeout_prints_hint(self, tmp_project, capsys):
+        """pypi (uv path) timeout message includes the remediation hint."""
+        (tmp_project / "pyproject.toml").write_text(
+            "[project]\nname = 'test'\nversion = '0.1.0'\n\n"
+            "[dependency-groups]\ndev = ['pytest>=8.0']\n"
+        )
+        with (
+            patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.testing.subprocess.run", side_effect=self._timeout),
+        ):
+            result = run_project_tests("pypi", project_dir=str(tmp_project))
+
+        assert result is False
+        err = capsys.readouterr().err
+        assert "timed out" in err
+        assert CHECK_TIMEOUT_HINT in err
+
+    def test_pypi_fallback_timeout_prints_hint(self, tmp_project, capsys):
+        """pypi bare-fallback (python -m pytest) timeout includes the hint."""
+        def tool_side_effect(name, *args, **kwargs):
+            return None if name == "uv" else "/usr/bin/pytest"
+
+        with (
+            patch("rlsbl.testing.require_tool", side_effect=tool_side_effect),
+            patch("rlsbl.testing.subprocess.run", side_effect=self._timeout),
+        ):
+            result = run_project_tests("pypi", project_dir=str(tmp_project))
+
+        assert result is False
+        assert CHECK_TIMEOUT_HINT in capsys.readouterr().err
+
+    def test_go_timeout_prints_hint(self, tmp_project, capsys):
+        """go timeout message includes the remediation hint."""
+        with patch("rlsbl.testing.subprocess.run", side_effect=self._timeout):
+            result = run_project_tests("go", project_dir=str(tmp_project))
+
+        assert result is False
+        assert CHECK_TIMEOUT_HINT in capsys.readouterr().err
+
+    def test_npm_timeout_prints_hint(self, tmp_project, capsys):
+        """npm timeout message includes the remediation hint."""
+        _setup_npm_project(tmp_project, test_script="jest")
+        with patch("rlsbl.testing.subprocess.run", side_effect=self._timeout):
+            result = run_project_tests("npm", project_dir=str(tmp_project))
+
+        assert result is False
+        assert CHECK_TIMEOUT_HINT in capsys.readouterr().err
+
+    def test_sync_workspace_timeout_prints_hint(self, tmp_project, capsys):
+        """sync_workspace timeout message includes the remediation hint."""
+        (tmp_project / "pyproject.toml").write_text(
+            "[project]\nname = 'test'\nversion = '0.1.0'\n"
+        )
+        with (
+            patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
+            patch("rlsbl.testing.subprocess.run", side_effect=self._timeout),
+        ):
+            result = sync_workspace(str(tmp_project))
+
+        assert result is False
+        assert CHECK_TIMEOUT_HINT in capsys.readouterr().err
+
 
 class TestPypiIntegration:
     """Integration tests exercising run_project_tests through _run_pypi_tests."""
@@ -626,7 +708,7 @@ class TestPypiIntegration:
             assert sync_cmd == ["uv", "sync", "--all-packages", "--quiet"]
             assert mock_run.call_args_list[0].kwargs["cwd"] == str(ws_root)
             pytest_cmd = mock_run.call_args_list[1][0][0]
-            assert pytest_cmd == ["uv", "run", "pytest"]
+            assert pytest_cmd == ["uv", "run", "python", "-m", "pytest"]
             assert mock_run.call_args_list[1].kwargs["cwd"] == str(pkg)
 
     def test_standalone_optional_dep_test(self, tmp_project):
@@ -647,7 +729,7 @@ class TestPypiIntegration:
 
             assert result is True
             assert mock_run.call_count == 1
-            assert mock_run.call_args[0][0] == ["uv", "run", "--extra", "test", "pytest"]
+            assert mock_run.call_args[0][0] == ["uv", "run", "--extra", "test", "python", "-m", "pytest"]
 
     def test_standalone_dev_group_default(self, tmp_project):
         """Non-workspace, pytest in [dependency-groups].dev: uv run pytest (default dev)."""
@@ -667,7 +749,7 @@ class TestPypiIntegration:
 
             assert result is True
             assert mock_run.call_count == 1
-            assert mock_run.call_args[0][0] == ["uv", "run", "pytest"]
+            assert mock_run.call_args[0][0] == ["uv", "run", "python", "-m", "pytest"]
 
     def test_standalone_not_declared_raises(self, tmp_project):
         """Non-workspace, pytest not declared anywhere: raises ConfigError."""
@@ -702,4 +784,4 @@ class TestPypiIntegration:
 
             assert result is True
             assert mock_run.call_count == 1
-            assert mock_run.call_args[0][0] == ["uv", "run", "--group", "testing", "pytest"]
+            assert mock_run.call_args[0][0] == ["uv", "run", "--group", "testing", "python", "-m", "pytest"]
