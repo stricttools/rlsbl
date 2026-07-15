@@ -848,13 +848,19 @@ def register_project_checks(app):
         """
         from ..commands.dev_sync import (
             OVERLAY_HEALTHY,
+            MalformedSentinelError,
             _classify_overlay,
             _inspect_installed,
             _load_sentinel,
         )
 
         root = str(ctx.project_root)
-        sentinel = _load_sentinel(root)
+        try:
+            sentinel = _load_sentinel(root)
+        except MalformedSentinelError as e:
+            # A corrupt sentinel must fail loudly, never SKIP: reading it as
+            # "no overlays" would hide overlays that may in fact be wiped.
+            return CheckResult("fail", str(e))
         if sentinel is None:
             return CheckResult("skip", "no dev overlays declared (no sentinel)")
         if not sentinel:

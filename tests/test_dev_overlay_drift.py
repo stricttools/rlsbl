@@ -24,6 +24,7 @@ from rlsbl.commands.dev_sync import (
     OVERLAY_MISSING,
     OVERLAY_WIPED,
     SENTINEL_FILENAME,
+    MalformedSentinelError,
     _classify_overlay,
     _inspect_installed,
     _load_sentinel,
@@ -103,9 +104,34 @@ def test_load_sentinel_absent_returns_none(tmp_project):
     assert _load_sentinel(str(tmp_project)) is None
 
 
-def test_load_sentinel_malformed_returns_empty_list(tmp_project):
+def test_load_sentinel_malformed_raises(tmp_project):
+    """A present-but-unparseable sentinel is a hard error, never a silent empty
+    list: reading corruption as "no overlays" would make the drift check SKIP
+    and `dev status` exit 0 while overlays may in fact be wiped."""
     (tmp_project / SENTINEL_FILENAME).write_text("this is ] not [ toml ==")
-    assert _load_sentinel(str(tmp_project)) == []
+    with pytest.raises(MalformedSentinelError) as exc:
+        _load_sentinel(str(tmp_project))
+    msg = str(exc.value)
+    assert SENTINEL_FILENAME in msg
+    assert "delete it" in msg.lower()
+    assert "rlsbl dev sync" in msg
+
+
+def test_load_sentinel_unreadable_raises(tmp_project):
+    """A present-but-unreadable sentinel (OSError) is also a hard error --
+    unreadable is not the same as absent."""
+    path = tmp_project / SENTINEL_FILENAME
+    path.write_text('[[overlay]]\npackage = "depa"\npath = "/x"\nversion = ""\n')
+    os.chmod(path, 0o000)
+    try:
+        # If the test runs as root, chmod 000 does not block reads; skip then.
+        if os.access(path, os.R_OK):
+            pytest.skip("cannot make file unreadable (running as root)")
+        with pytest.raises(MalformedSentinelError) as exc:
+            _load_sentinel(str(tmp_project))
+        assert SENTINEL_FILENAME in str(exc.value)
+    finally:
+        os.chmod(path, 0o644)
 
 
 # ---------------------------------------------------------------------------
@@ -221,6 +247,16 @@ def test_check_fails_missing_overlay(mock_git_repo):
     assert result.status == "fail"
 
 
+def test_check_fails_malformed_sentinel(mock_git_repo):
+    """A corrupt sentinel must FAIL the check loudly, never SKIP: reading it as
+    "no overlays" would hide overlays that may in fact be wiped."""
+    (mock_git_repo / SENTINEL_FILENAME).write_text("this is ] not [ toml ==")
+    result = _run_drift_check(mock_git_repo)
+    assert result.status == "fail"
+    assert SENTINEL_FILENAME in result.message
+    assert "rlsbl dev sync" in result.message
+
+
 def test_check_severity_is_error():
     assert app._check_defs["dev-overlay-drift"].severity == "error"
 
@@ -240,6 +276,16 @@ def test_status_empty_sentinel_exit_zero(tmp_project, capsys):
     (tmp_project / SENTINEL_FILENAME).write_text("")
     rc = run_status(str(tmp_project))
     assert rc == 0
+
+
+def test_status_malformed_sentinel_exit_one(tmp_project, capsys):
+    """A corrupt sentinel must exit nonzero with a message, never a silent 0."""
+    (tmp_project / SENTINEL_FILENAME).write_text("this is ] not [ toml ==")
+    rc = run_status(str(tmp_project))
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert SENTINEL_FILENAME in err
+    assert "rlsbl dev sync" in err
 
 
 def test_status_healthy_exit_zero(tmp_project, capsys):

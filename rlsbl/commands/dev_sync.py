@@ -28,6 +28,16 @@ from ..utils import require_tool
 
 OVERRIDES_FILENAME = "dev-sources.toml.local-only"
 
+
+class MalformedSentinelError(Exception):
+    """Raised when the overlay sentinel exists but cannot be parsed or read.
+
+    A present-but-corrupt sentinel must never read as "no overlays declared"
+    (which would silently SKIP the drift check and exit `dev status` 0). The
+    sentinel is regenerable local state, so the remedy is to delete it and
+    re-run `rlsbl dev sync`. Callers surface this loudly rather than degrading.
+    """
+
 # Written by run_sync after successful overlays; read by the
 # `dev-overlay-drift` check and `rlsbl dev status` to detect when a bare
 # `uv sync`/`uv run` silently reinstalled the registry wheel over an overlay.
@@ -240,8 +250,13 @@ def _load_sentinel(project_root):
 
     A missing sentinel means no overlays were ever declared -- e.g. a fresh CI
     checkout, where the gitignored sentinel never existed. That is the honest
-    not-applicable state (skip), never a failure. A malformed sentinel returns
-    an empty list (treated as "no overlays"), never a crash.
+    not-applicable state (skip), never a failure.
+
+    A present-but-unparseable sentinel (invalid TOML) or a present-but-
+    unreadable one (OSError) is a hard error (:class:`MalformedSentinelError`),
+    NEVER a silent empty list: reading corruption as "no overlays" would make
+    the drift check SKIP and `dev status` exit 0 while overlays may in fact be
+    wiped. Mirrors ``_load_overlays``, which also hard-errors on invalid TOML.
     """
     file_path = os.path.join(str(project_root), SENTINEL_FILENAME)
     if not os.path.isfile(file_path):
@@ -249,8 +264,18 @@ def _load_sentinel(project_root):
     try:
         with open(file_path, "rb") as f:
             data = tomllib.load(f)
-    except (OSError, tomllib.TOMLDecodeError):
-        return []
+    except tomllib.TOMLDecodeError as e:
+        raise MalformedSentinelError(
+            f"Error: the dev-overlay sentinel {file_path} exists but is not "
+            f"valid TOML: {e}. The sentinel is regenerable local state -- "
+            f"delete it and re-run `rlsbl dev sync` to rewrite it."
+        )
+    except OSError as e:
+        raise MalformedSentinelError(
+            f"Error: the dev-overlay sentinel {file_path} exists but could not "
+            f"be read: {e}. The sentinel is regenerable local state -- delete "
+            f"it and re-run `rlsbl dev sync` to rewrite it."
+        )
     entries = data.get("overlay") or []
     if not isinstance(entries, list):
         return []
@@ -407,7 +432,11 @@ def run_status(project_root):
     declared overlay was wiped or is missing (scriptable), 0 otherwise --
     including when no overlays are declared (no sentinel)."""
     project_root = str(project_root)
-    sentinel = _load_sentinel(project_root)
+    try:
+        sentinel = _load_sentinel(project_root)
+    except MalformedSentinelError as e:
+        print(str(e), file=sys.stderr)
+        return 1
     if sentinel is None:
         print(
             f"No dev overlays declared (no {SENTINEL_FILENAME}). "
