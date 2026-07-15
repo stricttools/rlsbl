@@ -305,8 +305,8 @@ class TestCheckSchema:
         assert passed is False
         assert "commits is empty" in details[0]
 
-    def test_freeform_type_accepted(self, git_repo):
-        """check_schema accepts any non-empty type string."""
+    def test_invalid_type_rejected(self, git_repo):
+        """check_schema rejects a non-enum type on a user-facing entry."""
         entries = [
             ChangelogEntry(
                 commits=["abc"],
@@ -316,7 +316,8 @@ class TestCheckSchema:
             ),
         ]
         passed, details = check_schema(entries)
-        assert passed is True
+        assert passed is False
+        assert any("invalid type" in d and "performance" in d for d in details)
 
 
 class TestCheckHasUserFacing:
