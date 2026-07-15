@@ -4,6 +4,8 @@ import os
 import tomllib
 from dataclasses import dataclass, field
 
+from ..errors import ConfigError
+
 
 # Per-language default forbidden imports
 _DEFAULT_FORBIDDEN = {
@@ -65,8 +67,10 @@ def load_language_config(
     try:
         with open(config_path, "rb") as f:
             data = tomllib.load(f)
-    except Exception:
-        return LanguageLintConfig(forbidden_imports=list(defaults))
+    except (tomllib.TOMLDecodeError, OSError) as exc:
+        raise ConfigError(
+            f"Invalid lint config {config_path}: {exc}"
+        ) from exc
 
     fi_section = data.get("forbidden-imports", {})
     forbidden = fi_section.get("modules", list(defaults))
@@ -95,17 +99,28 @@ def load_language_config(
 
 
 def load_parser_setting(project_path: str) -> str:
-    """Read parser type from .rlsbl/lint.toml, defaulting to 'ast'."""
+    """Read parser type from .rlsbl/lint.toml, defaulting to 'ast'.
+
+    A missing file keeps the documented ``"ast"`` default. Malformed TOML
+    or a present-but-invalid ``parser`` value is a hard error
+    (:class:`ConfigError`) naming the file and the problem -- never
+    silently defaulted.
+    """
     lint_toml = os.path.join(project_path, ".rlsbl", "lint.toml")
     if not os.path.isfile(lint_toml):
         return "ast"
     try:
         with open(lint_toml, "rb") as f:
             data = tomllib.load(f)
-        parser = data.get("parser", "ast")
-        if parser not in ("ast", "regex"):
-            return "ast"
-        return parser
-    except Exception:
-        return "ast"
+    except (tomllib.TOMLDecodeError, OSError) as exc:
+        raise ConfigError(
+            f"Invalid lint config {lint_toml}: {exc}"
+        ) from exc
+    parser = data.get("parser", "ast")
+    if parser not in ("ast", "regex"):
+        raise ConfigError(
+            f"Invalid parser in {lint_toml}: {parser!r}. "
+            f"Must be one of ('ast', 'regex')."
+        )
+    return parser
 

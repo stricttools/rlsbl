@@ -2,7 +2,56 @@
 
 import json
 
+import pytest
+
+from rlsbl.errors import ConfigError
 from rlsbl.lint import lint_library
+from rlsbl.lint.config import load_language_config, load_parser_setting
+
+
+class TestLoadParserSetting:
+    """load_parser_setting: missing file defaults; invalid present values hard-error."""
+
+    def test_missing_file_defaults_to_ast(self, tmp_path):
+        assert load_parser_setting(str(tmp_path)) == "ast"
+
+    def test_valid_regex(self, tmp_path):
+        rlsbl_dir = tmp_path / ".rlsbl"
+        rlsbl_dir.mkdir()
+        (rlsbl_dir / "lint.toml").write_text('parser = "regex"\n')
+        assert load_parser_setting(str(tmp_path)) == "regex"
+
+    def test_invalid_parser_value_raises(self, tmp_path):
+        rlsbl_dir = tmp_path / ".rlsbl"
+        rlsbl_dir.mkdir()
+        (rlsbl_dir / "lint.toml").write_text('parser = "bogus"\n')
+        with pytest.raises(ConfigError) as exc_info:
+            load_parser_setting(str(tmp_path))
+        msg = str(exc_info.value)
+        assert "parser" in msg
+        assert "bogus" in msg
+
+    def test_malformed_toml_raises(self, tmp_path):
+        rlsbl_dir = tmp_path / ".rlsbl"
+        rlsbl_dir.mkdir()
+        (rlsbl_dir / "lint.toml").write_text("this is = = not valid toml\n")
+        with pytest.raises(ConfigError):
+            load_parser_setting(str(tmp_path))
+
+
+class TestLoadLanguageConfig:
+    """load_language_config: missing file defaults; malformed TOML hard-errors."""
+
+    def test_missing_file_defaults(self, tmp_path):
+        cfg = load_language_config(str(tmp_path), "python")
+        assert "argparse" in cfg.forbidden_imports
+
+    def test_malformed_toml_raises(self, tmp_path):
+        lint_dir = tmp_path / ".rlsbl" / "lint"
+        lint_dir.mkdir(parents=True)
+        (lint_dir / "python.toml").write_text("this is = = not valid toml\n")
+        with pytest.raises(ConfigError):
+            load_language_config(str(tmp_path), "python")
 
 
 class TestParserSelection:
