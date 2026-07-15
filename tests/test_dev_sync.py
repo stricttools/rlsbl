@@ -607,3 +607,36 @@ def test_run_sync_does_not_write_sentinel_on_failure(
     monkeypatch.setattr("rlsbl.commands.dev_sync.subprocess.run", _FailInstall())
     assert run_sync(str(tmp_project)) == 1
     assert not (tmp_project / SENTINEL_FILENAME).exists()
+
+
+def test_run_sync_preexisting_sentinel_untouched_on_failure(
+    tmp_project, uv_present, no_sync_env, monkeypatch
+):
+    """A pre-existing (good) sentinel from an earlier successful sync must stay
+    byte-for-byte intact when a later `dev sync` fails mid-install-loop -- the
+    write happens only AFTER the whole loop succeeds, so there is no partial
+    rewrite that could half-overwrite the recorded state."""
+    from rlsbl.commands.dev_sync import SENTINEL_FILENAME, _write_sentinel
+
+    _two_overlays(tmp_project)
+
+    # Seed a good sentinel recording a prior, different overlay state.
+    _write_sentinel(
+        str(tmp_project),
+        [{"package": "old-dep", "path": "/prior/checkout", "version": "9.9.9"}],
+    )
+    before = (tmp_project / SENTINEL_FILENAME).read_text()
+
+    class _FailInstall(_Capture):
+        def __call__(self, cmd, *args, **kwargs):
+            result = super().__call__(cmd, *args, **kwargs)
+            if cmd[:3] == ["uv", "pip", "install"]:
+                return subprocess.CompletedProcess(args=cmd, returncode=1)
+            return result
+
+    monkeypatch.setattr("rlsbl.commands.dev_sync.subprocess.run", _FailInstall())
+    assert run_sync(str(tmp_project)) == 1
+
+    # The old sentinel is preserved exactly -- no partial rewrite.
+    after = (tmp_project / SENTINEL_FILENAME).read_text()
+    assert after == before
