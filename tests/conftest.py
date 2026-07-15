@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
+from githarness import git as _git
 from rlsbl.context import ProjectContext
 from rlsbl.workspace import (
     WORKSPACE_DIR,
@@ -49,26 +50,17 @@ def make_ctx(project_root, config=None):
 
 
 def run_git(repo, *args):
-    """Run a git command in the given repo directory."""
-    subprocess.run(
-        ["git"] + list(args),
-        cwd=str(repo),
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    """Run a git command in the given repo directory.
+
+    Thin wrapper over githarness.git; returns None (callers use it purely
+    for side effects) to preserve the historical signature.
+    """
+    _git(repo, *args)
 
 
 def git_head(repo):
     """Get HEAD hash."""
-    result = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        cwd=str(repo),
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return result.stdout.strip()
+    return _git(repo, "rev-parse", "HEAD")
 
 
 def make_commit(repo, filename="file.txt", message="change"):
