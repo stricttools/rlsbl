@@ -655,6 +655,29 @@ class TestTimeoutHint:
         assert result is False
         assert CHECK_TIMEOUT_HINT in capsys.readouterr().err
 
+    def test_maven_gradlew_timeout_prints_hint(self, tmp_project, capsys):
+        """maven (gradlew path) timeout message includes the remediation hint."""
+        gradlew = tmp_project / "gradlew"
+        gradlew.write_text("#!/bin/sh\n")
+        with patch("rlsbl.testing.subprocess.run", side_effect=self._timeout):
+            result = run_project_tests("maven", project_dir=str(tmp_project))
+
+        assert result is False
+        err = capsys.readouterr().err
+        assert "timed out" in err
+        assert CHECK_TIMEOUT_HINT in err
+
+    def test_maven_mvn_timeout_prints_hint(self, tmp_project, capsys):
+        """maven (mvn/pom.xml path) timeout message includes the remediation hint."""
+        (tmp_project / "pom.xml").write_text("<project></project>\n")
+        with patch("rlsbl.testing.subprocess.run", side_effect=self._timeout):
+            result = run_project_tests("maven", project_dir=str(tmp_project))
+
+        assert result is False
+        err = capsys.readouterr().err
+        assert "timed out" in err
+        assert CHECK_TIMEOUT_HINT in err
+
     def test_npm_timeout_prints_hint(self, tmp_project, capsys):
         """npm timeout message includes the remediation hint."""
         _setup_npm_project(tmp_project, test_script="jest")
