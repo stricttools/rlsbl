@@ -546,13 +546,13 @@ def test_run_sync_writes_sentinel_with_package_path_version(
 ):
     """After a successful sync, run_sync records the intended overlay state so
     the drift check and `dev status` can later detect a silent wipe."""
-    from rlsbl.commands.dev_sync import SENTINEL_FILENAME, _load_sentinel
+    from rlsbl.overlay_state import SENTINEL_FILENAME, load_sentinel
 
     _two_overlays(tmp_project)
     assert run_sync(str(tmp_project)) == 0
 
     assert (tmp_project / SENTINEL_FILENAME).is_file()
-    sentinel = _load_sentinel(str(tmp_project))
+    sentinel = load_sentinel(str(tmp_project))
     assert sentinel == [
         {
             "package": "depa",
@@ -571,8 +571,8 @@ def test_run_sync_sentinel_records_dynamic_version_as_none(
     tmp_project, fake_run, uv_present, no_sync_env
 ):
     """A dynamic-version checkout has no [project].version; the sentinel stores
-    it and _load_sentinel round-trips it back to None."""
-    from rlsbl.commands.dev_sync import _load_sentinel
+    it and load_sentinel round-trips it back to None."""
+    from rlsbl.overlay_state import load_sentinel
 
     dep = tmp_project / "dep"
     dep.mkdir()
@@ -582,7 +582,7 @@ def test_run_sync_sentinel_records_dynamic_version_as_none(
     _write_overlay_file(tmp_project, '[[overlay]]\npackage = "depa"\npath = "dep"\n')
     assert run_sync(str(tmp_project)) == 0
 
-    sentinel = _load_sentinel(str(tmp_project))
+    sentinel = load_sentinel(str(tmp_project))
     assert sentinel == [
         {"package": "depa", "path": str(dep), "version": None}
     ]

@@ -19,15 +19,17 @@ import pytest
 
 from rlsbl import app
 from rlsbl.context import create_context
-from rlsbl.commands.dev_sync import (
+from rlsbl.overlay_state import (
     OVERLAY_HEALTHY,
     OVERLAY_MISSING,
     OVERLAY_WIPED,
     SENTINEL_FILENAME,
     MalformedSentinelError,
-    _classify_overlay,
-    _inspect_installed,
-    _load_sentinel,
+    classify_overlay,
+    inspect_installed,
+    load_sentinel,
+)
+from rlsbl.commands.dev_sync import (
     _write_sentinel,
     run_status,
 )
@@ -87,7 +89,7 @@ def test_sentinel_write_and_load_roundtrip(tmp_project):
     _write_sentinel(str(tmp_project), overlays)
 
     assert (tmp_project / SENTINEL_FILENAME).is_file()
-    loaded = _load_sentinel(str(tmp_project))
+    loaded = load_sentinel(str(tmp_project))
     assert loaded == [
         {"package": "depa", "path": "/abs/depa", "version": "0.3.1"},
         # None version round-trips as None (stored as "" in the file).
@@ -101,7 +103,7 @@ def test_sentinel_write_is_atomic_no_tmp_left(tmp_project):
 
 
 def test_load_sentinel_absent_returns_none(tmp_project):
-    assert _load_sentinel(str(tmp_project)) is None
+    assert load_sentinel(str(tmp_project)) is None
 
 
 def test_load_sentinel_malformed_raises(tmp_project):
@@ -110,7 +112,7 @@ def test_load_sentinel_malformed_raises(tmp_project):
     and `dev status` exit 0 while overlays may in fact be wiped."""
     (tmp_project / SENTINEL_FILENAME).write_text("this is ] not [ toml ==")
     with pytest.raises(MalformedSentinelError) as exc:
-        _load_sentinel(str(tmp_project))
+        load_sentinel(str(tmp_project))
     msg = str(exc.value)
     assert SENTINEL_FILENAME in msg
     assert "delete it" in msg.lower()
@@ -128,21 +130,21 @@ def test_load_sentinel_unreadable_raises(tmp_project):
         if os.access(path, os.R_OK):
             pytest.skip("cannot make file unreadable (running as root)")
         with pytest.raises(MalformedSentinelError) as exc:
-            _load_sentinel(str(tmp_project))
+            load_sentinel(str(tmp_project))
         assert SENTINEL_FILENAME in str(exc.value)
     finally:
         os.chmod(path, 0o644)
 
 
 # ---------------------------------------------------------------------------
-# _inspect_installed / _classify_overlay
+# inspect_installed / classify_overlay
 # ---------------------------------------------------------------------------
 
 
 def test_inspect_editable_install(tmp_project):
     checkout = tmp_project / "depa-src"
     _make_dist_info(tmp_project, "depa", "0.3.1", editable=True, url_path=str(checkout))
-    installed = _inspect_installed(str(tmp_project), "depa")
+    installed = inspect_installed(str(tmp_project), "depa")
     assert installed["found"] is True
     assert installed["editable"] is True
     assert os.path.realpath(installed["path"]) == os.path.realpath(str(checkout))
@@ -151,20 +153,20 @@ def test_inspect_editable_install(tmp_project):
 
 def test_inspect_registry_wheel_not_editable(tmp_project):
     _make_dist_info(tmp_project, "depa", "0.3.1")  # no direct_url.json
-    installed = _inspect_installed(str(tmp_project), "depa")
+    installed = inspect_installed(str(tmp_project), "depa")
     assert installed["found"] is True
     assert installed["editable"] is False
 
 
 def test_inspect_missing_package(tmp_project):
-    installed = _inspect_installed(str(tmp_project), "depa")
+    installed = inspect_installed(str(tmp_project), "depa")
     assert installed["found"] is False
 
 
 def test_inspect_matches_normalized_name(tmp_project):
     # dist-info Name uses My_Pkg; lookup uses my-pkg.
     _make_dist_info(tmp_project, "My_Pkg", "1.0", editable=True, url_path="/x")
-    installed = _inspect_installed(str(tmp_project), "my-pkg")
+    installed = inspect_installed(str(tmp_project), "my-pkg")
     assert installed["found"] is True
 
 
@@ -172,7 +174,7 @@ def test_classify_healthy(tmp_project):
     checkout = tmp_project / "depa-src"
     _make_dist_info(tmp_project, "depa", "0.3.1", editable=True, url_path=str(checkout))
     entry = {"package": "depa", "path": str(checkout), "version": "0.3.1"}
-    state, detail = _classify_overlay(entry, _inspect_installed(str(tmp_project), "depa"))
+    state, detail = classify_overlay(entry, inspect_installed(str(tmp_project), "depa"))
     assert state == OVERLAY_HEALTHY
     assert "depa" in detail
 
@@ -181,7 +183,7 @@ def test_classify_wiped_registry_wheel(tmp_project):
     checkout = tmp_project / "depa-src"
     _make_dist_info(tmp_project, "depa", "0.3.1")  # registry wheel
     entry = {"package": "depa", "path": str(checkout), "version": "0.3.1"}
-    state, detail = _classify_overlay(entry, _inspect_installed(str(tmp_project), "depa"))
+    state, detail = classify_overlay(entry, inspect_installed(str(tmp_project), "depa"))
     assert state == OVERLAY_WIPED
     assert "rlsbl dev sync" in detail
 
@@ -189,13 +191,13 @@ def test_classify_wiped_registry_wheel(tmp_project):
 def test_classify_wiped_editable_wrong_path(tmp_project):
     _make_dist_info(tmp_project, "depa", "0.3.1", editable=True, url_path="/somewhere/else")
     entry = {"package": "depa", "path": str(tmp_project / "depa-src"), "version": "0.3.1"}
-    state, detail = _classify_overlay(entry, _inspect_installed(str(tmp_project), "depa"))
+    state, detail = classify_overlay(entry, inspect_installed(str(tmp_project), "depa"))
     assert state == OVERLAY_WIPED
 
 
 def test_classify_missing(tmp_project):
     entry = {"package": "depa", "path": "/abs/depa", "version": "0.3.1"}
-    state, detail = _classify_overlay(entry, _inspect_installed(str(tmp_project), "depa"))
+    state, detail = classify_overlay(entry, inspect_installed(str(tmp_project), "depa"))
     assert state == OVERLAY_MISSING
     assert "rlsbl dev sync" in detail
 

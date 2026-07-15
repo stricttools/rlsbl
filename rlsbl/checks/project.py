@@ -846,17 +846,17 @@ def register_project_checks(app):
         declared (e.g. a fresh CI checkout, where the gitignored sentinel never
         existed) -- the honest not-applicable state, never a failure.
         """
-        from ..commands.dev_sync import (
+        from ..overlay_state import (
             OVERLAY_HEALTHY,
             MalformedSentinelError,
-            _classify_overlay,
-            _inspect_installed,
-            _load_sentinel,
+            classify_overlay,
+            inspect_installed,
+            load_sentinel,
         )
 
         root = str(ctx.project_root)
         try:
-            sentinel = _load_sentinel(root)
+            sentinel = load_sentinel(root)
         except MalformedSentinelError as e:
             # A corrupt sentinel must fail loudly, never SKIP: reading it as
             # "no overlays" would hide overlays that may in fact be wiped.
@@ -868,8 +868,8 @@ def register_project_checks(app):
 
         drifted = []
         for entry in sentinel:
-            installed = _inspect_installed(root, entry["package"])
-            state, detail = _classify_overlay(entry, installed)
+            installed = inspect_installed(root, entry["package"])
+            state, detail = classify_overlay(entry, installed)
             if state != OVERLAY_HEALTHY:
                 drifted.append(detail)
 
