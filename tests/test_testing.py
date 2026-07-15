@@ -150,6 +150,136 @@ class TestPypiTarget:
 
 
 # ---------------------------------------------------------------------------
+# pypi test.pypi.markers config
+# ---------------------------------------------------------------------------
+
+class TestPypiMarkers:
+    """The test.pypi.markers config appends -m <markers> to every pytest path."""
+
+    MARKERS_CONFIG = {"test": {"pypi": {"markers": "not integration"}}}
+
+    def test_standalone_dev_group_appends_markers(self, tmp_project):
+        """Standalone dev-group path: uv run python -m pytest -m <markers>."""
+        (tmp_project / "pyproject.toml").write_text(
+            "[project]\nname = 'test'\nversion = '0.1.0'\n\n"
+            "[dependency-groups]\ndev = ['pytest>=8.0']\n"
+        )
+        with (
+            patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.testing.subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+            result = run_project_tests(
+                "pypi", project_dir=str(tmp_project), config=self.MARKERS_CONFIG
+            )
+            assert result is True
+            assert mock_run.call_args[0][0] == [
+                "uv", "run", "python", "-m", "pytest", "-m", "not integration"
+            ]
+
+    def test_standalone_named_group_appends_markers(self, tmp_project):
+        """Standalone named-group path preserves --group and appends markers."""
+        (tmp_project / "pyproject.toml").write_text(
+            "[project]\nname = 'test'\nversion = '0.1.0'\n\n"
+            "[dependency-groups]\ntesting = ['pytest>=8.0']\n"
+        )
+        with (
+            patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.testing.subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+            result = run_project_tests(
+                "pypi", project_dir=str(tmp_project), config=self.MARKERS_CONFIG
+            )
+            assert result is True
+            assert mock_run.call_args[0][0] == [
+                "uv", "run", "--group", "testing", "python", "-m", "pytest",
+                "-m", "not integration",
+            ]
+
+    def test_standalone_optional_dep_appends_markers(self, tmp_project):
+        """Standalone extra path preserves --extra and appends markers."""
+        (tmp_project / "pyproject.toml").write_text(
+            "[project]\nname = 'test'\nversion = '0.1.0'\n\n"
+            "[project.optional-dependencies]\ntest = ['pytest>=8.0']\n"
+        )
+        with (
+            patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.testing.subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+            result = run_project_tests(
+                "pypi", project_dir=str(tmp_project), config=self.MARKERS_CONFIG
+            )
+            assert result is True
+            assert mock_run.call_args[0][0] == [
+                "uv", "run", "--extra", "test", "python", "-m", "pytest",
+                "-m", "not integration",
+            ]
+
+    def test_workspace_member_appends_markers(self, tmp_project):
+        """Workspace-member path appends markers to the pytest call (not the sync)."""
+        ws_root = tmp_project / "workspace"
+        ws_root.mkdir()
+        (ws_root / "pyproject.toml").write_text("[project]\nname = 'ws'\nversion = '0.1.0'\n")
+        with (
+            patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=str(ws_root)),
+            patch("rlsbl.testing.subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+            result = run_project_tests(
+                "pypi", project_dir=str(tmp_project), workspace_root=str(ws_root),
+                config=self.MARKERS_CONFIG,
+            )
+            assert result is True
+            assert mock_run.call_count == 2
+            # sync call unaffected
+            assert mock_run.call_args_list[0][0][0] == ["uv", "sync", "--all-packages", "--quiet"]
+            # pytest call carries the markers
+            assert mock_run.call_args_list[1][0][0] == [
+                "uv", "run", "python", "-m", "pytest", "-m", "not integration"
+            ]
+
+    def test_fallback_bare_pytest_appends_markers(self, tmp_project):
+        """The bare python -m pytest fallback also carries the markers."""
+        def tool_side_effect(name, *args, **kwargs):
+            return None if name == "uv" else "/usr/bin/pytest"
+
+        with (
+            patch("rlsbl.testing.require_tool", side_effect=tool_side_effect),
+            patch("rlsbl.testing.subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+            result = run_project_tests(
+                "pypi", project_dir=str(tmp_project), config=self.MARKERS_CONFIG
+            )
+            assert result is True
+            assert mock_run.call_args[0][0] == [
+                "python", "-m", "pytest", "-m", "not integration"
+            ]
+
+    def test_absent_test_section_is_byte_identical(self, tmp_project):
+        """No test section -> command is exactly today's, no -m appended."""
+        (tmp_project / "pyproject.toml").write_text(
+            "[project]\nname = 'test'\nversion = '0.1.0'\n\n"
+            "[dependency-groups]\ndev = ['pytest>=8.0']\n"
+        )
+        with (
+            patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.testing.subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+            result = run_project_tests("pypi", project_dir=str(tmp_project), config={})
+            assert result is True
+            assert mock_run.call_args[0][0] == ["uv", "run", "python", "-m", "pytest"]
+
+
+# ---------------------------------------------------------------------------
 # go target
 # ---------------------------------------------------------------------------
 

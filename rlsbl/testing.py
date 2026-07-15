@@ -126,6 +126,23 @@ def _resolve_pytest_invocation(
         return ["uv", "run", "python", "-m", "pytest"]
 
 
+def _pytest_marker_args(config: dict) -> list[str]:
+    """Return ``["-m", <markers>]`` when a ``test.pypi.markers`` string is
+    configured, else ``[]``.
+
+    Reads the per-target test block via ``config.get("test", {}).get("pypi", {})``
+    so future per-target options (go tags, npm script selection) slot into the
+    same shape. An absent section/key -- or an empty/falsy markers value --
+    yields no arguments, keeping the pytest invocation byte-identical to the
+    no-config case. Structural validation (unknown keys, non-string/empty
+    markers) is enforced upstream by ``config.validate_test_config``.
+    """
+    markers = (config or {}).get("test", {}).get("pypi", {}).get("markers")
+    if markers:
+        return ["-m", markers]
+    return []
+
+
 def run_project_tests(
     target_name: str,
     *,
@@ -192,6 +209,7 @@ def _run_pypi_tests(
     """
     uv_verbose = config.get("uv_sync_verbose", False)
     effective_dir = project_dir or "."
+    marker_args = _pytest_marker_args(config)
 
     if require_tool("uv", fatal=False):
         is_workspace_member = (
@@ -211,13 +229,14 @@ def _run_pypi_tests(
             # Standalone: uv run handles sync; resolve the right invocation
             cmd = _resolve_pytest_invocation(effective_dir, workspace_root)
 
+        cmd = cmd + marker_args
         try:
             result = subprocess.run(cmd, cwd=project_dir, timeout=check_timeout)
         except subprocess.TimeoutExpired:
             print(f"Error: command timed out after {check_timeout}s: {cmd} {CHECK_TIMEOUT_HINT}", file=sys.stderr)
             return False
     elif require_tool("pytest", fatal=False):
-        fallback_cmd = ["python", "-m", "pytest"]
+        fallback_cmd = ["python", "-m", "pytest"] + marker_args
         try:
             result = subprocess.run(fallback_cmd, cwd=project_dir, timeout=check_timeout)
         except subprocess.TimeoutExpired:
