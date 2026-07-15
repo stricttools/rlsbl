@@ -16,6 +16,7 @@ from unittest.mock import patch
 
 import pytest
 
+from githarness import git as _git
 from rlsbl.commands.release.release_state import (
     get_state_path,
     save_release_state,
@@ -30,16 +31,6 @@ from rlsbl.workspace import (
     save_workspace,
     write_releasable_version,
 )
-
-
-def _git(repo, *args):
-    subprocess.run(
-        ["git"] + list(args),
-        cwd=str(repo),
-        check=True,
-        capture_output=True,
-        text=True,
-    )
 
 
 _ENTRY = {
