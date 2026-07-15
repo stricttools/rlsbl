@@ -293,6 +293,76 @@ class TestCmdAdd:
         captured = capsys.readouterr()
         assert "Warning" in captured.err
 
+    def test_duplicate_same_type_message_names_id_and_says_nothing_written(self, rlsbl_repo, capsys):
+        """Hard-block message references the stable entry id, says nothing was
+        written, and names the remediation."""
+        sha = _make_commit(rlsbl_repo)
+        flags_first = {
+            "commits": sha[:12],
+            "description": "First feature",
+            "type": "feature",
+            "user-facing": True,
+            "auto-commit": False,
+        }
+        cmd_add(flags_first, project_root=rlsbl_repo)
+        existing = read_unreleased(get_changes_dir("."))
+        first_id = existing[0].id
+        assert first_id  # sanity: added entries carry a stable id
+
+        capsys.readouterr()  # clear buffered output from the first add
+
+        flags_second = {
+            "commits": sha[:12],
+            "description": "Duplicate feature",
+            "type": "feature",
+            "user-facing": True,
+            "auto-commit": False,
+        }
+        with pytest.raises(SystemExit):
+            cmd_add(flags_second, project_root=rlsbl_repo)
+
+        err = capsys.readouterr().err
+        assert first_id in err, err
+        assert "Nothing was written" in err, err
+        assert "rlsbl changelog edit" in err, err
+        # Reference is by stable id, not an unstable positional ordinal.
+        assert f"entry {first_id}" in err, err
+        assert "entry 1:" not in err, err
+
+    def test_duplicate_different_type_message_says_written_and_id(self, rlsbl_repo, capsys):
+        """Allowed-duplicate message references the stable id, states the entry
+        WAS written, and cites max_entries_per_commit."""
+        sha = _make_commit(rlsbl_repo)
+        flags_first = {
+            "commits": sha[:12],
+            "description": "Feature entry",
+            "type": "feature",
+            "user-facing": True,
+            "auto-commit": False,
+        }
+        cmd_add(flags_first, project_root=rlsbl_repo)
+        existing = read_unreleased(get_changes_dir("."))
+        first_id = existing[0].id
+        assert first_id
+
+        capsys.readouterr()  # clear buffered output from the first add
+
+        flags_second = {
+            "commits": sha[:12],
+            "description": "Fix entry",
+            "type": "fix",
+            "user-facing": True,
+            "auto-commit": False,
+        }
+        cmd_add(flags_second, project_root=rlsbl_repo)
+
+        err = capsys.readouterr().err
+        assert first_id in err, err
+        assert "WAS" in err, err
+        assert "max_entries_per_commit" in err, err
+        # The allowed duplicate was actually written.
+        assert len(read_unreleased(get_changes_dir("."))) == 2
+
     def test_invalid_type_rejected_writes_nothing(self, rlsbl_repo):
         """An out-of-enum --type aborts before writing any entry."""
         sha = _make_commit(rlsbl_repo)

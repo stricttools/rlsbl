@@ -2,6 +2,7 @@
 
 import json
 import os
+import stat
 
 import pytest
 
@@ -273,6 +274,79 @@ class TestGenerateVersionFile:
         md = generate_version_file(str(changes), "0.5.0")
         assert "## 0.5.0" in md
         assert "No user-facing changes." in md
+
+
+class TestGenerateVersionFileReadOnlyMd:
+    """Read-only per-version .md handling in generate_version_file.
+
+    A finalized .jsonl is chmod 444 (immutable record). A user/tool may
+    reasonably lock the derivative .md alongside it. Regeneration must not
+    crash on a read-only .md: unlock, write, restore the ORIGINAL mode.
+    """
+
+    def _setup(self, tmp_path):
+        changes = tmp_path / "changes"
+        changes.mkdir()
+        (changes / "1.0.0.jsonl").write_text(
+            _jsonl_line(commits=["a"], user_facing=True, description="A feature", type="feature") + "\n"
+        )
+        # Generate the initial (writable) .md.
+        generate_version_file(str(changes), "1.0.0")
+        return changes
+
+    def test_readonly_md_stale_content_regenerated_and_mode_restored(self, tmp_path):
+        changes = self._setup(tmp_path)
+        md_path = changes / "1.0.0.md"
+        # Make the .md stale, then lock it read-only (mirroring a locked pair).
+        os.chmod(md_path, 0o644)
+        md_path.write_text("## 1.0.0\n\nSTALE\n")
+        os.chmod(md_path, 0o444)
+
+        md = generate_version_file(str(changes), "1.0.0")
+
+        content = md_path.read_text()
+        assert content == md
+        assert "STALE" not in content
+        assert "A feature" in content
+        # Original read-only mode restored.
+        assert stat.S_IMODE(os.stat(md_path).st_mode) == 0o444
+
+    def test_readonly_md_preserves_non_444_mode(self, tmp_path):
+        changes = self._setup(tmp_path)
+        md_path = changes / "1.0.0.md"
+        os.chmod(md_path, 0o644)
+        md_path.write_text("## 1.0.0\n\nSTALE\n")
+        os.chmod(md_path, 0o440)  # read-only but deliberately NOT 444
+
+        generate_version_file(str(changes), "1.0.0")
+
+        # Exact original mode restored -- never assume 444.
+        assert stat.S_IMODE(os.stat(md_path).st_mode) == 0o440
+
+    def test_readonly_md_identical_content_untouched(self, tmp_path):
+        changes = self._setup(tmp_path)
+        md_path = changes / "1.0.0.md"
+        os.chmod(md_path, 0o444)
+        mtime_before = os.stat(md_path).st_mtime_ns
+
+        generate_version_file(str(changes), "1.0.0")
+
+        # Identical content: no unlock, no write -- mode AND mtime unchanged.
+        assert stat.S_IMODE(os.stat(md_path).st_mode) == 0o444
+        assert os.stat(md_path).st_mtime_ns == mtime_before
+
+    def test_writable_md_stale_content_regenerated(self, tmp_path):
+        changes = self._setup(tmp_path)
+        md_path = changes / "1.0.0.md"
+        md_path.write_text("## 1.0.0\n\nSTALE\n")  # stays writable (0o644)
+
+        md = generate_version_file(str(changes), "1.0.0")
+
+        content = md_path.read_text()
+        assert content == md
+        assert "STALE" not in content
+        # Writable path leaves the mode writable.
+        assert stat.S_IMODE(os.stat(md_path).st_mode) & 0o200
 
 
 class TestGenerateChangelog:

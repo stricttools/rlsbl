@@ -146,29 +146,54 @@ def _check_project_scope(resolved_commits, ws_context):
             sys.exit(1)
 
 
+def _entry_ref(entry, ordinal):
+    """Human-readable reference to an existing entry.
+
+    Prefers the entry's stable ULID ``id`` (survives unrelated edits to the
+    file). Legacy entries without an id fall back to a 1-based ordinal, noted
+    explicitly so the reader knows it is positional and unstable.
+    """
+    if entry.id:
+        return f"entry {entry.id}"
+    return f"legacy entry #{ordinal}"
+
+
 def _check_duplicate_commits(existing_entries, new_entry):
     """Check if any commits in new_entry already appear in existing entries.
 
-    Hard error when a commit appears in an existing entry with the same
-    user_facing value and type. Warning when the types differ (legitimate
-    case: one commit spanning multiple changelog types).
+    Hard error (nothing is written, the process exits) when a commit appears
+    in an existing entry with the SAME user_facing value and type. Allowed
+    (the new entry IS written) when the type/user_facing differ: one commit
+    may legitimately carry, say, both a feature and a fix -- validation bounds
+    this via max_entries_per_commit.
+
+    Existing entries are named by their stable ULID id (see ``_entry_ref``) so
+    the message stays valid across unrelated edits to the file.
     """
     for new_hash in new_entry.commits:
         for i, existing in enumerate(existing_entries, start=1):
             if new_hash in existing.commits:
                 short = new_hash[:12]
+                ref = _entry_ref(existing, i)
+                desc = existing.description or "(no description)"
                 if (existing.user_facing == new_entry.user_facing
                         and existing.type == new_entry.type):
-                    desc = existing.description or "(no description)"
                     print(
-                        f"Error: commit {short} already covered by entry {i}: {desc}",
+                        f"Error: commit {short} is already covered by {ref}: "
+                        f"{desc}. Nothing was written. Edit the existing entry "
+                        f"with `rlsbl changelog edit`, or pass a different "
+                        f"--type if this is genuinely a different kind of "
+                        f"change.",
                         file=sys.stderr,
                     )
                     sys.exit(1)
                 else:
-                    desc = existing.description or "(no description)"
                     print(
-                        f"Warning: commit {short} already in entry {i}: {desc}",
+                        f"Warning: commit {short} also appears in {ref}: "
+                        f"{desc}. This entry WAS still written -- the same "
+                        f"commit may carry distinct changelog types (e.g. a "
+                        f"feature and a fix), so this duplicate is legal. "
+                        f"max_entries_per_commit bounds this at validation.",
                         file=sys.stderr,
                     )
 
