@@ -361,3 +361,63 @@ class TestScanArtifactsMocked:
         scan_artifacts_for_secrets(str(tmp_path))
         assert len(captured_cmds) == 1
         assert "--config" not in captured_cmds[0]
+
+
+class TestCleanStaleArtifacts:
+    """Temporal scoping: dist/ is cleared of matching artifacts before the
+    build so the scan sees only the current release's output."""
+
+    def test_removes_matching_artifacts(self, tmp_path, capsys):
+        """All artifact-pattern files are removed; non-artifact files survive."""
+        from rlsbl.secret_scan import clean_stale_artifacts
+
+        dist = tmp_path / "dist"
+        dist.mkdir()
+        stale_whl = dist / "fakepkg-0.9.0-py3-none-any.whl"
+        stale_sdist = dist / "fakepkg-0.9.0.tar.gz"
+        stale_tgz = dist / "fakepkg-0.9.0.tgz"
+        stale_zip = dist / "fakepkg-0.9.0.zip"
+        for f in (stale_whl, stale_sdist, stale_tgz, stale_zip):
+            f.write_bytes(b"stale")
+        # Non-artifact file that must NOT be touched.
+        keeper = dist / "build-notes.txt"
+        keeper.write_text("keep me")
+
+        removed = clean_stale_artifacts(str(tmp_path))
+
+        for f in (stale_whl, stale_sdist, stale_tgz, stale_zip):
+            assert not f.exists(), f"{f.name} (artifact) must be removed"
+        assert keeper.exists(), "non-artifact file must be preserved"
+        assert set(removed) == {
+            str(stale_whl), str(stale_sdist), str(stale_tgz), str(stale_zip)
+        }
+
+        out = capsys.readouterr().out
+        assert "stale artifact" in out.lower()
+        assert "fakepkg-0.9.0-py3-none-any.whl" in out
+
+    def test_no_dist_dir_is_noop(self, tmp_path):
+        """Missing dist/ returns [] without error."""
+        from rlsbl.secret_scan import clean_stale_artifacts
+
+        assert clean_stale_artifacts(str(tmp_path)) == []
+
+    def test_scan_scoped_to_fresh_after_clean(self, tmp_path):
+        """After clearing stale artifacts and (simulated) rebuilding, only the
+        fresh artifact is discovered by the scanner."""
+        from rlsbl.secret_scan import clean_stale_artifacts, _find_artifacts
+
+        dist = tmp_path / "dist"
+        dist.mkdir()
+        stale = dist / "fakepkg-0.9.0-py3-none-any.whl"
+        stale.write_bytes(b"stale")
+
+        clean_stale_artifacts(str(tmp_path))
+
+        # Simulate the build repopulating dist/ with the current version.
+        fresh = dist / "fakepkg-1.0.0-py3-none-any.whl"
+        fresh.write_bytes(b"fresh")
+
+        assert _find_artifacts(str(tmp_path)) == [str(fresh)], (
+            "only the freshly built artifact should be discoverable"
+        )

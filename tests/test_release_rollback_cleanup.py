@@ -80,3 +80,69 @@ class TestCleanupReleaseArtifacts:
         _cleanup_release_artifacts(str(tmp_path), version)
 
         assert not jsonl_file.exists(), "read-only JSONL should be removed"
+
+
+class TestCleanupTrackedGuard:
+    """Real-git tests for the tracked-file guard: finalize artifacts that are
+    TRACKED at the post-reset HEAD must be preserved (deleting them would leave
+    ` D` index entries that block a retry with --no-allow-dirty)."""
+
+    def test_tracked_finalized_files_are_preserved(self, tmp_path):
+        """Re-release case: version files committed by an earlier attempt are
+        tracked at HEAD; cleanup must leave them alone and keep the tree clean.
+        """
+        from githarness import init_repo, git
+
+        repo = tmp_path / "repo"
+        init_repo(repo)
+        changes = repo / ".rlsbl" / "changes"
+        releases = repo / ".rlsbl" / "releases"
+        changes.mkdir(parents=True)
+        releases.mkdir(parents=True)
+
+        version = "1.2.3"
+        jsonl = changes / f"{version}.jsonl"
+        md = changes / f"{version}.md"
+        toml = releases / f"v{version}.toml"
+        jsonl.write_text('{"commits":["abc"],"user_facing":false}\n')
+        md.write_text("## 1.2.3\n\n- No user-facing changes.\n")
+        toml.write_text('bump = "patch"\n')
+
+        # Commit them -- they are now TRACKED at HEAD (as after a reset --hard
+        # that restores an earlier partial attempt's finalize commit).
+        git(repo, "add", ".rlsbl")
+        git(repo, "commit", "-q", "-m", "finalize files from earlier attempt")
+
+        _cleanup_release_artifacts(str(repo), version)
+
+        assert jsonl.exists(), "tracked finalized JSONL must be preserved"
+        assert md.exists(), "tracked finalized .md must be preserved"
+        assert toml.exists(), "tracked finalized TOML must be preserved"
+        # Preserving tracked files must leave the working tree clean.
+        assert git(repo, "status", "--porcelain") == "", (
+            "cleanup must not dirty the tree by deleting tracked files"
+        )
+
+    def test_untracked_finalized_files_still_removed_in_repo(self, tmp_path):
+        """Guard is narrow: genuinely orphaned (untracked) finalize files are
+        still removed even inside a git repo."""
+        from githarness import init_repo, commit_file, git
+
+        repo = tmp_path / "repo"
+        init_repo(repo)
+        commit_file(repo, "README.md", "# hi\n", "initial")
+
+        changes = repo / ".rlsbl" / "changes"
+        changes.mkdir(parents=True)
+        version = "1.2.3"
+        jsonl = changes / f"{version}.jsonl"
+        md = changes / f"{version}.md"
+        jsonl.write_text('{"commits":["abc"],"user_facing":false}\n')
+        jsonl.chmod(0o444)
+        md.write_text("## 1.2.3\n")
+        # NOT committed -- these are untracked orphans.
+
+        _cleanup_release_artifacts(str(repo), version)
+
+        assert not jsonl.exists(), "untracked finalized JSONL must be removed"
+        assert not md.exists(), "untracked finalized .md must be removed"

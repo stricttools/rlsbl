@@ -838,6 +838,51 @@ def _run_release_mutating(state: ReleaseState):
                 file=sys.stderr,
             )
 
+    def _warn_rollback_residuals():
+        """Postcondition check: warn if the working tree is not clean after a
+        pre-TAGGED rollback.
+
+        A correct rollback (``git reset --hard`` + orphan-artifact cleanup)
+        must leave the working tree byte-identical to the pre-release HEAD.
+        If ``git status --porcelain`` still reports changes, something was not
+        fully reverted (e.g. a residual generated file). This is a warning,
+        not a fatal error -- the original release failure is the primary
+        signal -- but it names every leftover path so manual cleanup is
+        possible before retrying.
+
+        Transient release-machinery files that are not rollback residuals are
+        excluded: the advisory lock file (``.rlsbl/lock``, released by the
+        caller's ``finally`` after this handler) and the in-progress state
+        file (already removed by ``clear_release_state`` above, but excluded
+        defensively).
+        """
+        try:
+            residual = run("git", ["status", "--porcelain"]).strip()
+        except Exception:
+            return
+        if not residual:
+            return
+        # Transient paths that are not rollback residuals, as absolute paths.
+        _transient_abs = {
+            os.path.abspath(os.path.join(project_dir, lock_dir, "lock")),
+            os.path.abspath(_state_path),
+        }
+        leftover_paths = []
+        for _p in parse_porcelain_paths(residual):
+            _abs = os.path.abspath(os.path.join(_git_root, _p.rstrip("/")))
+            if _abs in _transient_abs:
+                continue
+            leftover_paths.append(_p)
+        if not leftover_paths:
+            return
+        print(
+            "Warning: rollback left residual working-tree changes; "
+            "may need manual cleanup before retrying:",
+            file=sys.stderr,
+        )
+        for _p in sorted(leftover_paths):
+            print(f"  {_p}", file=sys.stderr)
+
     # Everything from version-bump writes through commit/tag/push is wrapped
     # in a single try block so that any failure (including ReleaseAbortError
     # from the unexpected-files check) triggers rollback of version-bumped
@@ -1034,6 +1079,13 @@ def _run_release_mutating(state: ReleaseState):
                 if hf not in files_to_commit:
                     files_to_commit.append(hf)
                     log(f"Including hook-generated file: {hf}")
+
+        # Clear stale artifacts from dist/ BEFORE building so the secret scan
+        # below is scoped to exactly this release's output. Build tools append
+        # to dist/ without pruning older versions' artifacts; scanning those
+        # stale files could surface old secrets or slow the release.
+        from ...secret_scan import clean_stale_artifacts
+        clean_stale_artifacts(project_dir, log=log)
 
         # Build step: primary target (e.g. pypi builds a wheel, maven runs
         # gradle/mvn, pgdesign validates the schema).  Failures propagate to
@@ -1430,6 +1482,7 @@ def _run_release_mutating(state: ReleaseState):
             f"Local state has been rolled back to {pre_release_sha[:10]}.",
             file=sys.stderr,
         )
+        _warn_rollback_residuals()
         raise
     except Exception as e:
         if "TAGGED" in _completed:
@@ -1468,10 +1521,12 @@ def _run_release_mutating(state: ReleaseState):
             file=sys.stderr,
         )
         print(
-            "If the branch was partially pushed, you may need to run:\n"
-            f"  git push --force-with-lease origin {branch}",
+            "No push happened (the failure occurred before tagging), so nothing "
+            "on the remote needs fixing. Address the error above and re-run:\n"
+            "  rlsbl release run",
             file=sys.stderr,
         )
+        _warn_rollback_residuals()
         raise
 
     # Capture the pushed commit SHA now, before any post-release hooks that

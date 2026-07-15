@@ -160,6 +160,147 @@ class TestPartialPushRollback:
         )
 
 
+def _is_tracked(repo, relpath):
+    result = subprocess.run(
+        ["git", "ls-files", "--error-unmatch", relpath],
+        cwd=str(repo), capture_output=True, text=True,
+    )
+    return result.returncode == 0
+
+
+def _porcelain(repo):
+    result = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=str(repo), capture_output=True, text=True, check=True,
+    )
+    return result.stdout.strip()
+
+
+def _setup_rerelease_with_committed_finalize(repo):
+    """Simulate a re-release where an earlier partial attempt already committed
+    the finalize files for v1.0.1 (1.0.1.jsonl / 1.0.1.md) but never tagged and
+    left package.json at 1.0.0 with the changelog entry still in
+    unreleased.jsonl. On re-run, preflight passes (entry present in
+    unreleased.jsonl) and the mutating phase fails at finalize_version --
+    which refuses to overwrite the already-existing, tracked 1.0.1.jsonl. This
+    is a genuine pre-TAGGED failure whose rollback must preserve the tracked
+    finalize files.
+    """
+    _git(repo, "init", "-q", "-b", "main")
+    _git(repo, "config", "user.email", "test@test.local")
+    _git(repo, "config", "user.name", "Test")
+
+    (repo / "package.json").write_text(
+        json.dumps({"name": "test-pkg", "version": "1.0.0"}, indent=2) + "\n"
+    )
+    (repo / "CHANGELOG.md").write_text(
+        "# Changelog\n\n## 1.0.0\n\n- Initial release.\n"
+    )
+    changes_dir = repo / ".rlsbl" / "changes"
+    changes_dir.mkdir(parents=True)
+    (changes_dir / "unreleased.jsonl").write_text("")
+    (repo / ".rlsbl" / "config.json").write_text(
+        json.dumps({"private": False, "targets": ["npm"]}) + "\n"
+    )
+    _git(repo, "add", "package.json", "CHANGELOG.md",
+         ".rlsbl/changes/unreleased.jsonl", ".rlsbl/config.json")
+    _git(repo, "commit", "-q", "-m", "initial")
+    _git(repo, "tag", "v1.0.0")
+
+    # Unreleased feature commit, covered by an entry in unreleased.jsonl so
+    # preflight (coverage + user-facing) passes.
+    (repo / "feature.txt").write_text("new feature\n")
+    _git(repo, "add", "feature.txt")
+    _git(repo, "commit", "-q", "-m", "add feature")
+    feature_sha = _git_head(repo)
+
+    entry = {
+        "commits": [feature_sha],
+        "user_facing": True,
+        "description": "**Add feature.** New feature available.",
+        "type": "feature",
+    }
+    (changes_dir / "unreleased.jsonl").write_text(json.dumps(entry) + "\n")
+    _git(repo, "add", ".rlsbl/changes/unreleased.jsonl")
+    _git(repo, "commit", "-q", "-m", "changelog: add feature entry")
+
+    # Earlier partial attempt: 1.0.1.jsonl / 1.0.1.md committed (tracked) but
+    # never tagged. These are the finalize files the rollback must preserve.
+    (changes_dir / "1.0.1.jsonl").write_text(json.dumps(entry) + "\n")
+    (changes_dir / "1.0.1.md").write_text("## 1.0.1\n\n### Features\n- Add feature.\n")
+    _git(repo, "add", ".rlsbl/changes/1.0.1.jsonl", ".rlsbl/changes/1.0.1.md")
+    _git(repo, "commit", "-q", "-m", "chore: leftover finalize files from earlier attempt")
+
+
+class TestPreTaggedReReleaseRollback:
+    """Pre-TAGGED rollback must not destroy tracked finalize files, must not
+    emit the (wrong, unreachable) force-push hint, and must point the user at
+    fix-and-retry via `rlsbl release run`."""
+
+    def test_rollback_preserves_tracked_finalize_and_no_forcepush_hint(
+        self, tmp_project, capsys
+    ):
+        """A pre-TAGGED failure (finalize_version refuses to clobber the
+        tracked 1.0.1.jsonl) rolls back. Cleanup must preserve the tracked
+        finalize files, the tree must be byte-identical clean, no
+        `--force-with-lease` hint may appear, and the fix-and-retry pointer
+        must be present.
+        """
+        _setup_rerelease_with_committed_finalize(tmp_project)
+
+        from rlsbl.commands.release import run_cmd
+        from rlsbl.errors import RlsblError
+        from rlsbl.utils import run as real_run
+
+        pre_sha = _git_head(tmp_project)
+
+        def fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
+            if cmd == "gh":
+                return ""
+            return real_run(cmd, args=args, timeout=timeout, env=env, cwd=cwd)
+
+        with (
+            patch("rlsbl.commands.release.check_gh_installed", return_value=True),
+            patch("rlsbl.commands.release.check_gh_auth", return_value=True),
+            patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.run", side_effect=fake_run),
+        ):
+            with pytest.raises((SystemExit, RlsblError, subprocess.CalledProcessError)):
+                run_cmd(
+                    _rc(),
+                    {"yes": True, "quiet": False},
+                    ctx=ProjectContext(
+                        project_root=Path("."), workspace_root=None,
+                        config={"private": False, "pipelines": {}},
+                    ),
+                )
+
+        # Rollback landed us back at the pre-release HEAD.
+        assert _git_head(tmp_project) == pre_sha, \
+            "pre-TAGGED failure must reset to the pre-release commit"
+
+        # Tracked finalize files survive and stay tracked.
+        jsonl = tmp_project / ".rlsbl" / "changes" / "1.0.1.jsonl"
+        md = tmp_project / ".rlsbl" / "changes" / "1.0.1.md"
+        assert jsonl.exists() and md.exists(), \
+            "tracked finalize files must not be deleted by cleanup"
+        assert _is_tracked(tmp_project, ".rlsbl/changes/1.0.1.jsonl")
+        assert _is_tracked(tmp_project, ".rlsbl/changes/1.0.1.md")
+
+        # Byte-identical clean working tree (no ` D` entries, no orphans).
+        assert _porcelain(tmp_project) == "", \
+            "rollback must leave a byte-identical clean working tree"
+
+        err = capsys.readouterr().err
+        assert "force-with-lease" not in err, \
+            "the unreachable force-push hint must be gone"
+        assert "push --force" not in err
+        assert "rlsbl release run" in err, \
+            "rollback must point the user at fix-and-retry via rlsbl release run"
+        assert "residual" not in err.lower(), \
+            "a clean rollback must not emit the residual-leftover warning"
+
+
 def _tag_exists(repo, tag):
     result = subprocess.run(
         ["git", "tag", "-l", tag],

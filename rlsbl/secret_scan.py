@@ -46,6 +46,11 @@ def _require_gitleaks():
         raise
 
 
+# Glob patterns for the archive types the secret scan understands. Both the
+# discovery and the pre-build clean use this single source of truth.
+_ARTIFACT_PATTERNS = ["*.whl", "*.tar.gz", "*.tgz", "*.zip"]
+
+
 def _find_artifacts(project_dir):
     """Discover built artifacts in dist/ under the project directory.
 
@@ -56,11 +61,62 @@ def _find_artifacts(project_dir):
     if not os.path.isdir(dist_dir):
         return []
 
-    patterns = ["*.whl", "*.tar.gz", "*.tgz", "*.zip"]
     artifacts = []
-    for pattern in patterns:
+    for pattern in _ARTIFACT_PATTERNS:
         artifacts.extend(glob.glob(os.path.join(dist_dir, pattern)))
     return sorted(set(artifacts))
+
+
+def clean_stale_artifacts(project_dir, log=None):
+    """Remove pre-existing build artifacts from dist/ before a fresh build.
+
+    Build tools (e.g. ``uv build``, ``npm pack``) write new artifacts into
+    dist/ without removing older ones, so artifacts from previous versions
+    accumulate. The secret scan would then scan artifacts that are not part of
+    the current release -- stale files that could carry old secrets or slow the
+    scan. Clearing matching artifact files *before* the build scopes the
+    subsequent scan to exactly what this release produces.
+
+    This uses a temporal clean (option (a)) rather than version-string
+    filtering because version-in-filename conventions are unreliable across
+    ecosystems: wheels normalize versions per PEP 440 (``1.0.0-rc1`` ->
+    ``1.0.0rc1``) and package names (``my-pkg`` -> ``my_pkg``), npm scoped
+    packages embed the scope, etc. Matching a raw version string against these
+    filenames would miss or mis-match. Removing all artifacts before the build
+    and letting the build repopulate dist/ is robust for every ecosystem.
+
+    Only files matching the artifact glob patterns are removed -- never other
+    dist/ contents. Each removed file is reported via ``log``. This is normal
+    runtime tool behavior (not user data), so plain ``os.remove`` is used
+    rather than saferm.
+
+    Note: this scoping logic is intentionally a cohesive, standalone function
+    so a later phase can relocate it to per-target build boundaries cleanly.
+
+    Returns the list of absolute paths that were removed.
+    """
+    if log is None:
+        def log(msg):
+            print(msg)
+
+    dist_dir = os.path.join(project_dir, "dist")
+    if not os.path.isdir(dist_dir):
+        return []
+
+    removed = []
+    for pattern in _ARTIFACT_PATTERNS:
+        for path in glob.glob(os.path.join(dist_dir, pattern)):
+            try:
+                os.remove(path)
+                removed.append(path)
+            except OSError:
+                pass  # Best-effort: a file we cannot remove is not fatal.
+
+    if removed:
+        log(f"Cleared {len(removed)} stale artifact(s) from dist/ before build:")
+        for path in sorted(removed):
+            log(f"  removed {os.path.basename(path)}")
+    return removed
 
 
 def _unpack_artifact(artifact_path, dest_dir):
