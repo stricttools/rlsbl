@@ -408,9 +408,19 @@ def clean_stale_exclusions(config_path):
     write to disk if nothing changed.
     """
     config = read_json_config(config_path)
-    batch_limits = config.get("batch_limits")
-    if not isinstance(batch_limits, dict):
+    # Absent batch_limits: nothing to clean. But a present-but-non-dict value
+    # is invalid config -- hard error rather than silently no-op, mirroring
+    # get_changelog_validation_config's boundary (this function re-reads the
+    # config from disk independently, so it cannot assume prior validation).
+    if "batch_limits" not in config:
         return 0
+    batch_limits = config["batch_limits"]
+    if not isinstance(batch_limits, dict):
+        raise ConfigError(
+            f"Invalid batch_limits in {config_path}: {batch_limits!r} "
+            f"(type {type(batch_limits).__name__}). "
+            f"Must be a JSON object (dict)."
+        )
     exclusions = batch_limits.get("exclusions")
     if not isinstance(exclusions, list) or not exclusions:
         return 0

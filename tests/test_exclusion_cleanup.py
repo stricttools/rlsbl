@@ -8,6 +8,7 @@ import json
 import pytest
 
 from rlsbl.config import clean_stale_exclusions
+from rlsbl.errors import ConfigError
 
 
 def _write_config(path, config):
@@ -79,6 +80,18 @@ class TestCleanStaleExclusions:
         assert removed == 0
         result = _read_config(config_path)
         assert "batch_limits" not in result
+
+    def test_cleanup_rejects_non_dict_batch_limits(self, tmp_path):
+        """A present-but-non-dict batch_limits is invalid config: hard error,
+        not a silent no-op (mirrors get_changelog_validation_config)."""
+        config_path = tmp_path / "config.json"
+        _write_config(config_path, {"batch_limits": "5"})
+
+        with pytest.raises(ConfigError) as exc_info:
+            clean_stale_exclusions(str(config_path))
+        msg = str(exc_info.value)
+        assert "batch_limits" in msg
+        assert "str" in msg
 
     def test_cleanup_removes_multiple_unreleased(self, tmp_path):
         config_path = tmp_path / "config.json"
