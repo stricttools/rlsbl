@@ -169,11 +169,17 @@ def get_changelog_validation_config(config):
     purposes; "commits" and "entries" are optional lists silencing the
     corresponding batch_size_commits and batch_size_entries violations.
 
-    Returns an empty dict if no config or malformed.
+    Returns an empty dict when ``batch_limits`` is absent. A present but
+    non-dict ``batch_limits`` is a hard error (:class:`ConfigError`) --
+    never silently treated as absent.
     """
     batch_limits = config.get("batch_limits", {})
     if not isinstance(batch_limits, dict):
-        return {}
+        raise ConfigError(
+            f"Invalid batch_limits in .rlsbl/config.json: {batch_limits!r} "
+            f"(type {type(batch_limits).__name__}). "
+            f"Must be a JSON object (dict)."
+        )
     return batch_limits
 
 
