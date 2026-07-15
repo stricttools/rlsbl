@@ -197,6 +197,40 @@ class TestPrModeConfigRejected:
             )
 
 
+class TestMalformedTestConfigAbortsRelease:
+    """A malformed ``test`` block gates the release before any mutation."""
+
+    def test_release_flow_rejects_malformed_test_block(self, mock_git_repo):
+        """release run aborts (SystemExit) and creates no tag when the
+        ``test`` config block is malformed.
+
+        Regression: validate_test_config was never called in the release
+        validation sequence, so a bad test block (config-schema check is
+        tagged [project], not preflight) did not gate a release.
+        """
+        _setup_pr_mode_project(mock_git_repo)
+
+        with (
+            patch("rlsbl.commands.release.check_gh_installed", return_value=True),
+            patch("rlsbl.commands.release.check_gh_auth", return_value=True),
+            pytest.raises(SystemExit),
+        ):
+            run_cmd(
+                _rc(),
+                {"yes": True, "quiet": True},
+                ctx=_make_ctx(mock_git_repo, config_override={
+                    "private": False,
+                    "pipelines": {},
+                    # Unknown test target -> validate_test_config raises ConfigError.
+                    "test": {"not-a-real-target": {"markers": "x"}},
+                }),
+            )
+
+        # Aborted in validation -> no version bump tag was created.
+        tags = _git_output(mock_git_repo, "tag", "-l", "v1.0.1")
+        assert tags == "", f"release should abort before tagging, got: {tags}"
+
+
 class TestImperativeModeUnchanged:
     """Test 8: Imperative mode (default) behavior is unchanged."""
 
