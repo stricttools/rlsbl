@@ -38,6 +38,60 @@ class LanguageLintConfig:
     exclude_patterns: list[str] = field(default_factory=list)
 
 
+def _require_table(data: dict, key: str, config_path: str) -> dict:
+    """Return ``data[key]`` as a TOML table (dict), or the default empty dict.
+
+    An absent section keeps the empty-dict default. A section that is
+    *present* but not a table is a hard error -- never silently coerced.
+    """
+    if key not in data:
+        return {}
+    value = data[key]
+    if not isinstance(value, dict):
+        raise ConfigError(
+            f"Invalid lint config {config_path}: [{key}] must be a table "
+            f"(TOML section), got {value!r} (type {type(value).__name__})."
+        )
+    return value
+
+
+def _read_bool(section: dict, full_key: str, config_path: str, default: bool, *, key: str) -> bool:
+    """Read ``section[key]`` as a bool. Absent keeps *default*; wrong type errors."""
+    if key not in section:
+        return default
+    value = section[key]
+    if not isinstance(value, bool):
+        raise ConfigError(
+            f"Invalid lint config {config_path}: {full_key} must be a boolean, "
+            f"got {value!r} (type {type(value).__name__})."
+        )
+    return value
+
+
+def _read_str_list(section: dict, full_key: str, config_path: str, default: list, *, key: str) -> list:
+    """Read ``section[key]`` as a list of strings.
+
+    Absent keeps *default*. A present value that is not a list, or a list
+    containing a non-string element, is a hard error -- never silently used
+    as-is (e.g. a bare string where a list is required).
+    """
+    if key not in section:
+        return default
+    value = section[key]
+    if not isinstance(value, list):
+        raise ConfigError(
+            f"Invalid lint config {config_path}: {full_key} must be a list of "
+            f"strings, got {value!r} (type {type(value).__name__})."
+        )
+    for item in value:
+        if not isinstance(item, str):
+            raise ConfigError(
+                f"Invalid lint config {config_path}: {full_key} must contain only "
+                f"strings, found {item!r} (type {type(item).__name__})."
+            )
+    return value
+
+
 def load_language_config(
     project_path: str,
     language: str,
@@ -72,20 +126,20 @@ def load_language_config(
             f"Invalid lint config {config_path}: {exc}"
         ) from exc
 
-    fi_section = data.get("forbidden-imports", {})
-    forbidden = fi_section.get("modules", list(defaults))
-    allowed = fi_section.get("allow", [])
+    fi_section = _require_table(data, "forbidden-imports", config_path)
+    forbidden = _read_str_list(fi_section, "forbidden-imports.modules", config_path, list(defaults), key="modules")
+    allowed = _read_str_list(fi_section, "forbidden-imports.allow", config_path, [], key="allow")
 
-    stdout_section = data.get("stdout", {})
-    stdout_enabled = stdout_section.get("enabled", True)
-    stdout_ignore = stdout_section.get("ignore", [])
+    stdout_section = _require_table(data, "stdout", config_path)
+    stdout_enabled = _read_bool(stdout_section, "stdout.enabled", config_path, True, key="enabled")
+    stdout_ignore = _read_str_list(stdout_section, "stdout.ignore", config_path, [], key="ignore")
 
-    ep_section = data.get("entry-point", {})
-    ep_enabled = ep_section.get("enabled", True)
-    ep_ignore = ep_section.get("ignore", [])
+    ep_section = _require_table(data, "entry-point", config_path)
+    ep_enabled = _read_bool(ep_section, "entry-point.enabled", config_path, True, key="enabled")
+    ep_ignore = _read_str_list(ep_section, "entry-point.ignore", config_path, [], key="ignore")
 
-    files_section = data.get("files", {})
-    exclude = files_section.get("exclude", [])
+    files_section = _require_table(data, "files", config_path)
+    exclude = _read_str_list(files_section, "files.exclude", config_path, [], key="exclude")
 
     return LanguageLintConfig(
         forbidden_imports=forbidden,

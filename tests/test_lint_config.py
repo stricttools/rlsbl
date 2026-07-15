@@ -54,6 +54,107 @@ class TestLoadLanguageConfig:
             load_language_config(str(tmp_path), "python")
 
 
+class TestLoadLanguageConfigFieldTypes:
+    """load_language_config type-validates each field it reads; wrong types hard-error."""
+
+    def _write(self, tmp_path, body):
+        lint_dir = tmp_path / ".rlsbl" / "lint"
+        lint_dir.mkdir(parents=True, exist_ok=True)
+        (lint_dir / "python.toml").write_text(body)
+        return str(tmp_path)
+
+    def test_bool_field_wrong_type_raises(self, tmp_path):
+        """stdout.enabled = 'yes' (string) is rejected, not used as-is."""
+        path = self._write(tmp_path, '[stdout]\nenabled = "yes"\n')
+        with pytest.raises(ConfigError) as exc_info:
+            load_language_config(path, "python")
+        msg = str(exc_info.value)
+        assert "stdout.enabled" in msg
+        assert "boolean" in msg
+
+    def test_entry_point_bool_wrong_type_raises(self, tmp_path):
+        path = self._write(tmp_path, '[entry-point]\nenabled = 1\n')
+        with pytest.raises(ConfigError) as exc_info:
+            load_language_config(path, "python")
+        assert "entry-point.enabled" in str(exc_info.value)
+
+    def test_list_field_bare_string_raises(self, tmp_path):
+        """forbidden-imports.modules = 'argparse' (string, not list) is rejected."""
+        path = self._write(tmp_path, '[forbidden-imports]\nmodules = "argparse"\n')
+        with pytest.raises(ConfigError) as exc_info:
+            load_language_config(path, "python")
+        msg = str(exc_info.value)
+        assert "forbidden-imports.modules" in msg
+        assert "list of strings" in msg
+
+    def test_list_field_non_string_element_raises(self, tmp_path):
+        """A list containing a non-string element is rejected."""
+        path = self._write(tmp_path, '[forbidden-imports]\nmodules = ["ok", 123]\n')
+        with pytest.raises(ConfigError) as exc_info:
+            load_language_config(path, "python")
+        msg = str(exc_info.value)
+        assert "forbidden-imports.modules" in msg
+        assert "only" in msg
+
+    def test_allow_list_wrong_type_raises(self, tmp_path):
+        path = self._write(tmp_path, '[forbidden-imports]\nallow = "os"\n')
+        with pytest.raises(ConfigError) as exc_info:
+            load_language_config(path, "python")
+        assert "forbidden-imports.allow" in str(exc_info.value)
+
+    def test_stdout_ignore_wrong_type_raises(self, tmp_path):
+        path = self._write(tmp_path, '[stdout]\nignore = "main.py"\n')
+        with pytest.raises(ConfigError) as exc_info:
+            load_language_config(path, "python")
+        assert "stdout.ignore" in str(exc_info.value)
+
+    def test_entry_point_ignore_wrong_type_raises(self, tmp_path):
+        path = self._write(tmp_path, '[entry-point]\nignore = "cli.py"\n')
+        with pytest.raises(ConfigError) as exc_info:
+            load_language_config(path, "python")
+        assert "entry-point.ignore" in str(exc_info.value)
+
+    def test_files_exclude_wrong_type_raises(self, tmp_path):
+        path = self._write(tmp_path, '[files]\nexclude = "tests/*"\n')
+        with pytest.raises(ConfigError) as exc_info:
+            load_language_config(path, "python")
+        assert "files.exclude" in str(exc_info.value)
+
+    def test_section_not_a_table_raises(self, tmp_path):
+        """A present-but-scalar section (stdout = 'yes') is rejected."""
+        path = self._write(tmp_path, 'stdout = "yes"\n')
+        with pytest.raises(ConfigError) as exc_info:
+            load_language_config(path, "python")
+        msg = str(exc_info.value)
+        assert "stdout" in msg
+        assert "table" in msg
+
+    def test_valid_config_all_fields(self, tmp_path):
+        """A well-typed config loads without error and applies values."""
+        path = self._write(
+            tmp_path,
+            "[forbidden-imports]\n"
+            'modules = ["argparse"]\n'
+            'allow = ["click"]\n'
+            "[stdout]\n"
+            "enabled = false\n"
+            'ignore = ["main.py"]\n'
+            "[entry-point]\n"
+            "enabled = true\n"
+            'ignore = ["cli.py"]\n'
+            "[files]\n"
+            'exclude = ["tests/*"]\n',
+        )
+        cfg = load_language_config(path, "python")
+        assert cfg.forbidden_imports == ["argparse"]
+        assert cfg.allowed_imports == ["click"]
+        assert cfg.stdout_enabled is False
+        assert cfg.stdout_ignore == ["main.py"]
+        assert cfg.entry_point_enabled is True
+        assert cfg.entry_point_ignore == ["cli.py"]
+        assert cfg.exclude_patterns == ["tests/*"]
+
+
 class TestParserSelection:
     """Verify parser = 'regex' selects the regex backend."""
 
