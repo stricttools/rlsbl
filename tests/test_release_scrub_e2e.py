@@ -21,49 +21,23 @@ from rlsbl.changelog.generate import generate_changelog
 from rlsbl.commands.release_scrub import run_cmd
 from rlsbl.context import ProjectContext
 
+from githarness import (
+    add_remote as _add_remote,
+    commit_file as _commit_file,
+    git as _git,
+    init_repo,
+    remote_ref as _remote_ref,
+    snapshot_remote_refs as _snapshot_remote_refs,
+)
+
 MOD = "rlsbl.commands.release_scrub"
 
 SECRET = "SECRETTOKEN123"
 REPLACEMENT = "REDACTEDVALUE"
 
 
-def _git(repo, *args, check=True):
-    result = subprocess.run(
-        ["git", *args], cwd=str(repo),
-        capture_output=True, text=True, check=check,
-    )
-    return result.stdout.strip()
-
-
 def _init_repo(repo):
-    repo.mkdir(parents=True, exist_ok=True)
-    _git(repo, "init", "-q", "-b", "main")
-    _git(repo, "config", "user.email", "e2e@test.local")
-    _git(repo, "config", "user.name", "E2E")
-
-
-def _commit_file(repo, relpath, content, message):
-    path = repo / relpath
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content)
-    _git(repo, "add", relpath)
-    _git(repo, "commit", "-q", "-m", message)
-    return _git(repo, "rev-parse", "HEAD")
-
-
-def _add_remote(repo, remote_dir):
-    remote_dir.mkdir(parents=True)
-    subprocess.run(
-        ["git", "init", "-q", "--bare"], cwd=str(remote_dir),
-        capture_output=True, text=True, check=True,
-    )
-    _git(repo, "remote", "add", "origin", str(remote_dir))
-    _git(repo, "push", "-q", "origin", "main", "--tags")
-
-
-def _remote_ref(repo, refname):
-    out = _git(repo, "ls-remote", "origin", refname)
-    return out.split()[0] if out.split() else ""
+    init_repo(repo, email="e2e@test.local", name="E2E")
 
 
 def _jsonl_line(commits, user_facing=False, description=None, type_=None):
@@ -72,16 +46,6 @@ def _jsonl_line(commits, user_facing=False, description=None, type_=None):
         entry["description"] = description or "A change"
         entry["type"] = type_ or "fix"
     return json.dumps(entry) + "\n"
-
-
-def _snapshot_remote_refs(repo):
-    """Snapshot origin's refs exactly the way run_cmd does before a scrub."""
-    refs = {}
-    for line in _git(repo, "ls-remote", "origin").splitlines():
-        parts = line.split()
-        if len(parts) == 2:
-            refs[parts[1]] = parts[0]
-    return refs
 
 
 def _generate_and_commit_changelog(repo):
