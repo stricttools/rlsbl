@@ -8,6 +8,8 @@ import pytest
 from unittest.mock import patch, MagicMock, call
 
 from rlsbl.commands.watch import (
+    _classify_failure,
+    _fetch_failure_log,
     _has_publish_workflow_on_disk,
     _is_publish_workflow,
     _notify,
@@ -527,9 +529,10 @@ class TestAutoRetry:
         """When a workflow fails, _watch_single_run triggers a retry."""
         ci_run = {"databaseId": 100, "name": "CI", "headBranch": "main"}
 
-        # run_gh calls: original watch, retry trigger, run list poll, retry watch
+        # run_gh calls: original watch, log fetch, retry trigger, run list poll, retry watch
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
+            "",  # gh run view --log-failed (empty tail -> unknown -> retry)
             "",  # gh workflow run succeeds
             json.dumps([{"databaseId": 200, "name": "CI", "status": "in_progress", "createdAt": "2026-01-01"}]),  # gh run list
             "",  # retry watch succeeds
@@ -551,6 +554,7 @@ class TestAutoRetry:
 
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
+            "",  # gh run view --log-failed (empty tail -> unknown -> retry)
             "",  # gh workflow run trigger
             json.dumps([{"databaseId": 200, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]),  # gh run list
             "",  # retry watch succeeds
@@ -568,6 +572,7 @@ class TestAutoRetry:
 
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
+            "",  # gh run view --log-failed (empty tail -> unknown -> retry)
             "",  # gh workflow run trigger
             json.dumps([{"databaseId": 200, "name": "CI", "status": "in_progress", "createdAt": "2026-01-01"}]),  # gh run list
             subprocess.CalledProcessError(1, "gh"),  # retry watch also fails
@@ -587,6 +592,7 @@ class TestAutoRetry:
 
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
+            "",  # gh run view --log-failed (empty tail; retry still gated by branch)
         ]
 
         result = _watch_single_run(ci_run, "test-label", "user/repo")
@@ -602,6 +608,7 @@ class TestAutoRetry:
 
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
+            "",  # gh run view --log-failed (empty tail -> unknown -> retry)
             subprocess.CalledProcessError(1, "gh"),  # gh workflow run trigger fails
         ]
 
@@ -1164,6 +1171,230 @@ class TestRetryAttachment:
 
         assert result is None
         assert "retry run not found" in capsys.readouterr().err
+
+
+class TestClassifyFailure:
+    """Unit tests for _classify_failure signature matching."""
+
+    @pytest.mark.parametrize("log", [
+        "=========================== 3 failed, 5 passed in 1.2s",
+        "==== 1 failed ====",
+        "short test summary info",
+        "FAILED tests/test_foo.py::test_bar - AssertionError",
+        "--- FAIL: TestThing (0.00s)",
+        "FAIL\tgithub.com/x/y\t0.5s",
+        "ok   github.com/x/z [build failed]",
+        "Tests:       2 failed, 10 passed",
+        "npm ERR! Test failed.  See above for more details.",
+        "compilation failed",
+        "error: build failed",
+        "error[E0433]: failed to resolve",
+        "SyntaxError: invalid syntax",
+        "Error: Cannot find module 'foo'",
+        "undefined reference to `symbol'",
+        "./main.go:10:2: undefined: Foo",
+        "strictcli: FlagRegistrationError: bad flag",
+        "registration error: duplicate command",
+        "rlsbl.utils.ConfigError: invalid config",
+        "pydantic ValidationError: 2 validation errors",
+        "invalid configuration",
+        "goreleaser: error: invalid config",
+        "only configuration files are allowed",
+        "Invalid workflow file: .github/workflows/ci.yml",
+        "yaml: line 12: mapping values are not allowed",
+        "workflow syntax error near line 3",
+        "Error: Input required and not supplied: token",
+        "fatal: could not read Username for 'https://github.com'",
+        "Permission denied (publickey).",
+        "denied: permission_denied: write_package",
+        "remote: authentication failed",
+        "remote: Permission to smm-h/repo.git denied to bot",
+    ])
+    def test_deterministic_signatures(self, log):
+        assert _classify_failure(log) == "deterministic"
+
+    @pytest.mark.parametrize("log", [
+        "API rate limit exceeded for user",
+        "HTTP 429 Too Many Requests",
+        "read tcp: i/o timeout",
+        "dial tcp 10.0.0.1:443: connection refused",
+        "connection reset by peer",
+        "connection timed out",
+        "network is unreachable",
+        "Temporary failure in name resolution",
+        "net/http: TLS handshake timeout",
+        "dial tcp: lookup api.github.com: no such host",
+        "HTTP 503 returned from server",
+        "502 Bad Gateway",
+        "503 Service Unavailable",
+        "500 Internal Server Error",
+        "The runner has received a shutdown signal",
+        "The runner lost communication with the server",
+        "The operation was canceled.",
+        "received request to deprovision: instance terminated",
+    ])
+    def test_transient_signatures(self, log):
+        assert _classify_failure(log) == "transient"
+
+    def test_unknown_when_no_signature_matches(self):
+        assert _classify_failure("some unremarkable log line") == "unknown"
+
+    def test_empty_log_is_unknown(self):
+        assert _classify_failure("") == "unknown"
+        assert _classify_failure(None) == "unknown"
+
+    def test_deterministic_wins_over_transient(self):
+        """A log with both a hard error and network chatter is deterministic."""
+        log = "connection timed out\nFAILED tests/test_x.py::test_y - assert 1 == 2"
+        assert _classify_failure(log) == "deterministic"
+
+
+class TestFetchFailureLog:
+    """Unit tests for _fetch_failure_log tail-capping and gh invocation."""
+
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_returns_last_n_lines(self, mock_run_gh):
+        """Only the last _LOG_TAIL_LINES lines are returned."""
+        from rlsbl.commands.watch import _LOG_TAIL_LINES
+        lines = [f"line {i}" for i in range(_LOG_TAIL_LINES + 50)]
+        mock_run_gh.return_value = "\n".join(lines)
+
+        tail = _fetch_failure_log("123")
+        tail_lines = tail.splitlines()
+        assert len(tail_lines) == _LOG_TAIL_LINES
+        assert tail_lines[-1] == lines[-1]
+        assert tail_lines[0] == lines[50]
+
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_invokes_gh_log_failed_with_timeout(self, mock_run_gh):
+        """Uses `gh run view <id> --log-failed` with a bounded timeout."""
+        from rlsbl.commands.watch import _LOG_FETCH_TIMEOUT
+        mock_run_gh.return_value = "boom"
+        _fetch_failure_log("777")
+        args = mock_run_gh.call_args
+        assert args[0][0] == ["run", "view", "777", "--log-failed"]
+        assert args[1]["timeout"] == _LOG_FETCH_TIMEOUT
+
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_propagates_gh_exception(self, mock_run_gh):
+        """A gh failure propagates so the caller can emit a loud note."""
+        mock_run_gh.side_effect = subprocess.CalledProcessError(1, "gh")
+        with pytest.raises(subprocess.CalledProcessError):
+            _fetch_failure_log("1")
+
+
+class TestRetryClassification:
+    """Tests that _watch_single_run gates retries on failure classification
+    and always prints the fetched log tail on failure."""
+
+    @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_deterministic_failure_not_retried(self, mock_run_gh, mock_time, capsys):
+        """A deterministic-signature failure prints the tail and does NOT retry."""
+        ci_run = {"databaseId": 100, "name": "CI", "headBranch": "main"}
+
+        det_log = "short test summary info\nFAILED tests/test_x.py::test_y - assert"
+        mock_run_gh.side_effect = [
+            subprocess.CalledProcessError(1, "gh"),  # original watch fails
+            det_log,                                 # gh run view --log-failed
+        ]
+
+        result = _watch_single_run(ci_run, "test-label", "user/repo")
+
+        assert result["passed"] is False
+        assert result["run_id"] == "100"
+        # Exactly two gh calls: the watch and the log fetch -- NO retry trigger.
+        assert mock_run_gh.call_count == 2
+        err = capsys.readouterr().err
+        assert "failure log tail:" in err
+        assert "FAILED tests/test_x.py" in err  # tail is printed
+        assert "deterministic failure detected; not retrying" in err
+        assert "retrying once" not in err
+
+    @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_transient_failure_retried_once(self, mock_run_gh, mock_time, capsys):
+        """A transient-signature failure retries once (and prints the tail)."""
+        ci_run = {"databaseId": 100, "name": "CI", "headBranch": "main"}
+
+        mock_run_gh.side_effect = [
+            subprocess.CalledProcessError(1, "gh"),   # original watch fails
+            "read tcp: i/o timeout",                  # gh run view --log-failed
+            "",                                       # gh workflow run trigger
+            json.dumps([{"databaseId": 200, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]),
+            "",                                       # retry watch succeeds
+        ]
+
+        result = _watch_single_run(ci_run, "test-label", "user/repo")
+
+        assert result["passed"] is True
+        assert result["run_id"] == "200"
+        err = capsys.readouterr().err
+        assert "failure log tail:" in err
+        assert "i/o timeout" in err
+        assert "CI failed, retrying once..." in err
+
+    @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_unknown_failure_retried_once(self, mock_run_gh, mock_time, capsys):
+        """An unrecognized failure retries once (preserves historical behavior)."""
+        ci_run = {"databaseId": 100, "name": "CI", "headBranch": "main"}
+
+        mock_run_gh.side_effect = [
+            subprocess.CalledProcessError(1, "gh"),   # original watch fails
+            "something totally unrecognized happened",  # gh run view --log-failed
+            "",                                       # gh workflow run trigger
+            json.dumps([{"databaseId": 200, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]),
+            "",                                       # retry watch succeeds
+        ]
+
+        result = _watch_single_run(ci_run, "test-label", "user/repo")
+
+        assert result["passed"] is True
+        assert result["run_id"] == "200"
+        err = capsys.readouterr().err
+        assert "CI failed, retrying once..." in err
+
+    @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_log_fetch_failure_loud_note_then_retry(self, mock_run_gh, mock_time, capsys):
+        """When the log fetch itself fails, a LOUD note is printed and the
+        watcher falls back to retrying once (broken gh must not break watching)."""
+        ci_run = {"databaseId": 100, "name": "CI", "headBranch": "main"}
+
+        mock_run_gh.side_effect = [
+            subprocess.CalledProcessError(1, "gh"),          # original watch fails
+            subprocess.TimeoutExpired("gh", 30),             # gh run view --log-failed fails
+            "",                                              # gh workflow run trigger
+            json.dumps([{"databaseId": 200, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]),
+            "",                                              # retry watch succeeds
+        ]
+
+        result = _watch_single_run(ci_run, "test-label", "user/repo")
+
+        assert result["passed"] is True
+        assert result["run_id"] == "200"
+        err = capsys.readouterr().err
+        assert "could not fetch failure logs" in err
+        assert "retrying without classification" in err
+        assert "CI failed, retrying once..." in err
+
+    @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_tail_printed_even_when_not_retried(self, mock_run_gh, mock_time, capsys):
+        """The log tail is printed on a deterministic (non-retried) failure --
+        the operator gets the diagnosis, not just a run URL."""
+        ci_run = {"databaseId": 100, "name": "CI", "headBranch": "main"}
+
+        mock_run_gh.side_effect = [
+            subprocess.CalledProcessError(1, "gh"),
+            "goreleaser: error: invalid config\nyaml: line 4: bad",
+        ]
+
+        _watch_single_run(ci_run, "test-label", "user/repo")
+        err = capsys.readouterr().err
+        assert "failure log tail:" in err
+        assert "goreleaser: error: invalid config" in err
 
 
 if __name__ == "__main__":

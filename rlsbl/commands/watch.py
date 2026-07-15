@@ -4,6 +4,7 @@ import atexit
 import glob
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -69,6 +70,138 @@ def _notify(title, body, url=None):
                     _open_url(url)
     except Exception:
         pass
+
+
+# Failure classification for retry gating.
+#
+# A CI/Publish run that failed for a DETERMINISTIC reason (a test failure baked
+# into the tag, a compile error, a config/validation error, a workflow syntax
+# error, a missing-secret/auth denial) will fail identically on retry -- retrying
+# it wastes a full CI run and delays diagnosis. Before retrying, we fetch the
+# tail of the failing step's log and match it against these signatures.
+#
+# Both lists are module-level tuples of compiled, case-insensitive regexes so
+# new signatures can be appended without touching the classification logic.
+# Add deterministic signatures here as new blind-retry-wasted cases are observed.
+
+# Last N lines of the failing step log to fetch and classify.
+_LOG_TAIL_LINES = 100
+# Timeout (seconds) for the `gh run view --log-failed` fetch. Matches the
+# 30s budget used for the retry dispatch below (external calls must be bounded).
+_LOG_FETCH_TIMEOUT = 30
+
+# Deterministic: the failure will recur identically on retry -> never retry.
+# MULTILINE so ^-anchored patterns match at the start of any log line, not
+# just the start of the whole tail.
+_DETERMINISTIC_SIGNATURES = tuple(
+    re.compile(p, re.IGNORECASE | re.MULTILINE) for p in (
+        # --- Test-suite failures (pytest / go test / npm/jest) ---
+        r"={3,}\s*\d+\s+failed",          # pytest summary: "=== 1 failed ..."
+        r"short test summary info",       # pytest failure section header
+        r"^FAILED\s+\S",                  # pytest per-test failure line
+        r"--- FAIL:",                     # go test failure
+        r"^FAIL\b",                       # go test package failure
+        r"\[build failed\]",              # go test build failure
+        r"Tests:.*\bfailed",              # jest summary: "Tests: 1 failed, ..."
+        r"npm ERR!\s+Test failed",        # npm test script failure
+        # --- Compile / build errors ---
+        r"compilation (failed|error)",
+        r"\bbuild failed\b",
+        r"error\[E\d+\]",                # rust compiler diagnostic code
+        r"\bSyntaxError\b",
+        r"cannot find (module|package)",
+        r"undefined reference to",
+        r"undefined:\s",                  # go "undefined: Foo"
+        # --- Config / validation errors ---
+        r"strictcli",                    # strictcli registration/validation error
+        r"registration error",
+        r"\bConfigError\b",
+        r"\bValidationError\b",
+        r"invalid configuration",
+        r"goreleaser\b.*\b(error|invalid)",
+        r"only configuration files are allowed",  # goreleaser config error
+        # --- Workflow / YAML syntax errors ---
+        r"Invalid workflow file",
+        r"yaml:\s*line\s*\d+",
+        r"workflow.*syntax error",
+        # --- Missing-secret / auth / permission denials (re-run identically) ---
+        r"Input required and not supplied",   # GH Actions missing secret/input
+        r"could not read (Username|Password)",
+        r"Permission denied",
+        r"denied: permission_denied",
+        r"authentication failed",
+        r"remote: Permission to .* denied",
+    )
+)
+
+# Transient: infrastructure flake -> retry once (same as historical behavior).
+_TRANSIENT_SIGNATURES = tuple(
+    re.compile(p, re.IGNORECASE | re.MULTILINE) for p in (
+        # --- Rate limits ---
+        r"rate limit",
+        r"\b429\b",
+        r"Too Many Requests",
+        # --- Network / DNS / TLS ---
+        r"i/o timeout",
+        r"connection (reset|refused|timed out)",
+        r"network is unreachable",
+        r"temporary failure in name resolution",
+        r"TLS handshake timeout",
+        r"\bdial tcp\b",
+        # --- 5xx server errors ---
+        r"HTTP 5\d\d",
+        r"5\d\d\s+(Server Error|Bad Gateway|Service Unavailable|Gateway Time-?out)",
+        r"internal server error",
+        # --- Runner-lost / cancelled infrastructure ---
+        r"The runner has received a shutdown signal",
+        r"lost communication with the server",
+        r"The operation was canceled",
+        r"received request to (deprovision|cancel)",
+    )
+)
+
+
+def _classify_failure(log_text):
+    """Classify a CI failure log tail to decide whether a retry is worthwhile.
+
+    Returns one of:
+      - "deterministic": a signature indicating the failure recurs identically
+        on retry (test failures, compile/build errors, config/validation errors,
+        workflow syntax errors, missing-secret/auth denials). Never retry.
+      - "transient": an infrastructure-flake signature (network timeouts, 5xx,
+        rate limits, runner-lost/cancelled). Retry once.
+      - "unknown": no signature matched. Treated by the caller as transient
+        (retry once) -- this DEFAULT preserves the historical blind-retry
+        behavior for failures we don't yet recognize, rather than suppressing a
+        retry that might have succeeded.
+
+    Deterministic signatures are checked before transient ones so a log that
+    contains both a hard error and incidental network chatter is treated as
+    deterministic (the hard error is the real cause).
+    """
+    if not log_text:
+        return "unknown"
+    for pat in _DETERMINISTIC_SIGNATURES:
+        if pat.search(log_text):
+            return "deterministic"
+    for pat in _TRANSIENT_SIGNATURES:
+        if pat.search(log_text):
+            return "transient"
+    return "unknown"
+
+
+def _fetch_failure_log(run_id, config=None):
+    """Fetch the tail of the failing step's log for a run via gh.
+
+    Runs `gh run view <id> --log-failed` (through run_gh, so GH_REPO resolution
+    and thread-safe env handling apply) with a bounded timeout, and returns the
+    last _LOG_TAIL_LINES lines joined as a single string. Propagates any
+    exception from the gh call so the caller can emit a loud fallback note.
+    """
+    raw = run_gh(["run", "view", str(run_id), "--log-failed"],
+                 config=config, timeout=_LOG_FETCH_TIMEOUT)
+    lines = raw.splitlines()
+    return "\n".join(lines[-_LOG_TAIL_LINES:])
 
 
 def _retry_workflow(workflow_name, branch, repo_slug, label, failed_run_id, known_ids=None,
@@ -177,7 +310,37 @@ def _watch_single_run(ci_run, label, repo_slug, retried_lock=None, retried_workf
         if repo_slug:
             print(f"rlsbl: https://github.com/{repo_slug}/actions/runs/{run_id}",
                   file=sys.stderr)
-        # Auto-retry once before reporting failure (deduplicated by workflow name)
+
+        # Fetch the failing step's log tail and classify the failure before
+        # retrying. Deterministic failures (test/compile/config/auth errors)
+        # recur identically on retry, so we skip the retry entirely. The tail
+        # is ALWAYS printed on failure -- retried or not -- so the operator
+        # gets an immediate diagnosis instead of just a run URL.
+        classification = "unknown"
+        try:
+            log_tail = _fetch_failure_log(run_id)
+            if log_tail.strip():
+                print(f"rlsbl: {label}: [{workflow_name}] failure log tail:",
+                      file=sys.stderr)
+                print(log_tail, file=sys.stderr)
+            classification = _classify_failure(log_tail)
+        except Exception as exc:
+            # A broken gh must not break watching -- fall back to the historical
+            # blind retry. This is NOT a silent fallback: the note is loud so the
+            # operator knows classification was skipped and why.
+            print(f"rlsbl: {label}: [{workflow_name}] could not fetch failure "
+                  f"logs: {exc}; retrying without classification", file=sys.stderr)
+            classification = "unknown"
+
+        if classification == "deterministic":
+            print(f"rlsbl: {label}: [{workflow_name}] deterministic failure "
+                  f"detected; not retrying (it would fail identically)",
+                  file=sys.stderr)
+            return {"name": workflow_name, "passed": False, "run_id": run_id}
+
+        # Auto-retry once before reporting failure (deduplicated by workflow name).
+        # Reached for transient and unknown classifications (unknown -> retry
+        # preserves the historical behavior for unrecognized failures).
         branch = ci_run.get("headBranch")
         if branch and workflow_name:
             should_retry = True
