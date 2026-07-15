@@ -199,7 +199,7 @@ def _run_pypi_tests(
                     workspace_root, verbose=uv_verbose, check_timeout=check_timeout
                 ):
                     return False
-            cmd = ["uv", "run", "pytest"]
+            cmd = ["uv", "run", "python", "-m", "pytest"]
         else:
             # Standalone: uv run handles sync; resolve the right invocation
             cmd = _resolve_pytest_invocation(effective_dir, workspace_root)
