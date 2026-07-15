@@ -612,6 +612,8 @@ def _format_single_result(result):
             print(f'"{name}" is taken on npm.')
         if reason in _REASON_EXPLANATIONS:
             print(_REASON_EXPLANATIONS[reason])
+        if result.get("note"):
+            print(f"  Note: {result['note']}")
 
     elif registry == "pypi":
         print(f'Checking PyPI for "{name}"...')

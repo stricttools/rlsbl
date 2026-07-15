@@ -921,6 +921,24 @@ class TestReasonExplanations:
             _format_single_result(result)
         assert "removing dashes, dots, and underscores" in mock_stdout.getvalue()
 
+    def test_npm_moniker_note_shows_conflicting_package(self):
+        """npm moniker collision prints the concrete conflicting package name.
+
+        Regression: the npm branch previously omitted the ``Note:`` block that
+        pypi/crates/go all have, so the concrete conflicting package name (in
+        result["note"]) never reached the user.
+        """
+        result = {
+            "name": "selfdoc", "registry": "npm", "status": "taken",
+            "variants": [], "reason": "moniker",
+            "note": "moniker collision with 'self-doc' (npm strips punctuation)",
+        }
+        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
+            _format_single_result(result)
+        output = mock_stdout.getvalue()
+        assert "Note:" in output
+        assert "self-doc" in output
+
     def test_pypi_ultranorm_explanation(self):
         """PyPI ultranorm reason prints visual similarity explanation."""
         result = {

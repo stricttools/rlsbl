@@ -82,6 +82,29 @@ class TestClaimName:
             run_cmd("npm", ["taken-pkg"], {"yes": False})
         assert exc_info.value.code == 1
 
+    @patch("rlsbl.commands.check._check_single_name")
+    def test_claim_taken_moniker_shows_conflicting_package(self, mock_check, capsys):
+        """A moniker collision surfaces the concrete conflicting package name.
+
+        Regression: the taken branch printed result["reason"] (the internal tag
+        "moniker") instead of result["note"], hiding the actual package that
+        collided from the user.
+        """
+        mock_check.return_value = {
+            "name": "selfdoc", "registry": "npm", "status": "taken",
+            "variants": None, "reason": "moniker",
+            "note": "moniker collision with 'self-doc' (npm strips punctuation)",
+        }
+
+        with pytest.raises(SystemExit) as exc_info:
+            run_cmd("npm", ["selfdoc"], {"yes": False})
+        assert exc_info.value.code == 1
+
+        err = capsys.readouterr().err
+        assert "self-doc" in err
+        # The raw internal tag should not be what is shown to the user.
+        assert "appears taken on npm: moniker." not in err
+
     @patch("rlsbl.commands.claim_name.subprocess.run")
     @patch("rlsbl.commands.check._check_single_name")
     def test_claim_taken_with_yes_publishes(self, mock_check, mock_run, real_tmpdir):

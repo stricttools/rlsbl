@@ -57,8 +57,8 @@ def run_cmd(target, args, flags):
     if status == "available":
         pass
     elif status == "taken":
-        reason = result.get("reason", "unknown reason")
-        print(f"Name '{name}' appears taken on {target}: {reason}.", file=sys.stderr)
+        detail = result.get("note") or result.get("reason", "unknown reason")
+        print(f"Name '{name}' appears taken on {target}: {detail}.", file=sys.stderr)
         if flags["yes"]:
             print("--yes passed, attempting publish anyway...")
         else:
