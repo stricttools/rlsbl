@@ -432,6 +432,18 @@ pure = true
 needs_network = false
 depends_on = []
 
+# dev-sync overlay drift: reads the local dev-overlays sentinel and the venv's
+# dist-info direct_url.json (filesystem only -- no subprocess, no network, so
+# pure). In "preflight" so it blocks a LOCAL release when an overlay was wiped;
+# skips cleanly on CI (the gitignored sentinel never exists there).
+[checks.dev-overlay-drift]
+tags = ["project", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
 # ---------------------------------------------------------------------------
 # Pre-push checks
 # ---------------------------------------------------------------------------

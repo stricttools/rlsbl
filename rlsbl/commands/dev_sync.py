@@ -15,15 +15,30 @@ Why a wrapper is required (verified against uv 0.9.17):
   hence the hard gate below.
 """
 
+import glob
+import json
 import os
 import re
 import subprocess
 import sys
 import tomllib
+from urllib.parse import unquote, urlparse
 
 from ..utils import require_tool
 
 OVERRIDES_FILENAME = "dev-sources.toml.local-only"
+
+# Written by run_sync after successful overlays; read by the
+# `dev-overlay-drift` check and `rlsbl dev status` to detect when a bare
+# `uv sync`/`uv run` silently reinstalled the registry wheel over an overlay.
+# Gitignored fleet-wide via the same *.local-only pattern as the overrides
+# file (verified against rlsbl's .gitignore and the shared scaffold template).
+SENTINEL_FILENAME = "dev-overlays-state.toml.local-only"
+
+# Overlay health states shared by the drift check and `dev status`.
+OVERLAY_HEALTHY = "healthy"
+OVERLAY_WIPED = "wiped"
+OVERLAY_MISSING = "missing"
 
 _FILE_FORMAT_HOWTO = """\
 Create {filename} at the project root (gitignored fleet-wide via the
@@ -182,6 +197,252 @@ def _load_overlays(project_root):
     return overlays
 
 
+def _write_sentinel(project_root, overlays):
+    """Atomically record the intended overlay state after a successful sync.
+
+    Writes SENTINEL_FILENAME alongside the overrides file (gitignored via the
+    *.local-only pattern), capturing per overlaid package: its distribution
+    name, the editable checkout path, and the overlaid version (read from the
+    checkout's pyproject at sync time). The drift check and `rlsbl dev status`
+    read this to detect when a later bare `uv sync`/`uv run` reinstalled the
+    locked registry wheel over the overlay -- a silent wipe that would run the
+    consuming project's tests against stale RELEASED dependency code.
+
+    Atomic write (tmp + os.replace) per the codebase convention for shared
+    state. *overlays* is the list returned by ``_load_overlays``.
+    """
+    import tomlkit
+
+    doc = tomlkit.document()
+    aot = tomlkit.aot()
+    for overlay in overlays:
+        table = tomlkit.table()
+        table["package"] = overlay["package"]
+        table["path"] = overlay["path"]
+        # version is None for dynamic-version checkouts; record "" so the
+        # round-trip is total (an absent key would be ambiguous with a
+        # truncated/malformed sentinel).
+        table["version"] = overlay.get("version") or ""
+        aot.append(table)
+    doc["overlay"] = aot
+
+    target = os.path.join(str(project_root), SENTINEL_FILENAME)
+    tmp = target + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(tomlkit.dumps(doc))
+    os.replace(tmp, target)
+
+
+def _load_sentinel(project_root):
+    """Read SENTINEL_FILENAME. Returns a list of
+    {"package", "path", "version"} dicts, or None when the sentinel does not
+    exist.
+
+    A missing sentinel means no overlays were ever declared -- e.g. a fresh CI
+    checkout, where the gitignored sentinel never existed. That is the honest
+    not-applicable state (skip), never a failure. A malformed sentinel returns
+    an empty list (treated as "no overlays"), never a crash.
+    """
+    file_path = os.path.join(str(project_root), SENTINEL_FILENAME)
+    if not os.path.isfile(file_path):
+        return None
+    try:
+        with open(file_path, "rb") as f:
+            data = tomllib.load(f)
+    except (OSError, tomllib.TOMLDecodeError):
+        return []
+    entries = data.get("overlay") or []
+    if not isinstance(entries, list):
+        return []
+    result = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        result.append(
+            {
+                "package": entry.get("package"),
+                "path": entry.get("path"),
+                "version": entry.get("version") or None,
+            }
+        )
+    return result
+
+
+def _venv_site_packages(project_root):
+    """Return existing ``site-packages`` directories under the project's
+    ``.venv`` (one per Python minor version present)."""
+    pattern = os.path.join(
+        str(project_root), ".venv", "lib", "python*", "site-packages"
+    )
+    return [d for d in glob.glob(pattern) if os.path.isdir(d)]
+
+
+def _read_dist_info_metadata(dist_info):
+    """Return ``(name, version)`` from a ``*.dist-info`` directory's METADATA
+    file, falling back to the directory-name split when METADATA is absent.
+    Either element may be None if unreadable."""
+    meta_path = os.path.join(dist_info, "METADATA")
+    if os.path.isfile(meta_path):
+        name = version = None
+        try:
+            with open(meta_path, "r", encoding="utf-8", errors="replace") as f:
+                for line in f:
+                    if not line.strip():
+                        break  # blank line ends the RFC822 header block
+                    if name is None and line.startswith("Name:"):
+                        name = line[len("Name:"):].strip()
+                    elif version is None and line.startswith("Version:"):
+                        version = line[len("Version:"):].strip()
+                    if name and version:
+                        break
+        except OSError:
+            return None, None
+        return name, version
+
+    base = os.path.basename(dist_info)
+    if base.endswith(".dist-info"):
+        stem = base[: -len(".dist-info")]
+        name, _, version = stem.rpartition("-")
+        if name:
+            return name, version
+    return None, None
+
+
+def _read_direct_url(dist_info):
+    """Return ``(editable, path)`` from a dist-info's ``direct_url.json``.
+
+    A registry wheel has no ``direct_url.json`` -> ``(False, None)``. A uv
+    editable install writes ``dir_info.editable = true`` and a ``file://`` url
+    pointing at the checkout -> ``(True, "/abs/checkout")``. A non-editable
+    local install -> ``(False, "/abs/path")``.
+    """
+    du_path = os.path.join(dist_info, "direct_url.json")
+    if not os.path.isfile(du_path):
+        return False, None
+    try:
+        with open(du_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return False, None
+    editable = bool((data.get("dir_info") or {}).get("editable"))
+    url = data.get("url")
+    path = None
+    if isinstance(url, str) and url.startswith("file:"):
+        path = unquote(urlparse(url).path)
+    return editable, path
+
+
+def _inspect_installed(project_root, package):
+    """Inspect the project's ``.venv`` for how *package* is installed.
+
+    Returns ``{"found", "editable", "path", "version"}``:
+    - ``found=False``: no dist-info for *package* in the venv (missing).
+    - ``editable=True`` with ``path``: uv editable install; ``path`` is the
+      ``file://`` checkout it points at.
+    - ``editable=False``: a registry wheel or non-editable install -- i.e. the
+      overlay was wiped.
+    """
+    target = _normalize(package)
+    for site in _venv_site_packages(project_root):
+        for dist_info in glob.glob(os.path.join(site, "*.dist-info")):
+            meta_name, meta_version = _read_dist_info_metadata(dist_info)
+            if meta_name is None or _normalize(meta_name) != target:
+                continue
+            editable, path = _read_direct_url(dist_info)
+            return {
+                "found": True,
+                "editable": editable,
+                "path": path,
+                "version": meta_version,
+            }
+    return {"found": False, "editable": False, "path": None, "version": None}
+
+
+def _classify_overlay(entry, installed):
+    """Compare a sentinel *entry* against the *installed* venv state.
+
+    Returns ``(state, detail)`` where *state* is OVERLAY_HEALTHY /
+    OVERLAY_WIPED / OVERLAY_MISSING and *detail* is a human-readable line
+    naming the package and the exact ``rlsbl dev sync`` remediation.
+    """
+    package = entry["package"]
+    declared_path = entry["path"]
+
+    if not installed["found"]:
+        return (
+            OVERLAY_MISSING,
+            f"{package}: declared as an editable overlay of {declared_path} "
+            "but not installed in the venv at all -- run `rlsbl dev sync`",
+        )
+    if not installed["editable"]:
+        actual_version = installed["version"] or "unknown version"
+        return (
+            OVERLAY_WIPED,
+            f"{package}: overlay wiped -- now a registry install "
+            f"({actual_version}), no longer editable at {declared_path}. A "
+            "bare `uv sync`/`uv run` reinstalled the locked wheel; run "
+            "`rlsbl dev sync` to restore the overlay",
+        )
+
+    inst_path = installed["path"]
+    if inst_path is None or (
+        os.path.realpath(inst_path) != os.path.realpath(declared_path)
+    ):
+        return (
+            OVERLAY_WIPED,
+            f"{package}: editable install points at {inst_path}, not the "
+            f"declared overlay path {declared_path} -- run `rlsbl dev sync`",
+        )
+
+    return (
+        OVERLAY_HEALTHY,
+        f"{package}: editable at {declared_path} "
+        f"(version {installed['version'] or 'dynamic'})",
+    )
+
+
+def run_status(project_root):
+    """Entry point for `rlsbl dev status`. Prints the declared overlays and
+    their actual venv state, then returns a process exit code: 1 if any
+    declared overlay was wiped or is missing (scriptable), 0 otherwise --
+    including when no overlays are declared (no sentinel)."""
+    project_root = str(project_root)
+    sentinel = _load_sentinel(project_root)
+    if sentinel is None:
+        print(
+            f"No dev overlays declared (no {SENTINEL_FILENAME}). "
+            "`rlsbl dev sync` writes it after overlaying local checkouts."
+        )
+        return 0
+    if not sentinel:
+        print(f"{SENTINEL_FILENAME} records no overlays.")
+        return 0
+
+    drifted = 0
+    print(f"Dev overlays declared in {SENTINEL_FILENAME}:")
+    for entry in sentinel:
+        installed = _inspect_installed(project_root, entry["package"])
+        state, detail = _classify_overlay(entry, installed)
+        marker = {
+            OVERLAY_HEALTHY: "ok",
+            OVERLAY_WIPED: "WIPED",
+            OVERLAY_MISSING: "MISSING",
+        }[state]
+        print(f"  [{marker}] {detail}")
+        if state != OVERLAY_HEALTHY:
+            drifted += 1
+
+    if drifted:
+        print(
+            f"\n{drifted} of {len(sentinel)} overlay(s) drifted. Re-run "
+            "`rlsbl dev sync` to restore editable installs.",
+            file=sys.stderr,
+        )
+        return 1
+    print(f"\nAll {len(sentinel)} overlay(s) intact.")
+    return 0
+
+
 def run_sync(project_root):
     """Entry point for `rlsbl dev sync`. Returns a process exit code."""
     project_root = str(project_root)
@@ -252,8 +513,13 @@ def run_sync(project_root):
             )
             return 1
 
+    # Record the intended overlay state so the `dev-overlay-drift` check and
+    # `rlsbl dev status` can later detect a silent wipe by a bare uv sync/run.
+    _write_sentinel(project_root, overlays)
+
     print(
         f"Overlaid {len(overlays)} package(s). Note: a bare `uv sync` reverts "
-        "overlays; re-run `rlsbl dev sync` to restore them."
+        "overlays; re-run `rlsbl dev sync` to restore them (check with "
+        "`rlsbl dev status`)."
     )
     return 0

@@ -534,3 +534,76 @@ def test_e2e_real_uv_overlay_survives_rerun(tmp_project, no_sync_env):
     # Idempotent: a second run keeps the editable overlay in place.
     assert run_sync(str(tmp_project)) == 0
     assert str(dep) in _imported_file()
+
+
+# ---------------------------------------------------------------------------
+# Sentinel written by run_sync (drift detection input)
+# ---------------------------------------------------------------------------
+
+
+def test_run_sync_writes_sentinel_with_package_path_version(
+    tmp_project, fake_run, uv_present, no_sync_env
+):
+    """After a successful sync, run_sync records the intended overlay state so
+    the drift check and `dev status` can later detect a silent wipe."""
+    from rlsbl.commands.dev_sync import SENTINEL_FILENAME, _load_sentinel
+
+    _two_overlays(tmp_project)
+    assert run_sync(str(tmp_project)) == 0
+
+    assert (tmp_project / SENTINEL_FILENAME).is_file()
+    sentinel = _load_sentinel(str(tmp_project))
+    assert sentinel == [
+        {
+            "package": "depa",
+            "path": os.path.abspath(str(tmp_project / "depa-src")),
+            "version": "0.3.1",
+        },
+        {
+            "package": "depb",
+            "path": os.path.abspath(str(tmp_project / "depb-src")),
+            "version": "1.2.0",
+        },
+    ]
+
+
+def test_run_sync_sentinel_records_dynamic_version_as_none(
+    tmp_project, fake_run, uv_present, no_sync_env
+):
+    """A dynamic-version checkout has no [project].version; the sentinel stores
+    it and _load_sentinel round-trips it back to None."""
+    from rlsbl.commands.dev_sync import _load_sentinel
+
+    dep = tmp_project / "dep"
+    dep.mkdir()
+    (dep / "pyproject.toml").write_text(
+        '[project]\nname = "depa"\ndynamic = ["version"]\n'
+    )
+    _write_overlay_file(tmp_project, '[[overlay]]\npackage = "depa"\npath = "dep"\n')
+    assert run_sync(str(tmp_project)) == 0
+
+    sentinel = _load_sentinel(str(tmp_project))
+    assert sentinel == [
+        {"package": "depa", "path": str(dep), "version": None}
+    ]
+
+
+def test_run_sync_does_not_write_sentinel_on_failure(
+    tmp_project, uv_present, no_sync_env, monkeypatch
+):
+    """If the editable install fails, no sentinel is written -- the recorded
+    state must never claim overlays that were not actually installed."""
+    from rlsbl.commands.dev_sync import SENTINEL_FILENAME
+
+    _two_overlays(tmp_project)
+
+    class _FailInstall(_Capture):
+        def __call__(self, cmd, *args, **kwargs):
+            result = super().__call__(cmd, *args, **kwargs)
+            if cmd[:3] == ["uv", "pip", "install"]:
+                return subprocess.CompletedProcess(args=cmd, returncode=1)
+            return result
+
+    monkeypatch.setattr("rlsbl.commands.dev_sync.subprocess.run", _FailInstall())
+    assert run_sync(str(tmp_project)) == 1
+    assert not (tmp_project / SENTINEL_FILENAME).exists()

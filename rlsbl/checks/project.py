@@ -526,6 +526,13 @@ def register_project_checks(app):
         except ConfigError as e:
             errors.append(str(e))
 
+        # Validate the optional per-target test config block if present
+        from ..config import validate_test_config
+        try:
+            validate_test_config(config)
+        except ConfigError as e:
+            errors.append(str(e))
+
         if errors:
             return CheckResult("fail", f"{len(errors)} config error(s)", details=errors)
         return CheckResult("pass", "config schema valid")
@@ -809,3 +816,65 @@ def register_project_checks(app):
                 ],
             )
         return CheckResult("pass", "no cross-repo path sources")
+
+    @app.check("dev-overlay-drift")
+    def check_dev_overlay_drift(ctx):
+        """Declared dev-sync overlays must remain editable-installed.
+
+        `rlsbl dev sync` overlays local editable checkouts of sibling projects
+        onto the locked venv, then writes a sentinel
+        (dev-overlays-state.toml.local-only) recording each overlaid package,
+        its checkout path, and version. Any later bare `uv sync`/`uv run`
+        silently reinstalls the locked registry wheel over an overlay, so the
+        consuming project's tests then run against stale RELEASED dependency
+        code with no error at all. This check reads the sentinel and inspects
+        the venv's dist-info direct_url.json for each overlay: a package that
+        is no longer an editable install of its declared path is a hard failure
+        naming the package and the exact `rlsbl dev sync` remediation.
+
+        Complementary to the release-time `_abort_on_version_skew` guard
+        (commands/release/validate.py), which reads dev-sources.toml.local-only
+        and compares each checkout's version against the registry. That guard
+        answers "is the overlaid dependency ahead of its published release?";
+        this check answers "is the overlay still actually installed?" --
+        different inputs (the sentinel vs the overrides file), different
+        failures, both protecting local dev and local releases from
+        stale-code hazards. They never contradict: the skew guard can pass
+        while the overlay is wiped, and vice versa.
+
+        Skips cleanly when no sentinel exists: absence means no overlays were
+        declared (e.g. a fresh CI checkout, where the gitignored sentinel never
+        existed) -- the honest not-applicable state, never a failure.
+        """
+        from ..commands.dev_sync import (
+            OVERLAY_HEALTHY,
+            _classify_overlay,
+            _inspect_installed,
+            _load_sentinel,
+        )
+
+        root = str(ctx.project_root)
+        sentinel = _load_sentinel(root)
+        if sentinel is None:
+            return CheckResult("skip", "no dev overlays declared (no sentinel)")
+        if not sentinel:
+            return CheckResult("skip", "sentinel declares no overlays")
+
+        drifted = []
+        for entry in sentinel:
+            installed = _inspect_installed(root, entry["package"])
+            state, detail = _classify_overlay(entry, installed)
+            if state != OVERLAY_HEALTHY:
+                drifted.append(detail)
+
+        if drifted:
+            return CheckResult(
+                "fail",
+                f"{len(drifted)} of {len(sentinel)} dev overlay(s) wiped or "
+                "missing -- a bare `uv sync`/`uv run` reinstalled registry "
+                "wheels; run `rlsbl dev sync` to restore editable overlays",
+                details=drifted,
+            )
+        return CheckResult(
+            "pass", f"all {len(sentinel)} dev overlay(s) editable-installed"
+        )
