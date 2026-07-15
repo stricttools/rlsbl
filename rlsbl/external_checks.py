@@ -25,6 +25,15 @@ from strictcli import CheckResult
 # command name.  We require the explicit ``env`` prefix form instead.
 _ENV_ASSIGN_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 
+# Valid external-check name charset.  Matches strictcli's own check-name
+# pattern (``_IDENTIFIER_RE`` in strictcli, enforced on every checks.toml
+# check name): lowercase letter, then lowercase letters / digits / hyphens.
+# Critically, this charset excludes fnmatch metacharacters (``*?[]``); a name
+# like ``test-*`` would otherwise glob-match a built-in check (e.g.
+# ``test-suite``) in the name-selection path used by
+# ``run_external_preflight_checks``.
+_CHECK_NAME_RE = re.compile(r"^[a-z][a-z0-9-]*$")
+
 
 class ExternalCheckError(Exception):
     """Raised when external check config is invalid."""
@@ -77,6 +86,14 @@ def validate_external_checks(config, *, project_root=None):
                 )
 
         name = entry["name"]
+        if not _CHECK_NAME_RE.match(name):
+            raise ExternalCheckError(
+                f"external_checks[{i}].name '{name}' is not a valid check name "
+                f"(must match [a-z][a-z0-9-]*): lowercase letters, digits, and "
+                f"hyphens only, starting with a letter. This charset excludes "
+                f"glob metacharacters (*?[]), which would otherwise let a name "
+                f"pattern-match a built-in check during name-based selection."
+            )
         if name in seen_names:
             raise ExternalCheckError(
                 f"external_checks: duplicate name '{name}'"
@@ -218,10 +235,26 @@ def register_external_checks(app, config):
         depends_on = entry.get("depends_on", [])
         cwd = entry.get("cwd")
 
-        # Skip if already registered (idempotent for repeated context
-        # creation within the same process)
-        if name in app._check_defs:
-            continue
+        # A name already present in app._check_defs is one of two things:
+        #   (a) our OWN external check re-registered (repeated context creation
+        #       within the same process) -- idempotent, safe to skip; or
+        #   (b) a collision with a built-in check (registered from checks.toml)
+        #       or another provider -- a hard error, because name-based
+        #       selection (run_external_preflight_checks) would then run the
+        #       built-in instead of, or in addition to, this external check.
+        # Discriminate by the existing def's impl: our external checks always
+        # carry the ``_run_external_check`` closure from _make_external_check_fn.
+        existing = app._check_defs.get(name)
+        if existing is not None:
+            existing_impl = getattr(existing, "impl", None)
+            if getattr(existing_impl, "__name__", "") == "_run_external_check":
+                continue
+            raise ExternalCheckError(
+                f"external_checks: name '{name}' collides with an already-"
+                f"registered check (a built-in check or another provider). "
+                f"External check names must be unique across all checks; "
+                f"rename this external check to something that does not clash."
+            )
 
         check_fn = _make_external_check_fn(command, cwd, name)
 

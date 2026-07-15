@@ -149,6 +149,46 @@ class TestValidateExternalChecks:
         assert len(result) == 1
         assert result[0]["name"] == "envy"
 
+    @pytest.mark.parametrize("bad_name", [
+        "test-*",     # trailing glob star -> would fnmatch-match test-suite
+        "test?",      # single-char glob
+        "test[a-z]",  # glob character class
+        "Test",       # uppercase not allowed
+        "test_suite", # underscore not allowed
+        "1test",      # must start with a letter
+        "-test",      # must start with a letter, not a hyphen
+        "te st",      # whitespace not allowed
+    ])
+    def test_invalid_name_charset_rejected(self, monkeypatch, bad_name):
+        """Names outside [a-z][a-z0-9-]* are hard errors at registration.
+
+        Glob metacharacters (``*?[]``) are the security-relevant case: a name
+        like ``test-*`` would pattern-match the built-in ``test-suite`` during
+        name-based selection in the customized-hook path.
+        """
+        monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/" + name)
+        with pytest.raises(ExternalCheckError, match=r"valid check name"):
+            validate_external_checks({
+                "external_checks": [{
+                    "name": bad_name,
+                    "command": "mycheck --run",
+                    "tag": "preflight",
+                }]
+            })
+
+    def test_valid_name_charset_passes(self, monkeypatch):
+        """A conforming lowercase-hyphen name passes."""
+        monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/" + name)
+        result = validate_external_checks({
+            "external_checks": [{
+                "name": "my-ext-check-2",
+                "command": "mycheck --run",
+                "tag": "preflight",
+            }]
+        })
+        assert len(result) == 1
+        assert result[0]["name"] == "my-ext-check-2"
+
 
 # ---------------------------------------------------------------------------
 # Check function execution tests
@@ -271,6 +311,50 @@ class TestRegisterExternalChecks:
         register_external_checks(fake_app, config)
         register_external_checks(fake_app, config)
         assert len(fake_app._check_defs) == 1
+
+    def test_collision_with_builtin_hard_errors(self, monkeypatch):
+        """An external check whose name matches a pre-registered built-in
+        check is a hard error, NOT a silent skip.
+
+        Silently skipping would leave the built-in check registered under that
+        name; name-based selection would then run the BUILT-IN instead of the
+        external check the user declared.
+        """
+        from strictcli import _CheckDef, CheckResult
+
+        monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/" + name)
+
+        def _builtin_impl(ctx):
+            return CheckResult("pass", "builtin")
+
+        class FakeApp:
+            _check_defs = {}
+
+        fake_app = FakeApp()
+        # Pre-register a built-in check (impl is NOT our external closure).
+        fake_app._check_defs["test-suite"] = _CheckDef(
+            name="test-suite",
+            tags=["preflight"],
+            severity="error",
+            fast=False,
+            pure=False,
+            needs_network=False,
+            depends_on=[],
+            scope="",
+            impl=_builtin_impl,
+        )
+
+        config = {
+            "external_checks": [{
+                "name": "test-suite",  # exact collision with the built-in
+                "command": "mycheck --run",
+                "tag": "preflight",
+            }]
+        }
+        with pytest.raises(ExternalCheckError, match=r"collides"):
+            register_external_checks(fake_app, config)
+        # The built-in def must remain untouched (still the built-in impl).
+        assert fake_app._check_defs["test-suite"].impl is _builtin_impl
 
     def test_no_external_checks_noop(self):
         """No external_checks key means nothing is registered."""
