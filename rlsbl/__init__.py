@@ -586,14 +586,13 @@ def cmd_status(target, json, registry, **_kwargs):
 # scaffold
 # ---------------------------------------------------------------------------
 
-@app.command(name="scaffold", help="Generate or update CI/CD workflows, git hooks, changelog, and license files. Safe to run repeatedly -- merges template changes with your customizations. Use --force-overwrite to overwrite all files.")
+@app.command(name="scaffold", help="Generate or update CI/CD workflows, git hooks, changelog, and license files. Safe to run repeatedly -- three-way merges template changes with your customizations. Existing files with no stored merge base are healed from their last scaffold commit before merging.")
 @strictcli.flag(name="target", type=str, help="Target a specific registry (auto-detected if omitted)", default="")
-@strictcli.flag(name="force-overwrite", type=bool, default=False, help="Overwrite all scaffold-managed files, discarding any user customizations")
 @strictcli.flag(name="private", type=bool, default=False, help="Generate workflows without publish steps, suitable for private repositories")
 @strictcli.flag(name="auto-commit", type=bool, default=True, help="Auto-commit scaffolded files after writing them to disk")
 @strictcli.flag(name="skip-shared", type=bool, default=False, help="Skip processing of shared workflow templates across targets")
 @strictcli.flag(name="auto-tag", type=bool, default=True, help="Add or update the rlsbl GitHub topic tag on this invocation")
-def cmd_scaffold(target, force_overwrite, private, auto_commit, skip_shared, auto_tag, dry_run, **_kwargs):
+def cmd_scaffold(target, private, auto_commit, skip_shared, auto_tag, dry_run, **_kwargs):
     # Scaffold is special: if a project root exists, resolve it for use as
     # scaffold_root; if not, stay in cwd (for new projects).
     # If the current directory has project markers (pyproject.toml,
@@ -624,7 +623,6 @@ def cmd_scaffold(target, force_overwrite, private, auto_commit, skip_shared, aut
         scaffold_root = Path.cwd()
 
     flags = {
-        "force": force_overwrite,
         "private": private,
         "auto-commit": auto_commit,
         "skip-shared": skip_shared,

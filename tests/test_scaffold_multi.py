@@ -160,8 +160,13 @@ class TestRunCmdMulti:
         with open(marker) as f:
             assert f.read().strip() == __version__
 
-    def test_force_flag_overwrites(self, dual_registry_project):
-        """Running with --force overwrites existing managed files."""
+    def test_rescaffold_preserves_user_modifications(self, dual_registry_project):
+        """Re-scaffolding an unchanged template preserves the user's edits.
+
+        The first scaffold saves a merge base, so re-scaffolding with the same
+        template detects base == template and keeps the user's version instead
+        of wholesale-overwriting it (the --force-overwrite footgun is gone).
+        """
         with patch("sys.stdout", new_callable=StringIO):
             run_cmd_multi(["npm", "pypi"], [], {}, ctx=_ctx())
 
@@ -170,15 +175,13 @@ class TestRunCmdMulti:
         with open(ci_path, "w") as f:
             f.write("# user modified\n")
 
-        # Re-scaffold with force
+        # Re-scaffold: template is unchanged, base is stored -> user edit kept.
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd_multi(["npm", "pypi"], [], {"force": True}, ctx=_ctx())
+            run_cmd_multi(["npm", "pypi"], [], {}, ctx=_ctx())
 
         with open(ci_path) as f:
             content = f.read()
-        # Should be overwritten back to template content
-        assert "# user modified" not in content
-        assert "CI" in content
+        assert "# user modified" in content
 
 
 class TestPypiPrimaryNpmSecondary:

@@ -66,7 +66,7 @@ def test_scaffold_update_does_not_touch_ci_custom(tmp_project):
     mappings = [{"template": "ci-custom.yml.tpl", "target": target}]
 
     created, skipped, warnings, _ = process_mappings(
-        str(tpl_dir), mappings, {}, force=False,
+        str(tpl_dir), mappings, {},
     )
 
     # Content untouched
@@ -77,8 +77,8 @@ def test_scaffold_update_does_not_touch_ci_custom(tmp_project):
     assert target not in created_targets
 
 
-def test_scaffold_force_does_not_touch_ci_custom(tmp_project):
-    """USER_OWNED takes precedence even over --force for ci-custom.yml."""
+def test_scaffold_does_not_touch_ci_custom(tmp_project):
+    """USER_OWNED protects ci-custom.yml from being overwritten."""
     target = ".github/workflows/ci-custom.yml"
     target_path = tmp_project / target
     target_path.parent.mkdir(parents=True, exist_ok=True)
@@ -92,7 +92,7 @@ def test_scaffold_force_does_not_touch_ci_custom(tmp_project):
     mappings = [{"template": "ci-custom.yml.tpl", "target": target}]
 
     created, skipped, warnings, _ = process_mappings(
-        str(tpl_dir), mappings, {}, force=True,
+        str(tpl_dir), mappings, {},
     )
 
     assert target_path.read_text() == user_content
@@ -115,7 +115,7 @@ def test_scaffold_update_does_not_touch_publish_custom(tmp_project):
     mappings = [{"template": "publish-custom.yml.tpl", "target": target}]
 
     created, skipped, warnings, _ = process_mappings(
-        str(tpl_dir), mappings, {}, force=False,
+        str(tpl_dir), mappings, {},
     )
 
     assert target_path.read_text() == user_content

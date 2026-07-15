@@ -135,7 +135,7 @@ class TestReleaseDispatchScaffoldIntegration:
             "template": ".github/workflows/release-dispatch.yml.tpl",
             "target": ".github/workflows/release-dispatch.yml",
         }]
-        plans = plan_mappings(str(SHARED_TEMPLATE_DIR), mappings, {}, force=False)
+        plans = plan_mappings(str(SHARED_TEMPLATE_DIR), mappings, {})
         assert len(plans) == 1
         assert plans[0]["target"] == ".github/workflows/release-dispatch.yml"
         assert plans[0]["status"] == "created"

@@ -44,7 +44,7 @@ def test_scaffold_creates_unreleased_jsonl(tmp_project):
                 if m["target"] == ".rlsbl/changes/unreleased.jsonl"]
 
     created, skipped, warnings, _ = process_mappings(
-        tpl_dir, mappings, {}, force=False,
+        tpl_dir, mappings, {},
     )
 
     target = tmp_project / ".rlsbl" / "changes" / "unreleased.jsonl"
@@ -71,7 +71,7 @@ def test_scaffold_update_does_not_overwrite_unreleased_jsonl(tmp_project):
                 if m["target"] == ".rlsbl/changes/unreleased.jsonl"]
 
     created, skipped, warnings, _ = process_mappings(
-        tpl_dir, mappings, {}, force=False,
+        tpl_dir, mappings, {},
     )
 
     # File must be unchanged
@@ -98,10 +98,10 @@ def test_scaffold_force_does_not_overwrite_unreleased_jsonl(tmp_project):
                 if m["target"] == ".rlsbl/changes/unreleased.jsonl"]
 
     created, skipped, warnings, _ = process_mappings(
-        tpl_dir, mappings, {}, force=True,
+        tpl_dir, mappings, {},
     )
 
-    # User-owned files are never overwritten, even with --force
+    # User-owned files are never overwritten (USER_OWNED takes precedence)
     assert target_file.read_text() == user_content
     skipped_targets = [t for t, _ in skipped]
     assert ".rlsbl/changes/unreleased.jsonl" in skipped_targets

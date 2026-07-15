@@ -1249,7 +1249,7 @@ class TestCmdScaffold:
             with patch("rlsbl.utils.find_project_root", return_value=None):
                 with pytest.raises(SystemExit) as exc:
                     rlsbl.cmd_scaffold(
-                        target="", force_overwrite=False, private=False, auto_commit=True,
+                        target="", private=False, auto_commit=True,
                         skip_shared=False, auto_tag=True, dry_run=False,
                     )
                 assert exc.value.code == 1
@@ -1260,7 +1260,7 @@ class TestCmdScaffold:
                 mock_ctx.return_value = _ctx(config={})
                 with patch("rlsbl.commands.init_cmd.run_cmd") as mock_run:
                     rlsbl.cmd_scaffold(
-                        target="", force_overwrite=False, private=False, auto_commit=True,
+                        target="", private=False, auto_commit=True,
                         skip_shared=False, auto_tag=True, dry_run=False,
                     )
                     mock_run.assert_called_once()
@@ -1271,7 +1271,7 @@ class TestCmdScaffold:
                 mock_ctx.return_value = _ctx(config={})
                 with patch("rlsbl.commands.init_cmd.run_cmd_multi") as mock_run_multi:
                     rlsbl.cmd_scaffold(
-                        target="", force_overwrite=False, private=False, auto_commit=True,
+                        target="", private=False, auto_commit=True,
                         skip_shared=False, auto_tag=True, dry_run=False,
                     )
                     mock_run_multi.assert_called_once()
@@ -1279,7 +1279,7 @@ class TestCmdScaffold:
     def test_explicit_unknown_target_exits(self, tmp_project):
         with pytest.raises(SystemExit) as exc:
             rlsbl.cmd_scaffold(
-                target="nonexistent", force_overwrite=False, private=False, auto_commit=True,
+                target="nonexistent", private=False, auto_commit=True,
                 skip_shared=False, auto_tag=True, dry_run=False,
             )
         assert exc.value.code == 1
@@ -1289,12 +1289,12 @@ class TestCmdScaffold:
             mock_ctx.return_value = _ctx()
             with patch("rlsbl.commands.init_cmd.run_cmd") as mock_run:
                 rlsbl.cmd_scaffold(
-                    target="npm", force_overwrite=True, private=True, auto_commit=False,
+                    target="npm", private=True, auto_commit=False,
                     skip_shared=True, auto_tag=False, dry_run=True,
                 )
                 mock_run.assert_called_once()
                 flags = mock_run.call_args[0][2]
-                assert flags["force"] is True
+                assert "force" not in flags
                 assert flags["private"] is True
 
 

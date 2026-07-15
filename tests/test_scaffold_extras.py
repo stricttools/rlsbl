@@ -1,4 +1,4 @@
-"""Tests for scaffold extras: --force USER_OWNED behavior, auto-commit, and config migration."""
+"""Tests for scaffold extras: USER_OWNED behavior, auto-commit, and config migration."""
 
 import os
 import subprocess
@@ -11,15 +11,6 @@ from rlsbl.commands.init_cmd import (
     _finalize_scaffold,
     process_mappings,
 )
-
-
-def _write_file(path, content):
-    """Helper to write a file, creating parent dirs as needed."""
-    parent = os.path.dirname(path)
-    if parent:
-        os.makedirs(parent, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(content)
 
 
 def test_hook_templates_not_scaffolded():
@@ -37,8 +28,8 @@ def test_hook_templates_not_scaffolded():
     )
 
 
-def test_force_does_not_overwrite_changelog(tmp_project):
-    """--force must NOT overwrite CHANGELOG.md if it already exists."""
+def test_scaffold_does_not_overwrite_changelog(tmp_project):
+    """Scaffold must NOT overwrite CHANGELOG.md if it already exists (USER_OWNED)."""
     assert "CHANGELOG.md" in USER_OWNED
 
     # Pre-existing user content
@@ -53,7 +44,7 @@ def test_force_does_not_overwrite_changelog(tmp_project):
     mappings = [{"template": "changelog.tpl", "target": "CHANGELOG.md"}]
 
     created, skipped, warnings, _ = process_mappings(
-        str(tpl_dir), mappings, {}, force=True,
+        str(tpl_dir), mappings, {},
     )
 
     # CHANGELOG.md must be skipped as user-owned, not overwritten
@@ -76,7 +67,7 @@ def test_template_author_never_literal(tmp_project):
 
     # With a non-empty author value
     created, skipped, warnings, _ = process_mappings(
-        str(tpl_dir), mappings, {"author": "Test User"}, force=False,
+        str(tpl_dir), mappings, {"author": "Test User"},
     )
     license_file = tmp_project / "LICENSE"
     content = license_file.read_text()
@@ -86,64 +77,10 @@ def test_template_author_never_literal(tmp_project):
     # Remove the file and test with empty author -- empty is fine, literal is not
     license_file.unlink()
     created, skipped, warnings, _ = process_mappings(
-        str(tpl_dir), mappings, {"author": ""}, force=False,
+        str(tpl_dir), mappings, {"author": ""},
     )
     content = license_file.read_text()
     assert "{{author}}" not in content
-
-
-def test_force_overwrites_hooks(tmp_project):
-    """--force MUST overwrite hook files (hooks are managed, not user-owned)."""
-    hook_path = ".rlsbl/hooks/pre-release.sh"
-    assert hook_path not in USER_OWNED
-
-    # Pre-existing user hook
-    hook_file = tmp_project / ".rlsbl" / "hooks" / "pre-release.sh"
-    hook_file.parent.mkdir(parents=True, exist_ok=True)
-    hook_file.write_text("#!/bin/bash\necho 'my custom hook'\n")
-
-    # Set up a template directory with a hook template
-    tpl_dir = tmp_project / "templates"
-    tpl_dir.mkdir()
-    (tpl_dir / "pre-release.sh.tpl").write_text("#!/bin/bash\necho 'template hook'\n")
-
-    mappings = [{"template": "pre-release.sh.tpl", "target": hook_path}]
-
-    created, skipped, warnings, _ = process_mappings(
-        str(tpl_dir), mappings, {}, force=True,
-    )
-
-    # Hook must be overwritten since it's no longer user-owned
-    assert hook_file.read_text() == "#!/bin/bash\necho 'template hook'\n"
-    created_targets = [t for t, _ in created]
-    assert hook_path in created_targets
-
-
-def test_force_overwrites_non_user_owned(tmp_project):
-    """--force DOES overwrite non-user-owned files that already exist."""
-    target = ".github/workflows/ci.yml"
-    assert target not in USER_OWNED
-
-    # Pre-existing file with old content
-    _write_file(target, "old CI content\n")
-
-    # Template with new content
-    tpl_dir = tmp_project / "templates"
-    tpl_dir.mkdir()
-    (tpl_dir / "ci.yml.tpl").write_text("new CI content from template\n")
-
-    mappings = [{"template": "ci.yml.tpl", "target": target}]
-
-    created, skipped, warnings, _ = process_mappings(
-        str(tpl_dir), mappings, {}, force=True,
-    )
-
-    # File must be overwritten with template content
-    with open(target, "r") as f:
-        assert f.read() == "new CI content from template\n"
-    created_targets = {t: s for t, s in created}
-    assert target in created_targets
-    assert created_targets[target] == "overwritten"
 
 
 # --- Auto-commit tests ---
@@ -165,7 +102,7 @@ def test_scaffold_auto_commits_files(mock_git_repo, capsys):
 
     mappings = [{"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"}]
     created, skipped, warnings, new_hashes = process_mappings(
-        str(tpl_dir), mappings, {}, force=False,
+        str(tpl_dir), mappings, {},
     )
 
     assert len(created) == 1
@@ -211,7 +148,7 @@ def test_scaffold_no_commit_flag_skips_commit(mock_git_repo, capsys):
 
     mappings = [{"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"}]
     created, skipped, warnings, new_hashes = process_mappings(
-        str(tpl_dir), mappings, {}, force=False,
+        str(tpl_dir), mappings, {},
     )
 
     # Run _finalize_scaffold with --no-commit flag
@@ -281,7 +218,7 @@ def test_npm_scaffold_creates_npmignore(tmp_project):
 
     # Process the template and verify the file is created
     created, skipped, warnings, _ = process_mappings(
-        tpl_dir, npmignore_mappings, {}, force=False,
+        tpl_dir, npmignore_mappings, {},
     )
 
     npmignore_path = tmp_project / ".npmignore"
@@ -312,7 +249,7 @@ def test_npmignore_is_user_owned(tmp_project):
 
     # The user-owned file should not be overwritten
     created, skipped, warnings, _ = process_mappings(
-        tpl_dir, npmignore_mappings, {}, force=False,
+        tpl_dir, npmignore_mappings, {},
     )
 
     assert npmignore.read_text() == "# My custom npmignore\nmy-custom-dir/\n"
@@ -321,9 +258,9 @@ def test_npmignore_is_user_owned(tmp_project):
     created_targets = [t for t, _ in created]
     assert ".npmignore" not in created_targets
 
-    # With --force, the user-owned file should still not be overwritten
+    # A second scaffold still must not overwrite the user-owned file
     created, skipped, warnings, _ = process_mappings(
-        tpl_dir, npmignore_mappings, {}, force=True,
+        tpl_dir, npmignore_mappings, {},
     )
 
     assert npmignore.read_text() == "# My custom npmignore\nmy-custom-dir/\n"
@@ -349,7 +286,7 @@ def test_pypi_scaffold_does_not_create_npmignore(tmp_project):
 
 
 def test_bare_scaffold_is_idempotent(mock_git_repo):
-    """Bare scaffold (no --force) preserves user customizations via three-way merge.
+    """Re-scaffold preserves user customizations via three-way merge.
 
     This proves that bare scaffold does what --update used to do:
     1. Initial scaffold creates a file and stores a merge base
@@ -379,7 +316,7 @@ def test_bare_scaffold_is_idempotent(mock_git_repo):
 
     # Step 1: initial scaffold -- creates file and stores base
     created, skipped, warnings, _ = process_mappings(
-        str(tpl_dir), mappings, {}, force=False,
+        str(tpl_dir), mappings, {},
     )
     ci_path = mock_git_repo / ".github" / "workflows" / "ci.yml"
     assert ci_path.exists()
@@ -394,10 +331,10 @@ def test_bare_scaffold_is_idempotent(mock_git_repo):
     user_content = initial_content.rstrip("\n") + "\n" + custom_line + "\n"
     ci_path.write_text(user_content)
 
-    # Step 3: bare scaffold again (no --force) -- template unchanged
+    # Step 3: scaffold again -- template unchanged
     # Should detect no template changes and preserve user content exactly
     created2, skipped2, warnings2, _ = process_mappings(
-        str(tpl_dir), mappings, {}, force=False,
+        str(tpl_dir), mappings, {},
     )
     after_content = ci_path.read_text()
     assert custom_line in after_content, (
@@ -409,7 +346,7 @@ def test_bare_scaffold_is_idempotent(mock_git_repo):
     (tpl_dir / "ci.yml.tpl").write_text(tpl_v2)
 
     created3, skipped3, warnings3, _ = process_mappings(
-        str(tpl_dir), mappings, {}, force=False,
+        str(tpl_dir), mappings, {},
     )
     merged_content = ci_path.read_text()
 
@@ -451,7 +388,7 @@ def test_scaffold_auto_commits_from_subdirectory(mock_git_repo, monkeypatch, cap
 
     mappings = [{"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"}]
     created, skipped, warnings, new_hashes = process_mappings(
-        str(tpl_dir), mappings, {}, force=False,
+        str(tpl_dir), mappings, {},
     )
 
     assert len(created) == 1

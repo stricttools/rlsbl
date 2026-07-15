@@ -206,11 +206,9 @@ class TestScaffold:
         with open("package.json", "w") as f:
             json.dump({"name": "test-pkg", "version": "0.1.0"}, f)
 
-    def _run_scaffold(self, force=False):
+    def _run_scaffold(self):
         """Run scaffold for npm with stdout suppressed."""
         flags = {}
-        if force:
-            flags["force"] = True
         with patch("sys.stdout", new_callable=StringIO):
             run_cmd("npm", [], flags, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={}))
 
@@ -250,7 +248,7 @@ class TestScaffold:
         mappings = [{"template": "test.tpl", "target": "output.txt"}]
         with pytest.raises(ConfigError, match="planet"):
             process_mappings(
-                tpl_dir, mappings, {"name": "test-pkg"}, force=False,
+                tpl_dir, mappings, {"name": "test-pkg"},
             )
 
     # -- Base storage tests --
@@ -297,7 +295,7 @@ class TestScaffold:
             f.write(tpl_v1)
 
         mappings = [{"template": "test.tpl", "target": "output.txt"}]
-        process_mappings(tpl_dir, mappings, {}, force=False)
+        process_mappings(tpl_dir, mappings, {})
 
         # User modifies line2
         with open("output.txt", "w") as f:
@@ -308,7 +306,7 @@ class TestScaffold:
         with open(os.path.join(tpl_dir, "test.tpl"), "w") as f:
             f.write(tpl_v2)
 
-        created, skipped, warnings, _ = process_mappings(tpl_dir, mappings, {}, force=False)
+        created, skipped, warnings, _ = process_mappings(tpl_dir, mappings, {})
         with open("output.txt") as f:
             result = f.read()
 
@@ -327,7 +325,7 @@ class TestScaffold:
             f.write(tpl_v1)
 
         mappings = [{"template": "test.tpl", "target": "output.txt"}]
-        process_mappings(tpl_dir, mappings, {}, force=False)
+        process_mappings(tpl_dir, mappings, {})
 
         # User modifies line2
         with open("output.txt", "w") as f:
@@ -338,7 +336,7 @@ class TestScaffold:
         with open(os.path.join(tpl_dir, "test.tpl"), "w") as f:
             f.write(tpl_v2)
 
-        created, skipped, warnings, _ = process_mappings(tpl_dir, mappings, {}, force=False)
+        created, skipped, warnings, _ = process_mappings(tpl_dir, mappings, {})
         with open("output.txt") as f:
             result = f.read()
 
@@ -346,24 +344,31 @@ class TestScaffold:
         assert any("CONFLICTS" in s for _, s in created)
         assert any("conflict" in w.lower() for w in warnings)
 
-    def test_no_base_skips_with_warning(self):
-        """When no base is stored (legacy project), skip with a warning."""
+    def test_no_base_no_scaffold_commit_hard_errors(self):
+        """No stored base AND no scaffold commit to heal from -> hard error.
+
+        A divergent legacy file that was never committed under an 'rlsbl
+        scaffold' message cannot be merged and must not be silently skipped
+        (which leaves it unmergeable forever) or overwritten (which destroys
+        local edits).
+        """
         tpl_dir = os.path.join(self.tmp_dir, "_tpls")
         os.makedirs(tpl_dir)
 
         with open(os.path.join(tpl_dir, "test.tpl"), "w") as f:
             f.write("template content v2\n")
 
-        # Create target file directly (no base stored)
+        # Create target file directly (no base stored, never committed)
         with open("output.txt", "w") as f:
             f.write("different content\n")
 
         mappings = [{"template": "test.tpl", "target": "output.txt"}]
-        created, skipped, warnings, _ = process_mappings(tpl_dir, mappings, {}, force=False)
-
-        assert any(t == "output.txt" for t, _ in skipped)
-        assert any("no base stored" in w for w in warnings), \
-            f"Expected 'no base stored' warning, got: {warnings}"
+        with pytest.raises(ConfigError) as exc:
+            process_mappings(tpl_dir, mappings, {})
+        msg = str(exc.value)
+        assert "output.txt" in msg
+        assert "delete" in msg
+        assert "rlsbl scaffold" in msg
 
     def test_no_base_identical_content_skips_silently(self):
         """When no base is stored but file matches template, skip without warning."""
@@ -377,7 +382,7 @@ class TestScaffold:
             f.write(content)
 
         mappings = [{"template": "test.tpl", "target": "output.txt"}]
-        created, skipped, warnings, _ = process_mappings(tpl_dir, mappings, {}, force=False)
+        created, skipped, warnings, _ = process_mappings(tpl_dir, mappings, {})
 
         assert any(t == "output.txt" for t, _ in skipped)
         # No warning because content matches
@@ -393,41 +398,40 @@ class TestScaffold:
             f.write(tpl_content)
 
         mappings = [{"template": "test.tpl", "target": "output.txt"}]
-        process_mappings(tpl_dir, mappings, {}, force=False)
+        process_mappings(tpl_dir, mappings, {})
 
         # User modifies the file
         with open("output.txt", "w") as f:
             f.write("line1\nline2 customized\nline3\n")
 
         # Re-run with same template -- should skip (template unchanged)
-        created, skipped, warnings, _ = process_mappings(tpl_dir, mappings, {}, force=False)
+        created, skipped, warnings, _ = process_mappings(tpl_dir, mappings, {})
         assert any(t == "output.txt" for t, _ in skipped)
 
         # Verify user customization is preserved
         with open("output.txt") as f:
             assert "customized" in f.read()
 
-    # -- --force tests --
+    # -- re-scaffold tests --
 
-    def test_force_preserves_user_owned_files(self):
-        """With --force, scaffold does NOT overwrite user-owned files (e.g. CHANGELOG.md)."""
+    def test_rescaffold_preserves_user_owned_files(self):
+        """Re-scaffold does NOT overwrite user-owned files (e.g. CHANGELOG.md)."""
         with open("CHANGELOG.md", "w") as f:
             f.write("# My custom changelog\n")
 
-        self._run_scaffold(force=True)
+        self._run_scaffold()
 
         with open("CHANGELOG.md") as f:
             content = f.read()
-        # User-owned files must be preserved even with --force
+        # User-owned files must be preserved.
         assert "My custom changelog" in content
 
-    def test_force_updates_base(self):
-        """With --force, the base should be updated to the new template content."""
+    def test_rescaffold_keeps_base(self):
+        """Re-scaffolding with an unchanged template keeps the stored base."""
         self._run_scaffold()
         ci_base_before = _load_base(".github/workflows/ci.yml")
-        self._run_scaffold(force=True)
+        self._run_scaffold()
         ci_base_after = _load_base(".github/workflows/ci.yml")
-        # Base should exist after force
         assert ci_base_after is not None
         # Content should match (template hasn't changed)
         assert ci_base_before == ci_base_after
@@ -471,7 +475,7 @@ class TestScaffold:
 
         mappings = [{"template": "hooks/pre-release.sh.tpl",
                       "target": ".rlsbl/hooks/pre-release.sh"}]
-        process_mappings(tpl_dir, mappings, {}, force=False)
+        process_mappings(tpl_dir, mappings, {})
 
         # User modifies line 3 (echo start -> echo user_start)
         with open(".rlsbl/hooks/pre-release.sh", "w") as f:
@@ -498,7 +502,7 @@ class TestScaffold:
         with open(os.path.join(tpl_dir, "hooks", "pre-release.sh.tpl"), "w") as f:
             f.write(tpl_v2)
 
-        created, skipped, warnings, _ = process_mappings(tpl_dir, mappings, {}, force=False)
+        created, skipped, warnings, _ = process_mappings(tpl_dir, mappings, {})
         with open(".rlsbl/hooks/pre-release.sh") as f:
             result = f.read()
 
@@ -532,7 +536,7 @@ class TestGitignoreSetUnionMerge:
 
         mappings = [{"template": "gitignore.tpl", "target": ".gitignore"}]
         created, skipped, warnings, _ = process_mappings(
-            tpl_dir, mappings, {}, force=False,
+            tpl_dir, mappings, {},
         )
 
         with open(".gitignore") as f:
@@ -565,7 +569,7 @@ class TestGitignoreSetUnionMerge:
 
         mappings = [{"template": "gitignore.tpl", "target": ".gitignore"}]
         created, skipped, warnings, _ = process_mappings(
-            tpl_dir, mappings, {}, force=False,
+            tpl_dir, mappings, {},
         )
 
         with open(".gitignore") as f:
@@ -590,7 +594,7 @@ class TestGitignoreSetUnionMerge:
             f.write("node_modules/\n.rlsbl/lock\n")
 
         mappings = [{"template": "gitignore.tpl", "target": ".gitignore"}]
-        process_mappings(tpl_dir, mappings, {}, force=False)
+        process_mappings(tpl_dir, mappings, {})
 
         with open(".gitignore") as f:
             result = f.read()
@@ -601,8 +605,8 @@ class TestGitignoreSetUnionMerge:
         # New entry added
         assert ".rlsbl/lock" in result
 
-    def test_gitignore_force_preserves_user_entries(self):
-        """With --force, .gitignore still uses additive merge (never removes user entries)."""
+    def test_gitignore_preserves_user_entries(self):
+        """.gitignore uses additive merge (never removes user entries)."""
         tpl_dir = os.path.join(self.tmp_dir, "_tpls")
         os.makedirs(tpl_dir)
 
@@ -614,7 +618,7 @@ class TestGitignoreSetUnionMerge:
 
         mappings = [{"template": "gitignore.tpl", "target": ".gitignore"}]
         created, skipped, warnings, _ = process_mappings(
-            tpl_dir, mappings, {}, force=True,
+            tpl_dir, mappings, {},
         )
 
         with open(".gitignore") as f:

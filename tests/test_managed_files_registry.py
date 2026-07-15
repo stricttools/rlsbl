@@ -184,28 +184,6 @@ class TestOrphanDetection:
         assert "has been modified" in err
         assert orphan in err
 
-    def test_force_overrides_hash_check(self, mock_git_repo):
-        """With force=True, modified orphan IS deleted despite hash mismatch."""
-        _make_npm_project(mock_git_repo)
-
-        orphan = ".github/workflows/ci-old.yml"
-        os.makedirs(os.path.dirname(orphan), exist_ok=True)
-        with open(orphan, "w") as f:
-            f.write("# original\n")
-        original_hash = file_hash(orphan)
-
-        # Modify the file
-        with open(orphan, "w") as f:
-            f.write("# user modified this\n")
-
-        managed = {orphan: original_hash}
-        created, _, _ = self._run_finalize(
-            {}, mock_git_repo, flags={"force": True}, managed_files=managed
-        )
-
-        assert not os.path.exists(orphan)
-        assert any(t == orphan and s == "removed (orphan)" for t, s in created)
-
     def test_dry_run_shows_would_remove(self, mock_git_repo):
         """Dry-run prints 'Would remove' but does NOT delete."""
         _make_npm_project(mock_git_repo)

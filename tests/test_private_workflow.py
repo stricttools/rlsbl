@@ -171,7 +171,7 @@ class TestPrivateFlagScaffold:
         saved_config = read_project_config(Path(str(mock_git_repo)))
         with patch("sys.stdout", new_callable=StringIO):
             with patch("rlsbl.commands.init_cmd.is_private_repo", return_value=None):
-                run_cmd("npm", [], {"force": True, "auto-tag": False}, ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config=saved_config))
+                run_cmd("npm", [], {"auto-tag": False}, ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config=saved_config))
 
         assert not os.path.exists(publish_path), "publish.yml should still not exist (config remembers private)"
 

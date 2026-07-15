@@ -315,7 +315,7 @@ class TestScaffoldUpdateVersionComments:
 
         # Initial scaffold
         created, skipped, warnings, hashes = process_mappings(
-            str(tpl_dir), mappings, vars_dict, force=False,
+            str(tpl_dir), mappings, vars_dict,
         )
         ci_path = mock_git_repo / ".github" / "workflows" / "ci.yml"
         assert ci_path.exists()
@@ -332,7 +332,7 @@ class TestScaffoldUpdateVersionComments:
 
         # Scaffold (three-way merge)
         created2, skipped2, warnings2, hashes2 = process_mappings(
-            str(tpl_dir), mappings, vars_dict, force=False,
+            str(tpl_dir), mappings, vars_dict,
         )
 
         merged_content = ci_path.read_text()

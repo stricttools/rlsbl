@@ -44,7 +44,7 @@ class TestScaffoldUnresolvedVarsError:
         mappings = [{"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"}]
 
         with pytest.raises(ConfigError, match="minPython"):
-            process_mappings(str(tpl_dir), mappings, {}, force=False)
+            process_mappings(str(tpl_dir), mappings, {})
 
     def test_apply_plans_raises_on_unresolved_var(self, tmp_project):
         """apply_plans raises ConfigError when a plan has unresolved vars."""
@@ -53,7 +53,7 @@ class TestScaffoldUnresolvedVarsError:
         (tpl_dir / "hook.sh.tpl").write_text("echo {{projectName}}\n")
         mappings = [{"template": "hook.sh.tpl", "target": "hook.sh"}]
 
-        plans = plan_mappings(str(tpl_dir), mappings, {}, force=False)
+        plans = plan_mappings(str(tpl_dir), mappings, {})
         # plan_mappings stores unreplaced in the plan dict
         assert any(p.get("unreplaced") for p in plans)
 
@@ -70,7 +70,7 @@ class TestScaffoldUnresolvedVarsError:
         mappings = [{"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"}]
 
         created, skipped, warnings, _ = process_mappings(
-            str(tpl_dir), mappings, {"minPython": "3.11"}, force=False,
+            str(tpl_dir), mappings, {"minPython": "3.11"},
         )
         content = (tmp_project / ".github" / "workflows" / "ci.yml").read_text()
         assert "3.11" in content
@@ -84,7 +84,7 @@ class TestScaffoldUnresolvedVarsError:
         mappings = [{"template": "config.tpl", "target": "config.txt"}]
 
         with pytest.raises(ConfigError) as exc_info:
-            process_mappings(str(tpl_dir), mappings, {}, force=False)
+            process_mappings(str(tpl_dir), mappings, {})
         msg = str(exc_info.value)
         assert "alpha" in msg
         assert "beta" in msg
@@ -98,7 +98,7 @@ class TestScaffoldUnresolvedVarsError:
         mappings = [{"template": "f.tpl", "target": "f.txt"}]
 
         with pytest.raises(ConfigError, match="foo") as exc_info:
-            process_mappings(str(tpl_dir), mappings, {}, force=False)
+            process_mappings(str(tpl_dir), mappings, {})
         assert "bar" in str(exc_info.value)
 
 
