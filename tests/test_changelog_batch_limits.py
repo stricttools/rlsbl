@@ -82,16 +82,28 @@ class TestGetBatchLimitsConfig:
         assert cfg["max_entries_per_commit"] == 4
         assert cfg["exclusions"] == [{"reason": "x", "commits": ["abc"]}]
 
-    def test_wrong_type_uses_default(self, capsys):
-        cfg = _get_batch_limits_config({"batch_limits": {
-            "max_commits_per_entry": "not-an-int",
-            "exclusions": "not-a-list",
-        }})
-        assert cfg["max_commits_per_entry"] == 5
-        assert cfg["exclusions"] == []
-        err = capsys.readouterr().err
-        assert "max_commits_per_entry" in err
-        assert "exclusions" in err
+    def test_wrong_type_raises(self):
+        """A present-but-wrong-typed batch_limits key is a hard error."""
+        from rlsbl.errors import ConfigError
+
+        with pytest.raises(ConfigError) as exc_info:
+            _get_batch_limits_config({"batch_limits": {
+                "max_commits_per_entry": "not-an-int",
+            }})
+        msg = str(exc_info.value)
+        assert "max_commits_per_entry" in msg
+        assert "not-an-int" in msg
+
+    def test_wrong_type_exclusions_raises(self):
+        """A present-but-non-list exclusions value is a hard error."""
+        from rlsbl.errors import ConfigError
+
+        with pytest.raises(ConfigError) as exc_info:
+            _get_batch_limits_config({"batch_limits": {
+                "exclusions": "not-a-list",
+            }})
+        msg = str(exc_info.value)
+        assert "exclusions" in msg
 
 
 # ---------------------------------------------------------------------------

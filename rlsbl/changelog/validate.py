@@ -18,7 +18,7 @@ from .resolve import resolve_hash, resolve_hashes, _git_log_hashes, _unreleased_
 from .schema import ChangelogEntry, parse_jsonl, validate_schema
 from ..config import get_changelog_validation_config
 from ..git_util import filter_commits_for_project, filter_commits_for_releasable
-from ..errors import ChangelogError
+from ..errors import ChangelogError, ConfigError
 from ..utils import commit_files_if_changed
 
 
@@ -57,8 +57,10 @@ def _get_batch_limits_config(config) -> dict:
     - ``max_entries_per_commit`` (int)
     - ``exclusions`` (list)
 
-    If any key is missing or has the wrong type, the default is used and a
-    warning is emitted on stderr.
+    A missing key keeps its documented default. A key that is *present*
+    but has the wrong type is a hard error (:class:`ConfigError`) naming
+    the key, the offending value, and the accepted type -- invalid config
+    must never be silently replaced with a default.
     """
     raw = get_changelog_validation_config(config) or {}
     resolved: dict = {}
@@ -68,16 +70,16 @@ def _get_batch_limits_config(config) -> dict:
             resolved[key] = default
             continue
         value = raw[key]
-        if not isinstance(value, type(default)) or isinstance(value, bool) and not isinstance(default, bool):
-            # bool is a subclass of int, so guard against accidental bool-as-int
-            print(
-                f"warning: batch_limits.{key} has wrong type "
-                f"({type(value).__name__}); using default {default!r}",
-                file=sys.stderr,
+        # bool is a subclass of int, so guard against accidental bool-as-int.
+        if not isinstance(value, type(default)) or (
+            isinstance(value, bool) and not isinstance(default, bool)
+        ):
+            raise ConfigError(
+                f"Invalid batch_limits.{key} in .rlsbl/config.json: "
+                f"{value!r} (type {type(value).__name__}). "
+                f"Must be of type {type(default).__name__}."
             )
-            resolved[key] = default
-        else:
-            resolved[key] = value
+        resolved[key] = value
 
     return resolved
 
