@@ -14,8 +14,6 @@ import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from githarness import git as _git
 from rlsbl.commands.release.release_state import (
     get_state_path,
