@@ -265,8 +265,9 @@ def get_hook_timeout():
     """Return the hook timeout in seconds, from RLSBL_HOOK_TIMEOUT or default None.
 
     If not set, returns None (no timeout — hooks run to completion).
-    If set, parses as a positive integer.
-    On invalid value, prints a warning and returns None.
+    If set, parses as a positive integer. A present-but-invalid value is
+    a hard error (:class:`ConfigError`) naming the variable and the value
+    -- never silently ignored.
     """
     raw = os.environ.get("RLSBL_HOOK_TIMEOUT")
     if raw is None:
@@ -277,8 +278,9 @@ def get_hook_timeout():
             raise ValueError
         return val
     except ValueError:
-        print(f'Warning: invalid RLSBL_HOOK_TIMEOUT="{raw}", ignoring (no timeout)', file=sys.stderr)
-        return None
+        raise ConfigError(
+            f'Invalid RLSBL_HOOK_TIMEOUT="{raw}". Must be a positive integer.'
+        )
 
 
 def remote_branch_exists(branch, cwd=None):

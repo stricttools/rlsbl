@@ -112,11 +112,15 @@ class TestGetHookTimeout:
         assert get_hook_timeout() == 30
 
     @pytest.mark.parametrize("value", ["not-a-number", "0", "-5"])
-    def test_invalid_value_warns_and_returns_none(self, monkeypatch, capsys, value):
+    def test_invalid_value_raises(self, monkeypatch, value):
+        from rlsbl.errors import ConfigError
+
         monkeypatch.setenv("RLSBL_HOOK_TIMEOUT", value)
-        result = get_hook_timeout()
-        assert result is None
-        assert "invalid RLSBL_HOOK_TIMEOUT" in capsys.readouterr().err
+        with pytest.raises(ConfigError) as exc_info:
+            get_hook_timeout()
+        msg = str(exc_info.value)
+        assert "RLSBL_HOOK_TIMEOUT" in msg
+        assert value in msg
 
 
 class TestGetPushTimeout:
