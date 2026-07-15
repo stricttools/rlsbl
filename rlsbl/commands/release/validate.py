@@ -633,9 +633,10 @@ def _abort_on_destroyed_tag(project_dir, current_version, tag, *,
     """Abort a "first release" that is really a re-release of a destroyed tag.
 
     ``compute_release_version`` enters the first-release path whenever the
-    current version's tag does not exist locally. But "never tagged" and "tag
+    current version's tag does not exist locally. But "never tagged", "tag
     existed and was later destroyed" (e.g. by an interrupted or undone
-    release) are indistinguishable to that check. A finalized, immutable
+    release), and "tag exists under an old format after a tag_format change"
+    are indistinguishable to that check. A finalized, immutable
     ``.rlsbl/changes/<version>.jsonl`` for the exact current version proves the
     version is NOT new: it was released once and its changelog was locked at
     release time -- only the tag went missing.
@@ -668,14 +669,20 @@ def _abort_on_destroyed_tag(project_dir, current_version, tag, *,
     raise ReleaseValidationError(
         f"version {current_version} appears to have been released before: its "
         f"finalized changelog {finalized} exists, but no tag \"{tag}\" is "
-        f"present. The tag may have been deleted (e.g. by an interrupted or "
-        f"undone release), which makes this look like a first release when it "
-        f"is not.\n"
+        f"present. This happens when the tag was deleted (e.g. by an "
+        f"interrupted or undone release), OR when the tag format changed since "
+        f"this version was released -- the version was tagged under an "
+        f"old-format name, so the current-format tag \"{tag}\" does not exist. "
+        f"Either way this looks like a first release when it is not.\n"
         f"Recover by either:\n"
         f"  (1) restore the tag \"{tag}\" pointing at the original release "
         f"commit (git tag {tag} <release-commit>), then re-run the release; or\n"
         f"  (2) move the version forward -- bump {current_version} to a new "
-        f"version and release anew."
+        f"version and release anew; or\n"
+        f"  (3) if the tag format changed, check tag_format in workspace.toml / "
+        f"the releasable config -- if {current_version} was released under a "
+        f"different tag name, restore/create the current-format tag \"{tag}\" "
+        f"pointing at that release commit."
     )
 
 

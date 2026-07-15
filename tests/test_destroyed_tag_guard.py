@@ -100,6 +100,11 @@ class TestDestroyedTagStandalone:
         assert f"git tag v1.2.3" in msg
         # Recovery option 2: move the version forward.
         assert "forward" in msg.lower()
+        # Recovery option 3: a changed tag format lands here too -- the message
+        # names tag_format and where it is configured.
+        assert "tag_format" in msg
+        assert "workspace.toml" in msg
+        assert "tag format" in msg.lower()
 
         # Pre-mutation guarantee: nothing committed, tree still clean.
         assert git(repo, "rev-parse", "HEAD") == head_before
@@ -183,6 +188,9 @@ class TestDestroyedTagGuardUnit:
         assert "v3.4.5" in msg
         assert "restore" in msg.lower()
         assert "forward" in msg.lower()
+        # Third possibility: a tag_format change is diagnosed as well.
+        assert "tag_format" in msg
+        assert "tag format" in msg.lower()
 
     def test_standalone_no_finalized_file_passes(self, tmp_path):
         changes = tmp_path / ".rlsbl" / "changes"
