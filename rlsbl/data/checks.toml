@@ -1,5 +1,12 @@
 app = "rlsbl"
 
+# Purity standard for the `pure` flag below:
+# pure = the check spawns no subprocess and touches no network; read-only
+# subprocesses still count as impure (unverifiable). "Sometimes shells out"
+# means impure -- purity is verifiable by grepping the check impl (and every
+# helper it calls) for subprocess/run() usage, never by trusting that a
+# subprocess is "harmless".
+
 [checks.lock]
 tags = ["project"]
 severity = "warn"
@@ -177,7 +184,7 @@ depends_on = []
 tags = ["changelog", "preflight-changelog"]
 severity = "error"
 fast = true
-pure = true
+pure = false
 needs_network = false
 depends_on = []
 
@@ -216,7 +223,7 @@ scope = "workspace"
 tags = ["workspace"]
 severity = "error"
 fast = true
-pure = true
+pure = false
 needs_network = false
 depends_on = []
 scope = "workspace"
@@ -270,7 +277,7 @@ scope = "workspace"
 tags = ["workspace"]
 severity = "error"
 fast = false
-pure = true
+pure = false
 needs_network = false
 depends_on = []
 scope = "workspace"
@@ -361,7 +368,7 @@ depends_on = []
 tags = ["quality"]
 severity = "error"
 fast = true
-pure = true
+pure = false
 needs_network = false
 depends_on = []
 
@@ -433,7 +440,7 @@ depends_on = []
 tags = ["prepush"]
 severity = "error"
 fast = false
-pure = true
+pure = false
 needs_network = false
 depends_on = []
 
@@ -441,7 +448,7 @@ depends_on = []
 tags = ["prepush"]
 severity = "error"
 fast = true
-pure = true
+pure = false
 needs_network = false
 depends_on = []
 
