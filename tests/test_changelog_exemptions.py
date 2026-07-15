@@ -318,11 +318,15 @@ class TestExclusionHashResolution:
         passed, details = check_batch_size_entries(entries_by_version, config)
         assert passed is True
 
-    def test_unresolvable_exclusion_hash_warns(self, git_repo, capsys):
-        """A hash that doesn't resolve produces a warning on stderr
-        but is still kept for comparison."""
+    def test_unresolvable_exclusion_hash_raises(self, git_repo):
+        """A hash that doesn't resolve is invalid present config: a hard error,
+        not a warn-and-continue. Entries store full, resolvable hashes (and
+        abbreviated exclusions resolve via git rev-parse), so an unresolvable
+        exclusion can never legitimately match an entry -- tolerating it would
+        silently mask a stale/typo'd config value."""
         from rlsbl.changelog.schema import ChangelogEntry
         from rlsbl.changelog.validate import check_batch_size_entries
+        from rlsbl.errors import ConfigError
 
         bogus = "deadbeef"
         entries_by_version = {
@@ -336,9 +340,8 @@ class TestExclusionHashResolution:
             "exclusions": [{"reason": "test", "commits": [bogus]}],
         }
 
-        passed, details = check_batch_size_entries(entries_by_version, config)
-        # Should warn but not crash
-        assert passed is True  # Only 1 entry, under the limit
-        err = capsys.readouterr().err
-        assert "does not resolve" in err
-        assert "deadbeef" in err
+        with pytest.raises(ConfigError) as exc_info:
+            check_batch_size_entries(entries_by_version, config)
+        msg = str(exc_info.value)
+        assert "does not resolve" in msg
+        assert "deadbeef" in msg

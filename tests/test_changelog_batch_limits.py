@@ -24,6 +24,7 @@ from rlsbl.changelog.validate import (
     check_batch_size_entries,
     validate_unreleased,
 )
+from rlsbl.errors import ConfigError
 
 
 @pytest.fixture
@@ -213,7 +214,9 @@ class TestCheckBatchSizeEntries:
         assert "max: 5" in details[0]
 
     def test_exclusion_silences_commit_violation(self, git_repo):
-        commit = "c" * 40
+        # The exclusion commit must resolve (real commit in history) -- entries
+        # store full, resolvable hashes, so the exclusion references one too.
+        commit = _make_commit(git_repo)
         entries_by_version = {
             "unreleased": [ChangelogEntry(commits=[commit], user_facing=False)] * 8,
         }
@@ -224,6 +227,23 @@ class TestCheckBatchSizeEntries:
         passed, details = check_batch_size_entries(entries_by_version, cfg)
         assert passed is True
         assert details == []
+
+    def test_unresolvable_exclusion_hash_raises(self, git_repo):
+        """An exclusion referencing a commit not in history is invalid config:
+        hard error, not a warn-and-continue that silently masks it."""
+        bogus = "c" * 40  # not a real commit in the repo
+        entries_by_version = {
+            "unreleased": [ChangelogEntry(commits=[bogus], user_facing=False)] * 8,
+        }
+        cfg = {
+            "max_entries_per_commit": 5,
+            "exclusions": [{"reason": "stale", "commits": [bogus]}],
+        }
+        with pytest.raises(ConfigError) as exc_info:
+            check_batch_size_entries(entries_by_version, cfg)
+        msg = str(exc_info.value)
+        assert bogus in msg
+        assert "does not resolve" in msg
 
     def test_cross_version_check_passes_at_max(self, git_repo):
         """Commit appearing 5 times across versions (4 in 0.32.0 + 1 unreleased), max 5 => pass."""

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import subprocess
-import sys
 
 from .exemptions import (
     ExemptionStats,
@@ -456,15 +455,23 @@ def check_batch_size_entries(
         for commit in excl.get("commits", []) or []:
             if isinstance(commit, str):
                 resolved = resolve_hash(commit)
-                if resolved is not None:
-                    exempted_commits.add(resolved)
-                else:
-                    # Keep unresolved hash as-is (may still match abbreviated entries)
-                    print(
-                        f"warning: exclusion hash does not resolve: {commit}",
-                        file=sys.stderr,
+                if resolved is None:
+                    # An exclusion commit hash that does not resolve points at a
+                    # commit that is not in history (rebased/scrubbed away, or a
+                    # typo). It cannot legitimately match any entry: entries store
+                    # full, resolvable hashes (`changelog add` resolves via
+                    # git rev-parse before writing), so a valid entry never
+                    # carries an unresolvable string. Tolerating it would silently
+                    # mask an invalid present config value. Fail loudly instead --
+                    # fix the hash, remove the stale exclusion, or run
+                    # `rlsbl changelog remap` after a history rewrite.
+                    raise ConfigError(
+                        f"Invalid batch_limits exclusion in .rlsbl/config.json: "
+                        f"commit hash {commit!r} does not resolve to any commit in "
+                        f"history. Remove the stale exclusion or run "
+                        f"`rlsbl changelog remap` after a history rewrite."
                     )
-                    exempted_commits.add(commit)
+                exempted_commits.add(resolved)
 
     appearances: dict[str, list[tuple[str, int]]] = {}
     for version, entries in entries_by_version.items():
