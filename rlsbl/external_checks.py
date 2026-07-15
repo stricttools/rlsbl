@@ -12,11 +12,18 @@ they are per-project, not per-tool).
 """
 
 import os
+import re
 import shutil
 import subprocess
 import sys
 
 from strictcli import CheckResult
+
+
+# Leading environment-assignment pattern (``VAR=value``).  Shell-legal as a
+# command prefix, but our binary-existence check would misread it as the
+# command name.  We require the explicit ``env`` prefix form instead.
+_ENV_ASSIGN_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 
 
 class ExternalCheckError(Exception):
@@ -103,7 +110,17 @@ def validate_external_checks(config, *, project_root=None):
         # The command string is split by shell rules; the first token must
         # be findable.
         command = entry["command"]
-        binary = command.split()[0]
+        first_token = command.split()[0]
+        # Reject leading environment assignments (``VAR=value cmd ...``).
+        # They are shell-legal but would be misinterpreted as the binary
+        # name; the ``env`` prefix form is the supported way to set env vars.
+        if _ENV_ASSIGN_RE.match(first_token):
+            raise ExternalCheckError(
+                f"external_checks[{i}] ('{name}'): environment assignments in "
+                f"external check commands must use the env prefix: "
+                f"env VAR=1 cmd args"
+            )
+        binary = first_token
         if os.path.isabs(binary):
             if not os.path.isfile(binary):
                 raise ExternalCheckError(
@@ -220,3 +237,46 @@ def register_external_checks(app, config):
             impl=check_fn,
         )
         app._check_defs[name] = check_def
+
+
+def run_external_preflight_checks(app, ctx, config, *, tag_expr="preflight"):
+    """Run ONLY the config-declared external checks matching *tag_expr*.
+
+    Used when the pre-release hook is customized: built-in preflight checks
+    (test-suite, lint, maven-central-metadata) are the hook's responsibility
+    and must be skipped, but config-declared external checks must still run.
+
+    Selection mechanism: each external check is selected by its exact name
+    intersected with *tag_expr* (strictcli's ``run_checks`` ANDs ``name_glob``
+    with ``tag_expr``).  This runs exactly the config-declared external checks
+    that carry the preflight tag and never selects a built-in check.
+
+    Caveat: if a config-declared external check declares ``depends_on`` on a
+    built-in preflight check, strictcli's dependency resolver pulls that
+    built-in into the run.  Config-declared externals should not depend on
+    built-ins when the hook is expected to own testing/linting.
+
+    ``register_external_checks`` (via ``_register_external_checks_from_config``)
+    must have already registered the checks on *app*.
+
+    Returns ``(results, exit_code)`` where ``exit_code`` is non-zero if any
+    external check failed.
+    """
+    ext_checks = validate_external_checks(config)
+    all_results = []
+    seen = set()
+    worst_exit = 0
+    for entry in ext_checks:
+        name = entry["name"]
+        if name in seen:
+            continue
+        results, exit_code = app.run_checks(
+            ctx, tag_expr=tag_expr, name_glob=name,
+        )
+        for r in results:
+            if r.name not in seen:
+                all_results.append(r)
+                seen.add(r.name)
+        if exit_code != 0:
+            worst_exit = exit_code
+    return all_results, worst_exit

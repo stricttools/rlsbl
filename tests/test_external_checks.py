@@ -121,6 +121,34 @@ class TestValidateExternalChecks:
         assert len(result) == 1
         assert result[0]["name"] == "my-check"
 
+    def test_leading_env_assignment_rejected(self, monkeypatch):
+        """A `VAR=1 cmd` command prefix is rejected with env-prefix guidance."""
+        monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/" + name)
+        with pytest.raises(ExternalCheckError, match="must use the env prefix"):
+            validate_external_checks({
+                "external_checks": [{
+                    "name": "envy",
+                    "command": "VAR=1 mycheck --run",
+                    "tag": "preflight",
+                }]
+            })
+
+    def test_env_prefix_form_passes(self):
+        """The `env VAR=1 cmd` form validates `env` on PATH and passes.
+
+        `env` is a real binary on PATH, so no monkeypatch is needed -- this
+        proves the accepted form resolves the binary correctly.
+        """
+        result = validate_external_checks({
+            "external_checks": [{
+                "name": "envy",
+                "command": "env VAR=1 mycheck --run",
+                "tag": "preflight",
+            }]
+        })
+        assert len(result) == 1
+        assert result[0]["name"] == "envy"
+
 
 # ---------------------------------------------------------------------------
 # Check function execution tests
@@ -409,3 +437,124 @@ class TestExternalCheckIntegration:
                     "tag": "quality",
                 }]
             })
+
+
+# ---------------------------------------------------------------------------
+# run_external_preflight_checks: runs ONLY config-declared external checks
+# ---------------------------------------------------------------------------
+
+
+class TestRunExternalPreflightChecks:
+    """The helper used in the customized-hook case: it must run config-declared
+    external checks but never run built-in preflight-tagged checks."""
+
+    def test_runs_only_external_checks_not_builtins(self, mock_git_repo, tmp_path):
+        from strictcli import _CheckDef, CheckResult
+
+        import rlsbl
+        from rlsbl.external_checks import run_external_preflight_checks
+        from rlsbl.context import ProjectContext
+        from pathlib import Path
+
+        ext_marker = tmp_path / "ext-ran"
+        builtin_marker = tmp_path / "builtin-ran"
+
+        config = {
+            "private": False,
+            "external_checks": [{
+                "name": "ext-marker-check",
+                "command": f"touch {ext_marker}",
+                "tag": "preflight",
+            }],
+        }
+
+        rlsbl._register_external_checks_from_config(config)
+
+        # A fake built-in preflight-tagged check that must NOT run.
+        def _builtin_impl(ctx):
+            builtin_marker.write_text("ran")
+            return CheckResult("pass", "ok")
+
+        rlsbl.app._check_defs["fake-builtin-preflight"] = _CheckDef(
+            name="fake-builtin-preflight",
+            tags=["preflight"],
+            severity="error",
+            fast=False,
+            pure=False,
+            needs_network=False,
+            depends_on=[],
+            scope="",
+            impl=_builtin_impl,
+        )
+
+        try:
+            ctx = ProjectContext(
+                project_root=Path(str(mock_git_repo)),
+                workspace_root=None,
+                config=config,
+            )
+            results, exit_code = run_external_preflight_checks(
+                rlsbl.app, ctx, config,
+            )
+
+            assert exit_code == 0
+            assert ext_marker.exists(), "external check should have executed"
+            assert not builtin_marker.exists(), (
+                "built-in preflight check must NOT run in customized-hook mode"
+            )
+            names = [r.name for r in results]
+            assert "ext-marker-check" in names
+            assert "fake-builtin-preflight" not in names
+        finally:
+            rlsbl.app._check_defs.pop("ext-marker-check", None)
+            rlsbl.app._check_defs.pop("fake-builtin-preflight", None)
+
+    def test_failing_external_check_returns_nonzero(self, mock_git_repo):
+        import rlsbl
+        from rlsbl.external_checks import run_external_preflight_checks
+        from rlsbl.context import ProjectContext
+        from pathlib import Path
+
+        config = {
+            "private": False,
+            "external_checks": [{
+                "name": "ext-fail-check",
+                "command": "false",
+                "tag": "preflight",
+            }],
+        }
+        rlsbl._register_external_checks_from_config(config)
+        try:
+            ctx = ProjectContext(
+                project_root=Path(str(mock_git_repo)),
+                workspace_root=None,
+                config=config,
+            )
+            results, exit_code = run_external_preflight_checks(
+                rlsbl.app, ctx, config,
+            )
+            assert exit_code != 0
+            assert any(
+                r.name == "ext-fail-check" and r.result.status == "fail"
+                for r in results
+            )
+        finally:
+            rlsbl.app._check_defs.pop("ext-fail-check", None)
+
+
+# ---------------------------------------------------------------------------
+# _register_external_checks_from_config: malformed config is a hard error
+# ---------------------------------------------------------------------------
+
+
+class TestRegisterFromConfigHardError:
+    def test_malformed_config_aborts(self, capsys):
+        """A malformed external_checks section aborts (exit 1), not warn+continue."""
+        import rlsbl
+
+        with pytest.raises(SystemExit) as exc:
+            rlsbl._register_external_checks_from_config(
+                {"external_checks": "bad"}
+            )
+        assert exc.value.code == 1
+        assert "external checks config error" in capsys.readouterr().err

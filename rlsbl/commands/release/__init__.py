@@ -547,7 +547,12 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     )
 
     # Changelog preflight: run preflight-changelog checks via the check system
-    if not flags.get("dry-run", False):
+    if flags.get("dry-run", False):
+        log(
+            "preflight checks not executed under --dry-run; run "
+            "`rlsbl check --tag preflight-changelog` to evaluate the gate"
+        )
+    else:
         from rlsbl import app as _rlsbl_app, _register_external_checks_from_config
         from pathlib import Path as _Path
 
@@ -761,17 +766,27 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         # Check if releasable-level pre-release hook is customized
         hook_is_customized = is_releasable_hook_customized(str(monorepo_root), releasable_name, config=_releasable_config)
 
-        # 3. Built-in tests and lint via check system (skipped when releasable pre-release hook is customized)
-        if hook_is_customized:
-            log("Skipping built-in checks (releasable pre-release hook handles testing/linting)")
-        elif flags.get("dry-run", False):
-            log("Skipping preflight checks (dry-run)")
+        # 3. Preflight checks via the check system.  Config-declared external
+        # checks always run (independent of hook customization); built-in
+        # tests/lint are skipped only when the pre-release hook is customized
+        # (the hook then owns testing/linting).
+        if flags.get("dry-run", False):
+            log(
+                "preflight checks not executed under --dry-run; run "
+                "`rlsbl check --tag preflight` to evaluate the gate"
+            )
         else:
             from rlsbl import app as _rlsbl_app, _register_external_checks_from_config
             from ...check_context import WorkspaceCheckContext
+            from ...external_checks import run_external_preflight_checks
             from pathlib import Path as _Path
 
+            # Register external checks unconditionally so config-declared
+            # checks run even when the pre-release hook is customized.
             _register_external_checks_from_config(ctx.config)
+
+            if hook_is_customized:
+                log("Skipping built-in checks (releasable pre-release hook handles testing/linting; running config-declared external checks)")
 
             all_failed = []
             for pkg_name, pkg_dir in sorted(_member_tuples):
@@ -789,9 +804,17 @@ def _run_cmd_inner(release_config, flags, *, ctx):
                     graph=None,
                     releasables=[],
                 )
-                results, exit_code = _rlsbl_app.run_checks(
-                    member_ctx, tag_expr="preflight",
-                )
+                if hook_is_customized:
+                    # Run ONLY the config-declared external checks; the hook
+                    # owns built-in tests/lint.
+                    results, exit_code = run_external_preflight_checks(
+                        _rlsbl_app, member_ctx, ctx.config,
+                    )
+                else:
+                    # One run covering built-in + external preflight checks.
+                    results, exit_code = _rlsbl_app.run_checks(
+                        member_ctx, tag_expr="preflight",
+                    )
                 if exit_code != 0:
                     for r in results:
                         if r.result.status == "fail":
@@ -823,15 +846,23 @@ def _run_cmd_inner(release_config, flags, *, ctx):
 
         hook_is_customized = is_hook_customized(config, pre_release_script)
 
-        if hook_is_customized:
-            log("Skipping built-in checks (pre-release hook handles testing/linting)")
-        elif flags.get("dry-run", False):
-            log("Skipping preflight checks (dry-run)")
+        # Preflight checks via the check system.  Config-declared external
+        # checks always run (independent of hook customization); built-in
+        # tests/lint are skipped only when the pre-release hook is customized
+        # (the hook then owns testing/linting).
+        if flags.get("dry-run", False):
+            log(
+                "preflight checks not executed under --dry-run; run "
+                "`rlsbl check --tag preflight` to evaluate the gate"
+            )
         else:
             from rlsbl import app as _rlsbl_app, _register_external_checks_from_config
             from ...context import ProjectContext as _ProjectContext
+            from ...external_checks import run_external_preflight_checks
             from pathlib import Path as _Path
 
+            # Register external checks unconditionally so config-declared
+            # checks run even when the pre-release hook is customized.
             _register_external_checks_from_config(config)
 
             standalone_ctx = _ProjectContext(
@@ -839,9 +870,18 @@ def _run_cmd_inner(release_config, flags, *, ctx):
                 workspace_root=_Path(str(monorepo_root)) if monorepo_root else None,
                 config=config,
             )
-            results, exit_code = _rlsbl_app.run_checks(
-                standalone_ctx, tag_expr="preflight",
-            )
+            if hook_is_customized:
+                # Run ONLY the config-declared external checks; the hook owns
+                # built-in tests/lint.
+                log("Skipping built-in checks (pre-release hook handles testing/linting; running config-declared external checks)")
+                results, exit_code = run_external_preflight_checks(
+                    _rlsbl_app, standalone_ctx, config,
+                )
+            else:
+                # One run covering built-in + external preflight checks.
+                results, exit_code = _rlsbl_app.run_checks(
+                    standalone_ctx, tag_expr="preflight",
+                )
             if exit_code != 0:
                 failed = [
                     f"{r.name}: {r.result.message}"

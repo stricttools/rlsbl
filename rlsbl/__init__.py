@@ -219,16 +219,18 @@ def _check_context_factory():
 def _register_external_checks_from_config(config):
     """Register external checks from project config on the global app.
 
-    Silently returns on validation errors (prints a warning to stderr)
-    so that a misconfigured external_checks section does not crash the
-    entire check system.
+    A malformed ``external_checks`` section is a hard error: print the
+    message and abort (exit 1).  Silently continuing would let a
+    misconfigured gate be skipped without the caller knowing -- no silent
+    degradation.
     """
     from .external_checks import ExternalCheckError, register_external_checks
 
     try:
         register_external_checks(app, config)
     except ExternalCheckError as exc:
-        print(f"Warning: external checks config error: {exc}", file=sys.stderr)
+        print(f"Error: external checks config error: {exc}", file=sys.stderr)
+        sys.exit(1)
 
 
 app.set_check_context(_check_context_factory)
@@ -1616,6 +1618,21 @@ def cmd_dev_sync(**_kwargs):
         )
     )
     rc = run_sync(root)
+    if rc:
+        sys.exit(rc)
+
+
+@dev.command(name="status", help="Report the state of local dev-sync overlays: for each package recorded in the dev-overlays sentinel, show its declared editable checkout path and version alongside the venv's actual install (editable at the expected path, WIPED back to a registry wheel, or missing entirely). Exits 1 if any overlay drifted so scripts and pre-run guards can detect a silent wipe by a bare uv sync or uv run; exits 0 when all overlays are intact or none are declared.")
+def cmd_dev_status(**_kwargs):
+    from .commands.dev_sync import SENTINEL_FILENAME, run_status
+    root = _require_sub_project_root(
+        workspace_root_guidance=(
+            "Error: `rlsbl dev status` must run inside a sub-project, not at "
+            "the monorepo workspace root. cd into the sub-project (its "
+            f"{SENTINEL_FILENAME} lives at the sub-project root) and re-run."
+        )
+    )
+    rc = run_status(root)
     if rc:
         sys.exit(rc)
 
