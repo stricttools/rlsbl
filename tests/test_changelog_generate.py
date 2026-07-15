@@ -348,6 +348,18 @@ class TestGenerateVersionFileReadOnlyMd:
         # Writable path leaves the mode writable.
         assert stat.S_IMODE(os.stat(md_path).st_mode) & 0o200
 
+    def test_atomic_write_leaves_no_tmp_file(self, tmp_path):
+        """The .md is written atomically (tmp-in-same-dir + os.replace), so no
+        stray *.tmp file is left in the changes dir after regeneration."""
+        changes = self._setup(tmp_path)
+        md_path = changes / "1.0.0.md"
+        md_path.write_text("## 1.0.0\n\nSTALE\n")  # force a rewrite
+
+        generate_version_file(str(changes), "1.0.0")
+
+        leftover = [p.name for p in changes.iterdir() if p.name.endswith(".tmp")]
+        assert leftover == []
+
 
 class TestGenerateChangelog:
     """Tests for generate_changelog."""
