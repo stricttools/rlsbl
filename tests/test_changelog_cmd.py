@@ -293,6 +293,24 @@ class TestCmdAdd:
         captured = capsys.readouterr()
         assert "Warning" in captured.err
 
+    def test_invalid_type_rejected_writes_nothing(self, rlsbl_repo):
+        """An out-of-enum --type aborts before writing any entry."""
+        sha = _make_commit(rlsbl_repo)
+        flags = {
+            "commits": sha,
+            "description": "Something",
+            "type": "performance",
+            "user-facing": True,
+            "auto-commit": False,
+        }
+        with mock.patch("rlsbl.commands.changelog_cmd.commit_files") as mock_commit:
+            with pytest.raises(SystemExit) as exc_info:
+                cmd_add(flags, project_root=rlsbl_repo)
+        assert exc_info.value.code == 1
+        # Nothing written and nothing committed.
+        assert read_unreleased(get_changes_dir(".")) == []
+        mock_commit.assert_not_called()
+
 
 # ---------------------------------------------------------------------------
 # cmd_generate tests

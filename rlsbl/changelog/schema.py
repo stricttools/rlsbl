@@ -11,6 +11,7 @@ from ..errors import ChangelogError
 
 
 VALID_RELEASE_TYPES = ("ota", "build")
+VALID_TYPES = ("feature", "fix", "breaking")
 
 
 def generate_entry_id() -> str:
@@ -62,6 +63,10 @@ def validate_schema(entry: ChangelogEntry, *, coverage_unit: str = "commit") -> 
             errors.append("user_facing entry missing description")
         if not entry.type:
             errors.append("user_facing entry missing type")
+        elif entry.type not in VALID_TYPES:
+            errors.append(
+                f"invalid type: {entry.type!r} (must be one of {VALID_TYPES})"
+            )
     if entry.release_type is not None and entry.release_type not in VALID_RELEASE_TYPES:
         errors.append(
             f"invalid release_type: {entry.release_type!r} "

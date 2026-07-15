@@ -101,23 +101,33 @@ class TestValidateSchema:
         )
         assert validate_schema(entry) == []
 
-    def test_valid_type_feature(self):
-        """User-facing entry with type='feature' passes validation."""
+    @pytest.mark.parametrize("valid_type", ["feature", "fix", "breaking"])
+    def test_valid_types_pass(self, valid_type):
+        """User-facing entry with each valid type passes validation."""
         entry = ChangelogEntry(
             commits=["abc123"],
             user_facing=True,
             description="Added widget",
-            type="feature",
+            type=valid_type,
         )
         assert validate_schema(entry) == []
 
-    def test_freeform_type_accepted(self):
-        """User-facing entry with any non-empty type string passes validation."""
+    def test_invalid_type_rejected(self):
+        """User-facing entry with a non-enum type is a schema error naming the value."""
         entry = ChangelogEntry(
             commits=["abc123"],
             user_facing=True,
             description="Faster startup",
             type="performance",
+        )
+        errors = validate_schema(entry)
+        assert any("invalid type" in e and "performance" in e for e in errors)
+
+    def test_invalid_type_non_user_facing_ignored(self):
+        """Non-user-facing entries carry no type, so type enum is not enforced."""
+        entry = ChangelogEntry(
+            commits=["abc123"],
+            user_facing=False,
         )
         assert validate_schema(entry) == []
 

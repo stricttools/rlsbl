@@ -102,6 +102,30 @@ class TestCmdEdit:
         # Description should be unchanged
         assert entries[0].description == "My feature"
 
+    def test_edit_invalid_type_rejected_writes_nothing(self, rlsbl_repo):
+        """An out-of-enum --type aborts before rewriting the entry."""
+        sha = _make_commit(rlsbl_repo)
+        _add_unreleased_entry(rlsbl_repo, sha, description="My feature", entry_type="feature")
+
+        changes_dir = get_changes_dir(str(rlsbl_repo))
+        unreleased = os.path.join(changes_dir, "unreleased.jsonl")
+        before = open(unreleased, encoding="utf-8").read()
+
+        flags = {
+            "commits": sha,
+            "type": "performance",
+            "description": "",
+            "user-facing": None,
+            "auto-commit": True,
+        }
+        with mock.patch("rlsbl.commands.changelog_cmd.commit_files") as mock_commit:
+            with pytest.raises(SystemExit) as exc_info:
+                cmd_edit(flags, project_root=rlsbl_repo)
+        assert exc_info.value.code == 1
+        # File unchanged and nothing committed.
+        assert open(unreleased, encoding="utf-8").read() == before
+        mock_commit.assert_not_called()
+
     def test_edit_description(self, rlsbl_repo):
         """Edit an entry's description."""
         sha = _make_commit(rlsbl_repo)

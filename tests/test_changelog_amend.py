@@ -97,6 +97,33 @@ class TestCmdAmend:
         # File is re-locked
         assert is_read_only(str(jsonl_path))
 
+    def test_amend_invalid_type_rejected_writes_nothing(self, rlsbl_repo):
+        """An out-of-enum --type aborts before touching the released JSONL."""
+        sha = _make_commit(rlsbl_repo)
+        jsonl_path = _create_released_jsonl(rlsbl_repo, "1.0.0", [
+            {"commits": [sha], "user_facing": False},
+        ])
+        before = jsonl_path.read_text()
+
+        sha2 = _make_commit(rlsbl_repo, "b.txt")
+        flags = {
+            "version": "1.0.0",
+            "commits": sha2[:12],
+            "description": "New bugfix",
+            "type": "performance",
+            "user-facing": True,
+            "validate-hashes": True,
+        }
+        with mock.patch("rlsbl.commands.changelog_cmd.commit_files") as mock_commit:
+            with mock.patch("rlsbl.commands.changelog_cmd._sync_github_release"):
+                with pytest.raises(SystemExit) as exc_info:
+                    cmd_amend(flags, project_root=rlsbl_repo)
+        assert exc_info.value.code == 1
+        # File untouched and nothing committed.
+        assert jsonl_path.read_text() == before
+        assert is_read_only(str(jsonl_path))
+        mock_commit.assert_not_called()
+
     def test_amend_no_resolve_skips_hash_validation(self, rlsbl_repo):
         """Amend with --no-resolve skips hash validation."""
         sha = _make_commit(rlsbl_repo)
