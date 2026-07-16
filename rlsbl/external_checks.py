@@ -17,7 +17,7 @@ import shutil
 import subprocess
 import sys
 
-from strictcli import CheckResult
+from strictcli import ErrorReporter
 
 
 # Leading environment-assignment pattern (``VAR=value``).  Shell-legal as a
@@ -124,13 +124,8 @@ def validate_external_checks(config, *, project_root=None):
             )
 
         # Eagerly validate command binary existence.
-        # The command string is split by shell rules; the first token must
-        # be findable.
         command = entry["command"]
         first_token = command.split()[0]
-        # Reject leading environment assignments (``VAR=value cmd ...``).
-        # They are shell-legal but would be misinterpreted as the binary
-        # name; the ``env`` prefix form is the supported way to set env vars.
         if _ENV_ASSIGN_RE.match(first_token):
             raise ExternalCheckError(
                 f"external_checks[{i}] ('{name}'): environment assignments in "
@@ -157,10 +152,11 @@ def validate_external_checks(config, *, project_root=None):
 def _make_external_check_fn(command, cwd, name):
     """Build a check function that runs *command* as a subprocess.
 
-    The returned function has the signature ``fn(ctx) -> CheckResult``
-    expected by the strictcli check system.
+    The returned function has the signature ``fn(ctx) -> _CheckOutcome``
+    expected by the strictcli check system (reporter already bound).
     """
     def _run_external_check(ctx):
+        reporter = ErrorReporter()
         check_cwd = cwd
         if check_cwd is None:
             check_cwd = str(ctx.project_root)
@@ -177,37 +173,34 @@ def _make_external_check_fn(command, cwd, name):
                 timeout=300,
             )
         except subprocess.TimeoutExpired:
-            return CheckResult(
-                "fail",
-                f"external check '{name}' timed out after 300s",
-            )
+            reporter.error(f"external check '{name}' timed out after 300s")
+            return reporter.found(f"external check '{name}' timed out after 300s")
         except OSError as exc:
-            return CheckResult(
-                "fail",
-                f"external check '{name}' failed to execute: {exc}",
-            )
+            reporter.error(f"external check '{name}' failed to execute: {exc}")
+            return reporter.found(f"external check '{name}' failed to execute: {exc}")
 
         if result.returncode == 0:
             # Collect any stdout as the message (truncated)
             stdout = (result.stdout or "").strip()
             msg = stdout[:200] if stdout else "passed"
-            return CheckResult("pass", msg)
+            return reporter.passed(msg)
 
         # Non-zero exit: hard fail
         stderr = (result.stderr or "").strip()
         stdout = (result.stdout or "").strip()
         output = stderr or stdout or f"exit code {result.returncode}"
-        # Include details lines for diagnostic output
-        details = []
+        # Report detail lines as individual errors
         if stdout:
-            details.extend(stdout.splitlines()[:20])
+            for line in stdout.splitlines()[:20]:
+                reporter.error(line)
         if stderr:
-            details.extend(stderr.splitlines()[:20])
-        return CheckResult(
-            "fail",
+            for line in stderr.splitlines()[:20]:
+                reporter.error(line)
+        if not stdout and not stderr:
+            reporter.error(f"exit code {result.returncode}")
+        return reporter.found(
             f"external check '{name}' failed (exit {result.returncode}): "
-            + output.splitlines()[0][:200],
-            details=details,
+            + output.splitlines()[0][:200]
         )
 
     return _run_external_check
@@ -235,15 +228,6 @@ def register_external_checks(app, config):
         depends_on = entry.get("depends_on", [])
         cwd = entry.get("cwd")
 
-        # A name already present in app._check_defs is one of two things:
-        #   (a) our OWN external check re-registered (repeated context creation
-        #       within the same process) -- idempotent, safe to skip; or
-        #   (b) a collision with a built-in check (registered from checks.toml)
-        #       or another provider -- a hard error, because name-based
-        #       selection (run_external_preflight_checks) would then run the
-        #       built-in instead of, or in addition to, this external check.
-        # Discriminate by the existing def's impl: our external checks always
-        # carry the ``_run_external_check`` closure from _make_external_check_fn.
         existing = app._check_defs.get(name)
         if existing is not None:
             existing_impl = getattr(existing, "impl", None)
@@ -268,6 +252,7 @@ def register_external_checks(app, config):
             depends_on=depends_on,
             scope="",
             impl=check_fn,
+            impl_form="error",
         )
         app._check_defs[name] = check_def
 
@@ -283,11 +268,6 @@ def run_external_preflight_checks(app, ctx, config, *, tag_expr="preflight"):
     intersected with *tag_expr* (strictcli's ``run_checks`` ANDs ``name_glob``
     with ``tag_expr``).  This runs exactly the config-declared external checks
     that carry the preflight tag and never selects a built-in check.
-
-    Caveat: if a config-declared external check declares ``depends_on`` on a
-    built-in preflight check, strictcli's dependency resolver pulls that
-    built-in into the run.  Config-declared externals should not depend on
-    built-ins when the hook is expected to own testing/linting.
 
     ``register_external_checks`` (via ``_register_external_checks_from_config``)
     must have already registered the checks on *app*.
