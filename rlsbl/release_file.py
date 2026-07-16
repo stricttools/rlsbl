@@ -438,6 +438,7 @@ class RetryConfig:
     version: str  # version to retry (mandatory)
     dispatch: list[str]  # workflow filenames to dispatch, e.g. ["publish.yml"]
     ref: str  # git ref for CI dispatch, defaults to tag
+    tag: str  # release tag (e.g. "v1.2.3"), passed as workflow_dispatch input
 
 
 def get_retry_file_path(project_dir: str = ".", *, releasable_dir: str | None = None) -> str:
@@ -485,8 +486,16 @@ def read_retry_file(path: str) -> RetryConfig:
     if not isinstance(ref, str) or not ref.strip():
         raise ReleaseFileError("ref must be set in retry.toml (e.g. a tag like v1.2.3 or a branch like main)")
 
+    # --- tag (optional, defaults to ref) ---
+    tag = data.get("tag", "")
+    if isinstance(tag, str) and tag.strip():
+        tag = tag.strip()
+    else:
+        tag = ref.strip()  # default: tag = ref
+
     return RetryConfig(
         version=version.strip(),
         dispatch=list(dispatch),
         ref=ref.strip(),
+        tag=tag,
     )

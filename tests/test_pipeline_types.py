@@ -216,7 +216,7 @@ class TestPypiPipeline:
         p.publish(".", "1.0.0", None)
         assert len(calls) == 2
         assert calls[0] == ("uv", ["build"])
-        assert calls[1] == ("uv", ["publish"])
+        assert calls[1] == ("uv", ["publish", "--check-url", "https://pypi.org/simple/"])
 
     def test_publish_with_twine_password_fallback(self, monkeypatch):
         calls = []

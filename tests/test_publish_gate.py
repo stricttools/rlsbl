@@ -143,12 +143,20 @@ class TestPublishTemplateGating:
         jobs_idx = content.index("\njobs:")
         assert on_idx < conc_idx < jobs_idx
 
-    def test_no_release_payload_reads(self, tpl_path):
-        """Templates never read the release event payload (dispatch retries
-        at the tag ref have no payload; the ref carries the same data)."""
+    def test_release_payload_only_in_tag_fallback(self, tpl_path):
+        """Templates only read github.event.release.tag_name as a fallback
+        for the inputs.tag workflow_dispatch input -- never for other data."""
         with open(tpl_path, encoding="utf-8") as f:
             content = f.read()
-        assert "github.event.release" not in content
+        # The only allowed usage is: inputs.tag || github.event.release.tag_name
+        # Strip that pattern, then verify no other release payload reads remain
+        stripped = content.replace(
+            "${{ inputs.tag || github.event.release.tag_name }}", ""
+        )
+        assert "github.event.release" not in stripped, (
+            "templates must not read github.event.release except as "
+            "fallback in: inputs.tag || github.event.release.tag_name"
+        )
 
     def test_rendered_all_jobs_need_gate(self, tpl_path):
         """Rendered template: gate exists, every other job needs it."""

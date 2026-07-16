@@ -1168,7 +1168,7 @@ class TestReleaseRetryQuietMode:
             return ""
 
         mock_run_gh.side_effect = run_gh_effect
-        config = RetryConfig(version="1.0.0", dispatch=["ci.yml"], ref="v1.0.0")
+        config = RetryConfig(version="1.0.0", dispatch=["ci.yml"], ref="v1.0.0", tag="v1.0.0")
 
         with patch("rlsbl.commands.release_retry.time.sleep"):
             retry_run_cmd(config, {"yes": True, "quiet": True}, project_root=".")
@@ -1202,7 +1202,7 @@ class TestReleaseRetryConfirmationEOFError:
         mock_targets_dict.__getitem__ = lambda self, key: target
 
         mock_run.return_value = "a" * 40  # git rev-list
-        config = RetryConfig(version="1.0.0", dispatch=["ci.yml"], ref="v1.0.0")
+        config = RetryConfig(version="1.0.0", dispatch=["ci.yml"], ref="v1.0.0", tag="v1.0.0")
 
         with patch("builtins.input", side_effect=EOFError):
             with pytest.raises(SystemExit) as exc_info:
@@ -1230,7 +1230,7 @@ class TestReleaseRetryConfirmationEOFError:
         mock_targets_dict.__getitem__ = lambda self, key: target
 
         mock_run.return_value = "a" * 40  # git rev-list
-        config = RetryConfig(version="1.0.0", dispatch=["ci.yml"], ref="v1.0.0")
+        config = RetryConfig(version="1.0.0", dispatch=["ci.yml"], ref="v1.0.0", tag="v1.0.0")
 
         with patch("builtins.input", side_effect=KeyboardInterrupt):
             with pytest.raises(SystemExit) as exc_info:
@@ -1246,7 +1246,7 @@ class TestReleaseRetryNoTargets:
     @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
     def test_no_targets_exits(self, _gh_inst, _gh_auth, _ws_root, _detect, capsys):
-        config = RetryConfig(version="1.0.0", dispatch=["ci.yml"], ref="v1.0.0")
+        config = RetryConfig(version="1.0.0", dispatch=["ci.yml"], ref="v1.0.0", tag="v1.0.0")
         with pytest.raises(SystemExit) as exc_info:
             retry_run_cmd(config, {"yes": True}, project_root=".")
         assert exc_info.value.code == 1
@@ -1289,7 +1289,7 @@ class TestReleaseRetryDispatchWarning:
             return ""
 
         mock_run_gh.side_effect = run_gh_effect
-        config = RetryConfig(version="1.0.0", dispatch=["ci.yml"], ref="v1.0.0")
+        config = RetryConfig(version="1.0.0", dispatch=["ci.yml"], ref="v1.0.0", tag="v1.0.0")
 
         retry_run_cmd(config, {"yes": True}, project_root=".")
         captured = capsys.readouterr()

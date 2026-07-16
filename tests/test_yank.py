@@ -154,37 +154,33 @@ class TestPublicationProbeOnTargets:
         result = t.publication_probe("/fake", "1.0.0")
         assert result.status == PublicationStatus.UNPROBEABLE
 
-    @patch("rlsbl.targets.go.read_go_module_path", return_value="github.com/user/mod")
-    def test_go_published(self, _):
+    def test_go_published(self):
         from rlsbl.targets.go import GoTarget
 
         t = GoTarget()
-        mock_resp = MagicMock()
-        mock_resp.read.return_value = b'{"Version": "v1.0.0"}'
-        mock_resp.__enter__ = lambda s: s
-        mock_resp.__exit__ = lambda s, *a: None
-
-        with patch("rlsbl.commands.check._request_with_backoff", return_value=mock_resp):
+        mock_result = MagicMock(
+            returncode=0,
+            stdout="abc123\trefs/tags/v1.0.0\n",
+            stderr="",
+        )
+        with patch("subprocess.run", return_value=mock_result):
             result = t.publication_probe("/fake", "1.0.0")
         assert result.status == PublicationStatus.PUBLISHED
 
-    @patch("rlsbl.targets.go.read_go_module_path", return_value="github.com/user/mod")
-    def test_go_unpublished(self, _):
+    def test_go_unpublished(self):
         from rlsbl.targets.go import GoTarget
-        import urllib.error
 
         t = GoTarget()
-        with patch(
-            "rlsbl.commands.check._request_with_backoff",
-            side_effect=urllib.error.HTTPError(
-                url="", code=404, msg="", hdrs=None, fp=None
-            ),
-        ):
+        mock_result = MagicMock(
+            returncode=0,
+            stdout="",
+            stderr="",
+        )
+        with patch("subprocess.run", return_value=mock_result):
             result = t.publication_probe("/fake", "1.0.0")
         assert result.status == PublicationStatus.UNPUBLISHED
 
-    @patch("rlsbl.targets.go.read_go_module_path", return_value=None)
-    def test_go_no_module_returns_unprobeable(self, _):
+    def test_go_no_module_returns_unprobeable(self):
         from rlsbl.targets.go import GoTarget
         t = GoTarget()
         result = t.publication_probe("/fake", "1.0.0")

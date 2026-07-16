@@ -42,10 +42,12 @@ GATE_TIMEOUT_MINUTES = "20"
 GATE_GRACE_MINUTES = "5"
 GATE_POLL_SECONDS = "15"
 
-# One publish pipeline per workflow file per ref: a dispatch retry at the
-# same tag queues behind an in-flight run instead of racing it. Publishes
-# are never cancelled mid-flight (cancel-in-progress: false).
-PUBLISH_CONCURRENCY_GROUP = "${{ github.workflow_ref }}-${{ github.ref }}"
+# One publish pipeline per tag: a dispatch retry at the same tag queues
+# behind an in-flight run instead of racing it. Publishes are never
+# cancelled mid-flight (cancel-in-progress: false). Uses inputs.tag
+# (from workflow_dispatch) with fallback to github.ref_name so both
+# release events and manual dispatch converge on the same group key.
+PUBLISH_CONCURRENCY_GROUP = "publish-${{ inputs.tag || github.ref_name }}"
 
 
 def publish_concurrency_block() -> dict:

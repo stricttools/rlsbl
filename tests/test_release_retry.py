@@ -10,16 +10,19 @@ from rlsbl.errors import ReleaseFileError
 from rlsbl.release_file import RetryConfig
 
 
-def _make_retry_config(version="0.41.7", dispatch=None, ref=None):
+def _make_retry_config(version="0.41.7", dispatch=None, ref=None, tag=None):
     """Create a RetryConfig with sensible defaults."""
     if dispatch is None:
         dispatch = ["ci.yml"]
     if ref is None:
         ref = f"v{version}"
+    if tag is None:
+        tag = f"v{version}"
     return RetryConfig(
         version=version,
         dispatch=dispatch,
         ref=ref,
+        tag=tag,
     )
 
 
@@ -85,8 +88,8 @@ class TestReleaseRetry(unittest.TestCase):
         workflow_calls = [c for c in mock_run_gh.call_args_list
                           if len(c[0]) >= 1 and c[0][0][:2] == ["workflow", "run"]]
         self.assertEqual(len(workflow_calls), 2)
-        self.assertEqual(workflow_calls[0][0][0], ["workflow", "run", "publish.yml", "--ref", "v0.41.7"])
-        self.assertEqual(workflow_calls[1][0][0], ["workflow", "run", "ci.yml", "--ref", "v0.41.7"])
+        self.assertEqual(workflow_calls[0][0][0], ["workflow", "run", "publish.yml", "--ref", "v0.41.7", "-f", "tag=v0.41.7"])
+        self.assertEqual(workflow_calls[1][0][0], ["workflow", "run", "ci.yml", "--ref", "v0.41.7", "-f", "tag=v0.41.7"])
 
         # Cleanup (saferm) was called
         mock_cleanup.assert_called_once()
@@ -133,8 +136,8 @@ class TestReleaseRetry(unittest.TestCase):
                           if len(c[0]) >= 1 and c[0][0][:2] == ["workflow", "run"]]
         self.assertEqual(len(workflow_calls), 2)
         # Verify ref from config is used
-        self.assertEqual(workflow_calls[0][0][0], ["workflow", "run", "publish.yml", "--ref", "v0.41.7"])
-        self.assertEqual(workflow_calls[1][0][0], ["workflow", "run", "ci.yml", "--ref", "v0.41.7"])
+        self.assertEqual(workflow_calls[0][0][0], ["workflow", "run", "publish.yml", "--ref", "v0.41.7", "-f", "tag=v0.41.7"])
+        self.assertEqual(workflow_calls[1][0][0], ["workflow", "run", "ci.yml", "--ref", "v0.41.7", "-f", "tag=v0.41.7"])
 
     @patch("rlsbl.commands.release_retry._cleanup_retry_file")
     @patch("rlsbl.commands.release_retry.run_gh", return_value="")
@@ -175,7 +178,8 @@ class TestReleaseRetry(unittest.TestCase):
         self.assertIn("publish.yml", dispatched_filenames)
         # All dispatches use ref from config
         for call in workflow_calls:
-            self.assertEqual(call[0][0][3:], ["--ref", "v0.41.7"])
+            self.assertIn("--ref", call[0][0])
+            self.assertIn("v0.41.7", call[0][0])
 
     @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
@@ -323,7 +327,8 @@ class TestReleaseRetry(unittest.TestCase):
                           if len(c[0]) >= 1 and c[0][0][:2] == ["workflow", "run"]]
         self.assertGreater(len(workflow_calls), 0)
         for call in workflow_calls:
-            self.assertEqual(call[0][0][3:], ["--ref", "v0.41.7"])
+            self.assertIn("--ref", call[0][0])
+            self.assertIn("v0.41.7", call[0][0])
 
     @patch("rlsbl.commands.release_retry._cleanup_retry_file")
     @patch("rlsbl.commands.release_retry.run_gh", return_value="")

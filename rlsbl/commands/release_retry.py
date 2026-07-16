@@ -67,12 +67,17 @@ def _scaffold_retry_file(retry_path, primary, log):
     # Auto-detect dispatchable workflows
     dispatch = _find_dispatch_workflows()
 
+    # Build the tag for this version
+    tag = tgt.tag_format(version)
+
     # Write retry.toml
     doc = tomlkit.document()
     doc.add("version", version)
     doc.add("dispatch", dispatch)
     doc.add(tomlkit.comment("Git ref to dispatch CI against. Examples: v1.2.3 (tag), main (branch)"))
     doc.add("ref", "")
+    doc.add(tomlkit.comment("Release tag passed as workflow_dispatch input (checkout ref)"))
+    doc.add("tag", tag)
 
     os.makedirs(os.path.dirname(retry_path), exist_ok=True)
     tmp_path = retry_path + ".writing"
@@ -261,7 +266,12 @@ def run_cmd(retry_config, flags, project_root):
     collected_run_ids = []
     for filename in dispatch:
         try:
-            output = run_gh(["workflow", "run", filename, "--ref", retry_config.ref])
+            dispatch_args = ["workflow", "run", filename, "--ref", retry_config.ref]
+            # Pass the tag as a workflow_dispatch input so the workflow
+            # checks out the correct ref even when dispatched against a branch.
+            if retry_config.tag:
+                dispatch_args.extend(["-f", f"tag={retry_config.tag}"])
+            output = run_gh(dispatch_args)
             log(f"  Dispatched: {filename}")
             # gh workflow run may return a URL like https://github.com/owner/repo/actions/runs/12345
             match = re.search(r'/actions/runs/(\d+)', output)

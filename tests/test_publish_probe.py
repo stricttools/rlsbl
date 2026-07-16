@@ -430,5 +430,173 @@ class TestGoProbeRework(unittest.TestCase):
         self.assertIn("error", result.message)
 
 
+class TestRecoveryDispatch(unittest.TestCase):
+    """Tests for Phase 7.5: recovery dispatch with tag input."""
+
+    def test_all_publish_templates_have_tag_input(self):
+        """All 13 publish templates have workflow_dispatch.inputs.tag."""
+        import os, glob
+
+        tpl_dir = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "rlsbl", "templates",
+        )
+        templates = sorted(glob.glob(os.path.join(tpl_dir, "*/publish*.yml.tpl")))
+        self.assertEqual(len(templates), 13)
+
+        for tpl_path in templates:
+            with open(tpl_path) as f:
+                content = f.read()
+            name = os.path.basename(os.path.dirname(tpl_path)) + "/" + os.path.basename(tpl_path)
+            self.assertIn("inputs:", content, f"{name} missing inputs block")
+            self.assertIn("tag:", content, f"{name} missing tag input")
+
+    def test_all_publish_templates_have_tag_concurrency(self):
+        """All 13 publish templates use tag-based concurrency."""
+        import os, glob
+
+        tpl_dir = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "rlsbl", "templates",
+        )
+        templates = sorted(glob.glob(os.path.join(tpl_dir, "*/publish*.yml.tpl")))
+
+        for tpl_path in templates:
+            with open(tpl_path) as f:
+                content = f.read()
+            name = os.path.basename(os.path.dirname(tpl_path)) + "/" + os.path.basename(tpl_path)
+            self.assertIn("inputs.tag || github.ref_name", content,
+                          f"{name} missing tag-based concurrency")
+
+    def test_all_publish_templates_checkout_with_tag_ref(self):
+        """All 13 publish templates checkout with inputs.tag fallback."""
+        import os, glob
+
+        tpl_dir = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "rlsbl", "templates",
+        )
+        templates = sorted(glob.glob(os.path.join(tpl_dir, "*/publish*.yml.tpl")))
+
+        for tpl_path in templates:
+            with open(tpl_path) as f:
+                content = f.read()
+            name = os.path.basename(os.path.dirname(tpl_path)) + "/" + os.path.basename(tpl_path)
+            self.assertIn("inputs.tag || github.event.release.tag_name", content,
+                          f"{name} missing tag-based checkout ref")
+
+    def test_retry_config_has_tag_field(self):
+        """RetryConfig has a tag field."""
+        from rlsbl.release_file import RetryConfig
+        config = RetryConfig(
+            version="1.0.0",
+            dispatch=["publish.yml"],
+            ref="main",
+            tag="v1.0.0",
+        )
+        self.assertEqual(config.tag, "v1.0.0")
+
+    def test_read_retry_file_tag_defaults_to_ref(self):
+        """When tag is absent from retry.toml, it defaults to ref."""
+        import tempfile, os
+        import tomlkit as tk
+
+        doc = tk.document()
+        doc.add("version", "1.0.0")
+        doc.add("dispatch", ["publish.yml"])
+        doc.add("ref", "v1.0.0")
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
+            tk.dump(doc, f)
+            path = f.name
+
+        try:
+            from rlsbl.release_file import read_retry_file
+            config = read_retry_file(path)
+            self.assertEqual(config.tag, "v1.0.0")
+        finally:
+            os.unlink(path)
+
+    def test_read_retry_file_explicit_tag(self):
+        """When tag is set explicitly, it overrides the ref default."""
+        import tempfile, os
+        import tomlkit as tk
+
+        doc = tk.document()
+        doc.add("version", "1.0.0")
+        doc.add("dispatch", ["publish.yml"])
+        doc.add("ref", "main")
+        doc.add("tag", "v1.0.0")
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
+            tk.dump(doc, f)
+            path = f.name
+
+        try:
+            from rlsbl.release_file import read_retry_file
+            config = read_retry_file(path)
+            self.assertEqual(config.ref, "main")
+            self.assertEqual(config.tag, "v1.0.0")
+        finally:
+            os.unlink(path)
+
+    @patch("rlsbl.commands.release_retry._cleanup_retry_file")
+    @patch("rlsbl.commands.release_retry.run_gh", return_value="")
+    @patch("rlsbl.commands.release_retry.run")
+    @patch("os.path.exists", return_value=True)
+    @patch("rlsbl.commands.release_retry.resolve_member_context")
+    @patch("rlsbl.commands.release_retry.TARGETS")
+    @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
+    @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
+    @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
+    def test_retry_dispatch_passes_tag_input(self, _gh_inst, _gh_auth, _ws_root,
+                                              mock_targets_dict, mock_detect,
+                                              _exists, mock_run, mock_run_gh,
+                                              mock_cleanup):
+        """retry dispatch passes -f tag=<tag> to gh workflow run."""
+        from rlsbl.commands.release_retry import run_cmd
+        from rlsbl.release_file import RetryConfig
+
+        target = MagicMock()
+        target.read_version.return_value = "1.0.0"
+        target.tag_format.side_effect = lambda v: f"v{v}"
+        entry = MagicMock()
+        entry.name = "pypi"
+        entry.path = "."
+        mock_detect.return_value = MagicMock(targets=[entry])
+        mock_targets_dict.__getitem__ = lambda self, key: target
+
+        def run_effect(*args, **kwargs):
+            cmd, cmd_args = args[0], args[1] if len(args) > 1 else []
+            if cmd == "git" and cmd_args[:2] == ["rev-list", "-1"]:
+                return "abc123def456789012345678901234567890abcd"
+            return ""
+
+        mock_run.side_effect = run_effect
+
+        config = RetryConfig(
+            version="1.0.0",
+            dispatch=["publish.yml"],
+            ref="main",
+            tag="v1.0.0",
+        )
+
+        from io import StringIO
+        import time
+        with patch("rlsbl.commands.release_retry.time.sleep"):
+            with patch("sys.stdout", new_callable=StringIO):
+                run_cmd(config, {"yes": True}, project_root=".")
+
+        # Find the workflow run call via run_gh
+        workflow_calls = [c for c in mock_run_gh.call_args_list
+                          if len(c[0]) >= 1 and c[0][0][:2] == ["workflow", "run"]]
+        self.assertEqual(len(workflow_calls), 1)
+
+        dispatch_args = workflow_calls[0][0][0]
+        self.assertIn("-f", dispatch_args)
+        tag_idx = dispatch_args.index("-f")
+        self.assertEqual(dispatch_args[tag_idx + 1], "tag=v1.0.0")
+
+
 if __name__ == "__main__":
     unittest.main()

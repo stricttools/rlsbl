@@ -450,7 +450,7 @@ class TestRetryWatchAsync:
         mock_targets_dict.__getitem__ = lambda self, key: target
         mock_run.side_effect = self._run_side_effect
 
-        config = RetryConfig(version="0.41.7", dispatch=["ci.yml"], ref="v0.41.7")
+        config = RetryConfig(version="0.41.7", dispatch=["ci.yml"], ref="v0.41.7", tag="v0.41.7")
 
         with patch("rlsbl.commands.release_retry.time.sleep"), \
              patch("rlsbl.commands.release_retry.spawn_detached_watcher") as mock_spawn, \
@@ -494,7 +494,7 @@ class TestRetryWatchAsync:
 
         mock_run_gh.side_effect = run_gh_effect
 
-        config = RetryConfig(version="0.41.7", dispatch=["ci.yml"], ref="v0.41.7")
+        config = RetryConfig(version="0.41.7", dispatch=["ci.yml"], ref="v0.41.7", tag="v0.41.7")
 
         with patch("rlsbl.commands.release_retry.time.sleep"), \
              patch("rlsbl.commands.release_retry.spawn_detached_watcher") as mock_spawn, \
