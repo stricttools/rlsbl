@@ -231,7 +231,7 @@ class TestMakeExternalCheckFn:
         result = fn(FakeCtx())
         assert result.status == "fail"
         assert "bad-stuff" in result.message or any(
-            "bad-stuff" in d for d in result.details
+            "bad-stuff" in d for d in (p.text for p in result.problems)
         )
 
     def test_cwd_absolute(self, tmp_path):
@@ -320,12 +320,12 @@ class TestRegisterExternalChecks:
         name; name-based selection would then run the BUILT-IN instead of the
         external check the user declared.
         """
-        from strictcli import _CheckDef, CheckResult
+        from strictcli import _CheckDef, ErrorReporter
 
         monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/" + name)
 
         def _builtin_impl(ctx):
-            return CheckResult("pass", "builtin")
+            return ErrorReporter().passed("builtin")
 
         class FakeApp:
             _check_defs = {}
@@ -381,8 +381,6 @@ class TestRegisterExternalChecks:
 class TestExternalCheckIntegration:
     def test_external_check_in_preflight_tag(self, mock_git_repo, monkeypatch):
         """An external check tagged 'preflight' runs via run_checks."""
-        from strictcli import _CheckDef, CheckResult
-
         import rlsbl
 
         # Write config with an external check
@@ -414,12 +412,12 @@ class TestExternalCheckIntegration:
             workspace_root=None,
             config=config,
         )
-        results, exit_code = rlsbl.app.run_checks(ctx, tag_expr="preflight")
+        results, _impure, exit_code = rlsbl.app.run_checks(ctx, tag_expr="preflight")
 
         # Find our external check result
         ext_results = [r for r in results if r.name == "ext-test-pass"]
         assert len(ext_results) == 1
-        assert ext_results[0].result.status == "pass"
+        assert ext_results[0].status == "pass"
 
         # Cleanup: remove from app._check_defs to not pollute other tests
         del rlsbl.app._check_defs["ext-test-pass"]
@@ -448,11 +446,11 @@ class TestExternalCheckIntegration:
             workspace_root=None,
             config=config,
         )
-        results, exit_code = rlsbl.app.run_checks(ctx, tag_expr="preflight")
+        results, _impure, exit_code = rlsbl.app.run_checks(ctx, tag_expr="preflight")
 
         ext_results = [r for r in results if r.name == "ext-test-fail"]
         assert len(ext_results) == 1
-        assert ext_results[0].result.status == "fail"
+        assert ext_results[0].status == "fail"
         assert exit_code != 0
 
         # Cleanup
@@ -494,7 +492,7 @@ class TestExternalCheckIntegration:
             workspace_root=None,
             config=config,
         )
-        results, exit_code = rlsbl.app.run_checks(ctx, tag_expr="preflight")
+        results, _impure, exit_code = rlsbl.app.run_checks(ctx, tag_expr="preflight")
 
         names = [r.name for r in results]
         assert "ext-dep-target" in names
@@ -533,7 +531,7 @@ class TestRunExternalPreflightChecks:
     external checks but never run built-in preflight-tagged checks."""
 
     def test_runs_only_external_checks_not_builtins(self, mock_git_repo, tmp_path):
-        from strictcli import _CheckDef, CheckResult
+        from strictcli import _CheckDef, ErrorReporter
 
         import rlsbl
         from rlsbl.external_checks import run_external_preflight_checks
@@ -557,7 +555,7 @@ class TestRunExternalPreflightChecks:
         # A fake built-in preflight-tagged check that must NOT run.
         def _builtin_impl(ctx):
             builtin_marker.write_text("ran")
-            return CheckResult("pass", "ok")
+            return ErrorReporter().passed("ok")
 
         rlsbl.app._check_defs["fake-builtin-preflight"] = _CheckDef(
             name="fake-builtin-preflight",
@@ -619,7 +617,7 @@ class TestRunExternalPreflightChecks:
             )
             assert exit_code != 0
             assert any(
-                r.name == "ext-fail-check" and r.result.status == "fail"
+                r.name == "ext-fail-check" and r.status == "fail"
                 for r in results
             )
         finally:

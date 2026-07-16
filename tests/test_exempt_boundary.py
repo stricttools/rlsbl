@@ -8,32 +8,17 @@ in dev node projects would silently bypass changelog coverage).
 import json
 import os
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
-from conftest import make_workspace, run_git
+from conftest import capture_all_checks, make_workspace, run_git
 from rlsbl.check_context import WorkspaceCheckContext
-from rlsbl.checks import register_checks
 from rlsbl.workspace import load_workspace, WORKSPACE_DIR
 from rlsbl.workspace_graph import WorkspaceGraph
 
 
 def _register_and_get_checks():
-    """Register all checks on a mock app and return the check function dict."""
-    mock_app = MagicMock()
-    mock_app._checks_enabled = True
-    registered = {}
-
-    def fake_check(name):
-        def decorator(func):
-            registered[name] = func
-            return func
-        return decorator
-
-    mock_app.check = fake_check
-    register_checks(mock_app)
-    return registered
+    return capture_all_checks()
 
 
 def _make_pypi_project(root, subdir, version="0.1.0", deps=None, dev_deps=None):
@@ -127,8 +112,8 @@ class TestBoundaryGuardrail:
         result = checks["dev-only-boundary"](ctx)
 
         assert result.status == "fail"
-        assert "proj-a" in result.details[0]
-        assert "proj-b" in result.details[0]
+        assert "proj-a" in result.problems[0].text
+        assert "proj-b" in result.problems[0].text
 
     def test_boundary_allows_dev_dependency(self, tmp_path, monkeypatch):
         """Non-dev-node A depends on dev node B via dev dep only -> PASS."""
@@ -168,6 +153,6 @@ class TestBoundaryGuardrail:
         assert result.status == "fail"
         # Should mention proj-a (the non-dev-node project that transitively
         # depends on dev node proj-c)
-        violation_text = "\n".join(result.details)
+        violation_text = "\n".join(p.text for p in result.problems)
         assert "proj-a" in violation_text
         assert "proj-c" in violation_text

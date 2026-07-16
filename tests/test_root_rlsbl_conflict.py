@@ -4,8 +4,6 @@ import os
 
 import pytest
 
-from strictcli import CheckResult
-
 from rlsbl import app
 from rlsbl.check_context import WorkspaceCheckContext
 from rlsbl.commands.init_cmd import _is_workspace_root, run_cmd, run_cmd_multi
@@ -82,14 +80,15 @@ class TestRootRlsblConflictCheck:
 
     def test_skip_non_workspace_context(self, mock_git_repo):
         """Non-workspace context -> skip (via scope adapter)."""
+        from strictcli import SkipCheck
         from rlsbl.checks.scope import scope_adapter
         from rlsbl.context import ProjectContext
 
         ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         cdef = app._check_defs["root-rlsbl-conflict"]
         result = scope_adapter(ctx, cdef.scope)
-        assert result.status == "skip"
-        assert "not a monorepo" in result.message
+        assert isinstance(result, SkipCheck)
+        assert "not a monorepo" in result.reason
 
 
 # ---------------------------------------------------------------------------

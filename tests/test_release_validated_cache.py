@@ -74,7 +74,7 @@ class TestReleaseValidatedCache:
     @patch("rlsbl.commands.release.finalize_version")
     @patch("rlsbl.commands.release.extract_changelog_entry", return_value="- Bugfix")
     @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
-    @patch("rlsbl.app.run_checks", return_value=([], 0))
+    @patch("rlsbl.app.run_checks", return_value=([], [], 0))
     def test_validated_cache_does_not_trigger_abort(self, _run_checks, _vrt,
                                                     _extract, _finalize,
                                                     _gen_ver_file, _validate, _gen_cl,
@@ -140,7 +140,7 @@ class TestReleaseValidatedCache:
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
-    @patch("rlsbl.app.run_checks", return_value=([], 0))
+    @patch("rlsbl.app.run_checks", return_value=([], [], 0))
     def test_validated_only_dirty_still_aborts_unexpected(self, _run_checks, _vrt,
                                                           _validate, _gen_cl,
                                                           _deploy, _tag, _gh_inst,

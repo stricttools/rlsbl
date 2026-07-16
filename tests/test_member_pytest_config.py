@@ -101,7 +101,7 @@ class TestMemberPytestConfigCheck:
             _ctx(mock_git_repo, [proj])
         )
         assert result.status == "fail"
-        assert "mylib" in " ".join(result.details or []) + result.message
+        assert "mylib" in " ".join(p.text for p in result.problems) + result.message
 
     def test_passes_member_with_pytest_config(self, mock_git_repo):
         """Member declaring its own [tool.pytest.ini_options] -> pass."""

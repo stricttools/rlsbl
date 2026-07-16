@@ -481,7 +481,7 @@ class TestSubtreePublish:
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
-    @patch("rlsbl.app.run_checks", return_value=([], 0))
+    @patch("rlsbl.app.run_checks", return_value=([], [], 0))
     def test_subtree_push_failure_nonfatal(
         self, _run_checks, _vrt, _validate, _gen_cl,
         _gh_inst, _gh_auth, _clean, _branch, mock_run,

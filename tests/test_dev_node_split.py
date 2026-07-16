@@ -239,22 +239,8 @@ class TestReleaseGateUsesReleasable:
 
 
 def _register_and_get_checks():
-    """Register all checks on a mock app and return the check function dict."""
-    from rlsbl.checks import register_checks
-
-    mock_app = MagicMock()
-    mock_app._checks_enabled = True
-    registered = {}
-
-    def fake_check(name):
-        def decorator(func):
-            registered[name] = func
-            return func
-        return decorator
-
-    mock_app.check = fake_check
-    register_checks(mock_app)
-    return registered
+    from conftest import capture_all_checks
+    return capture_all_checks()
 
 
 def _make_pypi_project(root, subdir, version="0.1.0", deps=None, dev_deps=None):
@@ -340,8 +326,8 @@ class TestBoundaryCheckUsesDevOnly:
         result = checks["dev-only-boundary"](ctx)
 
         assert result.status == "fail"
-        assert "app" in result.details[0]
-        assert "testlib" in result.details[0]
+        assert "app" in result.problems[0].text
+        assert "testlib" in result.problems[0].text
 
     def test_non_dev_only_releasable_false_no_boundary(self, tmp_path, monkeypatch):
         """A releasable=false project that is NOT dev_only should NOT trigger boundary.

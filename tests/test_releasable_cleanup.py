@@ -643,8 +643,8 @@ releasable = "core"
 """)
         result = self._impl()(self._ctx(tmp_project))
         assert result.status == "fail"
-        assert any("changes" in d for d in result.details)
-        assert any("version" in d for d in result.details)
+        assert any("changes" in d for d in (p.text for p in result.problems))
+        assert any("version" in d for d in (p.text for p in result.problems))
 
     def test_passes_on_minimal_state_with_hooks(self, tmp_project):
         pkg = tmp_project / "pkg"

@@ -119,7 +119,7 @@ class TestConfigSchemaCheckSurfacesTestConfig:
         )
         result = app._check_defs["config-schema"].impl(ctx)
         assert result.status == "fail"
-        assert any("not a recognized option" in d for d in result.details)
+        assert any("not a recognized option" in d for d in (p.text for p in result.problems))
 
     def test_valid_test_block_passes_check(self, tmp_project):
         ctx = ProjectContext(
@@ -146,7 +146,7 @@ class TestConfigSchemaCheckSurfacesPipelineTargetLinks:
         )
         result = app._check_defs["config-schema"].impl(ctx)
         assert result.status == "fail"
-        assert any("missing required key 'target'" in d for d in result.details)
+        assert any("missing required key 'target'" in d for d in (p.text for p in result.problems))
 
     def test_dangling_target_ref_fails_check(self, tmp_project):
         ctx = ProjectContext(
@@ -160,7 +160,7 @@ class TestConfigSchemaCheckSurfacesPipelineTargetLinks:
         )
         result = app._check_defs["config-schema"].impl(ctx)
         assert result.status == "fail"
-        assert any("dangling reference" in d for d in result.details)
+        assert any("dangling reference" in d for d in (p.text for p in result.problems))
 
     def test_valid_target_links_pass_check(self, tmp_project):
         ctx = ProjectContext(

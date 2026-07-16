@@ -116,7 +116,7 @@ class TestSkipLockInRunCmdInner:
     @patch("rlsbl.commands.release.build_hook_env", return_value={})
     @patch("rlsbl.commands.release.get_hook_timeout", return_value=30)
     @patch("rlsbl.commands.release.is_hook_customized", return_value=False)
-    @patch("rlsbl.app.run_checks", return_value=([], 0))
+    @patch("rlsbl.app.run_checks", return_value=([], [], 0))
     @patch("rlsbl.commands.release._run_strictcli_schema_dump")
     @patch("rlsbl.commands.release._run_selfdoc_gen")
     @patch("rlsbl.commands.release._run_selfdoc_check")

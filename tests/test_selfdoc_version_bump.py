@@ -12,8 +12,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from strictcli import CheckResult
-
 from rlsbl import app
 from conftest import make_ctx
 from rlsbl.context import ProjectContext

@@ -121,7 +121,7 @@ class TestWorkspaceUnbuildableFail:
             result = app._check_defs["workspace-unbuildable"].impl(ctx)
         assert result.status == "fail"
         assert "broken-pkg" in result.message
-        assert len(result.details) == 2
+        assert len(result.problems) == 2
 
     def test_fails_on_timeout(self, mock_git_repo):
         """uv sync dry-run times out -> fail."""

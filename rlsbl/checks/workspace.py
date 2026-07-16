@@ -761,7 +761,7 @@ def register_workspace_checks(app):
             return reporter.found(msg)
         return reporter.passed("no root config conflict")
 
-    @app.warn_check("go-companion-tags")
+    @app.error_check("go-companion-tags")
     def check_go_companion_tags(ctx, reporter):
         """Releasables with publishing Go members should have companion tags."""
         from ..errors import ConfigError
@@ -815,7 +815,7 @@ def register_workspace_checks(app):
 
         if config_errors:
             for ce in config_errors:
-                reporter.warn(ce)
+                reporter.error(ce)
             return reporter.found(f"{len(config_errors)} releasable/member config error(s)")
 
         if not checked_any:

@@ -160,7 +160,7 @@ class TestCrossRepoPathSourcesCheck:
 
         result = _run_check(repo)
         assert result.status == "fail"
-        assert "dep" in " ".join(result.details or [result.message])
+        assert "dep" in " ".join([p.text for p in result.problems] or [result.message])
 
     def test_fail_relative_cross_repo(self, tmp_path):
         repo = tmp_path / "repo"
@@ -179,7 +179,7 @@ class TestCrossRepoPathSourcesCheck:
 
         result = _run_check(repo)
         assert result.status == "fail"
-        joined = " ".join(result.details or [result.message])
+        joined = " ".join([p.text for p in result.problems] or [result.message])
         assert "invalid path value for source 'dep'" in joined
         assert "pyproject.toml" in joined
 

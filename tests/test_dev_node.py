@@ -8,6 +8,42 @@ from unittest.mock import patch
 import pytest
 
 from conftest import run_git, make_commit, make_workspace
+
+
+def _capture_all_checks():
+    """Register all rlsbl checks and return {name: fn(ctx)} dict."""
+    from strictcli import ErrorReporter, WarnReporter
+    from rlsbl.checks import register_checks
+
+    captured = {}
+
+    def _make_registrar(reporter_cls):
+        def registrar(name):
+            def decorator(fn):
+                def run(ctx):
+                    return fn(ctx, reporter_cls())
+                captured[name] = run
+                return fn
+            return decorator
+        return registrar
+
+    error_registrar = _make_registrar(ErrorReporter)
+    warn_registrar = _make_registrar(WarnReporter)
+
+    class MockApp:
+        _checks_enabled = True
+
+        def set_scope_adapter(self, adapter):
+            pass
+
+        def error_check(self, name):
+            return error_registrar(name)
+
+        def warn_check(self, name):
+            return warn_registrar(name)
+
+    register_checks(MockApp())
+    return captured
 from rlsbl.commands.changelog_cmd import cmd_add
 from rlsbl.commands.release import run_cmd as release_run_cmd
 from rlsbl.commands.edit_release import run_cmd as edit_run_cmd
@@ -90,7 +126,6 @@ class TestDevNodeProjectChecks:
 
     def test_dev_node_project_skips_user_facing_check(self, dev_node_monorepo):
         """Changelog-user-facing check returns skip for dev node projects."""
-        from strictcli import CheckResult
         from rlsbl.check_context import WorkspaceCheckContext
         from rlsbl.workspace import load_workspace, resolve_project
         from rlsbl.workspace_graph import WorkspaceGraph
@@ -111,23 +146,7 @@ class TestDevNodeProjectChecks:
             graph=graph,
         )
 
-        # Import and call the check function
-        from rlsbl.checks import register_checks
-        from unittest.mock import MagicMock
-
-        mock_app = MagicMock()
-        mock_app._checks_enabled = True
-
-        # Collect registered checks
-        registered_checks = {}
-        def fake_check(name):
-            def decorator(func):
-                registered_checks[name] = func
-                return func
-            return decorator
-        mock_app.check = fake_check
-
-        register_checks(mock_app)
+        registered_checks = _capture_all_checks()
 
         # Run changelog-user-facing check
         result = registered_checks["changelog-user-facing"](ctx)
@@ -136,7 +155,6 @@ class TestDevNodeProjectChecks:
 
     def test_dev_node_project_skips_coverage_check(self, dev_node_monorepo):
         """Changelog-coverage check returns skip for dev node projects."""
-        from strictcli import CheckResult
         from rlsbl.check_context import WorkspaceCheckContext
         from rlsbl.workspace import load_workspace
         from rlsbl.workspace_graph import WorkspaceGraph
@@ -155,21 +173,7 @@ class TestDevNodeProjectChecks:
             graph=graph,
         )
 
-        from rlsbl.checks import register_checks
-        from unittest.mock import MagicMock
-
-        mock_app = MagicMock()
-        mock_app._checks_enabled = True
-
-        registered_checks = {}
-        def fake_check(name):
-            def decorator(func):
-                registered_checks[name] = func
-                return func
-            return decorator
-        mock_app.check = fake_check
-
-        register_checks(mock_app)
+        registered_checks = _capture_all_checks()
 
         result = registered_checks["changelog-coverage"](ctx)
         assert result.status == "skip"
@@ -195,21 +199,7 @@ class TestDevNodeProjectChecks:
             graph=graph,
         )
 
-        from rlsbl.checks import register_checks
-        from unittest.mock import MagicMock
-
-        mock_app = MagicMock()
-        mock_app._checks_enabled = True
-
-        registered_checks = {}
-        def fake_check(name):
-            def decorator(func):
-                registered_checks[name] = func
-                return func
-            return decorator
-        mock_app.check = fake_check
-
-        register_checks(mock_app)
+        registered_checks = _capture_all_checks()
 
         # Coverage check should NOT skip for regular project
         result = registered_checks["changelog-coverage"](ctx)

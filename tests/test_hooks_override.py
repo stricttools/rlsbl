@@ -202,7 +202,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         mock_run.side_effect = ["", "0", "", ""]
 
         with patch("rlsbl.commands.release.subprocess") as mock_sp, \
-             patch("rlsbl.app.run_checks", return_value=([], 0)) as mock_checks:
+             patch("rlsbl.app.run_checks", return_value=([], [], 0)) as mock_checks:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
@@ -260,7 +260,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         mock_run.side_effect = ["", "0", "", ""]
 
         with patch("rlsbl.commands.release.subprocess") as mock_sp, \
-             patch("rlsbl.app.run_checks", return_value=([], 0)) as mock_checks:
+             patch("rlsbl.app.run_checks", return_value=([], [], 0)) as mock_checks:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
@@ -317,7 +317,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         mock_run.side_effect = ["", "0", "", ""]
 
         with patch("rlsbl.commands.release.subprocess") as mock_sp, \
-             patch("rlsbl.app.run_checks", return_value=([], 0)) as mock_checks:
+             patch("rlsbl.app.run_checks", return_value=([], [], 0)) as mock_checks:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
@@ -370,7 +370,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         mock_run.side_effect = ["", "0", "", ""]
 
         with patch("rlsbl.commands.release.subprocess") as mock_sp, \
-             patch("rlsbl.app.run_checks", return_value=([], 0)) as mock_checks:
+             patch("rlsbl.app.run_checks", return_value=([], [], 0)) as mock_checks:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
@@ -469,7 +469,7 @@ class TestExternalChecksVsHookCustomization:
 
         def tracking_run_checks(ctx, *, tag_expr=None, name_glob=None, **kw):
             calls.append((tag_expr, name_glob))
-            return ([], 0)
+            return ([], [], 0)
 
         started = [p.start() for p in _FULL_FLOW_PATCHES]
         try:
@@ -542,7 +542,7 @@ class TestExternalChecksVsHookCustomization:
         try:
             with (
                 patch("rlsbl.commands.release.is_hook_customized", return_value=True),
-                patch("rlsbl.app.run_checks", return_value=([], 0)) as mock_checks,
+                patch("rlsbl.app.run_checks", return_value=([], [], 0)) as mock_checks,
             ):
                 from rlsbl.commands.release import run_cmd
 

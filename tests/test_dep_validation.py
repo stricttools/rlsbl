@@ -24,6 +24,46 @@ from rlsbl.lint.utils import walk_source_files
 from rlsbl.workspace import WORKSPACE_DIR
 
 
+def _capture_all_checks():
+    """Register all rlsbl checks on a mock app and return a dict of {name: fn(ctx)}.
+
+    Each captured function wraps the raw (ctx, reporter) impl to create the
+    appropriate reporter, matching what strictcli's _CheckDef.impl does.
+    """
+    from strictcli import ErrorReporter, WarnReporter
+    from rlsbl.checks import register_checks
+
+    captured = {}
+
+    def _make_registrar(reporter_cls):
+        def registrar(name):
+            def decorator(fn):
+                def run(ctx):
+                    return fn(ctx, reporter_cls())
+                captured[name] = run
+                return fn
+            return decorator
+        return registrar
+
+    error_registrar = _make_registrar(ErrorReporter)
+    warn_registrar = _make_registrar(WarnReporter)
+
+    class MockApp:
+        _checks_enabled = True
+
+        def set_scope_adapter(self, adapter):
+            pass
+
+        def error_check(self, name):
+            return error_registrar(name)
+
+        def warn_check(self, name):
+            return warn_registrar(name)
+
+    register_checks(MockApp())
+    return captured
+
+
 # Minimal pyproject.toml so the Python import scanner finds .py files
 _PYPROJECT = '[project]\nname = "example"\n'
 
@@ -1557,24 +1597,7 @@ class TestRootProjectDepScan:
 
     def test_sibling_exclude_dirs_integration(self, tmp_path):
         """_sibling_exclude_dirs computes correct exclusions for root project."""
-        from rlsbl.checks import register_checks
-
-        # Capture the _sibling_exclude_dirs function
-        captured = {}
-
-        class MockApp:
-            _checks_enabled = True
-
-            def set_scope_adapter(self, adapter):
-                pass
-
-            def check(self, name):
-                def decorator(fn):
-                    captured[name] = fn
-                    return fn
-                return decorator
-
-        register_checks(MockApp())
+        _capture_all_checks()  # trigger registration side effects
 
         # Access _sibling_exclude_dirs via the module's closure
         from rlsbl import checks as checks_mod
@@ -1642,22 +1665,7 @@ class TestRootProjectDepScan:
             graph=graph,
         )
 
-        captured = {}
-
-        class MockApp:
-            _checks_enabled = True
-
-            def set_scope_adapter(self, adapter):
-                pass
-
-            def check(self, name):
-                def decorator(fn):
-                    captured[name] = fn
-                    return fn
-                return decorator
-
-        from rlsbl.checks import register_checks
-        register_checks(MockApp())
+        captured = _capture_all_checks()
 
         # Run deps-unused which triggers _build_dep_import_cache
         result = captured["deps-unused"](ctx)
@@ -1676,24 +1684,7 @@ class TestDepsChecksIntegration:
     """Integration tests: checks registered on the strictcli check system."""
 
     def _capture_checks(self):
-        """Register all checks on a mock app and return the captured dict."""
-        captured = {}
-
-        class MockApp:
-            _checks_enabled = True
-
-            def set_scope_adapter(self, adapter):
-                pass
-
-            def check(self, name):
-                def decorator(fn):
-                    captured[name] = fn
-                    return fn
-                return decorator
-
-        from rlsbl.checks import register_checks
-        register_checks(MockApp())
-        return captured
+        return _capture_all_checks()
 
     def test_deps_unused_registered(self):
         """deps-unused check is registered."""
@@ -1707,25 +1698,26 @@ class TestDepsChecksIntegration:
 
     def test_deps_unused_skip_not_workspace(self):
         """deps-unused skips when context is not a workspace (via scope adapter)."""
+        from strictcli import SkipCheck
         from rlsbl.checks.scope import scope_adapter
         from rlsbl.context import ProjectContext
 
         ctx = ProjectContext(project_root=Path("/tmp/fake"), workspace_root=None, config={})
         result = scope_adapter(ctx, "workspace")
-        assert result.status == "skip"
+        assert isinstance(result, SkipCheck)
 
     def test_deps_undeclared_skip_not_workspace(self):
         """deps-undeclared skips when context is not a workspace (via scope adapter)."""
+        from strictcli import SkipCheck
         from rlsbl.checks.scope import scope_adapter
         from rlsbl.context import ProjectContext
 
         ctx = ProjectContext(project_root=Path("/tmp/fake"), workspace_root=None, config={})
         result = scope_adapter(ctx, "workspace")
-        assert result.status == "skip"
+        assert isinstance(result, SkipCheck)
 
     def test_deps_unused_pass_clean_workspace(self, tmp_path):
         """deps-unused passes when all declared deps are imported."""
-        from strictcli import CheckResult
 
         from rlsbl.check_context import WorkspaceCheckContext
         from rlsbl.workspace_graph import WorkspaceGraph
@@ -1772,8 +1764,6 @@ class TestDepsChecksIntegration:
 
     def test_deps_unused_fail_unused_dep(self, tmp_path):
         """deps-unused fails when a declared dep is not imported."""
-        from strictcli import CheckResult
-
         from rlsbl.check_context import WorkspaceCheckContext
         from rlsbl.workspace_graph import WorkspaceGraph
 
@@ -1818,8 +1808,6 @@ class TestDepsChecksIntegration:
 
     def test_deps_undeclared_fail_missing_dep(self, tmp_path):
         """deps-undeclared fails when a workspace import has no declared dep."""
-        from strictcli import CheckResult
-
         from rlsbl.check_context import WorkspaceCheckContext
         from rlsbl.workspace_graph import WorkspaceGraph
 
@@ -1875,21 +1863,23 @@ class TestDepsChecksIntegration:
 
     def test_deps_runtime_test_only_skip_not_workspace(self):
         """deps-runtime-test-only skips when context is not a workspace (via scope adapter)."""
+        from strictcli import SkipCheck
         from rlsbl.checks.scope import scope_adapter
         from rlsbl.context import ProjectContext
 
         ctx = ProjectContext(project_root=Path("/tmp/fake"), workspace_root=None, config={})
         result = scope_adapter(ctx, "workspace")
-        assert result.status == "skip"
+        assert isinstance(result, SkipCheck)
 
     def test_deps_dev_in_lib_skip_not_workspace(self):
         """deps-dev-in-lib skips when context is not a workspace (via scope adapter)."""
+        from strictcli import SkipCheck
         from rlsbl.checks.scope import scope_adapter
         from rlsbl.context import ProjectContext
 
         ctx = ProjectContext(project_root=Path("/tmp/fake"), workspace_root=None, config={})
         result = scope_adapter(ctx, "workspace")
-        assert result.status == "skip"
+        assert isinstance(result, SkipCheck)
 
     def test_deps_runtime_test_only_warns(self, tmp_path):
         """deps-runtime-test-only warns when a runtime dep is test-only."""
@@ -2261,24 +2251,7 @@ class TestDeadWorkspacePackagesCheck:
     """Integration tests: dead-workspace-packages check on the strictcli system."""
 
     def _capture_checks(self):
-        """Register all checks on a mock app and return the captured dict."""
-        captured = {}
-
-        class MockApp:
-            _checks_enabled = True
-
-            def set_scope_adapter(self, adapter):
-                pass
-
-            def check(self, name):
-                def decorator(fn):
-                    captured[name] = fn
-                    return fn
-                return decorator
-
-        from rlsbl.checks import register_checks
-        register_checks(MockApp())
-        return captured
+        return _capture_all_checks()
 
     def test_registered(self):
         """dead-workspace-packages check is registered."""
@@ -2287,12 +2260,13 @@ class TestDeadWorkspacePackagesCheck:
 
     def test_skip_not_workspace(self):
         """Skips when context is not a workspace (via scope adapter)."""
+        from strictcli import SkipCheck
         from rlsbl.checks.scope import scope_adapter
         from rlsbl.context import ProjectContext
 
         ctx = ProjectContext(project_root=Path("/tmp/fake"), workspace_root=None, config={})
         result = scope_adapter(ctx, "workspace")
-        assert result.status == "skip"
+        assert isinstance(result, SkipCheck)
 
     def test_pass_all_libraries_imported(self, tmp_path):
         """Passes when all library packages have workspace importers."""
@@ -2582,24 +2556,7 @@ class TestDeadDartModulesCheck:
     """Integration tests: dead-modules check for Dart projects."""
 
     def _capture_checks(self):
-        """Register all checks on a mock app and return the captured dict."""
-        captured = {}
-
-        class MockApp:
-            _checks_enabled = True
-
-            def set_scope_adapter(self, adapter):
-                pass
-
-            def check(self, name):
-                def decorator(fn):
-                    captured[name] = fn
-                    return fn
-                return decorator
-
-        from rlsbl.checks import register_checks
-        register_checks(MockApp())
-        return captured
+        return _capture_all_checks()
 
     def test_dead_modules_dart_pass_clean(self, tmp_path):
         """dead-modules passes for a Dart project with all files reachable."""

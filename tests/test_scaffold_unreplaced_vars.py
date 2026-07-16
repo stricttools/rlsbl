@@ -29,7 +29,7 @@ class TestScaffoldUnreplacedVars:
         result = app._check_defs["scaffold-unreplaced-vars"].impl(ctx)
         assert result.status == "fail"
         assert "unreplaced" in result.message
-        assert any("{{pypi.minRequiredPython}}" in d for d in result.details)
+        assert any("{{pypi.minRequiredPython}}" in d for d in (p.text for p in result.problems))
 
     def test_clean_workflow_passes(self, tmp_project):
         """Workflow file with no rlsbl template variables passes."""
@@ -79,7 +79,7 @@ class TestScaffoldUnreplacedVars:
         ctx = make_ctx(tmp_project)
         result = app._check_defs["scaffold-unreplaced-vars"].impl(ctx)
         assert result.status == "fail"
-        assert any("{{projectName}}" in d for d in result.details)
+        assert any("{{projectName}}" in d for d in (p.text for p in result.problems))
 
     def test_no_scaffold_files_passes(self, tmp_project):
         """Project with no scaffold files passes."""
@@ -104,9 +104,9 @@ class TestScaffoldUnreplacedVars:
         ctx = make_ctx(tmp_project)
         result = app._check_defs["scaffold-unreplaced-vars"].impl(ctx)
         assert result.status == "fail"
-        assert any("{{version}}" in d for d in result.details)
+        assert any("{{version}}" in d for d in (p.text for p in result.problems))
         # ${{ secrets.NPM_TOKEN }} should NOT appear in errors
-        assert not any("secrets" in d for d in result.details)
+        assert not any("secrets" in d for d in (p.text for p in result.problems))
 
     def test_docker_metadata_action_not_flagged(self, tmp_project):
         """Docker metadata-action type=semver,pattern={{version}} is not flagged."""
@@ -153,11 +153,11 @@ class TestScaffoldUnreplacedVars:
         ctx = make_ctx(tmp_project)
         result = app._check_defs["scaffold-unreplaced-vars"].impl(ctx)
         assert result.status == "fail"
-        assert any("{{pypi.minRequiredPython}}" in d for d in result.details)
+        assert any("{{pypi.minRequiredPython}}" in d for d in (p.text for p in result.problems))
         # Docker metadata patterns should not appear in errors
-        assert not any("{{version}}" in d for d in result.details)
-        assert not any("{{major}}" in d for d in result.details)
-        assert not any("{{minor}}" in d for d in result.details)
+        assert not any("{{version}}" in d for d in (p.text for p in result.problems))
+        assert not any("{{major}}" in d for d in (p.text for p in result.problems))
+        assert not any("{{minor}}" in d for d in (p.text for p in result.problems))
 
     def test_goreleaser_with_template_var_fails(self, tmp_project):
         """.goreleaser.yml containing {{goModule}} is flagged."""
@@ -169,4 +169,4 @@ class TestScaffoldUnreplacedVars:
         ctx = make_ctx(tmp_project)
         result = app._check_defs["scaffold-unreplaced-vars"].impl(ctx)
         assert result.status == "fail"
-        assert any("{{goModule}}" in d for d in result.details)
+        assert any("{{goModule}}" in d for d in (p.text for p in result.problems))

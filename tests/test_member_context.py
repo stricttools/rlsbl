@@ -189,19 +189,8 @@ class TestCollectCompanionTagsInheritance:
 
 
 def _get_check(name):
-    from rlsbl.checks.workspace import register_workspace_checks
-
-    app = MagicMock()
-    checks = {}
-
-    def fake_check(check_name):
-        def decorator(fn):
-            checks[check_name] = fn
-            return fn
-        return decorator
-
-    app.check = fake_check
-    register_workspace_checks(app)
+    from conftest import capture_all_checks
+    checks = capture_all_checks()
     return checks[name]
 
 
@@ -236,7 +225,7 @@ class TestGoCompanionTagsCheckInheritance:
         ctx = self._ctx(str(repo), [proj], [Releasable(name="myrel")])
         result = check_fn(ctx)
         assert result.status == "warn"
-        assert "missing companion tag" in result.details[0]
+        assert "missing companion tag" in result.problems[0].text
 
     def test_check_passes_when_tag_exists(self, tmp_path):
         repo, _member, _rel_dir = _make_go_member_monorepo(
@@ -304,7 +293,7 @@ class TestMemberSetAgreement:
         )
         result = check_fn(ctx)
         assert result.status == "warn"
-        assert "packages/golib/v2.0.0" in result.details[0]
+        assert "packages/golib/v2.0.0" in result.problems[0].text
 
 
 # ---------------------------------------------------------------------------

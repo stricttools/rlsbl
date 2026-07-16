@@ -8,8 +8,6 @@ from unittest.mock import patch
 
 import pytest
 
-from strictcli import CheckResult
-
 from rlsbl import app
 from rlsbl.context import ProjectContext
 from rlsbl.check_context import WorkspaceCheckContext
@@ -483,7 +481,7 @@ class TestChangelogSchemaCheck:
         ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["changelog-schema"].impl(ctx)
         assert result.status == "fail"
-        assert len(result.details) > 0
+        assert len(result.problems) > 0
 
     def test_schema_skip_no_changes_dir(self, mock_git_repo):
         """No .rlsbl/changes/ -> skip."""
@@ -533,7 +531,7 @@ class TestChangelogHashesCheck:
         ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["changelog-hashes"].impl(ctx)
         assert result.status == "fail"
-        assert len(result.details) > 0
+        assert len(result.problems) > 0
 
 
 # ---------------------------------------------------------------------------
@@ -555,13 +553,14 @@ class TestWorkspaceChecksSkipForNonWorkspace:
         "workspace-stale-entries",
     ])
     def test_skip_for_project_context(self, mock_git_repo, name):
+        from strictcli import SkipCheck
         from rlsbl.checks.scope import scope_adapter
 
         ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         cdef = app._check_defs[name]
         result = scope_adapter(ctx, cdef.scope)
-        assert result.status == "skip"
-        assert "not a monorepo" in result.message
+        assert isinstance(result, SkipCheck)
+        assert "not a monorepo" in result.reason
 
 
 class TestWorkspaceCiRouterCheck:
@@ -624,7 +623,7 @@ class TestWorkspaceStaleEntriesCheck:
         )
         result = app._check_defs["workspace-stale-entries"].impl(ctx)
         assert result.status == "fail"
-        assert len(result.details) == 1
+        assert len(result.problems) == 1
 
     def test_dart_project_not_stale(self, mock_git_repo):
         """Dart project with pubspec.yaml is NOT flagged as stale."""
@@ -721,7 +720,7 @@ class TestWorkspaceUnregisteredCheck:
         )
         result = app._check_defs["workspace-unregistered"].impl(ctx)
         assert result.status == "fail"
-        assert any("mylib" in d for d in result.details)
+        assert any("mylib" in p.text for p in result.problems)
 
     def test_parent_of_registered_path_not_flagged(self, mock_git_repo):
         """Directory that is a parent of a registered project path is NOT flagged."""
@@ -769,9 +768,9 @@ class TestWorkspaceUnregisteredCheck:
         )
         result = app._check_defs["workspace-unregistered"].impl(ctx)
         assert result.status == "fail"
-        assert any("tools" in d for d in result.details)
+        assert any("tools" in p.text for p in result.problems)
         # backend should NOT be in the unregistered list (it's registered)
-        assert not any("backend" in d for d in result.details)
+        assert not any("backend" in p.text for p in result.problems)
 
 
 # ---------------------------------------------------------------------------
@@ -830,12 +829,13 @@ class TestLibraryLintCheck:
 
     def test_standalone_project_skips(self, mock_git_repo):
         """Standalone (non-monorepo) project -> skip (via scope adapter)."""
+        from strictcli import SkipCheck
         from rlsbl.checks.scope import scope_adapter
 
         ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = scope_adapter(ctx, "workspace:library")
-        assert result.status == "skip"
-        assert "not a monorepo" in result.message
+        assert isinstance(result, SkipCheck)
+        assert "not a monorepo" in result.reason
 
 
 # ---------------------------------------------------------------------------

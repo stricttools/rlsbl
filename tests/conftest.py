@@ -44,6 +44,46 @@ def make_ctx(project_root, config=None):
     return ProjectContext(project_root=project_root, workspace_root=None, config=config)
 
 
+def capture_all_checks():
+    """Register all rlsbl checks on a mock app and return a dict of {name: fn(ctx)}.
+
+    Each captured function wraps the raw (ctx, reporter) impl to create the
+    appropriate reporter, matching what strictcli's _CheckDef.impl does.
+    """
+    from strictcli import ErrorReporter, WarnReporter
+    from rlsbl.checks import register_checks
+
+    captured = {}
+
+    def _make_registrar(reporter_cls):
+        def registrar(name):
+            def decorator(fn):
+                def run(ctx):
+                    return fn(ctx, reporter_cls())
+                captured[name] = run
+                return fn
+            return decorator
+        return registrar
+
+    error_registrar = _make_registrar(ErrorReporter)
+    warn_registrar = _make_registrar(WarnReporter)
+
+    class MockApp:
+        _checks_enabled = True
+
+        def set_scope_adapter(self, adapter):
+            pass
+
+        def error_check(self, name):
+            return error_registrar(name)
+
+        def warn_check(self, name):
+            return warn_registrar(name)
+
+    register_checks(MockApp())
+    return captured
+
+
 # ---------------------------------------------------------------------------
 # Utility functions (imported explicitly by test modules)
 # ---------------------------------------------------------------------------

@@ -9,8 +9,6 @@ from unittest.mock import patch
 
 import pytest
 
-from strictcli import CheckResult
-
 from rlsbl import app
 from rlsbl.context import ProjectContext
 from rlsbl.check_context import WorkspaceCheckContext
@@ -53,12 +51,13 @@ class TestDepsStaleCheck:
 
     def test_skip_for_non_workspace(self, mock_git_repo):
         """Non-workspace context -> skip (via scope adapter)."""
+        from strictcli import SkipCheck
         from rlsbl.checks.scope import scope_adapter
 
         ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = scope_adapter(ctx, "workspace")
-        assert result.status == "skip"
-        assert "not a monorepo" in result.message
+        assert isinstance(result, SkipCheck)
+        assert "not a monorepo" in result.reason
 
     def test_pass_fresh_constraint(self, mock_git_repo):
         """Constraint that satisfies the current version -> pass."""
@@ -139,10 +138,10 @@ class TestDepsStaleCheck:
         )
         result = app._check_defs["deps-stale"].impl(ctx)
         assert result.status == "fail"
-        assert len(result.details) == 1
-        assert "myapp" in result.details[0]
-        assert "lib" in result.details[0]
-        assert "2.0.0" in result.details[0]
+        assert len(result.problems) == 1
+        assert "myapp" in result.problems[0].text
+        assert "lib" in result.problems[0].text
+        assert "2.0.0" in result.problems[0].text
 
     def test_pass_no_deps(self, mock_git_repo):
         """Project with no dependencies -> pass."""

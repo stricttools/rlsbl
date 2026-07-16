@@ -332,17 +332,8 @@ class TestGoCompanionTagsCheck:
     def test_skips_when_no_releasables(self, tmp_path):
         """Check skips when there are no releasables."""
         from rlsbl.checks.workspace import register_workspace_checks
-        app = MagicMock()
-        checks = {}
-
-        def fake_check(name):
-            def decorator(fn):
-                checks[name] = fn
-                return fn
-            return decorator
-        app.check = fake_check
-
-        register_workspace_checks(app)
+        from conftest import capture_all_checks
+        checks = capture_all_checks()
         check_fn = checks["go-companion-tags"]
 
         ctx = self._make_check_ctx(str(tmp_path), [], [])
@@ -354,17 +345,8 @@ class TestGoCompanionTagsCheck:
         from rlsbl.checks.workspace import register_workspace_checks
         from rlsbl.workspace import Releasable, WorkspaceProject, write_releasable_version
 
-        app = MagicMock()
-        checks = {}
-
-        def fake_check(name):
-            def decorator(fn):
-                checks[name] = fn
-                return fn
-            return decorator
-        app.check = fake_check
-
-        register_workspace_checks(app)
+        from conftest import capture_all_checks
+        checks = capture_all_checks()
         check_fn = checks["go-companion-tags"]
 
         # Set up a git repo with a Go member but no companion tag
@@ -404,24 +386,15 @@ class TestGoCompanionTagsCheck:
 
         result = check_fn(ctx)
         assert result.status == "warn"
-        assert "missing companion tag" in result.details[0]
+        assert "missing companion tag" in result.problems[0].text
 
     def test_passes_when_companion_tag_exists(self, tmp_path):
         """Check passes when all Go companion tags exist."""
         from rlsbl.checks.workspace import register_workspace_checks
         from rlsbl.workspace import Releasable, WorkspaceProject, write_releasable_version
 
-        app = MagicMock()
-        checks = {}
-
-        def fake_check(name):
-            def decorator(fn):
-                checks[name] = fn
-                return fn
-            return decorator
-        app.check = fake_check
-
-        register_workspace_checks(app)
+        from conftest import capture_all_checks
+        checks = capture_all_checks()
         check_fn = checks["go-companion-tags"]
 
         # Set up a git repo with a Go member AND the companion tag
@@ -468,17 +441,8 @@ class TestGoCompanionTagsCheck:
         from rlsbl.checks.workspace import register_workspace_checks
         from rlsbl.workspace import Releasable, WorkspaceProject, write_releasable_version
 
-        app = MagicMock()
-        checks = {}
-
-        def fake_check(name):
-            def decorator(fn):
-                checks[name] = fn
-                return fn
-            return decorator
-        app.check = fake_check
-
-        register_workspace_checks(app)
+        from conftest import capture_all_checks
+        checks = capture_all_checks()
         check_fn = checks["go-companion-tags"]
 
         repo = tmp_path / "workspace"
@@ -530,17 +494,8 @@ class TestGoCompanionTagsCheck:
         from rlsbl.checks.workspace import register_workspace_checks
         from rlsbl.workspace import Releasable, WorkspaceProject, write_releasable_version
 
-        app = MagicMock()
-        checks = {}
-
-        def fake_check(name):
-            def decorator(fn):
-                checks[name] = fn
-                return fn
-            return decorator
-        app.check = fake_check
-
-        register_workspace_checks(app)
+        from conftest import capture_all_checks
+        checks = capture_all_checks()
         check_fn = checks["go-companion-tags"]
 
         repo = tmp_path / "workspace"
@@ -575,8 +530,8 @@ class TestGoCompanionTagsCheck:
 
         result = check_fn(ctx)
         assert result.status == "fail"
-        assert "golib" in result.details[0]
-        assert "config" in result.details[0].lower()
+        assert "golib" in result.problems[0].text
+        assert "config" in result.problems[0].text.lower()
 
     def test_fails_when_releasable_version_unreadable(self, tmp_path):
         """A releasable whose version file cannot be read must produce a
@@ -585,17 +540,8 @@ class TestGoCompanionTagsCheck:
         from rlsbl.checks.workspace import register_workspace_checks
         from rlsbl.workspace import Releasable, WorkspaceProject
 
-        app = MagicMock()
-        checks = {}
-
-        def fake_check(name):
-            def decorator(fn):
-                checks[name] = fn
-                return fn
-            return decorator
-        app.check = fake_check
-
-        register_workspace_checks(app)
+        from conftest import capture_all_checks
+        checks = capture_all_checks()
         check_fn = checks["go-companion-tags"]
 
         repo = tmp_path / "workspace"
@@ -632,8 +578,8 @@ class TestGoCompanionTagsCheck:
 
         result = check_fn(ctx)
         assert result.status == "fail"
-        assert "myrel" in result.details[0]
-        assert "version" in result.details[0].lower()
+        assert "myrel" in result.problems[0].text
+        assert "version" in result.problems[0].text.lower()
 
     def test_fails_when_member_targets_unresolvable(self, tmp_path):
         """A member whose config exists but resolves no targets anywhere must
@@ -646,17 +592,8 @@ class TestGoCompanionTagsCheck:
         from rlsbl.checks.workspace import register_workspace_checks
         from rlsbl.workspace import Releasable, WorkspaceProject, write_releasable_version
 
-        app = MagicMock()
-        checks = {}
-
-        def fake_check(name):
-            def decorator(fn):
-                checks[name] = fn
-                return fn
-            return decorator
-        app.check = fake_check
-
-        register_workspace_checks(app)
+        from conftest import capture_all_checks
+        checks = capture_all_checks()
         check_fn = checks["go-companion-tags"]
 
         repo = tmp_path / "workspace"
@@ -693,4 +630,4 @@ class TestGoCompanionTagsCheck:
 
         result = check_fn(ctx)
         assert result.status == "fail"
-        assert "golib" in result.details[0]
+        assert "golib" in result.problems[0].text

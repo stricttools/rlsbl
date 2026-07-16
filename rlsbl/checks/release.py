@@ -55,11 +55,9 @@ def register_release_checks(app):
             return reporter.skipped(f"{tag} not created yet")
 
         if not check_gh_installed():
-            reporter.warn("gh CLI is not installed")
-            return reporter.found("gh CLI is not installed")
+            return reporter.skipped("gh CLI is not installed")
         if not check_gh_auth():
-            reporter.warn("gh CLI is not authenticated")
-            return reporter.found("gh CLI is not authenticated")
+            return reporter.skipped("gh CLI is not authenticated")
 
         try:
             run_gh(["release", "view", tag], config=ctx.config, cwd=str(ctx.project_root))

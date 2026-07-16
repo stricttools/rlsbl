@@ -389,7 +389,7 @@ class TestTwoHookModel:
 
         mock_run.side_effect = ["", "0", "", ""]
 
-        with patch("rlsbl.app.run_checks", return_value=([], 0)) as mock_checks:
+        with patch("rlsbl.app.run_checks", return_value=([], [], 0)) as mock_checks:
             from rlsbl.commands.release import run_cmd
 
             with pytest.raises(SystemExit) as exc_info:
@@ -502,7 +502,7 @@ class TestFullFlowOrder:
                 execution_order.append("preflight-changelog")
             else:
                 execution_order.append("preflight")
-            return ([], 0)
+            return ([], [], 0)
 
         # Wrap subprocess.run to record hook invocations by name.
         original_subprocess_run = subprocess.run

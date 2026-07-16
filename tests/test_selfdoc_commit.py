@@ -108,7 +108,7 @@ class _PatchContext:
             self._stack.append(p)
 
         # Patch app.run_checks (preflight checks) which uses a deferred import
-        p = patch("rlsbl.app.run_checks", return_value=([], 0))
+        p = patch("rlsbl.app.run_checks", return_value=([], [], 0))
         self.mocks["app.run_checks"] = p.start()
         self._stack.append(p)
 

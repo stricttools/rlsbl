@@ -8,32 +8,17 @@ mirroring dev-only-boundary (which covers the dev-only variant of the
 same hole).
 """
 
-from unittest.mock import MagicMock
-
 import pytest
 
-from conftest import make_workspace, run_git
+from conftest import capture_all_checks, make_workspace, run_git
 from rlsbl.check_context import WorkspaceCheckContext
-from rlsbl.checks import register_checks
 from rlsbl.workspace import WORKSPACE_DIR, load_workspace
 from rlsbl.workspace_graph import WorkspaceGraph
 
 
 def _register_and_get_checks():
     """Register all checks on a mock app and return the check function dict."""
-    mock_app = MagicMock()
-    mock_app._checks_enabled = True
-    registered = {}
-
-    def fake_check(name):
-        def decorator(func):
-            registered[name] = func
-            return func
-        return decorator
-
-    mock_app.check = fake_check
-    register_checks(mock_app)
-    return registered
+    return capture_all_checks()
 
 
 def _make_pypi_project(root, subdir, version="0.1.0", deps=None, dev_deps=None):
@@ -129,8 +114,8 @@ class TestUnversionedBoundary:
         result = checks["unversioned-boundary"](ctx)
 
         assert result.status == "fail"
-        assert "proj-a" in result.details[0]
-        assert "proj-b" in result.details[0]
+        assert "proj-a" in result.problems[0].text
+        assert "proj-b" in result.problems[0].text
 
     def test_boundary_allows_dev_dependency(self, tmp_path, monkeypatch):
         """Releasable A depends on unversioned B via dev dep only -> PASS."""
@@ -191,7 +176,7 @@ class TestUnversionedBoundary:
         result = checks["unversioned-boundary"](ctx)
 
         assert result.status == "fail"
-        violation_text = "\n".join(result.details)
+        violation_text = "\n".join(p.text for p in result.problems)
         assert "proj-a" in violation_text
         assert "proj-c" in violation_text
 
@@ -213,11 +198,11 @@ class TestUnversionedBoundary:
 
         assert result.status == "fail"
         # A is flagged for its direct dep on B and its transitive dep on C
-        assert any("'proj-a'" in v and "'proj-b'" in v for v in result.details)
-        assert any("'proj-a'" in v and "'proj-c'" in v for v in result.details)
+        assert any("'proj-a'" in v and "'proj-b'" in v for v in (p.text for p in result.problems))
+        assert any("'proj-a'" in v and "'proj-c'" in v for v in (p.text for p in result.problems))
         # B is unversioned itself -- never flagged as a violating dependent
         assert not any(
-            v.startswith("releasable project 'proj-b'") for v in result.details
+            v.startswith("releasable project 'proj-b'") for v in " ".join(p.text for p in result.problems)
         )
 
     def test_no_unversioned_projects(self, tmp_path, monkeypatch):

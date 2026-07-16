@@ -112,7 +112,7 @@ class TestReleaseAllowDirty:
     @patch("rlsbl.commands.release.extract_changelog_entry", return_value="- Bugfix")
     @patch("rlsbl.commands.release.get_changes_dir", return_value=".rlsbl/changes")
     @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
-    @patch("rlsbl.app.run_checks", return_value=([], 0))
+    @patch("rlsbl.app.run_checks", return_value=([], [], 0))
     def test_allow_dirty_non_dry_run_passes_recheck(self, _run_checks, _vrt,
                                                      _changes_dir, _extract, _finalize,
                                                      _gen_ver_file, _validate, _gen_cl,
@@ -184,7 +184,7 @@ class TestReleaseAllowDirty:
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
-    @patch("rlsbl.app.run_checks", return_value=([], 0))
+    @patch("rlsbl.app.run_checks", return_value=([], [], 0))
     def test_allow_dirty_still_catches_new_unexpected_files(self, _run_checks, _vrt,
                                                              _validate, _gen_cl,
                                                              _deploy, _tag,

@@ -525,7 +525,7 @@ scope = "workspace"
 
 [checks.go-companion-tags]
 tags = ["workspace"]
-severity = "warn"
+severity = "error"
 fast = true
 pure = false
 needs_network = false

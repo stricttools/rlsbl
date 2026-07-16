@@ -122,7 +122,7 @@ class TestPreReleaseHookOutput:
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
-    @patch("rlsbl.app.run_checks", return_value=([], 0))
+    @patch("rlsbl.app.run_checks", return_value=([], [], 0))
     @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
     def test_hook_exit_code_in_error_message(
         self,
@@ -217,7 +217,7 @@ class TestPostReleaseHookOutput:
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
-    @patch("rlsbl.app.run_checks", return_value=([], 0))
+    @patch("rlsbl.app.run_checks", return_value=([], [], 0))
     def test_failed_hook_is_non_fatal(
         self,
         _run_checks,
@@ -298,7 +298,7 @@ class TestWatchSHABeforePostHook:
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
-    @patch("rlsbl.app.run_checks", return_value=([], 0))
+    @patch("rlsbl.app.run_checks", return_value=([], [], 0))
     def test_watch_sha_is_pre_hook_commit(
         self,
         _run_checks,
@@ -421,7 +421,7 @@ class TestHookTimeout:
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
-    @patch("rlsbl.app.run_checks", return_value=([], 0))
+    @patch("rlsbl.app.run_checks", return_value=([], [], 0))
     @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
     def test_pre_release_timeout_message_includes_seconds(
         self,
@@ -573,7 +573,7 @@ class TestHookCwdStandalone:
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
-    @patch("rlsbl.app.run_checks", return_value=([], 0))
+    @patch("rlsbl.app.run_checks", return_value=([], [], 0))
     def test_post_release_hook_cwd_none_standalone(
         self,
         _run_checks,
@@ -783,7 +783,7 @@ class TestHookCwdMonorepo:
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
-    @patch("rlsbl.app.run_checks", return_value=([], 0))
+    @patch("rlsbl.app.run_checks", return_value=([], [], 0))
     @patch("rlsbl.commands.release.validate_release_targets", return_value="pypi")
     def test_post_release_hook_cwd_monorepo(
         self,

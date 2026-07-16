@@ -351,24 +351,8 @@ class TestCircularDepsCheck:
     """Integration tests: circular-deps check registered on the strictcli system."""
 
     def _capture_checks(self):
-        """Register all checks on a mock app and return the captured dict."""
-        captured = {}
-
-        class MockApp:
-            _checks_enabled = True
-
-            def set_scope_adapter(self, adapter):
-                pass
-
-            def check(self, name):
-                def decorator(fn):
-                    captured[name] = fn
-                    return fn
-                return decorator
-
-        from rlsbl.checks import register_checks
-        register_checks(MockApp())
-        return captured
+        from conftest import capture_all_checks
+        return capture_all_checks()
 
     def test_registered(self):
         """circular-deps check is registered."""
@@ -436,7 +420,7 @@ class TestCircularDepsCheck:
         captured = self._capture_checks()
         ctx = ProjectContext(project_root=Path(tmp_path), workspace_root=None, config={})
         result = captured["circular-deps"](ctx)
-        assert result.status == "fail"
+        assert result.status == "warn"
         assert "circular dependency cycle" in result.message
 
     def test_details_show_cycle_path(self, tmp_path):
@@ -453,7 +437,7 @@ class TestCircularDepsCheck:
         captured = self._capture_checks()
         ctx = ProjectContext(project_root=Path(tmp_path), workspace_root=None, config={})
         result = captured["circular-deps"](ctx)
-        assert result.details is not None
-        assert len(result.details) >= 1
+        assert result.problems is not None
+        assert len(result.problems) >= 1
         # Detail should contain " -> " showing the cycle
-        assert " -> " in result.details[0]
+        assert " -> " in result.problems[0].text

@@ -194,7 +194,7 @@ class TestWatchInvokedAfterRelease:
     @patch("rlsbl.commands.release.read_deploy_config", return_value=([], []))
     @patch("rlsbl.commands.release.should_tag", return_value=False)
     @patch("rlsbl.commands.release.upload_release_assets")
-    @patch("rlsbl.app.run_checks", return_value=([], 0))
+    @patch("rlsbl.app.run_checks", return_value=([], [], 0))
     @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
     def test_watch_flag_invokes_watch_run_cmd(
         self,
@@ -290,7 +290,7 @@ class TestWatchInvokedAfterRelease:
     @patch("rlsbl.commands.release.read_deploy_config", return_value=([], []))
     @patch("rlsbl.commands.release.should_tag", return_value=False)
     @patch("rlsbl.commands.release.upload_release_assets")
-    @patch("rlsbl.app.run_checks", return_value=([], 0))
+    @patch("rlsbl.app.run_checks", return_value=([], [], 0))
     @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
     def test_no_watch_flag_prints_hint(
         self,

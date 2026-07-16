@@ -40,22 +40,8 @@ class TestVersionConsistencyPublishedMembers:
 
     @staticmethod
     def _get_check_fn():
-        from unittest.mock import MagicMock
-        mock_app = MagicMock()
-        mock_app._checks_enabled = True
-        registered = {}
-
-        def capture_check(name):
-            def decorator(fn):
-                registered[name] = fn
-                return fn
-            return decorator
-
-        mock_app.check = capture_check
-
-        from rlsbl.checks.project import register_project_checks
-        register_project_checks(mock_app)
-        return registered["version-consistency"]
+        from conftest import capture_all_checks
+        return capture_all_checks()["version-consistency"]
 
     def test_published_member_mismatch_fails(self, tmp_path):
         """Non-private member with mismatched manifest version fails."""

@@ -236,7 +236,7 @@ def test_check_fails_wiped_overlay_names_package(mock_git_repo):
     )
     result = _run_drift_check(mock_git_repo)
     assert result.status == "fail"
-    blob = result.message + " " + " ".join(result.details or [])
+    blob = result.message + " " + " ".join(p.text for p in result.problems)
     assert "depa" in blob
     assert "rlsbl dev sync" in blob
 

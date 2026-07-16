@@ -14,6 +14,46 @@ from rlsbl.workspace import WORKSPACE_DIR, WORKSPACE_FILE
 from rlsbl.workspace_graph import WorkspaceGraph
 
 
+def _capture_checks():
+    """Register all rlsbl checks on a mock app and return a dict of {name: fn(ctx)}.
+
+    Each captured function wraps the raw (ctx, reporter) impl to create the
+    appropriate reporter, matching what strictcli's _CheckDef.impl does.
+    """
+    from strictcli import ErrorReporter, WarnReporter
+    from rlsbl.checks import register_checks
+
+    captured = {}
+
+    def _make_registrar(reporter_cls):
+        def registrar(name):
+            def decorator(fn):
+                def run(ctx):
+                    return fn(ctx, reporter_cls())
+                captured[name] = run
+                return fn
+            return decorator
+        return registrar
+
+    error_registrar = _make_registrar(ErrorReporter)
+    warn_registrar = _make_registrar(WarnReporter)
+
+    class MockApp:
+        _checks_enabled = True
+
+        def set_scope_adapter(self, adapter):
+            pass
+
+        def error_check(self, name):
+            return error_registrar(name)
+
+        def warn_check(self, name):
+            return warn_registrar(name)
+
+    register_checks(MockApp())
+    return captured
+
+
 def _write_workspace(tmp_project, content):
     """Write workspace.toml with the given TOML content."""
     ws_dir = tmp_project / WORKSPACE_DIR
@@ -428,9 +468,6 @@ class TestLayersViolationsCheck:
     def test_check_runs_via_system(self, tmp_path):
         """The registered check produces a result."""
         from pathlib import Path
-        from unittest.mock import MagicMock
-
-        from strictcli import CheckResult
 
         from rlsbl.check_context import WorkspaceCheckContext
 
@@ -463,46 +500,26 @@ class TestLayersViolationsCheck:
             graph=graph,
         )
 
-        # Import the check function directly by calling register_checks
-        # on a mock app that captures the registered check
-        captured = {}
-
-        class MockApp:
-            _checks_enabled = True
-
-            def set_scope_adapter(self, adapter):
-                pass
-
-            def check(self, name):
-                def decorator(fn):
-                    captured[name] = fn
-                    return fn
-                return decorator
-
-        from rlsbl.checks import register_checks
-        register_checks(MockApp())
-
+        captured = _capture_checks()
         assert "layers-violations" in captured
         result = captured["layers-violations"](ctx)
-        assert isinstance(result, CheckResult)
         assert result.status == "pass"
 
     def test_check_skip_not_workspace(self):
         """The check skips when context is not a workspace (via scope adapter)."""
         from pathlib import Path
 
+        from strictcli import SkipCheck
         from rlsbl.checks.scope import scope_adapter
         from rlsbl.context import ProjectContext
 
         ctx = ProjectContext(project_root=Path("/tmp/fake"), workspace_root=None, config={})
         result = scope_adapter(ctx, "workspace:non_dev_only")
-        assert result.status == "skip"
+        assert isinstance(result, SkipCheck)
 
     def test_check_skip_no_layers(self, tmp_path):
         """The check skips when no [layers] section exists."""
         from pathlib import Path
-
-        from strictcli import CheckResult
 
         from rlsbl.check_context import WorkspaceCheckContext
 
@@ -524,23 +541,7 @@ class TestLayersViolationsCheck:
             graph=graph,
         )
 
-        captured = {}
-
-        class MockApp:
-            _checks_enabled = True
-
-            def set_scope_adapter(self, adapter):
-                pass
-
-            def check(self, name):
-                def decorator(fn):
-                    captured[name] = fn
-                    return fn
-                return decorator
-
-        from rlsbl.checks import register_checks
-        register_checks(MockApp())
-
+        captured = _capture_checks()
         result = captured["layers-violations"](ctx)
         assert result.status == "skip"
         assert "layers not configured" in result.message
@@ -548,8 +549,6 @@ class TestLayersViolationsCheck:
     def test_check_fail_on_violation(self, tmp_path):
         """The check fails when a layer violation exists."""
         from pathlib import Path
-
-        from strictcli import CheckResult
 
         from rlsbl.check_context import WorkspaceCheckContext
 
@@ -582,23 +581,7 @@ class TestLayersViolationsCheck:
             graph=graph,
         )
 
-        captured = {}
-
-        class MockApp:
-            _checks_enabled = True
-
-            def set_scope_adapter(self, adapter):
-                pass
-
-            def check(self, name):
-                def decorator(fn):
-                    captured[name] = fn
-                    return fn
-                return decorator
-
-        from rlsbl.checks import register_checks
-        register_checks(MockApp())
-
+        captured = _capture_checks()
         result = captured["layers-violations"](ctx)
         assert result.status == "fail"
         assert "1 layer violation" in result.message
@@ -649,23 +632,7 @@ class TestLayersViolationsCheck:
         # Apply scope adapter to filter out dev_node projects
         adapted = scope_adapter(ctx, "workspace:non_dev_only")
 
-        captured = {}
-
-        class MockApp:
-            _checks_enabled = True
-
-            def set_scope_adapter(self, adapter):
-                pass
-
-            def check(self, name):
-                def decorator(fn):
-                    captured[name] = fn
-                    return fn
-                return decorator
-
-        from rlsbl.checks import register_checks
-        register_checks(MockApp())
-
+        captured = _capture_checks()
         result = captured["layers-violations"](adapted)
         assert result.status == "pass"
 
@@ -707,23 +674,7 @@ class TestLayersViolationsCheck:
             graph=graph,
         )
 
-        captured = {}
-
-        class MockApp:
-            _checks_enabled = True
-
-            def set_scope_adapter(self, adapter):
-                pass
-
-            def check(self, name):
-                def decorator(fn):
-                    captured[name] = fn
-                    return fn
-                return decorator
-
-        from rlsbl.checks import register_checks
-        register_checks(MockApp())
-
+        captured = _capture_checks()
         result = captured["layers-violations"](ctx)
         assert result.status == "fail"
-        assert any("stray" in d for d in (result.details or []))
+        assert any("stray" in p.text for p in result.problems)

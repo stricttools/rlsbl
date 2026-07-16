@@ -299,8 +299,8 @@ class TestDependsOnOrdering:
         ctx.push_stdin = _make_push_stdin(prepush_repo, head_sha, base_sha)
 
         # Run all prepush checks via the check system
-        results, exit_code = app.run_checks(ctx, tag_expr="prepush", ignore_warnings=True)
-        results_dict = {cr.name: cr.result for cr in results}
+        results, _impure, exit_code = app.run_checks(ctx, tag_expr="prepush", ignore_warnings=True)
+        results_dict = {cr.name: cr for cr in results}
 
         # changelog-coverage must have failed
         assert results_dict["prepush-changelog-coverage"].status == "fail"
@@ -426,9 +426,10 @@ class TestWorkspaceTestSuiteSkipsNonWorkspace:
         ctx = make_ctx(prepush_repo)
         ctx.push_stdin = "refs/heads/main abc123 refs/heads/main 000000"
 
+        from strictcli import SkipCheck
         result = scope_adapter(ctx, "workspace:non_dev_only")
-        assert result.status == "skip"
-        assert "not a monorepo" in result.message
+        assert isinstance(result, SkipCheck)
+        assert "not a monorepo" in result.reason
 
 
 class TestWorkspaceTestSuiteSkipsNoPushContext:

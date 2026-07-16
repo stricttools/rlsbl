@@ -18,7 +18,7 @@ import pytest
 
 from conftest import git_head, make_commit, make_ctx, make_workspace, run_git
 
-from strictcli import CheckResult
+from strictcli import SkipCheck
 
 from rlsbl import app
 from rlsbl.check_context import WorkspaceCheckContext
@@ -31,19 +31,31 @@ from rlsbl.context import ProjectContext
 # ------------------------------------------------------------------
 
 
+class _SkipOutcome:
+    """Thin wrapper so SkipCheck (which has .reason) exposes .status/.message
+    like a _CheckOutcome -- keeps test assertions uniform.
+    """
+    __slots__ = ("status", "message", "problems")
+
+    def __init__(self, skip: SkipCheck):
+        self.status = "skip"
+        self.message = skip.reason
+        self.problems = ()
+
+
 def _run_check(name, ctx):
     """Run a check through the scope adapter, mirroring the real runtime.
 
-    If the check has a scope and the scope adapter returns a CheckResult
-    (e.g. skip), that result is returned directly. Otherwise the adapted
+    If the check has a scope and the scope adapter returns a SkipCheck,
+    that directive is wrapped and returned. Otherwise the adapted
     context is passed to the check's impl function.
     """
     cdef = app._check_defs[name]
     check_ctx = ctx
     if cdef.scope:
         adapted = scope_adapter(ctx, cdef.scope)
-        if isinstance(adapted, CheckResult):
-            return adapted
+        if isinstance(adapted, SkipCheck):
+            return _SkipOutcome(adapted)
         check_ctx = adapted
     return cdef.impl(check_ctx)
 
@@ -1010,7 +1022,7 @@ class TestConfigSchema:
         ctx = make_ctx(repo)
         result = app._check_defs["config-schema"].impl(ctx)
         assert result.status == "fail"
-        assert any("publish_mode" in d for d in result.details)
+        assert any("publish_mode" in d for d in (p.text for p in result.problems))
 
     def test_empty_targets_config_schema_fails(self, tmp_path, monkeypatch):
         """validate_config_schema catches targets: [] via config-schema check."""
@@ -1023,7 +1035,7 @@ class TestConfigSchema:
         ctx = make_ctx(repo)
         result = app._check_defs["config-schema"].impl(ctx)
         assert result.status == "fail"
-        assert any("targets is an empty list" in d for d in result.details)
+        assert any("targets is an empty list" in d for d in (p.text for p in result.problems))
 
     def test_release_mode_config_schema_fails(self, tmp_path, monkeypatch):
         """validate_config_schema catches release.mode via config-schema check."""
@@ -1039,7 +1051,7 @@ class TestConfigSchema:
         ctx = make_ctx(repo)
         result = app._check_defs["config-schema"].impl(ctx)
         assert result.status == "fail"
-        assert any("release.mode" in d for d in result.details)
+        assert any("release.mode" in d for d in (p.text for p in result.problems))
 
 
 class TestLicenseFile:
@@ -1744,8 +1756,8 @@ class TestCircularDeps:
             result = app._check_defs["circular-deps"].impl(ctx)
         assert result.status == "skip"
 
-    def test_npm_cycles_fail(self, tmp_path, monkeypatch):
-        """Lines 173-176: npm cycles produce fail (not warn)."""
+    def test_npm_cycles_warn(self, tmp_path, monkeypatch):
+        """npm cycles produce warn (warn-severity check, all cycles are reporter.warn)."""
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
@@ -1759,7 +1771,7 @@ class TestCircularDeps:
             patch("rlsbl.dep_validation.find_circular_npm_deps", return_value=[["a", "b"]]),
         ):
             result = app._check_defs["circular-deps"].impl(ctx)
-        assert result.status == "fail"
+        assert result.status == "warn"
         assert "cycle" in result.message.lower()
 
     def test_python_cycles_warn(self, tmp_path, monkeypatch):
@@ -2256,7 +2268,7 @@ class TestWorkspaceUnregistered:
 
         result = app._check_defs["workspace-unregistered"].impl(ctx)
         assert result.status == "fail"
-        assert any("beta" in d for d in result.details)
+        assert any("beta" in d for d in (p.text for p in result.problems))
 
     def test_all_registered_passes(self, tmp_path, monkeypatch):
         repo = tmp_path / "repo"
@@ -2333,7 +2345,7 @@ class TestWorkspaceUnregistered:
         ctx = _make_ws_ctx(repo, projects)
         result = app._check_defs["workspace-unregistered"].impl(ctx)
         assert result.status == "fail"
-        assert any("gamma" in d for d in result.details)
+        assert any("gamma" in d for d in (p.text for p in result.problems))
 
 
 class TestWorkspaceStaleEntries:

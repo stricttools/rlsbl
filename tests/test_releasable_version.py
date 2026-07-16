@@ -373,21 +373,8 @@ class TestVersionConsistencyExplicitMode:
 
     def _get_check_fn(self):
         """Register checks and return the version-consistency function."""
-        mock_app = MagicMock()
-        mock_app._checks_enabled = True
-        registered = {}
-
-        def capture_check(name):
-            def decorator(fn):
-                registered[name] = fn
-                return fn
-            return decorator
-
-        mock_app.check = capture_check
-
-        from rlsbl.checks.project import register_project_checks
-        register_project_checks(mock_app)
-        return registered["version-consistency"]
+        from conftest import capture_all_checks
+        return capture_all_checks()["version-consistency"]
 
     def test_explicit_mode_uses_releasable_version(self, tmp_path):
         """In explicit mode, the check returns the releasable version."""

@@ -3,7 +3,7 @@
 import os
 from pathlib import Path
 
-from strictcli import CheckResult
+from strictcli import SkipCheck
 
 from rlsbl.check_context import WorkspaceCheckContext
 from rlsbl.checks.scope import scope_adapter
@@ -47,9 +47,8 @@ def test_workspace_token_passes_workspace_ctx():
 def test_workspace_token_skips_non_workspace_ctx():
     ctx = _make_proj_ctx()
     result = scope_adapter(ctx, "workspace")
-    assert isinstance(result, CheckResult)
-    assert result.status == "skip"
-    assert "not a monorepo workspace" in result.message
+    assert isinstance(result, SkipCheck)
+    assert "not a monorepo workspace" in result.reason
 
 
 # ---------------------------------------------------------------------------
@@ -182,16 +181,14 @@ def test_push_token_passes_when_push_stdin_present():
 def test_push_token_skips_when_push_stdin_none():
     ctx = _make_ws_ctx(push_stdin=None)
     result = scope_adapter(ctx, "push")
-    assert isinstance(result, CheckResult)
-    assert result.status == "skip"
-    assert "not in push context" in result.message
+    assert isinstance(result, SkipCheck)
+    assert "not in push context" in result.reason
 
 
 def test_push_token_skips_on_project_ctx():
     ctx = _make_proj_ctx(push_stdin=None)
     result = scope_adapter(ctx, "push")
-    assert isinstance(result, CheckResult)
-    assert result.status == "skip"
+    assert isinstance(result, SkipCheck)
 
 
 # ---------------------------------------------------------------------------
@@ -227,17 +224,15 @@ def test_workspace_non_dev_only_skips_non_workspace():
     """workspace:non_dev_only should skip on non-workspace context."""
     ctx = _make_proj_ctx()
     result = scope_adapter(ctx, "workspace:non_dev_only")
-    assert isinstance(result, CheckResult)
-    assert result.status == "skip"
+    assert isinstance(result, SkipCheck)
 
 
-def test_composition_short_circuits_on_check_result():
-    """If workspace token returns skip, non_dev_only never runs."""
+def test_composition_short_circuits_on_skip_check():
+    """If workspace token returns SkipCheck, non_dev_only never runs."""
     ctx = _make_proj_ctx()
     result = scope_adapter(ctx, "workspace:non_dev_only")
-    assert isinstance(result, CheckResult)
-    assert result.status == "skip"
-    assert "not a monorepo workspace" in result.message
+    assert isinstance(result, SkipCheck)
+    assert "not a monorepo workspace" in result.reason
 
 
 # ---------------------------------------------------------------------------
@@ -269,21 +264,32 @@ def test_unknown_token_in_composition():
 
 
 def _register_and_get_check(name):
-    """Register workspace checks on a mock app and return the named check fn."""
+    """Register workspace checks on a mock app and return the named check fn.
+
+    The returned function accepts only ``ctx`` and internally creates the
+    appropriate reporter (ErrorReporter for error_check, WarnReporter for
+    warn_check), matching what strictcli's ``_CheckDef.impl`` does.
+    """
     from unittest.mock import MagicMock
 
+    from strictcli import ErrorReporter, WarnReporter
     from rlsbl.checks.workspace import register_workspace_checks
 
     mock_app = MagicMock()
     checks = {}
 
-    def capture_check(check_name):
-        def decorator(fn):
-            checks[check_name] = fn
-            return fn
-        return decorator
+    def _make_capture(reporter_cls):
+        def capture_check(check_name):
+            def decorator(fn):
+                def run(ctx):
+                    return fn(ctx, reporter_cls())
+                checks[check_name] = run
+                return fn
+            return decorator
+        return capture_check
 
-    mock_app.check = capture_check
+    mock_app.error_check = _make_capture(ErrorReporter)
+    mock_app.warn_check = _make_capture(WarnReporter)
     register_workspace_checks(mock_app)
     return checks[name]
 
@@ -361,23 +367,8 @@ def test_scaffold_gitignore_stale_passes_when_entries_present(tmp_path):
     projects = [{"name": "proj", "path": "proj"}]
     ctx = _make_ws_ctx(projects=projects, workspace_root=tmp_path)
 
-    # Import and call the check directly
-    from rlsbl.checks.workspace import register_workspace_checks
-    from unittest.mock import MagicMock
-
-    mock_app = MagicMock()
-    checks = {}
-
-    def capture_check(name):
-        def decorator(fn):
-            checks[name] = fn
-            return fn
-        return decorator
-
-    mock_app.check = capture_check
-    register_workspace_checks(mock_app)
-
-    result = checks["scaffold-gitignore-stale"](ctx)
+    check_fn = _register_and_get_check("scaffold-gitignore-stale")
+    result = check_fn(ctx)
     assert result.status == "pass"
 
 
@@ -391,26 +382,12 @@ def test_scaffold_gitignore_stale_warns_on_missing_entries(tmp_path):
     projects = [{"name": "proj", "path": "proj"}]
     ctx = _make_ws_ctx(projects=projects, workspace_root=tmp_path)
 
-    from rlsbl.checks.workspace import register_workspace_checks
-    from unittest.mock import MagicMock
-
-    mock_app = MagicMock()
-    checks = {}
-
-    def capture_check(name):
-        def decorator(fn):
-            checks[name] = fn
-            return fn
-        return decorator
-
-    mock_app.check = capture_check
-    register_workspace_checks(mock_app)
-
-    result = checks["scaffold-gitignore-stale"](ctx)
+    check_fn = _register_and_get_check("scaffold-gitignore-stale")
+    result = check_fn(ctx)
     assert result.status == "warn"
-    assert len(result.details) == 1
-    assert "proj" in result.details[0]
-    assert ".rlsbl" in result.details[0]
+    assert len(result.problems) == 1
+    assert "proj" in result.problems[0].text
+    assert ".rlsbl" in result.problems[0].text
 
 
 def test_scaffold_gitignore_stale_warns_on_missing_gitignore(tmp_path):
@@ -421,24 +398,10 @@ def test_scaffold_gitignore_stale_warns_on_missing_gitignore(tmp_path):
     projects = [{"name": "proj", "path": "proj"}]
     ctx = _make_ws_ctx(projects=projects, workspace_root=tmp_path)
 
-    from rlsbl.checks.workspace import register_workspace_checks
-    from unittest.mock import MagicMock
-
-    mock_app = MagicMock()
-    checks = {}
-
-    def capture_check(name):
-        def decorator(fn):
-            checks[name] = fn
-            return fn
-        return decorator
-
-    mock_app.check = capture_check
-    register_workspace_checks(mock_app)
-
-    result = checks["scaffold-gitignore-stale"](ctx)
+    check_fn = _register_and_get_check("scaffold-gitignore-stale")
+    result = check_fn(ctx)
     assert result.status == "warn"
-    assert ".gitignore not found" in result.details[0]
+    assert ".gitignore not found" in result.problems[0].text
 
 
 def test_scaffold_gitignore_stale_multiple_projects(tmp_path):
@@ -461,24 +424,10 @@ def test_scaffold_gitignore_stale_multiple_projects(tmp_path):
     ]
     ctx = _make_ws_ctx(projects=projects, workspace_root=tmp_path)
 
-    from rlsbl.checks.workspace import register_workspace_checks
-    from unittest.mock import MagicMock
-
-    mock_app = MagicMock()
-    checks = {}
-
-    def capture_check(name):
-        def decorator(fn):
-            checks[name] = fn
-            return fn
-        return decorator
-
-    mock_app.check = capture_check
-    register_workspace_checks(mock_app)
-
-    result = checks["scaffold-gitignore-stale"](ctx)
+    check_fn = _register_and_get_check("scaffold-gitignore-stale")
+    result = check_fn(ctx)
     assert result.status == "warn"
-    # Only proj_b should be in the details
-    proj_names_in_details = [d.split(":")[0] for d in result.details]
-    assert "proj_b" in proj_names_in_details
-    assert "proj_a" not in proj_names_in_details
+    # Only proj_b should be in the problems
+    proj_names_in_problems = [p.text.split(":")[0] for p in result.problems]
+    assert "proj_b" in proj_names_in_problems
+    assert "proj_a" not in proj_names_in_problems

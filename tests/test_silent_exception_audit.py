@@ -25,11 +25,12 @@ class TestQualityCheckLibraryLint:
         cfg_dir.mkdir(exist_ok=True)
         (cfg_dir / "config.json").write_text(json.dumps({"targets": []}))
 
+        from strictcli import SkipCheck
         ctx = make_ctx(tmp_project)
         result = scope_adapter(ctx, "workspace:library")
 
-        assert result.status == "skip"
-        assert "not a monorepo" in result.message
+        assert isinstance(result, SkipCheck)
+        assert "not a monorepo" in result.reason
 
 
 class TestVersionConsistencyCorruptedTarget:

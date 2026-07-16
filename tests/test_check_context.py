@@ -115,29 +115,40 @@ def test_get_changelog_context_uses_target_specific_tag_glob(tmp_path, monkeypat
         graph=None,
     )
 
-    # Import and call _get_changelog_context via the register_checks closure
-    # We need to access the inner function, so we import and call it through
-    # the checks module directly.
+    # Register checks via a mock app that wraps (ctx, reporter) functions
+    from strictcli import ErrorReporter, WarnReporter
     from rlsbl.checks import register_checks
-    from unittest.mock import MagicMock
 
-    app = MagicMock()
-    app._checks_enabled = True
-    # Collect the _get_changelog_context function via the check registrations
     check_fns = {}
-    def fake_check(name):
-        def decorator(fn):
-            check_fns[name] = fn
-            return fn
-        return decorator
-    app.check = fake_check
-    register_checks(app)
 
-    # Call any changelog check that uses _get_changelog_context -- changelog-hashes
-    # is simplest. But we need the inner helper directly. Since it's a closure,
-    # we access it through a changelog check function.
-    # Instead, let's directly test by calling the check and inspecting.
-    # The easiest approach: patch check_in_range to capture the tag_glob argument.
+    def _make_registrar(reporter_cls):
+        def registrar(name):
+            def decorator(fn):
+                def run(ctx):
+                    return fn(ctx, reporter_cls())
+                check_fns[name] = run
+                return fn
+            return decorator
+        return registrar
+
+    error_registrar = _make_registrar(ErrorReporter)
+    warn_registrar = _make_registrar(WarnReporter)
+
+    class MockApp:
+        _checks_enabled = True
+
+        def set_scope_adapter(self, adapter):
+            pass
+
+        def error_check(self, name):
+            return error_registrar(name)
+
+        def warn_check(self, name):
+            return warn_registrar(name)
+
+    register_checks(MockApp())
+
+    # Patch check_in_range to capture the tag_glob argument.
     from unittest.mock import patch
     captured = {}
 

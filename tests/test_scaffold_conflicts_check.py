@@ -64,7 +64,7 @@ class TestScaffoldConflictsCheck:
         (tmp_project / ".goreleaser.yml").write_text(CONFLICTED_CONTENT)
         result = _run_check(tmp_project)
         assert result.status == "fail"
-        assert ".goreleaser.yml:2" in result.details
+        assert ".goreleaser.yml:2" in " ".join(p.text for p in result.problems)
 
     def test_separator_only_line_passes(self, tmp_project):
         """A bare '=======' line without <<<<<<< / >>>>>>> is not a conflict."""
@@ -123,7 +123,7 @@ class TestScaffoldConflictsCheck:
         (wf_dir / "publish.yml").write_text(CONFLICTED_CONTENT)
         result = _run_check(tmp_project)
         assert result.status == "fail"
-        assert any("publish.yml" in d for d in result.details)
+        assert any("publish.yml" in d for d in (p.text for p in result.problems))
 
     def test_conflicted_hook_caught_without_registry_entry(self, tmp_project):
         """A conflicted .rlsbl/hooks file is caught even when it is not
@@ -135,7 +135,7 @@ class TestScaffoldConflictsCheck:
         )
         result = _run_check(tmp_project)
         assert result.status == "fail"
-        assert any("pre-release.sh" in d for d in result.details)
+        assert any("pre-release.sh" in d for d in (p.text for p in result.problems))
 
 
 class TestRlsblDirRecursiveScan:
@@ -162,7 +162,7 @@ class TestRlsblDirRecursiveScan:
         (bases_dir / "publish.yml").write_text(CONFLICTED_CONTENT)
         result = _run_check(tmp_project)
         assert result.status == "fail"
-        assert ".rlsbl/bases/.github/workflows/publish.yml:2" in result.details
+        assert ".rlsbl/bases/.github/workflows/publish.yml:2" in " ".join(p.text for p in result.problems)
 
     def test_conflict_in_workflow_fails_with_line_number(self, tmp_project):
         """Conflict markers in .github/workflows/ are detected and the
@@ -179,7 +179,7 @@ class TestRlsblDirRecursiveScan:
         )
         result = _run_check(tmp_project)
         assert result.status == "fail"
-        assert ".github/workflows/ci.yml:2" in result.details
+        assert ".github/workflows/ci.yml:2" in " ".join(p.text for p in result.problems)
 
     def test_no_scaffold_files_passes(self, tmp_project):
         """Project with no .rlsbl or workflow files passes."""

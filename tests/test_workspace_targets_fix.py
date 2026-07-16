@@ -22,12 +22,22 @@ from rlsbl.check_context import WorkspaceCheckContext
 from rlsbl.checks.scope import scope_adapter
 from rlsbl.workspace import Releasable, WorkspaceProject
 
-from strictcli import CheckResult
+from strictcli import SkipCheck
 
 
 # ------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------
+
+
+class _SkipOutcome:
+    """Wrapper for SkipCheck with .status/.message for uniform test assertions."""
+    __slots__ = ("status", "message", "problems")
+
+    def __init__(self, skip: SkipCheck):
+        self.status = "skip"
+        self.message = skip.reason
+        self.problems = ()
 
 
 def _init_repo(repo):
@@ -58,8 +68,8 @@ def _run_check(name, ctx):
     check_ctx = ctx
     if cdef.scope:
         adapted = scope_adapter(ctx, cdef.scope)
-        if isinstance(adapted, CheckResult):
-            return adapted
+        if isinstance(adapted, SkipCheck):
+            return _SkipOutcome(adapted)
         check_ctx = adapted
     return cdef.impl(check_ctx)
 
@@ -206,7 +216,7 @@ class TestReleasableUnionCheckFails:
         assert result.status == "fail"
         assert "core" in result.message
         # Both per-project failures and releasable failure should be reported
-        assert any("releasable 'core'" in d for d in result.details)
+        assert any("releasable 'core'" in p.text for p in result.problems)
 
     def test_failure_reports_releasable_name(self, tmp_path, monkeypatch):
         """The failure message explicitly names which releasable has no targets."""
@@ -252,7 +262,7 @@ class TestReleasableUnionCheckPasses:
         assert result.status == "fail"
         assert "core-utils" in result.message
         # But the releasable union check should NOT appear in details
-        assert not any("releasable 'core'" in d for d in result.details)
+        assert not any("releasable 'core'" in p.text for p in result.problems)
 
     def test_all_members_have_targets(self, tmp_path, monkeypatch):
         repo = tmp_path / "repo"

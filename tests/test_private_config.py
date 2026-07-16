@@ -184,7 +184,7 @@ class TestPrivatePublishGuardrail:
     @patch("rlsbl.commands.release.extract_changelog_entry", return_value="- Bugfix")
     @patch("rlsbl.commands.release.get_changes_dir", return_value=".rlsbl/changes")
     @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
-    @patch("rlsbl.app.run_checks", return_value=([], 0))
+    @patch("rlsbl.app.run_checks", return_value=([], [], 0))
     def test_private_true_skips_publish(
         self, _run_checks, _vrt,
         _changes_dir, _extract, _finalize, _gen_ver_file,
@@ -248,7 +248,7 @@ class TestPrivatePublishGuardrail:
     @patch("rlsbl.commands.release.get_changes_dir", return_value=".rlsbl/changes")
     @patch("rlsbl.commands.release.upload_release_assets")
     @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
-    @patch("rlsbl.app.run_checks", return_value=([], 0))
+    @patch("rlsbl.app.run_checks", return_value=([], [], 0))
     def test_private_true_with_assets_still_uploads(
         self, _run_checks, _vrt, mock_upload_assets,
         _changes_dir, _extract, _finalize, _gen_ver_file,

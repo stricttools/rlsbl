@@ -70,5 +70,5 @@ class TestChangelogOrphansThreadsTagGlob:
         ctx = _make_workspace_ctx(repo, releasables)
         result = app._check_defs["changelog-orphans"].impl(ctx)
         assert result.status == "pass", (
-            f"Expected pass, got {result.status}: {result.message} {result.details}"
+            f"Expected pass, got {result.status}: {result.message} {[p.text for p in result.problems]}"
         )
