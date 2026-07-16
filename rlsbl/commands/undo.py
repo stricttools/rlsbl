@@ -393,23 +393,45 @@ def _build_plan(uc, flags, ctx):
                 for _, subj in revert_shas
             )
             if not has_version_bump:
-                # Identify the commit that stopped the walk (one parent past
-                # the oldest collected commit).
-                oldest_sha = revert_shas[-1][0]
+                # No version-bump found. Check if one exists deeper in the
+                # tag's ancestry (meaning a foreign commit stopped the walk).
+                # If no version-bump exists at all (finalize-only releases),
+                # that's legitimate — proceed.
+                version_bump_exists = False
                 try:
-                    boundary_sha = run("git", ["rev-parse", f"{oldest_sha}^"]).strip()
-                    boundary_subject = run("git", ["log", "-1", "--format=%s", boundary_sha]).strip()
-                    boundary_desc = f"{boundary_sha[:10]} ({boundary_subject})"
+                    # Search only the current release's commits (between
+                    # this tag and its predecessor) to avoid matching version
+                    # bumps from earlier releases.
+                    prev_tag = run(
+                        "git", ["describe", "--tags", "--abbrev=0", f"{tag}^"],
+                        timeout=30,
+                    ).strip()
+                    log_range = f"{prev_tag}..{tag}"
                 except Exception:
-                    boundary_desc = "unknown"
-                print(
-                    f"Error: release commit walk for {tag} collected "
-                    f"{len(revert_shas)} commit(s) but never reached the "
-                    f"version bump commit. An unexpected commit stopped the "
-                    f"walk: {boundary_desc}. Refusing to partially undo.",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
+                    log_range = tag
+                try:
+                    log_output = run(
+                        "git", ["log", "--format=%s", log_range],
+                        timeout=30,
+                    ).strip()
+                    for line in log_output.splitlines():
+                        if _classify_release_commit(line.strip(), expected_msg) == "version_bump":
+                            version_bump_exists = True
+                            break
+                except Exception:
+                    pass
+
+                if version_bump_exists:
+                    # A non-release commit stopped the walk -- refuse.
+                    print(
+                        f"Error: release commit walk for {tag} collected "
+                        f"{len(revert_shas)} commit(s) but never reached the "
+                        f"version bump commit. A non-release commit in the "
+                        f"release range stopped the walk. Refusing to "
+                        f"partially undo.",
+                        file=sys.stderr,
+                    )
+                    sys.exit(1)
     else:
         version = version_flag.lstrip("v")
         tag = _build_tag_from_version(uc, version)
