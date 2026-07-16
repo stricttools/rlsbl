@@ -9,6 +9,7 @@
 - **Breaking: `private` config key replaced by `publish_mode`; `rlsbl migrate` removed.** .rlsbl/config.json now requires `"publish_mode": "ci"` (publish via CI pipelines) or `"publish_mode": "none"` (suppress publishing). A config still carrying `private` is a hard error naming the exact edit. `scaffold --private` is replaced by `--publish-mode <ci|none>`; private repos must choose explicitly, public repos default to `ci`. The `private-publish-workflow` check is renamed `publish-mode-workflow`. Run `scripts/sweep_publish_mode.py --fix` to migrate configs. The `rlsbl migrate` command is removed -- it delegated to migrable (TOML) while rlsbl configs are JSON, so every invocation errored since it shipped.
 - **`scaffold --force-overwrite` removed.** The flag wholesale-overwrote every managed file and destroyed local edits; it is deleted. Re-scaffolding a legacy repo now heals missing bases and three-way merges instead, and a file with no reconstructable base hard-errors with remediations rather than silently overwriting.
 - **Pipelines now require an explicit `target` link.** Each pipeline entry must declare a `target` (a target name it publishes for, or `null` for a targetless deploy). Missing fields and references to non-existent targets are hard errors.
+- **Breaking.** Migrated check system from CheckResult to strictcli's reporter-based check API (ErrorReporter/WarnReporter + CheckOutcome).
 
 ### Features
 
@@ -24,6 +25,8 @@
 - **CI template probes.** Go, Docker, Maven Central, and Zig publish templates now check if already published before running build/publish steps.
 - **npm wrapper per-package probes.** Each platform package probes npm registry before publishing; wrapper meta-package gated on its own probe step.
 - **Recovery dispatch.** All 13 publish templates gain a tag workflow_dispatch input for retry dispatch. Checkout uses inputs.tag with release.tag_name fallback. Concurrency keyed on tag. retry.toml gains tag field; dispatch passes -f tag=<tag>.
+- **New feature.** Added pure/impure partition for dry-run preflight checks, showing which checks would run without executing impure ones.
+- **New feature.** External checks now use strictcli's check provider pattern for proper registration before filtering.
 
 ### Fixes
 
