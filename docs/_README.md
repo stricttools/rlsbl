@@ -132,25 +132,6 @@ rlsbl check --tag changelog    # run checks by tag
 rlsbl check --name lock        # run a single check
 ```
 
-## Config management
-
-Schema-driven configuration migration system for projects that ship user-facing config files.
-
-```
-rlsbl migrate              # run pending migrations
-rlsbl migrate --status     # show migration status
-rlsbl migrate --dry-run    # preview changes
-```
-
-### Library API
-
-```python
-from rlsbl.lib import ConfigMigrator, load_schema, migrate
-
-# One-liner: load schema and run all pending migrations
-result = migrate(".")  # returns {filename: was_written} or None
-```
-
 ## Undo
 
 ```

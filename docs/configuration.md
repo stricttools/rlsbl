@@ -17,7 +17,7 @@ Project-level configuration file created by `rlsbl config init` or `rlsbl scaffo
 | targets | array | List of target names to use for versioning (overrides auto-detection) |
 | pipelines | object | Publish pipelines keyed by user-chosen name (see [Pipeline config](#pipeline-config) below) |
 | tag | bool | Enable/disable ecosystem tagging (default: true) |
-| private | bool (required) | Safety guardrail: when true, blocks publishing to public registries |
+| publish_mode | string (required) | Publish routing: `"ci"` publishes via CI pipelines; `"none"` suppresses publishing to public registries. No default. Replaces the former `private` boolean (a config still carrying `private` is a hard error). |
 | release_branches | array | Branch names that trigger the manual-release-push warning. Default: `["main", "master"]` when absent. An empty list is a hard error -- either omit the key entirely or list at least one branch. |
 | changelog_format | string | Controls the format of generated CHANGELOG.md. Default: `"grouped"`. Currently the only supported value, which produces version sections with `### Breaking`, `### Features`, `### Fixes` sub-headers. |
 | batch_limits | object | Limits and exclusions for changelog batch-size validation checks. See [batch_limits](#batch_limits) below. |

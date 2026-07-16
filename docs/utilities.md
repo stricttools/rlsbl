@@ -171,37 +171,6 @@ rlsbl prs
 
 Run before releasing to check for in-flight work that might conflict with or depend on the release. This is especially important in monorepo workflows where multiple contributors may have PRs targeting different sub-projects, and a release could invalidate their base versions.
 
-## `rlsbl migrate`
-
-Run pending configuration migrations to update `.rlsbl/` config files to the latest schema. When rlsbl introduces breaking config format changes between versions, migrations handle the transformation automatically so you do not need to manually rewrite configuration files.
-
-### Usage
-
-```
-rlsbl migrate            # apply pending migrations
-rlsbl migrate --dry-run  # preview changes without applying
-rlsbl migrate --status   # show which migrations are pending
-```
-
-### Requirements
-
-Migrations are executed by an external tool called `migrable`, which must be installed separately as a Go binary. It handles schema transformations as versioned migration scripts, applying them in order and tracking which migrations have already run to prevent double-application:
-
-```
-go install github.com/smm-h/migrable/cmd/migrable@latest
-```
-
-### Behavior
-
-- Delegates to the external `migrable` binary
-- Operates on the `.rlsbl/` config directory
-- Migrations are schema upgrades (e.g., renaming config keys, restructuring JSON)
-- Exit code matches `migrable`'s exit code
-
-### When to use
-
-Run `rlsbl migrate` after upgrading rlsbl to a new version that introduces config format changes, such as renamed JSON keys, restructured objects, or new required fields. If `rlsbl check` reports schema issues or validation errors against your `.rlsbl/config.json`, run `rlsbl migrate --status` to see if a migration is available that can automatically transform the config to the new schema.
-
 ## `rlsbl record-gif`
 
 Record a terminal demo GIF of the project's CLI help output using the vhs terminal recorder from Charm. This produces consistent, reproducible demo recordings suitable for README files and documentation sites, with configurable dimensions and timing.

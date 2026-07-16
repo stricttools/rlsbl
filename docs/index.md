@@ -22,7 +22,7 @@ Install rlsbl via `uv tool install rlsbl` (Python) or `npx rlsbl` (npm wrapper).
 - [Check system](checks.md) -- 57 diagnostic checks across 6 primary tags
 - [Deployment](deploy.md) -- deploy targets, post-release hooks, Cloudflare Pages
 - [Development workflow](dev-workflow.md) -- editable installs, pre-push hook, local testing
-- [Utility commands](utilities.md) -- status, discover, migrate, record-gif, and other helpers
+- [Utility commands](utilities.md) -- status, discover, record-gif, and other helpers
 
 ## Architecture
 

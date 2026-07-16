@@ -59,7 +59,7 @@ Some checks carry multiple tags, so they appear in multiple tag counts: `test-su
 | `license-consistency` | warn | License identifier matches across manifest files |
 | `config-schema` | error | `.rlsbl/config.json` conforms to the expected schema (no unknown keys, correct types) |
 | `private-hook-stale` | error | Detects leftover private repo hook files that should be deleted |
-| `private-publish-workflow` | error | Private repos must not have a publish workflow that pushes to public registries |
+| `publish-mode-workflow` | error | `publish_mode: "none"` repos must not have a publish workflow that pushes to public registries |
 | `npm-private-mismatch` | error | `package.json` private field matches `.rlsbl/config.json` private flag (npm targets only) |
 | `target-version-readable` | error | Version can be read from all declared target files |
 | `dunder-version-missing` | error | PyPI targets that keep a version constant in source must use `__version__` |

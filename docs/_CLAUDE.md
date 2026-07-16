@@ -51,7 +51,7 @@ During `rlsbl release run`, the validation and build steps run in this order:
 `.rlsbl/config.json` holds per-project settings. Key fields:
 
 - `pipelines` -- publish pipelines with mandatory `type` and `local` fields. See [docs/pipelines.md](pipelines.md).
-- `private` (bool, required) -- blocks publishing to public registries when `true`. No default.
+- `publish_mode` (enum, required) -- `"ci"` publishes via CI pipelines; `"none"` suppresses publishing to public registries. No default. (Replaces the former `private` boolean.)
 - `release_branches` -- branch names that trigger manual-release-push warnings.
 - `batch_limits` -- limits for changelog batch size checks. See [docs/changelog.md](changelog.md).
 
