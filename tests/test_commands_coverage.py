@@ -789,6 +789,7 @@ class TestReleaseEnvFile:
              patch(f"{MOD_RELEASE}.generate_changelog", return_value="## 0.2.0\n"), \
              patch(f"{MOD_RELEASE}.extract_changelog_entry_from_text", return_value="entry"), \
              patch(f"{MOD_RELEASE}.print_dry_run_summary"), \
+             patch("rlsbl.app.run_checks", return_value=([], [], 0)), \
              patch("rlsbl.config.load_env_file"):
             _run_cmd_inner(release_config, {"dry-run": True}, ctx=_ctx(config=config))
 
