@@ -169,9 +169,6 @@ def _check_context_factory():
 
     Returns WorkspaceCheckContext if in a monorepo, otherwise ProjectCheckContext.
     Imports are deferred to avoid circular dependencies and to keep the factory lazy.
-
-    Also registers any external checks declared in the project's config
-    on the strictcli app (idempotent -- safe to call repeatedly).
     """
     import os
     from pathlib import Path
@@ -205,35 +202,30 @@ def _check_context_factory():
             releasables=releasables,
         )
         wctx.push_stdin = push_stdin
-        _register_external_checks_from_config(ctx.config)
         return wctx
     from .workspace import create_standalone_releasable
 
     ctx = create_context(Path.cwd())
     ctx.push_stdin = push_stdin
     ctx.releasable = create_standalone_releasable(ctx.project_root)
-    _register_external_checks_from_config(ctx.config)
     return ctx
 
 
-def _register_external_checks_from_config(config):
-    """Register external checks from project config on the global app.
+def _read_config_for_cwd():
+    """Read the rlsbl config for the current working directory.
 
-    A malformed ``external_checks`` section is a hard error: print the
-    message and abort (exit 1).  Silently continuing would let a
-    misconfigured gate be skipped without the caller knowing -- no silent
-    degradation.
+    Used by the external check provider to read config at materialization
+    time (called lazily by strictcli, memoized by cwd).
     """
-    from .external_checks import ExternalCheckError, register_external_checks
-
-    try:
-        register_external_checks(app, config)
-    except ExternalCheckError as exc:
-        print(f"Error: external checks config error: {exc}", file=sys.stderr)
-        sys.exit(1)
+    from .config import read_project_config
+    return read_project_config(os.getcwd())
 
 
 app.set_check_context(_check_context_factory)
+
+# Register the external check provider (lazily reads config per cwd).
+from .external_checks import make_external_check_provider
+app.register_check_provider(make_external_check_provider(_read_config_for_cwd))
 
 # Register check implementations on the strictcli check system.
 from .checks import register_checks

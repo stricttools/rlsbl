@@ -8,10 +8,12 @@ import sys
 
 import pytest
 
+from strictcli import ErrorReporter
+
 from rlsbl.external_checks import (
     ExternalCheckError,
     _make_external_check_fn,
-    register_external_checks,
+    make_external_check_provider,
     validate_external_checks,
 )
 
@@ -203,7 +205,7 @@ class TestMakeExternalCheckFn:
         class FakeCtx:
             project_root = tmp_path
 
-        result = fn(FakeCtx())
+        result = fn(FakeCtx(), ErrorReporter())
         assert result.status == "pass"
         assert "hello" in result.message
 
@@ -214,7 +216,7 @@ class TestMakeExternalCheckFn:
         class FakeCtx:
             project_root = tmp_path
 
-        result = fn(FakeCtx())
+        result = fn(FakeCtx(), ErrorReporter())
         assert result.status == "fail"
         assert "test-check" in result.message
 
@@ -228,7 +230,7 @@ class TestMakeExternalCheckFn:
         class FakeCtx:
             project_root = tmp_path
 
-        result = fn(FakeCtx())
+        result = fn(FakeCtx(), ErrorReporter())
         assert result.status == "fail"
         assert "bad-stuff" in result.message or any(
             "bad-stuff" in d for d in (p.text for p in result.problems)
@@ -243,7 +245,7 @@ class TestMakeExternalCheckFn:
         class FakeCtx:
             project_root = tmp_path
 
-        result = fn(FakeCtx())
+        result = fn(FakeCtx(), ErrorReporter())
         assert result.status == "pass"
         assert str(sub) in result.message
 
@@ -256,26 +258,20 @@ class TestMakeExternalCheckFn:
         class FakeCtx:
             project_root = tmp_path
 
-        result = fn(FakeCtx())
+        result = fn(FakeCtx(), ErrorReporter())
         assert result.status == "pass"
         assert str(sub) in result.message
 
 
 # ---------------------------------------------------------------------------
-# Registration tests
+# Provider tests
 # ---------------------------------------------------------------------------
 
 
-class TestRegisterExternalChecks:
-    def test_registers_on_app(self, monkeypatch):
-        """External checks are added to app._check_defs."""
+class TestMakeExternalCheckProvider:
+    def test_provider_returns_specs(self, monkeypatch):
+        """Provider returns error_check_spec objects from config."""
         monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/" + name)
-
-        # Create a minimal app-like object with _check_defs
-        class FakeApp:
-            _check_defs = {}
-
-        fake_app = FakeApp()
         config = {
             "external_checks": [{
                 "name": "ext-quality-check",
@@ -284,104 +280,55 @@ class TestRegisterExternalChecks:
                 "depends_on": ["test-suite"],
             }]
         }
-        register_external_checks(fake_app, config)
+        provider = make_external_check_provider(lambda: config)
+        specs = provider()
+        assert len(specs) == 1
+        assert specs[0].name == "ext-quality-check"
+        assert specs[0].tags == ["quality"]
+        assert specs[0].depends_on == ["test-suite"]
+        assert specs[0].severity == "error"
+        assert specs[0].pure is False
 
-        assert "ext-quality-check" in fake_app._check_defs
-        check_def = fake_app._check_defs["ext-quality-check"]
-        assert check_def.tags == ["quality"]
-        assert check_def.depends_on == ["test-suite"]
-        assert check_def.impl is not None
-        assert check_def.severity == "error"
+    def test_provider_empty_config(self):
+        """No external_checks key -> empty list."""
+        provider = make_external_check_provider(lambda: {})
+        specs = provider()
+        assert specs == []
 
-    def test_idempotent_registration(self, monkeypatch):
-        """Calling register twice with the same config does not error."""
-        monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/" + name)
+    def test_provider_config_read_error(self):
+        """Config reader raising -> empty list (graceful)."""
+        def exploding_reader():
+            raise FileNotFoundError("no config")
 
-        class FakeApp:
-            _check_defs = {}
+        provider = make_external_check_provider(exploding_reader)
+        specs = provider()
+        assert specs == []
 
-        fake_app = FakeApp()
-        config = {
-            "external_checks": [{
-                "name": "ext-check",
-                "command": "mycheck",
-                "tag": "quality",
-            }]
-        }
-        register_external_checks(fake_app, config)
-        register_external_checks(fake_app, config)
-        assert len(fake_app._check_defs) == 1
-
-    def test_collision_with_builtin_hard_errors(self, monkeypatch):
-        """An external check whose name matches a pre-registered built-in
-        check is a hard error, NOT a silent skip.
-
-        Silently skipping would leave the built-in check registered under that
-        name; name-based selection would then run the BUILT-IN instead of the
-        external check the user declared.
-        """
-        from strictcli import _CheckDef, ErrorReporter
-
-        monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/" + name)
-
-        def _builtin_impl(ctx):
-            return ErrorReporter().passed("builtin")
-
-        class FakeApp:
-            _check_defs = {}
-
-        fake_app = FakeApp()
-        # Pre-register a built-in check (impl is NOT our external closure).
-        fake_app._check_defs["test-suite"] = _CheckDef(
-            name="test-suite",
-            tags=["preflight"],
-            severity="error",
-            fast=False,
-            pure=False,
-            needs_network=False,
-            depends_on=[],
-            scope="",
-            impl=_builtin_impl,
+    def test_provider_malformed_config_raises(self):
+        """Malformed external_checks -> ValueError (hard error)."""
+        provider = make_external_check_provider(
+            lambda: {"external_checks": "bad"}
         )
-
-        config = {
-            "external_checks": [{
-                "name": "test-suite",  # exact collision with the built-in
-                "command": "mycheck --run",
-                "tag": "preflight",
-            }]
-        }
-        with pytest.raises(ExternalCheckError, match=r"collides"):
-            register_external_checks(fake_app, config)
-        # The built-in def must remain untouched (still the built-in impl).
-        assert fake_app._check_defs["test-suite"].impl is _builtin_impl
-
-    def test_no_external_checks_noop(self):
-        """No external_checks key means nothing is registered."""
-        class FakeApp:
-            _check_defs = {}
-
-        register_external_checks(FakeApp(), {})
-        assert len(FakeApp._check_defs) == 0
-
-    def test_invalid_config_raises(self):
-        """Invalid config raises ExternalCheckError."""
-        class FakeApp:
-            _check_defs = {}
-
-        with pytest.raises(ExternalCheckError):
-            register_external_checks(FakeApp(), {"external_checks": "bad"})
+        with pytest.raises(ValueError, match="external checks config error"):
+            provider()
 
 
 # ---------------------------------------------------------------------------
-# Integration: external check runs during rlsbl check --tag
+# Integration: external check runs via the app's built-in provider
 # ---------------------------------------------------------------------------
 
 
 class TestExternalCheckIntegration:
+    """Integration tests exercise the real app by writing config files
+    in the test repo's .rlsbl/config.json and resetting the provider
+    cache so the built-in provider picks them up.
+    """
+
     def test_external_check_in_preflight_tag(self, mock_git_repo, monkeypatch):
         """An external check tagged 'preflight' runs via run_checks."""
         import rlsbl
+
+        monkeypatch.chdir(mock_git_repo)
 
         # Write config with an external check
         rlsbl_dir = mock_git_repo / ".rlsbl"
@@ -389,6 +336,7 @@ class TestExternalCheckIntegration:
         config = {
             "publish_mode": "ci",
             "targets": ["plain"],
+            "coverage_unit": "commit",
             "external_checks": [{
                 "name": "ext-test-pass",
                 "command": "echo 'all good'",
@@ -397,71 +345,78 @@ class TestExternalCheckIntegration:
         }
         (rlsbl_dir / "config.json").write_text(json.dumps(config))
 
-        # Register the external check on the real app
-        rlsbl._register_external_checks_from_config(config)
+        # Reset provider cache so cwd change triggers re-materialization
+        rlsbl.app.reset_check_provider_cache()
 
-        # Verify it was registered
-        assert "ext-test-pass" in rlsbl.app._check_defs
+        try:
+            from rlsbl.context import ProjectContext
+            from pathlib import Path
 
-        # Run checks with preflight tag
-        from rlsbl.context import ProjectContext
-        from pathlib import Path
+            ctx = ProjectContext(
+                project_root=Path(str(mock_git_repo)),
+                workspace_root=None,
+                config=config,
+            )
+            results, _impure, exit_code = rlsbl.app.run_checks(ctx, tag_expr="preflight")
 
-        ctx = ProjectContext(
-            project_root=Path(str(mock_git_repo)),
-            workspace_root=None,
-            config=config,
-        )
-        results, _impure, exit_code = rlsbl.app.run_checks(ctx, tag_expr="preflight")
-
-        # Find our external check result
-        ext_results = [r for r in results if r.name == "ext-test-pass"]
-        assert len(ext_results) == 1
-        assert ext_results[0].status == "pass"
-
-        # Cleanup: remove from app._check_defs to not pollute other tests
-        del rlsbl.app._check_defs["ext-test-pass"]
+            ext_results = [r for r in results if r.name == "ext-test-pass"]
+            assert len(ext_results) == 1
+            assert ext_results[0].status == "pass"
+        finally:
+            rlsbl.app.reset_check_provider_cache()
 
     def test_external_check_failure_aborts(self, mock_git_repo, monkeypatch):
         """A failing external check causes non-zero exit from run_checks."""
         import rlsbl
 
+        monkeypatch.chdir(mock_git_repo)
+
+        rlsbl_dir = mock_git_repo / ".rlsbl"
+        rlsbl_dir.mkdir(exist_ok=True)
         config = {
             "publish_mode": "ci",
+            "targets": ["plain"],
+            "coverage_unit": "commit",
             "external_checks": [{
                 "name": "ext-test-fail",
                 "command": "false",
                 "tag": "preflight",
             }],
         }
+        (rlsbl_dir / "config.json").write_text(json.dumps(config))
 
-        rlsbl._register_external_checks_from_config(config)
-        assert "ext-test-fail" in rlsbl.app._check_defs
+        rlsbl.app.reset_check_provider_cache()
 
-        from rlsbl.context import ProjectContext
-        from pathlib import Path
+        try:
+            from rlsbl.context import ProjectContext
+            from pathlib import Path
 
-        ctx = ProjectContext(
-            project_root=Path(str(mock_git_repo)),
-            workspace_root=None,
-            config=config,
-        )
-        results, _impure, exit_code = rlsbl.app.run_checks(ctx, tag_expr="preflight")
+            ctx = ProjectContext(
+                project_root=Path(str(mock_git_repo)),
+                workspace_root=None,
+                config=config,
+            )
+            results, _impure, exit_code = rlsbl.app.run_checks(ctx, tag_expr="preflight")
 
-        ext_results = [r for r in results if r.name == "ext-test-fail"]
-        assert len(ext_results) == 1
-        assert ext_results[0].status == "fail"
-        assert exit_code != 0
+            ext_results = [r for r in results if r.name == "ext-test-fail"]
+            assert len(ext_results) == 1
+            assert ext_results[0].status == "fail"
+            assert exit_code != 0
+        finally:
+            rlsbl.app.reset_check_provider_cache()
 
-        # Cleanup
-        del rlsbl.app._check_defs["ext-test-fail"]
-
-    def test_depends_on_ordering(self, mock_git_repo):
+    def test_depends_on_ordering(self, mock_git_repo, monkeypatch):
         """depends_on fields are preserved and used in ordering."""
         import rlsbl
 
+        monkeypatch.chdir(mock_git_repo)
+
+        rlsbl_dir = mock_git_repo / ".rlsbl"
+        rlsbl_dir.mkdir(exist_ok=True)
         config = {
             "publish_mode": "ci",
+            "targets": ["plain"],
+            "coverage_unit": "commit",
             "external_checks": [
                 {
                     "name": "ext-dep-target",
@@ -476,36 +431,31 @@ class TestExternalCheckIntegration:
                 },
             ],
         }
+        (rlsbl_dir / "config.json").write_text(json.dumps(config))
 
-        rlsbl._register_external_checks_from_config(config)
+        rlsbl.app.reset_check_provider_cache()
 
-        # Verify dependency metadata is preserved
-        dependent_def = rlsbl.app._check_defs["ext-dep-dependent"]
-        assert "ext-dep-target" in dependent_def.depends_on
+        try:
+            from rlsbl.context import ProjectContext
+            from pathlib import Path
 
-        # Run checks and verify both ran
-        from rlsbl.context import ProjectContext
-        from pathlib import Path
+            ctx = ProjectContext(
+                project_root=Path(str(mock_git_repo)),
+                workspace_root=None,
+                config=config,
+            )
+            results, _impure, exit_code = rlsbl.app.run_checks(ctx, tag_expr="preflight")
 
-        ctx = ProjectContext(
-            project_root=Path(str(mock_git_repo)),
-            workspace_root=None,
-            config=config,
-        )
-        results, _impure, exit_code = rlsbl.app.run_checks(ctx, tag_expr="preflight")
+            names = [r.name for r in results]
+            assert "ext-dep-target" in names
+            assert "ext-dep-dependent" in names
 
-        names = [r.name for r in results]
-        assert "ext-dep-target" in names
-        assert "ext-dep-dependent" in names
-
-        # Target must appear before dependent in results
-        target_idx = names.index("ext-dep-target")
-        dependent_idx = names.index("ext-dep-dependent")
-        assert target_idx < dependent_idx
-
-        # Cleanup
-        del rlsbl.app._check_defs["ext-dep-target"]
-        del rlsbl.app._check_defs["ext-dep-dependent"]
+            # Target must appear before dependent in results
+            target_idx = names.index("ext-dep-target")
+            dependent_idx = names.index("ext-dep-dependent")
+            assert target_idx < dependent_idx
+        finally:
+            rlsbl.app.reset_check_provider_cache()
 
     def test_missing_command_hard_error_at_registration(self, monkeypatch):
         """A missing command binary errors at registration, not run time."""
@@ -530,19 +480,23 @@ class TestRunExternalPreflightChecks:
     """The helper used in the customized-hook case: it must run config-declared
     external checks but never run built-in preflight-tagged checks."""
 
-    def test_runs_only_external_checks_not_builtins(self, mock_git_repo, tmp_path):
-        from strictcli import _CheckDef, ErrorReporter
+    def test_runs_only_external_checks_not_builtins(self, mock_git_repo, monkeypatch, tmp_path):
+        from strictcli import _CheckDef
 
         import rlsbl
         from rlsbl.external_checks import run_external_preflight_checks
         from rlsbl.context import ProjectContext
         from pathlib import Path
 
+        monkeypatch.chdir(mock_git_repo)
+
         ext_marker = tmp_path / "ext-ran"
         builtin_marker = tmp_path / "builtin-ran"
 
         config = {
             "publish_mode": "ci",
+            "targets": ["plain"],
+            "coverage_unit": "commit",
             "external_checks": [{
                 "name": "ext-marker-check",
                 "command": f"touch {ext_marker}",
@@ -550,7 +504,10 @@ class TestRunExternalPreflightChecks:
             }],
         }
 
-        rlsbl._register_external_checks_from_config(config)
+        rlsbl_dir = mock_git_repo / ".rlsbl"
+        rlsbl_dir.mkdir(exist_ok=True)
+        (rlsbl_dir / "config.json").write_text(json.dumps(config))
+        rlsbl.app.reset_check_provider_cache()
 
         # A fake built-in preflight-tagged check that must NOT run.
         def _builtin_impl(ctx):
@@ -588,24 +545,32 @@ class TestRunExternalPreflightChecks:
             assert "ext-marker-check" in names
             assert "fake-builtin-preflight" not in names
         finally:
-            rlsbl.app._check_defs.pop("ext-marker-check", None)
+            rlsbl.app.reset_check_provider_cache()
             rlsbl.app._check_defs.pop("fake-builtin-preflight", None)
 
-    def test_failing_external_check_returns_nonzero(self, mock_git_repo):
+    def test_failing_external_check_returns_nonzero(self, mock_git_repo, monkeypatch):
         import rlsbl
         from rlsbl.external_checks import run_external_preflight_checks
         from rlsbl.context import ProjectContext
         from pathlib import Path
 
+        monkeypatch.chdir(mock_git_repo)
+
         config = {
             "publish_mode": "ci",
+            "coverage_unit": "commit",
             "external_checks": [{
                 "name": "ext-fail-check",
                 "command": "false",
                 "tag": "preflight",
             }],
         }
-        rlsbl._register_external_checks_from_config(config)
+
+        rlsbl_dir = mock_git_repo / ".rlsbl"
+        rlsbl_dir.mkdir(exist_ok=True)
+        (rlsbl_dir / "config.json").write_text(json.dumps(config))
+        rlsbl.app.reset_check_provider_cache()
+
         try:
             ctx = ProjectContext(
                 project_root=Path(str(mock_git_repo)),
@@ -621,22 +586,19 @@ class TestRunExternalPreflightChecks:
                 for r in results
             )
         finally:
-            rlsbl.app._check_defs.pop("ext-fail-check", None)
+            rlsbl.app.reset_check_provider_cache()
 
 
 # ---------------------------------------------------------------------------
-# _register_external_checks_from_config: malformed config is a hard error
+# Provider error handling: malformed config is a hard error
 # ---------------------------------------------------------------------------
 
 
-class TestRegisterFromConfigHardError:
-    def test_malformed_config_aborts(self, capsys):
-        """A malformed external_checks section aborts (exit 1), not warn+continue."""
-        import rlsbl
-
-        with pytest.raises(SystemExit) as exc:
-            rlsbl._register_external_checks_from_config(
-                {"external_checks": "bad"}
-            )
-        assert exc.value.code == 1
-        assert "external checks config error" in capsys.readouterr().err
+class TestProviderHardError:
+    def test_malformed_config_raises_value_error(self):
+        """A malformed external_checks section raises ValueError from provider."""
+        provider = make_external_check_provider(
+            lambda: {"external_checks": "bad"}
+        )
+        with pytest.raises(ValueError, match="external checks config error"):
+            provider()

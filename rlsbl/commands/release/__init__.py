@@ -559,10 +559,8 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             "`rlsbl check --tag preflight-changelog` to evaluate the gate"
         )
     else:
-        from rlsbl import app as _rlsbl_app, _register_external_checks_from_config
+        from rlsbl import app as _rlsbl_app
         from pathlib import Path as _Path
-
-        _register_external_checks_from_config(config)
 
         if releasable_name and monorepo_root:
             from ...check_context import WorkspaceCheckContext as _WsCtx
@@ -782,14 +780,10 @@ def _run_cmd_inner(release_config, flags, *, ctx):
                 "`rlsbl check --tag preflight` to evaluate the gate"
             )
         else:
-            from rlsbl import app as _rlsbl_app, _register_external_checks_from_config
+            from rlsbl import app as _rlsbl_app
             from ...check_context import WorkspaceCheckContext
             from ...external_checks import run_external_preflight_checks
             from pathlib import Path as _Path
-
-            # Register external checks unconditionally so config-declared
-            # checks run even when the pre-release hook is customized.
-            _register_external_checks_from_config(ctx.config)
 
             if hook_is_customized:
                 log("Skipping built-in checks (releasable pre-release hook handles testing/linting; running config-declared external checks)")
@@ -862,14 +856,10 @@ def _run_cmd_inner(release_config, flags, *, ctx):
                 "`rlsbl check --tag preflight` to evaluate the gate"
             )
         else:
-            from rlsbl import app as _rlsbl_app, _register_external_checks_from_config
+            from rlsbl import app as _rlsbl_app
             from ...context import ProjectContext as _ProjectContext
             from ...external_checks import run_external_preflight_checks
             from pathlib import Path as _Path
-
-            # Register external checks unconditionally so config-declared
-            # checks run even when the pre-release hook is customized.
-            _register_external_checks_from_config(config)
 
             standalone_ctx = _ProjectContext(
                 project_root=_Path(project_dir),

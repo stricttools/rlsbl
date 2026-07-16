@@ -6,18 +6,19 @@ optional depends_on, and optional cwd.  During ``rlsbl check --tag``
 or the release preflight, external checks run as subprocess calls.
 Non-zero exit = hard fail.  No bypass mechanism.
 
-External checks are registered dynamically on the strictcli app when
-a check context is created (they cannot be in checks.toml because
-they are per-project, not per-tool).
+External checks are registered via a strictcli check provider
+(``app.register_check_provider``).  The provider reads the project
+config at materialization time (keyed on cwd) and returns a list of
+``error_check_spec()`` specs.  strictcli handles memoization and
+re-materialization when the cwd changes.
 """
 
 import os
 import re
 import shutil
 import subprocess
-import sys
 
-from strictcli import ErrorReporter
+from strictcli import error_check_spec
 
 
 # Leading environment-assignment pattern (``VAR=value``).  Shell-legal as a
@@ -152,11 +153,10 @@ def validate_external_checks(config, *, project_root=None):
 def _make_external_check_fn(command, cwd, name):
     """Build a check function that runs *command* as a subprocess.
 
-    The returned function has the signature ``fn(ctx) -> _CheckOutcome``
-    expected by the strictcli check system (reporter already bound).
+    The returned function has the ``(ctx, reporter)`` signature expected by
+    strictcli's check system.
     """
-    def _run_external_check(ctx):
-        reporter = ErrorReporter()
+    def _run_external_check(ctx, reporter):
         check_cwd = cwd
         if check_cwd is None:
             check_cwd = str(ctx.project_root)
@@ -206,55 +206,52 @@ def _make_external_check_fn(command, cwd, name):
     return _run_external_check
 
 
-def register_external_checks(app, config):
-    """Register external checks from *config* on *app*.
+def make_external_check_provider(config_reader):
+    """Build a check provider that reads external checks from config.
 
-    Injects ``_CheckDef`` objects directly into ``app._check_defs`` with
-    their ``impl`` already set, bypassing the checks.toml double-entry
-    requirement (external checks are config-declared, not TOML-declared).
+    ``config_reader`` is a callable that returns the project config dict
+    for the current working directory.  The provider is called lazily by
+    strictcli at materialization time (memoized by cwd).
 
-    Raises :class:`ExternalCheckError` on invalid config.
+    Returns a provider function suitable for ``app.register_check_provider()``.
     """
-    from strictcli import _CheckDef  # internal but stable dataclass
+    def _provider():
+        try:
+            config = config_reader()
+        except Exception:
+            # Config unreadable (e.g. no .rlsbl/ in cwd) -> no external checks
+            return []
 
-    ext_checks = validate_external_checks(config)
-    if not ext_checks:
-        return
+        try:
+            ext_checks = validate_external_checks(config)
+        except ExternalCheckError as exc:
+            # Surface config errors as a hard error during materialization
+            raise ValueError(
+                f"external checks config error: {exc}"
+            ) from exc
 
-    for entry in ext_checks:
-        name = entry["name"]
-        tag = entry["tag"]
-        command = entry["command"]
-        depends_on = entry.get("depends_on", [])
-        cwd = entry.get("cwd")
+        specs = []
+        for entry in ext_checks:
+            name = entry["name"]
+            tag = entry["tag"]
+            command = entry["command"]
+            depends_on = entry.get("depends_on", [])
+            cwd = entry.get("cwd")
 
-        existing = app._check_defs.get(name)
-        if existing is not None:
-            existing_impl = getattr(existing, "impl", None)
-            if getattr(existing_impl, "__name__", "") == "_run_external_check":
-                continue
-            raise ExternalCheckError(
-                f"external_checks: name '{name}' collides with an already-"
-                f"registered check (a built-in check or another provider). "
-                f"External check names must be unique across all checks; "
-                f"rename this external check to something that does not clash."
-            )
+            check_fn = _make_external_check_fn(command, cwd, name)
 
-        check_fn = _make_external_check_fn(command, cwd, name)
+            specs.append(error_check_spec(
+                name=name,
+                tags=[tag],
+                fast=False,
+                pure=False,
+                needs_network=False,
+                depends_on=depends_on,
+                impl=check_fn,
+            ))
+        return specs
 
-        check_def = _CheckDef(
-            name=name,
-            tags=[tag],
-            severity="error",
-            fast=False,
-            pure=False,
-            needs_network=False,
-            depends_on=depends_on,
-            scope="",
-            impl=check_fn,
-            impl_form="error",
-        )
-        app._check_defs[name] = check_def
+    return _provider
 
 
 def run_external_preflight_checks(app, ctx, config, *, tag_expr="preflight"):
@@ -269,8 +266,8 @@ def run_external_preflight_checks(app, ctx, config, *, tag_expr="preflight"):
     with ``tag_expr``).  This runs exactly the config-declared external checks
     that carry the preflight tag and never selects a built-in check.
 
-    ``register_external_checks`` (via ``_register_external_checks_from_config``)
-    must have already registered the checks on *app*.
+    The check provider must have already been registered on *app*
+    (via ``app.register_check_provider``).
 
     Returns ``(results, exit_code)`` where ``exit_code`` is non-zero if any
     external check failed.
