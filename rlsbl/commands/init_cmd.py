@@ -708,16 +708,19 @@ def plan_mappings(template_dir, mappings, vars_dict, *, required_vars=None):
             ours = f.read()
         base = _load_base(target)
 
+        heal_notice = None
         if base is None:
             # No stored base -- a project scaffolded before merge-base tracking.
             # Heal by reconstructing the base from the file's content at its most
             # recent scaffold commit, then fall through to the normal three-way
             # merge so local edits are preserved (never wholesale-overwritten).
+            # Reconstruction is read-only here; the actual base write + notice are
+            # deferred to apply_plans so this analysis pass stays side-effect-free
+            # (dry-run must not touch disk).
             reconstructed = _reconstruct_base_from_history(target)
             if reconstructed is not None:
                 base, short_sha = reconstructed
-                _save_base(target, base)
-                print(
+                heal_notice = (
                     f"{target}: base reconstructed from last scaffold commit "
                     f"{short_sha}"
                 )
@@ -760,23 +763,41 @@ def plan_mappings(template_dir, mappings, vars_dict, *, required_vars=None):
                 "content": theirs,
                 "base_content": theirs,
             }
-            if unreplaced:
-                plan["unreplaced"] = unreplaced
-            plans.append(plan)
         elif base == theirs:
-            plans.append({
-                "target": target,
-                "status": "unchanged",
-                "bucket": "skipped",
-                "action": "none",
-            })
+            # Template unchanged since the base. When healing, persist the base
+            # (save_base_only) so future runs need not re-reconstruct it;
+            # otherwise nothing to do.
+            if heal_notice is not None:
+                plan = {
+                    "target": target,
+                    "status": "unchanged, base healed",
+                    "bucket": "skipped",
+                    "action": "save_base_only",
+                    "base_content": theirs,
+                }
+            else:
+                plan = {
+                    "target": target,
+                    "status": "unchanged",
+                    "bucket": "skipped",
+                    "action": "none",
+                }
         elif ours == theirs:
-            plans.append({
-                "target": target,
-                "status": "unchanged",
-                "bucket": "skipped",
-                "action": "none",
-            })
+            if heal_notice is not None:
+                plan = {
+                    "target": target,
+                    "status": "unchanged, base healed",
+                    "bucket": "skipped",
+                    "action": "save_base_only",
+                    "base_content": theirs,
+                }
+            else:
+                plan = {
+                    "target": target,
+                    "status": "unchanged",
+                    "bucket": "skipped",
+                    "action": "none",
+                }
         else:
             merged, has_conflicts = _three_way_merge(ours, base, theirs)
             if has_conflicts:
@@ -798,9 +819,11 @@ def plan_mappings(template_dir, mappings, vars_dict, *, required_vars=None):
                     "content": merged,
                     "base_content": theirs,
                 }
-            if unreplaced:
-                plan["unreplaced"] = unreplaced
-            plans.append(plan)
+        if unreplaced:
+            plan["unreplaced"] = unreplaced
+        if heal_notice is not None:
+            plan["heal_notice"] = heal_notice
+        plans.append(plan)
 
     return plans
 
@@ -823,6 +846,11 @@ def apply_plans(plans):
         if action == "warn_only":
             warnings.append(plan["warning"])
             continue
+
+        # Emit the one-line base-reconstruction notice (deferred from the
+        # analysis pass so dry-run never triggers it).
+        if plan.get("heal_notice"):
+            print(plan["heal_notice"])
 
         if action == "none":
             if plan["bucket"] == "skipped":
@@ -910,6 +938,7 @@ def _print_dry_run_report(plans_groups, registry=None, registries=None):
     created = []
     skipped = []
     warnings = []
+    heal_notices = []
     for plans in plans_groups:
         for plan in plans:
             if plan.get("action") == "warn_only":
@@ -921,7 +950,12 @@ def _print_dry_run_report(plans_groups, registry=None, registries=None):
                 skipped.append((plan["target"], plan["status"]))
             if plan.get("warning"):
                 warnings.append(plan["warning"])
+            if plan.get("heal_notice"):
+                heal_notices.append(plan["heal_notice"])
             check_unreplaced_vars(plan["target"], plan.get("unreplaced"))
+
+    for notice in heal_notices:
+        print(f"Would heal: {notice}")
 
     _print_file_status_table(created, skipped)
 
@@ -2076,13 +2110,15 @@ def _plan_merged_publish(publish_target, merged_content):
     with open(publish_target, "r", encoding="utf-8") as f:
         ours = f.read()
     base = _load_base(publish_target)
+    heal_notice = None
     if base is None:
         # Heal the missing base from the last scaffold commit, then merge.
+        # Reconstruction is read-only; the base write + notice are deferred to
+        # apply_plans so this analysis stays side-effect-free (dry-run safe).
         reconstructed = _reconstruct_base_from_history(publish_target)
         if reconstructed is not None:
             base, short_sha = reconstructed
-            _save_base(publish_target, base)
-            print(
+            heal_notice = (
                 f"{publish_target}: base reconstructed from last scaffold "
                 f"commit {short_sha}"
             )
@@ -2108,7 +2144,7 @@ def _plan_merged_publish(publish_target, merged_content):
                 "'rlsbl scaffold' so its content becomes a reconstructable base."
             )
     if ours == base:
-        return {
+        plan = {
             "target": publish_target,
             "status": "updated",
             "bucket": "created",
@@ -2116,32 +2152,52 @@ def _plan_merged_publish(publish_target, merged_content):
             "content": merged_content,
             "base_content": merged_content,
         }
-    if base == merged_content or ours == merged_content:
-        return {
-            "target": publish_target,
-            "status": "unchanged",
-            "bucket": "skipped",
-            "action": "none",
-        }
-    merged_text, has_conflicts = _three_way_merge(ours, base, merged_content)
-    if has_conflicts:
-        return {
-            "target": publish_target,
-            "status": "CONFLICTS -- resolve manually",
-            "bucket": "created",
-            "action": "write",
-            "content": merged_text,
-            "base_content": merged_content,
-            "warning": f"{publish_target}: merge conflicts detected, resolve manually",
-        }
-    return {
-        "target": publish_target,
-        "status": "merged",
-        "bucket": "created",
-        "action": "write",
-        "content": merged_text,
-        "base_content": merged_content,
-    }
+    elif base == merged_content or ours == merged_content:
+        if heal_notice is not None:
+            plan = {
+                "target": publish_target,
+                "status": "unchanged, base healed",
+                "bucket": "skipped",
+                "action": "save_base_only",
+                "base_content": merged_content,
+            }
+        else:
+            plan = {
+                "target": publish_target,
+                "status": "unchanged",
+                "bucket": "skipped",
+                "action": "none",
+            }
+        if heal_notice is not None:
+            plan["heal_notice"] = heal_notice
+        return plan
+    else:
+        merged_text, has_conflicts = _three_way_merge(ours, base, merged_content)
+        if has_conflicts:
+            plan = {
+                "target": publish_target,
+                "status": "CONFLICTS -- resolve manually",
+                "bucket": "created",
+                "action": "write",
+                "content": merged_text,
+                "base_content": merged_content,
+                "warning": f"{publish_target}: merge conflicts detected, resolve manually",
+            }
+        else:
+            plan = {
+                "target": publish_target,
+                "status": "merged",
+                "bucket": "created",
+                "action": "write",
+                "content": merged_text,
+                "base_content": merged_content,
+            }
+        if heal_notice is not None:
+            plan["heal_notice"] = heal_notice
+        return plan
+    if heal_notice is not None:
+        plan["heal_notice"] = heal_notice
+    return plan
 
 
 def run_cmd_multi(registries_list, args, flags, ctx):

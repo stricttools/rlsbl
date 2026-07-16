@@ -107,6 +107,27 @@ def test_no_scaffold_commit_hard_errors(tmp_path, monkeypatch):
     assert "rlsbl scaffold" in msg      # remediation 2: commit under scaffold msg
 
 
+def test_plan_mappings_does_not_write_base_during_analysis(tmp_path, monkeypatch):
+    """plan_mappings must stay side-effect-free: no base written during analysis.
+
+    The base reconstruction is read-only during planning; the actual write is
+    deferred to apply_plans, so a dry-run scaffold never touches disk.
+    """
+    repo = tmp_path / "repo"
+    init_repo(repo)
+    target = "d.txt"
+    commit_file(repo, target, "base\n", "rlsbl scaffold")
+    (repo / target).write_text("base-edited\n")  # diverged local edit
+    tpl = _tpl_dir(repo, "d.tpl", "base\nplus\n")
+    monkeypatch.chdir(repo)
+
+    mappings = [{"template": "d.tpl", "target": target}]
+    plans = plan_mappings(tpl, mappings, {})  # analysis only -- no apply
+    # No base file written yet; the plan carries the heal notice for apply_plans.
+    assert not os.path.exists(repo / BASES_DIR / target)
+    assert any(p.get("heal_notice") for p in plans)
+
+
 def test_identical_content_seeds_base_without_history(tmp_path, monkeypatch):
     """When the file already matches the template, seed the base (no error)."""
     repo = tmp_path / "repo"
