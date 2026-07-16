@@ -283,7 +283,7 @@ def run_external_preflight_checks(app, ctx, config, *, tag_expr="preflight"):
         name = entry["name"]
         if name in seen:
             continue
-        results, exit_code = app.run_checks(
+        results, _impure_listed, exit_code = app.run_checks(
             ctx, tag_expr=tag_expr, name_glob=name,
         )
         for r in results:

@@ -597,7 +597,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         # produces a warning when no user-facing entries exist, which
         # is expected for hotfix).
         _cl_ignore_warn = (bump_type == "hotfix")
-        _cl_results, _cl_exit = _rlsbl_app.run_checks(
+        _cl_results, _cl_impure, _cl_exit = _rlsbl_app.run_checks(
             _changelog_ctx, tag_expr="preflight-changelog",
             ignore_warnings=_cl_ignore_warn,
         )
@@ -605,9 +605,9 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             # When warnings are treated as errors, include them in the report
             _cl_error_statuses = {"fail"} if _cl_ignore_warn else {"fail", "warn"}
             _cl_failed = [
-                f"{r.name}: {r.result.message}"
+                f"{r.name}: {r.message}"
                 for r in _cl_results
-                if r.result.status in _cl_error_statuses
+                if r.status in _cl_error_statuses
             ]
             for msg in _cl_failed:
                 print(f"  FAIL  {msg}", file=sys.stderr)
@@ -818,14 +818,14 @@ def _run_cmd_inner(release_config, flags, *, ctx):
                     )
                 else:
                     # One run covering built-in + external preflight checks.
-                    results, exit_code = _rlsbl_app.run_checks(
+                    results, _impure, exit_code = _rlsbl_app.run_checks(
                         member_ctx, tag_expr="preflight",
                     )
                 if exit_code != 0:
                     for r in results:
-                        if r.result.status == "fail":
+                        if r.status == "fail":
                             all_failed.append(
-                                f"{pkg_name}: {r.name}: {r.result.message}"
+                                f"{pkg_name}: {r.name}: {r.message}"
                             )
             if all_failed:
                 for msg in all_failed:
@@ -885,14 +885,14 @@ def _run_cmd_inner(release_config, flags, *, ctx):
                 )
             else:
                 # One run covering built-in + external preflight checks.
-                results, exit_code = _rlsbl_app.run_checks(
+                results, _impure, exit_code = _rlsbl_app.run_checks(
                     standalone_ctx, tag_expr="preflight",
                 )
             if exit_code != 0:
                 failed = [
-                    f"{r.name}: {r.result.message}"
+                    f"{r.name}: {r.message}"
                     for r in results
-                    if r.result.status == "fail"
+                    if r.status == "fail"
                 ]
                 for msg in failed:
                     print(f"  FAIL  {msg}", file=sys.stderr)
