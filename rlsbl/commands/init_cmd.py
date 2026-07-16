@@ -1443,6 +1443,21 @@ def _print_private_summary():
     print("  Go:     go get github.com/owner/repo@vX.Y.Z")
 
 
+def _detect_go_artifact_kind(project_root) -> str:
+    """Detect whether a Go project is a library or binary.
+
+    Returns ``"library"`` when the project has no ``package main`` entry
+    points (pure module), ``"binary"`` otherwise. Gracefully falls back
+    to ``"binary"`` when introspection fails (e.g. ``go`` not on PATH).
+    """
+    try:
+        from ..go_introspect import list_main_packages
+        mains = list_main_packages(str(project_root))
+        return "library" if not mains else "binary"
+    except Exception:
+        return "binary"
+
+
 def _ensure_pipeline_config(registries, ctx):
     """Generate default pipeline config for detected targets if not already present.
 
@@ -1450,6 +1465,10 @@ def _ensure_pipeline_config(registries, ctx):
     creates a pipeline entry with name=target_name, type=target_name, local=false.
     If multiple targets share the same pipeline type, errors with a message
     telling the user to name pipelines manually.
+
+    Go pipelines additionally set ``artifact`` to ``"library"`` or
+    ``"binary"`` (auto-detected from the project's package layout). No
+    implicit default -- the key is always explicit.
 
     Writes the generated pipeline entries to config.json under the "pipelines" key.
     Skips if "pipelines" already exists in config.
@@ -1469,10 +1488,13 @@ def _ensure_pipeline_config(registries, ctx):
                 )
                 sys.exit(1)
             seen_types[target_name] = True
-            pipelines[target_name] = {
+            entry = {
                 "type": target_name,
                 "local": False,
             }
+            if target_name == "go":
+                entry["artifact"] = _detect_go_artifact_kind(ctx.project_root)
+            pipelines[target_name] = entry
 
     if pipelines:
         ctx.config = write_project_config("pipelines", pipelines, ctx.project_root)

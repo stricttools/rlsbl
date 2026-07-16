@@ -35,8 +35,17 @@ class GoPipeline(BasePipeline):
         )
 
     def template_mappings(self, ctx) -> list[dict[str, str]]:
+        # Library projects use a lightweight module-availability verification
+        # publish template instead of goreleaser. The artifact kind is set by
+        # _ensure_pipeline_config (auto-detected) or declared explicitly in
+        # config.json.
+        artifact = self.config.get("artifact", "binary")
+        if artifact == "library":
+            tpl = "publish-library.yml.tpl"
+        else:
+            tpl = "publish.yml.tpl"
         return [
-            {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
+            {"template": tpl, "target": ".github/workflows/publish.yml"},
         ]
 
     def build_assets(self, dir_path: str, version: str, dist_dir: str, ctx) -> list[str]:
