@@ -4,12 +4,19 @@
 
 ## Unreleased
 
+### Breaking
+
+- **Breaking: `private` config key replaced by `publish_mode`; `rlsbl migrate` removed.** .rlsbl/config.json now requires `"publish_mode": "ci"` (publish via CI pipelines) or `"publish_mode": "none"` (suppress publishing). A config still carrying `private` is a hard error naming the exact edit. `scaffold --private` is replaced by `--publish-mode <ci|none>`; private repos must choose explicitly, public repos default to `ci`. The `private-publish-workflow` check is renamed `publish-mode-workflow`. Run `scripts/sweep_publish_mode.py --fix` to migrate configs. The `rlsbl migrate` command is removed -- it delegated to migrable (TOML) while rlsbl configs are JSON, so every invocation errored since it shipped.
+- **`scaffold --force-overwrite` removed.** The flag wholesale-overwrote every managed file and destroyed local edits; it is deleted. Re-scaffolding a legacy repo now heals missing bases and three-way merges instead, and a file with no reconstructable base hard-errors with remediations rather than silently overwriting.
+- **Pipelines now require an explicit `target` link.** Each pipeline entry must declare a `target` (a target name it publishes for, or `null` for a targetless deploy). Missing fields and references to non-existent targets are hard errors.
+
 ### Features
 
 - **Per-target test config.** `.rlsbl/config.json` gains an optional `test` section: set `test.pypi.markers` (e.g. "not integration") to append `-m <markers>` to the built-in pytest run, so slow or credentialed integration tests can be excluded from release/check test runs.
 - **Dev-sync overlay sentinel.** `rlsbl dev sync` writes a sentinel recording the path-source overlay it applied, a new `dev-overlay-drift` check flags when the working copy's overlay has drifted from that record, and a malformed sentinel now hard-errors instead of being silently treated as empty.
 - **Smarter watch on CI failure.** `rlsbl watch` now classifies CI failures before retrying and always prints the tail of the failure log, so you see why a run failed instead of a bare retry.
 - **Configurable-budget hints in timeout messages.** Timeout errors now point to the environment variable that controls the budget, and the built-in pytest run is invoked as `python -m pytest` so it always uses the project interpreter rather than a system-installed pytest.
+- **Scaffold heals missing merge bases from history.** Re-scaffolding a project that predates merge-base tracking now reconstructs each managed file's base from its most recent `rlsbl scaffold` commit and runs a normal three-way merge (conflicts surface as markers, never silent overwrites) instead of skipping the merge and advising a destructive overwrite. Reconstruction is read-only during analysis, so `--dry-run` reports `Would heal:` and writes nothing; healed bases are persisted so future runs need not re-reconstruct.
 
 ### Fixes
 
