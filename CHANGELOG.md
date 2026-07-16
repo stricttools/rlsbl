@@ -23,6 +23,7 @@
 - **External checks run even with customized hooks.** Release preflight now runs external checks regardless of hook customization, and the dry-run preflight reports honestly what it would do.
 - **External-check names are validated.** External-check names must match `[a-z][a-z0-9-]*`, which excludes glob metacharacters that could pattern-match a built-in check, and a name colliding with a built-in check is now a hard error.
 - **Malformed `test` config blocks are gated during release.** A malformed `test` section (unknown targets/options, bad marker types) is now rejected before any release mutation instead of surfacing later.
+- **`release undo` reworked for safety.** It now fully unwinds multi-commit releases (previously only one commit was reverted, stranding version files at the undone version); `--dry-run` previews the complete plan and changes nothing (the flag was previously ignored, so a dry run still deleted tags and the Release and pushed a revert); and undoing the latest release now requires registry evidence -- a published release is refused and routed to `release yank`/`release deprecate` instead of being destroyed.
 
 ## 0.104.1
 
