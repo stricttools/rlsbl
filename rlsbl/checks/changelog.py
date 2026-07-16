@@ -14,7 +14,7 @@ from ._common import _resolve_version_and_tag, _get_all_changelog_contexts
 def register_changelog_checks(app):
     """Register changelog-tag checks on *app*."""
 
-    @app.warn_check("changelog-entry")
+    @app.error_check("changelog-entry")
     def check_changelog_entry(ctx, reporter):
         """CHANGELOG.md must have an entry for the current version."""
         from ..utils import extract_changelog_entry
@@ -48,7 +48,7 @@ def register_changelog_checks(app):
         )
 
         if not os.path.exists(changelog_path):
-            reporter.warn("CHANGELOG.md not found")
+            reporter.error("CHANGELOG.md not found")
             return reporter.found("CHANGELOG.md not found")
 
         entry = extract_changelog_entry(changelog_path, version)
@@ -205,8 +205,7 @@ def register_changelog_checks(app):
             pending_dir = get_pending_dir(changes_dir)
             entries = read_pending_files(pending_dir)
             if not entries:
-                reporter.warn("no pending changelog files")
-                return reporter.found("no pending changelog files")
+                return reporter.skipped("no pending changelog files")
             has_uf = any(e.user_facing for e in entries)
             if has_uf:
                 return reporter.passed("has user-facing entries")

@@ -77,12 +77,11 @@ def register_release_checks(app):
             output = run("git", ["rev-list", "--left-right", "--count",
                                   f"origin/{branch}...HEAD"], cwd=root_str)
         except subprocess.CalledProcessError:
-            reporter.warn(f"no remote tracking for {branch}")
-            return reporter.found(f"no remote tracking for {branch}")
+            return reporter.skipped(f"no remote tracking for {branch}")
 
         parts = output.split("\t")
         if len(parts) != 2:
-            reporter.warn(f"unexpected rev-list output: {output}")
+            reporter.error(f"unexpected rev-list output: {output}")
             return reporter.found(f"unexpected rev-list output: {output}")
 
         behind, ahead = int(parts[0]), int(parts[1])

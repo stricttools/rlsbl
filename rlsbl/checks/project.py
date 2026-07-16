@@ -280,8 +280,7 @@ def register_project_checks(app):
         rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
         target_entries = detect_targets(str(ctx.project_root), releasable_config_dir=rel_dir)
         if not target_entries:
-            reporter.warn("no targets detected")
-            return reporter.found("no targets detected")
+            return reporter.skipped("no targets detected")
 
         versions = {}
         for name, path in target_entries:
@@ -311,8 +310,7 @@ def register_project_checks(app):
 
         unique = set(v for v in versions.values() if v is not None)
         if len(unique) == 0:
-            reporter.warn("no targets reported a version")
-            return reporter.found("no targets reported a version")
+            return reporter.skipped("no targets reported a version")
         if len(unique) > 1:
             detail = ", ".join(f"{n}={v}" for n, v in versions.items() if v is not None)
             reporter.error(f"version mismatch: {detail}")
@@ -343,8 +341,7 @@ def register_project_checks(app):
         rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
         target_entries = detect_targets(str(ctx.project_root), releasable_config_dir=rel_dir)
         if not target_entries:
-            reporter.warn("no targets detected")
-            return reporter.found("no targets detected")
+            return reporter.skipped("no targets detected")
 
         names = {}
         for name, path in target_entries:
@@ -359,8 +356,7 @@ def register_project_checks(app):
 
         have_name = {k: v for k, v in names.items() if v is not None}
         if not have_name:
-            reporter.warn("no targets reported a name")
-            return reporter.found("no targets reported a name")
+            return reporter.skipped("no targets reported a name")
 
         missing = [k for k, v in names.items() if v is None]
         normalized = {k: _normalize_name(k, v) for k, v in have_name.items()}

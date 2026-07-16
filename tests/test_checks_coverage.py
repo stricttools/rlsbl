@@ -295,7 +295,7 @@ class TestGithubReleaseCheck:
 class TestBranchSyncCheck:
     """Tests for the branch-sync check."""
 
-    def test_no_remote_tracking_warns(self, tmp_path, monkeypatch):
+    def test_no_remote_tracking_skips(self, tmp_path, monkeypatch):
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
@@ -304,7 +304,7 @@ class TestBranchSyncCheck:
         ctx = make_ctx(repo)
         # No remote => rev-list will fail
         result = app._check_defs["branch-sync"].impl(ctx)
-        assert result.status == "warn"
+        assert result.status == "skip"
         assert "no remote tracking" in result.message
 
     def test_in_sync_passes(self, tmp_path, monkeypatch):
@@ -354,7 +354,7 @@ class TestBranchSyncCheck:
         assert result.status == "fail"
         assert "behind" in result.message and "ahead" in result.message
 
-    def test_unexpected_output_warns(self, tmp_path, monkeypatch):
+    def test_unexpected_output_fails(self, tmp_path, monkeypatch):
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
@@ -363,7 +363,7 @@ class TestBranchSyncCheck:
         ctx = make_ctx(repo)
         with patch("rlsbl.utils.run", return_value="garbage"):
             result = app._check_defs["branch-sync"].impl(ctx)
-        assert result.status == "warn"
+        assert result.status == "fail"
         assert "unexpected" in result.message
 
 
@@ -435,7 +435,7 @@ class TestChangelogEntryCheck:
         result = app._check_defs["changelog-entry"].impl(ctx)
         assert result.status == "skip"
 
-    def test_no_changelog_warns(self, tmp_path, monkeypatch):
+    def test_no_changelog_fails(self, tmp_path, monkeypatch):
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
@@ -447,7 +447,7 @@ class TestChangelogEntryCheck:
         run_git(repo, "commit", "-q", "-m", "add pyproject")
         ctx = make_ctx(repo)
         result = app._check_defs["changelog-entry"].impl(ctx)
-        assert result.status == "warn"
+        assert result.status == "fail"
         assert "not found" in result.message
 
     def test_entry_exists_passes(self, tmp_path, monkeypatch):

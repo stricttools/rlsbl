@@ -105,7 +105,7 @@ depends_on = []
 
 [checks.changelog-entry]
 tags = ["changelog"]
-severity = "warn"
+severity = "error"
 fast = true
 pure = true
 needs_network = false

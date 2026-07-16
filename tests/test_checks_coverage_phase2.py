@@ -593,7 +593,7 @@ class TestVersionConsistency:
             patch("rlsbl.targets.detect_targets", return_value=[]),
         ):
             result = app._check_defs["version-consistency"].impl(ctx)
-        assert result.status == "warn"
+        assert result.status == "skip"
         assert "no targets" in result.message
 
     def test_version_mismatch_fails(self, tmp_path, monkeypatch):
@@ -636,7 +636,7 @@ class TestVersionConsistency:
         # selfdoc version = None, pypi version = 0.1.0 -> only one unique version
         assert result.status == "pass"
 
-    def test_no_versions_reported_warns(self, tmp_path, monkeypatch):
+    def test_no_versions_reported_skips(self, tmp_path, monkeypatch):
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
@@ -655,14 +655,14 @@ class TestVersionConsistency:
             patch("rlsbl.targets.TARGETS", {"pypi": mock_target}),
         ):
             result = app._check_defs["version-consistency"].impl(ctx)
-        assert result.status == "warn"
+        assert result.status == "skip"
         assert "no targets reported a version" in result.message
 
 
 class TestNameConsistency:
     """name-consistency check."""
 
-    def test_no_targets_warns(self, tmp_path, monkeypatch):
+    def test_no_targets_skips(self, tmp_path, monkeypatch):
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
@@ -672,10 +672,10 @@ class TestNameConsistency:
         ctx = make_ctx(repo)
         with patch("rlsbl.targets.detect_targets", return_value=[]):
             result = app._check_defs["name-consistency"].impl(ctx)
-        assert result.status == "warn"
+        assert result.status == "skip"
         assert "no targets" in result.message
 
-    def test_no_names_reported_warns(self, tmp_path, monkeypatch):
+    def test_no_names_reported_skips(self, tmp_path, monkeypatch):
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
@@ -692,7 +692,7 @@ class TestNameConsistency:
             patch("rlsbl.targets.TARGETS", {"pypi": mock_target}),
         ):
             result = app._check_defs["name-consistency"].impl(ctx)
-        assert result.status == "warn"
+        assert result.status == "skip"
         assert "no targets reported a name" in result.message
 
     def test_name_mismatch_warns(self, tmp_path, monkeypatch):
@@ -3212,3 +3212,248 @@ class TestWorkspaceCiSyncedEdge:
         result = app._check_defs["workspace-ci-synced"].impl(ctx)
         assert result.status == "fail"
         assert "beta" in result.message
+
+
+# ==================================================================
+# Behavior-pinning: derived label assertions for reclassified checks
+# ==================================================================
+
+
+class TestReclassifiedLabels:
+    """Pin the derived status label for each sub-condition that was
+    reclassified in Phase 4.2 (warn/pass -> skip, warn -> error, etc.)."""
+
+    # -- version-consistency: not-applicable conditions -> skip -----------
+
+    def test_version_consistency_no_targets_is_skip(self, tmp_path, monkeypatch):
+        """version-consistency: no targets detected -> skip (not warn)."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+        _init_repo(repo)
+        _setup_scaffold(repo)
+
+        ctx = make_ctx(repo)
+        with (
+            patch("rlsbl.checks.project._get_releasable_version_for_project", return_value=None),
+            patch("rlsbl.targets.detect_targets", return_value=[]),
+        ):
+            result = app._check_defs["version-consistency"].impl(ctx)
+        assert result.status == "skip"
+
+    def test_version_consistency_no_versions_is_skip(self, tmp_path, monkeypatch):
+        """version-consistency: targets exist but none report a version -> skip."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+        _init_repo(repo)
+        _setup_scaffold(repo)
+
+        TargetEntry = namedtuple("TargetEntry", ["name", "path"])
+        mock_target = MagicMock()
+        mock_target.read_version.side_effect = Exception("can't read")
+
+        ctx = make_ctx(repo)
+        with (
+            patch("rlsbl.checks.project._get_releasable_version_for_project", return_value=None),
+            patch("rlsbl.targets.detect_targets", return_value=[TargetEntry("pypi", str(repo))]),
+            patch("rlsbl.targets.TARGETS", {"pypi": mock_target}),
+        ):
+            result = app._check_defs["version-consistency"].impl(ctx)
+        assert result.status == "skip"
+
+    # -- name-consistency: not-applicable conditions -> skip ---------------
+
+    def test_name_consistency_no_targets_is_skip(self, tmp_path, monkeypatch):
+        """name-consistency: no targets detected -> skip (not warn)."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+        _init_repo(repo)
+        _setup_scaffold(repo)
+
+        ctx = make_ctx(repo)
+        with patch("rlsbl.targets.detect_targets", return_value=[]):
+            result = app._check_defs["name-consistency"].impl(ctx)
+        assert result.status == "skip"
+
+    def test_name_consistency_no_names_is_skip(self, tmp_path, monkeypatch):
+        """name-consistency: targets exist but none report a name -> skip."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+        _init_repo(repo)
+        _setup_scaffold(repo)
+
+        TargetEntry = namedtuple("TargetEntry", ["name", "path"])
+        mock_target = MagicMock()
+        mock_target.read_name.side_effect = Exception("can't read")
+
+        ctx = make_ctx(repo)
+        with (
+            patch("rlsbl.targets.detect_targets", return_value=[TargetEntry("pypi", str(repo))]),
+            patch("rlsbl.targets.TARGETS", {"pypi": mock_target}),
+        ):
+            result = app._check_defs["name-consistency"].impl(ctx)
+        assert result.status == "skip"
+
+    # -- branch-sync: reclassified sub-conditions -------------------------
+
+    def test_branch_sync_no_remote_is_skip(self, tmp_path, monkeypatch):
+        """branch-sync: no remote tracking -> skip (not warn)."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+        _init_repo(repo)
+
+        ctx = make_ctx(repo)
+        # No remote configured -> rev-list raises CalledProcessError
+        result = app._check_defs["branch-sync"].impl(ctx)
+        assert result.status == "skip"
+
+    def test_branch_sync_behind_is_fail(self, tmp_path, monkeypatch):
+        """branch-sync: behind remote -> fail (error severity)."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+        _init_repo(repo)
+
+        ctx = make_ctx(repo)
+        with patch("rlsbl.utils.run", return_value="5\t0"):
+            result = app._check_defs["branch-sync"].impl(ctx)
+        assert result.status == "fail"
+
+    def test_branch_sync_ahead_is_warn(self, tmp_path, monkeypatch):
+        """branch-sync: ahead of remote -> warn (not error)."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+        _init_repo(repo)
+
+        ctx = make_ctx(repo)
+        with patch("rlsbl.utils.run", return_value="0\t2"):
+            result = app._check_defs["branch-sync"].impl(ctx)
+        assert result.status == "warn"
+
+    def test_branch_sync_unexpected_output_is_fail(self, tmp_path, monkeypatch):
+        """branch-sync: unexpected rev-list output -> fail (error severity)."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+        _init_repo(repo)
+
+        ctx = make_ctx(repo)
+        with patch("rlsbl.utils.run", return_value="garbage"):
+            result = app._check_defs["branch-sync"].impl(ctx)
+        assert result.status == "fail"
+
+    # -- changelog-entry: reclassified severity and sub-conditions ---------
+
+    def test_changelog_entry_missing_file_is_fail(self, tmp_path, monkeypatch):
+        """changelog-entry: CHANGELOG.md missing -> fail (error severity)."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+        _init_repo(repo)
+        _setup_scaffold(repo, config={"publish_mode": "ci", "targets": ["pypi"]})
+        (repo / "pyproject.toml").write_text(
+            '[project]\nname = "test"\nversion = "0.1.0"\n'
+        )
+        run_git(repo, "add", "pyproject.toml")
+        run_git(repo, "commit", "-q", "-m", "add pyproject")
+
+        ctx = make_ctx(repo)
+        result = app._check_defs["changelog-entry"].impl(ctx)
+        assert result.status == "fail"
+
+    def test_changelog_entry_missing_section_is_warn(self, tmp_path, monkeypatch):
+        """changelog-entry: CHANGELOG.md exists but lacks version entry -> warn."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+        _init_repo(repo)
+        _setup_scaffold(repo, config={"publish_mode": "ci", "targets": ["pypi"]})
+        (repo / "pyproject.toml").write_text(
+            '[project]\nname = "test"\nversion = "0.1.0"\n'
+        )
+        (repo / "CHANGELOG.md").write_text("# Changelog\n\n## 0.0.1\n\nOlder.\n")
+        run_git(repo, "add", ".")
+        run_git(repo, "commit", "-q", "-m", "add files")
+
+        ctx = make_ctx(repo)
+        result = app._check_defs["changelog-entry"].impl(ctx)
+        assert result.status == "warn"
+
+    # -- changelog-user-facing: changeset-file mode no-pending -> skip -----
+
+    def test_changelog_user_facing_no_pending_files_is_skip(self, tmp_path, monkeypatch):
+        """changelog-user-facing: changeset-file mode with no pending files -> skip."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+        _init_repo(repo)
+        changes_dir = repo / ".rlsbl" / "changes"
+        changes_dir.mkdir(parents=True)
+        pending_dir = changes_dir / "pending"
+        pending_dir.mkdir()
+        # Empty pending dir
+
+        ctx = make_ctx(repo, config={"coverage_unit": "changeset-file"})
+        result = app._check_defs["changelog-user-facing"].impl(ctx)
+        assert result.status == "skip"
+
+    # -- library-lint: dual-gating errors vs warnings ----------------------
+
+    def test_library_lint_errors_only_is_fail(self, tmp_path, monkeypatch):
+        """library-lint: errors present -> fail."""
+        from rlsbl.checks.quality import register_quality_checks
+
+        class FakeLintResult:
+            def __init__(self, severity):
+                self.severity = severity
+
+        def fake_lint_library(*args, **kwargs):
+            return [FakeLintResult("error"), FakeLintResult("error")]
+
+        ctx = WorkspaceCheckContext(
+            project_root=tmp_path,
+            workspace_root=tmp_path,
+            config={},
+            projects=[{"name": "lib", "path": "."}],
+            graph=None,
+        )
+        ctx.projects[0]["library"] = True
+
+        with (
+            patch("rlsbl.checks.quality.get_check_timeout", return_value=30),
+            patch("rlsbl.targets.resolve_releasable_config_dir", return_value=None),
+            patch("rlsbl.lint.lint_library", fake_lint_library),
+        ):
+            result = app._check_defs["library-lint"].impl(ctx)
+        assert result.status == "fail"
+
+    def test_library_lint_warnings_only_is_warn(self, tmp_path, monkeypatch):
+        """library-lint: warnings only (no errors) -> warn."""
+        class FakeLintResult:
+            def __init__(self, severity):
+                self.severity = severity
+
+        def fake_lint_library(*args, **kwargs):
+            return [FakeLintResult("warning"), FakeLintResult("warning")]
+
+        ctx = WorkspaceCheckContext(
+            project_root=tmp_path,
+            workspace_root=tmp_path,
+            config={},
+            projects=[{"name": "lib", "path": "."}],
+            graph=None,
+        )
+        ctx.projects[0]["library"] = True
+
+        with (
+            patch("rlsbl.checks.quality.get_check_timeout", return_value=30),
+            patch("rlsbl.targets.resolve_releasable_config_dir", return_value=None),
+            patch("rlsbl.lint.lint_library", fake_lint_library),
+        ):
+            result = app._check_defs["library-lint"].impl(ctx)
+        assert result.status == "warn"

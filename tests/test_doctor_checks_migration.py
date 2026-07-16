@@ -218,11 +218,11 @@ class TestVersionConsistencyCheck:
         assert result.status == "pass"
         assert "1.2.3" in result.message
 
-    def test_version_warn_no_targets(self, mock_git_repo):
-        """No targets detected -> warn."""
+    def test_version_skip_no_targets(self, mock_git_repo):
+        """No targets detected -> skip."""
         ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["version-consistency"].impl(ctx)
-        assert result.status == "warn"
+        assert result.status == "skip"
         assert "no targets" in result.message
 
     def test_selfdoc_included_in_consistency(self, mock_git_repo):
@@ -278,14 +278,14 @@ class TestChangelogEntryCheck:
         assert result.status == "pass"
         assert "2.0.0" in result.message
 
-    def test_changelog_warn_no_file(self, mock_git_repo):
-        """No CHANGELOG.md -> warn."""
+    def test_changelog_fail_no_file(self, mock_git_repo):
+        """No CHANGELOG.md -> fail (error severity: missing file)."""
         pkg = {"name": "test-pkg", "version": "2.0.0"}
         (mock_git_repo / "package.json").write_text(json.dumps(pkg))
 
         ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["changelog-entry"].impl(ctx)
-        assert result.status == "warn"
+        assert result.status == "fail"
 
     def test_changelog_skip_no_version(self, mock_git_repo):
         """No version detected -> skip."""
@@ -340,11 +340,11 @@ class TestLocalTagCheck:
 class TestBranchSyncCheck:
     """The branch-sync check compares local and remote branches."""
 
-    def test_branch_sync_warn_no_remote(self, mock_git_repo):
-        """No remote tracking branch -> warn."""
+    def test_branch_sync_skip_no_remote(self, mock_git_repo):
+        """No remote tracking branch -> skip."""
         ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["branch-sync"].impl(ctx)
-        assert result.status == "warn"
+        assert result.status == "skip"
         assert "no remote tracking" in result.message
 
 
