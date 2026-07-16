@@ -62,6 +62,46 @@ class MemberContext:
         """Dict mapping target name -> resolved directory path."""
         return {e.name: e.path for e in self.targets}
 
+    @cached_property
+    def pipelines(self) -> dict:
+        """Loaded publish pipelines (name -> pipeline), from the merged config.
+
+        Each pipeline carries an explicit ``target`` link (Phase 6.1): a target
+        name, or ``None`` for a target-less publisher (deploy). Empty dict when
+        the config declares no ``pipelines``.
+        """
+        from .pipelines import load_pipelines
+
+        return load_pipelines(self.config)
+
+    @cached_property
+    def resolved_targets(self) -> list:
+        """List of :class:`ResolvedTarget`, one per (target, linked pipeline).
+
+        Pipeline-less targets resolve with ``pipeline=None``; a target served by
+        multiple pipelines produces one record per pipeline (the release flow
+        publishes per pipeline). Target-less pipelines are excluded -- see
+        :attr:`deploy_pipelines`.
+
+        Additive: existing consumers keep using ``targets`` / ``target_paths`` /
+        ``publish_mode`` unchanged.
+        """
+        from .resolved_target import resolve_targets
+
+        return resolve_targets(self.targets, self.pipelines, self.publish_mode)
+
+    @property
+    def deploy_pipelines(self) -> list:
+        """Target-less publishers (``target: null``), in config order.
+
+        These are deploys (e.g. a docs/site publish), not release targets, so
+        they are surfaced separately -- never faked into a ResolvedTarget.
+        """
+        from .resolved_target import partition_pipelines
+
+        _by_target, deploys = partition_pipelines(self.pipelines)
+        return deploys
+
 
 def resolve_member_context(member_dir, releasable_config_dir=None) -> MemberContext:
     """Resolve a member directory's effective merged config and detected targets.
