@@ -411,13 +411,21 @@ releasable = "core"
         (pkg_dir / "pyproject.toml").write_text(
             '[project]\nname = "pkg"\nversion = "0.1.0"\n'
         )
+        # Per-package config needs publish_mode (required key); "none"
+        # suppresses target detection so the check returns the releasable
+        # version from the version file alone.
+        rlsbl_dir = pkg_dir / ".rlsbl"
+        rlsbl_dir.mkdir()
+        (rlsbl_dir / "config.json").write_text(
+            json.dumps({"publish_mode": "none"})
+        )
 
         # Build check context for the project directory
         from rlsbl.context import ProjectContext
         ctx = ProjectContext(
             project_root=pkg_dir,
             workspace_root=tmp_path,
-            config={},
+            config={"publish_mode": "none"},
         )
 
         check_fn = self._get_check_fn()
