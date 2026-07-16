@@ -1,27 +1,27 @@
-"""Tests for releasable-aware `rlsbl release undo`.
+"""Real-git tests for releasable-aware `rlsbl release undo`.
 
-In explicit releasable mode the finalized JSONL and the canonical
-CHANGELOG.md live at the releasable level, so undo must unfinalize and
-regenerate there (never at the representative member's .rlsbl/changes/).
-Undo must also clear any preserved in-progress release state after a
-successful rollback -- otherwise the stale state hard-blocks the next
-`rlsbl release run`.
+In explicit releasable mode the finalized JSONL and the canonical CHANGELOG.md
+live at the releasable level, so undo must unfinalize/regenerate there (never at
+the representative member's .rlsbl/changes/). Undo must also clear any preserved
+in-progress release state after a successful rollback.
+
+These run against real git with a bare remote. Only the GitHub CLI (``run_gh``)
+and the registry probe (``run_evidence_gate``) are mocked.
 """
 
 import json
 import os
-import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
-from githarness import git as _git
+from githarness import add_remote, git as _git, remote_ref
 from rlsbl.commands.release.release_state import (
     get_state_path,
     save_release_state,
 )
 from rlsbl.commands.undo import run_cmd as undo_run_cmd
 from rlsbl.context import ProjectContext, create_context
-from rlsbl.utils import run as real_run
+from rlsbl.evidence_gate import Evidence, EvidenceKind, GateResult, Verdict
 from rlsbl.workspace import (
     Releasable,
     get_releasable_changes_dir,
@@ -39,43 +39,45 @@ _ENTRY = {
 }
 
 
-def _fake_run_factory():
-    def fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
-        if cmd == "gh":
-            return ""
-        if cmd == "git" and args and args[0] == "push":
-            return ""
-        return real_run(cmd, args=args, timeout=timeout, env=env, cwd=cwd)
-    return fake_run
+def _cleared_gate(*_a, **_k):
+    return GateResult(
+        Verdict.CLEARED,
+        [Evidence("registry_probe", "npm", EvidenceKind.UNPUBLISHED, "not on npm")],
+        "unpublished",
+    )
 
 
-def _undo_patches():
-    def failing_run_gh(args, **kwargs):
-        raise subprocess.CalledProcessError(1, "gh")
+def _failing_run_gh(args, **kwargs):
+    import subprocess
+    raise subprocess.CalledProcessError(1, "gh")
 
+
+def _undo_patches(gate=_cleared_gate):
     return [
         patch("rlsbl.commands.undo.check_gh_installed", return_value=True),
         patch("rlsbl.commands.undo.check_gh_auth", return_value=True),
-        patch("rlsbl.commands.undo.run_gh", side_effect=failing_run_gh),
-        patch("rlsbl.commands.undo.run", side_effect=_fake_run_factory()),
+        patch("rlsbl.commands.undo.run_gh", side_effect=_failing_run_gh),
+        patch("rlsbl.commands.undo.run_evidence_gate", side_effect=gate),
         patch("rlsbl.commands.undo.push_if_needed"),
     ]
 
 
-def _run_undo(ctx):
-    patches = _undo_patches()
+def _run_undo(ctx, flags=None, *, gate=_cleared_gate, extra_patches=None):
+    flags = flags or {"yes": True}
+    patches = _undo_patches(gate=gate) + list(extra_patches or [])
     for p in patches:
         p.start()
     try:
-        undo_run_cmd(None, [], {"yes": True}, ctx=ctx)
+        undo_run_cmd(None, [], flags, ctx=ctx)
     finally:
-        for p in patches:
+        for p in reversed(patches):
             p.stop()
 
 
 def _setup_released_releasable_workspace(root):
     """Releasable workspace 'alpha' in the state a completed release leaves:
     a version-bump commit, a changelog-finalize commit, and the release tag.
+    A bare remote is wired up so tag-deletion pushes are exercised for real.
 
     Returns the member (representative) directory.
     """
@@ -90,7 +92,7 @@ def _setup_released_releasable_workspace(root):
     )
     (core / ".rlsbl").mkdir()
     (core / ".rlsbl" / "config.json").write_text(
-        json.dumps({"private": False, "targets": ["npm"], "pipelines": {}}) + "\n"
+        json.dumps({"publish_mode": "ci", "targets": ["npm"], "pipelines": {}}) + "\n"
     )
 
     # in-progress.json is gitignored in scaffolded projects
@@ -140,6 +142,7 @@ def _setup_released_releasable_workspace(root):
     _git(root, "commit", "-q", "-m", "chore: finalize changelog for 1.0.1")
 
     _git(root, "tag", "alpha@v1.0.1")
+    add_remote(root, root.parent / f"{root.name}-alpha-remote.git")
     return core
 
 
@@ -173,6 +176,13 @@ class TestUndoReleasablePaths:
         # The member's .rlsbl/changes/ must never be created by undo
         assert not (core / ".rlsbl" / "changes").exists()
 
+        # Tag deleted locally and on the real bare remote.
+        assert "alpha@v1.0.1" not in _git(tmp_project, "tag", "-l").split()
+        assert remote_ref(tmp_project, "refs/tags/alpha@v1.0.1") == ""
+
+        # Audit record written at the releasable level.
+        assert (Path(rel_dir) / "undo-audit.json").exists()
+
     def test_undo_clears_releasable_in_progress_state(self, tmp_project, monkeypatch):
         """After undoing a release whose fatal failure preserved
         in-progress.json, the state file is cleared so the next
@@ -198,6 +208,35 @@ class TestUndoReleasablePaths:
             "successful rollback"
         )
 
+    def test_non_latest_undo_deletes_companion_tags_and_writes_audit(self, tmp_project, monkeypatch):
+        """The non-latest path must delete companion tags (previously a gap --
+        only the latest path did) and write the audit BEFORE deletions."""
+        core = _setup_released_releasable_workspace(tmp_project)
+        # A Go-style companion tag pushed alongside the release.
+        _git(tmp_project, "tag", "core/v1.0.1")
+        _git(tmp_project, "push", "-q", "origin", "core/v1.0.1")
+        assert remote_ref(tmp_project, "refs/tags/core/v1.0.1") != ""
+
+        monkeypatch.chdir(core)
+        ctx = create_context(Path(str(core)), workspace_root=Path(str(tmp_project)))
+
+        _run_undo(
+            ctx,
+            flags={"yes": True, "version": "1.0.1"},
+            extra_patches=[patch(
+                "rlsbl.commands.release.execute.collect_companion_tags",
+                return_value=["core/v1.0.1"],
+            )],
+        )
+
+        # Companion tag deleted locally and on the remote.
+        assert "core/v1.0.1" not in _git(tmp_project, "tag", "-l").split()
+        assert remote_ref(tmp_project, "refs/tags/core/v1.0.1") == ""
+
+        # Audit record written at the releasable level.
+        rel_dir = get_releasable_dir(str(tmp_project), "alpha")
+        assert (Path(rel_dir) / "undo-audit.json").exists()
+
 
 class TestUndoClearsStandaloneState:
 
@@ -214,8 +253,9 @@ class TestUndoClearsStandaloneState:
         changes_dir.mkdir(parents=True)
         (changes_dir / "unreleased.jsonl").write_text(json.dumps(_ENTRY) + "\n")
         (repo / ".rlsbl" / "config.json").write_text(
-            json.dumps({"private": False, "targets": ["npm"]}) + "\n"
+            json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
         )
+        (repo / "CHANGELOG.md").write_text("# Changelog\n\n## Unreleased\n\n- thing\n")
         _git(repo, "add", "-A")
         _git(repo, "commit", "-q", "-m", "initial")
         _git(repo, "tag", "v1.0.0")
@@ -227,6 +267,7 @@ class TestUndoClearsStandaloneState:
         _git(repo, "add", "-A")
         _git(repo, "commit", "-q", "-m", "v1.0.1")
         _git(repo, "tag", "v1.0.1")
+        add_remote(repo, repo.parent / f"{repo.name}-standalone-remote.git")
 
         state_path = get_state_path(str(repo))
         save_release_state(state_path, {
@@ -240,7 +281,7 @@ class TestUndoClearsStandaloneState:
         ctx = ProjectContext(
             project_root=Path(str(repo)),
             workspace_root=None,
-            config={"private": False},
+            config={"publish_mode": "ci"},
         )
         _run_undo(ctx)
 
