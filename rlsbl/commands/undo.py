@@ -12,6 +12,7 @@ anything; a real run consumes the identical plan object.
 import dataclasses
 import os
 import re
+import subprocess
 import sys
 import traceback
 from types import SimpleNamespace
@@ -585,7 +586,7 @@ def _execute_plan(plan, uc, flags, ctx):
         run("git", ["add", audit_path])
         try:
             run("git", ["commit", "-m", f"chore: audit record for undo of {tag}"])
-        except Exception:
+        except subprocess.CalledProcessError:
             pass  # nothing to commit (audit file unchanged) is acceptable
         results.append(("Write audit record", OK, "-"))
     except Exception:
