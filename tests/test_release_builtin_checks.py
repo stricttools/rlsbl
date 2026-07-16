@@ -288,8 +288,14 @@ class TestTwoHookModel:
         _remote_exists,
         tmp_project,
     ):
-        """pre-checks.sh runs before preflight checks (which are skipped in dry-run)."""
+        """pre-checks.sh runs before preflight checks (pure checks execute in dry-run)."""
         _setup_npm_project(tmp_project, test_script="jest")
+        # Add a user-facing entry so changelog-user-facing passes under dry-run
+        import json as _json
+        changes_dir = tmp_project / ".rlsbl" / "changes"
+        (changes_dir / "unreleased.jsonl").write_text(
+            _json.dumps({"commits": ["abc1234"], "user_facing": True, "description": "test", "type": "feature"}) + "\n"
+        )
         hooks_dir = tmp_project / ".rlsbl" / "hooks"
         hooks_dir.mkdir(parents=True)
         marker = tmp_project / "pre-checks-ran"
@@ -302,7 +308,7 @@ class TestTwoHookModel:
 
         from rlsbl.commands.release import run_cmd
 
-        run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
+        run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}, "coverage_unit": "commit"}))
 
         # The hook should have actually run and created the marker
         assert marker.exists(), "pre-checks.sh should have created the marker file"
@@ -333,8 +339,14 @@ class TestTwoHookModel:
         _remote_exists,
         tmp_project,
     ):
-        """pre-release.sh runs after preflight checks."""
+        """pre-release.sh runs after preflight checks (pure checks execute in dry-run)."""
         _setup_npm_project(tmp_project, test_script=None)
+        # Add a user-facing entry so changelog-user-facing passes under dry-run
+        import json as _json
+        changes_dir = tmp_project / ".rlsbl" / "changes"
+        (changes_dir / "unreleased.jsonl").write_text(
+            _json.dumps({"commits": ["abc1234"], "user_facing": True, "description": "test", "type": "feature"}) + "\n"
+        )
         hooks_dir = tmp_project / ".rlsbl" / "hooks"
         hooks_dir.mkdir(parents=True)
         pre_release_marker = tmp_project / "pre-release-ran"
@@ -347,7 +359,7 @@ class TestTwoHookModel:
 
         from rlsbl.commands.release import run_cmd
 
-        run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
+        run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}, "coverage_unit": "commit"}))
 
         # pre-release hook still executes in dry-run mode
         assert pre_release_marker.exists(), (

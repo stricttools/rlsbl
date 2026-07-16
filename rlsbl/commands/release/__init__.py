@@ -553,14 +553,12 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     )
 
     # Changelog preflight: run preflight-changelog checks via the check system
-    if flags.get("dry-run", False):
-        log(
-            "preflight checks not executed under --dry-run; run "
-            "`rlsbl check --tag preflight-changelog` to evaluate the gate"
-        )
-    else:
+    # Under --dry-run, pure checks execute; impure checks are listed as "would run".
+    if True:
         from rlsbl import app as _rlsbl_app
         from pathlib import Path as _Path
+
+        _is_dry = flags.get("dry-run", False)
 
         if releasable_name and monorepo_root:
             from ...check_context import WorkspaceCheckContext as _WsCtx
@@ -598,7 +596,11 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         _cl_results, _cl_impure, _cl_exit = _rlsbl_app.run_checks(
             _changelog_ctx, tag_expr="preflight-changelog",
             ignore_warnings=_cl_ignore_warn,
+            pure_only=_is_dry,
         )
+        if _is_dry:
+            for _impure_name in _cl_impure:
+                log(f"would run: {_impure_name} (impure)")
         if _cl_exit != 0:
             # When warnings are treated as errors, include them in the report
             _cl_error_statuses = {"fail"} if _cl_ignore_warn else {"fail", "warn"}
@@ -774,16 +776,14 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         # checks always run (independent of hook customization); built-in
         # tests/lint are skipped only when the pre-release hook is customized
         # (the hook then owns testing/linting).
-        if flags.get("dry-run", False):
-            log(
-                "preflight checks not executed under --dry-run; run "
-                "`rlsbl check --tag preflight` to evaluate the gate"
-            )
-        else:
+        # Under --dry-run, pure checks execute; impure checks are listed.
+        if True:
             from rlsbl import app as _rlsbl_app
             from ...check_context import WorkspaceCheckContext
             from ...external_checks import run_external_preflight_checks
             from pathlib import Path as _Path
+
+            _pf_dry = flags.get("dry-run", False)
 
             if hook_is_customized:
                 log("Skipping built-in checks (releasable pre-release hook handles testing/linting; running config-declared external checks)")
@@ -805,22 +805,38 @@ def _run_cmd_inner(release_config, flags, *, ctx):
                     releasables=[],
                 )
                 if hook_is_customized:
-                    # Run ONLY the config-declared external checks; the hook
-                    # owns built-in tests/lint.
-                    results, exit_code = run_external_preflight_checks(
-                        _rlsbl_app, member_ctx, ctx.config,
-                    )
+                    if _pf_dry:
+                        # In dry-run with customized hook, list external checks
+                        from ...external_checks import validate_external_checks
+                        for entry in validate_external_checks(ctx.config):
+                            log(f"would run: {entry['name']} (impure)")
+                    else:
+                        # Run ONLY the config-declared external checks; the hook
+                        # owns built-in tests/lint.
+                        results, exit_code = run_external_preflight_checks(
+                            _rlsbl_app, member_ctx, ctx.config,
+                        )
+                        if exit_code != 0:
+                            for r in results:
+                                if r.status == "fail":
+                                    all_failed.append(
+                                        f"{pkg_name}: {r.name}: {r.message}"
+                                    )
                 else:
                     # One run covering built-in + external preflight checks.
-                    results, _impure, exit_code = _rlsbl_app.run_checks(
+                    results, _impure_listed, exit_code = _rlsbl_app.run_checks(
                         member_ctx, tag_expr="preflight",
+                        pure_only=_pf_dry,
                     )
-                if exit_code != 0:
-                    for r in results:
-                        if r.status == "fail":
-                            all_failed.append(
-                                f"{pkg_name}: {r.name}: {r.message}"
-                            )
+                    if _pf_dry:
+                        for _impure_name in _impure_listed:
+                            log(f"would run: {_impure_name} (impure)")
+                    if exit_code != 0:
+                        for r in results:
+                            if r.status == "fail":
+                                all_failed.append(
+                                    f"{pkg_name}: {r.name}: {r.message}"
+                                )
             if all_failed:
                 for msg in all_failed:
                     print(f"  FAIL  {msg}", file=sys.stderr)
@@ -850,16 +866,14 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         # checks always run (independent of hook customization); built-in
         # tests/lint are skipped only when the pre-release hook is customized
         # (the hook then owns testing/linting).
-        if flags.get("dry-run", False):
-            log(
-                "preflight checks not executed under --dry-run; run "
-                "`rlsbl check --tag preflight` to evaluate the gate"
-            )
-        else:
+        # Under --dry-run, pure checks execute; impure checks are listed.
+        if True:
             from rlsbl import app as _rlsbl_app
             from ...context import ProjectContext as _ProjectContext
             from ...external_checks import run_external_preflight_checks
             from pathlib import Path as _Path
+
+            _pf_dry = flags.get("dry-run", False)
 
             standalone_ctx = _ProjectContext(
                 project_root=_Path(project_dir),
@@ -870,25 +884,45 @@ def _run_cmd_inner(release_config, flags, *, ctx):
                 # Run ONLY the config-declared external checks; the hook owns
                 # built-in tests/lint.
                 log("Skipping built-in checks (pre-release hook handles testing/linting; running config-declared external checks)")
-                results, exit_code = run_external_preflight_checks(
-                    _rlsbl_app, standalone_ctx, config,
-                )
+                if _pf_dry:
+                    from ...external_checks import validate_external_checks
+                    for entry in validate_external_checks(config):
+                        log(f"would run: {entry['name']} (impure)")
+                else:
+                    results, exit_code = run_external_preflight_checks(
+                        _rlsbl_app, standalone_ctx, config,
+                    )
+                    if exit_code != 0:
+                        failed = [
+                            f"{r.name}: {r.message}"
+                            for r in results
+                            if r.status == "fail"
+                        ]
+                        for msg in failed:
+                            print(f"  FAIL  {msg}", file=sys.stderr)
+                        raise HookError(
+                            f"Preflight checks failed ({len(failed)} failure(s))"
+                        )
             else:
                 # One run covering built-in + external preflight checks.
-                results, _impure, exit_code = _rlsbl_app.run_checks(
+                results, _impure_listed, exit_code = _rlsbl_app.run_checks(
                     standalone_ctx, tag_expr="preflight",
+                    pure_only=_pf_dry,
                 )
-            if exit_code != 0:
-                failed = [
-                    f"{r.name}: {r.message}"
-                    for r in results
-                    if r.status == "fail"
-                ]
-                for msg in failed:
-                    print(f"  FAIL  {msg}", file=sys.stderr)
-                raise HookError(
-                    f"Preflight checks failed ({len(failed)} failure(s))"
-                )
+                if _pf_dry:
+                    for _impure_name in _impure_listed:
+                        log(f"would run: {_impure_name} (impure)")
+                if exit_code != 0:
+                    failed = [
+                        f"{r.name}: {r.message}"
+                        for r in results
+                        if r.status == "fail"
+                    ]
+                    for msg in failed:
+                        print(f"  FAIL  {msg}", file=sys.stderr)
+                    raise HookError(
+                        f"Preflight checks failed ({len(failed)} failure(s))"
+                    )
 
         # Run pre-release hook
         pre_release_script = os.path.join(project_dir, ".rlsbl", "hooks", "pre-release.sh")

@@ -602,3 +602,64 @@ class TestProviderHardError:
         )
         with pytest.raises(ValueError, match="external checks config error"):
             provider()
+
+
+# ---------------------------------------------------------------------------
+# Partition wiring: external checks (pure=false) listed under pure_only
+# ---------------------------------------------------------------------------
+
+
+class TestPartitionWiring:
+    """External checks are hardcoded pure=false. Under pure_only=True they
+    appear in the impure_listed set and never execute."""
+
+    def test_external_check_listed_not_executed_under_pure_only(
+        self, mock_git_repo, monkeypatch, tmp_path,
+    ):
+        """pure_only=True lists external checks as impure, does not execute them."""
+        import rlsbl
+        from rlsbl.context import ProjectContext
+        from pathlib import Path
+
+        monkeypatch.chdir(mock_git_repo)
+
+        ext_marker = tmp_path / "ext-ran"
+        config = {
+            "publish_mode": "ci",
+            "targets": ["plain"],
+            "coverage_unit": "commit",
+            "external_checks": [{
+                "name": "ext-pure-test",
+                "command": f"touch {ext_marker}",
+                "tag": "preflight",
+            }],
+        }
+
+        rlsbl_dir = mock_git_repo / ".rlsbl"
+        rlsbl_dir.mkdir(exist_ok=True)
+        (rlsbl_dir / "config.json").write_text(json.dumps(config))
+        rlsbl.app.reset_check_provider_cache()
+
+        try:
+            ctx = ProjectContext(
+                project_root=Path(str(mock_git_repo)),
+                workspace_root=None,
+                config=config,
+            )
+            results, impure_listed, exit_code = rlsbl.app.run_checks(
+                ctx, tag_expr="preflight", pure_only=True,
+            )
+
+            # External check must appear in impure_listed
+            assert "ext-pure-test" in impure_listed
+
+            # External check must NOT have executed
+            assert not ext_marker.exists(), (
+                "external check should not execute under pure_only=True"
+            )
+
+            # External check must NOT appear in results
+            ext_results = [r for r in results if r.name == "ext-pure-test"]
+            assert len(ext_results) == 0
+        finally:
+            rlsbl.app.reset_check_provider_cache()
