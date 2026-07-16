@@ -417,15 +417,14 @@ def monorepo_fixture(tmp_path, monkeypatch):
     python_dir = tmp_path / "python"
     go_dir = tmp_path / "go"
 
-    _uf_entry = json.dumps({"commits": ["abc1234"], "user_facing": True, "description": "test", "type": "feature"}) + "\n"
     (python_dir / ".rlsbl" / "changes").mkdir(parents=True)
-    (python_dir / ".rlsbl" / "changes" / "unreleased.jsonl").write_text(_uf_entry)
+    (python_dir / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
     (python_dir / ".rlsbl" / "config.json").write_text(
         json.dumps({"publish_mode": "ci", "targets": ["pypi"]}) + "\n"
     )
 
     (go_dir / ".rlsbl" / "changes").mkdir(parents=True)
-    (go_dir / ".rlsbl" / "changes" / "unreleased.jsonl").write_text(_uf_entry)
+    (go_dir / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
     (go_dir / ".rlsbl" / "config.json").write_text(
         json.dumps({"publish_mode": "ci", "targets": ["plain"]}) + "\n"
     )
@@ -445,6 +444,21 @@ def monorepo_fixture(tmp_path, monkeypatch):
     # Tag both subprojects
     run_git(tmp_path, "tag", "mypylib@v0.1.0")
     run_git(tmp_path, "tag", "mygolib@v0.1.0")
+
+    # Make a post-tag change so there's an unreleased commit, then add a
+    # user-facing changelog entry covering it. This satisfies the
+    # changelog-user-facing check which now runs pure in dry-run mode.
+    (python_dir / "post_tag.txt").write_text("post-tag change\n")
+    (go_dir / "post_tag.txt").write_text("post-tag change\n")
+    run_git(tmp_path, "add", "python/post_tag.txt", "go/post_tag.txt")
+    run_git(tmp_path, "commit", "-q", "-m", "post-tag change")
+    _post_tag_sha = git_head(tmp_path)
+    _uf_entry = json.dumps({"commits": [_post_tag_sha], "user_facing": True, "description": "test", "type": "feature"}) + "\n"
+    (python_dir / ".rlsbl" / "changes" / "unreleased.jsonl").write_text(_uf_entry)
+    (go_dir / ".rlsbl" / "changes" / "unreleased.jsonl").write_text(_uf_entry)
+    run_git(tmp_path, "add", "python/.rlsbl/changes/unreleased.jsonl")
+    run_git(tmp_path, "add", "go/.rlsbl/changes/unreleased.jsonl")
+    run_git(tmp_path, "commit", "-q", "-m", "add changelog entries")
 
     yield SimpleNamespace(
         root=tmp_path,
