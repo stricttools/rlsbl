@@ -96,6 +96,7 @@ def build_npm_publish_jobs(
     bin_command: str,
     artifacts: list[PlatformArtifact],
     depends_on: str = "goreleaser",
+    provenance: bool = False,
 ) -> str:
     """Generate YAML for npm wrapper publish jobs in a publish workflow.
 
@@ -108,7 +109,14 @@ def build_npm_publish_jobs(
     ``depends_on`` is the name of the job that must complete before
     npm-publish runs (e.g. ``"goreleaser"`` for Go, ``"build-and-upload"``
     for Zig).
+
+    ``provenance`` threads ``--provenance`` into ``npm publish`` commands
+    and adds ``id-token: write`` permission to the job (required for npm
+    OIDC build-provenance attestation on GitHub Actions). Mirrors the
+    ``id-token: write`` pattern already used by crates_wrapper.py.
     """
+    provenance_flag = " --provenance" if provenance else ""
+
     # Build the extract step script
     extract_lines = []
     for artifact in artifacts:
@@ -139,16 +147,30 @@ def build_npm_publish_jobs(
     for artifact in artifacts:
         d = artifact.npm_platform
         publish_lines.append(
-            f"cd npm-wrapper/{d} && npm publish --access public && cd ../.."
+            f"cd npm-wrapper/{d} && npm publish --access public{provenance_flag} && cd ../.."
         )
     publish_script = "\n          ".join(publish_lines)
 
     checkout_action = format_action("actions/checkout")
     setup_node_action = format_action("actions/setup-node")
+
+    # When provenance is enabled, the job needs id-token: write for the
+    # OIDC attestation flow (same pattern as crates_wrapper.py).
+    if provenance:
+        permissions_block = """\
+    permissions:
+      contents: read
+      id-token: write"""
+    else:
+        permissions_block = ""
+
+    # Build the permissions section (indented under the job key)
+    permissions_yaml = f"\n{permissions_block}" if permissions_block else ""
+
     return f"""
   npm-publish:
     needs: [gate, {depends_on}]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest{permissions_yaml}
     steps:
       - uses: {checkout_action}
       - uses: {setup_node_action}
@@ -173,7 +195,7 @@ def build_npm_publish_jobs(
         env:
           NODE_AUTH_TOKEN: ${{{{ secrets.NPM_TOKEN }}}}
       - name: Publish wrapper package
-        run: cd npm-wrapper && npm publish --access public
+        run: cd npm-wrapper && npm publish --access public{provenance_flag}
         env:
           NODE_AUTH_TOKEN: ${{{{ secrets.NPM_TOKEN }}}}
 """
