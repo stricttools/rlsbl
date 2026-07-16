@@ -29,3 +29,7 @@ Install the project locally for development using the detected target's editable
 ## dev sync
 
 Overlay local editable checkouts of sibling projects onto this project's locked environment. Reads dev-sources.toml.local-only for overlay entries, runs uv sync --inexact excluding overlaid packages, then uv pip install -e per entry. Requires UV_NO_SYNC=1 in the environment to prevent bare uv run from reverting overlays.
+
+## dev status
+
+Report the state of local dev-sync overlays: for each package recorded in the dev-overlays sentinel, show its declared editable checkout path and version alongside the venv's actual install (editable at the expected path, WIPED back to a registry wheel, or missing entirely). Exits 1 if any overlay drifted so scripts and pre-run guards can detect a silent wipe by a bare uv sync or uv run; exits 0 when all overlays are intact or none are declared.

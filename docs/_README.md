@@ -118,7 +118,7 @@ See [docs/ci-customization.md](docs/ci-customization.md) for an example.
 
 | Tag | Checks | Description |
 |-----|--------|-------------|
-| `project` | 14 | Version, name, license, description consistency; config schema; private hook/workflow; npm mismatch; target/dunder version readability; selfdoc drift; scaffold conflicts |
+| `project` | 14 | Version, name, license, description consistency; config schema; stale private hook; publish-mode workflow; npm mismatch; target/dunder version readability; selfdoc drift; scaffold conflicts |
 | `release` | 5 | Local/remote tag, GitHub Release, branch sync, scaffold conflicts |
 | `changelog` | 9 | Hash resolution, range, coverage, orphans, schema, user-facing, batch limits, entry |
 | `workspace` | 14 | CI router, CI sync, targets, unregistered, stale entries, dev-only/unversioned boundaries, dead packages, subtree remote, buildability, gitignore, root conflict, Go companion tags, workspace tests |

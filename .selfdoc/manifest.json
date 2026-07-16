@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.104.0",
+  "version": "0.104.1",
   "description": "",
   "language": "python",
   "base_url": "https://rlsbl.smmh.dev",
@@ -65,11 +65,6 @@
     {
       "path": "cli-index.md",
       "title": "rlsbl CLI Reference",
-      "type": "doc"
-    },
-    {
-      "path": "cli-migrate.md",
-      "title": "rlsbl migrate",
       "type": "doc"
     },
     {
@@ -345,11 +340,6 @@
     {
       "path": "rlsbl-commands-init_cmd.md",
       "title": "rlsbl.commands.init_cmd",
-      "type": "doc"
-    },
-    {
-      "path": "rlsbl-commands-migrate.md",
-      "title": "rlsbl.commands.migrate",
       "type": "doc"
     },
     {
@@ -668,6 +658,11 @@
       "type": "doc"
     },
     {
+      "path": "rlsbl-overlay_state.md",
+      "title": "rlsbl.overlay_state",
+      "type": "doc"
+    },
+    {
       "path": "rlsbl-pipelines-base.md",
       "title": "rlsbl.pipelines.base",
       "type": "doc"
@@ -980,5 +975,5 @@
       ]
     }
   ],
-  "last_gen": "2026-07-13T18:36:05.505438+00:00"
+  "last_gen": "2026-07-16T00:53:03.227852+00:00"
 }
