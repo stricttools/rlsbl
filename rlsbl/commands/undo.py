@@ -376,6 +376,33 @@ def _build_plan(uc, flags, ctx):
         tag = _find_latest_tag(uc)
         version, expected_msg = _version_and_msg(uc, tag)
         revert_shas, cap_cl, cap_rf = _walk_release_commits(tag, expected_msg)
+        # Completeness guard: if the walk collected release-shaped commits
+        # but never reached the version-bump commit (e.g. a foreign commit
+        # was interleaved and stopped the walk early), refuse the undo
+        # rather than silently performing a partial revert.
+        if revert_shas:
+            has_version_bump = any(
+                _classify_release_commit(subj, expected_msg) == "version_bump"
+                for _, subj in revert_shas
+            )
+            if not has_version_bump:
+                # Identify the commit that stopped the walk (one parent past
+                # the oldest collected commit).
+                oldest_sha = revert_shas[-1][0]
+                try:
+                    boundary_sha = run("git", ["rev-parse", f"{oldest_sha}^"]).strip()
+                    boundary_subject = run("git", ["log", "-1", "--format=%s", boundary_sha]).strip()
+                    boundary_desc = f"{boundary_sha[:10]} ({boundary_subject})"
+                except Exception:
+                    boundary_desc = "unknown"
+                print(
+                    f"Error: release commit walk for {tag} collected "
+                    f"{len(revert_shas)} commit(s) but never reached the "
+                    f"version bump commit. An unexpected commit stopped the "
+                    f"walk: {boundary_desc}. Refusing to partially undo.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
     else:
         version = version_flag.lstrip("v")
         tag = _build_tag_from_version(uc, version)

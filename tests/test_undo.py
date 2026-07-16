@@ -361,6 +361,56 @@ class TestEdgeCases:
         # Undo still unwound the release.
         assert json.loads((repo / "package.json").read_text())["version"] == "1.0.0"
 
+    def test_interleaved_foreign_commit_refuses_partial_undo(self, tmp_path, monkeypatch, capsys):
+        """A foreign commit interleaved in the release sequence stops the walk
+        before reaching the version-bump commit. The undo must hard-error
+        rather than silently performing a partial revert."""
+        repo = tmp_path / "repo"
+        init_repo(repo)
+
+        _write(repo, "package.json", json.dumps({"name": "pkg", "version": "1.0.0"}, indent=2) + "\n")
+        _write(repo, ".rlsbl/config.json", json.dumps({
+            "publish_mode": "ci", "targets": ["npm"],
+        }, indent=2) + "\n")
+        _write(repo, ".rlsbl/changes/unreleased.jsonl", json.dumps(_ENTRY) + "\n")
+        _write(repo, ".rlsbl/releases/unreleased.toml", 'bump = "patch"\ndescription = "x"\n')
+        _write(repo, "CHANGELOG.md", "# Changelog\n")
+        _write(repo, ".gitignore", ".rlsbl/releases/in-progress.json\n")
+        git(repo, "add", "-A")
+        git(repo, "commit", "-q", "-m", "initial")
+        git(repo, "tag", "v1.0.0")
+
+        # 1. version-bump
+        pkg = json.loads((repo / "package.json").read_text())
+        pkg["version"] = "1.0.1"
+        (repo / "package.json").write_text(json.dumps(pkg, indent=2) + "\n")
+        git(repo, "add", "-A")
+        git(repo, "commit", "-q", "-m", "v1.0.1")
+
+        # 2. FOREIGN commit (interleaved -- not a release commit)
+        _write(repo, "foreign.txt", "unrelated work\n")
+        git(repo, "add", "-A")
+        git(repo, "commit", "-q", "-m", "unrelated feature work")
+
+        # 3. finalize-changelog (walk starts here, hits foreign before version_bump)
+        os.rename(repo / ".rlsbl/changes/unreleased.jsonl", repo / ".rlsbl/changes/1.0.1.jsonl")
+        (repo / ".rlsbl/changes/unreleased.jsonl").write_text("")
+        git(repo, "add", "-A")
+        git(repo, "commit", "-q", "-m", "chore: finalize changelog for 1.0.1")
+        git(repo, "tag", "v1.0.1")
+        add_remote(repo, repo.parent / "remote.git")
+        monkeypatch.chdir(repo)
+
+        head_before = git(repo, "rev-parse", "HEAD")
+        with pytest.raises(SystemExit) as exc:
+            _run_undo(repo, {"yes": True})
+        assert exc.value.code == 1
+
+        err = capsys.readouterr().err
+        assert "version bump" in err.lower() or "version_bump" in err.lower()
+        # Nothing was reverted.
+        assert git(repo, "rev-parse", "HEAD") == head_before
+
     def test_no_tags_errors(self, tmp_path, monkeypatch, capsys):
         repo = tmp_path / "repo"
         init_repo(repo)
