@@ -1848,18 +1848,59 @@ def _extract_jobs_section(lines):
     return job_lines
 
 
-def _generate_merged_publish(targets, template_vars, target_paths=None):
+def _resolve_publish_template(target_name, pipelines, templates_root):
+    """Resolve the publish template path for a target.
+
+    When a loaded pipeline is available, uses its ``template_mappings``
+    to find the publish template (so pipeline config like ``artifact``
+    drives template selection). Falls back to the hardcoded
+    ``{target_name}/publish.yml.tpl`` path for targets without a loaded
+    pipeline.
+
+    Returns the absolute path to the template file, or ``None`` when
+    no template exists.
+    """
+    # Try pipeline-driven resolution first
+    if pipelines:
+        for pipeline in pipelines.values():
+            link = getattr(pipeline, "target", None)
+            if link == target_name:
+                tpl_dir = pipeline.template_dir()
+                if tpl_dir:
+                    for mapping in pipeline.template_mappings(ctx=None):
+                        if "publish" in mapping.get("target", ""):
+                            candidate = os.path.join(tpl_dir, mapping["template"])
+                            if os.path.exists(candidate):
+                                return candidate
+
+    # Fallback: hardcoded path by target name
+    candidate = os.path.join(templates_root, target_name, "publish.yml.tpl")
+    if os.path.exists(candidate):
+        return candidate
+    return None
+
+
+def _generate_merged_publish(targets, template_vars, target_paths=None,
+                             pipelines=None):
     """Generate a merged publish.yml from individual target publish templates.
 
-    Reads each target's publish.yml.tpl, renders template variables, parses
-    as structured YAML, and merges on-triggers, permissions, env, and jobs
-    into a single workflow dict.
+    Reads each target's publish template (resolved via pipeline
+    ``template_mappings`` when *pipelines* is provided, falling back to
+    the hardcoded ``{target_name}/publish.yml.tpl`` path), renders
+    template variables, parses as structured YAML, and merges
+    on-triggers, permissions, env, and jobs into a single workflow dict.
 
     When *target_paths* is provided (a dict mapping target name to its
     directory path), subdirectory targets get:
     - ``defaults.run.working-directory`` injected into their jobs
     - ``packages-dir`` rewritten for PyPI publish actions
     - version-file inputs prefixed for setup actions
+
+    When *pipelines* is provided (the loaded pipeline dict from config),
+    template resolution goes through each pipeline's
+    ``template_mappings`` method, allowing pipeline config keys (e.g.
+    Go's ``artifact``) to drive template selection. This replaces the
+    target-name-based template bypass.
     """
     from io import StringIO
 
@@ -1886,8 +1927,10 @@ def _generate_merged_publish(targets, template_vars, target_paths=None):
     merged_jobs = {}
 
     for target_name in targets:
-        tpl_path = os.path.join(templates_root, target_name, "publish.yml.tpl")
-        if not os.path.exists(tpl_path):
+        tpl_path = _resolve_publish_template(
+            target_name, pipelines, templates_root,
+        )
+        if tpl_path is None:
             continue
 
         with open(tpl_path, "r", encoding="utf-8") as f:
@@ -2395,11 +2438,16 @@ def run_cmd_multi(registries_list, args, flags, ctx):
                         ))
 
         # Plan the merged publish workflow (skip for publish_mode "none" and workspace roots)
-        # Read publish templates from pipeline types instead of targets
+        # Load pipelines so _generate_merged_publish can use pipeline-driven
+        # template resolution (Phase 6.7) instead of hardcoded target-name paths.
         merged_plans = []
         if not private and not is_ws_root:
+            _loaded_pipelines = load_pipelines(ctx.config)
             publish_target = os.path.join(".github", "workflows", "publish.yml")
-            merged_content = _generate_merged_publish(registries_list, vars_dict, target_paths)
+            merged_content = _generate_merged_publish(
+                registries_list, vars_dict, target_paths,
+                pipelines=_loaded_pipelines,
+            )
             merged_plans = [_plan_merged_publish(
                 publish_target, merged_content,
             )]
