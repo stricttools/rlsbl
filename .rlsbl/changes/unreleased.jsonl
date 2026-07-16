@@ -45,3 +45,5 @@
 {"id":"18c2ce16eb03736d3e5a8112da0849b29717321ac9df4ed1","commits":["d4825b155282479e3e7452e7aeb92915b72820ca"],"user_facing":true,"description":"**New feature.** External checks now use strictcli's check provider pattern for proper registration before filtering.","type":"feature"}
 {"id":"18c2ce18848c8f13930509d12c3040829eee4058a3e8dfa1","commits":["c34bc21546737f3e09b7dd346a0084399142cece"],"user_facing":false}
 {"id":"18c2ce19e1b051926aee049efc5a4384a44813d0b2f4b4ad","commits":["6c398d59a821d1c79a99a871cb518dd9b836a37e"],"user_facing":false}
+{"id":"18c2ce8c669325cf938a294c497843a69a5f035cf9bacd0e","commits":["cfa5393a1ca395cd01a4bd0978315ace43e5c150"],"user_facing":false}
+{"id":"18c2ce8f6b2b0015ecd4839943b94b678ea1e98ed2eec390","commits":["ba44990d1c9d722714ce15a79a8cce12b800a428"],"user_facing":false}
