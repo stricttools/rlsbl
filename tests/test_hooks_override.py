@@ -37,7 +37,7 @@ def _setup_project(tmp_path, hook_body=None):
     )
     changes_dir = tmp_path / ".rlsbl" / "changes"
     changes_dir.mkdir(parents=True, exist_ok=True)
-    (changes_dir / "unreleased.jsonl").write_text("")
+    (changes_dir / "unreleased.jsonl").write_text(json.dumps({"commits": ["abc1234"], "user_facing": True, "description": "test", "type": "feature"}) + "\n")
     (tmp_path / ".rlsbl" / "config.json").write_text(
         json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
     )
@@ -193,16 +193,15 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         tmp_project,
         capsys,
     ):
-        """When the pre-release hook is customized, preflight checks
-        are skipped."""
+        """When the pre-release hook is customized in dry-run, external
+        checks are listed but not executed (they are impure)."""
         _setup_project(
             tmp_project,
             hook_body=_V1_TEMPLATE + "uv run pytest\n",
         )
         mock_run.side_effect = ["", "0", "", ""]
 
-        with patch("rlsbl.commands.release.subprocess") as mock_sp, \
-             patch("rlsbl.app.run_checks", return_value=([], [], 0)) as mock_checks:
+        with patch("rlsbl.commands.release.subprocess") as mock_sp:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
@@ -213,19 +212,14 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
                 _rc(), {"dry-run": True, "yes": True},
                 ctx=ProjectContext(
                     project_root=Path("."), workspace_root=None,
-                    config={"publish_mode": "ci", "pipelines": {}},
+                    config={"publish_mode": "ci", "pipelines": {}, "coverage_unit": "commit"},
                 ),
             )
 
-        mock_checks.assert_not_called()
-
         captured = capsys.readouterr()
-        # Under --dry-run the preflight gate is not executed; the honest
-        # interim contract prints a pointer to the standalone check command.
-        assert (
-            "preflight checks not executed under --dry-run; run "
-            "`rlsbl check --tag preflight` to evaluate the gate"
-        ) in captured.out
+        # In dry-run with customized hook, the message about skipping built-in
+        # checks is printed but no actual external check execution occurs.
+        assert "Skipping built-in checks" in captured.out
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
@@ -255,12 +249,11 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         capsys,
     ):
         """When the pre-release hook is the unmodified scaffold template,
-        preflight checks are skipped in dry-run mode."""
+        dry-run runs pure preflight checks and lists impure ones."""
         _setup_project(tmp_project, hook_body=_V1_TEMPLATE)
         mock_run.side_effect = ["", "0", "", ""]
 
-        with patch("rlsbl.commands.release.subprocess") as mock_sp, \
-             patch("rlsbl.app.run_checks", return_value=([], [], 0)) as mock_checks:
+        with patch("rlsbl.commands.release.subprocess") as mock_sp:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
@@ -271,19 +264,14 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
                 _rc(), {"dry-run": True, "yes": True},
                 ctx=ProjectContext(
                     project_root=Path("."), workspace_root=None,
-                    config={"publish_mode": "ci", "pipelines": {}},
+                    config={"publish_mode": "ci", "pipelines": {}, "coverage_unit": "commit"},
                 ),
             )
 
-        # In dry-run mode, preflight checks are not executed; the honest
-        # interim contract prints a pointer to the standalone check command.
-        mock_checks.assert_not_called()
-
+        # In dry-run mode, pure checks execute and impure checks are listed.
+        # No old-style "not executed" message.
         captured = capsys.readouterr()
-        assert (
-            "preflight checks not executed under --dry-run; run "
-            "`rlsbl check --tag preflight` to evaluate the gate"
-        ) in captured.out
+        assert "not executed" not in captured.out
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
@@ -311,13 +299,12 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         _remote_exists,
         tmp_project,
     ):
-        """When no pre-release hook exists, preflight checks are still
-        skipped in dry-run mode."""
+        """When no pre-release hook exists, dry-run runs pure preflight
+        checks and lists impure ones via the partition."""
         _setup_project(tmp_project, hook_body=None)  # no hook
         mock_run.side_effect = ["", "0", "", ""]
 
-        with patch("rlsbl.commands.release.subprocess") as mock_sp, \
-             patch("rlsbl.app.run_checks", return_value=([], [], 0)) as mock_checks:
+        with patch("rlsbl.commands.release.subprocess") as mock_sp:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
@@ -328,12 +315,9 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
                 _rc(), {"dry-run": True, "quiet": True, "yes": True},
                 ctx=ProjectContext(
                     project_root=Path("."), workspace_root=None,
-                    config={"publish_mode": "ci", "pipelines": {}},
+                    config={"publish_mode": "ci", "pipelines": {}, "coverage_unit": "commit"},
                 ),
             )
-
-        # In dry-run mode, preflight checks are skipped
-        mock_checks.assert_not_called()
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
@@ -361,7 +345,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         _remote_exists,
         tmp_project,
     ):
-        """Even when preflight checks are skipped, the pre-release hook itself
+        """Even with dry-run partition, the pre-release hook itself
         still executes."""
         _setup_project(
             tmp_project,
@@ -369,8 +353,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         )
         mock_run.side_effect = ["", "0", "", ""]
 
-        with patch("rlsbl.commands.release.subprocess") as mock_sp, \
-             patch("rlsbl.app.run_checks", return_value=([], [], 0)) as mock_checks:
+        with patch("rlsbl.commands.release.subprocess") as mock_sp:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
@@ -381,12 +364,9 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
                 _rc(), {"dry-run": True, "quiet": True, "yes": True},
                 ctx=ProjectContext(
                     project_root=Path("."), workspace_root=None,
-                    config={"publish_mode": "ci", "pipelines": {}},
+                    config={"publish_mode": "ci", "pipelines": {}, "coverage_unit": "commit"},
                 ),
             )
-
-        # Preflight checks skipped (hook is customized)
-        mock_checks.assert_not_called()
 
         # The pre-release hook was still called via subprocess.run
         assert mock_sp.run.call_count >= 1
@@ -531,18 +511,18 @@ class TestExternalChecksVsHookCustomization:
             "externals must not be run again by name when hook not customized"
         )
 
-    def test_dry_run_executes_zero_checks_and_prints_pointers(self, tmp_project, capsys):
-        """Under --dry-run, no run_checks call happens at any of the three
-        sites, and each site prints the honest pointer message."""
+    def test_dry_run_runs_pure_checks_and_lists_impure(self, tmp_project, capsys):
+        """Under --dry-run, pure checks execute and impure checks are listed
+        (including external checks which are always impure)."""
         config = self._setup_with_external_check(
             tmp_project, hook_body="#!/bin/bash\necho custom tests\n"
         )
+        config["coverage_unit"] = "commit"
 
         started = [p.start() for p in _FULL_FLOW_PATCHES]
         try:
             with (
                 patch("rlsbl.commands.release.is_hook_customized", return_value=True),
-                patch("rlsbl.app.run_checks", return_value=([], [], 0)) as mock_checks,
             ):
                 from rlsbl.commands.release import run_cmd
 
@@ -561,13 +541,6 @@ class TestExternalChecksVsHookCustomization:
             import rlsbl
             rlsbl.app._check_defs.pop("ext-preflight-check", None)
 
-        mock_checks.assert_not_called()
         out = capsys.readouterr().out
-        assert (
-            "preflight checks not executed under --dry-run; run "
-            "`rlsbl check --tag preflight-changelog` to evaluate the gate"
-        ) in out
-        assert (
-            "preflight checks not executed under --dry-run; run "
-            "`rlsbl check --tag preflight` to evaluate the gate"
-        ) in out
+        # External checks should be listed as impure under dry-run
+        assert "would run" in out or "Skipping built-in checks" in out

@@ -417,14 +417,15 @@ def monorepo_fixture(tmp_path, monkeypatch):
     python_dir = tmp_path / "python"
     go_dir = tmp_path / "go"
 
+    _uf_entry = json.dumps({"commits": ["abc1234"], "user_facing": True, "description": "test", "type": "feature"}) + "\n"
     (python_dir / ".rlsbl" / "changes").mkdir(parents=True)
-    (python_dir / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
+    (python_dir / ".rlsbl" / "changes" / "unreleased.jsonl").write_text(_uf_entry)
     (python_dir / ".rlsbl" / "config.json").write_text(
         json.dumps({"publish_mode": "ci", "targets": ["pypi"]}) + "\n"
     )
 
     (go_dir / ".rlsbl" / "changes").mkdir(parents=True)
-    (go_dir / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
+    (go_dir / ".rlsbl" / "changes" / "unreleased.jsonl").write_text(_uf_entry)
     (go_dir / ".rlsbl" / "config.json").write_text(
         json.dumps({"publish_mode": "ci", "targets": ["plain"]}) + "\n"
     )

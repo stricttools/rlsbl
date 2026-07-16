@@ -40,7 +40,7 @@ def _setup_npm_project(tmp_path):
     )
     changes_dir = tmp_path / ".rlsbl" / "changes"
     changes_dir.mkdir(parents=True, exist_ok=True)
-    (changes_dir / "unreleased.jsonl").write_text("")
+    (changes_dir / "unreleased.jsonl").write_text(json.dumps({"commits": ["abc1234"], "user_facing": True, "description": "test", "type": "feature"}) + "\n")
     config_dir = tmp_path / ".rlsbl"
     config_dir.mkdir(exist_ok=True)
     config = {"targets": ["npm"], "publish_mode": "ci"}

@@ -40,7 +40,7 @@ def _setup_project(tmp_path, hook_name, hook_body):
     # JSONL changelog
     changes_dir = tmp_path / ".rlsbl" / "changes"
     changes_dir.mkdir(parents=True, exist_ok=True)
-    (changes_dir / "unreleased.jsonl").write_text("")
+    (changes_dir / "unreleased.jsonl").write_text(json.dumps({"commits": ["abc1234"], "user_facing": True, "description": "test", "type": "feature"}) + "\n")
     # Config with required private key and targets
     (tmp_path / ".rlsbl" / "config.json").write_text(
         json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
@@ -171,7 +171,7 @@ class TestPreReleaseHookOutput:
         )
         changes_dir = tmp_project / ".rlsbl" / "changes"
         changes_dir.mkdir(parents=True, exist_ok=True)
-        (changes_dir / "unreleased.jsonl").write_text("")
+        (changes_dir / "unreleased.jsonl").write_text(json.dumps({"commits": ["abc1234"], "user_facing": True, "description": "test", "type": "feature"}) + "\n")
         (tmp_project / ".rlsbl" / "config.json").write_text(
             json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
         )
@@ -911,7 +911,7 @@ def _setup_releasable_project_with_hook(repo, hook_name, hook_body):
     )
     changes_dir = repo / ".rlsbl" / "changes"
     changes_dir.mkdir(parents=True)
-    (changes_dir / "unreleased.jsonl").write_text("")
+    (changes_dir / "unreleased.jsonl").write_text(json.dumps({"commits": ["abc1234"], "user_facing": True, "description": "test", "type": "feature"}) + "\n")
     (repo / ".rlsbl" / "config.json").write_text(
         json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
     )
@@ -1089,7 +1089,7 @@ class TestHookGeneratedFiles:
         )
         changes_dir = tmp_project / ".rlsbl" / "changes"
         changes_dir.mkdir(parents=True)
-        (changes_dir / "unreleased.jsonl").write_text("")
+        (changes_dir / "unreleased.jsonl").write_text(json.dumps({"commits": ["abc1234"], "user_facing": True, "description": "test", "type": "feature"}) + "\n")
         (tmp_project / ".rlsbl" / "config.json").write_text(
             json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
         )

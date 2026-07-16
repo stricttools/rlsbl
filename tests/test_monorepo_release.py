@@ -72,7 +72,7 @@ class TestMonorepoRelease:
         )
         changes_dir = proj_dir / ".rlsbl" / "changes"
         changes_dir.mkdir(parents=True, exist_ok=True)
-        (changes_dir / "unreleased.jsonl").write_text("")
+        (changes_dir / "unreleased.jsonl").write_text(json.dumps({"commits": ["abc1234"], "user_facing": True, "description": "test", "type": "feature"}) + "\n")
         (proj_dir / ".rlsbl" / "config.json").write_text(
             json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
         )
@@ -268,7 +268,7 @@ class TestMonorepoRelease:
         )
         changes_dir = mock_git_repo / ".rlsbl" / "changes"
         changes_dir.mkdir(parents=True, exist_ok=True)
-        (changes_dir / "unreleased.jsonl").write_text("")
+        (changes_dir / "unreleased.jsonl").write_text(json.dumps({"commits": ["abc1234"], "user_facing": True, "description": "test", "type": "feature"}) + "\n")
         (mock_git_repo / ".rlsbl" / "config.json").write_text(
             json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
         )
@@ -397,7 +397,7 @@ class TestSubtreePublish:
         )
         changes_dir = proj_dir / ".rlsbl" / "changes"
         changes_dir.mkdir(parents=True, exist_ok=True)
-        (changes_dir / "unreleased.jsonl").write_text("")
+        (changes_dir / "unreleased.jsonl").write_text(json.dumps({"commits": ["abc1234"], "user_facing": True, "description": "test", "type": "feature"}) + "\n")
         (proj_dir / ".rlsbl" / "config.json").write_text(
             json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
         )
