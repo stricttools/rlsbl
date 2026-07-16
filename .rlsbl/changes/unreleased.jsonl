@@ -50,3 +50,4 @@
 {"id":"18c2ce9a0cc4d168a9fe3ed602ef4658b6b8567016d9fcc8","commits":["2f2cfeb0316bc436c1920c49b9f48c6ffb8490f0","66ad8318f616e96cdd63358d031f8604836ae885"],"user_facing":false}
 {"id":"18c2cf3c77b3422b0065902016854f4b9fa5d970bbbb98a4","commits":["df5de7b1f25b44cee963f063e12faa7b6ae6b490"],"user_facing":true,"description":"**Bug fix.** The undo completeness guard error message no longer references undefined variables.","type":"fix"}
 {"id":"18c2cf3d827d2a0888cf68a5d4284090a1fa1a1fb6b94575","commits":["1f086854a1650bf8b290bc2a2037bcd8efb855e1","391291851b0b2b5c5d09ab6691bb2bcf2daa1a95"],"user_facing":false}
+{"id":"18c2cf4a54d80f571a2c7818d06749deae8da16e298ba16e","commits":["08f673f7ade2157d98b80a27763c5370d8aeba44"],"user_facing":false}
