@@ -36,6 +36,9 @@ class MavenPipeline(BasePipeline):
             print(f"  Skipping pipeline '{self.name}' local publish (config: local=false)")
             return
 
+        if not self.probe_before_publish(dir_path, version, ctx):
+            return
+
         token_var = self.config.get("token_var", "GITHUB_TOKEN")
         token = os.environ.get(token_var)
         if not token:
@@ -110,6 +113,9 @@ class MavenCentralPipeline(BasePipeline):
     def publish(self, dir_path: str, version: str, ctx) -> None:
         if not self.local:
             print(f"  Skipping pipeline '{self.name}' local publish (config: local=false)")
+            return
+
+        if not self.probe_before_publish(dir_path, version, ctx):
             return
 
         missing = [v for v in _MAVEN_CENTRAL_REQUIRED_VARS if not os.environ.get(v)]

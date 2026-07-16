@@ -2,6 +2,7 @@
 
 import os
 import subprocess
+import sys
 
 from .base import CredentialPipeline
 from ..utils import require_tool, run
@@ -25,6 +26,30 @@ class DockerPipeline(CredentialPipeline):
         return [
             {"template": "publish.yml.tpl", "target": ".github/workflows/docker-publish.yml"},
         ]
+
+    def publish(self, dir_path: str, version: str, ctx) -> None:
+        if not self.local:
+            print(f"  Skipping pipeline '{self.name}' local publish (config: local=false)")
+            return
+
+        if not self.probe_before_publish(dir_path, version, ctx):
+            return
+
+        username = os.environ.get(self.username_var)
+        password = os.environ.get(self.password_var)
+        if not username or not password:
+            missing = []
+            if not username:
+                missing.append(self.username_var)
+            if not password:
+                missing.append(self.password_var)
+            print(
+                f"Error: pipeline '{self.name}' requires {' and '.join(missing)} but "
+                f"{'it is' if len(missing) == 1 else 'they are'} not set",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        self._publish_command(dir_path, version, username, password)
 
     def _publish_command(self, dir_path: str, version: str, username: str, password: str) -> None:
         image = self.config.get("image")

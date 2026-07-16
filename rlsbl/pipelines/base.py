@@ -4,6 +4,18 @@ import os
 import subprocess
 import sys
 
+# Error message signatures that registries use for "already published":
+# npm: E403 "You cannot publish over the previously published versions"
+#      or EPUBLISHCONFLICT
+# PyPI: 400 "File already exists"
+# crates.io: "already uploaded"
+_ALREADY_EXISTS_SIGNATURES = (
+    "previously published version",
+    "EPUBLISHCONFLICT",
+    "File already exists",
+    "already uploaded",
+)
+
 
 class BasePipeline:
     """Concrete base providing no-op defaults for optional Pipeline methods.
@@ -16,6 +28,54 @@ class BasePipeline:
         self.pipeline_type = pipeline_type
         self.local = local
         self.config = config
+
+    def probe_before_publish(self, dir_path: str, version: str, ctx) -> bool:
+        """Probe the linked target's registry before publishing.
+
+        Returns True if publishing should proceed, False if already published
+        (skip with log). Requires the pipeline to have a ``target`` attribute
+        linking it to a target name.
+        """
+        from ..targets import TARGETS
+        from ..publication_probe import PublicationStatus
+
+        target_name = getattr(self, "target", None)
+        if target_name is None:
+            # No linked target -- cannot probe, proceed with publish
+            return True
+
+        target = TARGETS.get(target_name)
+        if target is None:
+            return True
+
+        if "publication_probe" not in getattr(target, "capabilities", frozenset()):
+            return True
+
+        result = target.publication_probe(dir_path, version, ctx)
+        if result.status == PublicationStatus.PUBLISHED:
+            print(
+                f"  Pipeline '{self.name}': already published "
+                f"({result.message}), skipping"
+            )
+            return False
+        # UNPUBLISHED or UNPROBEABLE: proceed with publish
+        return True
+
+    @staticmethod
+    def is_already_published_error(exc: Exception) -> bool:
+        """Check if an exception represents an "already published" error.
+
+        Inspects the exception message, stdout, and stderr for known registry
+        error signatures. When True, the caller should treat the error as
+        success (idempotent).
+        """
+        parts = [str(exc)]
+        if hasattr(exc, "stdout") and exc.stdout:
+            parts.append(str(exc.stdout))
+        if hasattr(exc, "stderr") and exc.stderr:
+            parts.append(str(exc.stderr))
+        combined = " ".join(parts)
+        return any(sig in combined for sig in _ALREADY_EXISTS_SIGNATURES)
 
     def publish(self, dir_path: str, version: str, ctx) -> None:
         pass

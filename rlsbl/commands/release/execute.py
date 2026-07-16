@@ -1817,12 +1817,27 @@ def _run_release_mutating(state: ReleaseState):
             else:
                 # Standalone / implicit mode: single publish pass from
                 # representative config.
+                # Resume support: state tracks published_targets set so
+                # completed pipelines are skipped on retry.
+                _existing_state_pub2 = load_release_state(_state_path) or {}
+                _already_published_targets = set(
+                    _existing_state_pub2.get("published_targets", [])
+                )
+                _published_targets = list(_already_published_targets)
+
                 release_pipelines = load_pipelines(ctx.config)
                 for pl_name, pl in release_pipelines.items():
+                    if pl_name in _already_published_targets:
+                        log(f"  Pipeline '{pl_name}': skipped (already published)")
+                        continue
                     try:
                         pl.publish(primary_path, new_version, ctx=ctx)
                     except Exception as e:
                         from ...errors import PostReleaseError
+                        # Save partial progress so resume skips done pipelines
+                        _pub2_state = load_release_state(_state_path) or {}
+                        _pub2_state["published_targets"] = _published_targets
+                        save_release_state(_state_path, _pub2_state)
                         save_step_failure(
                             _state_path, "PIPELINES_PUBLISHED",
                             f"pipeline '{pl_name}': {e}",
@@ -1832,6 +1847,12 @@ def _run_release_mutating(state: ReleaseState):
                             f"Release state has been preserved; fix the issue and "
                             f"run `rlsbl release resume` to re-attempt the publish."
                         ) from e
+                    _published_targets.append(pl_name)
+
+                # Persist final published_targets list in state
+                _pub2_final = load_release_state(_state_path) or {}
+                _pub2_final["published_targets"] = _published_targets
+                save_release_state(_state_path, _pub2_final)
 
         save_step(_state_path, "PIPELINES_PUBLISHED")
         _completed.add("PIPELINES_PUBLISHED")

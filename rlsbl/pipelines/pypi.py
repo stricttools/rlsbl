@@ -37,6 +37,9 @@ class PypiPipeline(TokenPipeline):
             print(f"  Skipping pipeline '{self.name}' local publish (config: local=false)")
             return
 
+        if not self.probe_before_publish(dir_path, version, ctx):
+            return
+
         # When token_var was explicitly set in config, use it directly
         config_token_var = self.config.get("token_var")
         if config_token_var:
@@ -64,12 +67,15 @@ class PypiPipeline(TokenPipeline):
     def _publish_command(self, dir_path: str, version: str, token: str) -> None:
         try:
             run("uv", ["build"], env=os.environ, cwd=dir_path)
-            run("uv", ["publish"], env={
+            run("uv", ["publish", "--check-url", "https://pypi.org/simple/"], env={
                 **os.environ,
                 "UV_PUBLISH_TOKEN": token,
             }, cwd=dir_path)
             print(f"Published to PyPI: {version}")
         except subprocess.CalledProcessError as exc:
+            if self.is_already_published_error(exc):
+                print(f"  PyPI: version already exists, treating as success")
+                return
             raise RuntimeError(f"PyPI publish failed: {exc}") from exc
 
     def required_env_vars(self) -> list[str]:

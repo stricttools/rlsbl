@@ -33,6 +33,9 @@ class DenoPipeline(TokenPipeline):
             print(f"  Skipping pipeline '{self.name}' local publish (config: local=false)")
             return
 
+        if not self.probe_before_publish(dir_path, version, ctx):
+            return
+
         # When token_var was explicitly set in config, use it directly
         config_token_var = self.config.get("token_var")
         if config_token_var:

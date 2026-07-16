@@ -57,6 +57,9 @@ class GoPipeline(BasePipeline):
             print(f"  Skipping pipeline '{self.name}' local publish (config: local=false)")
             return
 
+        if not self.probe_before_publish(dir_path, version, ctx):
+            return
+
         module_path = read_go_module_path(dir_path)
         if module_path is None:
             raise ConfigError(
