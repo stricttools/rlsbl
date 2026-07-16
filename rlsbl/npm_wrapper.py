@@ -142,13 +142,24 @@ def build_npm_publish_jobs(
             )
     extract_script = "\n          ".join(extract_lines)
 
-    # Build the publish platform packages step script
+    # Build the per-platform probe + publish step script.
+    # Each platform package probes its own @scope/name-platform@version
+    # before publishing. If already published, the publish is skipped.
     publish_lines = []
     for artifact in artifacts:
         d = artifact.npm_platform
+        pkg_name = f"{npm_scope}/{bin_command}-{d}"
         publish_lines.append(
-            f"cd npm-wrapper/{d} && npm publish --access public{provenance_flag} && cd ../.."
+            f'if npm view "{pkg_name}@${{VERSION}}" version 2>/dev/null; then'
         )
+        publish_lines.append(
+            f'  echo "Already published: {pkg_name}@${{VERSION}}, skipping"'
+        )
+        publish_lines.append("else")
+        publish_lines.append(
+            f"  cd npm-wrapper/{d} && npm publish --access public{provenance_flag} && cd ../.."
+        )
+        publish_lines.append("fi")
     publish_script = "\n          ".join(publish_lines)
 
     checkout_action = format_action("actions/checkout")
@@ -194,7 +205,16 @@ def build_npm_publish_jobs(
           {publish_script}
         env:
           NODE_AUTH_TOKEN: ${{{{ secrets.NPM_TOKEN }}}}
+      - name: Check if wrapper already published
+        id: check-wrapper
+        run: |
+          WRAPPER_NAME="{npm_scope}/{bin_command}"
+          if npm view "${{WRAPPER_NAME}}@${{VERSION}}" version 2>/dev/null; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Already published: ${{WRAPPER_NAME}}@${{VERSION}}"
+          fi
       - name: Publish wrapper package
+        if: steps.check-wrapper.outputs.skip != 'true'
         run: cd npm-wrapper && npm publish --access public{provenance_flag}
         env:
           NODE_AUTH_TOKEN: ${{{{ secrets.NPM_TOKEN }}}}

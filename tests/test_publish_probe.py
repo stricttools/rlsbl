@@ -316,6 +316,44 @@ class TestCITemplateProbes(unittest.TestCase):
         self.assertIn("inherently idempotent", content)
 
 
+class TestNpmWrapperPerPackageProbes(unittest.TestCase):
+    """Tests for npm wrapper per-package probes in publish jobs."""
+
+    def test_platform_packages_have_probes(self):
+        """Each platform package publish line includes an npm view probe."""
+        from rlsbl.npm_wrapper import (
+            build_npm_publish_jobs, PlatformArtifact,
+        )
+
+        artifacts = [
+            PlatformArtifact("linux-x64", "linux", "x64", "a.tar.gz", "tar xzf", "mycli"),
+            PlatformArtifact("darwin-arm64", "darwin", "arm64", "b.tar.gz", "tar xzf", "mycli"),
+        ]
+
+        result = build_npm_publish_jobs("@scope", "mycli", artifacts)
+
+        # Each platform package should have an npm view probe
+        self.assertIn('npm view "@scope/mycli-linux-x64@${VERSION}"', result)
+        self.assertIn('npm view "@scope/mycli-darwin-arm64@${VERSION}"', result)
+        self.assertIn("Already published:", result)
+
+    def test_wrapper_package_has_probe(self):
+        """The meta wrapper package publish is gated on a probe step."""
+        from rlsbl.npm_wrapper import (
+            build_npm_publish_jobs, PlatformArtifact,
+        )
+
+        artifacts = [
+            PlatformArtifact("linux-x64", "linux", "x64", "a.tar.gz", "tar xzf", "mycli"),
+        ]
+
+        result = build_npm_publish_jobs("@scope", "mycli", artifacts)
+
+        self.assertIn("Check if wrapper already published", result)
+        self.assertIn("check-wrapper", result)
+        self.assertIn("steps.check-wrapper.outputs.skip != 'true'", result)
+
+
 class TestGoProbeRework(unittest.TestCase):
     """Tests for Go target publication_probe using git ls-remote."""
 
