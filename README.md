@@ -6,7 +6,7 @@
 
 # rlsbl
 
-> *[selfdoc: custom directive 'target-count' failed: cannot import name 'CheckResult' from 'strictcli' (/home/m/Projects/strictcli/python/strictcli/__init__.py)]*
+Release orchestration and project scaffolding for npm, PyPI, Go, and [15 more release targets](https://rlsbl.smmh.dev/targets).
 
 ## Install
 

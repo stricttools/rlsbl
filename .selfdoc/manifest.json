@@ -768,6 +768,11 @@
       "type": "doc"
     },
     {
+      "path": "rlsbl-resolved_target.md",
+      "title": "rlsbl.resolved_target",
+      "type": "doc"
+    },
+    {
       "path": "rlsbl-secret_scan.md",
       "title": "rlsbl.secret_scan",
       "type": "doc"
@@ -975,5 +980,5 @@
       ]
     }
   ],
-  "last_gen": "2026-07-16T00:53:03.227852+00:00"
+  "last_gen": "2026-07-16T15:39:44.367834+00:00"
 }

@@ -128,6 +128,7 @@ order: 90
 - [rlsbl.releasable_cleanup](rlsbl-releasable_cleanup.html)
 - [rlsbl.releasable_migration](rlsbl-releasable_migration.html)
 - [rlsbl.release_file](rlsbl-release_file.html)
+- [rlsbl.resolved_target](rlsbl-resolved_target.html)
 - [rlsbl.secret_scan](rlsbl-secret_scan.html)
 - [rlsbl.snapshot](rlsbl-snapshot.html)
 - [rlsbl.strictcli_detect](rlsbl-strictcli_detect.html)
