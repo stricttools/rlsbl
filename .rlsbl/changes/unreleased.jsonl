@@ -29,3 +29,4 @@
 {"id":"18c2b2b46e5cb8a0cac365e045174f05861d22ff0113ff62","commits":["0fb0740f677b76586f21f1cb0db8f508937c00e7"],"user_facing":false}
 {"id":"18c2b2b66c99b38146840a998ae145f0b1fd89a001b8c80b","commits":["4013cf98016e74a44b019e7a0a5575c2137f3e47","e445f9ebb828f4af45802508c6a069db02d3f411","52d4dfa019e423461efc85a76f973a97102929c2"],"user_facing":true,"description":"**Undo hardening.** The release commit walk now refuses partial undo when a foreign commit blocks the version-bump commit. INCONCLUSIVE evidence gate prints remediation guidance. The audit commit exception is narrowed to CalledProcessError.","type":"fix"}
 {"id":"18c2b2b779b1bfb1b5b67495e989481fac205f494ec189aa","commits":["72668d734886d8b0940770a6f4eeecd98c9fd0ce"],"user_facing":false}
+{"id":"18c2b2b89e755ec5406d14d512f84ec097606021c11b4a75","commits":["71a32af64db1e2e75f775e78d3c63abe44b52bf1"],"user_facing":false}
