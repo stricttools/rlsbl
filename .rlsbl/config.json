@@ -3,7 +3,17 @@
   "env_file": "~/Projects/.env",
   "push_timeout": 120,
   "batch_limits": {
-    "exclusions": []
+    "exclusions": [
+      {
+        "reason": "**Breaking.** Migrated check system from CheckResult to strictcli's reporter-based check API (ErrorReporter/WarnReporter + CheckOutcome).",
+        "entries": [
+          {
+            "version": "unreleased",
+            "line": 43
+          }
+        ]
+      }
+    ]
   },
   "targets": [
     "npm",

@@ -17,6 +17,13 @@
 - **Smarter watch on CI failure.** `rlsbl watch` now classifies CI failures before retrying and always prints the tail of the failure log, so you see why a run failed instead of a bare retry.
 - **Configurable-budget hints in timeout messages.** Timeout errors now point to the environment variable that controls the budget, and the built-in pytest run is invoked as `python -m pytest` so it always uses the project interpreter rather than a system-installed pytest.
 - **Scaffold heals missing merge bases from history.** Re-scaffolding a project that predates merge-base tracking now reconstructs each managed file's base from its most recent `rlsbl scaffold` commit and runs a normal three-way merge (conflicts surface as markers, never silent overwrites) instead of skipping the merge and advising a destructive overwrite. Reconstruction is read-only during analysis, so `--dry-run` reports `Would heal:` and writes nothing; healed bases are persisted so future runs need not re-reconstruct.
+- **New feature.** Go pipelines distinguish library vs binary via the artifact config key. Library projects get a lightweight module-availability verification publish template instead of goreleaser. Auto-detected during scaffold.
+- **New feature.** npm wrapper publish jobs support provenance attestation. When provenance is enabled, --provenance flag and id-token: write permission are added to the generated workflow.
+- **Idempotent publish.** Pipeline publish() methods probe the linked target's registry before publishing; already-published versions are skipped. Per-pipeline resume via published_targets in release state. PyPI publish passes --check-url. Already-exists errors (npm E403, PyPI 400, crates.io) treated as success.
+- **Go probe rework.** Go target publication_probe now uses git ls-remote --tags instead of Go module proxy HTTP GET. Avoids proxy cache lag and works for private modules.
+- **CI template probes.** Go, Docker, Maven Central, and Zig publish templates now check if already published before running build/publish steps.
+- **npm wrapper per-package probes.** Each platform package probes npm registry before publishing; wrapper meta-package gated on its own probe step.
+- **Recovery dispatch.** All 13 publish templates gain a tag workflow_dispatch input for retry dispatch. Checkout uses inputs.tag with release.tag_name fallback. Concurrency keyed on tag. retry.toml gains tag field; dispatch passes -f tag=<tag>.
 
 ### Fixes
 
@@ -31,6 +38,9 @@
 - **External-check names are validated.** External-check names must match `[a-z][a-z0-9-]*`, which excludes glob metacharacters that could pattern-match a built-in check, and a name colliding with a built-in check is now a hard error.
 - **Malformed `test` config blocks are gated during release.** A malformed `test` section (unknown targets/options, bad marker types) is now rejected before any release mutation instead of surfacing later.
 - **`release undo` reworked for safety.** It now fully unwinds multi-commit releases (previously only one commit was reverted, stranding version files at the undone version); `--dry-run` previews the complete plan and changes nothing (the flag was previously ignored, so a dry run still deleted tags and the Release and pushed a revert); and undoing the latest release now requires registry evidence -- a published release is refused and routed to `release yank`/`release deprecate` instead of being destroyed.
+- **Undo hardening.** The release commit walk now refuses partial undo when a foreign commit blocks the version-bump commit. INCONCLUSIVE evidence gate prints remediation guidance. The audit commit exception is narrowed to CalledProcessError.
+- **Fix.** npm, cargo, and deno pipelines now publish from the target's directory (cwd=dir_path) so subdirectory targets build and publish correctly. Secret scan covers per-target dist/ directories.
+- **Fix.** Merged publish workflow generation now uses pipeline template_mappings for template resolution instead of hardcoded target-name paths, so pipeline config drives template selection.
 
 ## 0.104.1
 
