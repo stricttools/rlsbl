@@ -424,6 +424,84 @@ def validate_pipelines_config(config):
                     )
 
 
+def validate_pipeline_target_links(config):
+    """Validate the ``target`` link field on each pipeline entry.
+
+    Pipelines and targets are configured separately-but-linked: every pipeline
+    entry in the ``pipelines`` section must declare an explicit ``target``
+    field. There is no name-based inference -- the link is always declared.
+    The field takes one of two shapes:
+
+    - a target NAME (string) that the pipeline publishes for. The name must
+      match a target present in the config's ``targets`` list (string form or
+      dict ``{"name": ...}`` form). A name matching no configured target is a
+      dangling reference and a hard error.
+    - ``null`` (None) -- a targetless publisher (e.g. a docs/site deploy that
+      publishes no release artifact for any target).
+
+    A pipeline missing the ``target`` key is a hard error naming the pipeline
+    and both valid shapes. This validator is additive to
+    ``validate_pipelines_config`` and mirrors its style.
+
+    This validator does NOT require every target to be referenced by a
+    pipeline -- pipeline-less targets (e.g. ``plain``/``spec``) are legal.
+
+    Raises ``ConfigError`` on any violation.
+    """
+    pipelines = config.get("pipelines")
+    if pipelines is None:
+        return
+    if not isinstance(pipelines, dict):
+        # Non-dict shape errors are owned by validate_pipelines_config.
+        return
+
+    # Collect valid target names from the targets list (string and dict forms).
+    valid_target_names = set()
+    raw_targets = config.get("targets")
+    if isinstance(raw_targets, list):
+        for entry in raw_targets:
+            if isinstance(entry, str):
+                valid_target_names.add(entry)
+            elif isinstance(entry, dict):
+                tname = entry.get("name")
+                if isinstance(tname, str) and tname:
+                    valid_target_names.add(tname)
+
+    for name, entry in pipelines.items():
+        if not isinstance(entry, dict):
+            # Non-dict entry shape errors are owned by validate_pipelines_config.
+            continue
+
+        if "target" not in entry:
+            raise ConfigError(
+                f"pipeline '{name}' is missing required key 'target'. Every "
+                "pipeline must declare what it publishes for -- there is no "
+                "name-based inference. Use one of two shapes:\n"
+                '  "target": "<target-name>"  -- publishes for a target named in '
+                'the "targets" list\n'
+                '  "target": null              -- a targetless publisher (e.g. a '
+                "docs/site deploy)"
+            )
+
+        target_ref = entry["target"]
+        if target_ref is None:
+            continue  # targetless publisher -- valid
+        if not isinstance(target_ref, str):
+            raise ConfigError(
+                f"pipeline '{name}'.target must be a target name (string) or "
+                f"null, got {type(target_ref).__name__}"
+            )
+        if target_ref not in valid_target_names:
+            known = ", ".join(sorted(valid_target_names)) or "(none configured)"
+            raise ConfigError(
+                f"pipeline '{name}'.target '{target_ref}' is a dangling "
+                f"reference: no target named '{target_ref}' is present in the "
+                f'config\'s "targets" list. Configured targets: {known}. Either '
+                f"add '{target_ref}' to targets, correct the name, or set "
+                '"target": null if this pipeline publishes no release target.'
+            )
+
+
 def validate_test_config(config):
     """Validate the optional ``test`` section of a project config.
 

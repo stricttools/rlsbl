@@ -129,3 +129,51 @@ class TestConfigSchemaCheckSurfacesTestConfig:
         )
         result = app._check_defs["config-schema"].impl(ctx)
         assert result.status == "pass"
+
+
+class TestConfigSchemaCheckSurfacesPipelineTargetLinks:
+    """The config-schema check surfaces validate_pipeline_target_links failures."""
+
+    def test_missing_target_field_fails_check(self, tmp_project):
+        ctx = ProjectContext(
+            project_root=tmp_project,
+            workspace_root=None,
+            config={
+                "publish_mode": "ci",
+                "targets": ["pypi"],
+                "pipelines": {"pypi": {"type": "pypi", "local": False}},
+            },
+        )
+        result = app._check_defs["config-schema"].impl(ctx)
+        assert result.status == "fail"
+        assert any("missing required key 'target'" in d for d in result.details)
+
+    def test_dangling_target_ref_fails_check(self, tmp_project):
+        ctx = ProjectContext(
+            project_root=tmp_project,
+            workspace_root=None,
+            config={
+                "publish_mode": "ci",
+                "targets": ["pypi"],
+                "pipelines": {"npm": {"type": "npm", "local": False, "provenance": True, "target": "npm"}},
+            },
+        )
+        result = app._check_defs["config-schema"].impl(ctx)
+        assert result.status == "fail"
+        assert any("dangling reference" in d for d in result.details)
+
+    def test_valid_target_links_pass_check(self, tmp_project):
+        ctx = ProjectContext(
+            project_root=tmp_project,
+            workspace_root=None,
+            config={
+                "publish_mode": "ci",
+                "targets": ["pypi"],
+                "pipelines": {
+                    "pypi": {"type": "pypi", "local": False, "target": "pypi"},
+                    "docs-deploy": {"type": "cloudflare-pages", "local": True, "target": None},
+                },
+            },
+        )
+        result = app._check_defs["config-schema"].impl(ctx)
+        assert result.status == "pass"

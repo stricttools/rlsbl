@@ -173,6 +173,14 @@ def validate_pipeline_config(config):
             "Add a pipelines section or run 'rlsbl scaffold'."
         )
 
+    # Enforce the explicit pipeline->target link (separate-but-linked shape):
+    # every pipeline must declare a target name or null, and named refs must
+    # resolve to a configured target. Raises ConfigError, caught by the
+    # release run_cmd wrapper. Runs at the same scope as this validator
+    # (per publishing member in releasable mode; representative otherwise).
+    from ...config import validate_pipeline_target_links
+    validate_pipeline_target_links(config)
+
     pipelines = load_pipelines(config)
     missing_vars = []
     for pl_name, pl in pipelines.items():

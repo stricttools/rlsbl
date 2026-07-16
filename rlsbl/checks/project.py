@@ -526,6 +526,13 @@ def register_project_checks(app):
         except ConfigError as e:
             errors.append(str(e))
 
+        # Validate pipeline target links (separate-but-linked config shape)
+        from ..config import validate_pipeline_target_links
+        try:
+            validate_pipeline_target_links(config)
+        except ConfigError as e:
+            errors.append(str(e))
+
         # Validate the optional per-target test config block if present
         from ..config import validate_test_config
         try:

@@ -8,7 +8,7 @@ import rlsbl.pipelines as _pipelines_mod
 from rlsbl.errors import ConfigError
 from rlsbl.pipelines import Pipeline, PIPELINE_TYPES, load_pipelines
 from rlsbl.pipelines.base import BasePipeline, TokenPipeline, CredentialPipeline
-from rlsbl.config import validate_pipelines_config
+from rlsbl.config import validate_pipelines_config, validate_pipeline_target_links
 
 
 # ---------------------------------------------------------------------------
@@ -554,3 +554,191 @@ class TestValidatePipelinesConfig:
         validate_pipelines_config(
             {"pipelines": {"p": {"type": "test_token", "local": True}}}
         )
+
+
+# ---------------------------------------------------------------------------
+# load_pipelines: target link attribute
+# ---------------------------------------------------------------------------
+
+
+class TestLoadPipelinesTargetLink:
+    def test_string_target_stored_on_object(self, monkeypatch):
+        monkeypatch.setattr(
+            _pipelines_mod, "PIPELINE_TYPES",
+            {**PIPELINE_TYPES, "test_token": _TestTokenPipeline},
+        )
+        config = {
+            "targets": ["pypi"],
+            "pipelines": {"p": {"type": "test_token", "local": False, "target": "pypi"}},
+        }
+        result = load_pipelines(config)
+        assert result["p"].target == "pypi"
+
+    def test_null_target_stored_as_none(self, monkeypatch):
+        monkeypatch.setattr(
+            _pipelines_mod, "PIPELINE_TYPES",
+            {**PIPELINE_TYPES, "test_token": _TestTokenPipeline},
+        )
+        config = {
+            "pipelines": {"deploy": {"type": "test_token", "local": True, "target": None}},
+        }
+        result = load_pipelines(config)
+        assert result["deploy"].target is None
+
+    def test_missing_target_defaults_to_none_without_raising(self, monkeypatch):
+        # load_pipelines does not validate; a missing target attribute is None.
+        monkeypatch.setattr(
+            _pipelines_mod, "PIPELINE_TYPES",
+            {**PIPELINE_TYPES, "test_token": _TestTokenPipeline},
+        )
+        config = {"pipelines": {"p": {"type": "test_token", "local": True}}}
+        result = load_pipelines(config)
+        assert result["p"].target is None
+
+
+# ---------------------------------------------------------------------------
+# validate_pipeline_target_links
+# ---------------------------------------------------------------------------
+
+
+class TestValidatePipelineTargetLinks:
+    def test_no_pipelines_key_passes(self):
+        validate_pipeline_target_links({})
+
+    def test_none_pipelines_passes(self):
+        validate_pipeline_target_links({"pipelines": None})
+
+    def test_non_dict_pipelines_deferred_to_other_validator(self):
+        # Shape errors are owned by validate_pipelines_config; this validator
+        # must not raise on a non-dict pipelines section.
+        validate_pipeline_target_links({"pipelines": "not-a-dict"})
+
+    def test_missing_target_field_fails(self):
+        with pytest.raises(ConfigError, match="missing required key 'target'"):
+            validate_pipeline_target_links(
+                {"targets": ["pypi"], "pipelines": {"pypi": {"type": "pypi", "local": False}}}
+            )
+
+    def test_missing_target_error_names_pipeline_and_both_shapes(self):
+        with pytest.raises(ConfigError) as exc:
+            validate_pipeline_target_links(
+                {"targets": ["pypi"], "pipelines": {"docs": {"type": "cloudflare-pages", "local": True}}}
+            )
+        msg = str(exc.value)
+        assert "docs" in msg           # names the pipeline
+        assert '"target": null' in msg  # targetless shape
+        assert '"target"' in msg        # named-target shape
+
+    def test_null_target_passes(self):
+        # Targetless publisher (deploy) is valid.
+        validate_pipeline_target_links(
+            {"targets": ["pypi"], "pipelines": {"docs": {"type": "cloudflare-pages", "local": True, "target": None}}}
+        )
+
+    def test_valid_string_target_ref_passes(self):
+        validate_pipeline_target_links(
+            {"targets": ["pypi"], "pipelines": {"pypi": {"type": "pypi", "local": False, "target": "pypi"}}}
+        )
+
+    def test_valid_dict_name_target_ref_passes(self):
+        # targets list uses dict form {"name": ..., "path": ...}.
+        validate_pipeline_target_links(
+            {
+                "targets": [{"name": "npm", "path": "npm/"}],
+                "pipelines": {"npm": {"type": "npm", "local": False, "target": "npm"}},
+            }
+        )
+
+    def test_dangling_target_ref_fails(self):
+        with pytest.raises(ConfigError, match="dangling reference"):
+            validate_pipeline_target_links(
+                {"targets": ["pypi"], "pipelines": {"npm": {"type": "npm", "local": False, "target": "npm"}}}
+            )
+
+    def test_dangling_error_names_pipeline_and_target(self):
+        with pytest.raises(ConfigError) as exc:
+            validate_pipeline_target_links(
+                {"targets": ["pypi"], "pipelines": {"npm": {"type": "npm", "local": False, "target": "npm"}}}
+            )
+        msg = str(exc.value)
+        assert "npm" in msg
+        assert "pypi" in msg  # lists configured targets
+
+    def test_target_absent_and_non_null_ref_is_dangling(self):
+        with pytest.raises(ConfigError, match="dangling reference"):
+            validate_pipeline_target_links(
+                {"pipelines": {"pypi": {"type": "pypi", "local": False, "target": "pypi"}}}
+            )
+
+    def test_non_string_non_null_target_fails(self):
+        with pytest.raises(ConfigError, match="must be a target name"):
+            validate_pipeline_target_links(
+                {"targets": ["pypi"], "pipelines": {"p": {"type": "pypi", "local": False, "target": 42}}}
+            )
+
+    def test_one_type_two_pipelines_passes(self):
+        # One target type serving two distinct pipelines, both linked.
+        validate_pipeline_target_links(
+            {
+                "targets": ["pypi", "npm"],
+                "pipelines": {
+                    "pypi-main": {"type": "pypi", "local": False, "target": "pypi"},
+                    "npm-main": {"type": "npm", "local": False, "target": "npm"},
+                },
+            }
+        )
+
+    def test_targetless_and_linked_mix_passes(self):
+        # A real-world mix: a linked publisher plus a targetless deploy.
+        validate_pipeline_target_links(
+            {
+                "targets": ["pypi"],
+                "pipelines": {
+                    "pypi": {"type": "pypi", "local": False, "target": "pypi"},
+                    "docs-deploy": {"type": "cloudflare-pages", "local": True, "target": None},
+                },
+            }
+        )
+
+    def test_unreferenced_target_is_legal(self):
+        # A target with no pipeline (e.g. plain/spec) must NOT be required.
+        validate_pipeline_target_links(
+            {
+                "targets": ["pypi", "spec"],
+                "pipelines": {"pypi": {"type": "pypi", "local": False, "target": "pypi"}},
+            }
+        )
+
+
+# ---------------------------------------------------------------------------
+# Release surface: validate_pipeline_config enforces target links
+# ---------------------------------------------------------------------------
+
+
+class TestReleaseSurfaceTargetLinks:
+    """validate_pipeline_config (the release-flow pipeline validator) must
+    surface target-link violations just like the config-schema check."""
+
+    def test_missing_target_field_fails_release(self):
+        from rlsbl.commands.release.validate import validate_pipeline_config
+        with pytest.raises(ConfigError, match="missing required key 'target'"):
+            validate_pipeline_config(
+                {"targets": ["pypi"], "pipelines": {"pypi": {"type": "pypi", "local": False}}}
+            )
+
+    def test_dangling_target_ref_fails_release(self):
+        from rlsbl.commands.release.validate import validate_pipeline_config
+        with pytest.raises(ConfigError, match="dangling reference"):
+            validate_pipeline_config(
+                {
+                    "targets": ["pypi"],
+                    "pipelines": {"npm": {"type": "npm", "local": False, "provenance": True, "target": "npm"}},
+                }
+            )
+
+    def test_valid_target_links_pass_release(self):
+        from rlsbl.commands.release.validate import validate_pipeline_config
+        pipelines = validate_pipeline_config(
+            {"targets": ["pypi"], "pipelines": {"pypi": {"type": "pypi", "local": False, "target": "pypi"}}}
+        )
+        assert "pypi" in pipelines

@@ -13,15 +13,18 @@
     "npm": {
       "type": "npm",
       "local": false,
-      "provenance": true
+      "provenance": true,
+      "target": "npm"
     },
     "pypi": {
       "type": "pypi",
-      "local": false
+      "local": false,
+      "target": "pypi"
     },
     "docs-deploy": {
       "type": "cloudflare-pages",
-      "local": true
+      "local": true,
+      "target": null
     }
   },
   "coverage_unit": "commit"

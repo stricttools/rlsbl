@@ -82,12 +82,12 @@ def _make_releasable_monorepo(
         "core": {
             "publish_mode": "ci",
             "targets": ["pypi"],
-            "pipelines": {"pypi": {"type": "pypi", "local": False}},
+            "pipelines": {"pypi": {"type": "pypi", "local": False, "target": "pypi"}},
         },
         "web": {
             "publish_mode": "ci",
             "targets": ["pypi"],
-            "pipelines": {"pypi": {"type": "pypi", "local": False}},
+            "pipelines": {"pypi": {"type": "pypi", "local": False, "target": "pypi"}},
         },
     }
     if member_configs:

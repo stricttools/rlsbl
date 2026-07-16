@@ -33,6 +33,11 @@ def load_pipelines(config: dict) -> dict[str, "Pipeline"]:
     find the class, which is instantiated with the pipeline name, type,
     local flag, and full entry config.
 
+    The explicit ``target`` link field is parsed and stored on each pipeline
+    instance as the ``target`` attribute (a target name string, or ``None``
+    for a targetless publisher). Absent means ``None`` here -- presence is
+    enforced by ``validate_pipeline_target_links``, not by this loader.
+
     Returns a dict mapping pipeline names to pipeline instances.
     Returns an empty dict if no ``pipelines`` key exists in the config.
     """
@@ -50,6 +55,8 @@ def load_pipelines(config: dict) -> dict[str, "Pipeline"]:
             local=entry["local"],
             config=entry,
         )
+        # Explicit target link for later phases' ResolvedTarget resolution.
+        instance.target = entry.get("target")
         result[name] = instance
     return result
 
