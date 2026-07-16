@@ -2,7 +2,6 @@
 title: rlsbl.overlay_state
 description: "Dev-overlay sentinel loading and venv inspection, shared between the ``rlsbl dev sync``/``dev status`` commands and the ``dev-overlay-drift`` check."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 97
 ---

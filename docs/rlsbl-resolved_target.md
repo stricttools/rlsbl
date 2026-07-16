@@ -2,7 +2,6 @@
 title: rlsbl.resolved_target
 description: "Resolution of a member's release surface into ``ResolvedTarget`` records."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 119
 ---
