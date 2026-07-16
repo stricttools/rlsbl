@@ -323,6 +323,11 @@ class TestEvidenceGate:
         assert git(repo, "rev-parse", "HEAD") == head_before
         assert "v1.0.1" in git(repo, "tag", "-l").split()
 
+        err = capsys.readouterr().err
+        assert "verify publication status manually" in err.lower()
+        assert "release yank" in err
+        assert "release deprecate" in err
+
     def test_second_undo_walks_to_published_release_is_refused(self, tmp_path, monkeypatch, capsys):
         """After a first undo removed the latest release, a second undo lands on
         the previous (published) release; the gate must protect it. Modeled here

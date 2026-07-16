@@ -455,6 +455,14 @@ def _enforce_gate(plan):
         )
         print(f"  rlsbl release yank {v}       # remove it from registries", file=sys.stderr)
         print(f"  rlsbl release deprecate {v}  # mark it deprecated in place", file=sys.stderr)
+    else:
+        v = plan.version
+        print(
+            "\nVerify publication status manually and retry, or use "
+            f"`rlsbl release yank {v}` / `rlsbl release deprecate {v}` "
+            "if the version was published.",
+            file=sys.stderr,
+        )
     sys.exit(1)
 
 
