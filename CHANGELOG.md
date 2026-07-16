@@ -2,6 +2,28 @@
 
 # Changelog
 
+## Unreleased
+
+### Features
+
+- **Per-target test config.** `.rlsbl/config.json` gains an optional `test` section: set `test.pypi.markers` (e.g. "not integration") to append `-m <markers>` to the built-in pytest run, so slow or credentialed integration tests can be excluded from release/check test runs.
+- **Dev-sync overlay sentinel.** `rlsbl dev sync` writes a sentinel recording the path-source overlay it applied, a new `dev-overlay-drift` check flags when the working copy's overlay has drifted from that record, and a malformed sentinel now hard-errors instead of being silently treated as empty.
+- **Smarter watch on CI failure.** `rlsbl watch` now classifies CI failures before retrying and always prints the tail of the failure log, so you see why a run failed instead of a bare retry.
+- **Configurable-budget hints in timeout messages.** Timeout errors now point to the environment variable that controls the budget, and the built-in pytest run is invoked as `python -m pytest` so it always uses the project interpreter rather than a system-installed pytest.
+
+### Fixes
+
+- **Invalid `batch_limits` config now hard-errors.** Wrong-typed keys, a non-dict `batch_limits` block, and unresolvable exclusion commit hashes are rejected loudly instead of being silently ignored.
+- **Malformed lint and hook config now hard-errors.** Malformed lint TOML, an invalid parser value, wrong-typed lint config fields, and an invalid `RLSBL_HOOK_TIMEOUT` value are rejected with a clear error instead of being used as-is or silently ignored.
+- **Changelog entry type is validated.** `rlsbl changelog add --type` now rejects any value that is not one of `feature`, `fix`, or `breaking` for user-facing entries.
+- **Safer release rollback.** Rollback now preserves tracked finalize files, drops the misleading force-push advice, checks for residual state, and the pre-publish secret scan is scoped to freshly built artifacts.
+- **First-release path guarded against destroyed tags.** The first-release flow no longer breaks when tags have been destroyed, and the destroyed-tag guard message now diagnoses a changed `tag_format` as a likely cause.
+- **Robust per-version changelog regeneration.** Regeneration now handles a read-only per-version `.md` file and writes it atomically, and duplicate-commit messaging is stabilized.
+- **Clearer npm name-collision errors.** When an npm package name collides with an existing moniker, the error now names the concrete conflicting package.
+- **External checks run even with customized hooks.** Release preflight now runs external checks regardless of hook customization, and the dry-run preflight reports honestly what it would do.
+- **External-check names are validated.** External-check names must match `[a-z][a-z0-9-]*`, which excludes glob metacharacters that could pattern-match a built-in check, and a name colliding with a built-in check is now a hard error.
+- **Malformed `test` config blocks are gated during release.** A malformed `test` section (unknown targets/options, bad marker types) is now rejected before any release mutation instead of surfacing later.
+
 ## 0.104.1
 
 Root-publisher publish gate, pytest rootdir pin, batch release idempotency, push-timeout resume resilience
