@@ -61,7 +61,7 @@ def _init_repo(repo):
 def _setup_scaffold(repo, config=None, tag=None):
     """Add .rlsbl/ scaffold to a repo."""
     if config is None:
-        config = {"private": False, "targets": []}
+        config = {"publish_mode": "ci", "targets": []}
     elif "targets" not in config:
         config = {**config, "targets": []}
     changes = repo / ".rlsbl" / "changes"
@@ -128,7 +128,7 @@ class TestPrepushMonorepoPushedCommitsNone:
         changes = pkg / ".rlsbl" / "changes"
         changes.mkdir(parents=True)
         (changes / "unreleased.jsonl").write_text("")
-        (pkg / ".rlsbl" / "config.json").write_text(json.dumps({"private": False, "targets": ["npm"]}))
+        (pkg / ".rlsbl" / "config.json").write_text(json.dumps({"publish_mode": "ci", "targets": ["npm"]}))
 
         make_workspace(repo, [{"path": "packages/alpha", "name": "alpha"}])
         run_git(repo, "add", ".")
@@ -329,7 +329,7 @@ class TestPrepushImplicitMonorepoEdgeCases:
         changes.mkdir(parents=True)
         (changes / "unreleased.jsonl").write_text("")
         (repo / "packages" / "alpha" / ".rlsbl" / "config.json").write_text(
-            json.dumps({"private": False, "targets": ["npm"]})
+            json.dumps({"publish_mode": "ci", "targets": ["npm"]})
         )
 
         make_workspace(repo, [
@@ -466,7 +466,7 @@ class TestFindConflictedScaffoldFiles:
         repo = tmp_path
         rlsbl_dir = repo / ".rlsbl"
         rlsbl_dir.mkdir()
-        (rlsbl_dir / "config.json").write_text('{"private": false}\n')
+        (rlsbl_dir / "config.json").write_text('{"publish_mode": "ci"}\n')
         result = find_conflicted_scaffold_files(repo)
         assert result == []
 
@@ -589,7 +589,7 @@ class TestVersionConsistency:
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
-        _setup_scaffold(repo, config={"private": False, "targets": ["pypi", "npm"]})
+        _setup_scaffold(repo, config={"publish_mode": "ci", "targets": ["pypi", "npm"]})
         (repo / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "0.1.0"\n'
         )
@@ -609,7 +609,7 @@ class TestVersionConsistency:
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
-        _setup_scaffold(repo, config={"private": False, "targets": ["pypi"]})
+        _setup_scaffold(repo, config={"publish_mode": "ci", "targets": ["pypi"]})
         (repo / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "0.1.0"\n'
         )
@@ -688,7 +688,7 @@ class TestNameConsistency:
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
-        _setup_scaffold(repo, config={"private": False, "targets": ["pypi", "npm"]})
+        _setup_scaffold(repo, config={"publish_mode": "ci", "targets": ["pypi", "npm"]})
         (repo / "pyproject.toml").write_text(
             '[project]\nname = "alpha"\nversion = "0.1.0"\n'
         )
@@ -707,7 +707,7 @@ class TestNameConsistency:
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
-        _setup_scaffold(repo, config={"private": False, "targets": ["pypi"]})
+        _setup_scaffold(repo, config={"publish_mode": "ci", "targets": ["pypi"]})
         (repo / "pyproject.toml").write_text(
             '[project]\nname = "mylib"\nversion = "0.1.0"\n'
         )
@@ -994,7 +994,7 @@ class TestConfigSchema:
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
-        _setup_scaffold(repo, config={"private": False, "targets": ["pypi"]})
+        _setup_scaffold(repo, config={"publish_mode": "ci", "targets": ["pypi"]})
 
         ctx = make_ctx(repo)
         result = app._check_defs["config-schema"].impl(ctx)
@@ -1010,7 +1010,7 @@ class TestConfigSchema:
         ctx = make_ctx(repo)
         result = app._check_defs["config-schema"].impl(ctx)
         assert result.status == "fail"
-        assert any("private" in d for d in result.details)
+        assert any("publish_mode" in d for d in result.details)
 
     def test_empty_targets_config_schema_fails(self, tmp_path, monkeypatch):
         """validate_config_schema catches targets: [] via config-schema check."""
@@ -1018,7 +1018,7 @@ class TestConfigSchema:
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
-        _setup_scaffold(repo, config={"private": False, "targets": []})
+        _setup_scaffold(repo, config={"publish_mode": "ci", "targets": []})
 
         ctx = make_ctx(repo)
         result = app._check_defs["config-schema"].impl(ctx)
@@ -1032,7 +1032,7 @@ class TestConfigSchema:
         monkeypatch.chdir(repo)
         _init_repo(repo)
         _setup_scaffold(repo, config={
-            "private": False, "targets": ["pypi"],
+            "publish_mode": "ci", "targets": ["pypi"],
             "release": {"mode": "imperative"},
         })
 
@@ -1112,17 +1112,17 @@ class TestLicenseFile:
 
 
 class TestPrivatePublishWorkflow:
-    """private-publish-workflow check."""
+    """publish-mode-workflow check."""
 
     def test_not_private_passes(self, tmp_path, monkeypatch):
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
-        _setup_scaffold(repo, config={"private": False})
+        _setup_scaffold(repo, config={"publish_mode": "ci"})
 
         ctx = make_ctx(repo)
-        result = app._check_defs["private-publish-workflow"].impl(ctx)
+        result = app._check_defs["publish-mode-workflow"].impl(ctx)
         assert result.status == "pass"
 
     def test_missing_private_key_fails(self, tmp_path, monkeypatch):
@@ -1133,19 +1133,19 @@ class TestPrivatePublishWorkflow:
         _setup_scaffold(repo, config={"some_key": True})
 
         ctx = make_ctx(repo)
-        result = app._check_defs["private-publish-workflow"].impl(ctx)
+        result = app._check_defs["publish-mode-workflow"].impl(ctx)
         assert result.status == "fail"
-        assert "private" in result.message
+        assert "publish_mode" in result.message
 
     def test_private_no_workflows_passes(self, tmp_path, monkeypatch):
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
-        _setup_scaffold(repo, config={"private": True})
+        _setup_scaffold(repo, config={"publish_mode": "none"})
 
         ctx = make_ctx(repo)
-        result = app._check_defs["private-publish-workflow"].impl(ctx)
+        result = app._check_defs["publish-mode-workflow"].impl(ctx)
         assert result.status == "pass"
 
     def test_private_with_publish_workflow_fails(self, tmp_path, monkeypatch):
@@ -1153,7 +1153,7 @@ class TestPrivatePublishWorkflow:
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
-        _setup_scaffold(repo, config={"private": True})
+        _setup_scaffold(repo, config={"publish_mode": "none"})
 
         wf_dir = repo / ".github" / "workflows"
         wf_dir.mkdir(parents=True)
@@ -1162,7 +1162,7 @@ class TestPrivatePublishWorkflow:
         run_git(repo, "commit", "-q", "-m", "add workflow")
 
         ctx = make_ctx(repo)
-        result = app._check_defs["private-publish-workflow"].impl(ctx)
+        result = app._check_defs["publish-mode-workflow"].impl(ctx)
         assert result.status == "fail"
         assert "publish" in result.message
 
@@ -1172,7 +1172,7 @@ class TestPrivatePublishWorkflow:
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
-        _setup_scaffold(repo, config={"private": True})
+        _setup_scaffold(repo, config={"publish_mode": "none"})
 
         wf_dir = repo / ".github" / "workflows"
         wf_dir.mkdir(parents=True)
@@ -1183,7 +1183,7 @@ class TestPrivatePublishWorkflow:
         run_git(repo, "commit", "-q", "-m", "add workflow")
 
         ctx = make_ctx(repo)
-        result = app._check_defs["private-publish-workflow"].impl(ctx)
+        result = app._check_defs["publish-mode-workflow"].impl(ctx)
         assert result.status == "fail"
 
     def test_private_with_clean_workflow_passes(self, tmp_path, monkeypatch):
@@ -1191,7 +1191,7 @@ class TestPrivatePublishWorkflow:
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
-        _setup_scaffold(repo, config={"private": True})
+        _setup_scaffold(repo, config={"publish_mode": "none"})
 
         wf_dir = repo / ".github" / "workflows"
         wf_dir.mkdir(parents=True)
@@ -1200,7 +1200,7 @@ class TestPrivatePublishWorkflow:
         run_git(repo, "commit", "-q", "-m", "add workflow")
 
         ctx = make_ctx(repo)
-        result = app._check_defs["private-publish-workflow"].impl(ctx)
+        result = app._check_defs["publish-mode-workflow"].impl(ctx)
         assert result.status == "pass"
 
 
@@ -1212,7 +1212,7 @@ class TestNpmPrivateMismatch:
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
-        _setup_scaffold(repo, config={"private": False})
+        _setup_scaffold(repo, config={"publish_mode": "ci"})
 
         ctx = make_ctx(repo)
         result = app._check_defs["npm-private-mismatch"].impl(ctx)
@@ -1223,7 +1223,7 @@ class TestNpmPrivateMismatch:
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
-        _setup_scaffold(repo, config={"private": False})
+        _setup_scaffold(repo, config={"publish_mode": "ci"})
         (repo / "package.json").write_text("not json{{{")
 
         ctx = make_ctx(repo)
@@ -1235,7 +1235,7 @@ class TestNpmPrivateMismatch:
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
-        _setup_scaffold(repo, config={"private": False})
+        _setup_scaffold(repo, config={"publish_mode": "ci"})
         (repo / "package.json").write_text('{"name": "test", "version": "0.1.0", "private": true}\n')
         run_git(repo, "add", "package.json")
         run_git(repo, "commit", "-q", "-m", "add pkg")
@@ -1250,7 +1250,7 @@ class TestNpmPrivateMismatch:
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
-        _setup_scaffold(repo, config={"private": False})
+        _setup_scaffold(repo, config={"publish_mode": "ci"})
         (repo / "package.json").write_text('{"name": "test", "version": "0.1.0"}\n')
         run_git(repo, "add", "package.json")
         run_git(repo, "commit", "-q", "-m", "add pkg")
@@ -1273,7 +1273,7 @@ class TestNpmPrivateMismatch:
         ctx = make_ctx(repo)
         result = app._check_defs["npm-private-mismatch"].impl(ctx)
         assert result.status == "fail"
-        assert "private" in result.message
+        assert "publish_mode" in result.message
 
 
 class TestTargetVersionReadable:
@@ -1296,7 +1296,7 @@ class TestTargetVersionReadable:
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
-        _setup_scaffold(repo, config={"private": False, "targets": ["pypi"]})
+        _setup_scaffold(repo, config={"publish_mode": "ci", "targets": ["pypi"]})
         (repo / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "0.1.0"\n'
         )
@@ -1424,7 +1424,7 @@ class TestSelfdocVersionDrift:
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
-        _setup_scaffold(repo, config={"private": False, "targets": ["pypi"]})
+        _setup_scaffold(repo, config={"publish_mode": "ci", "targets": ["pypi"]})
         (repo / "selfdoc.json").write_text('{"version": "0.1.0"}\n')
         (repo / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "0.1.0"\n'
@@ -1442,7 +1442,7 @@ class TestSelfdocVersionDrift:
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
-        _setup_scaffold(repo, config={"private": False, "targets": ["pypi"]})
+        _setup_scaffold(repo, config={"publish_mode": "ci", "targets": ["pypi"]})
         (repo / "selfdoc.json").write_text('{"version": "0.2.0"}\n')
         (repo / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "0.1.0"\n'
@@ -2322,7 +2322,7 @@ class TestWorkspaceUnregistered:
         gamma.mkdir()
         rlsbl = gamma / ".rlsbl"
         rlsbl.mkdir()
-        (rlsbl / "config.json").write_text('{"private": false, "targets": ["npm"]}\n')
+        (rlsbl / "config.json").write_text('{"publish_mode": "ci", "targets": ["npm"]}\n')
 
         from rlsbl.workspace import WorkspaceProject
         projects = []  # No projects registered

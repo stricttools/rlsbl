@@ -109,7 +109,7 @@ def _setup_releasable_workspace(root):
     )
     (core / ".rlsbl").mkdir()
     (core / ".rlsbl" / "config.json").write_text(
-        json.dumps({"private": False, "targets": ["npm"], "pipelines": {}}) + "\n"
+        json.dumps({"publish_mode": "ci", "targets": ["npm"], "pipelines": {}}) + "\n"
     )
 
     save_workspace(
@@ -450,11 +450,21 @@ class TestUndoRestoresReleasableReleaseFile:
         def failing_run_gh(args, **kwargs):
             raise subprocess.CalledProcessError(1, "gh")
 
+        from rlsbl.evidence_gate import Evidence, EvidenceKind, GateResult, Verdict
+
+        def cleared_gate(*_a, **_k):
+            return GateResult(
+                Verdict.CLEARED,
+                [Evidence("registry_probe", "npm", EvidenceKind.UNPUBLISHED, "not on npm")],
+                "unpublished",
+            )
+
         with (
             patch("rlsbl.commands.undo.check_gh_installed", return_value=True),
             patch("rlsbl.commands.undo.check_gh_auth", return_value=True),
             patch("rlsbl.commands.undo.run_gh", side_effect=failing_run_gh),
             patch("rlsbl.commands.undo.run", side_effect=_fake_run_factory()),
+            patch("rlsbl.commands.undo.run_evidence_gate", side_effect=cleared_gate),
             patch("rlsbl.commands.undo.push_if_needed"),
         ):
             undo_run_cmd(None, [], {"yes": True}, ctx=ctx)

@@ -1,4 +1,4 @@
-"""Tests for private repository workflow: --private flag, publish skip, asset upload hook."""
+"""Tests for publish-suppression workflow: --publish-mode flag, publish skip, auto-detection."""
 
 import json
 import os
@@ -10,12 +10,13 @@ import pytest
 from pathlib import Path
 
 from rlsbl.commands.init_cmd import (
-    _resolve_private,
+    _resolve_publish_mode,
     process_mappings,
     run_cmd,
 )
 from rlsbl.config import read_project_config
 from rlsbl.context import ProjectContext
+from rlsbl.errors import ConfigError
 from rlsbl.utils import is_private_repo
 
 
@@ -81,7 +82,7 @@ class TestIsPrivateRepo:
 
 
 class TestPrivateFlagScaffold:
-    """Tests for --private flag integration with scaffold."""
+    """Tests for --publish-mode flag integration with scaffold."""
 
     def test_private_flag_skips_publish_template(self, mock_git_repo):
         """Scaffold with private=True should not create publish.yml."""
@@ -91,7 +92,7 @@ class TestPrivateFlagScaffold:
 
         with patch("sys.stdout", new_callable=StringIO):
             with patch("rlsbl.commands.init_cmd.is_private_repo", return_value=True):
-                run_cmd("npm", [], {"private": True, "auto-tag": False}, ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={}))
+                run_cmd("npm", [], {"publish-mode": "none", "auto-tag": False}, ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={}))
 
         publish_path = os.path.join(".github", "workflows", "publish.yml")
         assert not os.path.exists(publish_path), "publish.yml should not exist for private repos"
@@ -100,17 +101,15 @@ class TestPrivateFlagScaffold:
         ci_path = os.path.join(".github", "workflows", "ci.yml")
         assert os.path.exists(ci_path), "ci.yml should still be created"
 
-    def test_private_auto_detection(self, mock_git_repo):
-        """When is_private_repo() returns True, scaffold should skip publish."""
+    def test_private_repo_requires_explicit_publish_mode(self, mock_git_repo):
+        """A private repo with no --publish-mode flag is a hard error (must choose)."""
         pkg = {"name": "test-pkg", "version": "1.0.0"}
         (mock_git_repo / "package.json").write_text(json.dumps(pkg))
 
         with patch("sys.stdout", new_callable=StringIO):
             with patch("rlsbl.commands.init_cmd.is_private_repo", return_value=True):
-                run_cmd("npm", [], {"auto-tag": False}, ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={}))
-
-        publish_path = os.path.join(".github", "workflows", "publish.yml")
-        assert not os.path.exists(publish_path), "publish.yml should not exist for auto-detected private repos"
+                with pytest.raises(ConfigError, match="Cannot auto-determine publish_mode"):
+                    run_cmd("npm", [], {"auto-tag": False}, ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={}))
 
     def test_private_does_not_scaffold_hook_files(self, mock_git_repo):
         """Private scaffold should not create hook files (hooks are config-driven)."""
@@ -119,7 +118,7 @@ class TestPrivateFlagScaffold:
 
         with patch("sys.stdout", new_callable=StringIO):
             with patch("rlsbl.commands.init_cmd.is_private_repo", return_value=True):
-                run_cmd("npm", [], {"private": True, "auto-tag": False}, ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={}))
+                run_cmd("npm", [], {"publish-mode": "none", "auto-tag": False}, ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={}))
 
         hooks_dir = os.path.join(".rlsbl", "hooks")
         hook_files = []
@@ -136,10 +135,10 @@ class TestPrivateFlagScaffold:
 
         with patch("sys.stdout", new_callable=StringIO):
             with patch("rlsbl.commands.init_cmd.is_private_repo", return_value=True):
-                run_cmd("npm", [], {"private": True, "auto-tag": False}, ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={}))
+                run_cmd("npm", [], {"publish-mode": "none", "auto-tag": False}, ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={}))
 
         config = read_project_config(str(mock_git_repo))
-        assert config.get("private") is True
+        assert config.get("publish_mode") == "none"
 
     def test_public_repo_creates_publish(self, mock_git_repo):
         """Public repos should still get publish.yml."""
@@ -158,16 +157,16 @@ class TestPrivateFlagScaffold:
         pkg = {"name": "test-pkg", "version": "1.0.0"}
         (mock_git_repo / "package.json").write_text(json.dumps(pkg))
 
-        # First scaffold with --private
+        # First scaffold with --publish-mode none
         with patch("sys.stdout", new_callable=StringIO):
             with patch("rlsbl.commands.init_cmd.is_private_repo", return_value=None):
-                run_cmd("npm", [], {"private": True, "auto-tag": False}, ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={}))
+                run_cmd("npm", [], {"publish-mode": "none", "auto-tag": False}, ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={}))
 
         # Remove publish.yml tracking and CI to force re-creation scenario
         publish_path = os.path.join(".github", "workflows", "publish.yml")
         assert not os.path.exists(publish_path)
 
-        # Second scaffold without --private flag, but config remembers
+        # Second scaffold without --publish-mode flag, but config remembers
         saved_config = read_project_config(Path(str(mock_git_repo)))
         with patch("sys.stdout", new_callable=StringIO):
             with patch("rlsbl.commands.init_cmd.is_private_repo", return_value=None):

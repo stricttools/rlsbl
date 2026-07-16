@@ -2,7 +2,7 @@
 
 Checks: lock, version-consistency, name-consistency, license-consistency,
 description-consistency, private-hook-stale, config-schema, license-file,
-private-publish-workflow, npm-private-mismatch, target-version-readable,
+publish-mode-workflow, npm-private-mismatch, target-version-readable,
 dunder-version-missing, selfdoc-version-drift, scaffold-conflicts,
 cross-repo-path-sources.
 """
@@ -224,7 +224,7 @@ def register_project_checks(app):
 
         In explicit releasable mode (when the project belongs to a named
         releasable with a version file), the releasable version is the
-        source of truth. Published (non-private) member manifests are
+        source of truth. Published (publish_mode != "none") member manifests are
         checked against the releasable version -- a mismatch is an error.
 
         In implicit mode (no [[releasables]]), all targets within the
@@ -245,10 +245,10 @@ def register_project_checks(app):
             member = resolve_member_context(
                 str(ctx.project_root), releasable_config_dir=rel_dir,
             )
-            if member.is_private:
+            if member.publish_mode == "none":
                 return CheckResult(
                     "pass",
-                    f"{releasable_version} (private member, version file only)",
+                    f"{releasable_version} (publish-suppressed member, version file only)",
                 )
 
             # Check manifest versions of published member
@@ -501,7 +501,7 @@ def register_project_checks(app):
 
     @app.check("config-schema")
     def check_config_schema(ctx):
-        """Validate config schema: private key, banned keys, and pipelines."""
+        """Validate config schema: publish_mode, banned keys, and pipelines."""
         skip = _skip_if_virtual_root(ctx)
         if skip is not None:
             return skip
@@ -509,8 +509,8 @@ def register_project_checks(app):
         config = ctx.config
         errors = []
 
-        if "private" not in config:
-            errors.append('"private" key missing from config')
+        # publish_mode presence/validity (and the deprecated private key ban)
+        # are enforced by validate_config_schema below.
 
         # Validate banned keys and structural invariants
         from ..config import validate_config_schema as _validate_config_schema
@@ -566,20 +566,20 @@ def register_project_checks(app):
 
         return CheckResult("pass", "LICENSE file valid")
 
-    @app.check("private-publish-workflow")
-    def check_private_publish_workflow(ctx):
-        """Private repos must not have publish workflows."""
+    @app.check("publish-mode-workflow")
+    def check_publish_mode_workflow(ctx):
+        """publish_mode "none" repos must not have publish workflows."""
         skip = _skip_if_virtual_root(ctx)
         if skip is not None:
             return skip
 
-        if "private" not in ctx.config:
-            return CheckResult(
-                "fail",
-                'missing required "private" key in .rlsbl/config.json — set "private": true or "private": false',
-            )
-        if not ctx.config["private"]:
-            return CheckResult("pass", "not a private repo")
+        from ..config import get_publish_mode
+        try:
+            mode = get_publish_mode(ctx.config)
+        except ConfigError as e:
+            return CheckResult("fail", str(e))
+        if mode != "none":
+            return CheckResult("pass", 'publish_mode is not "none"')
 
         import glob
 
@@ -605,13 +605,13 @@ def register_project_checks(app):
         if publish_files:
             return CheckResult(
                 "fail",
-                f"private repo has publish workflow(s): {', '.join(sorted(publish_files))}",
+                f'publish_mode "none" repo has publish workflow(s): {", ".join(sorted(publish_files))}',
             )
-        return CheckResult("pass", "no publish workflows in private repo")
+        return CheckResult("pass", 'no publish workflows in publish_mode "none" repo')
 
     @app.check("npm-private-mismatch")
     def check_npm_private_mismatch(ctx):
-        """package.json private:true must not contradict config private:false."""
+        """package.json private:true must not contradict publish_mode "ci"."""
         root_str = str(ctx.project_root)
         pkg_path = os.path.join(root_str, "package.json")
         if not os.path.exists(pkg_path):
@@ -624,19 +624,19 @@ def register_project_checks(app):
             return CheckResult("skip", "cannot read package.json")
 
         npm_private = pkg.get("private", False)
-        if "private" not in ctx.config:
-            return CheckResult(
-                "fail",
-                'missing required "private" key in .rlsbl/config.json — set "private": true or "private": false',
-            )
-        config_private = ctx.config["private"]
+        from ..config import get_publish_mode
+        try:
+            mode = get_publish_mode(ctx.config)
+        except ConfigError as e:
+            return CheckResult("fail", str(e))
 
-        if npm_private is True and config_private is False:
+        if npm_private is True and mode != "none":
             return CheckResult(
                 "fail",
-                'package.json has "private": true but .rlsbl/config.json has "private": false',
+                'package.json has "private": true but .rlsbl/config.json has '
+                f'"publish_mode": "{mode}" (publishing enabled)',
             )
-        return CheckResult("pass", "npm private flag consistent with config")
+        return CheckResult("pass", "npm private flag consistent with publish_mode")
 
     @app.check("target-version-readable")
     def check_target_version_readable(ctx):

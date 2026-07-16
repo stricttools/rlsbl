@@ -41,7 +41,7 @@ def rlsbl_repo(tmp_path, monkeypatch):
     (changes / "unreleased.jsonl").write_text("")
 
     # config.json needed for cmd_add (reads batch_limits)
-    (repo / ".rlsbl" / "config.json").write_text(json.dumps({"private": False}) + "\n")
+    (repo / ".rlsbl" / "config.json").write_text(json.dumps({"publish_mode": "ci"}) + "\n")
 
     return repo
 

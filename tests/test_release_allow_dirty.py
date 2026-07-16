@@ -41,7 +41,7 @@ class TestReleaseAllowDirty:
         with open(os.path.join(".rlsbl", "changes", "unreleased.jsonl"), "w") as f:
             f.write('{"commits":["abc1234"],"user_facing":true,"description":"Bugfix","type":"fix"}\n')
         with open(os.path.join(".rlsbl", "config.json"), "w") as f:
-            json.dump({"private": False, "targets": ["npm"]}, f)
+            json.dump({"publish_mode": "ci", "targets": ["npm"]}, f)
 
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
@@ -51,7 +51,7 @@ class TestReleaseAllowDirty:
         from rlsbl.commands.release import run_cmd
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(_rc(), {"quiet": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
+            run_cmd(_rc(), {"quiet": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
         assert exc_info.value.code == 1
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
@@ -87,7 +87,7 @@ class TestReleaseAllowDirty:
                 "dry-run": True,
                 "quiet": False,
             },
-            ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}),
+            ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}),
 )
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
@@ -164,7 +164,7 @@ class TestReleaseAllowDirty:
                 "yes": True,
                 "quiet": False,
             },
-            ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}),
+            ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}),
 )
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
@@ -226,6 +226,6 @@ class TestReleaseAllowDirty:
                     "yes": True,
                     "quiet": False,
                 },
-                ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}),
+                ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}),
 )
             assert exc_info.value.code == 1

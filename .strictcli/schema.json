@@ -49,7 +49,7 @@
   "project_id": "rlsbl",
   "name": "rlsbl",
   "version": "0.104.1",
-  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 52 commands organized into 16 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
+  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 52 commands organized into 15 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
   "global_flags": [
     {
       "name": "dry-run",
@@ -156,7 +156,7 @@
     },
     "scaffold": {
       "name": "scaffold",
-      "help": "Generate or update CI/CD workflows, git hooks, changelog, and license files. Safe to run repeatedly -- merges template changes with your customizations. Use --force-overwrite to overwrite all files.",
+      "help": "Generate or update CI/CD workflows, git hooks, changelog, and license files. Safe to run repeatedly -- three-way merges template changes with your customizations. Existing files with no stored merge base are healed from their last scaffold commit before merging.",
       "flags": [
         {
           "name": "target",
@@ -165,18 +165,10 @@
           "default": ""
         },
         {
-          "name": "force-overwrite",
-          "type": "bool",
-          "help": "Overwrite all scaffold-managed files, discarding any user customizations",
-          "default": false,
-          "negatable": true
-        },
-        {
-          "name": "private",
-          "type": "bool",
-          "help": "Generate workflows without publish steps, suitable for private repositories",
-          "default": false,
-          "negatable": true
+          "name": "publish-mode",
+          "type": "str",
+          "help": "Publish mode: \"ci\" to publish via CI pipelines, or \"none\" to suppress publishing. Required for private repos; public repos default to \"ci\".",
+          "default": ""
         },
         {
           "name": "auto-commit",
@@ -343,19 +335,6 @@
           "type": "str",
           "help": "Total recording duration in seconds before auto-stop (default: 10)",
           "default": "10"
-        }
-      ]
-    },
-    "migrate": {
-      "name": "migrate",
-      "help": "Run pending configuration migrations to update .rlsbl config files to the latest schema. Use --dry-run to preview changes without applying, or --status to see which migrations are pending.",
-      "flags": [
-        {
-          "name": "status",
-          "type": "bool",
-          "help": "Display which migrations are pending and which have already been applied",
-          "default": false,
-          "negatable": true
         }
       ]
     },
@@ -1249,6 +1228,10 @@
         "sync": {
           "name": "sync",
           "help": "Overlay local editable checkouts of sibling projects onto this project's locked environment. Reads dev-sources.toml.local-only for overlay entries, runs uv sync --inexact excluding overlaid packages, then uv pip install -e per entry. Requires UV_NO_SYNC=1 in the environment to prevent bare uv run from reverting overlays."
+        },
+        "status": {
+          "name": "status",
+          "help": "Report the state of local dev-sync overlays: for each package recorded in the dev-overlays sentinel, show its declared editable checkout path and version alongside the venv's actual install (editable at the expected path, WIPED back to a registry wheel, or missing entirely). Exits 1 if any overlay drifted so scripts and pre-run guards can detect a silent wipe by a bare uv sync or uv run; exits 0 when all overlays are intact or none are declared."
         }
       }
     }
@@ -1399,7 +1382,7 @@
       ],
       "severity": "error",
       "fast": false,
-      "pure": true,
+      "pure": false,
       "needs_network": false,
       "depends_on": [],
       "scope": "workspace:library"
@@ -1492,7 +1475,7 @@
       ],
       "severity": "error",
       "fast": true,
-      "pure": true,
+      "pure": false,
       "needs_network": false,
       "depends_on": []
     },
@@ -1537,7 +1520,7 @@
       ],
       "severity": "error",
       "fast": true,
-      "pure": true,
+      "pure": false,
       "needs_network": false,
       "depends_on": [],
       "scope": "workspace"
@@ -1603,7 +1586,7 @@
       ],
       "severity": "error",
       "fast": false,
-      "pure": true,
+      "pure": false,
       "needs_network": false,
       "depends_on": [],
       "scope": "workspace"
@@ -1702,11 +1685,11 @@
       ],
       "severity": "error",
       "fast": true,
-      "pure": true,
+      "pure": false,
       "needs_network": false,
       "depends_on": []
     },
-    "private-publish-workflow": {
+    "publish-mode-workflow": {
       "tags": [
         "project"
       ],
@@ -1778,13 +1761,24 @@
       "needs_network": false,
       "depends_on": []
     },
+    "dev-overlay-drift": {
+      "tags": [
+        "project",
+        "preflight"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
     "prepush-changelog-coverage": {
       "tags": [
         "prepush"
       ],
       "severity": "error",
       "fast": false,
-      "pure": true,
+      "pure": false,
       "needs_network": false,
       "depends_on": []
     },
@@ -1794,7 +1788,7 @@
       ],
       "severity": "error",
       "fast": true,
-      "pure": true,
+      "pure": false,
       "needs_network": false,
       "depends_on": []
     },

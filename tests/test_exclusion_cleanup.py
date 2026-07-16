@@ -73,7 +73,7 @@ class TestCleanStaleExclusions:
 
     def test_cleanup_handles_no_batch_limits(self, tmp_path):
         config_path = tmp_path / "config.json"
-        _write_config(config_path, {"private": False})
+        _write_config(config_path, {"publish_mode": "ci"})
 
         removed = clean_stale_exclusions(str(config_path))
 
@@ -147,7 +147,7 @@ class TestExclusionCleanupIntegration:
         # Set up .rlsbl/config.json with a stale exclusion
         config_path = tmp_path / ".rlsbl" / "config.json"
         _write_config(config_path, {
-            "private": False,
+            "publish_mode": "ci",
             "batch_limits": {
                 "max_commits_per_entry": 5,
                 "max_entries_per_commit": 5,
@@ -187,7 +187,7 @@ class TestExclusionCleanupIntegration:
         assert exclusions[0]["reason"] == "permanent exclusion for v1.0.0"
 
         # Verify other config keys are preserved
-        assert result["private"] is False
+        assert result["publish_mode"] == "ci"
         assert result["batch_limits"]["max_commits_per_entry"] == 5
 
     def test_finalize_then_cleanup_no_stale(self, tmp_path):
@@ -204,7 +204,7 @@ class TestExclusionCleanupIntegration:
 
         config_path = tmp_path / ".rlsbl" / "config.json"
         _write_config(config_path, {
-            "private": False,
+            "publish_mode": "ci",
             "batch_limits": {
                 "exclusions": [
                     {
@@ -416,7 +416,7 @@ class TestCleanStaleCommitLevelExclusions:
         )
 
         config_path = self._setup_config(tmp_path, {
-            "private": False,
+            "publish_mode": "ci",
             "batch_limits": {
                 "exclusions": [
                     {

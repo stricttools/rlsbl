@@ -95,19 +95,19 @@ class TestIsHookCustomized:
 
     def test_no_hooks_section_customized_script_is_customized(self, tmp_path):
         """No hooks config section + customized script -> customized=True (backward compat)."""
-        config = {"private": False}
+        config = {"publish_mode": "ci"}
         hook_path = _make_hook_file(tmp_path, _V1_TEMPLATE + "npm test\n")
         assert is_hook_customized(config, hook_path) is True
 
     def test_no_hooks_section_template_script_not_customized(self, tmp_path):
         """No hooks config section + template script -> customized=False."""
-        config = {"private": False}
+        config = {"publish_mode": "ci"}
         hook_path = _make_hook_file(tmp_path, _V1_TEMPLATE)
         assert is_hook_customized(config, hook_path) is False
 
     def test_no_hooks_section_no_script_not_customized(self, tmp_path):
         """No hooks config section + missing script -> customized=False."""
-        config = {"private": False}
+        config = {"publish_mode": "ci"}
         hook_path = str(tmp_path / "nonexistent" / "pre-release.sh")
         assert is_hook_customized(config, hook_path) is False
 
@@ -205,7 +205,7 @@ class TestIsReleasableHookCustomizedWithConfig:
         ])
         _make_releasable_hook(tmp_path, "www", "pre-release.sh",
                               "#!/bin/bash\nnpm run build\n")
-        config = {"private": False}
+        config = {"publish_mode": "ci"}
         assert is_releasable_hook_customized(str(tmp_path), "www", config=config) is True
 
 

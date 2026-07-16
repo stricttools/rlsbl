@@ -576,11 +576,11 @@ class TestPrivateHookStaleCheck:
         from rlsbl.context import ProjectContext
         config_dir = tmp_path / ".rlsbl"
         config_dir.mkdir(parents=True, exist_ok=True)
-        (config_dir / "config.json").write_text('{"private": false}')
+        (config_dir / "config.json").write_text('{"publish_mode": "ci"}')
         return ProjectContext(
             project_root=tmp_path,
             workspace_root=Path(workspace_root) if workspace_root else None,
-            config={"private": False},
+            config={"publish_mode": "ci"},
         )
 
     def _run_check(self, ctx):
@@ -635,7 +635,7 @@ class TestPrivateHookStaleCheck:
     def test_no_hooks_pass(self, tmp_path):
         """No hooks at all passes the check."""
         (tmp_path / ".rlsbl").mkdir(parents=True, exist_ok=True)
-        (tmp_path / ".rlsbl" / "config.json").write_text('{"private": false}')
+        (tmp_path / ".rlsbl" / "config.json").write_text('{"publish_mode": "ci"}')
 
         ctx = self._make_check_ctx(tmp_path)
         result = self._run_check(ctx)

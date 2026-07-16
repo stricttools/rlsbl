@@ -88,13 +88,13 @@ def _setup_releasable_repo(tmp_path, monkeypatch, *, batch_limit=3):
     # Per-package .rlsbl/config.json (no batch_limits -- must inherit)
     pkg_rlsbl = proj_dir / ".rlsbl"
     pkg_rlsbl.mkdir()
-    (pkg_rlsbl / "config.json").write_text(json.dumps({"private": False}) + "\n")
+    (pkg_rlsbl / "config.json").write_text(json.dumps({"publish_mode": "ci"}) + "\n")
 
     # Releasable-level config with batch_limits
     rel_dir = get_releasable_dir(str(repo), "www")
     os.makedirs(rel_dir, exist_ok=True)
     rel_config = {
-        "private": False,
+        "publish_mode": "ci",
         "batch_limits": {
             "max_commits_per_entry": batch_limit,
             "max_entries_per_commit": 5,
@@ -261,7 +261,7 @@ class TestStandaloneExclusionRegression:
 
         # Config with low batch limit
         config = {
-            "private": False,
+            "publish_mode": "ci",
             "batch_limits": {
                 "max_commits_per_entry": 3,
                 "max_entries_per_commit": 5,

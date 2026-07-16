@@ -192,7 +192,7 @@ class TestCoverageUnitConfig:
         # that's handled in the validation flow. We test the new
         # read_coverage_unit helper instead.
         from rlsbl.changelog.files import read_coverage_unit
-        config = {"private": True}
+        config = {"publish_mode": "none"}
         with pytest.raises(Exception, match="coverage_unit"):
             read_coverage_unit(config)
 
@@ -242,7 +242,7 @@ def changeset_repo(tmp_path, monkeypatch):
     config_path = config_dir / "config.json"
     config_path.write_text(json.dumps({
         "coverage_unit": "changeset-file",
-        "private": True,
+        "publish_mode": "none",
     }, indent=2))
 
     return repo
@@ -539,7 +539,7 @@ class TestReadCoverageUnitEnforcement:
         config_path = repo / ".rlsbl" / "config.json"
         config_path.write_text(json.dumps({
             "coverage_unit": "bogus-value",
-            "private": True,
+            "publish_mode": "none",
         }, indent=2))
 
         sha = _make_commit(repo, "file.txt", "change")
@@ -578,7 +578,7 @@ class TestReadCoverageUnitEnforcement:
         config_path = repo / ".rlsbl" / "config.json"
         config_path.write_text(json.dumps({
             "coverage_unit": "commit",
-            "private": True,
+            "publish_mode": "none",
         }, indent=2))
 
         sha = _make_commit(repo, "file.txt", "change")
@@ -610,7 +610,7 @@ class TestReadCoverageUnitEnforcement:
 
         rlsbl_dir = tmp_path / ".rlsbl"
         rlsbl_dir.mkdir()
-        (rlsbl_dir / "config.json").write_text(json.dumps({"private": True}))
+        (rlsbl_dir / "config.json").write_text(json.dumps({"publish_mode": "none"}))
 
         config = read_project_config(tmp_path)
         assert config["coverage_unit"] == "commit"
@@ -653,7 +653,7 @@ class TestChangesetAutoPackages:
 
         config = {
             "coverage_unit": "changeset-file",
-            "private": True,
+            "publish_mode": "none",
         }
 
         # Create a mock releasable
@@ -690,7 +690,7 @@ class TestChangesetAutoPackages:
 
         config = {
             "coverage_unit": "changeset-file",
-            "private": True,
+            "publish_mode": "none",
         }
 
         flags = {

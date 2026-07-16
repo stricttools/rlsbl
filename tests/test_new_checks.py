@@ -1,4 +1,4 @@
-"""Tests for Phase 12 checks: private-publish-workflow, npm-private-mismatch,
+"""Tests for Phase 12 checks: publish-mode-workflow, npm-private-mismatch,
 target-version-readable, selfdoc-version-drift.
 
 The scaffold-conflict-markers tests that used to live here moved to
@@ -13,36 +13,36 @@ from rlsbl import app
 
 
 # ------------------------------------------------------------------
-# private-publish-workflow
+# publish-mode-workflow
 # ------------------------------------------------------------------
 
 
 class TestPrivatePublishWorkflow:
-    """Tests for the private-publish-workflow check."""
+    """Tests for the publish-mode-workflow check."""
 
     def test_public_repo_passes(self, tmp_project):
         """Non-private repo always passes regardless of workflows."""
         cfg_dir = tmp_project / ".rlsbl"
         cfg_dir.mkdir()
-        (cfg_dir / "config.json").write_text(json.dumps({"private": False}))
+        (cfg_dir / "config.json").write_text(json.dumps({"publish_mode": "ci"}))
         wf_dir = tmp_project / ".github" / "workflows"
         wf_dir.mkdir(parents=True)
         (wf_dir / "publish.yml").write_text("name: Publish\non: push\n")
         ctx = make_ctx(tmp_project)
-        result = app._check_defs["private-publish-workflow"].impl(ctx)
+        result = app._check_defs["publish-mode-workflow"].impl(ctx)
         assert result.status == "pass"
-        assert "not a private repo" in result.message
+        assert 'publish_mode is not "none"' in result.message
 
     def test_private_repo_with_publish_filename_fails(self, tmp_project):
         """Private repo with a file named 'publish.yml' fails."""
         cfg_dir = tmp_project / ".rlsbl"
         cfg_dir.mkdir()
-        (cfg_dir / "config.json").write_text(json.dumps({"private": True}))
+        (cfg_dir / "config.json").write_text(json.dumps({"publish_mode": "none"}))
         wf_dir = tmp_project / ".github" / "workflows"
         wf_dir.mkdir(parents=True)
         (wf_dir / "publish.yml").write_text("name: Publish\non: push\n")
         ctx = make_ctx(tmp_project)
-        result = app._check_defs["private-publish-workflow"].impl(ctx)
+        result = app._check_defs["publish-mode-workflow"].impl(ctx)
         assert result.status == "fail"
         assert "publish.yml" in result.message
 
@@ -50,7 +50,7 @@ class TestPrivatePublishWorkflow:
         """Private repo with 'release: [published]' trigger fails."""
         cfg_dir = tmp_project / ".rlsbl"
         cfg_dir.mkdir()
-        (cfg_dir / "config.json").write_text(json.dumps({"private": True}))
+        (cfg_dir / "config.json").write_text(json.dumps({"publish_mode": "none"}))
         wf_dir = tmp_project / ".github" / "workflows"
         wf_dir.mkdir(parents=True)
         (wf_dir / "deploy.yml").write_text(
@@ -60,7 +60,7 @@ class TestPrivatePublishWorkflow:
             "    types: [published]\n"
         )
         ctx = make_ctx(tmp_project)
-        result = app._check_defs["private-publish-workflow"].impl(ctx)
+        result = app._check_defs["publish-mode-workflow"].impl(ctx)
         assert result.status == "fail"
         assert "deploy.yml" in result.message
 
@@ -68,21 +68,21 @@ class TestPrivatePublishWorkflow:
         """Private repo with no .github/workflows/ directory passes."""
         cfg_dir = tmp_project / ".rlsbl"
         cfg_dir.mkdir()
-        (cfg_dir / "config.json").write_text(json.dumps({"private": True}))
+        (cfg_dir / "config.json").write_text(json.dumps({"publish_mode": "none"}))
         ctx = make_ctx(tmp_project)
-        result = app._check_defs["private-publish-workflow"].impl(ctx)
+        result = app._check_defs["publish-mode-workflow"].impl(ctx)
         assert result.status == "pass"
 
     def test_private_repo_clean_workflows_passes(self, tmp_project):
         """Private repo with only CI workflows (no publish) passes."""
         cfg_dir = tmp_project / ".rlsbl"
         cfg_dir.mkdir()
-        (cfg_dir / "config.json").write_text(json.dumps({"private": True}))
+        (cfg_dir / "config.json").write_text(json.dumps({"publish_mode": "none"}))
         wf_dir = tmp_project / ".github" / "workflows"
         wf_dir.mkdir(parents=True)
         (wf_dir / "ci.yml").write_text("name: CI\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n")
         ctx = make_ctx(tmp_project)
-        result = app._check_defs["private-publish-workflow"].impl(ctx)
+        result = app._check_defs["publish-mode-workflow"].impl(ctx)
         assert result.status == "pass"
         assert "no publish workflows" in result.message
 
@@ -108,7 +108,7 @@ class TestNpmPrivateMismatch:
         )
         cfg_dir = tmp_project / ".rlsbl"
         cfg_dir.mkdir()
-        (cfg_dir / "config.json").write_text(json.dumps({"private": False}))
+        (cfg_dir / "config.json").write_text(json.dumps({"publish_mode": "ci"}))
         ctx = make_ctx(tmp_project)
         result = app._check_defs["npm-private-mismatch"].impl(ctx)
         assert result.status == "fail"
@@ -121,7 +121,7 @@ class TestNpmPrivateMismatch:
         )
         cfg_dir = tmp_project / ".rlsbl"
         cfg_dir.mkdir()
-        (cfg_dir / "config.json").write_text(json.dumps({"private": True}))
+        (cfg_dir / "config.json").write_text(json.dumps({"publish_mode": "none"}))
         ctx = make_ctx(tmp_project)
         result = app._check_defs["npm-private-mismatch"].impl(ctx)
         assert result.status == "pass"
@@ -133,7 +133,7 @@ class TestNpmPrivateMismatch:
         )
         cfg_dir = tmp_project / ".rlsbl"
         cfg_dir.mkdir()
-        (cfg_dir / "config.json").write_text(json.dumps({"private": False}))
+        (cfg_dir / "config.json").write_text(json.dumps({"publish_mode": "ci"}))
         ctx = make_ctx(tmp_project)
         result = app._check_defs["npm-private-mismatch"].impl(ctx)
         assert result.status == "pass"
@@ -145,7 +145,7 @@ class TestNpmPrivateMismatch:
         )
         cfg_dir = tmp_project / ".rlsbl"
         cfg_dir.mkdir()
-        (cfg_dir / "config.json").write_text(json.dumps({"private": True}))
+        (cfg_dir / "config.json").write_text(json.dumps({"publish_mode": "none"}))
         ctx = make_ctx(tmp_project)
         result = app._check_defs["npm-private-mismatch"].impl(ctx)
         assert result.status == "pass"

@@ -147,7 +147,7 @@ class TestRlsblDirRecursiveScan:
         """Files without conflict markers pass."""
         rlsbl_dir = tmp_project / ".rlsbl"
         rlsbl_dir.mkdir()
-        (rlsbl_dir / "config.json").write_text('{"private": false}\n')
+        (rlsbl_dir / "config.json").write_text('{"publish_mode": "ci"}\n')
         wf_dir = tmp_project / ".github" / "workflows"
         wf_dir.mkdir(parents=True)
         (wf_dir / "ci.yml").write_text("name: CI\non: push\n")

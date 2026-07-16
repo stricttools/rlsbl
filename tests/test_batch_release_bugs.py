@@ -40,11 +40,11 @@ class TestBatchModeSkipsValidation:
         # Need .rlsbl/config.json for the release flow
         rlsbl_dir = project_root / ".rlsbl"
         rlsbl_dir.mkdir()
-        (rlsbl_dir / "config.json").write_text('{"private": true}')
+        (rlsbl_dir / "config.json").write_text('{"publish_mode": "none"}')
         return ProjectContext(
             project_root=project_root,
             workspace_root=None,
-            config={"private": True},
+            config={"publish_mode": "none"},
         )
 
     def _make_release_config(self):

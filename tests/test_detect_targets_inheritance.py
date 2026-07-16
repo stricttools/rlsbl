@@ -30,7 +30,7 @@ class TestReleasableConfigInheritance:
         # Per-package config.json with no targets key
         rlsbl_dir = pkg_dir / ".rlsbl"
         rlsbl_dir.mkdir()
-        (rlsbl_dir / "config.json").write_text(json.dumps({"private": False}))
+        (rlsbl_dir / "config.json").write_text(json.dumps({"publish_mode": "ci"}))
 
         # Releasable-level config.json with targets
         rel_dir = tmp_path / "releasable"
@@ -60,7 +60,7 @@ class TestReleasableConfigInheritance:
         rlsbl_dir = pkg_dir / ".rlsbl"
         rlsbl_dir.mkdir()
         (rlsbl_dir / "config.json").write_text(
-            json.dumps({"private": False, "targets": ["npm"]})
+            json.dumps({"publish_mode": "ci", "targets": ["npm"]})
         )
 
         # Releasable-level config with different targets (authoritative)
@@ -86,13 +86,13 @@ class TestReleasableConfigInheritance:
         rlsbl_dir = pkg_dir / ".rlsbl"
         rlsbl_dir.mkdir()
         (rlsbl_dir / "config.json").write_text(
-            json.dumps({"private": False, "targets": ["npm"]})
+            json.dumps({"publish_mode": "ci", "targets": ["npm"]})
         )
 
         # Releasable-level config WITHOUT targets key
         rel_dir = tmp_path / "releasable"
         rel_dir.mkdir()
-        (rel_dir / "config.json").write_text(json.dumps({"private": False}))
+        (rel_dir / "config.json").write_text(json.dumps({"publish_mode": "ci"}))
 
         # Create package.json for npm target
         (pkg_dir / "package.json").write_text(
@@ -122,7 +122,7 @@ class TestTwoTierRule:
         """Config exists but no targets key raises ConfigError with hints."""
         rlsbl_dir = tmp_path / ".rlsbl"
         rlsbl_dir.mkdir()
-        (rlsbl_dir / "config.json").write_text(json.dumps({"private": False}))
+        (rlsbl_dir / "config.json").write_text(json.dumps({"publish_mode": "ci"}))
 
         # Create a manifest so auto-detect would find something
         (tmp_path / "pyproject.toml").write_text(
@@ -140,7 +140,7 @@ class TestTwoTierRule:
         """Config exists, no targets key, no manifests -> ConfigError."""
         rlsbl_dir = tmp_path / ".rlsbl"
         rlsbl_dir.mkdir()
-        (rlsbl_dir / "config.json").write_text(json.dumps({"private": False}))
+        (rlsbl_dir / "config.json").write_text(json.dumps({"publish_mode": "ci"}))
 
         with pytest.raises(ConfigError) as exc_info:
             detect_targets(str(tmp_path))
@@ -156,7 +156,7 @@ class TestExplicitTargets:
         rlsbl_dir = tmp_path / ".rlsbl"
         rlsbl_dir.mkdir()
         (rlsbl_dir / "config.json").write_text(
-            json.dumps({"private": False, "targets": []})
+            json.dumps({"publish_mode": "ci", "targets": []})
         )
 
         # Even if a manifest exists, targets: [] returns empty
@@ -172,7 +172,7 @@ class TestExplicitTargets:
         rlsbl_dir = tmp_path / ".rlsbl"
         rlsbl_dir.mkdir()
         (rlsbl_dir / "config.json").write_text(
-            json.dumps({"private": False, "targets": ["pypi"]})
+            json.dumps({"publish_mode": "ci", "targets": ["pypi"]})
         )
         (tmp_path / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "0.1.0"\n'
@@ -192,7 +192,7 @@ class TestBackwardCompatibility:
         rlsbl_dir = tmp_path / ".rlsbl"
         rlsbl_dir.mkdir()
         (rlsbl_dir / "config.json").write_text(
-            json.dumps({"private": False, "targets": ["npm"]})
+            json.dumps({"publish_mode": "ci", "targets": ["npm"]})
         )
         (tmp_path / "package.json").write_text(
             json.dumps({"name": "test", "version": "1.0.0"})
@@ -218,7 +218,7 @@ class TestBackwardCompatibility:
         rlsbl_dir = tmp_path / ".rlsbl"
         rlsbl_dir.mkdir()
         (rlsbl_dir / "config.json").write_text(
-            json.dumps({"private": False, "targets": ["npm"]})
+            json.dumps({"publish_mode": "ci", "targets": ["npm"]})
         )
         (tmp_path / "package.json").write_text(
             json.dumps({"name": "test", "version": "1.0.0"})

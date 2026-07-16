@@ -29,7 +29,7 @@ def _write_config(root, install_paths=None):
     entry = {"type": "go", "local": True}
     if install_paths is not None:
         entry["install_paths"] = install_paths
-    config = {"pipelines": {"go": entry}, "private": False}
+    config = {"pipelines": {"go": entry}, "publish_mode": "ci"}
     _write(root / ".rlsbl" / "config.json", json.dumps(config))
     return config
 

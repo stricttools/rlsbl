@@ -380,13 +380,13 @@ def monorepo_fixture(tmp_path, monkeypatch):
     (python_dir / ".rlsbl" / "changes").mkdir(parents=True)
     (python_dir / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
     (python_dir / ".rlsbl" / "config.json").write_text(
-        json.dumps({"private": False, "targets": ["pypi"]}) + "\n"
+        json.dumps({"publish_mode": "ci", "targets": ["pypi"]}) + "\n"
     )
 
     (go_dir / ".rlsbl" / "changes").mkdir(parents=True)
     (go_dir / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
     (go_dir / ".rlsbl" / "config.json").write_text(
-        json.dumps({"private": False, "targets": ["plain"]}) + "\n"
+        json.dumps({"publish_mode": "ci", "targets": ["plain"]}) + "\n"
     )
 
     # Create minimal project files
@@ -521,7 +521,7 @@ def _create_multi_releasable_monorepo(
         rlsbl_dir = proj_dir / ".rlsbl"
         rlsbl_dir.mkdir(exist_ok=True)
         (rlsbl_dir / "config.json").write_text(
-            json.dumps({"private": False, "targets": ["pypi"]}) + "\n"
+            json.dumps({"publish_mode": "ci", "targets": ["pypi"]}) + "\n"
         )
         project_dirs[proj["name"]] = proj_dir
 

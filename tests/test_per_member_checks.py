@@ -79,7 +79,7 @@ releasable = "myrel"
         rlsbl_dir = pkg_dir / ".rlsbl"
         rlsbl_dir.mkdir()
         (rlsbl_dir / "config.json").write_text(
-            json.dumps({"private": False, "targets": ["pypi"]}) + "\n"
+            json.dumps({"publish_mode": "ci", "targets": ["pypi"]}) + "\n"
         )
 
         from rlsbl.context import ProjectContext
@@ -117,7 +117,7 @@ releasable = "myrel"
         rlsbl_dir = pkg_dir / ".rlsbl"
         rlsbl_dir.mkdir()
         (rlsbl_dir / "config.json").write_text(
-            json.dumps({"private": False, "targets": ["pypi"]}) + "\n"
+            json.dumps({"publish_mode": "ci", "targets": ["pypi"]}) + "\n"
         )
 
         from rlsbl.context import ProjectContext
@@ -155,7 +155,7 @@ releasable = "myrel"
         rlsbl_dir = pkg_dir / ".rlsbl"
         rlsbl_dir.mkdir()
         (rlsbl_dir / "config.json").write_text(
-            json.dumps({"private": True, "targets": ["pypi"]}) + "\n"
+            json.dumps({"publish_mode": "none", "targets": ["pypi"]}) + "\n"
         )
 
         from rlsbl.context import ProjectContext
@@ -169,7 +169,7 @@ releasable = "myrel"
         result = check_fn(ctx)
 
         assert result.status == "pass"
-        assert "private member" in result.message
+        assert "publish-suppressed member" in result.message
 
 
 # ---------------------------------------------------------------------------

@@ -43,7 +43,7 @@ def _make_go(dir_path):
                 "pipelines": {
                     "go": {"type": "go", "local": True, "install_paths": ["."]}
                 },
-                "private": False,
+                "publish_mode": "ci",
             },
             f,
         )
@@ -233,7 +233,7 @@ def test_skip_reason_from_target_is_shown(
             {
                 "targets": ["go"],
                 "pipelines": {"go": {"type": "go", "local": True}},
-                "private": False,
+                "publish_mode": "ci",
             },
             f,
         )
@@ -304,7 +304,7 @@ def _make_multi_target(root):
                 "pipelines": {
                     "go": {"type": "go", "local": True, "install_paths": ["."]}
                 },
-                "private": False,
+                "publish_mode": "ci",
             },
             f,
         )

@@ -51,7 +51,7 @@ def dev_node_monorepo(tmp_path, monkeypatch):
     (dev_node_dir / ".rlsbl" / "changes").mkdir(parents=True)
     (dev_node_dir / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
     (dev_node_dir / ".rlsbl" / "config.json").write_text(
-        json.dumps({"private": False, "targets": ["npm"]}) + "\n"
+        json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
     )
     (dev_node_dir / "package.json").write_text(
         json.dumps({"name": "mypkg-internal", "version": "0.1.0"})
@@ -61,7 +61,7 @@ def dev_node_monorepo(tmp_path, monkeypatch):
     (regular_dir / ".rlsbl" / "changes").mkdir(parents=True)
     (regular_dir / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
     (regular_dir / ".rlsbl" / "config.json").write_text(
-        json.dumps({"private": False, "targets": ["npm"]}) + "\n"
+        json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
     )
     (regular_dir / "package.json").write_text(
         json.dumps({"name": "mypkg-regular", "version": "0.1.0"})
@@ -269,7 +269,7 @@ class TestDevNodeReleaseBlocked:
         ctx = ProjectContext(
             project_root=Path(str(dev_node_dir)),
             workspace_root=Path(str(root)),
-            config={"private": False, "pipelines": {}},
+            config={"publish_mode": "ci", "pipelines": {}},
         )
 
         rc = ReleaseConfig(bump="patch", include=["npm"], exclude=[],
@@ -310,7 +310,7 @@ class TestDevNodeReleaseBlockedRegardlessOfConfig:
         ctx = ProjectContext(
             project_root=Path(str(dev_node_dir)),
             workspace_root=Path(str(root)),
-            config={"private": False, "pipelines": {}},
+            config={"publish_mode": "ci", "pipelines": {}},
         )
 
         rc = ReleaseConfig(bump="patch", include=["npm"], exclude=[], description="")
@@ -347,7 +347,7 @@ class TestDevNodeReleaseBlockedRegardlessOfConfig:
         ctx = ProjectContext(
             project_root=Path(str(dev_node_dir)),
             workspace_root=Path(str(root)),
-            config={"private": False, "pipelines": {}},
+            config={"publish_mode": "ci", "pipelines": {}},
         )
 
         rc = ReleaseConfig(

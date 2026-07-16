@@ -104,7 +104,7 @@ def _setup_release_run_project(tmp_path):
     changes_dir.mkdir(parents=True)
     (changes_dir / "unreleased.jsonl").write_text("")
     (tmp_path / ".rlsbl" / "config.json").write_text(
-        json.dumps({"targets": ["npm"], "private": False}) + "\n"
+        json.dumps({"targets": ["npm"], "publish_mode": "ci"}) + "\n"
     )
     releases_dir = tmp_path / ".rlsbl" / "releases"
     releases_dir.mkdir(parents=True)
@@ -244,7 +244,7 @@ def _setup_releasable_npm_project(repo):
     changes_dir.mkdir(parents=True)
     (changes_dir / "unreleased.jsonl").write_text("")
     (repo / ".rlsbl" / "config.json").write_text(
-        json.dumps({"private": False, "targets": ["npm"]}) + "\n"
+        json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
     )
     _git(repo, "add", "package.json", "CHANGELOG.md",
          ".rlsbl/changes/unreleased.jsonl", ".rlsbl/config.json")
@@ -301,7 +301,7 @@ class TestExecuteEpilogueWatchAsync:
 
         ctx = ProjectContext(project_root=Path(str(tmp_project)),
                              workspace_root=None,
-                             config={"private": False, "pipelines": {}})
+                             config={"publish_mode": "ci", "pipelines": {}})
 
         with (
             patch("rlsbl.commands.release.check_gh_installed", return_value=True),
@@ -352,7 +352,7 @@ class TestExecuteEpilogueWatchAsync:
 
         ctx = ProjectContext(project_root=Path(str(tmp_project)),
                              workspace_root=None,
-                             config={"private": False, "pipelines": {}})
+                             config={"publish_mode": "ci", "pipelines": {}})
 
         with (
             patch("rlsbl.commands.release.check_gh_installed", return_value=True),

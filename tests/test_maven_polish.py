@@ -174,7 +174,7 @@ class TestVersionCatalogKeyMissing:
         (tmp_project / "build.gradle.kts").write_text('version = "4.0.0"\n')
         rlsbl_dir = tmp_project / ".rlsbl"
         rlsbl_dir.mkdir()
-        (rlsbl_dir / "config.json").write_text('{"private": false}')
+        (rlsbl_dir / "config.json").write_text('{"publish_mode": "ci"}')
 
         target = MavenTarget()
         assert target.read_version(str(tmp_project)) == "4.0.0"

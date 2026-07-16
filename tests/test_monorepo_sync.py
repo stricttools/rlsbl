@@ -797,7 +797,7 @@ class TestDotPathSelfReference:
         with open(os.path.join(rel_dir, "config.json"), "w") as f:
             json.dump(
                 {
-                    "private": False,
+                    "publish_mode": "ci",
                     "targets": ["pypi"],
                     "publish_gate_check_regex": r"^(test)( \(.*\))?$",
                 },
@@ -1090,7 +1090,7 @@ class TestRootPublisherSync:
         mono = os.path.join(root, ".rlsbl-monorepo")
         rel_dir = os.path.join(mono, "releasables", "orxtra")
         os.makedirs(rel_dir, exist_ok=True)
-        cfg = {"private": False, "targets": ["pypi"]}
+        cfg = {"publish_mode": "ci", "targets": ["pypi"]}
         if gate_regex is not None:
             cfg["publish_gate_check_regex"] = gate_regex
         with open(os.path.join(rel_dir, "config.json"), "w") as f:

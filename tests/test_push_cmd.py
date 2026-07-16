@@ -64,7 +64,7 @@ def push_repo(tmp_path, monkeypatch):
     (changes / "unreleased.jsonl").write_text("")
     (repo / ".rlsbl" / "config.json").write_text(
         json.dumps({
-            "private": False,
+            "publish_mode": "ci",
             "targets": [],
             "release_branches": ["main"],
         })

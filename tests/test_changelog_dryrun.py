@@ -46,7 +46,7 @@ def rlsbl_repo(tmp_path, monkeypatch):
     os.chmod(released, 0o444)
 
     (repo / ".rlsbl" / "config.json").write_text(json.dumps({
-        "private": True,
+        "publish_mode": "none",
         "targets": [],
         "batch_limits": {"max_commits_per_entry": 2},
     }))

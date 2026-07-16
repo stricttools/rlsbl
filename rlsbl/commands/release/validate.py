@@ -131,25 +131,26 @@ def validate_ota_mode(release_config, project_root, config):
 
 
 def validate_config_integrity(config):
-    """Validate the 'private' key exists and private repos don't have local pipelines.
+    """Validate ``publish_mode`` and that suppressed repos have no local pipelines.
 
     Raises ReleaseValidationError on failure.
     """
-    if "private" not in config:
-        raise ReleaseValidationError(
-            '"private" key missing from .rlsbl/config.json.\n'
-            'Set "private": true for private repos or "private": false for public repos.\n'
-            'Quick fix: rlsbl scaffold'
-        )
+    from ...config import get_publish_mode, ConfigError
 
-    if config["private"]:
+    try:
+        mode = get_publish_mode(config)
+    except ConfigError as e:
+        raise ReleaseValidationError(f"{e}\nQuick fix: rlsbl scaffold")
+
+    if mode == "none":
         pipelines_cfg = config.get("pipelines", {})
         if isinstance(pipelines_cfg, dict):
             for pipeline_name, pipeline_cfg in pipelines_cfg.items():
                 if isinstance(pipeline_cfg, dict) and pipeline_cfg.get("local"):
                     raise ReleaseValidationError(
-                        "private repo cannot publish to public registries.\n"
-                        f'Remove pipelines.{pipeline_name}.local or set "private": false.'
+                        'publish_mode "none" cannot publish to public registries.\n'
+                        f'Remove pipelines.{pipeline_name}.local or set '
+                        '"publish_mode": "ci".'
                     )
 
 

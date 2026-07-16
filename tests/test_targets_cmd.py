@@ -109,7 +109,7 @@ class TestMultiTargetRelease:
         with open(os.path.join(".rlsbl", "changes", "unreleased.jsonl"), "w") as f:
             f.write("")
         with open(os.path.join(".rlsbl", "config.json"), "w") as f:
-            json.dump({"private": False, "targets": ["npm", "spec"]}, f)
+            json.dump({"publish_mode": "ci", "targets": ["npm", "spec"]}, f)
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
@@ -168,10 +168,10 @@ class TestMultiTargetRelease:
         from rlsbl.commands.release import run_cmd
 
         with patch("sys.stdout", StringIO()):
-            run_cmd(_rc(include=["npm", "spec"]), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
+            run_cmd(_rc(include=["npm", "spec"]), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
         # Verify spec target build was called with config kwarg
-        build_mock.assert_called_once_with(".", "1.0.1", config={"private": False, "pipelines": {}, "coverage_unit": "commit"})
+        build_mock.assert_called_once_with(".", "1.0.1", config={"publish_mode": "ci", "pipelines": {}, "coverage_unit": "commit"})
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
@@ -224,4 +224,4 @@ class TestMultiTargetRelease:
 
         # Secondary build failure now aborts the release
         with pytest.raises((RuntimeError, SystemExit)):
-            run_cmd(_rc(include=["npm", "spec"]), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
+            run_cmd(_rc(include=["npm", "spec"]), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))

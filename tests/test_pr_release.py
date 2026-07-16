@@ -82,7 +82,7 @@ def _setup_pr_mode_project(repo):
     (changes_dir / "unreleased.jsonl").write_text("")
     (repo / ".rlsbl" / "config.json").write_text(
         json.dumps({
-            "private": False,
+            "publish_mode": "ci",
             "targets": ["npm"],
             "release": {"mode": "pr"},
             "pipelines": {},
@@ -138,7 +138,7 @@ def _make_ctx(repo, *, config_override=None):
     config shapes.
     """
     config = config_override or {
-        "private": False,
+        "publish_mode": "ci",
         "pipelines": {},
     }
     return ProjectContext(
@@ -171,13 +171,13 @@ class TestPrModeConfigRejected:
     """PR mode configs are rejected by validate_config_schema."""
 
     def test_pr_mode_config_rejected_by_schema_validation(self):
-        config = {"release": {"mode": "pr"}}
+        config = {"release": {"mode": "pr"}, "publish_mode": "ci"}
         with pytest.raises(ConfigError, match="release.mode is no longer supported"):
             validate_config_schema(config)
 
     def test_imperative_mode_config_also_rejected(self):
         """Even imperative mode key is banned -- the key itself is dead config."""
-        config = {"release": {"mode": "imperative"}}
+        config = {"release": {"mode": "imperative"}, "publish_mode": "ci"}
         with pytest.raises(ConfigError, match="release.mode is no longer supported"):
             validate_config_schema(config)
 
@@ -190,7 +190,7 @@ class TestPrModeConfigRejected:
                 _rc(),
                 {"yes": True, "quiet": False},
                 ctx=_make_ctx(mock_git_repo, config_override={
-                    "private": False,
+                    "publish_mode": "ci",
                     "pipelines": {},
                     "release": {"mode": "pr"},
                 }),
@@ -219,7 +219,7 @@ class TestMalformedTestConfigAbortsRelease:
                 _rc(),
                 {"yes": True, "quiet": True},
                 ctx=_make_ctx(mock_git_repo, config_override={
-                    "private": False,
+                    "publish_mode": "ci",
                     "pipelines": {},
                     # Unknown test target -> validate_test_config raises ConfigError.
                     "test": {"not-a-real-target": {"markers": "x"}},
@@ -248,7 +248,7 @@ class TestImperativeModeUnchanged:
         changes_dir.mkdir(parents=True)
         (changes_dir / "unreleased.jsonl").write_text("")
         (mock_git_repo / ".rlsbl" / "config.json").write_text(
-            json.dumps({"private": False, "targets": ["npm"], "pipelines": {}}) + "\n"
+            json.dumps({"publish_mode": "ci", "targets": ["npm"], "pipelines": {}}) + "\n"
         )
         _git(mock_git_repo, "add",
              "package.json", "CHANGELOG.md",
@@ -321,7 +321,7 @@ class TestAnyReleaseModeKeyErrors:
                 _rc(),
                 {"yes": True, "quiet": True},
                 ctx=_make_ctx(mock_git_repo, config_override={
-                    "private": False,
+                    "publish_mode": "ci",
                     "pipelines": {},
                     "release": {"mode": "invalid"},
                 }),

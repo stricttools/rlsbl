@@ -51,7 +51,7 @@ def _setup_changelog_repo(repo, tag="v0.1.0", targets=None):
     changes.mkdir(parents=True)
     (changes / "unreleased.jsonl").write_text("")
     (repo / ".rlsbl" / "config.json").write_text(
-        json.dumps({"private": False, "targets": targets}) + "\n"
+        json.dumps({"publish_mode": "ci", "targets": targets}) + "\n"
     )
     run_git(repo, "add", ".rlsbl")
     run_git(repo, "commit", "-q", "-m", "scaffold")
@@ -395,7 +395,7 @@ def changelog_repo(tmp_path, monkeypatch):
     changes.mkdir(parents=True)
     (changes / "unreleased.jsonl").write_text("")
     (repo / ".rlsbl" / "config.json").write_text(
-        json.dumps({"private": False}) + "\n"
+        json.dumps({"publish_mode": "ci"}) + "\n"
     )
     run_git(repo, "add", ".rlsbl")
     run_git(repo, "commit", "-q", "-m", "scaffold")
@@ -568,7 +568,7 @@ class TestChangelogRangeCheck:
         changes = repo / ".rlsbl" / "changes"
         changes.mkdir(parents=True)
         (repo / ".rlsbl" / "config.json").write_text(
-            json.dumps({"private": False}) + "\n"
+            json.dumps({"publish_mode": "ci"}) + "\n"
         )
 
         # Make an entry pointing to the OLD commit (before the tag)
@@ -1004,7 +1004,7 @@ class TestPrepushChangelogCoverageMonorepoNoReleasables:
         changes = pkg / ".rlsbl" / "changes"
         changes.mkdir(parents=True)
         (changes / "unreleased.jsonl").write_text("")
-        (pkg / ".rlsbl" / "config.json").write_text(json.dumps({"private": False}))
+        (pkg / ".rlsbl" / "config.json").write_text(json.dumps({"publish_mode": "ci"}))
 
         make_workspace(repo, [{"path": "packages/alpha", "name": "alpha"}])
         run_git(repo, "add", ".")
@@ -1055,7 +1055,7 @@ class TestPrepushChangelogCoverageMonorepoNoReleasables:
         changes = pkg / ".rlsbl" / "changes"
         changes.mkdir(parents=True)
         (changes / "unreleased.jsonl").write_text("")
-        (pkg / ".rlsbl" / "config.json").write_text(json.dumps({"private": False}))
+        (pkg / ".rlsbl" / "config.json").write_text(json.dumps({"publish_mode": "ci"}))
 
         make_workspace(repo, [{"path": "packages/alpha", "name": "alpha"}])
         run_git(repo, "add", ".")
@@ -1191,7 +1191,7 @@ class TestPrepushChangelogCoverageMonorepoNoReleasables:
         changes = repo / ".rlsbl" / "changes"
         changes.mkdir(parents=True)
         (changes / "unreleased.jsonl").write_text("")
-        (repo / ".rlsbl" / "config.json").write_text(json.dumps({"private": False}))
+        (repo / ".rlsbl" / "config.json").write_text(json.dumps({"publish_mode": "ci"}))
         run_git(repo, "add", ".rlsbl")
         run_git(repo, "commit", "-q", "-m", "scaffold")
         base = git_head(repo)
@@ -1234,7 +1234,7 @@ class TestPrepushChangelogCoverageMonorepoNoReleasables:
         changes = repo / ".rlsbl" / "changes"
         changes.mkdir(parents=True)
         (changes / "unreleased.jsonl").write_text("")
-        (repo / ".rlsbl" / "config.json").write_text(json.dumps({"private": False}))
+        (repo / ".rlsbl" / "config.json").write_text(json.dumps({"publish_mode": "ci"}))
         run_git(repo, "add", ".rlsbl")
         run_git(repo, "commit", "-q", "-m", "scaffold")
         base = git_head(repo)

@@ -91,7 +91,7 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "scaffold-unreplaced-vars": None,
     "ruff-lint": None,
     # --- phase 12 project checks ---
-    "private-publish-workflow": None,
+    "publish-mode-workflow": None,
     "npm-private-mismatch": frozenset({"npm"}),
     "target-version-readable": None,
     "dunder-version-missing": frozenset({"pypi"}),

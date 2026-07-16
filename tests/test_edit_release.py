@@ -246,7 +246,7 @@ class TestEditReleaseReleasableInheritance:
             releasables=[Releasable(name="alpha")],
             projects=[{"path": "libs/alpha-core", "name": "alpha-core",
                        "releasable": "alpha"}],
-            releasable_configs={"alpha": {"private": False, "targets": ["pypi"]}},
+            releasable_configs={"alpha": {"publish_mode": "ci", "targets": ["pypi"]}},
         )
         member = ns.root / "libs" / "alpha-core"
         # Targets live ONLY at the releasable level: member config has none.
@@ -291,7 +291,7 @@ class TestEditReleaseReleasableInheritance:
             releasables=[Releasable(name="alpha")],
             projects=[{"path": "libs/alpha-core", "name": "alpha-core",
                        "releasable": "alpha"}],
-            releasable_configs={"alpha": {"private": False, "targets": ["pypi"]}},
+            releasable_configs={"alpha": {"publish_mode": "ci", "targets": ["pypi"]}},
         )
         member = ns.root / "libs" / "alpha-core"
         (member / ".rlsbl" / "config.json").write_text("{}\n")

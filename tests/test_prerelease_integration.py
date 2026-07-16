@@ -94,7 +94,7 @@ def _setup_releasable_pypi_project(repo):
     changes_dir.mkdir(parents=True)
     (changes_dir / "unreleased.jsonl").write_text("")
     (repo / ".rlsbl" / "config.json").write_text(
-        json.dumps({"targets": ["pypi"], "private": False, "pipelines": {}}) + "\n"
+        json.dumps({"targets": ["pypi"], "publish_mode": "ci", "pipelines": {}}) + "\n"
     )
 
     _git(repo, "add",
@@ -148,7 +148,7 @@ def _make_ctx(repo):
     return ProjectContext(
         project_root=Path(str(repo)),
         workspace_root=None,
-        config={"private": False, "pipelines": {}},
+        config={"publish_mode": "ci", "pipelines": {}},
     )
 
 

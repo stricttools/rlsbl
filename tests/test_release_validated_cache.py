@@ -51,7 +51,7 @@ class TestReleaseValidatedCache:
         with open(os.path.join(changes_dir, ".validated"), "w") as f:
             f.write("fakehash123\n")
         with open(os.path.join(".rlsbl", "config.json"), "w") as f:
-            json.dump({"private": False, "targets": ["npm"]}, f)
+            json.dump({"publish_mode": "ci", "targets": ["npm"]}, f)
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.release_lock")
@@ -120,7 +120,7 @@ class TestReleaseValidatedCache:
                 "yes": True,
                 "quiet": False,
             },
-            ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}),
+            ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}),
 )
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
@@ -176,6 +176,6 @@ class TestReleaseValidatedCache:
                     "yes": True,
                     "quiet": False,
                 },
-                ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}),
+                ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}),
 )
             assert ctx.value.code == 1

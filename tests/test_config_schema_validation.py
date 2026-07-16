@@ -12,20 +12,20 @@ class TestBanEmptyTargets:
     """targets: [] must be a hard error."""
 
     def test_empty_targets_list_raises(self):
-        config = {"targets": []}
+        config = {"targets": [], "publish_mode": "ci"}
         with pytest.raises(ConfigError, match="targets is an empty list"):
             validate_config_schema(config)
 
     def test_non_empty_targets_passes(self):
-        config = {"targets": ["pypi"]}
+        config = {"targets": ["pypi"], "publish_mode": "ci"}
         validate_config_schema(config)  # no error
 
     def test_missing_targets_key_passes(self):
-        config = {"private": True}
+        config = {"publish_mode": "ci"}
         validate_config_schema(config)  # no error
 
     def test_targets_none_passes(self):
-        config = {"targets": None}
+        config = {"targets": None, "publish_mode": "ci"}
         validate_config_schema(config)  # no error (None is not a list)
 
 
@@ -33,27 +33,27 @@ class TestBanReleaseMode:
     """release.mode key must be a hard error regardless of value."""
 
     def test_release_mode_imperative_raises(self):
-        config = {"release": {"mode": "imperative"}}
+        config = {"release": {"mode": "imperative"}, "publish_mode": "ci"}
         with pytest.raises(ConfigError, match="release.mode is no longer supported"):
             validate_config_schema(config)
 
     def test_release_mode_pr_raises(self):
-        config = {"release": {"mode": "pr"}}
+        config = {"release": {"mode": "pr"}, "publish_mode": "ci"}
         with pytest.raises(ConfigError, match="release.mode is no longer supported"):
             validate_config_schema(config)
 
     def test_release_section_without_mode_passes(self):
-        config = {"release": {"other_key": "value"}}
+        config = {"release": {"other_key": "value"}, "publish_mode": "ci"}
         validate_config_schema(config)  # no error
 
     def test_no_release_section_passes(self):
-        config = {}
+        config = {"publish_mode": "ci"}
         validate_config_schema(config)  # no error
 
     def test_release_not_dict_passes(self):
         # Non-dict release values don't trigger mode check
         # (other validators handle the structural issue)
-        config = {"release": "string_value"}
+        config = {"release": "string_value", "publish_mode": "ci"}
         validate_config_schema(config)  # no error
 
 
@@ -61,7 +61,7 @@ class TestMultipleViolations:
     """First violation wins (raises immediately)."""
 
     def test_empty_targets_checked_before_release_mode(self):
-        config = {"targets": [], "release": {"mode": "pr"}}
+        config = {"targets": [], "release": {"mode": "pr"}, "publish_mode": "ci"}
         with pytest.raises(ConfigError, match="targets is an empty list"):
             validate_config_schema(config)
 
@@ -70,7 +70,7 @@ class TestValidateTestConfig:
     """Per-target ``test`` section validation (validate_test_config)."""
 
     def test_absent_test_section_passes(self):
-        validate_test_config({"private": True})  # no error
+        validate_test_config({"publish_mode": "none"})  # no error
 
     def test_test_none_passes(self):
         validate_test_config({"test": None})  # no error (None is not a dict)
@@ -115,7 +115,7 @@ class TestConfigSchemaCheckSurfacesTestConfig:
         ctx = ProjectContext(
             project_root=tmp_project,
             workspace_root=None,
-            config={"private": True, "test": {"pypi": {"marker": "not integration"}}},
+            config={"publish_mode": "ci", "test": {"pypi": {"marker": "not integration"}}},
         )
         result = app._check_defs["config-schema"].impl(ctx)
         assert result.status == "fail"
@@ -125,7 +125,7 @@ class TestConfigSchemaCheckSurfacesTestConfig:
         ctx = ProjectContext(
             project_root=tmp_project,
             workspace_root=None,
-            config={"private": True, "test": {"pypi": {"markers": "not integration"}}},
+            config={"publish_mode": "ci", "test": {"pypi": {"markers": "not integration"}}},
         )
         result = app._check_defs["config-schema"].impl(ctx)
         assert result.status == "pass"

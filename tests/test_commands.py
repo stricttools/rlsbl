@@ -670,7 +670,7 @@ class TestRelease:
             f.write('{"commits":["abc1234"],"user_facing":true,"description":"Bugfix","type":"fix"}\n')
         # Config with required private key
         with open(os.path.join(".rlsbl", "config.json"), "w") as f:
-            json.dump({"private": False, "targets": ["npm"]}, f)
+            json.dump({"publish_mode": "ci", "targets": ["npm"]}, f)
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
@@ -701,7 +701,7 @@ class TestRelease:
             orig_cl = f.read()
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
         # Files should be unchanged
         with open("package.json") as f:
@@ -717,7 +717,7 @@ class TestRelease:
         from rlsbl.commands.release import run_cmd
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(_rc(), {"quiet": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
+            run_cmd(_rc(), {"quiet": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
         assert exc_info.value.code == 1
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
@@ -738,7 +738,7 @@ class TestRelease:
         ]
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(_rc(), {"quiet": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
+            run_cmd(_rc(), {"quiet": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
         assert exc_info.value.code == 1
 
     @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
@@ -765,7 +765,7 @@ class TestRelease:
 
         # Should reach dry-run exit without aborting
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd(_rc(), {"quiet": False, "dry-run": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
+            run_cmd(_rc(), {"quiet": False, "dry-run": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
@@ -793,7 +793,7 @@ class TestRelease:
 
         with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
             with patch("sys.stdout", new_callable=StringIO):
-                run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
+                run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
         assert "Remote branch origin/main does not exist yet" in mock_stderr.getvalue()
 
@@ -817,7 +817,7 @@ class TestRelease:
 
         with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(_rc(), {"quiet": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
+                run_cmd(_rc(), {"quiet": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
         assert exc_info.value.code == 1
         assert "Cannot verify remote-ahead status" in mock_stderr.getvalue()
 
@@ -843,7 +843,7 @@ class TestReleaseCommitTrailers:
         with open(os.path.join(".rlsbl", "changes", "unreleased.jsonl"), "w") as f:
             f.write('{"commits":["abc1234"],"user_facing":true,"description":"Bugfix","type":"fix"}\n')
         with open(os.path.join(".rlsbl", "config.json"), "w") as f:
-            json.dump({"private": False, "targets": ["npm"]}, f)
+            json.dump({"publish_mode": "ci", "targets": ["npm"]}, f)
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.release_lock")
@@ -901,7 +901,7 @@ class TestReleaseCommitTrailers:
         ]
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
+            run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
         # First call is the version-bump commit -- should be autogenerated
         version_bump_call = mock_commit_files.call_args_list[0]
@@ -964,7 +964,7 @@ class TestReleaseCommitTrailers:
         ]
 
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
+            run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
         # Second call is the finalization commit -- should have autogenerated=True
         finalize_call = mock_commit_files.call_args_list[1]
@@ -1318,28 +1318,6 @@ class TestStatusChangelogExemption:
         assert "exempted" not in data["jsonl_coverage"]
 
 
-class TestMigrateCommand:
-    """Tests for rlsbl.commands.migrate."""
-
-    @patch("rlsbl.commands.migrate.subprocess.run")
-    def test_migrate_no_migrable(self, mock_subprocess_run):
-        """When migrable is not installed, print install instructions and exit 1."""
-        mock_subprocess_run.side_effect = FileNotFoundError("migrable not found")
-
-        from rlsbl.commands.migrate import run_cmd
-
-        with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {})
-        assert exc_info.value.code == 1
-
-    def test_migrate_shows_help_text(self):
-        """The migrate command should appear in the CLI help output."""
-        from rlsbl import app
-
-        result = app.test(["--help"])
-        assert "migrate" in result.stdout
-
-
 class TestScaffoldAutoDetection:
     """Tests for scaffold auto-detection writing targets to config."""
 
@@ -1452,7 +1430,7 @@ class TestReleaseRollbackOnPushFailure:
             f.write('{"commits":["abc1234"],"user_facing":true,'
                     '"description":"Bugfix","type":"fix"}\n')
         with open(os.path.join(".rlsbl", "config.json"), "w") as f:
-            json.dump({"private": False, "targets": ["npm"]}, f)
+            json.dump({"publish_mode": "ci", "targets": ["npm"]}, f)
 
         # Initial commit and tag
         subprocess.run(["git", "add", "."], check=True)
@@ -1500,7 +1478,7 @@ class TestReleaseRollbackOnPushFailure:
                     "yes": True,
                     "quiet": True,
                 },
-                ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}),
+                ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}),
 )
 
         # HEAD must NOT be rolled back -- the release commits are preserved.

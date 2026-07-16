@@ -204,9 +204,9 @@ def _create_rlsbl_config(target_path, source_config_path=None):
         with open(source_config_path, "r", encoding="utf-8") as f:
             config = json.load(f)
 
-    # Ensure private field exists
-    if "private" not in config:
-        config["private"] = False
+    # Ensure publish_mode is set (default: publish via CI)
+    if "publish_mode" not in config:
+        config["publish_mode"] = "ci"
 
     config_path = os.path.join(rlsbl_dir, "config.json")
     with open(config_path, "w", encoding="utf-8") as f:

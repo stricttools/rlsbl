@@ -44,7 +44,7 @@ class TestWarnIfHookNeedsMigration:
         self, tmp_path, capsys
     ):
         """A customized script with no hooks config emits a migration warning."""
-        config = {"private": False}
+        config = {"publish_mode": "ci"}
         hook_path = _make_hook_file(tmp_path, "#!/bin/bash\nmake test\n")
         result = warn_if_hook_needs_migration(config, hook_path)
         assert result is True
@@ -79,7 +79,7 @@ class TestWarnIfHookNeedsMigration:
         self, tmp_path, capsys
     ):
         """An unmodified scaffold template script -> no warning."""
-        config = {"private": False}
+        config = {"publish_mode": "ci"}
         hook_path = _make_hook_file(tmp_path, _V1_TEMPLATE)
         result = warn_if_hook_needs_migration(config, hook_path)
         assert result is False
@@ -88,7 +88,7 @@ class TestWarnIfHookNeedsMigration:
 
     def test_no_warning_when_no_script_exists(self, tmp_path, capsys):
         """No script file at all -> no warning."""
-        config = {"private": False}
+        config = {"publish_mode": "ci"}
         hook_path = str(tmp_path / "nonexistent" / "pre-release.sh")
         result = warn_if_hook_needs_migration(config, hook_path)
         assert result is False

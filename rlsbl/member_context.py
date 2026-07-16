@@ -3,8 +3,8 @@
 In explicit releasable mode, a member package's effective configuration is
 the releasable-level config.json merged with the per-package config.json
 (per-package wins), and target detection must use the same inheritance so
-releasable-level ``private`` / ``targets`` apply to members that don't set
-them. This module is the single source of truth for that resolution --
+releasable-level ``publish_mode`` / ``targets`` apply to members that don't
+set them. This module is the single source of truth for that resolution --
 every code path that decides whether a member is published (version sync,
 companion tags, workspace checks, primary path resolution) must go through
 it so they all agree on the member set.
@@ -22,8 +22,8 @@ class MemberContext:
 
     ``targets`` is computed lazily: detect_targets() can raise ConfigError
     (config file present but no targets key anywhere), and consumers that
-    skip private members must be able to check ``is_private`` without
-    triggering target detection.
+    skip publish-suppressed members must be able to check ``publish_mode``
+    without triggering target detection.
     """
 
     def __init__(self, member_dir, releasable_config_dir=None):
@@ -37,9 +37,16 @@ class MemberContext:
         )
 
     @property
-    def is_private(self) -> bool:
-        """Whether the member is private (defaults to True when unset)."""
-        return bool(self.config.get("private", True))
+    def publish_mode(self) -> str:
+        """The member's effective publish_mode (one of ``"ci"`` / ``"none"``).
+
+        Required-read: raises :class:`ConfigError` when the key is absent or
+        invalid (with releasable-level inheritance already applied). Consumers
+        derive the old boolean via ``publish_mode == "none"``.
+        """
+        from .config import get_publish_mode
+
+        return get_publish_mode(self.config)
 
     @cached_property
     def targets(self) -> list:

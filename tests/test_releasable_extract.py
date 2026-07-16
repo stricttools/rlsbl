@@ -171,8 +171,8 @@ name = "pkgB"
     # Create config.json for pkgA
     config_dir = root / "pkgA" / ".rlsbl"
     config_dir.mkdir(exist_ok=True)
-    (config_dir / "config.json").write_text(json.dumps({"private": False}) + "\n")
-    _make_commit(root, "pkgA/.rlsbl/config.json", json.dumps({"private": False}) + "\n", "config for pkgA")
+    (config_dir / "config.json").write_text(json.dumps({"publish_mode": "ci"}) + "\n")
+    _make_commit(root, "pkgA/.rlsbl/config.json", json.dumps({"publish_mode": "ci"}) + "\n", "config for pkgA")
 
     # Commit workspace
     subprocess.run(
@@ -623,7 +623,8 @@ class TestCmdExtract:
         config_path = target / ".rlsbl" / "config.json"
         assert config_path.is_file()
         config = json.loads(config_path.read_text())
-        assert "private" in config
+        assert "publish_mode" in config
+        assert "private" not in config
 
     def test_workspace_updated(self, tmp_path):
         """The source monorepo's workspace.toml no longer lists the extracted package."""

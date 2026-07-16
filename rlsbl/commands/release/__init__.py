@@ -471,9 +471,9 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         registry = validate_release_targets(release_config, project_root)
 
     # Pipeline config validation (deferred from above so releasable
-    # context is available). In releasable mode, validates each non-private
-    # publishing member's pipeline config; in standalone/implicit mode,
-    # validates the representative's config.
+    # context is available). In releasable mode, validates each publishing
+    # member's pipeline config (publish_mode != "none"); in
+    # standalone/implicit mode, validates the representative's config.
     # Configs to scan for the npm provenance guard (below). Collected here so
     # the releasable member contexts are not resolved twice.
     _provenance_scan_configs = []
@@ -484,7 +484,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             if not os.path.isdir(_mp_abs):
                 continue
             _m_ctx = _rmc(_mp_abs, releasable_config_dir=_rel_cfg_dir)
-            if _m_ctx.is_private:
+            if _m_ctx.publish_mode == "none":
                 continue
             _m_pipelines = _m_ctx.config.get("pipelines")
             if _m_pipelines is not None:

@@ -68,7 +68,7 @@ EXPECTED_CHECKS = [
     "workspace-unbuildable",
     "circular-deps",
     # Phase 12 project checks
-    "private-publish-workflow",
+    "publish-mode-workflow",
     "npm-private-mismatch",
     "target-version-readable",
     "dunder-version-missing",
@@ -647,7 +647,7 @@ class TestWorkspaceStaleEntriesCheck:
         proj_dir.mkdir()
         rlsbl_dir = proj_dir / ".rlsbl"
         rlsbl_dir.mkdir()
-        (rlsbl_dir / "config.json").write_text('{"private": false}')
+        (rlsbl_dir / "config.json").write_text('{"publish_mode": "ci"}')
         ctx = WorkspaceCheckContext(
             project_root=mock_git_repo,
             workspace_root=mock_git_repo,
@@ -665,7 +665,7 @@ class TestWorkspaceStaleEntriesCheck:
         (proj_dir / "VERSION").write_text("1.0.0\n")
         rlsbl_dir = proj_dir / ".rlsbl"
         rlsbl_dir.mkdir()
-        (rlsbl_dir / "config.json").write_text('{"private": false}')
+        (rlsbl_dir / "config.json").write_text('{"publish_mode": "ci"}')
         ctx = WorkspaceCheckContext(
             project_root=mock_git_repo,
             workspace_root=mock_git_repo,

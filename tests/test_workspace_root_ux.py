@@ -36,7 +36,7 @@ def _setup_monorepo(root):
     )
     (core / ".rlsbl").mkdir()
     (core / ".rlsbl" / "config.json").write_text(
-        json.dumps({"private": False, "targets": ["pypi"], "pipelines": {}})
+        json.dumps({"publish_mode": "ci", "targets": ["pypi"], "pipelines": {}})
         + "\n"
     )
     (core / ".rlsbl" / "changes").mkdir()

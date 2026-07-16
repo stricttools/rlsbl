@@ -78,7 +78,7 @@ class TestCollectCompanionTags:
         go_entry = MagicMock()
         go_entry.name = "go"
 
-        with patch("rlsbl.config.read_project_config", return_value={"private": False}), \
+        with patch("rlsbl.config.read_project_config", return_value={"publish_mode": "ci"}), \
              patch("rlsbl.targets.detect_targets", return_value=[go_entry]), \
              patch("rlsbl.commands.release.TARGETS", {"go": GoTarget()}):
             result = collect_companion_tags(
@@ -94,7 +94,7 @@ class TestCollectCompanionTags:
 
         mock_detect = MagicMock()
 
-        with patch("rlsbl.config.read_project_config", return_value={"private": True}), \
+        with patch("rlsbl.config.read_project_config", return_value={"publish_mode": "none"}), \
              patch("rlsbl.targets.detect_targets", mock_detect):
             result = collect_companion_tags(
                 ["packages/internal"], str(tmp_path), "1.0.0",
@@ -113,7 +113,7 @@ class TestCollectCompanionTags:
         npm_entry.name = "npm"
 
         # BaseTarget.companion_tags returns [] for npm
-        with patch("rlsbl.config.read_project_config", return_value={"private": False}), \
+        with patch("rlsbl.config.read_project_config", return_value={"publish_mode": "ci"}), \
              patch("rlsbl.targets.detect_targets", return_value=[npm_entry]), \
              patch("rlsbl.commands.release.TARGETS", {"npm": BaseTarget()}):
             result = collect_companion_tags(
@@ -132,7 +132,7 @@ class TestCollectCompanionTags:
         go_entry2 = MagicMock()
         go_entry2.name = "go"
 
-        with patch("rlsbl.config.read_project_config", return_value={"private": False}), \
+        with patch("rlsbl.config.read_project_config", return_value={"publish_mode": "ci"}), \
              patch("rlsbl.targets.detect_targets", return_value=[go_entry1, go_entry2]), \
              patch("rlsbl.commands.release.TARGETS", {"go": GoTarget()}):
             result = collect_companion_tags(
@@ -151,7 +151,7 @@ class TestCollectCompanionTags:
         go_entry.name = "go"
 
         # Primary tag happens to match what GoTarget would produce
-        with patch("rlsbl.config.read_project_config", return_value={"private": False}), \
+        with patch("rlsbl.config.read_project_config", return_value={"publish_mode": "ci"}), \
              patch("rlsbl.targets.detect_targets", return_value=[go_entry]), \
              patch("rlsbl.commands.release.TARGETS", {"go": GoTarget()}):
             result = collect_companion_tags(
@@ -161,18 +161,20 @@ class TestCollectCompanionTags:
         # The /v check catches this first, but even without it, dedup would exclude
         assert result == []
 
-    def test_default_private_when_unset(self, tmp_path):
-        """Packages without explicit private flag default to True (skipped)."""
+    def test_missing_publish_mode_is_hard_error(self, tmp_path):
+        """A member with no publish_mode key is a hard error (required-read)."""
+        from rlsbl.errors import ConfigError
+
         pkg_dir = tmp_path / "packages" / "mylib"
         pkg_dir.mkdir(parents=True)
 
-        # No "private" key at all -- defaults to True
+        # No publish_mode key at all -- required-read raises, never silently skips.
         with patch("rlsbl.config.read_project_config", return_value={}):
-            result = collect_companion_tags(
-                ["packages/mylib"], str(tmp_path), "1.0.0",
-                "myreleasable@v1.0.0",
-            )
-        assert result == []
+            with pytest.raises(ConfigError):
+                collect_companion_tags(
+                    ["packages/mylib"], str(tmp_path), "1.0.0",
+                    "myreleasable@v1.0.0",
+                )
 
     def test_corrupt_member_config_raises(self, tmp_path):
         """A member with a corrupt config.json must abort companion-tag
@@ -238,7 +240,7 @@ class TestCompanionTagIntegration:
         (go_pkg / "go.mod").write_text("module github.com/test/golib\n\ngo 1.21\n")
         (go_pkg / ".rlsbl").mkdir()
         (go_pkg / ".rlsbl" / "config.json").write_text(json.dumps({
-            "private": False,
+            "publish_mode": "ci",
             "targets": ["go"],
         }))
 
@@ -293,7 +295,7 @@ class TestCompanionTagIntegration:
         (go_pkg / "go.mod").write_text("module github.com/test/private\n\ngo 1.21\n")
         (go_pkg / ".rlsbl").mkdir()
         (go_pkg / ".rlsbl" / "config.json").write_text(json.dumps({
-            "private": True,
+            "publish_mode": "none",
             "targets": ["go"],
         }))
 
@@ -378,7 +380,7 @@ class TestGoCompanionTagsCheck:
         (go_pkg / "go.mod").write_text("module github.com/test/golib\n\ngo 1.21\n")
         (go_pkg / ".rlsbl").mkdir()
         (go_pkg / ".rlsbl" / "config.json").write_text(json.dumps({
-            "private": False,
+            "publish_mode": "ci",
             "targets": ["go"],
         }))
 
@@ -434,7 +436,7 @@ class TestGoCompanionTagsCheck:
         (go_pkg / "go.mod").write_text("module github.com/test/golib\n\ngo 1.21\n")
         (go_pkg / ".rlsbl").mkdir()
         (go_pkg / ".rlsbl" / "config.json").write_text(json.dumps({
-            "private": False,
+            "publish_mode": "ci",
             "targets": ["go"],
         }))
 
@@ -493,7 +495,7 @@ class TestGoCompanionTagsCheck:
         }))
         (npm_pkg / ".rlsbl").mkdir()
         (npm_pkg / ".rlsbl" / "config.json").write_text(json.dumps({
-            "private": False,
+            "publish_mode": "ci",
             "targets": ["npm"],
         }))
 
@@ -607,7 +609,7 @@ class TestGoCompanionTagsCheck:
         (go_pkg / "go.mod").write_text("module github.com/test/golib\n\ngo 1.21\n")
         (go_pkg / ".rlsbl").mkdir()
         (go_pkg / ".rlsbl" / "config.json").write_text(json.dumps({
-            "private": False,
+            "publish_mode": "ci",
             "targets": ["go"],
         }))
 
@@ -669,7 +671,7 @@ class TestGoCompanionTagsCheck:
         (go_pkg / ".rlsbl").mkdir()
         # Config exists, no targets key anywhere -> detect_targets raises
         (go_pkg / ".rlsbl" / "config.json").write_text(json.dumps({
-            "private": False,
+            "publish_mode": "ci",
         }))
 
         ws_dir = repo / ".rlsbl-monorepo"

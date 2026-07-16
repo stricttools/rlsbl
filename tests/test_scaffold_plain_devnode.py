@@ -142,7 +142,7 @@ class TestBareScaffoldPlainTarget:
         rlsbl_dir = mock_git_repo / ".rlsbl"
         rlsbl_dir.mkdir()
         (rlsbl_dir / "config.json").write_text(
-            json.dumps({"targets": ["plain"], "private": False})
+            json.dumps({"targets": ["plain"], "publish_mode": "ci"})
         )
         (mock_git_repo / "VERSION").write_text("0.1.0\n")
         monkeypatch.chdir(mock_git_repo)

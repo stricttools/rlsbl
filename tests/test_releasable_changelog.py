@@ -644,7 +644,7 @@ class TestGenerateChangelogPerReleasable:
         # Create project config
         config_dir = tmp_path / ".rlsbl"
         config_dir.mkdir()
-        (config_dir / "config.json").write_text(json.dumps({"private": False}))
+        (config_dir / "config.json").write_text(json.dumps({"publish_mode": "ci"}))
 
         # Generate
         changelog_path = os.path.join(rel_dir, "CHANGELOG.md")
@@ -673,7 +673,7 @@ class TestGenerateChangelogPerReleasable:
         append_entry(changes_dir, entry)
 
         config_dir = tmp_path / ".rlsbl"
-        (config_dir / "config.json").write_text(json.dumps({"private": False}))
+        (config_dir / "config.json").write_text(json.dumps({"publish_mode": "ci"}))
 
         content = generate_changelog(str(tmp_path))
         changelog_path = os.path.join(str(tmp_path), "CHANGELOG.md")
@@ -704,7 +704,7 @@ class TestGenerateChangelogPerReleasable:
 
         config_dir = tmp_path / ".rlsbl"
         config_dir.mkdir()
-        (config_dir / "config.json").write_text(json.dumps({"private": False}))
+        (config_dir / "config.json").write_text(json.dumps({"publish_mode": "ci"}))
 
         changelog_path = os.path.join(rel_dir, "CHANGELOG.md")
         generate_changelog(
@@ -757,7 +757,7 @@ class TestCachePerReleasable:
 
         config_dir = root / ".rlsbl"
         config_dir.mkdir()
-        (config_dir / "config.json").write_text(json.dumps({"private": False}))
+        (config_dir / "config.json").write_text(json.dumps({"publish_mode": "ci"}))
 
         result = validate_unreleased(changes_dir, config={})
         if result["passed"]:

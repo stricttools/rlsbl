@@ -85,7 +85,7 @@ class TestPreservesStructuredEntries:
         assert targets == [{"name": "go", "path": "go/"}]
 
     def test_empty_disk_targets_appends_string(self, tmp_path):
-        _write_config(tmp_path, {"private": False})  # no targets key
+        _write_config(tmp_path, {"publish_mode": "ci"})  # no targets key
         ctx = _bare_ctx(tmp_path)
         _ensure_target_in_config("pypi", ctx)
         assert _read_config(tmp_path)["targets"] == ["pypi"]

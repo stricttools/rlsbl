@@ -417,7 +417,7 @@ class TestSyncMemberPackageVersions:
         rlsbl_dir = os.path.join(abs_pkg, ".rlsbl")
         os.makedirs(rlsbl_dir, exist_ok=True)
         with open(os.path.join(rlsbl_dir, "config.json"), "w") as f:
-            json.dump({"private": True, "targets": ["pypi"]}, f)
+            json.dump({"publish_mode": "none", "targets": ["pypi"]}, f)
 
         # Create a pyproject.toml to detect as pypi
         with open(os.path.join(abs_pkg, "pyproject.toml"), "w") as f:
@@ -456,7 +456,7 @@ class TestSyncMemberPackageVersions:
         rlsbl_dir = os.path.join(abs_pkg, ".rlsbl")
         os.makedirs(rlsbl_dir, exist_ok=True)
         with open(os.path.join(rlsbl_dir, "config.json"), "w") as f:
-            json.dump({"private": False, "targets": ["pypi"]}, f)
+            json.dump({"publish_mode": "ci", "targets": ["pypi"]}, f)
 
         # Create a pyproject.toml
         with open(os.path.join(abs_pkg, "pyproject.toml"), "w") as f:
@@ -481,7 +481,7 @@ class TestSyncMemberPackageVersions:
         rlsbl_dir = os.path.join(abs_pkg, ".rlsbl")
         os.makedirs(rlsbl_dir, exist_ok=True)
         with open(os.path.join(rlsbl_dir, "config.json"), "w") as f:
-            json.dump({"private": False, "targets": ["pypi"]}, f)
+            json.dump({"publish_mode": "ci", "targets": ["pypi"]}, f)
 
         # Create a pyproject.toml so pypi target is detected
         with open(os.path.join(abs_pkg, "pyproject.toml"), "w") as f:

@@ -80,12 +80,12 @@ def _make_releasable_monorepo(
     # Default member configs
     default_member_cfgs = {
         "core": {
-            "private": False,
+            "publish_mode": "ci",
             "targets": ["pypi"],
             "pipelines": {"pypi": {"type": "pypi", "local": False}},
         },
         "web": {
-            "private": False,
+            "publish_mode": "ci",
             "targets": ["pypi"],
             "pipelines": {"pypi": {"type": "pypi", "local": False}},
         },
@@ -106,7 +106,7 @@ def _make_releasable_monorepo(
         )
         rlsbl_dir = proj_dir / ".rlsbl"
         rlsbl_dir.mkdir(exist_ok=True)
-        cfg = default_member_cfgs.get(proj["name"], {"private": False})
+        cfg = default_member_cfgs.get(proj["name"], {"publish_mode": "ci"})
         (rlsbl_dir / "config.json").write_text(json.dumps(cfg) + "\n")
 
     # Releasable-level setup
@@ -160,7 +160,7 @@ class TestPerMemberPipelineResolution:
         for pkg in ("core", "web"):
             pkg_dir = str(tmp_path / "packages" / pkg)
             ctx = resolve_member_context(pkg_dir, releasable_config_dir=rel_dir)
-            assert not ctx.is_private
+            assert ctx.publish_mode == "ci"
             pipelines = load_pipelines(ctx.config)
             assert "pypi" in pipelines
 
@@ -169,17 +169,17 @@ class TestPerMemberPipelineResolution:
         monkeypatch.chdir(tmp_path)
         _make_releasable_monorepo(
             tmp_path,
-            member_configs={"web": {"private": True}},
+            member_configs={"web": {"publish_mode": "none"}},
         )
 
         rel_dir = get_releasable_dir(str(tmp_path), "myrel")
         web_dir = str(tmp_path / "packages" / "web")
         web_ctx = resolve_member_context(web_dir, releasable_config_dir=rel_dir)
-        assert web_ctx.is_private
+        assert web_ctx.publish_mode == "none"
 
         core_dir = str(tmp_path / "packages" / "core")
         core_ctx = resolve_member_context(core_dir, releasable_config_dir=rel_dir)
-        assert not core_ctx.is_private
+        assert core_ctx.publish_mode == "ci"
 
     def test_member_without_pipelines_produces_empty(self, tmp_path, monkeypatch):
         """A member with no pipelines config produces empty pipelines dict."""
@@ -324,7 +324,7 @@ class TestPublishResumeState:
                 continue
             abs_pkg = str(tmp_path / pkg_path)
             ctx = resolve_member_context(abs_pkg, releasable_config_dir=rel_dir)
-            if not ctx.is_private:
+            if ctx.publish_mode != "none":
                 pipelines = load_pipelines(ctx.config)
                 if pipelines:
                     not_skipped.append(pkg_path)

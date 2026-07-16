@@ -17,7 +17,7 @@ def _setup_pypi_project(tmp_project, init_content="", *, pkg_name="mypkg"):
     rlsbl_dir = tmp_project / ".rlsbl"
     rlsbl_dir.mkdir(parents=True, exist_ok=True)
     (rlsbl_dir / "config.json").write_text(
-        json.dumps({"private": False, "targets": ["pypi"]}) + "\n"
+        json.dumps({"publish_mode": "ci", "targets": ["pypi"]}) + "\n"
     )
 
     # pyproject.toml
@@ -89,7 +89,7 @@ class TestDunderVersionMissing:
         rlsbl_dir = tmp_project / ".rlsbl"
         rlsbl_dir.mkdir(parents=True, exist_ok=True)
         (rlsbl_dir / "config.json").write_text(
-            json.dumps({"private": False, "targets": ["go"]}) + "\n"
+            json.dumps({"publish_mode": "ci", "targets": ["go"]}) + "\n"
         )
         (tmp_project / "go.mod").write_text(
             "module example.com/mymod\n\ngo 1.21\n"
@@ -106,7 +106,7 @@ class TestDunderVersionMissing:
         rlsbl_dir = tmp_project / ".rlsbl"
         rlsbl_dir.mkdir(parents=True, exist_ok=True)
         (rlsbl_dir / "config.json").write_text(
-            json.dumps({"private": False, "targets": ["pypi"]}) + "\n"
+            json.dumps({"publish_mode": "ci", "targets": ["pypi"]}) + "\n"
         )
         (tmp_project / "pyproject.toml").write_text(
             '[project]\nname = "mypkg"\nversion = "1.0.0"\n'

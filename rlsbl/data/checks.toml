@@ -376,7 +376,7 @@ depends_on = []
 # Phase 12 project checks
 # ---------------------------------------------------------------------------
 
-[checks.private-publish-workflow]
+[checks.publish-mode-workflow]
 tags = ["project"]
 severity = "error"
 fast = true

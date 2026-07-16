@@ -181,7 +181,8 @@ def _collect_status(registry, target_path=".", *, tag_glob=None, ctx, project=No
     registry_version = None
     drift = None
     if flags.get("registry"):
-        is_private = ctx.config.get("private", False)
+        from ..config import suppresses_publish
+        is_private = suppresses_publish(ctx.config)
         if is_private:
             drift = "PRIVATE"
         else:

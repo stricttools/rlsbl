@@ -88,7 +88,7 @@ def _setup_released_project_with_stale_md(repo):
     (changes_dir / "unreleased.jsonl").write_text("")
 
     (repo / ".rlsbl" / "config.json").write_text(
-        json.dumps({"private": False, "targets": ["npm"]}) + "\n"
+        json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
     )
 
     # Archived release file for v1.0.0 carrying the description that
@@ -157,7 +157,7 @@ def _make_ctx(repo):
     return ProjectContext(
         project_root=Path(str(repo)),
         workspace_root=None,
-        config={"private": False, "pipelines": {}},
+        config={"publish_mode": "ci", "pipelines": {}},
     )
 
 

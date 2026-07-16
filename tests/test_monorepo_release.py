@@ -74,7 +74,7 @@ class TestMonorepoRelease:
         changes_dir.mkdir(parents=True, exist_ok=True)
         (changes_dir / "unreleased.jsonl").write_text("")
         (proj_dir / ".rlsbl" / "config.json").write_text(
-            json.dumps({"private": False, "targets": ["npm"]}) + "\n"
+            json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
         )
 
         # Commit the monorepo structure
@@ -112,7 +112,7 @@ class TestMonorepoRelease:
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False, "pipelines": {}}))
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"publish_mode": "ci", "pipelines": {}}))
 
         output = mock_out.getvalue()
         assert "tooling@v1.0.0" in output
@@ -140,7 +140,7 @@ class TestMonorepoRelease:
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False, "pipelines": {}}))
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"publish_mode": "ci", "pipelines": {}}))
 
         output = mock_out.getvalue()
         assert "tooling: release v1.0.0" in output
@@ -171,7 +171,7 @@ class TestMonorepoRelease:
         mock_run.side_effect = ["", "0", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False, "pipelines": {}}))
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"publish_mode": "ci", "pipelines": {}}))
 
         output = mock_out.getvalue()
         assert "tooling@v1.0.1" in output
@@ -198,7 +198,7 @@ class TestMonorepoRelease:
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False, "pipelines": {}}))
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"publish_mode": "ci", "pipelines": {}}))
 
         output = mock_out.getvalue()
         assert "Project:   tooling (tooling)" in output
@@ -239,7 +239,7 @@ class TestMonorepoRelease:
             run_cmd(_rc(), {
                 "dry-run": True, "quiet": True,
             },
-            ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False, "pipelines": {}}),
+            ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"publish_mode": "ci", "pipelines": {}}),
 )
         assert exc_info.value.code == 1
 
@@ -270,7 +270,7 @@ class TestMonorepoRelease:
         changes_dir.mkdir(parents=True, exist_ok=True)
         (changes_dir / "unreleased.jsonl").write_text("")
         (mock_git_repo / ".rlsbl" / "config.json").write_text(
-            json.dumps({"private": False, "targets": ["npm"]}) + "\n"
+            json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
         )
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
@@ -281,7 +281,7 @@ class TestMonorepoRelease:
         mock_run.side_effect = ["", "0", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
         output = mock_out.getvalue()
         assert "Tag:       v2.0.1" in output
@@ -322,7 +322,7 @@ class TestMonorepoRelease:
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False, "pipelines": {}}))
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"publish_mode": "ci", "pipelines": {}}))
 
         output = mock_out.getvalue()
         # Should read 1.0.0 from libs/core/package.json, not 9.9.9 from root
@@ -361,7 +361,7 @@ class TestMonorepoRelease:
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False, "pipelines": {}}))
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"publish_mode": "ci", "pipelines": {}}))
 
         output = mock_out.getvalue()
         assert "Initial release of core component" in output
@@ -399,7 +399,7 @@ class TestSubtreePublish:
         changes_dir.mkdir(parents=True, exist_ok=True)
         (changes_dir / "unreleased.jsonl").write_text("")
         (proj_dir / ".rlsbl" / "config.json").write_text(
-            json.dumps({"private": False, "targets": ["npm"]}) + "\n"
+            json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
         )
 
         subprocess.run(["git", "add", "."], cwd=str(repo_root), check=True)
@@ -434,7 +434,7 @@ class TestSubtreePublish:
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False, "pipelines": {}}))
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"publish_mode": "ci", "pipelines": {}}))
 
         output = mock_out.getvalue()
         assert "Subtree:" in output
@@ -464,7 +464,7 @@ class TestSubtreePublish:
         mock_run.side_effect = ["", "0", "", "", "", ""]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False, "pipelines": {}}))
+            run_cmd(_rc(), {"dry-run": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"publish_mode": "ci", "pipelines": {}}))
 
         output = mock_out.getvalue()
         assert "Subtree:" not in output
@@ -515,4 +515,4 @@ class TestSubtreePublish:
         # publish code path is still exercised because it reads subtree_remote
         # from workspace.toml via resolve_project.
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
+            run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))

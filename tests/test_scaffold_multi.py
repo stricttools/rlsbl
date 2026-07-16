@@ -635,7 +635,7 @@ class TestSubdirectoryNpmTarget:
                 "pypi",
                 {"name": "npm", "path": "npm"},
             ],
-            "private": False,
+            "publish_mode": "ci",
         }
         (rlsbl_dir / "config.json").write_text(json.dumps(config, indent=2) + "\n")
 

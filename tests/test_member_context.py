@@ -84,10 +84,10 @@ class TestResolveMemberContext:
         _repo, member, rel_dir = _make_go_member_monorepo(
             tmp_path,
             member_config={},
-            releasable_config={"private": False, "targets": ["go"]},
+            releasable_config={"publish_mode": "ci", "targets": ["go"]},
         )
         ctx = resolve_member_context(str(member), releasable_config_dir=rel_dir)
-        assert ctx.is_private is False
+        assert ctx.publish_mode == "ci"
         assert [e.name for e in ctx.targets] == ["go"]
         assert ctx.targets[0].path == str(member)
 
@@ -95,31 +95,37 @@ class TestResolveMemberContext:
         """Per-package private:true wins over releasable-level private:false."""
         _repo, member, rel_dir = _make_go_member_monorepo(
             tmp_path,
-            member_config={"private": True},
-            releasable_config={"private": False, "targets": ["go"]},
+            member_config={"publish_mode": "none"},
+            releasable_config={"publish_mode": "ci", "targets": ["go"]},
         )
         ctx = resolve_member_context(str(member), releasable_config_dir=rel_dir)
-        assert ctx.is_private is True
+        assert ctx.publish_mode == "none"
 
-    def test_private_defaults_true_when_unset_everywhere(self, tmp_path):
-        """No private key anywhere -> private defaults to True."""
+    def test_publish_mode_required_when_unset_everywhere(self, tmp_path):
+        """No publish_mode key anywhere -> required-read hard error (no default)."""
+        from rlsbl.errors import ConfigError
+
         _repo, member, rel_dir = _make_go_member_monorepo(
             tmp_path,
             member_config={},
             releasable_config={"targets": ["go"]},
         )
         ctx = resolve_member_context(str(member), releasable_config_dir=rel_dir)
-        assert ctx.is_private is True
+        with pytest.raises(ConfigError):
+            _ = ctx.publish_mode
 
-    def test_without_releasable_config_dir(self, tmp_path):
-        """No inheritance: falls back to per-package config / auto-detection."""
+    def test_without_releasable_config_dir_requires_publish_mode(self, tmp_path):
+        """No inheritance and no per-package publish_mode -> hard error."""
+        from rlsbl.errors import ConfigError
+
         _repo, member, _rel_dir = _make_go_member_monorepo(
             tmp_path,
             member_config=None,
-            releasable_config={"private": False, "targets": ["go"]},
+            releasable_config={"publish_mode": "ci", "targets": ["go"]},
         )
         ctx = resolve_member_context(str(member))
-        assert ctx.is_private is True  # no config at all -> default private
+        with pytest.raises(ConfigError):
+            _ = ctx.publish_mode
         assert any(e.name == "go" for e in ctx.targets)  # auto-detected
 
     def test_targets_are_lazy(self, tmp_path):
@@ -131,12 +137,12 @@ class TestResolveMemberContext:
         """
         _repo, member, rel_dir = _make_go_member_monorepo(
             tmp_path,
-            member_config={"private": True},
+            member_config={"publish_mode": "none"},
             releasable_config={},  # no targets key at releasable level either
         )
         ctx = resolve_member_context(str(member), releasable_config_dir=rel_dir)
         # Constructing the context and checking privacy must not raise
-        assert ctx.is_private is True
+        assert ctx.publish_mode == "none"
         # Accessing targets is what raises
         from rlsbl.targets import ConfigError
 
@@ -155,7 +161,7 @@ class TestCollectCompanionTagsInheritance:
         repo, _member, rel_dir = _make_go_member_monorepo(
             tmp_path,
             member_config={},
-            releasable_config={"private": False, "targets": ["go"]},
+            releasable_config={"publish_mode": "ci", "targets": ["go"]},
         )
         result = collect_companion_tags(
             ["packages/golib"], str(repo), "1.0.0", "myrel@v1.0.0",
@@ -167,8 +173,8 @@ class TestCollectCompanionTagsInheritance:
         """Per-package private:true overrides releasable private:false."""
         repo, _member, rel_dir = _make_go_member_monorepo(
             tmp_path,
-            member_config={"private": True},
-            releasable_config={"private": False, "targets": ["go"]},
+            member_config={"publish_mode": "none"},
+            releasable_config={"publish_mode": "ci", "targets": ["go"]},
         )
         result = collect_companion_tags(
             ["packages/golib"], str(repo), "1.0.0", "myrel@v1.0.0",
@@ -219,7 +225,7 @@ class TestGoCompanionTagsCheckInheritance:
         repo, _member, _rel_dir = _make_go_member_monorepo(
             tmp_path,
             member_config={},
-            releasable_config={"private": False, "targets": ["go"]},
+            releasable_config={"publish_mode": "ci", "targets": ["go"]},
         )
         check_fn = _get_check("go-companion-tags")
         proj = WorkspaceProject({
@@ -236,7 +242,7 @@ class TestGoCompanionTagsCheckInheritance:
         repo, _member, _rel_dir = _make_go_member_monorepo(
             tmp_path,
             member_config={},
-            releasable_config={"private": False, "targets": ["go"]},
+            releasable_config={"publish_mode": "ci", "targets": ["go"]},
         )
         run_git(repo, "tag", "packages/golib/v1.0.0")
         check_fn = _get_check("go-companion-tags")
@@ -261,7 +267,7 @@ class TestMemberSetAgreement:
         repo, member, rel_dir = _make_go_member_monorepo(
             tmp_path,
             member_config={},
-            releasable_config={"private": False, "targets": ["go"]},
+            releasable_config={"publish_mode": "ci", "targets": ["go"]},
         )
 
         # 1. Version sync considers the member published (already worked)
@@ -315,7 +321,7 @@ class TestResolveTargetPathsInheritance:
         """
         _repo, member, rel_dir = _make_go_member_monorepo(
             tmp_path,
-            member_config={"private": False},
+            member_config={"publish_mode": "ci"},
             releasable_config={"targets": ["go"]},
         )
         result = resolve_target_paths(str(member), releasable_config_dir=rel_dir)
@@ -327,7 +333,7 @@ class TestResolveTargetPathsInheritance:
         proj.mkdir()
         (proj / ".rlsbl").mkdir()
         (proj / ".rlsbl" / "config.json").write_text(
-            json.dumps({"private": False, "targets": ["go"]})
+            json.dumps({"publish_mode": "ci", "targets": ["go"]})
         )
         (proj / "go.mod").write_text("module example.com/x\n")
         result = resolve_target_paths(str(proj))

@@ -389,7 +389,7 @@ class TestExternalCheckIntegration:
         rlsbl_dir = mock_git_repo / ".rlsbl"
         rlsbl_dir.mkdir(exist_ok=True)
         config = {
-            "private": False,
+            "publish_mode": "ci",
             "targets": ["plain"],
             "external_checks": [{
                 "name": "ext-test-pass",
@@ -429,7 +429,7 @@ class TestExternalCheckIntegration:
         import rlsbl
 
         config = {
-            "private": False,
+            "publish_mode": "ci",
             "external_checks": [{
                 "name": "ext-test-fail",
                 "command": "false",
@@ -463,7 +463,7 @@ class TestExternalCheckIntegration:
         import rlsbl
 
         config = {
-            "private": False,
+            "publish_mode": "ci",
             "external_checks": [
                 {
                     "name": "ext-dep-target",
@@ -544,7 +544,7 @@ class TestRunExternalPreflightChecks:
         builtin_marker = tmp_path / "builtin-ran"
 
         config = {
-            "private": False,
+            "publish_mode": "ci",
             "external_checks": [{
                 "name": "ext-marker-check",
                 "command": f"touch {ext_marker}",
@@ -600,7 +600,7 @@ class TestRunExternalPreflightChecks:
         from pathlib import Path
 
         config = {
-            "private": False,
+            "publish_mode": "ci",
             "external_checks": [{
                 "name": "ext-fail-check",
                 "command": "false",

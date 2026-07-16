@@ -760,7 +760,7 @@ def _setup_root_publisher(root, *, gate_regex, targets=("pypi",), name="orxtra")
     mono = os.path.join(root, ".rlsbl-monorepo")
     rel_dir = os.path.join(mono, "releasables", name)
     os.makedirs(rel_dir, exist_ok=True)
-    cfg = {"private": False, "targets": list(targets)}
+    cfg = {"publish_mode": "ci", "targets": list(targets)}
     if gate_regex is not None:
         cfg["publish_gate_check_regex"] = gate_regex
     with open(os.path.join(rel_dir, "config.json"), "w") as f:

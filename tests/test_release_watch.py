@@ -43,7 +43,7 @@ def _setup_npm_project(tmp_path):
     (changes_dir / "unreleased.jsonl").write_text("")
     config_dir = tmp_path / ".rlsbl"
     config_dir.mkdir(exist_ok=True)
-    config = {"targets": ["npm"], "private": False}
+    config = {"targets": ["npm"], "publish_mode": "ci"}
     (config_dir / "config.json").write_text(json.dumps(config) + "\n")
 
 
@@ -103,7 +103,7 @@ class TestNoWatchPrintsHint:
             _rc(),
             {"dry-run": True, "quiet": False, "yes": True, "watch": False},
         
-            ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}),
+            ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}),
 )
 
         captured = capsys.readouterr()
@@ -161,7 +161,7 @@ class TestWatchInvokesWatchCmd:
             _rc(),
             {"dry-run": True, "quiet": False, "yes": True, "watch": True},
         
-            ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}),
+            ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}),
 )
 
         captured = capsys.readouterr()
@@ -263,7 +263,7 @@ class TestWatchInvokedAfterRelease:
                 _rc(),
                 {"yes": True, "quiet": False, "watch": True},
             
-                ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}),
+                ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}),
 )
             mock_watch.assert_called_once_with(None, [fake_sha], {})
 
@@ -356,7 +356,7 @@ class TestWatchInvokedAfterRelease:
                 _rc(),
                 {"yes": True, "quiet": False, "watch": False},
 
-                ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}),
+                ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}),
 )
             mock_watch.assert_not_called()
 

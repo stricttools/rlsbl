@@ -75,7 +75,7 @@ def _setup_releasable_npm_project(repo):
     changes_dir.mkdir(parents=True)
     (changes_dir / "unreleased.jsonl").write_text("")
     (repo / ".rlsbl" / "config.json").write_text(
-        json.dumps({"private": False, "targets": ["npm"]}) + "\n"
+        json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
     )
     _git(repo, "add", "package.json", "CHANGELOG.md", ".rlsbl/changes/unreleased.jsonl", ".rlsbl/config.json")
     _git(repo, "commit", "-q", "-m", "initial")
@@ -169,7 +169,7 @@ class TestReleaseUnexpectedFiles:
                     "quiet": True,
                 },
             
-                ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}),
+                ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}),
 )
 
         # Verify the release actually completed: the version was bumped
@@ -232,7 +232,7 @@ class TestReleaseUnexpectedFiles:
                         "quiet": True,
                     },
                 
-                    ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}),
+                    ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}),
 )
 
         assert exc_info.value.code == 1, (

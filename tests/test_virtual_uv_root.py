@@ -81,7 +81,7 @@ class TestVirtualRootCheckSkips:
         "name-consistency",
         "version-consistency",
         "config-schema",
-        "private-publish-workflow",
+        "publish-mode-workflow",
     ]
 
     def test_all_skip_at_virtual_root(self, tmp_project):

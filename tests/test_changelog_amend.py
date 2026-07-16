@@ -258,8 +258,8 @@ class TestCmdAmendPackages:
                  "releasable": "beta"},
             ],
             releasable_configs={
-                "alpha": {"private": False, "targets": ["pypi"]},
-                "beta": {"private": False, "targets": ["pypi"]},
+                "alpha": {"publish_mode": "ci", "targets": ["pypi"]},
+                "beta": {"publish_mode": "ci", "targets": ["pypi"]},
             },
         )
         root = ns.root

@@ -23,7 +23,18 @@ from unittest.mock import ANY, MagicMock, call, patch
 
 import pytest
 
+from githarness import add_remote, git as _ghgit, init_repo
 from rlsbl.context import ProjectContext
+from rlsbl.evidence_gate import Evidence, EvidenceKind, GateResult, Verdict
+
+
+def _undo_cleared_gate(*_a, **_k):
+    return GateResult(
+        Verdict.CLEARED,
+        [Evidence("registry_probe", "npm", EvidenceKind.UNPUBLISHED, "not on npm")],
+        "unpublished",
+    )
+
 
 # Convenience to build a minimal context
 def _ctx(root=".", config=None, workspace_root=None):
@@ -443,38 +454,54 @@ class TestUndoReleaseFileFinalize:
 
 
 class TestUndoFinalizeOnlyReverted:
-    """Covers lines 196-199: finalize commits reverted but HEAD is not the version-bump."""
+    """A release whose tag points at a finalize-changelog commit sitting on a
+    non-release-shaped boundary (no matching version-bump commit): the walk
+    collects and reverts the finalize commit only, then reconciles, and undo
+    completes cleanly. Real git; only run_gh and the registry gate are mocked.
+    """
 
-    @patch(f"{MOD_UNDO}.generate_changelog")
-    @patch(f"{MOD_UNDO}.unfinalize_version", return_value=["unreleased.jsonl"])
-    @patch(f"{MOD_UNDO}.get_changes_dir", return_value="/fake/.rlsbl/changes")
-    @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
-    @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
+    @patch(f"{MOD_UNDO}.run_evidence_gate", side_effect=_undo_cleared_gate)
     @patch(f"{MOD_UNDO}.push_if_needed")
-    @patch(f"{MOD_UNDO}.get_current_branch", return_value="main")
-    @patch(f"{MOD_UNDO}.is_clean_tree", return_value=True)
     @patch(f"{MOD_UNDO}.check_gh_auth", return_value=True)
     @patch(f"{MOD_UNDO}.check_gh_installed", return_value=True)
     @patch(f"{MOD_UNDO}.run_gh", return_value="")
-    @patch(f"{MOD_UNDO}.run")
-    def test_finalize_reverted_but_no_version_bump(self, mock_run, _run_gh, *_):
+    def test_finalize_reverted_but_no_version_bump(
+        self, _run_gh, _gh_inst, _gh_auth, _push, _gate, tmp_path, monkeypatch,
+    ):
         from rlsbl.commands.undo import run_cmd
 
-        mock_run.side_effect = [
-            "v1.0.0",
-            "",                                           # git push origin :v1.0.0
-            "",                                           # git tag -d
-            "chore: finalize changelog for 1.0.0",       # git log (finalize)
-            "",                                           # git revert (finalize)
-            "some other commit",                          # git log (not version-bump)
-            # changelog restoration: git add, git commit
-            "",                                           # git add
-            "",                                           # git commit
-        ]
+        repo = tmp_path / "repo"
+        init_repo(repo)
+        (repo / "package.json").write_text(json.dumps({"name": "pkg", "version": "1.0.0"}) + "\n")
+        (repo / ".rlsbl").mkdir()
+        (repo / ".rlsbl" / "config.json").write_text(
+            json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
+        )
+        (repo / ".rlsbl" / "changes").mkdir()
+        (repo / ".rlsbl" / "changes" / "unreleased.jsonl").write_text(
+            json.dumps({"commits": [], "user_facing": True,
+                        "description": "thing", "type": "feature"}) + "\n"
+        )
+        (repo / "CHANGELOG.md").write_text("# Changelog\n\n## Unreleased\n\n- thing\n")
+        _ghgit(repo, "add", "-A")
+        _ghgit(repo, "commit", "-q", "-m", "some other commit")  # non-release boundary
+
+        # finalize-changelog commit on top; tag points here (no version-bump).
+        os.rename(repo / ".rlsbl" / "changes" / "unreleased.jsonl",
+                  repo / ".rlsbl" / "changes" / "1.0.0.jsonl")
+        (repo / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
+        _ghgit(repo, "add", "-A")
+        _ghgit(repo, "commit", "-q", "-m", "chore: finalize changelog for 1.0.0")
+        _ghgit(repo, "tag", "v1.0.0")
+        add_remote(repo, repo.parent / "finalize-remote.git")
+
+        monkeypatch.chdir(repo)
         with patch("sys.stdout", new_callable=StringIO) as out:
-            run_cmd("npm", [], {"yes": True}, ctx=_ctx())
-        # All steps OK, so simple success message (no summary table)
-        assert "Undo complete" in out.getvalue()
+            run_cmd("npm", [], {"yes": True}, ctx=_ctx(repo, {"publish_mode": "ci"}))
+        assert "Undo of v1.0.0 complete" in out.getvalue()
+        # The finalize was undone: the finalized JSONL is gone again.
+        assert not (repo / ".rlsbl" / "changes" / "1.0.0.jsonl").exists()
+        assert "v1.0.0" not in _ghgit(repo, "tag", "-l").split()
 
 
 # ============================================================================
@@ -732,7 +759,7 @@ class TestReleaseEnvFile:
         env_file = tmp_path / ".env"
         env_file.write_text("CF_ACCOUNT_ID=test123\n")
 
-        config = {"env_file": str(env_file)}
+        config = {"env_file": str(env_file), "publish_mode": "ci"}
         release_config = MagicMock()
         release_config.bump = "minor"
         release_config.include = []

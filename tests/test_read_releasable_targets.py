@@ -28,7 +28,7 @@ def _write_config(tmp_path, data):
 
 class TestReadReleasableTargets:
     def test_absent_returns_none(self, tmp_path):
-        path = _write_config(tmp_path, {"private": False})
+        path = _write_config(tmp_path, {"publish_mode": "ci"})
         assert read_releasable_targets(path) is None
 
     def test_non_empty_list_returned(self, tmp_path):
@@ -56,7 +56,7 @@ class TestSharedBanMessages:
     def test_empty_message_shared(self):
         # config-level and releasable-level differ only in the location string.
         assert empty_targets_ban_message("config").startswith("targets is an empty list in config.")
-        assert "set \"private\": true" in empty_targets_ban_message("/x/config.json")
+        assert 'set "publish_mode": "none"' in empty_targets_ban_message("/x/config.json")
 
     def test_non_list_message_names_type(self):
         assert "must be a list" in non_list_targets_ban_message("config", "pypi")

@@ -184,6 +184,61 @@ def get_changelog_validation_config(config):
 
 
 
+# The closed set of valid publish_mode values. "ci" publishes via CI
+# pipelines (the old private:false); "none" suppresses publishing (old
+# private:true). "local" is reserved for a future direct-publish mode.
+PUBLISH_MODES = frozenset({"ci", "none"})
+
+
+def old_private_key_message():
+    """Exact-edit remediation for the removed ``private`` config key.
+
+    The ``private`` key was misleading (it read as GitHub repo visibility but
+    meant "suppress publishing"). It is replaced by the ``publish_mode`` enum.
+    """
+    return (
+        'The "private" key in .rlsbl/config.json has been replaced by '
+        '"publish_mode". Replace "private": false with "publish_mode": "ci" '
+        '(publish via CI pipelines), or replace "private": true with '
+        '"publish_mode": "none" (suppress publishing).'
+    )
+
+
+def get_publish_mode(config):
+    """Return the ``publish_mode`` enum value (one of :data:`PUBLISH_MODES`).
+
+    Single source of truth for reading the publish mode. Raises
+    :class:`ConfigError` when the deprecated ``private`` key is present, when
+    ``publish_mode`` is absent (it is required, no default), or when its value
+    is not one of the valid modes.
+    """
+    if "private" in config:
+        raise ConfigError(old_private_key_message())
+    if "publish_mode" not in config:
+        raise ConfigError(
+            'missing required "publish_mode" key in .rlsbl/config.json — set '
+            '"publish_mode": "ci" to publish via CI, or "publish_mode": "none" '
+            'to suppress publishing.'
+        )
+    mode = config["publish_mode"]
+    if mode not in PUBLISH_MODES:
+        raise ConfigError(
+            f'invalid "publish_mode" value {mode!r} in .rlsbl/config.json — '
+            f'must be one of {sorted(PUBLISH_MODES)}.'
+        )
+    return mode
+
+
+def suppresses_publish(config):
+    """True when the config's publish_mode suppresses publishing (``"none"``).
+
+    Derives the old ``is_private`` boolean from the enum. Raises
+    :class:`ConfigError` via :func:`get_publish_mode` when the key is absent or
+    invalid (required-read, no silent default).
+    """
+    return get_publish_mode(config) == "none"
+
+
 def empty_targets_ban_message(location):
     """Return the standard error message for a banned empty ``targets`` list.
 
@@ -192,7 +247,7 @@ def empty_targets_ban_message(location):
     """
     return (
         f'targets is an empty list in {location}. '
-        'Remove the "targets" key entirely, or set "private": true '
+        'Remove the "targets" key entirely, or set "publish_mode": "none" '
         'to suppress publishing.'
     )
 
@@ -206,7 +261,7 @@ def non_list_targets_ban_message(location, value):
     return (
         f'targets must be a list in {location}, got {type(value).__name__}. '
         'Provide a list of target names, remove the "targets" key entirely, '
-        'or set "private": true to suppress publishing.'
+        'or set "publish_mode": "none" to suppress publishing.'
     )
 
 
@@ -215,9 +270,11 @@ def validate_config_schema(config, *, project_dir=None):
     banned keys and structural invariants.
 
     Checks:
-    1. ``targets: []`` -- hard error if targets key exists and is an empty
-       list.  Use ``private: true`` to suppress publishing instead.
-    2. ``release.mode`` -- hard error if the key exists.  PR mode was
+    1. ``publish_mode`` -- hard error if the deprecated ``private`` key is
+       present, if ``publish_mode`` is absent, or if its value is invalid.
+    2. ``targets: []`` -- hard error if targets key exists and is an empty
+       list.  Use ``publish_mode: "none"`` to suppress publishing instead.
+    3. ``release.mode`` -- hard error if the key exists.  PR mode was
        removed; even ``mode = "imperative"`` is dead config.
 
     Called early in the release flow before any mutations.
@@ -229,7 +286,10 @@ def validate_config_schema(config, *, project_dir=None):
     Raises:
         ConfigError on any violation.
     """
-    # 1. Ban targets: []
+    # 1. Require publish_mode (and ban the deprecated private key)
+    get_publish_mode(config)
+
+    # 2. Ban targets: []
     targets = config.get("targets")
     if isinstance(targets, list) and len(targets) == 0:
         raise ConfigError(empty_targets_ban_message("config"))

@@ -175,7 +175,7 @@ class TestReleasableEmptyTargetsIsBanned:
         )
         os.makedirs(rel_dir, exist_ok=True)
         with open(os.path.join(rel_dir, "config.json"), "w") as f:
-            json.dump({"private": True}, f)  # no targets key
+            json.dump({"publish_mode": "none"}, f)  # no targets key
 
         member_a = tmp_path / "pkg-a"
         member_a.mkdir()

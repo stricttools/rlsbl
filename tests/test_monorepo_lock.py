@@ -116,7 +116,7 @@ class TestMonorepoReleaseLockPlacement:
         changes_dir.mkdir(parents=True, exist_ok=True)
         (changes_dir / "unreleased.jsonl").write_text("")
         (proj_dir / ".rlsbl" / "config.json").write_text(
-            json.dumps({"private": False, "targets": ["npm"]}) + "\n"
+            json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
         )
 
         subprocess.run(["git", "add", "."], cwd=str(repo_root), check=True)
@@ -186,7 +186,7 @@ class TestMonorepoReleaseLockPlacement:
              patch("rlsbl.commands.release.validate_changelog_state", return_value=None), \
              patch("rlsbl.commands.release.acquire_lock", spy_acquire):
             with patch("sys.stdout", new_callable=StringIO):
-                run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"private": False, "pipelines": {}}))
+                run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"publish_mode": "ci", "pipelines": {}}))
 
         assert lock_acquired_in == [".rlsbl-monorepo"]
         # .rlsbl/ should NOT exist at the repo root (only .rlsbl-monorepo/ should)

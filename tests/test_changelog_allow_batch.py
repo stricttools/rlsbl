@@ -37,7 +37,7 @@ def batch_repo(tmp_path, monkeypatch):
 
     # Set up config.json with max_commits_per_entry=3
     config = {
-        "private": False,
+        "publish_mode": "ci",
         "batch_limits": {
             "max_commits_per_entry": 3,
             "max_entries_per_commit": 5,

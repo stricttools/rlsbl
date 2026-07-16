@@ -67,7 +67,7 @@ def _setup_releasable_monorepo(
         rlsbl_dir = proj_dir / ".rlsbl"
         rlsbl_dir.mkdir(exist_ok=True)
         (rlsbl_dir / "config.json").write_text(
-            json.dumps({"private": False, "targets": ["pypi"]}) + "\n"
+            json.dumps({"publish_mode": "ci", "targets": ["pypi"]}) + "\n"
         )
 
     # Set up per-releasable state directories
@@ -384,7 +384,7 @@ class TestImplicitModeNoCrash:
         changes = pkg / ".rlsbl" / "changes"
         changes.mkdir(parents=True)
         (changes / "unreleased.jsonl").write_text("")
-        (pkg / ".rlsbl" / "config.json").write_text(json.dumps({"private": False, "targets": ["npm"]}))
+        (pkg / ".rlsbl" / "config.json").write_text(json.dumps({"publish_mode": "ci", "targets": ["npm"]}))
 
         make_workspace(repo, [{"path": "packages/alpha", "name": "alpha"}])
         run_git(repo, "add", ".")
@@ -418,7 +418,7 @@ class TestImplicitModeNoCrash:
         changes = pkg / ".rlsbl" / "changes"
         changes.mkdir(parents=True)
         (changes / "unreleased.jsonl").write_text("")
-        (pkg / ".rlsbl" / "config.json").write_text(json.dumps({"private": False, "targets": ["npm"]}))
+        (pkg / ".rlsbl" / "config.json").write_text(json.dumps({"publish_mode": "ci", "targets": ["npm"]}))
 
         make_workspace(repo, [{"path": "packages/alpha", "name": "alpha"}])
         run_git(repo, "add", ".")
@@ -518,7 +518,7 @@ class TestWorkspaceRootWithDotProject:
         changes = repo / ".rlsbl" / "changes"
         changes.mkdir(parents=True)
         (changes / "unreleased.jsonl").write_text("")
-        (repo / ".rlsbl" / "config.json").write_text(json.dumps({"private": False, "targets": ["npm"]}))
+        (repo / ".rlsbl" / "config.json").write_text(json.dumps({"publish_mode": "ci", "targets": ["npm"]}))
 
         make_workspace(repo, [{"path": ".", "name": "root-pkg"}])
         run_git(repo, "add", ".")

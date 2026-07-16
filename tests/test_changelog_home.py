@@ -127,7 +127,7 @@ def _setup_releasable_workspace(root, member_path="packages/core",
     )
     (member / ".rlsbl").mkdir(exist_ok=True)
     (member / ".rlsbl" / "config.json").write_text(
-        json.dumps({"private": False, "targets": ["npm"], "pipelines": {}}) + "\n"
+        json.dumps({"publish_mode": "ci", "targets": ["npm"], "pipelines": {}}) + "\n"
     )
 
     project_entry = {
@@ -388,7 +388,7 @@ class TestReleasableReleaseChangelogHome:
         ctx = WorkspaceCheckContext(
             project_root=Path(str(core)),
             workspace_root=Path(str(tmp_project)),
-            config={"private": False, "targets": ["npm"]},
+            config={"publish_mode": "ci", "targets": ["npm"]},
             projects=projects,
             graph=None,
             releasables=releasables,

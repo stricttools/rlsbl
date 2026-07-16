@@ -588,11 +588,11 @@ def cmd_status(target, json, registry, **_kwargs):
 
 @app.command(name="scaffold", help="Generate or update CI/CD workflows, git hooks, changelog, and license files. Safe to run repeatedly -- three-way merges template changes with your customizations. Existing files with no stored merge base are healed from their last scaffold commit before merging.")
 @strictcli.flag(name="target", type=str, help="Target a specific registry (auto-detected if omitted)", default="")
-@strictcli.flag(name="private", type=bool, default=False, help="Generate workflows without publish steps, suitable for private repositories")
+@strictcli.flag(name="publish-mode", type=str, default="", help='Publish mode: "ci" to publish via CI pipelines, or "none" to suppress publishing. Required for private repos; public repos default to "ci".')
 @strictcli.flag(name="auto-commit", type=bool, default=True, help="Auto-commit scaffolded files after writing them to disk")
 @strictcli.flag(name="skip-shared", type=bool, default=False, help="Skip processing of shared workflow templates across targets")
 @strictcli.flag(name="auto-tag", type=bool, default=True, help="Add or update the rlsbl GitHub topic tag on this invocation")
-def cmd_scaffold(target, private, auto_commit, skip_shared, auto_tag, dry_run, **_kwargs):
+def cmd_scaffold(target, publish_mode, auto_commit, skip_shared, auto_tag, dry_run, **_kwargs):
     # Scaffold is special: if a project root exists, resolve it for use as
     # scaffold_root; if not, stay in cwd (for new projects).
     # If the current directory has project markers (pyproject.toml,
@@ -623,7 +623,7 @@ def cmd_scaffold(target, private, auto_commit, skip_shared, auto_tag, dry_run, *
         scaffold_root = Path.cwd()
 
     flags = {
-        "private": private,
+        "publish-mode": publish_mode,
         "auto-commit": auto_commit,
         "skip-shared": skip_shared,
         "auto-tag": auto_tag,
@@ -763,12 +763,12 @@ def cmd_release_edit(dry_run, version=None, **_kwargs):
 @release_group.command(name="undo", help="Revert a release. Without --version, reverts the latest release (deletes GitHub Release, removes git tag, reverts version bump commit). With --version, reverts a non-latest release if it is provably unpublished (probes registries for evidence, deletes GitHub Release + tag only, un-finalizes changelog).")
 @strictcli.flag(name="target", type=str, help="Target a specific registry for version detection (auto-detected if omitted)", default="")
 @strictcli.flag(name="version", type=str, help="Version to undo (for non-latest releases that are provably unpublished)", default="")
-def cmd_release_undo(target, version, yes, **_kwargs):
+def cmd_release_undo(target, version, yes, dry_run, **_kwargs):
     root = _require_project_root()
     from .workspace import find_workspace_root
     monorepo_root = find_workspace_root(str(root))
     ctx = create_context(root, workspace_root=Path(monorepo_root) if monorepo_root else None)
-    flags = {"yes": yes, "version": version or None}
+    flags = {"yes": yes, "version": version or None, "dry_run": dry_run}
     from .commands.undo import run_cmd
     run_cmd(target or None, [], flags, ctx=ctx)
 
@@ -1019,18 +1019,6 @@ def cmd_record_gif(width, height, font_size, duration, **_kwargs):
     flags = {"width": width, "height": height, "font-size": font_size, "duration": duration}
     from .commands.record_gif import run_cmd
     run_cmd(None, [], flags, ctx=ctx)
-
-
-# ---------------------------------------------------------------------------
-# migrate
-# ---------------------------------------------------------------------------
-
-@app.command(name="migrate", help="Run pending configuration migrations to update .rlsbl config files to the latest schema. Use --dry-run to preview changes without applying, or --status to see which migrations are pending.")
-@strictcli.flag(name="status", type=bool, default=False, help="Display which migrations are pending and which have already been applied")
-def cmd_migrate(dry_run, status, **_kwargs):
-    flags = {"dry-run": dry_run, "status": status}
-    from .commands.migrate import run_cmd
-    run_cmd(None, [], flags)
 
 
 # ---------------------------------------------------------------------------

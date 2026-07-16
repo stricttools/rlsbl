@@ -359,21 +359,32 @@ class TestCmdReleaseUndo:
     @patch("rlsbl.context.create_context")
     @patch("rlsbl.commands.undo.run_cmd")
     def test_delegates(self, mock_run, *_):
-        rlsbl.cmd_release_undo(target="npm", version="", yes=True)
+        rlsbl.cmd_release_undo(target="npm", version="", yes=True, dry_run=False)
         mock_run.assert_called_once()
         assert mock_run.call_args[1]["ctx"] is not None
         flags = mock_run.call_args[0][2]
         assert flags["version"] is None  # empty string -> None
+        assert flags["dry_run"] is False
 
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.workspace.find_workspace_root", return_value=None)
     @patch("rlsbl.context.create_context")
     @patch("rlsbl.commands.undo.run_cmd")
     def test_delegates_with_version(self, mock_run, *_):
-        rlsbl.cmd_release_undo(target="", version="0.9.0", yes=True)
+        rlsbl.cmd_release_undo(target="", version="0.9.0", yes=True, dry_run=False)
         mock_run.assert_called_once()
         flags = mock_run.call_args[0][2]
         assert flags["version"] == "0.9.0"
+
+    @patch("rlsbl._require_project_root", return_value=Path("/fake"))
+    @patch("rlsbl.workspace.find_workspace_root", return_value=None)
+    @patch("rlsbl.context.create_context")
+    @patch("rlsbl.commands.undo.run_cmd")
+    def test_delegates_dry_run(self, mock_run, *_):
+        rlsbl.cmd_release_undo(target="", version="", yes=False, dry_run=True)
+        mock_run.assert_called_once()
+        flags = mock_run.call_args[0][2]
+        assert flags["dry_run"] is True
 
 
 # ============================================================================
@@ -622,21 +633,6 @@ class TestCmdRecordGif:
         flags = mock_run.call_args[0][2]
         assert flags["width"] == "800"
         assert flags["font-size"] == "20"
-
-
-# ============================================================================
-# cmd_migrate
-# ============================================================================
-
-
-class TestCmdMigrate:
-    @patch("rlsbl.commands.migrate.run_cmd")
-    def test_delegates(self, mock_run):
-        rlsbl.cmd_migrate(dry_run=True, status=True)
-        mock_run.assert_called_once()
-        flags = mock_run.call_args[0][2]
-        assert flags["dry-run"] is True
-        assert flags["status"] is True
 
 
 # ============================================================================
@@ -1249,7 +1245,7 @@ class TestCmdScaffold:
             with patch("rlsbl.utils.find_project_root", return_value=None):
                 with pytest.raises(SystemExit) as exc:
                     rlsbl.cmd_scaffold(
-                        target="", private=False, auto_commit=True,
+                        target="", publish_mode="ci", auto_commit=True,
                         skip_shared=False, auto_tag=True, dry_run=False,
                     )
                 assert exc.value.code == 1
@@ -1260,7 +1256,7 @@ class TestCmdScaffold:
                 mock_ctx.return_value = _ctx(config={})
                 with patch("rlsbl.commands.init_cmd.run_cmd") as mock_run:
                     rlsbl.cmd_scaffold(
-                        target="", private=False, auto_commit=True,
+                        target="", publish_mode="ci", auto_commit=True,
                         skip_shared=False, auto_tag=True, dry_run=False,
                     )
                     mock_run.assert_called_once()
@@ -1271,7 +1267,7 @@ class TestCmdScaffold:
                 mock_ctx.return_value = _ctx(config={})
                 with patch("rlsbl.commands.init_cmd.run_cmd_multi") as mock_run_multi:
                     rlsbl.cmd_scaffold(
-                        target="", private=False, auto_commit=True,
+                        target="", publish_mode="ci", auto_commit=True,
                         skip_shared=False, auto_tag=True, dry_run=False,
                     )
                     mock_run_multi.assert_called_once()
@@ -1279,7 +1275,7 @@ class TestCmdScaffold:
     def test_explicit_unknown_target_exits(self, tmp_project):
         with pytest.raises(SystemExit) as exc:
             rlsbl.cmd_scaffold(
-                target="nonexistent", private=False, auto_commit=True,
+                target="nonexistent", publish_mode="ci", auto_commit=True,
                 skip_shared=False, auto_tag=True, dry_run=False,
             )
         assert exc.value.code == 1
@@ -1289,13 +1285,13 @@ class TestCmdScaffold:
             mock_ctx.return_value = _ctx()
             with patch("rlsbl.commands.init_cmd.run_cmd") as mock_run:
                 rlsbl.cmd_scaffold(
-                    target="npm", private=True, auto_commit=False,
+                    target="npm", publish_mode="none", auto_commit=False,
                     skip_shared=True, auto_tag=False, dry_run=True,
                 )
                 mock_run.assert_called_once()
                 flags = mock_run.call_args[0][2]
                 assert "force" not in flags
-                assert flags["private"] is True
+                assert flags["publish-mode"] == "none"
 
 
 # ============================================================================

@@ -1154,7 +1154,7 @@ def find_dead_workspace_packages(
             guarded_imports) as produced by _build_dep_import_cache in
             rlsbl/checks/_common.py.
         published_members: optional set of project names that are published
-            members of a releasable (non-private, with pipelines). These
+            members of a releasable (publish_mode != "none", with pipelines). These
             are exempt from the dead-workspace check because they are
             consumed externally via a package registry.
 

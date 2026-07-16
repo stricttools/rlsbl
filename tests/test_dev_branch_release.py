@@ -58,7 +58,7 @@ def dev_branch_repo(tmp_path, monkeypatch):
     (changes / "unreleased.jsonl").write_text("")
 
     (repo / ".rlsbl" / "config.json").write_text(
-        json.dumps({"private": False, "targets": []})
+        json.dumps({"publish_mode": "ci", "targets": []})
     )
 
     run_git(repo, "add", ".rlsbl")
@@ -126,7 +126,7 @@ class TestCoverageEnforcedOnNonReleaseBranch:
         (changes / "unreleased.jsonl").write_text("")
 
         (repo / ".rlsbl" / "config.json").write_text(
-            json.dumps({"private": False, "targets": []})
+            json.dumps({"publish_mode": "ci", "targets": []})
         )
 
         run_git(repo, "add", ".rlsbl")
@@ -171,7 +171,7 @@ class TestCoverageEnforcedOnNonReleaseBranch:
         (changes / "unreleased.jsonl").write_text("")
 
         (repo / ".rlsbl" / "config.json").write_text(
-            json.dumps({"private": False, "targets": []})
+            json.dumps({"publish_mode": "ci", "targets": []})
         )
 
         run_git(repo, "add", ".rlsbl")
@@ -458,7 +458,7 @@ class TestReleaseFromDevIntegration:
 
         (repo / ".rlsbl" / "config.json").write_text(
             json.dumps({
-                "private": False,
+                "publish_mode": "ci",
                 "targets": ["pypi"],
                 "pipelines": {"pypi": {"type": "pypi", "local": False}},
             })

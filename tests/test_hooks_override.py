@@ -39,7 +39,7 @@ def _setup_project(tmp_path, hook_body=None):
     changes_dir.mkdir(parents=True, exist_ok=True)
     (changes_dir / "unreleased.jsonl").write_text("")
     (tmp_path / ".rlsbl" / "config.json").write_text(
-        json.dumps({"private": False, "targets": ["npm"]}) + "\n"
+        json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
     )
     if hook_body is not None:
         hooks_dir = tmp_path / ".rlsbl" / "hooks"
@@ -213,7 +213,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
                 _rc(), {"dry-run": True, "yes": True},
                 ctx=ProjectContext(
                     project_root=Path("."), workspace_root=None,
-                    config={"private": False, "pipelines": {}},
+                    config={"publish_mode": "ci", "pipelines": {}},
                 ),
             )
 
@@ -271,7 +271,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
                 _rc(), {"dry-run": True, "yes": True},
                 ctx=ProjectContext(
                     project_root=Path("."), workspace_root=None,
-                    config={"private": False, "pipelines": {}},
+                    config={"publish_mode": "ci", "pipelines": {}},
                 ),
             )
 
@@ -328,7 +328,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
                 _rc(), {"dry-run": True, "quiet": True, "yes": True},
                 ctx=ProjectContext(
                     project_root=Path("."), workspace_root=None,
-                    config={"private": False, "pipelines": {}},
+                    config={"publish_mode": "ci", "pipelines": {}},
                 ),
             )
 
@@ -381,7 +381,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
                 _rc(), {"dry-run": True, "quiet": True, "yes": True},
                 ctx=ProjectContext(
                     project_root=Path("."), workspace_root=None,
-                    config={"private": False, "pipelines": {}},
+                    config={"publish_mode": "ci", "pipelines": {}},
                 ),
             )
 
@@ -448,7 +448,7 @@ class TestExternalChecksVsHookCustomization:
         (hooks_dir / "pre-checks.sh").write_text("#!/bin/bash\nexit 0\n")
         (hooks_dir / "pre-checks.sh").chmod(0o755)
         return {
-            "private": False,
+            "publish_mode": "ci",
             "pipelines": {},
             "external_checks": [{
                 "name": "ext-preflight-check",

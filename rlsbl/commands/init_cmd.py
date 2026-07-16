@@ -1356,27 +1356,57 @@ def _finalize_scaffold(all_hash_dicts, created, skipped, warnings, *,
         print("Committed scaffold changes.")
 
 
-def _resolve_private(flags, ctx):
-    """Determine if this is a private repository.
+def _resolve_publish_mode(flags, ctx):
+    """Determine the project's ``publish_mode`` (``"ci"`` or ``"none"``).
 
-    Checks --private flag first, then saved config, then auto-detects via GitHub API.
-    The caller is responsible for persisting the value to config.json.
+    Resolution order:
+    1. The explicit ``--publish-mode`` flag, if passed (validated against the
+       enum).
+    2. The value saved in .rlsbl/config.json, if present (validated).
+    3. Auto-detection via the GitHub API: a repo that is definitively PRIVATE
+       is a hard error -- the choice affects publish routing and must be made
+       explicitly with ``--publish-mode``. A PUBLIC repo (or one whose
+       visibility cannot be detected) defaults to ``"ci"``.
 
-    Returns True/False, or False if detection fails.
+    The caller persists the returned value to config.json.
+
+    Raises:
+        ConfigError when a private repo has no explicit choice, or when an
+        explicit/saved value is not a valid mode.
     """
-    if flags.get("private"):
-        return True
+    from ..config import PUBLISH_MODES
 
-    # Check saved config
-    if "private" in ctx.config:
-        return bool(ctx.config["private"])
+    flag_val = flags.get("publish-mode") or ""
+    if flag_val:
+        if flag_val not in PUBLISH_MODES:
+            raise ConfigError(
+                f"--publish-mode must be one of {sorted(PUBLISH_MODES)}, "
+                f"got {flag_val!r}."
+            )
+        return flag_val
 
-    # Auto-detect via GitHub API
+    # Saved config (validated)
+    if "publish_mode" in ctx.config:
+        saved = ctx.config["publish_mode"]
+        if saved not in PUBLISH_MODES:
+            raise ConfigError(
+                f'invalid "publish_mode" value {saved!r} in .rlsbl/config.json '
+                f"-- must be one of {sorted(PUBLISH_MODES)}."
+            )
+        return saved
+
+    # Auto-detect: a definitively-private repo must choose explicitly (a
+    # silent "ci" there would publish a repo meant to be suppressed). A public
+    # or undetectable repo defaults to "ci" (publishing is the safe default and
+    # matches prior behavior).
     detected = is_private_repo()
-    if detected is not None:
-        return detected
-
-    return False
+    if detected is True:
+        raise ConfigError(
+            "Cannot auto-determine publish_mode: this is a private repository. "
+            "Pass --publish-mode ci to publish via CI pipelines, or "
+            "--publish-mode none to suppress publishing."
+        )
+    return "ci"
 
 
 def _append_deploy_workflow_if_configured(mappings, config):
@@ -1403,8 +1433,8 @@ def _append_release_dispatch_if_configured(mappings, config):
 
 
 def _print_private_summary():
-    """Print helpful output for private repository scaffold."""
-    print("\nPrivate repository detected. Scaffold configured for private distribution.")
+    """Print helpful output for a publish_mode "none" scaffold."""
+    print('\npublish_mode is "none". Scaffold configured without registry publishing.')
     print("- publish.yml skipped (no public registry)")
     print("- Asset upload is a built-in release step (configure via publish.<target>.assets)")
     print("\nConsumers can install via:")
@@ -1518,10 +1548,11 @@ def run_cmd(registry, args, flags, ctx):
         if not dry_run:
             _ensure_target_in_config(registry, ctx=ctx)
 
-        # Determine if this is a private repository
-        private = _resolve_private(flags, ctx=ctx)
+        # Determine the project's publish mode
+        publish_mode = _resolve_publish_mode(flags, ctx=ctx)
+        private = publish_mode == "none"
         if not dry_run:
-            ctx.config = write_project_config("private", private, project_root)
+            ctx.config = write_project_config("publish_mode", publish_mode, project_root)
 
         # Generate default pipeline config if not present
         if not dry_run and not private:
@@ -1558,7 +1589,7 @@ def run_cmd(registry, args, flags, ctx):
                 required_vars={"name", "registryUrl"},
             )
 
-        # Process pipeline publish templates (skip for private repos and workspace roots)
+        # Process pipeline publish templates (skip for publish_mode "none" and workspace roots)
         pipeline_plans = []
         if not private and not is_ws_root:
             pipelines = load_pipelines(ctx.config)
@@ -2245,10 +2276,11 @@ def run_cmd_multi(registries_list, args, flags, ctx):
             for r in registries_list:
                 _ensure_target_in_config(r, ctx=ctx)
 
-        # Determine if this is a private repository
-        private = _resolve_private(flags, ctx=ctx)
+        # Determine the project's publish mode
+        publish_mode = _resolve_publish_mode(flags, ctx=ctx)
+        private = publish_mode == "none"
         if not dry_run:
-            ctx.config = write_project_config("private", private, project_root)
+            ctx.config = write_project_config("publish_mode", publish_mode, project_root)
 
         # Generate default pipeline config if not present
         if not dry_run and not private:
@@ -2256,7 +2288,7 @@ def run_cmd_multi(registries_list, args, flags, ctx):
 
         print(f"Multiple registries detected: {', '.join(registries_list)}")
         if private:
-            print("Scaffolding for private repository (no publish workflow).")
+            print('Scaffolding with publish_mode "none" (no publish workflow).')
         else:
             print("Scaffolding with merged publish workflow.")
         vars_dict = _merge_template_vars(registries_list, primary, target_paths, ctx)
@@ -2340,7 +2372,7 @@ def run_cmd_multi(registries_list, args, flags, ctx):
                             target_obj.template_dir(), [m], vars_dict,
                         ))
 
-        # Plan the merged publish workflow (skip for private repos and workspace roots)
+        # Plan the merged publish workflow (skip for publish_mode "none" and workspace roots)
         # Read publish templates from pipeline types instead of targets
         merged_plans = []
         if not private and not is_ws_root:

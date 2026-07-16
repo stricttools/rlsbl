@@ -125,7 +125,7 @@ def _setup_releasable_workspace(root, member_config=None,
         json.dumps({"name": "core", "version": "1.0.0"}, indent=2) + "\n"
     )
     (core / ".rlsbl").mkdir()
-    cfg = member_config or {"private": False, "targets": ["npm"], "pipelines": {}}
+    cfg = member_config or {"publish_mode": "ci", "targets": ["npm"], "pipelines": {}}
     (core / ".rlsbl" / "config.json").write_text(json.dumps(cfg) + "\n")
 
     save_workspace(
@@ -185,7 +185,7 @@ def _setup_standalone_npm(repo, scaffolded):
     changes_dir.mkdir(parents=True)
     (changes_dir / "unreleased.jsonl").write_text("")
     (repo / ".rlsbl" / "config.json").write_text(
-        json.dumps({"private": False, "targets": ["npm"]}) + "\n"
+        json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
     )
     if scaffolded:
         # Scaffold metadata marks the project as actually scaffolded
@@ -216,7 +216,7 @@ def _run_standalone_release(repo):
     ctx = ProjectContext(
         project_root=Path(str(repo)),
         workspace_root=None,
-        config={"private": False, "pipelines": {}},
+        config={"publish_mode": "ci", "pipelines": {}},
     )
     patches = _release_patches()
     for p in patches:
@@ -286,7 +286,7 @@ class TestPrivateRepresentative:
         version file still updates."""
         core = _setup_releasable_workspace(
             tmp_project,
-            member_config={"private": True, "targets": ["npm"], "pipelines": {}},
+            member_config={"publish_mode": "none", "targets": ["npm"], "pipelines": {}},
         )
         before = (core / "package.json").read_text()
 
@@ -324,7 +324,7 @@ class TestReleaseModeConfigRejected:
         core = _setup_releasable_workspace(
             tmp_project,
             member_config={
-                "private": False, "targets": ["npm"], "pipelines": {},
+                "publish_mode": "ci", "targets": ["npm"], "pipelines": {},
                 "release": {"mode": "pr"},
             },
             root_workflows=("publish.yml",),

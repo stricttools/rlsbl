@@ -438,7 +438,7 @@ class TestScriptFallback:
         script.write_text("#!/bin/bash\necho script\n")
         script.chmod(0o755)
 
-        config = {"private": False}
+        config = {"publish_mode": "ci"}
         run_release_hook(
             "pre-checks",
             str(script),

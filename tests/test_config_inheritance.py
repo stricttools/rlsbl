@@ -13,10 +13,10 @@ class TestMergeConfigShallow:
     """merge_config replaces top-level scalar and list values from overlay."""
 
     def test_overlay_replaces_scalar(self):
-        base = {"private": True, "push_timeout": 120}
-        overlay = {"private": False}
+        base = {"publish_mode": "none", "push_timeout": 120}
+        overlay = {"publish_mode": "ci"}
         result = merge_config(base, overlay)
-        assert result == {"private": False, "push_timeout": 120}
+        assert result == {"publish_mode": "ci", "push_timeout": 120}
 
     def test_overlay_replaces_list(self):
         base = {"targets": ["pypi"]}
@@ -25,10 +25,10 @@ class TestMergeConfigShallow:
         assert result == {"targets": ["npm", "go"]}
 
     def test_overlay_adds_new_keys(self):
-        base = {"private": True}
+        base = {"publish_mode": "none"}
         overlay = {"push_timeout": 300}
         result = merge_config(base, overlay)
-        assert result == {"private": True, "push_timeout": 300}
+        assert result == {"publish_mode": "none", "push_timeout": 300}
 
 
 class TestMergeConfigDeep:
@@ -75,17 +75,17 @@ class TestMergeConfigMissingKeys:
     """merge_config preserves base keys absent from overlay."""
 
     def test_base_preserved_when_overlay_empty(self):
-        base = {"private": True, "push_timeout": 120, "targets": ["pypi"]}
+        base = {"publish_mode": "none", "push_timeout": 120, "targets": ["pypi"]}
         overlay = {}
         result = merge_config(base, overlay)
         assert result == base
 
     def test_base_preserved_for_absent_keys(self):
-        base = {"private": True, "push_timeout": 120, "batch_limits": {"max_commits_per_entry": 5}}
-        overlay = {"private": False}
+        base = {"publish_mode": "none", "push_timeout": 120, "batch_limits": {"max_commits_per_entry": 5}}
+        overlay = {"publish_mode": "ci"}
         result = merge_config(base, overlay)
         assert result == {
-            "private": False,
+            "publish_mode": "ci",
             "push_timeout": 120,
             "batch_limits": {"max_commits_per_entry": 5},
         }
@@ -128,9 +128,9 @@ class TestReadProjectConfigNoReleasable:
     """Without releasable_config_dir, behavior is unchanged."""
 
     def test_per_package_config_only(self, tmp_path):
-        _write_json(tmp_path / ".rlsbl" / "config.json", {"private": False, "push_timeout": 300})
+        _write_json(tmp_path / ".rlsbl" / "config.json", {"publish_mode": "ci", "push_timeout": 300})
         result = read_project_config(tmp_path)
-        assert result == {"private": False, "push_timeout": 300, "coverage_unit": "commit"}
+        assert result == {"publish_mode": "ci", "push_timeout": 300, "coverage_unit": "commit"}
 
     def test_per_package_absent_returns_empty(self, tmp_path):
         result = read_project_config(tmp_path)
@@ -143,20 +143,20 @@ class TestReadProjectConfigReleasableInheritance:
     def test_per_package_absent_returns_releasable_config(self, tmp_path):
         """Per-package config absent -> releasable config returned as-is."""
         rel_dir = _make_releasable_dir(tmp_path, "alpha")
-        _write_json(rel_dir / "config.json", {"private": False, "push_timeout": 120})
+        _write_json(rel_dir / "config.json", {"publish_mode": "ci", "push_timeout": 120})
 
         # No per-package config exists
         pkg_dir = tmp_path / "pkgs" / "core"
         pkg_dir.mkdir(parents=True)
 
         result = read_project_config(pkg_dir, releasable_config_dir=str(rel_dir))
-        assert result == {"private": False, "push_timeout": 120, "coverage_unit": "commit"}
+        assert result == {"publish_mode": "ci", "push_timeout": 120, "coverage_unit": "commit"}
 
     def test_per_package_merges_on_top_of_releasable(self, tmp_path):
         """Per-package config present -> merged on top of releasable."""
         rel_dir = _make_releasable_dir(tmp_path, "alpha")
         _write_json(rel_dir / "config.json", {
-            "private": False,
+            "publish_mode": "ci",
             "push_timeout": 120,
             "batch_limits": {"max_commits_per_entry": 5},
         })
@@ -169,7 +169,7 @@ class TestReadProjectConfigReleasableInheritance:
 
         result = read_project_config(pkg_dir, releasable_config_dir=str(rel_dir))
         assert result == {
-            "private": False,
+            "publish_mode": "ci",
             "push_timeout": 300,
             "coverage_unit": "commit",
             "batch_limits": {
@@ -181,13 +181,13 @@ class TestReadProjectConfigReleasableInheritance:
     def test_per_package_overrides_releasable(self, tmp_path):
         """Per-package values override releasable values."""
         rel_dir = _make_releasable_dir(tmp_path, "alpha")
-        _write_json(rel_dir / "config.json", {"private": False, "push_timeout": 120})
+        _write_json(rel_dir / "config.json", {"publish_mode": "ci", "push_timeout": 120})
 
         pkg_dir = tmp_path / "pkgs" / "core"
-        _write_json(pkg_dir / ".rlsbl" / "config.json", {"private": True})
+        _write_json(pkg_dir / ".rlsbl" / "config.json", {"publish_mode": "none"})
 
         result = read_project_config(pkg_dir, releasable_config_dir=str(rel_dir))
-        assert result["private"] is True
+        assert result["publish_mode"] == "none"
         # Inherited from releasable
         assert result["push_timeout"] == 120
 
@@ -196,10 +196,10 @@ class TestReadProjectConfigReleasableInheritance:
         rel_dir = _make_releasable_dir(tmp_path, "alpha")
 
         pkg_dir = tmp_path / "pkgs" / "core"
-        _write_json(pkg_dir / ".rlsbl" / "config.json", {"private": True})
+        _write_json(pkg_dir / ".rlsbl" / "config.json", {"publish_mode": "none"})
 
         result = read_project_config(pkg_dir, releasable_config_dir=str(rel_dir))
-        assert result == {"private": True, "coverage_unit": "commit"}
+        assert result == {"publish_mode": "none", "coverage_unit": "commit"}
 
 
 # ---------------------------------------------------------------------------
@@ -241,7 +241,7 @@ class TestCreateContextReleasable:
         # Releasable-level config
         rel_dir = ws_dir / "releasables" / "alpha"
         rel_dir.mkdir(parents=True)
-        _write_json(rel_dir / "config.json", {"private": False, "push_timeout": 120})
+        _write_json(rel_dir / "config.json", {"publish_mode": "ci", "push_timeout": 120})
 
         # Per-package directories with minimal config
         core_dir = tmp_path / "core"
@@ -270,7 +270,7 @@ class TestCreateContextReleasable:
 
         ctx = create_context(Path(core_dir), workspace_root=Path(monorepo))
         # private inherited from releasable
-        assert ctx.config.get("private") is False
+        assert ctx.config.get("publish_mode") == "ci"
         # push_timeout inherited from releasable
         assert ctx.config.get("push_timeout") == 120
         # batch_limits from per-package
@@ -285,7 +285,7 @@ class TestCreateContextReleasable:
 
         ctx = create_context(Path(cli_dir), workspace_root=Path(monorepo))
         # cli has no per-package config, so gets pure releasable config
-        assert ctx.config.get("private") is False
+        assert ctx.config.get("publish_mode") == "ci"
         assert ctx.config.get("push_timeout") == 120
 
     def test_no_workspace_root_no_inheritance(self, tmp_path, monkeypatch):
@@ -293,10 +293,10 @@ class TestCreateContextReleasable:
         from rlsbl.context import create_context
 
         monkeypatch.chdir(tmp_path)
-        _write_json(tmp_path / ".rlsbl" / "config.json", {"private": True})
+        _write_json(tmp_path / ".rlsbl" / "config.json", {"publish_mode": "none"})
 
         ctx = create_context(Path(tmp_path))
-        assert ctx.config == {"private": True, "coverage_unit": "commit"}
+        assert ctx.config == {"publish_mode": "none", "coverage_unit": "commit"}
 
 
 # ---------------------------------------------------------------------------
@@ -320,7 +320,7 @@ class TestSyncMemberPackageVersionsInheritance:
 
         # Releasable config with private: false
         rel_dir = _make_releasable_dir(tmp_path, "alpha")
-        _write_json(rel_dir / "config.json", {"private": False})
+        _write_json(rel_dir / "config.json", {"publish_mode": "ci"})
 
         # Package with no private field in config.json (should inherit false)
         pkg_dir = tmp_path / "pkg"
@@ -380,12 +380,12 @@ class TestSyncMemberPackageVersionsInheritance:
 
         # Releasable config with private: false
         rel_dir = _make_releasable_dir(tmp_path, "alpha")
-        _write_json(rel_dir / "config.json", {"private": False})
+        _write_json(rel_dir / "config.json", {"publish_mode": "ci"})
 
         # Package overrides with private: true
         pkg_dir = tmp_path / "pkg"
         pkg_dir.mkdir()
-        _write_json(pkg_dir / ".rlsbl" / "config.json", {"private": True})
+        _write_json(pkg_dir / ".rlsbl" / "config.json", {"publish_mode": "none"})
 
         ctx = ProjectContext(
             project_root=Path(tmp_path),

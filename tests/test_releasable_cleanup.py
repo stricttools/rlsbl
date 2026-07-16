@@ -742,7 +742,7 @@ class TestCleanupCommand:
                         files=["version", "config.json"])
         (pkg / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         (pkg / ".rlsbl" / "hooks" / "pre-release.sh").write_text("#!/bin/sh\n")
-        (pkg / ".rlsbl" / "config.json").write_text('{"private": true}\n')
+        (pkg / ".rlsbl" / "config.json").write_text('{"publish_mode": "none"}\n')
         (pkg / "CHANGELOG.md").write_text("# Changelog\n")
         _write_workspace(root, """\
 [[releasables]]
@@ -755,7 +755,7 @@ releasable = "core"
 """)
         rel_dir = root / WORKSPACE_DIR / "releasables" / "core"
         rel_dir.mkdir(parents=True, exist_ok=True)
-        (rel_dir / "config.json").write_text('{"private": true}\n')
+        (rel_dir / "config.json").write_text('{"publish_mode": "none"}\n')
         git("add", "-A")
         git("commit", "-q", "-m", "initial")
         return pkg

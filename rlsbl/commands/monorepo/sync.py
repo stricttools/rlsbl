@@ -271,18 +271,21 @@ def _get_monorepo_tag_prefix(project, root, releasables=None):
 def _root_is_publisher(project, root):
     """Return True when the root project (path='.') actually publishes.
 
-    A root publisher is non-private and has at least one detectable publish
-    target. Detection is config-based (not based on the on-disk publish.yml,
-    which is the generated router itself). A ConfigError during target
-    detection means the root is not a resolvable publisher -- treat it as a
-    non-publisher rather than crashing sync.
+    A root publisher has publish_mode != "none" and at least one detectable
+    publish target. Detection is config-based (not based on the on-disk
+    publish.yml, which is the generated router itself). A ConfigError during
+    publish_mode or target detection means the root is not a resolvable
+    publisher -- treat it as a non-publisher rather than crashing sync.
     """
-    from ...config import read_project_config
+    from ...config import read_project_config, suppresses_publish, ConfigError
 
     rel_dir = resolve_releasable_config_dir(project, root)
     project_dir = os.path.join(root, project["path"])
     config = read_project_config(project_dir, releasable_config_dir=rel_dir)
-    if config.get("private"):
+    try:
+        if suppresses_publish(config):
+            return False
+    except ConfigError:
         return False
     try:
         entries = detect_targets(project_dir, releasable_config_dir=rel_dir)

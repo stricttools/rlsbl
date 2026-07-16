@@ -281,7 +281,7 @@ class TestCleanupConfigIdentical:
     def test_config_removed_when_identical(self, mock_run, tmp_project):
         """config.json is removed when identical to releasable-level config."""
         pkg = tmp_project / "pkg"
-        shared_config = {"private": False, "batch_limits": {"max_commits_per_entry": 5}}
+        shared_config = {"publish_mode": "ci", "batch_limits": {"max_commits_per_entry": 5}}
         _make_rlsbl_dir(pkg)
         (pkg / ".rlsbl" / "config.json").write_text(
             json.dumps(shared_config, indent=2) + "\n"
@@ -320,8 +320,8 @@ class TestCleanupConfigDifferent:
         """config.json is kept when it differs from releasable-level config."""
         pkg = tmp_project / "pkg"
         _make_rlsbl_dir(pkg)
-        pkg_config = {"private": False, "custom_setting": "override"}
-        rel_config = {"private": False}
+        pkg_config = {"publish_mode": "ci", "custom_setting": "override"}
+        rel_config = {"publish_mode": "ci"}
         (pkg / ".rlsbl" / "config.json").write_text(
             json.dumps(pkg_config, indent=2) + "\n"
         )
@@ -337,8 +337,8 @@ class TestCleanupConfigDifferent:
         """config.json is kept when a value differs from releasable config."""
         pkg = tmp_project / "pkg"
         _make_rlsbl_dir(pkg)
-        pkg_config = {"private": True}
-        rel_config = {"private": False}
+        pkg_config = {"publish_mode": "none"}
+        rel_config = {"publish_mode": "ci"}
         (pkg / ".rlsbl" / "config.json").write_text(
             json.dumps(pkg_config, indent=2) + "\n"
         )
@@ -354,7 +354,7 @@ class TestCleanupConfigDifferent:
         """config.json with content is kept when releasable has no config (empty dict)."""
         pkg = tmp_project / "pkg"
         _make_rlsbl_dir(pkg)
-        pkg_config = {"private": False}
+        pkg_config = {"publish_mode": "ci"}
         (pkg / ".rlsbl" / "config.json").write_text(
             json.dumps(pkg_config, indent=2) + "\n"
         )
@@ -504,7 +504,7 @@ class TestCleanupAllNewTargets:
     def test_full_cleanup_removes_all(self, mock_run, tmp_project):
         """All cleanup targets are removed for a releasable member in one call."""
         pkg = tmp_project / "pkg"
-        shared_config = {"private": False}
+        shared_config = {"publish_mode": "ci"}
         _make_rlsbl_dir(
             pkg,
             subdirs=["changes", "releases", "hooks", "bases"],

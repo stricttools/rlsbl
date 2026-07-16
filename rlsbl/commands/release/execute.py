@@ -352,7 +352,7 @@ def archive_blog_body(releases_dir, version):
 
 def collect_companion_tags(member_package_paths, workspace_root, version,
                            primary_tag, releasable_config_dir=None):
-    """Collect companion tags from all non-private member packages.
+    """Collect companion tags from all publishing member packages.
 
     Iterates member packages in an explicit releasable, detects their
     targets, and collects companion tags (e.g. Go module proxy tags).
@@ -361,7 +361,7 @@ def collect_companion_tags(member_package_paths, workspace_root, version,
     - Only meaningful in explicit releasable mode (caller checks).
     - Skips companion creation if the primary tag already contains a
       ``/v`` pattern (Go-compatible), to avoid duplicate tags.
-    - Skips private packages (same logic as _sync_member_package_versions,
+    - Skips publish-suppressed packages (same logic as _sync_member_package_versions,
       including releasable-level config inheritance).
 
     Args:
@@ -400,8 +400,8 @@ def collect_companion_tags(member_package_paths, workspace_root, version,
             abs_pkg, releasable_config_dir=releasable_config_dir,
         )
 
-        # Skip private packages (default True when unset)
-        if member.is_private:
+        # Skip publish-suppressed packages (publish_mode == "none")
+        if member.publish_mode == "none":
             continue
 
         entries = member.targets
@@ -428,13 +428,13 @@ def _sync_member_package_versions(
 ):
     """Sync version to published member packages in explicit releasable mode.
 
-    For each member package that has publishing pipelines (non-private,
-    has a detected target), writes the version to the manifest.
-    Private-only packages are left untouched.
+    For each member package that publishes (publish_mode != "none", has a
+    detected target), writes the version to the manifest. Publish-suppressed
+    packages are left untouched.
 
     Uses ``read_project_config`` with releasable inheritance so that
-    releasable-level ``private: false`` is respected by member packages
-    that don't set ``private`` themselves.
+    releasable-level ``publish_mode`` is respected by member packages
+    that don't set it themselves.
 
     Args:
         member_package_paths: list of workspace-relative paths for member packages.
@@ -464,8 +464,8 @@ def _sync_member_package_versions(
             abs_pkg, releasable_config_dir=releasable_config_dir,
         )
 
-        # Skip private packages (default True when unset)
-        if member.is_private:
+        # Skip publish-suppressed packages (publish_mode == "none")
+        if member.publish_mode == "none":
             continue
 
         # Detect targets and write version
@@ -631,8 +631,8 @@ def _run_release_mutating(state: ReleaseState):
         _releasable_cfg_dir = get_releasable_dir(str(monorepo_root), releasable_name)
 
     # In releasable mode, the representative member is subject to the same
-    # private-awareness as every other member (resolve_member_context with
-    # releasable-level inheritance): a private representative's manifests
+    # publish_mode-awareness as every other member (resolve_member_context with
+    # releasable-level inheritance): a publish-suppressed representative's manifests
     # are never version-bumped or keyword-tagged. The releasable version
     # file remains the source of truth and is always updated.
     _rep_is_private = False
@@ -640,7 +640,7 @@ def _run_release_mutating(state: ReleaseState):
         from ...member_context import resolve_member_context
         _rep_is_private = resolve_member_context(
             project_dir, releasable_config_dir=_releasable_cfg_dir,
-        ).is_private
+        ).publish_mode == "none"
 
     # Snapshot dirty files BEFORE any version-bump writes. This captures
     # everything dirtied by prior stages (generate_changelog, hooks, lint,
@@ -919,7 +919,7 @@ def _run_release_mutating(state: ReleaseState):
                 log(f"Updated releasable version: {releasable_name} -> {new_version}")
 
             if _rep_is_private:
-                log("Skipping representative manifest bump (private member)")
+                log("Skipping representative manifest bump (publish-suppressed member)")
             else:
                 modified = reg.write_version(primary_path, new_version, ctx=ctx)
                 for rel in modified:
@@ -1006,7 +1006,7 @@ def _run_release_mutating(state: ReleaseState):
                 _mp_member = _rmc_lock(
                     _mp_abs, releasable_config_dir=_releasable_cfg_dir,
                 )
-                if _mp_member.is_private:
+                if _mp_member.publish_mode == "none":
                     continue
                 _mp_tpaths = _mp_member.target_paths
                 if _mp_tpaths:
@@ -1659,7 +1659,7 @@ def _run_release_mutating(state: ReleaseState):
     # loudly reported, then the release completes and state is cleared).
 
     # Upload release assets for pipelines with assets/custom_assets config.
-    # In releasable mode, iterate each non-private publishing member and
+    # In releasable mode, iterate each publishing member (publish_mode != "none") and
     # upload assets from each member's directory with member-prefixed names.
     if release_created:
         if "ASSETS_UPLOADED" in _completed:
@@ -1677,7 +1677,7 @@ def _run_release_mutating(state: ReleaseState):
                         _a_member = _rmc_asset(
                             _a_abs_pkg, releasable_config_dir=_releasable_cfg_dir,
                         )
-                        if _a_member.is_private:
+                        if _a_member.publish_mode == "none":
                             continue
                         # Use the member name (last path component) as prefix
                         _a_member_name = os.path.basename(_a_pkg_path.rstrip("/"))
@@ -1695,17 +1695,18 @@ def _run_release_mutating(state: ReleaseState):
             save_step(_state_path, "ASSETS_UPLOADED")
             _completed.add("ASSETS_UPLOADED")
 
-    # Publish step: skip for private repos (they don't publish to registries).
-    # Publish failures are FATAL: for `local: true` pipelines this IS the
-    # publish, so downgrading a failure to a warning would silently ship a
-    # release that was never published.
-    is_private = ctx.config["private"]
+    # Publish step: skip when publish_mode is "none" (suppressed -- no
+    # registry publishing). Publish failures are FATAL: for `local: true`
+    # pipelines this IS the publish, so downgrading a failure to a warning
+    # would silently ship a release that was never published.
+    from ...config import suppresses_publish
+    is_private = suppresses_publish(ctx.config)
     if "PIPELINES_PUBLISHED" in _completed:
         log("Skipping pipeline publish (already done)")
     else:
         if not is_private:
             if releasable_name and member_package_paths and monorepo_root:
-                # Per-member publish: each non-private member with pipelines
+                # Per-member publish: each publishing member with pipelines
                 # publishes from its own directory at the shared version.
                 # Resume support: state tracks published_members list so
                 # completed members are skipped on retry.
@@ -1726,8 +1727,8 @@ def _run_release_mutating(state: ReleaseState):
                         abs_pkg, releasable_config_dir=_releasable_cfg_dir,
                     )
 
-                    if member.is_private:
-                        log(f"  {pkg_path}: skipped (private)")
+                    if member.publish_mode == "none":
+                        log(f"  {pkg_path}: skipped (publish_mode none)")
                         continue
 
                     member_pipelines = load_pipelines(member.config)

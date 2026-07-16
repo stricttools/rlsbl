@@ -391,7 +391,7 @@ def register_workspace_checks(app):
     def check_dead_workspace_packages(ctx):
         """Library packages must be imported by at least one workspace sibling.
 
-        Published releasable members (non-private, with pipelines) are
+        Published releasable members (publish_mode != "none", with pipelines) are
         exempt -- they are consumed externally via a package registry.
         """
         from ..dep_validation import find_dead_workspace_packages
@@ -412,7 +412,7 @@ def register_workspace_checks(app):
                     member = resolve_member_context(
                         abs_pkg, releasable_config_dir=rel_dir,
                     )
-                    if member.is_private:
+                    if member.publish_mode == "none":
                         continue
                     pipelines = load_pipelines(member.config)
                     if pipelines:
@@ -853,7 +853,7 @@ def register_workspace_checks(app):
 
     @app.check("go-companion-tags")
     def check_go_companion_tags(ctx):
-        """Releasables with non-private Go members should have companion tags."""
+        """Releasables with publishing Go members should have companion tags."""
         from ..errors import ConfigError
         from ..member_context import resolve_member_context
         from ..targets import resolve_releasable_config_dir
@@ -897,7 +897,7 @@ def register_workspace_checks(app):
                     member = resolve_member_context(
                         abs_pkg, releasable_config_dir=rel_dir,
                     )
-                    if member.is_private:
+                    if member.publish_mode == "none":
                         continue
                     has_go = any(e.name == "go" for e in member.targets)
                 except ConfigError as e:
@@ -926,7 +926,7 @@ def register_workspace_checks(app):
             )
 
         if not checked_any:
-            return CheckResult("skip", "no non-private Go members in releasables")
+            return CheckResult("skip", "no publishing Go members in releasables")
 
         if missing:
             return CheckResult(

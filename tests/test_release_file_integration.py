@@ -1,7 +1,7 @@
 """Tests for release file integration with rlsbl release.
 
 Verifies that:
-- run_cmd(ReleaseConfig, flags, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}})) works (dry-run mode)
+- run_cmd(ReleaseConfig, flags, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}})) works (dry-run mode)
 - Missing release file gives correct error in cmd_release
 - Include/exclude validation catches mismatches with detected targets
 """
@@ -37,7 +37,7 @@ def _setup_npm_project(tmp_path):
     # Config to declare targets so detect_targets returns consistent results
     config_dir = tmp_path / ".rlsbl"
     config_dir.mkdir(exist_ok=True)
-    config = {"targets": ["npm"], "private": False}
+    config = {"targets": ["npm"], "publish_mode": "ci"}
     (config_dir / "config.json").write_text(json.dumps(config) + "\n")
 
 
@@ -57,7 +57,7 @@ def _setup_multi_target_project(tmp_path, targets):
     (changes_dir / "unreleased.jsonl").write_text("")
     config_dir = tmp_path / ".rlsbl"
     config_dir.mkdir(exist_ok=True)
-    config = {"targets": targets, "private": False}
+    config = {"targets": targets, "publish_mode": "ci"}
     (config_dir / "config.json").write_text(json.dumps(config) + "\n")
 
 
@@ -66,7 +66,7 @@ def _setup_multi_target_project(tmp_path, targets):
 # ---------------------------------------------------------------------------
 
 class TestRunCmdWithReleaseConfig:
-    """run_cmd(ReleaseConfig, flags, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}})) works correctly in dry-run mode."""
+    """run_cmd(ReleaseConfig, flags, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}})) works correctly in dry-run mode."""
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
@@ -109,7 +109,7 @@ class TestRunCmdWithReleaseConfig:
             include=["npm"],
             exclude=[],
         )
-        run_cmd(config, {"dry-run": True, "quiet": False, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
+        run_cmd(config, {"dry-run": True, "quiet": False, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
         captured = capsys.readouterr()
         assert "1.0.1" in captured.out
@@ -155,7 +155,7 @@ class TestRunCmdWithReleaseConfig:
             include=["npm"],
             exclude=[],
         )
-        run_cmd(config, {"dry-run": True, "quiet": False, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
+        run_cmd(config, {"dry-run": True, "quiet": False, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
         captured = capsys.readouterr()
         assert "1.1.0" in captured.out
@@ -200,7 +200,7 @@ class TestRunCmdWithReleaseConfig:
             include=["npm"],
             exclude=[],
         )
-        run_cmd(config, {"dry-run": True, "quiet": False, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
+        run_cmd(config, {"dry-run": True, "quiet": False, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
         captured = capsys.readouterr()
         assert "2.0.0" in captured.out
@@ -237,7 +237,7 @@ class TestTargetExhaustivenessValidation:
             exclude=[],
         )
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(config, {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
+            run_cmd(config, {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
@@ -284,7 +284,7 @@ class TestTargetExhaustivenessValidation:
             exclude=["pypi"],
         )
         # Should succeed without SystemExit
-        run_cmd(config, {"dry-run": True, "quiet": False, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
+        run_cmd(config, {"dry-run": True, "quiet": False, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
         captured = capsys.readouterr()
         assert "Dry run" in captured.out
@@ -303,7 +303,7 @@ class TestTargetExhaustivenessValidation:
             exclude=[],
         )
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(config, {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
+            run_cmd(config, {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
@@ -350,7 +350,7 @@ class TestTargetExhaustivenessValidation:
             exclude=["pypi"],  # pypi not detected but listed in exclude
         )
         # Should succeed (warning, not error)
-        run_cmd(config, {"dry-run": True, "quiet": False, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
+        run_cmd(config, {"dry-run": True, "quiet": False, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
         captured = capsys.readouterr()
         assert "not detected in project" in captured.err
@@ -372,7 +372,7 @@ class TestTargetExhaustivenessValidation:
             exclude=["npm"],
         )
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd(config, {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}))
+            run_cmd(config, {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
@@ -451,7 +451,7 @@ class TestCmdReleaseInvalidFile:
 # ---------------------------------------------------------------------------
 
 class TestReleaseConfigSignature:
-    """run_cmd(ReleaseConfig, flags, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}})) is the only supported calling convention."""
+    """run_cmd(ReleaseConfig, flags, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}})) is the only supported calling convention."""
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
@@ -483,14 +483,14 @@ class TestReleaseConfigSignature:
         tmp_project,
         capsys,
     ):
-        """run_cmd(ReleaseConfig, flags, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}})) works in dry-run mode."""
+        """run_cmd(ReleaseConfig, flags, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}})) works in dry-run mode."""
         _setup_npm_project(tmp_project)
         mock_run.side_effect = ["", "0", "", ""]
 
         run_cmd(
             ReleaseConfig(bump="patch", include=["npm"], exclude=[]),
             {"dry-run": True, "quiet": False, "yes": True},
-            ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"private": False, "pipelines": {}}),
+            ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}),
 )
 
         captured = capsys.readouterr()
@@ -662,4 +662,4 @@ class TestMonorepoDirectoryScoping:
             exclude=[],
         )
         # Dry-run: skips changelog preflight, just validates the path resolution
-        run_cmd(config, {"dry-run": True, "quiet": False, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(monorepo_fixture.root)), config={"private": False, "pipelines": {}}))
+        run_cmd(config, {"dry-run": True, "quiet": False, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(monorepo_fixture.root)), config={"publish_mode": "ci", "pipelines": {}}))

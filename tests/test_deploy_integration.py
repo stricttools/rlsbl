@@ -106,7 +106,7 @@ class TestReleaseWithDeployTargets:
             tag="v1.0.1",
             branch="main",
             changelog_entry="- Fixed a bug",
-            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False, "pipelines": {}, "deploy": deploy_targets}),
+            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}, "deploy": deploy_targets}),
         ))
 
         assert len(deploy_calls) == 1
@@ -197,7 +197,7 @@ class TestReleaseDeployFailureContinues:
             tag="v1.0.1",
             branch="main",
             changelog_entry="- Fixed a bug",
-            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False, "pipelines": {}, "deploy": deploy_targets}),
+            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}, "deploy": deploy_targets}),
         ))
 
         captured = capsys.readouterr()
@@ -263,7 +263,7 @@ class TestReleaseNoDeployConfig:
             tag="v1.0.1",
             branch="main",
             changelog_entry="- Fixed a bug",
-            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False, "pipelines": {}}),
+            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}),
         ))
 
         # deploy_target should never have been called
@@ -330,7 +330,7 @@ class TestReleaseDeployConfigErrors:
             tag="v1.0.1",
             branch="main",
             changelog_entry="- Fixed a bug",
-            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False, "pipelines": {}, "deploy": deploy_targets}),
+            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}, "deploy": deploy_targets}),
         ))
 
         # deploy_target should never have been called (config has errors)
@@ -400,7 +400,7 @@ class TestReleaseStopsAtFirstDeployFailure:
             tag="v1.0.1",
             branch="main",
             changelog_entry="- Fixed a bug",
-            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"private": False, "pipelines": {}, "deploy": deploy_targets}),
+            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}, "deploy": deploy_targets}),
         ))
 
         # Only staging was attempted; prod was NOT attempted

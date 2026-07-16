@@ -136,7 +136,7 @@ class TestConfigJsonSkip:
             {"path": "app", "name": "app", "releasable": "www"},
         ])
 
-        config = {"private": False, "targets": ["pypi"]}
+        config = {"publish_mode": "ci", "targets": ["pypi"]}
         _setup_releasable(mock_git_repo, "www", config=config)
         _write_pkg_config(proj_dir, config)
 
@@ -157,8 +157,8 @@ class TestConfigJsonSkip:
             {"path": "app", "name": "app", "releasable": "www"},
         ])
 
-        releasable_config = {"private": False, "targets": ["pypi"]}
-        pkg_config = {"private": False, "targets": ["pypi"], "batch_limits": {"max_commits_per_entry": 10}}
+        releasable_config = {"publish_mode": "ci", "targets": ["pypi"]}
+        pkg_config = {"publish_mode": "ci", "targets": ["pypi"], "batch_limits": {"max_commits_per_entry": 10}}
         _setup_releasable(mock_git_repo, "www", config=releasable_config)
         _write_pkg_config(proj_dir, pkg_config)
 
@@ -184,7 +184,7 @@ class TestConfigJsonSkip:
         # Pre-create the releasable config with these same values
         _setup_releasable(mock_git_repo, "www", config={
             "targets": ["plain"],
-            "private": False,
+            "publish_mode": "ci",
         })
 
         monkeypatch.chdir(proj_dir)
@@ -213,7 +213,7 @@ class TestConfigJsonSkip:
         rel_dir = Path(get_releasable_dir(str(mock_git_repo), "www"))
         rel_dir.mkdir(parents=True, exist_ok=True)
 
-        pkg_config = {"private": False}
+        pkg_config = {"publish_mode": "ci"}
         _write_pkg_config(proj_dir, pkg_config)
 
         warnings = []
@@ -236,7 +236,7 @@ class TestNonReleasableConfigPreserved:
 
     def test_non_monorepo_config_preserved(self, mock_git_repo):
         """Standalone project (no monorepo) keeps its config.json."""
-        pkg_config = {"private": False, "targets": ["pypi"]}
+        pkg_config = {"publish_mode": "ci", "targets": ["pypi"]}
         _write_pkg_config(mock_git_repo, pkg_config)
 
         warnings = []
@@ -254,7 +254,7 @@ class TestNonReleasableConfigPreserved:
             {"path": "lib", "name": "lib"},
         ])
 
-        pkg_config = {"private": False}
+        pkg_config = {"publish_mode": "ci"}
         _write_pkg_config(proj_dir, pkg_config)
 
         warnings = []
@@ -302,7 +302,7 @@ class TestSafermInvocation:
             {"path": "app", "name": "app", "releasable": "www"},
         ])
 
-        config = {"private": False, "targets": ["pypi"]}
+        config = {"publish_mode": "ci", "targets": ["pypi"]}
         _setup_releasable(mock_git_repo, "www", config=config)
         _write_pkg_config(proj_dir, config)
 
@@ -377,7 +377,7 @@ class TestSafermInvocation:
             return original_run(cmd, *args, **kwargs)
 
         with patch("rlsbl.commands.init_cmd.subprocess.run", side_effect=tracking_run):
-            config = {"targets": ["plain"], "private": False}
+            config = {"targets": ["plain"], "publish_mode": "ci"}
             created = []
             _finalize_scaffold(
                 all_hash_dicts=[{}],
@@ -455,7 +455,7 @@ class TestOrphanBaseSweep:
             return original_run(cmd, *args, **kwargs)
 
         with patch("rlsbl.commands.init_cmd.subprocess.run", side_effect=tracking_run):
-            config = {"targets": ["plain"], "private": False}
+            config = {"targets": ["plain"], "publish_mode": "ci"}
             _finalize_scaffold(
                 all_hash_dicts=[{}],
                 created=[],
@@ -504,7 +504,7 @@ class TestOrphanBaseSweep:
             return original_run(cmd, *args, **kwargs)
 
         with patch("rlsbl.commands.init_cmd.subprocess.run", side_effect=tracking_run):
-            config = {"targets": ["plain"], "private": False}
+            config = {"targets": ["plain"], "publish_mode": "ci"}
             _finalize_scaffold(
                 all_hash_dicts=[{}],
                 created=[],
@@ -569,7 +569,7 @@ class TestOrphanBaseSweep:
         current_hashes = {managed_rel: managed_hash}
 
         with patch("rlsbl.commands.init_cmd.subprocess.run", side_effect=tracking_run):
-            config = {"targets": ["plain"], "private": False}
+            config = {"targets": ["plain"], "publish_mode": "ci"}
             _finalize_scaffold(
                 all_hash_dicts=[current_hashes],
                 created=[],
@@ -621,7 +621,7 @@ class TestEmptyDirectoryCleanup:
             return original_run(cmd, *args, **kwargs)
 
         with patch("rlsbl.commands.init_cmd.subprocess.run", side_effect=tracking_run):
-            config = {"targets": ["plain"], "private": False}
+            config = {"targets": ["plain"], "publish_mode": "ci"}
             _finalize_scaffold(
                 all_hash_dicts=[{}],
                 created=[],

@@ -41,7 +41,7 @@ def monorepo_with_projects(tmp_path, monkeypatch):
         (proj_dir / ".rlsbl" / "changes").mkdir(parents=True)
         (proj_dir / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         (proj_dir / ".rlsbl" / "config.json").write_text(
-            json.dumps({"private": False}) + "\n"
+            json.dumps({"publish_mode": "ci"}) + "\n"
         )
         (proj_dir / "package.json").write_text(
             json.dumps({"name": proj, "version": "0.1.0"})

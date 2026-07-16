@@ -49,7 +49,7 @@ def _make_project(root, *, targets=None, pkg_version="1.0.0", selfdoc_version="1
     # .rlsbl/config.json
     rlsbl_dir = root / ".rlsbl"
     rlsbl_dir.mkdir(exist_ok=True)
-    config = {"private": False}
+    config = {"publish_mode": "ci"}
     if targets is not None:
         config["targets"] = targets
     else:

@@ -276,7 +276,7 @@ class TestRollbackClobberInReleaseFlow:
         changes_dir.mkdir(parents=True)
         (changes_dir / "unreleased.jsonl").write_text("")
         (repo / ".rlsbl" / "config.json").write_text(
-            json.dumps({"private": False, "targets": ["npm"]}) + "\n"
+            json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
         )
         (repo / "CHANGELOG.md").write_text("# Changelog\n\n## 1.0.0\n\n- Init.\n")
         _git(repo, "add", ".")
@@ -345,6 +345,6 @@ class TestRollbackClobberInReleaseFlow:
                     ctx=ProjectContext(
                         project_root=Path("."),
                         workspace_root=None,
-                        config={"private": False, "pipelines": {}},
+                        config={"publish_mode": "ci", "pipelines": {}},
                     ),
                 )

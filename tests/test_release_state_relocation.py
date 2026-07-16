@@ -102,7 +102,7 @@ def _setup_releasable_workspace(root):
     )
     (core / ".rlsbl").mkdir()
     (core / ".rlsbl" / "config.json").write_text(
-        json.dumps({"private": False, "targets": ["npm"], "pipelines": {}}) + "\n"
+        json.dumps({"publish_mode": "ci", "targets": ["npm"], "pipelines": {}}) + "\n"
     )
 
     save_workspace(

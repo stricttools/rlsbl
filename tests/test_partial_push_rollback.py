@@ -68,7 +68,7 @@ def _setup_releasable_npm_project(repo):
     changes_dir.mkdir(parents=True)
     (changes_dir / "unreleased.jsonl").write_text("")
     (repo / ".rlsbl" / "config.json").write_text(
-        json.dumps({"private": False, "targets": ["npm"]}) + "\n"
+        json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
     )
     _git(repo, "add", "package.json", "CHANGELOG.md",
          ".rlsbl/changes/unreleased.jsonl", ".rlsbl/config.json")
@@ -150,7 +150,7 @@ class TestPartialPushRollback:
                     ctx=ProjectContext(
                         project_root=Path("."),
                         workspace_root=None,
-                        config={"private": False, "pipelines": {}},
+                        config={"publish_mode": "ci", "pipelines": {}},
                     ),
                 )
 
@@ -200,7 +200,7 @@ def _setup_rerelease_with_committed_finalize(repo):
     changes_dir.mkdir(parents=True)
     (changes_dir / "unreleased.jsonl").write_text("")
     (repo / ".rlsbl" / "config.json").write_text(
-        json.dumps({"private": False, "targets": ["npm"]}) + "\n"
+        json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
     )
     _git(repo, "add", "package.json", "CHANGELOG.md",
          ".rlsbl/changes/unreleased.jsonl", ".rlsbl/config.json")
@@ -271,7 +271,7 @@ class TestPreTaggedReReleaseRollback:
                     {"yes": True, "quiet": False},
                     ctx=ProjectContext(
                         project_root=Path("."), workspace_root=None,
-                        config={"private": False, "pipelines": {}},
+                        config={"publish_mode": "ci", "pipelines": {}},
                     ),
                 )
 
@@ -389,7 +389,7 @@ class TestPostTaggedPushResumable:
                     {"yes": True, "quiet": False},
                     ctx=ProjectContext(
                         project_root=Path("."), workspace_root=None,
-                        config={"private": False, "pipelines": {}},
+                        config={"publish_mode": "ci", "pipelines": {}},
                     ),
                 )
 
@@ -442,7 +442,7 @@ class TestPostTaggedPushResumable:
                     {"yes": True, "quiet": False},
                     ctx=ProjectContext(
                         project_root=Path("."), workspace_root=None,
-                        config={"private": False, "pipelines": {}},
+                        config={"publish_mode": "ci", "pipelines": {}},
                     ),
                 )
 

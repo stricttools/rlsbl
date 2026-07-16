@@ -44,7 +44,7 @@ class TestStatusRegistryAhead:
             mock_query.return_value = {"status": "found", "version": "1.1.0"}
             capsys.readouterr()
             from rlsbl.commands.status import run_cmd
-            run_cmd("npm", [], {"registry": True}, ctx=make_ctx("."))
+            run_cmd("npm", [], {"registry": True}, ctx=make_ctx(".", config={"publish_mode": "ci"}))
             out = capsys.readouterr().out
 
         assert "Registry:" in out
@@ -61,7 +61,7 @@ class TestStatusRegistryAhead:
             mock_query.return_value = {"status": "found", "version": "1.1.0"}
             capsys.readouterr()
             from rlsbl.commands.status import run_cmd
-            run_cmd("npm", [], {"registry": True, "json": True}, ctx=make_ctx("."))
+            run_cmd("npm", [], {"registry": True, "json": True}, ctx=make_ctx(".", config={"publish_mode": "ci"}))
             out = capsys.readouterr().out
 
         data = json.loads(out)
@@ -81,7 +81,7 @@ class TestStatusRegistrySame:
             mock_query.return_value = {"status": "found", "version": "2.0.0"}
             capsys.readouterr()
             from rlsbl.commands.status import run_cmd
-            run_cmd("npm", [], {"registry": True}, ctx=make_ctx("."))
+            run_cmd("npm", [], {"registry": True}, ctx=make_ctx(".", config={"publish_mode": "ci"}))
             out = capsys.readouterr().out
 
         assert "Registry:" in out
@@ -101,7 +101,7 @@ class TestStatusRegistryUnpublished:
             mock_query.return_value = {"status": "not_found"}
             capsys.readouterr()
             from rlsbl.commands.status import run_cmd
-            run_cmd("npm", [], {"registry": True}, ctx=make_ctx("."))
+            run_cmd("npm", [], {"registry": True}, ctx=make_ctx(".", config={"publish_mode": "ci"}))
             out = capsys.readouterr().out
 
         assert "Registry:" in out
@@ -116,7 +116,7 @@ class TestStatusRegistryUnpublished:
             mock_query.return_value = {"status": "not_found"}
             capsys.readouterr()
             from rlsbl.commands.status import run_cmd
-            run_cmd("npm", [], {"registry": True, "json": True}, ctx=make_ctx("."))
+            run_cmd("npm", [], {"registry": True, "json": True}, ctx=make_ctx(".", config={"publish_mode": "ci"}))
             out = capsys.readouterr().out
 
         data = json.loads(out)
@@ -132,7 +132,7 @@ class TestStatusRegistryPrivate:
         subprocess.run(["git", "add", "package.json"], cwd=str(mock_git_repo), check=True)
         subprocess.run(["git", "commit", "-q", "-m", "add package"], cwd=str(mock_git_repo), check=True)
 
-        ctx = make_ctx(".", config={"private": True})
+        ctx = make_ctx(".", config={"publish_mode": "none"})
         with patch("rlsbl.registry.query_registry_version") as mock_query:
             capsys.readouterr()
             from rlsbl.commands.status import run_cmd
@@ -149,7 +149,7 @@ class TestStatusRegistryPrivate:
         subprocess.run(["git", "add", "package.json"], cwd=str(mock_git_repo), check=True)
         subprocess.run(["git", "commit", "-q", "-m", "add package"], cwd=str(mock_git_repo), check=True)
 
-        ctx = make_ctx(".", config={"private": True})
+        ctx = make_ctx(".", config={"publish_mode": "none"})
         capsys.readouterr()
         from rlsbl.commands.status import run_cmd
         run_cmd("npm", [], {"registry": True, "json": True}, ctx=ctx)
@@ -172,7 +172,7 @@ class TestStatusRegistryError:
             mock_query.return_value = {"status": "error", "message": "HTTP 500"}
             capsys.readouterr()
             from rlsbl.commands.status import run_cmd
-            run_cmd("npm", [], {"registry": True}, ctx=make_ctx("."))
+            run_cmd("npm", [], {"registry": True}, ctx=make_ctx(".", config={"publish_mode": "ci"}))
             out = capsys.readouterr().out
 
         assert "Registry:" in out
@@ -187,7 +187,7 @@ class TestStatusRegistryError:
             mock_query.return_value = {"status": "error", "message": "HTTP 500"}
             capsys.readouterr()
             from rlsbl.commands.status import run_cmd
-            run_cmd("npm", [], {"registry": True, "json": True}, ctx=make_ctx("."))
+            run_cmd("npm", [], {"registry": True, "json": True}, ctx=make_ctx(".", config={"publish_mode": "ci"}))
             out = capsys.readouterr().out
 
         data = json.loads(out)
@@ -206,7 +206,7 @@ class TestStatusRegistryFlagNotSet:
         with patch("rlsbl.registry.query_registry_version") as mock_query:
             capsys.readouterr()
             from rlsbl.commands.status import run_cmd
-            run_cmd("npm", [], {}, ctx=make_ctx("."))
+            run_cmd("npm", [], {}, ctx=make_ctx(".", config={"publish_mode": "ci"}))
             out = capsys.readouterr().out
             mock_query.assert_not_called()
 
@@ -219,7 +219,7 @@ class TestStatusRegistryFlagNotSet:
 
         capsys.readouterr()
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {"json": True}, ctx=make_ctx("."))
+        run_cmd("npm", [], {"json": True}, ctx=make_ctx(".", config={"publish_mode": "ci"}))
         out = capsys.readouterr().out
 
         data = json.loads(out)
