@@ -350,7 +350,13 @@ def _gh_release_exists(tag, ctx):
 
 
 def _plan_gate(uc, ctx, version):
-    """Run the registry evidence gate for the release (both paths)."""
+    """Run the registry evidence gate for the release (both paths).
+
+    Resolution goes through MemberContext so targets/paths inherit
+    releasable-level config. ``resolved_targets`` is available on the
+    context for future per-pipeline evidence checks, but the evidence
+    gate currently operates per-target-object only.
+    """
     member = resolve_member_context(
         uc.start_path, releasable_config_dir=uc.releasable_config_dir,
     )

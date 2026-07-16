@@ -495,7 +495,15 @@ def _sync_member_package_versions(
 
 @dataclasses.dataclass
 class ReleaseState:
-    """All state needed by _run_release_mutating, grouped logically."""
+    """All state needed by _run_release_mutating, grouped logically.
+
+    ``resolved_targets`` is the canonical list of publishable
+    (target, pipeline) pairs (see :class:`ResolvedTarget`). The legacy
+    scalar fields ``registry``, ``target``, ``primary_path``,
+    ``target_paths``, and ``secondary_targets`` are derived from it via
+    helper methods so existing consumers keep working during the
+    transition.
+    """
 
     # Identity
     registry: str
@@ -534,6 +542,12 @@ class ReleaseState:
     companion_tags: list[str] = dataclasses.field(default_factory=list)
     completed_steps: list[str] = dataclasses.field(default_factory=list)
 
+    # Resolved targets (Phase 6.3): the canonical per-(target, pipeline)
+    # records. When set, the legacy scalar fields above are derivable
+    # from this list; when None, the legacy fields are used directly
+    # (backward compat for callers that have not migrated yet).
+    resolved_targets: list | None = None
+
     # Release config fields (persisted in state file for resume)
     include: list[str] = dataclasses.field(default_factory=list)
     exclude: list[str] = dataclasses.field(default_factory=list)
@@ -545,6 +559,33 @@ class ReleaseState:
     quiet: bool = False
     log: object = None  # callable
     ctx: object = None  # ProjectContext
+
+    # -- Derivation helpers ---------------------------------------------------
+
+    def get_target_paths(self) -> dict:
+        """Derive target_paths from resolved_targets when available.
+
+        Returns a dict mapping target name -> directory path. Deduplicates
+        by target name (keeps the first occurrence for each name, matching
+        the order of resolved_targets).
+        """
+        if self.resolved_targets is not None:
+            paths: dict[str, str] = {}
+            for rt in self.resolved_targets:
+                if rt.name not in paths:
+                    paths[rt.name] = rt.path
+            return paths
+        return self.target_paths or {}
+
+    def get_secondary_targets(self) -> dict:
+        """Derive secondary_targets from resolved_targets when available.
+
+        Returns all target_paths entries except the primary (registry).
+        """
+        if self.resolved_targets is not None:
+            paths = self.get_target_paths()
+            return {k: v for k, v in paths.items() if k != self.registry}
+        return self.secondary_targets or {}
 
 
 def _run_release_mutating(state: ReleaseState):
@@ -564,7 +605,7 @@ def _run_release_mutating(state: ReleaseState):
     tag = state.tag
     branch = state.branch
     changelog_entry = state.changelog_entry
-    secondary_targets = state.secondary_targets
+    secondary_targets = state.get_secondary_targets()
     monorepo_name = state.monorepo_name
     monorepo_project_path = state.monorepo_project_path
     releasable_name = state.releasable_name
@@ -655,9 +696,13 @@ def _run_release_mutating(state: ReleaseState):
     if primary_path is None:
         primary_path = project_dir
     if target_paths is None:
-        target_paths = resolve_target_paths(
-            project_dir, releasable_config_dir=_releasable_cfg_dir,
-        )
+        derived = state.get_target_paths()
+        if derived:
+            target_paths = derived
+        else:
+            target_paths = resolve_target_paths(
+                project_dir, releasable_config_dir=_releasable_cfg_dir,
+            )
 
     # git status --porcelain outputs paths relative to the repo root.
     # Compute the repo root so vpath can produce matching relative paths.
