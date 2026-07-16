@@ -253,5 +253,81 @@ class TestPypiCheckUrl(unittest.TestCase):
         self.assertIn("https://pypi.org/simple/", args[1])
 
 
+class TestGoProbeRework(unittest.TestCase):
+    """Tests for Go target publication_probe using git ls-remote."""
+
+    @patch("subprocess.run")
+    def test_tag_exists_returns_published(self, mock_run):
+        """When git ls-remote returns output for the tag, it is PUBLISHED."""
+        from rlsbl.targets.go import GoTarget
+
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="abc123\trefs/tags/v1.0.0\n",
+            stderr="",
+        )
+
+        target = GoTarget()
+        result = target.publication_probe("/dir", "1.0.0")
+
+        self.assertEqual(result.status, PublicationStatus.PUBLISHED)
+        self.assertIn("tag v1.0.0 exists", result.message)
+
+        # Verify git ls-remote was called correctly
+        call_args = mock_run.call_args
+        self.assertEqual(
+            call_args[0][0],
+            ["git", "ls-remote", "--tags", "origin", "v1.0.0"],
+        )
+
+    @patch("subprocess.run")
+    def test_tag_missing_returns_unpublished(self, mock_run):
+        """When git ls-remote returns empty output, it is UNPUBLISHED."""
+        from rlsbl.targets.go import GoTarget
+
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="",
+            stderr="",
+        )
+
+        target = GoTarget()
+        result = target.publication_probe("/dir", "2.0.0")
+
+        self.assertEqual(result.status, PublicationStatus.UNPUBLISHED)
+        self.assertIn("not found", result.message)
+
+    @patch("subprocess.run")
+    def test_ls_remote_failure_returns_unprobeable(self, mock_run):
+        """When git ls-remote fails, returns UNPROBEABLE."""
+        from rlsbl.targets.go import GoTarget
+
+        mock_run.return_value = MagicMock(
+            returncode=128,
+            stdout="",
+            stderr="fatal: could not read from remote repository",
+        )
+
+        target = GoTarget()
+        result = target.publication_probe("/dir", "1.0.0")
+
+        self.assertEqual(result.status, PublicationStatus.UNPROBEABLE)
+        self.assertIn("git ls-remote failed", result.message)
+
+    @patch("subprocess.run")
+    def test_timeout_returns_unprobeable(self, mock_run):
+        """When git ls-remote times out, returns UNPROBEABLE."""
+        import subprocess
+        from rlsbl.targets.go import GoTarget
+
+        mock_run.side_effect = subprocess.TimeoutExpired(cmd="git", timeout=30)
+
+        target = GoTarget()
+        result = target.publication_probe("/dir", "1.0.0")
+
+        self.assertEqual(result.status, PublicationStatus.UNPROBEABLE)
+        self.assertIn("error", result.message)
+
+
 if __name__ == "__main__":
     unittest.main()

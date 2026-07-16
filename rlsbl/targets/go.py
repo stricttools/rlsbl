@@ -73,53 +73,71 @@ class GoTarget(BaseTarget):
         return {}
 
     def publication_probe(self, dir_path, version, ctx=None):
-        """Probe Go module proxy for a specific version of this module."""
+        """Probe for a specific version by checking tag existence via git.
+
+        Uses ``git ls-remote --tags origin <tag>`` instead of the Go module
+        proxy: tag existence is the authoritative signal for Go module
+        publication (the proxy indexes from tags). This avoids proxy cache
+        lag and works for private modules.
+        """
+        import subprocess
         from ..publication_probe import PublicationProbeResult, PublicationStatus
 
-        module_path = read_go_module_path(dir_path)
-        if not module_path:
-            return PublicationProbeResult(
-                status=PublicationStatus.UNPROBEABLE,
-                registry="go",
-                version=version,
-                message="no module path in go.mod",
-            )
+        tag = f"v{version}"
 
-        import json as _json
-        import urllib.error
-        from ..commands.check import _request_with_backoff
-
-        url = f"https://proxy.golang.org/{module_path}/@v/v{version}.info"
         try:
-            with _request_with_backoff(url) as resp:
-                _json.loads(resp.read())
-            return PublicationProbeResult(
-                status=PublicationStatus.PUBLISHED,
-                registry="go",
-                version=version,
-                message=f"{module_path}@v{version} found on Go proxy",
+            result = subprocess.run(
+                ["git", "ls-remote", "--tags", "origin", tag],
+                cwd=dir_path,
+                capture_output=True,
+                text=True,
+                timeout=30,
             )
-        except urllib.error.HTTPError as e:
-            if e.code in (404, 410):
+            if result.returncode != 0:
                 return PublicationProbeResult(
-                    status=PublicationStatus.UNPUBLISHED,
+                    status=PublicationStatus.UNPROBEABLE,
                     registry="go",
                     version=version,
-                    message=f"{module_path}@v{version} not found on Go proxy",
+                    message=f"git ls-remote failed: {result.stderr.strip()}",
+                )
+            # Non-empty output means the tag exists on the remote
+            if result.stdout.strip():
+                return PublicationProbeResult(
+                    status=PublicationStatus.PUBLISHED,
+                    registry="go",
+                    version=version,
+                    message=f"tag {tag} exists on origin",
                 )
             return PublicationProbeResult(
-                status=PublicationStatus.UNPROBEABLE,
+                status=PublicationStatus.UNPUBLISHED,
                 registry="go",
                 version=version,
-                message=f"Go proxy error: HTTP {e.code}",
+                message=f"tag {tag} not found on origin",
             )
-        except Exception as e:
+        except (subprocess.TimeoutExpired, FileNotFoundError) as e:
             return PublicationProbeResult(
                 status=PublicationStatus.UNPROBEABLE,
                 registry="go",
                 version=version,
-                message=f"Go proxy error: {e}",
+                message=f"git ls-remote error: {e}",
             )
+
+        # -- Old proxy-based probe (kept as reference) --
+        # import json as _json
+        # import urllib.error
+        # from ..commands.check import _request_with_backoff
+        # url = f"https://proxy.golang.org/{module_path}/@v/v{version}.info"
+        # try:
+        #     with _request_with_backoff(url) as resp:
+        #         _json.loads(resp.read())
+        #     return PublicationProbeResult(
+        #         status=PublicationStatus.PUBLISHED, ...)
+        # except urllib.error.HTTPError as e:
+        #     if e.code in (404, 410):
+        #         return PublicationProbeResult(
+        #             status=PublicationStatus.UNPUBLISHED, ...)
+        #     return PublicationProbeResult(
+        #         status=PublicationStatus.UNPROBEABLE, ...)
 
     def _is_library(self, dir_path):
         """Return True if the project has no `package main` package anywhere."""
