@@ -1,2 +1,3 @@
 {"id":"18c2d35cf623f4cee774d18286be4e9eb7925c881e88a820","commits":["1e6bc181a8cde9f5c4d563ed1dbac15ab7e4488a"],"user_facing":false}
 {"id":"18c2d3c1a56ccd90489d54321fde4aeaa842a4b68967783b","commits":["58aa270998013f6b975a655888e226e8354edfaf"],"user_facing":true,"description":"**Fix.** Monorepo publish router now defines `workflow_dispatch.inputs.tag` so retry dispatch resolves the correct project. Gate resolver falls back to the tag input. Also, `rlsbl release retry` auto-scaffold now generates correct monorepo/releasable tag format instead of standalone `v1.2.3`.","type":"fix"}
+{"id":"18c2d3f54e27fa1b111c065d10ad4ad4bd5f1b54a334c35a","commits":["f11666af289f5a497a6f2affe0edf1d3ff017978"],"user_facing":false}
