@@ -656,7 +656,6 @@
   "en/rlsbl-overlay_state.md": {
     "content": "5e138fb19b9c4d2c7d0d19ddcf0cd0553b61f06dfcc5a8a56cb5e68b0ee82da9",
     "description": "02fe8adc92590596ab54477a5138a525cad6d0c353a96d93d5e240453e5ebb7e",
-    "seed_hash": "02fe8adc92590596ab54477a5138a525cad6d0c353a96d93d5e240453e5ebb7e",
     "source_docstring": "737c3cd947be79dc2ec3b6ea8c3d5076f5a425fd62096cad461afed2ee317cd4"
   },
   "en/rlsbl-pipelines-base.md": {
@@ -767,7 +766,6 @@
   "en/rlsbl-resolved_target.md": {
     "content": "f6c4e13b1bc9c1eabbae169563236e24054a94bdb2375955c9a6cd6d5265e48b",
     "description": "adc540fb8d626613174209ffe402d858a17b8cfb818373415696e062a5353872",
-    "seed_hash": "adc540fb8d626613174209ffe402d858a17b8cfb818373415696e062a5353872",
     "source_docstring": "ba31474583c1ca59eee0fb741cd0283f5c9780ba3cfdbf8fe47a9a6b56125115"
   },
   "en/rlsbl-secret_scan.md": {
