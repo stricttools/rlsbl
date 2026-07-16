@@ -194,7 +194,7 @@ class TestPrivatePublishGuardrail:
         _remote_exists, capsys,
     ):
         """When private=true, pipeline.publish() is not called."""
-        _write_config(self.tmp_dir, {"publish_mode": "none", "targets": ["npm"], "pipelines": {"npm": {"type": "npm", "local": False}}})
+        _write_config(self.tmp_dir, {"publish_mode": "none", "targets": ["npm"], "pipelines": {"npm": {"type": "npm", "target": "npm", "local": False}}})
 
         from rlsbl.commands.release import run_cmd
 
@@ -221,7 +221,7 @@ class TestPrivatePublishGuardrail:
         ]
 
         with patch("rlsbl.pipelines.npm.NpmPipeline.publish") as mock_publish:
-            run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "none", "pipelines": {"npm": {"type": "npm", "local": False}}}))
+            run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "none", "targets": ["npm"], "pipelines": {"npm": {"type": "npm", "target": "npm", "local": False}}}))
             # publish() must NOT be called for private repos
             mock_publish.assert_not_called()
 
@@ -261,7 +261,7 @@ class TestPrivatePublishGuardrail:
         _write_config(self.tmp_dir, {
             "publish_mode": "none",
             "targets": ["npm"],
-            "pipelines": {"npm": {"type": "npm", "local": False, "assets": True, "max_asset_size_mb": 50}},
+            "pipelines": {"npm": {"type": "npm", "target": "npm", "local": False, "assets": True, "max_asset_size_mb": 50}},
         })
 
         from rlsbl.commands.release import run_cmd
@@ -289,7 +289,7 @@ class TestPrivatePublishGuardrail:
             "def456",           # git rev-parse HEAD (pushed_sha)
         ]
 
-        run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "none", "pipelines": {"npm": {"type": "npm", "local": False, "assets": True, "max_asset_size_mb": 50}}}))
+        run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "none", "targets": ["npm"], "pipelines": {"npm": {"type": "npm", "target": "npm", "local": False, "assets": True, "max_asset_size_mb": 50}}}))
 
         # upload_release_assets must be called even for private repos
         mock_upload_assets.assert_called_once()
