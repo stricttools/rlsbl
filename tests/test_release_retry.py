@@ -799,6 +799,71 @@ class TestScaffoldRetryFile(unittest.TestCase):
             self.assertNotIn("assets", data)
 
 
+    def test_scaffold_uses_monorepo_tag_format(self):
+        """_scaffold_retry_file uses monorepo_tag_format when monorepo_name is provided."""
+        import tempfile
+        import tomlkit as tk
+        from rlsbl.commands.release_retry import _scaffold_retry_file
+
+        target = MagicMock()
+        target.read_version.return_value = "1.5.0"
+        target.tag_format.side_effect = lambda v: f"v{v}"
+        target.monorepo_tag_format.side_effect = lambda name, v, path=None: f"{name}@v{v}"
+        entry = MagicMock()
+        entry.name = "pypi"
+        entry.path = "."
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            retry_path = os.path.join(tmpdir, "retry.toml")
+
+            with patch("rlsbl.commands.release_retry.TARGETS", {"pypi": target}), \
+                 patch("rlsbl.commands.release_retry._find_dispatch_workflows", return_value=["publish.yml"]):
+                with self.assertRaises(ReleaseFileError):
+                    _scaffold_retry_file(
+                        retry_path, entry, lambda msg: None,
+                        monorepo_name="mypkg",
+                        monorepo_project_path="packages/mypkg",
+                    )
+
+            with open(retry_path) as f:
+                data = tk.load(f)
+            # Must use monorepo tag format (mypkg@v1.5.0), not standalone (v1.5.0)
+            self.assertEqual(data["tag"], "mypkg@v1.5.0")
+            target.monorepo_tag_format.assert_called_once_with(
+                "mypkg", "1.5.0", path="packages/mypkg"
+            )
+
+    def test_scaffold_uses_releasable_tag_format(self):
+        """_scaffold_retry_file uses releasable tag format when releasable context is provided."""
+        import tempfile
+        import tomlkit as tk
+        from rlsbl.commands.release_retry import _scaffold_retry_file
+
+        target = MagicMock()
+        target.read_version.return_value = "2.0.0"
+        target.tag_format.side_effect = lambda v: f"v{v}"
+        entry = MagicMock()
+        entry.name = "pypi"
+        entry.path = "."
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            retry_path = os.path.join(tmpdir, "retry.toml")
+
+            with patch("rlsbl.commands.release_retry.TARGETS", {"pypi": target}), \
+                 patch("rlsbl.commands.release_retry._find_dispatch_workflows", return_value=["publish.yml"]), \
+                 patch("rlsbl.commands.release.validate._format_releasable_tag", return_value="core@v2.0.0") as mock_fmt:
+                with self.assertRaises(ReleaseFileError):
+                    _scaffold_retry_file(
+                        retry_path, entry, lambda msg: None,
+                        releasable_name="core",
+                        releasable_tag_fmt="{{name}}@v{{version}}",
+                    )
+
+            with open(retry_path) as f:
+                data = tk.load(f)
+            self.assertEqual(data["tag"], "core@v2.0.0")
+
+
 class TestRunIdCapture(unittest.TestCase):
     """Tests for capturing dispatched run IDs and passing them to watch."""
 

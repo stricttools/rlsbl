@@ -130,7 +130,12 @@ class TestPublishRouterTopLevel:
         ):
             content = generate_inline_publish_router(projects, root)
         parsed = _safe_load(content)
-        assert parsed["on"] == {"release": {"types": ["published"]}, "workflow_dispatch": None}
+        on = parsed["on"]
+        assert on["release"] == {"types": ["published"]}
+        assert "workflow_dispatch" in on
+        wd = on["workflow_dispatch"]
+        assert wd["inputs"]["tag"]["type"] == "string"
+        assert wd["inputs"]["tag"]["required"] is False
 
     def test_has_router_name(self, tmp_path):
         root = str(tmp_path)
@@ -303,3 +308,58 @@ class TestRouterJobStructure:
         job_names = list(parsed["jobs"].keys())
         assert "mypkg-publish" in job_names
         assert "mylib-publish" in job_names
+
+
+class TestRouterDispatchRecovery:
+    """Router supports workflow_dispatch with tag input for retry dispatch."""
+
+    def test_workflow_dispatch_has_tag_input(self, tmp_path):
+        """The router's workflow_dispatch trigger defines an inputs.tag input."""
+        root = str(tmp_path)
+        _setup_project(root, "pkg", PYPI_PUBLISH_WF)
+        projects = [{"name": "pkg", "path": "pkg"}]
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            side_effect=_mock_tag_prefix,
+        ):
+            content = generate_inline_publish_router(projects, root)
+        parsed = _safe_load(content)
+        tag_input = parsed["on"]["workflow_dispatch"]["inputs"]["tag"]
+        assert tag_input["type"] == "string"
+        assert tag_input["required"] is False
+        assert "tag" in tag_input["description"].lower()
+
+    def test_concurrency_references_tag_input(self, tmp_path):
+        """Concurrency group keys on inputs.tag for dispatch retries."""
+        root = str(tmp_path)
+        _setup_project(root, "pkg", PYPI_PUBLISH_WF)
+        projects = [{"name": "pkg", "path": "pkg"}]
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            side_effect=_mock_tag_prefix,
+        ):
+            content = generate_inline_publish_router(projects, root)
+        parsed = _safe_load(content)
+        group = parsed["concurrency"]["group"]
+        assert "inputs.tag" in group
+        assert "github.ref_name" in group
+
+    def test_gate_resolver_uses_tag_input_fallback(self, tmp_path):
+        """The gate resolver script resolves the tag from TAG_INPUT or GITHUB_REF_NAME."""
+        root = str(tmp_path)
+        _setup_project(root, "pkg", PYPI_PUBLISH_WF)
+        projects = [{"name": "pkg", "path": "pkg"}]
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            side_effect=_mock_tag_prefix,
+        ):
+            content = generate_inline_publish_router(projects, root)
+        parsed = _safe_load(content)
+        gate = parsed["jobs"]["gate"]
+        # TAG_INPUT env var is set from inputs.tag
+        assert gate["env"]["TAG_INPUT"] == "${{ inputs.tag }}"
+        # Resolver script uses tag_ref variable (TAG_INPUT or GITHUB_REF_NAME)
+        resolver_step = gate["steps"][0]
+        assert 'TAG_INPUT' in resolver_step["run"]
+        assert 'tag_ref' in resolver_step["run"]
+        assert 'case "$tag_ref"' in resolver_step["run"]

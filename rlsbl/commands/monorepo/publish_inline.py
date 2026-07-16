@@ -446,7 +446,18 @@ def generate_inline_publish_router(projects_with_publish: list, root: str, relea
 
     workflow_dict = {
         "name": "Publish Router",
-        "on": {"release": {"types": ["published"]}, "workflow_dispatch": None},
+        "on": {
+            "release": {"types": ["published"]},
+            "workflow_dispatch": {
+                "inputs": {
+                    "tag": {
+                        "description": "Release tag to publish (e.g. pkga@v1.2.3). Overrides the ref for retry dispatch.",
+                        "required": False,
+                        "type": "string",
+                    },
+                },
+            },
+        },
         # Per-ref publish concurrency: a dispatch retry at the same tag
         # queues behind the in-flight run; never cancel a publish.
         "concurrency": publish_concurrency_block(),

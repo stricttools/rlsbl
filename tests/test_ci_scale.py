@@ -316,4 +316,6 @@ class TestPublishRouterScale:
         ):
             content = generate_inline_publish_router(projects, root)
         parsed = _safe_load(content)
-        assert parsed["on"] == {"release": {"types": ["published"]}, "workflow_dispatch": None}
+        on = parsed["on"]
+        assert on["release"] == {"types": ["published"]}
+        assert on["workflow_dispatch"]["inputs"]["tag"]["type"] == "string"

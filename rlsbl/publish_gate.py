@@ -244,7 +244,11 @@ def build_router_gate_job(prefix_regex_pairs: list[tuple[str, str]]) -> dict:
         "# The tag prefix selects the releasing project; a bare dispatch from",
         "# a branch matches no project and fails here instead of silently",
         "# skipping every job.",
-        'case "$GITHUB_REF_NAME" in',
+        "#",
+        "# inputs.tag (TAG_INPUT) overrides GITHUB_REF_NAME so web-UI dispatch",
+        "# with an explicit tag input also resolves the correct project.",
+        'tag_ref="${TAG_INPUT:-$GITHUB_REF_NAME}"',
+        'case "$tag_ref" in',
     ]
     for prefix, regex in sorted(
         prefix_regex_pairs, key=lambda pair: len(pair[0]), reverse=True
@@ -256,7 +260,7 @@ def build_router_gate_job(prefix_regex_pairs: list[tuple[str, str]]) -> dict:
     lines.extend(
         [
             "  *)",
-            f'    echo "::error::Publish gate: ref \'$GITHUB_REF_NAME\' matches no project tag prefix (known prefixes: {known})."',
+            f'    echo "::error::Publish gate: ref \'$tag_ref\' matches no project tag prefix (known prefixes: {known})."',
             '    echo "To retry a release publish, dispatch this workflow at the tag ref: gh workflow run publish.yml --ref <tag>"',
             "    exit 1",
             "    ;;",
@@ -266,7 +270,11 @@ def build_router_gate_job(prefix_regex_pairs: list[tuple[str, str]]) -> dict:
         ]
     )
     resolver_script = "\n".join(lines) + "\n"
-    return build_gate_job(resolver_script=resolver_script)
+    job = build_gate_job(resolver_script=resolver_script)
+    # Pass the workflow_dispatch tag input so the resolver can fall back to it
+    # when dispatched from the web UI with an explicit tag override.
+    job["env"]["TAG_INPUT"] = "${{ inputs.tag }}"
+    return job
 
 
 def _literal_str_representer(representer, data):
