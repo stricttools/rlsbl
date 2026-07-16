@@ -2,7 +2,18 @@
 
 # Changelog
 
-## Unreleased
+## 0.105.0
+
+Check outcome model adoption, undo plan-phase rework, ResolvedTarget unification, idempotent publish, publish_mode enum, scaffold base-healing, dev-sync sentinel, per-target test config.
+
+<details>
+<summary>Context</summary>
+
+Breaking changes: publish_mode replaces private config key; --force-overwrite removed from scaffold; migrate command removed; pipeline target field now required; check implementations use reporter API.
+
+New features: idempotent publish with registry probes; recovery dispatch across all publish templates; scaffold base-healing from history; dev-sync overlay sentinel and drift check; per-target test markers config; external-check name validation; malformed config hard-errors (test blocks, lint TOML, hook timeout, batch_limits); changelog entry type validation; smarter CI watch with failure classification; configurable-budget hints in timeout messages; npm name-collision errors name the conflicting package; robust per-version changelog regeneration; first-release guard against destroyed tags; undo completeness guard for multi-commit releases.
+
+</details>
 
 ### Breaking
 
@@ -44,6 +55,7 @@
 - **Undo hardening.** The release commit walk now refuses partial undo when a foreign commit blocks the version-bump commit. INCONCLUSIVE evidence gate prints remediation guidance. The audit commit exception is narrowed to CalledProcessError.
 - **Fix.** npm, cargo, and deno pipelines now publish from the target's directory (cwd=dir_path) so subdirectory targets build and publish correctly. Secret scan covers per-target dist/ directories.
 - **Fix.** Merged publish workflow generation now uses pipeline template_mappings for template resolution instead of hardcoded target-name paths, so pipeline config drives template selection.
+- **Bug fix.** The undo completeness guard error message no longer references undefined variables.
 
 ## 0.104.1
 
