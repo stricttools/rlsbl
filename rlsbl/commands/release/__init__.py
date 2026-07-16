@@ -183,9 +183,14 @@ def _resume_cmd_inner(saved_state, flags, *, ctx):
     primary_path = target_paths.get(registry, project_dir)
 
     # Resolve the canonical (target, pipeline) pairs for the release flow.
-    from ...member_context import resolve_member_context as _rmc_resume
-    _resume_member = _rmc_resume(project_dir, releasable_config_dir=_rel_cfg_dir)
-    _resolved_targets = _resume_member.resolved_targets
+    # Best-effort: see the comment at the main release path.
+    _resolved_targets = None
+    try:
+        from ...member_context import resolve_member_context as _rmc_resume
+        _resume_member = _rmc_resume(project_dir, releasable_config_dir=_rel_cfg_dir)
+        _resolved_targets = _resume_member.resolved_targets
+    except Exception:
+        pass
 
     # Read current version from disk (the version bump may already be done)
     try:
@@ -531,9 +536,17 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     primary_path = target_paths.get(registry, project_dir)
 
     # Resolve the canonical (target, pipeline) pairs for the release flow.
-    from ...member_context import resolve_member_context as _rmc_main
-    _main_member = _rmc_main(project_dir, releasable_config_dir=_rel_cfg_dir)
-    _resolved_targets = _main_member.resolved_targets
+    # Best-effort: resolved_targets enhance the release flow but are not
+    # required for backward compat. If target detection fails (e.g. config
+    # has no "targets" key), the legacy scalar fields on ReleaseState are
+    # used instead.
+    _resolved_targets = None
+    try:
+        from ...member_context import resolve_member_context as _rmc_main
+        _main_member = _rmc_main(project_dir, releasable_config_dir=_rel_cfg_dir)
+        _resolved_targets = _main_member.resolved_targets
+    except Exception:
+        pass
 
     current_version, new_version, bump_type, tag = compute_release_version(
         target, primary_path, release_config.bump,
