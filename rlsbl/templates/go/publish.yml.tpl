@@ -34,7 +34,22 @@ jobs:
       - name: Scan source for secrets
         run: |
           gitleaks dir .
+      - name: Check if already published
+        id: check-go
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if git ls-remote --tags origin "${TAG}" | grep -q "${TAG}"; then
+            # Tag already pushed and goreleaser assets likely exist
+            RELEASE_ASSETS=$(gh release view "${TAG}" --json assets -q '.assets | length' 2>/dev/null || echo "0")
+            if [ "${RELEASE_ASSETS}" -gt 0 ]; then
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "Already published: ${TAG} (${RELEASE_ASSETS} assets)"
+            fi
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: {{action "goreleaser/goreleaser-action"}}
+        if: steps.check-go.outputs.skip != 'true'
         with:
           version: "~> v2"
           args: release --clean

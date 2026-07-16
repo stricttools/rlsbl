@@ -253,6 +253,69 @@ class TestPypiCheckUrl(unittest.TestCase):
         self.assertIn("https://pypi.org/simple/", args[1])
 
 
+class TestCITemplateProbes(unittest.TestCase):
+    """Tests that publish templates contain probe steps."""
+
+    def _read_template(self, *path_parts):
+        import os
+        tpl_dir = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "rlsbl", "templates",
+        )
+        tpl_path = os.path.join(tpl_dir, *path_parts)
+        with open(tpl_path, "r", encoding="utf-8") as f:
+            return f.read()
+
+    def test_npm_publish_has_probe(self):
+        content = self._read_template("npm", "publish.yml.tpl")
+        self.assertIn("Check if already published", content)
+        self.assertIn("check-npm", content)
+
+    def test_pypi_publish_has_skip_existing(self):
+        content = self._read_template("pypi", "publish.yml.tpl")
+        self.assertIn("skip-existing: true", content)
+
+    def test_cargo_publish_has_probe(self):
+        content = self._read_template("cargo", "publish.yml.tpl")
+        self.assertIn("Check if already published", content)
+        self.assertIn("check-cargo", content)
+
+    def test_hex_publish_has_probe(self):
+        content = self._read_template("hex", "publish.yml.tpl")
+        self.assertIn("Check if already published", content)
+        self.assertIn("check-hex", content)
+
+    def test_deno_publish_has_probe(self):
+        content = self._read_template("deno", "publish.yml.tpl")
+        self.assertIn("Check if already published", content)
+        self.assertIn("check-deno", content)
+
+    def test_go_publish_has_probe(self):
+        content = self._read_template("go", "publish.yml.tpl")
+        self.assertIn("Check if already published", content)
+        self.assertIn("check-go", content)
+
+    def test_docker_publish_has_probe(self):
+        content = self._read_template("docker", "publish.yml.tpl")
+        self.assertIn("Check if already published", content)
+        self.assertIn("check-docker", content)
+
+    def test_maven_central_publish_has_probe(self):
+        content = self._read_template("maven", "publish-central.yml.tpl")
+        self.assertIn("Check if already published", content)
+        self.assertIn("check-maven-central", content)
+
+    def test_zig_publish_has_probe(self):
+        content = self._read_template("zig", "publish.yml.tpl")
+        self.assertIn("Check if already published", content)
+        self.assertIn("check-zig", content)
+
+    def test_maven_gp_inherently_idempotent(self):
+        """Maven (GitHub Packages) template is inherently idempotent (overwrites)."""
+        content = self._read_template("maven", "publish.yml.tpl")
+        self.assertIn("inherently idempotent", content)
+
+
 class TestGoProbeRework(unittest.TestCase):
     """Tests for Go target publication_probe using git ls-remote."""
 

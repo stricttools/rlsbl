@@ -32,38 +32,56 @@ jobs:
       - name: Scan source for secrets
         run: |
           gitleaks dir .
+      - name: Check if already published
+        id: check-zig
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          RELEASE_ASSETS=$(gh release view "${TAG}" --json assets -q '.assets | length' 2>/dev/null || echo "0")
+          if [ "${RELEASE_ASSETS}" -gt 0 ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Already published: ${TAG} (${RELEASE_ASSETS} assets)"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build x86_64-linux
+        if: steps.check-zig.outputs.skip != 'true'
         run: |
           zig build -Doptimize=ReleaseSafe -Dtarget=x86_64-linux
           cp zig-out/bin/{{zig.projectName}} {{zig.projectName}}-x86_64-linux
 
       - name: Build aarch64-linux
+        if: steps.check-zig.outputs.skip != 'true'
         run: |
           zig build -Doptimize=ReleaseSafe -Dtarget=aarch64-linux
           cp zig-out/bin/{{zig.projectName}} {{zig.projectName}}-aarch64-linux
 
       - name: Build x86_64-macos
+        if: steps.check-zig.outputs.skip != 'true'
         run: |
           zig build -Doptimize=ReleaseSafe -Dtarget=x86_64-macos
           cp zig-out/bin/{{zig.projectName}} {{zig.projectName}}-x86_64-macos
 
       - name: Build aarch64-macos
+        if: steps.check-zig.outputs.skip != 'true'
         run: |
           zig build -Doptimize=ReleaseSafe -Dtarget=aarch64-macos
           cp zig-out/bin/{{zig.projectName}} {{zig.projectName}}-aarch64-macos
 
       - name: Build x86_64-windows
+        if: steps.check-zig.outputs.skip != 'true'
         run: |
           zig build -Doptimize=ReleaseSafe -Dtarget=x86_64-windows
           cp zig-out/bin/{{zig.projectName}}.exe {{zig.projectName}}-x86_64-windows.exe
 
       - name: Build aarch64-windows
+        if: steps.check-zig.outputs.skip != 'true'
         run: |
           zig build -Doptimize=ReleaseSafe -Dtarget=aarch64-windows
           cp zig-out/bin/{{zig.projectName}}.exe {{zig.projectName}}-aarch64-windows.exe
 
       - name: Upload release assets
+        if: steps.check-zig.outputs.skip != 'true'
         run: |
           gh release upload "${{ github.ref_name }}" \
             {{zig.projectName}}-x86_64-linux \

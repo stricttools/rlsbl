@@ -33,12 +33,23 @@ jobs:
       - name: Scan source for secrets
         run: |
           gitleaks dir .
+      - name: Check if already published
+        id: check-docker
+        run: |
+          IMAGE="${REGISTRY}/${IMAGE_NAME}"
+          TAG="${GITHUB_REF_NAME#v}"
+          if docker manifest inspect "${IMAGE}:${TAG}" > /dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Already published: ${IMAGE}:${TAG}"
+          fi
       - uses: {{action "docker/login-action"}}
+        if: steps.check-docker.outputs.skip != 'true'
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: {{action "docker/metadata-action"}}
+        if: steps.check-docker.outputs.skip != 'true'
         id: meta
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
@@ -46,6 +57,7 @@ jobs:
             type=semver,pattern=\{{version}}
             type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
       - uses: {{action "docker/build-push-action"}}
+        if: steps.check-docker.outputs.skip != 'true'
         with:
           context: .
           push: true
