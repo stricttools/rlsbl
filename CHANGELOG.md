@@ -2,6 +2,14 @@
 
 # Changelog
 
+## 0.105.1
+
+Fix CI regression in dry-run preflight + monorepo recovery dispatch.
+
+### Fixes
+
+- **Fix.** Monorepo publish router now defines `workflow_dispatch.inputs.tag` so retry dispatch resolves the correct project. Gate resolver falls back to the tag input. Also, `rlsbl release retry` auto-scaffold now generates correct monorepo/releasable tag format instead of standalone `v1.2.3`.
+
 ## 0.105.0
 
 Check outcome model adoption, undo plan-phase rework, ResolvedTarget unification, idempotent publish, publish_mode enum, scaffold base-healing, dev-sync sentinel, per-target test config.
