@@ -11,8 +11,6 @@ import json
 import os
 import tomllib
 
-from strictcli import CheckResult
-
 from ..errors import ConfigError
 
 
@@ -180,30 +178,22 @@ def _get_releasable_version_for_project(ctx):
         return None
 
 
-def _skip_if_virtual_root(ctx):
-    """Return a SKIP ``CheckResult`` when ``ctx.project_root`` is a virtual uv
-    workspace root (``[tool.uv.workspace]`` but no ``[project]`` table), else
-    None.
-
-    Virtual roots are not packages: they publish nothing, carry no name or
-    version, and have no per-project ``.rlsbl/config.json``. Version, name,
-    and publish-oriented checks do not apply to them, so consumers return this
-    SKIP instead of hard-failing on a missing version or config key.
+def _virtual_root_skip_reason(ctx):
+    """Return a skip reason string when ctx.project_root is a virtual uv
+    workspace root (has [tool.uv.workspace] but no [project] table), else None.
     """
     from ..utils import is_virtual_uv_root
 
     if is_virtual_uv_root(str(ctx.project_root)):
-        return CheckResult(
-            "skip", "virtual uv workspace root (no [project] table -- not a release target)"
-        )
+        return "virtual uv workspace root (no [project] table -- not a release target)"
     return None
 
 
 def register_project_checks(app):
     """Register project-tag checks on *app*."""
 
-    @app.check("lock")
-    def check_lock(ctx):
+    @app.warn_check("lock")
+    def check_lock(ctx, reporter):
         """Detect stale lock files."""
         from ..lock import is_stale
 
@@ -215,11 +205,12 @@ def register_project_checks(app):
             stale_paths.append(".rlsbl-monorepo/lock")
 
         if stale_paths:
-            return CheckResult("warn", f"stale lock file exists at {', '.join(stale_paths)}")
-        return CheckResult("pass", "no lock file")
+            reporter.warn(f"stale lock file exists at {', '.join(stale_paths)}")
+            return reporter.found(f"stale lock file exists at {', '.join(stale_paths)}")
+        return reporter.passed("no lock file")
 
-    @app.check("version-consistency")
-    def check_version_consistency(ctx):
+    @app.error_check("version-consistency")
+    def check_version_consistency(ctx, reporter):
         """All detected targets must report the same version.
 
         In explicit releasable mode (when the project belongs to a named
@@ -230,9 +221,9 @@ def register_project_checks(app):
         In implicit mode (no [[releasables]]), all targets within the
         project must agree on the same version.
         """
-        skip = _skip_if_virtual_root(ctx)
-        if skip is not None:
-            return skip
+        skip_reason = _virtual_root_skip_reason(ctx)
+        if skip_reason is not None:
+            return reporter.skipped(skip_reason)
 
         # In explicit mode, the releasable version file is authoritative.
         # Published members' manifests must match it.
@@ -246,9 +237,8 @@ def register_project_checks(app):
                 str(ctx.project_root), releasable_config_dir=rel_dir,
             )
             if member.publish_mode == "none":
-                return CheckResult(
-                    "pass",
-                    f"{releasable_version} (publish-suppressed member, version file only)",
+                return reporter.passed(
+                    f"{releasable_version} (publish-suppressed member, version file only)"
                 )
 
             # Check manifest versions of published member
@@ -273,14 +263,16 @@ def register_project_checks(app):
                     )
 
             if mismatches:
-                return CheckResult(
-                    "fail",
+                reporter.error(
                     f"published member manifest version mismatch vs releasable "
-                    f"version {releasable_version}: {', '.join(mismatches)}",
+                    f"version {releasable_version}: {', '.join(mismatches)}"
                 )
-            return CheckResult(
-                "pass",
-                f"{releasable_version} (releasable version, manifests match)",
+                return reporter.found(
+                    f"published member manifest version mismatch vs releasable "
+                    f"version {releasable_version}: {', '.join(mismatches)}"
+                )
+            return reporter.passed(
+                f"{releasable_version} (releasable version, manifests match)"
             )
 
         from ..targets import TARGETS, detect_targets, resolve_releasable_config_dir_for_ctx
@@ -288,7 +280,8 @@ def register_project_checks(app):
         rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
         target_entries = detect_targets(str(ctx.project_root), releasable_config_dir=rel_dir)
         if not target_entries:
-            return CheckResult("warn", "no targets detected")
+            reporter.warn("no targets detected")
+            return reporter.found("no targets detected")
 
         versions = {}
         for name, path in target_entries:
@@ -318,20 +311,22 @@ def register_project_checks(app):
 
         unique = set(v for v in versions.values() if v is not None)
         if len(unique) == 0:
-            return CheckResult("warn", "no targets reported a version")
+            reporter.warn("no targets reported a version")
+            return reporter.found("no targets reported a version")
         if len(unique) > 1:
             detail = ", ".join(f"{n}={v}" for n, v in versions.items() if v is not None)
-            return CheckResult("fail", f"version mismatch: {detail}")
+            reporter.error(f"version mismatch: {detail}")
+            return reporter.found(f"version mismatch: {detail}")
 
         version = unique.pop()
-        return CheckResult("pass", f"{version} across {len(versions)} target(s)")
+        return reporter.passed(f"{version} across {len(versions)} target(s)")
 
-    @app.check("name-consistency")
-    def check_name_consistency(ctx):
+    @app.warn_check("name-consistency")
+    def check_name_consistency(ctx, reporter):
         """All detected targets must report the same package name."""
-        skip = _skip_if_virtual_root(ctx)
-        if skip is not None:
-            return skip
+        skip_reason = _virtual_root_skip_reason(ctx)
+        if skip_reason is not None:
+            return reporter.skipped(skip_reason)
 
         from ..targets import TARGETS, detect_targets, resolve_releasable_config_dir_for_ctx
         from ..targets.utils import normalize_go, normalize_npm, normalize_pypi
@@ -348,7 +343,8 @@ def register_project_checks(app):
         rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
         target_entries = detect_targets(str(ctx.project_root), releasable_config_dir=rel_dir)
         if not target_entries:
-            return CheckResult("warn", "no targets detected")
+            reporter.warn("no targets detected")
+            return reporter.found("no targets detected")
 
         names = {}
         for name, path in target_entries:
@@ -363,7 +359,8 @@ def register_project_checks(app):
 
         have_name = {k: v for k, v in names.items() if v is not None}
         if not have_name:
-            return CheckResult("warn", "no targets reported a name")
+            reporter.warn("no targets reported a name")
+            return reporter.found("no targets reported a name")
 
         missing = [k for k, v in names.items() if v is None]
         normalized = {k: _normalize_name(k, v) for k, v in have_name.items()}
@@ -374,20 +371,21 @@ def register_project_checks(app):
             msg = f"{raw_name} across {len(target_entries)} target(s)"
             if missing:
                 msg += f" (no name from: {', '.join(missing)})"
-            return CheckResult("pass", msg)
+            return reporter.passed(msg)
 
         detail = ", ".join(f"{k}={v}" for k, v in have_name.items())
-        return CheckResult("warn", f"name mismatch: {detail}")
+        reporter.warn(f"name mismatch: {detail}")
+        return reporter.found(f"name mismatch: {detail}")
 
-    @app.check("license-consistency")
-    def check_license_consistency(ctx):
+    @app.warn_check("license-consistency")
+    def check_license_consistency(ctx, reporter):
         """All detected targets must report the same license."""
         from ..targets import TARGETS, detect_targets, resolve_releasable_config_dir_for_ctx
 
         rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
         target_entries = detect_targets(str(ctx.project_root), releasable_config_dir=rel_dir)
         if not target_entries:
-            return CheckResult("pass", "no targets declare a license")
+            return reporter.passed("no targets declare a license")
 
         licenses = {}
         for name, path in target_entries:
@@ -401,27 +399,28 @@ def register_project_checks(app):
                 print(f"Warning: could not read metadata from {name}: {e}", file=sys.stderr)
 
         if len(licenses) == 0:
-            return CheckResult("pass", "no targets declare a license")
+            return reporter.passed("no targets declare a license")
         if len(licenses) < 2:
-            return CheckResult("pass", f"only {len(licenses)} target(s) declare a license")
+            return reporter.passed(f"only {len(licenses)} target(s) declare a license")
 
         unique = set(v.lower() for v in licenses.values())
         if len(unique) == 1:
             license_val = next(iter(licenses.values()))
-            return CheckResult("pass", f"{license_val} across {len(licenses)} target(s)")
+            return reporter.passed(f"{license_val} across {len(licenses)} target(s)")
 
         detail = ", ".join(f"{k}={v}" for k, v in licenses.items())
-        return CheckResult("warn", f"license mismatch: {detail}")
+        reporter.warn(f"license mismatch: {detail}")
+        return reporter.found(f"license mismatch: {detail}")
 
-    @app.check("description-consistency")
-    def check_description_consistency(ctx):
+    @app.warn_check("description-consistency")
+    def check_description_consistency(ctx, reporter):
         """All detected targets must report the same description."""
         from ..targets import TARGETS, detect_targets, resolve_releasable_config_dir_for_ctx
 
         rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
         target_entries = detect_targets(str(ctx.project_root), releasable_config_dir=rel_dir)
         if not target_entries:
-            return CheckResult("pass", "no targets declare a description")
+            return reporter.passed("no targets declare a description")
 
         descriptions = {}
         for name, path in target_entries:
@@ -435,20 +434,21 @@ def register_project_checks(app):
                 print(f"Warning: could not read metadata from {name}: {e}", file=sys.stderr)
 
         if len(descriptions) == 0:
-            return CheckResult("pass", "no targets declare a description")
+            return reporter.passed("no targets declare a description")
         if len(descriptions) < 2:
-            return CheckResult("pass", f"only {len(descriptions)} target(s) declare a description")
+            return reporter.passed(f"only {len(descriptions)} target(s) declare a description")
 
         unique = set(descriptions.values())
         if len(unique) == 1:
             desc_val = next(iter(descriptions.values()))
-            return CheckResult("pass", f"{desc_val} across {len(descriptions)} target(s)")
+            return reporter.passed(f"{desc_val} across {len(descriptions)} target(s)")
 
         detail = ", ".join(f"{k}={v}" for k, v in descriptions.items())
-        return CheckResult("warn", f"description mismatch: {detail}")
+        reporter.warn(f"description mismatch: {detail}")
+        return reporter.found(f"description mismatch: {detail}")
 
-    @app.check("private-hook-stale")
-    def check_private_hook_stale(ctx):
+    @app.error_check("private-hook-stale")
+    def check_private_hook_stale(ctx, reporter):
         """Detect legacy private asset upload code in post-release hook.
 
         Checks the per-package hook at ``.rlsbl/hooks/post-release.sh``.
@@ -488,29 +488,27 @@ def register_project_checks(app):
                                 stale_paths.append(os.path.relpath(rel_hook, str(ctx.project_root)))
 
         if stale_paths:
-            return CheckResult(
-                "fail",
+            msg = (
                 f"Post-release hook(s) contain legacy private asset upload code: "
                 f"{', '.join(stale_paths)}. "
                 "Asset upload is now a built-in release step. "
-                "Run `rlsbl scaffold` to get the standard hook template.",
+                "Run `rlsbl scaffold` to get the standard hook template."
             )
+            reporter.error(msg)
+            return reporter.found(msg)
         if not hooks_found:
-            return CheckResult("pass", "no post-release hook")
-        return CheckResult("pass", "no legacy private hook code")
+            return reporter.passed("no post-release hook")
+        return reporter.passed("no legacy private hook code")
 
-    @app.check("config-schema")
-    def check_config_schema(ctx):
+    @app.error_check("config-schema")
+    def check_config_schema(ctx, reporter):
         """Validate config schema: publish_mode, banned keys, and pipelines."""
-        skip = _skip_if_virtual_root(ctx)
-        if skip is not None:
-            return skip
+        skip_reason = _virtual_root_skip_reason(ctx)
+        if skip_reason is not None:
+            return reporter.skipped(skip_reason)
 
         config = ctx.config
         errors = []
-
-        # publish_mode presence/validity (and the deprecated private key ban)
-        # are enforced by validate_config_schema below.
 
         # Validate banned keys and structural invariants
         from ..config import validate_config_schema as _validate_config_schema
@@ -541,59 +539,64 @@ def register_project_checks(app):
             errors.append(str(e))
 
         if errors:
-            return CheckResult("fail", f"{len(errors)} config error(s)", details=errors)
-        return CheckResult("pass", "config schema valid")
+            for err in errors:
+                reporter.error(err)
+            return reporter.found(f"{len(errors)} config error(s)")
+        return reporter.passed("config schema valid")
 
-    @app.check("license-file")
-    def check_license_file(ctx):
+    @app.error_check("license-file")
+    def check_license_file(ctx, reporter):
         """LICENSE file must exist, be non-empty, and have no template variables."""
         import re as _re
 
         license_path = os.path.join(str(ctx.project_root), "LICENSE")
         if not os.path.exists(license_path):
-            return CheckResult("fail", "LICENSE file not found in project root")
+            reporter.error("LICENSE file not found in project root")
+            return reporter.found("LICENSE file not found in project root")
 
         try:
             size = os.path.getsize(license_path)
         except OSError:
-            return CheckResult("fail", "cannot read LICENSE file")
+            reporter.error("cannot read LICENSE file")
+            return reporter.found("cannot read LICENSE file")
 
         if size == 0:
-            return CheckResult("fail", "LICENSE file is empty")
+            reporter.error("LICENSE file is empty")
+            return reporter.found("LICENSE file is empty")
 
         with open(license_path, "r", encoding="utf-8") as f:
             content = f.read()
 
         template_vars = _re.findall(r"\{\{\w+(?:\.\w+)*\}\}", content)
         if template_vars:
-            return CheckResult(
-                "fail",
-                f"LICENSE contains unreplaced template variable(s): {', '.join(template_vars)}",
-            )
+            msg = f"LICENSE contains unreplaced template variable(s): {', '.join(template_vars)}"
+            reporter.error(msg)
+            return reporter.found(msg)
 
-        return CheckResult("pass", "LICENSE file valid")
+        return reporter.passed("LICENSE file valid")
 
-    @app.check("publish-mode-workflow")
-    def check_publish_mode_workflow(ctx):
+    @app.error_check("publish-mode-workflow")
+    def check_publish_mode_workflow(ctx, reporter):
         """publish_mode "none" repos must not have publish workflows."""
-        skip = _skip_if_virtual_root(ctx)
-        if skip is not None:
-            return skip
+        skip_reason = _virtual_root_skip_reason(ctx)
+        if skip_reason is not None:
+            return reporter.skipped(skip_reason)
 
         from ..config import get_publish_mode
         try:
             mode = get_publish_mode(ctx.config)
         except ConfigError as e:
-            return CheckResult("fail", str(e))
+            reporter.error(str(e))
+            return reporter.found(str(e))
         if mode != "none":
-            return CheckResult("pass", 'publish_mode is not "none"')
+            return reporter.passed('publish_mode is not "none"')
 
         import glob
 
         root_str = str(ctx.project_root)
         wf_dir = os.path.join(root_str, ".github", "workflows")
         if not os.path.isdir(wf_dir):
-            return CheckResult("pass", "no .github/workflows/ directory")
+            return reporter.passed("no .github/workflows/ directory")
 
         publish_files = []
         for filepath in glob.glob(os.path.join(wf_dir, "*.yml")):
@@ -610,54 +613,55 @@ def register_project_checks(app):
                 continue
 
         if publish_files:
-            return CheckResult(
-                "fail",
-                f'publish_mode "none" repo has publish workflow(s): {", ".join(sorted(publish_files))}',
-            )
-        return CheckResult("pass", 'no publish workflows in publish_mode "none" repo')
+            msg = f'publish_mode "none" repo has publish workflow(s): {", ".join(sorted(publish_files))}'
+            reporter.error(msg)
+            return reporter.found(msg)
+        return reporter.passed('no publish workflows in publish_mode "none" repo')
 
-    @app.check("npm-private-mismatch")
-    def check_npm_private_mismatch(ctx):
+    @app.error_check("npm-private-mismatch")
+    def check_npm_private_mismatch(ctx, reporter):
         """package.json private:true must not contradict publish_mode "ci"."""
         root_str = str(ctx.project_root)
         pkg_path = os.path.join(root_str, "package.json")
         if not os.path.exists(pkg_path):
-            return CheckResult("skip", "no package.json")
+            return reporter.skipped("no package.json")
 
         try:
             with open(pkg_path, "r", encoding="utf-8") as f:
                 pkg = json.load(f)
         except (OSError, json.JSONDecodeError):
-            return CheckResult("skip", "cannot read package.json")
+            return reporter.skipped("cannot read package.json")
 
         npm_private = pkg.get("private", False)
         from ..config import get_publish_mode
         try:
             mode = get_publish_mode(ctx.config)
         except ConfigError as e:
-            return CheckResult("fail", str(e))
+            reporter.error(str(e))
+            return reporter.found(str(e))
 
         if npm_private is True and mode != "none":
-            return CheckResult(
-                "fail",
+            msg = (
                 'package.json has "private": true but .rlsbl/config.json has '
-                f'"publish_mode": "{mode}" (publishing enabled)',
+                f'"publish_mode": "{mode}" (publishing enabled)'
             )
-        return CheckResult("pass", "npm private flag consistent with publish_mode")
+            reporter.error(msg)
+            return reporter.found(msg)
+        return reporter.passed("npm private flag consistent with publish_mode")
 
-    @app.check("target-version-readable")
-    def check_target_version_readable(ctx):
+    @app.error_check("target-version-readable")
+    def check_target_version_readable(ctx, reporter):
         """Every detected target must be able to read its version without error."""
-        skip = _skip_if_virtual_root(ctx)
-        if skip is not None:
-            return skip
+        skip_reason = _virtual_root_skip_reason(ctx)
+        if skip_reason is not None:
+            return reporter.skipped(skip_reason)
 
         from ..targets import TARGETS, detect_targets, resolve_releasable_config_dir_for_ctx
 
         rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
         target_entries = detect_targets(str(ctx.project_root), releasable_config_dir=rel_dir)
         if not target_entries:
-            return CheckResult("skip", "no targets detected")
+            return reporter.skipped("no targets detected")
 
         errors = []
         for name, path in target_entries:
@@ -668,18 +672,13 @@ def register_project_checks(app):
                 errors.append(f"{name}: {exc}")
 
         if errors:
-            return CheckResult(
-                "fail",
-                f"{len(errors)} target(s) cannot read version",
-                details=errors,
-            )
-        return CheckResult(
-            "pass",
-            f"all {len(target_entries)} target(s) version readable",
-        )
+            for err in errors:
+                reporter.error(err)
+            return reporter.found(f"{len(errors)} target(s) cannot read version")
+        return reporter.passed(f"all {len(target_entries)} target(s) version readable")
 
-    @app.check("dunder-version-missing")
-    def check_dunder_version_missing(ctx):
+    @app.error_check("dunder-version-missing")
+    def check_dunder_version_missing(ctx, reporter):
         """PyPI targets with a version constant must use __version__."""
         import ast
         import re as _re
@@ -694,22 +693,23 @@ def register_project_checks(app):
 
         # Step 3: skip if no pypi target
         if not any(name == "pypi" for name, _path in target_entries):
-            return CheckResult("skip", "no pypi target")
+            return reporter.skipped("no pypi target")
 
         # Step 4: detect package root
         root_str = str(ctx.project_root)
         try:
             pkg_root = detect_python_package_root(root_str)
         except VersionError as e:
-            return CheckResult("fail", str(e))
+            reporter.error(str(e))
+            return reporter.found(str(e))
 
         if pkg_root is None:
-            return CheckResult("pass", "cannot determine package root")
+            return reporter.passed("cannot determine package root")
 
         # Step 5: check __init__.py existence
         init_path = os.path.join(root_str, pkg_root, "__init__.py")
         if not os.path.exists(init_path):
-            return CheckResult("pass", "no __init__.py (namespace package)")
+            return reporter.passed("no __init__.py (namespace package)")
 
         # Step 6: read file content
         with open(init_path, "r", encoding="utf-8") as f:
@@ -717,14 +717,14 @@ def register_project_checks(app):
 
         # Step 7: check for __version__
         if has_any_dunder_version(content):
-            return CheckResult("pass", "__version__ defined")
+            return reporter.passed("__version__ defined")
 
         # Step 8: scan AST for version-like constants without __version__
         rel_path = os.path.relpath(init_path, root_str)
         try:
             tree = ast.parse(content)
         except SyntaxError:
-            return CheckResult("pass", "cannot parse __init__.py")
+            return reporter.passed("cannot parse __init__.py")
 
         for node in ast.iter_child_nodes(tree):
             if isinstance(node, ast.Assign):
@@ -736,96 +736,95 @@ def register_project_checks(app):
                         and isinstance(node.value.value, str)
                         and _re.search(r"\d+\.\d+", node.value.value)
                     ):
-                        return CheckResult(
-                            "fail",
+                        msg = (
                             f'{target.id} = "{node.value.value}" found in '
-                            f"{rel_path} but no __version__; rename to __version__",
+                            f"{rel_path} but no __version__; rename to __version__"
                         )
+                        reporter.error(msg)
+                        return reporter.found(msg)
 
         # Step 9: no version constant at all -- pure re-export module
-        return CheckResult("pass", "no version constant in __init__.py")
+        return reporter.passed("no version constant in __init__.py")
 
-    @app.check("selfdoc-version-drift")
-    def check_selfdoc_version_drift(ctx):
+    @app.error_check("selfdoc-version-drift")
+    def check_selfdoc_version_drift(ctx, reporter):
         """selfdoc.json version must match the primary target's version."""
         root_str = str(ctx.project_root)
         selfdoc_path = os.path.join(root_str, "selfdoc.json")
         if not os.path.exists(selfdoc_path):
-            return CheckResult("skip", "no selfdoc.json")
+            return reporter.skipped("no selfdoc.json")
 
         try:
             with open(selfdoc_path, "r", encoding="utf-8") as f:
                 selfdoc_data = json.load(f)
         except (OSError, json.JSONDecodeError):
-            return CheckResult("skip", "cannot read selfdoc.json")
+            return reporter.skipped("cannot read selfdoc.json")
 
         selfdoc_version = selfdoc_data.get("version")
         if selfdoc_version is None:
-            return CheckResult("skip", "selfdoc.json has no version field")
+            return reporter.skipped("selfdoc.json has no version field")
 
         from ..targets import TARGETS, detect_targets, resolve_releasable_config_dir_for_ctx
 
         rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
         target_entries = detect_targets(root_str, releasable_config_dir=rel_dir)
         if not target_entries:
-            return CheckResult("skip", "no targets detected")
+            return reporter.skipped("no targets detected")
 
         first_name, first_path = target_entries[0]
         target = TARGETS[first_name]
         try:
             primary_version = target.read_version(first_path)
         except Exception:
-            return CheckResult("skip", "cannot read primary target version")
+            return reporter.skipped("cannot read primary target version")
 
         if primary_version is None:
-            return CheckResult("skip", "primary target reports no version")
+            return reporter.skipped("primary target reports no version")
 
         if selfdoc_version != primary_version:
-            return CheckResult(
-                "fail",
+            msg = (
                 f"selfdoc.json version ({selfdoc_version}) != "
-                f"primary target {first_name} version ({primary_version})",
+                f"primary target {first_name} version ({primary_version})"
             )
-        return CheckResult("pass", f"selfdoc.json version matches ({selfdoc_version})")
+            reporter.error(msg)
+            return reporter.found(msg)
+        return reporter.passed(f"selfdoc.json version matches ({selfdoc_version})")
 
-    @app.check("scaffold-conflicts")
-    def check_scaffold_conflicts(ctx):
+    @app.error_check("scaffold-conflicts")
+    def check_scaffold_conflicts(ctx, reporter):
         """Scaffold-managed files must not contain unresolved merge conflict markers."""
         conflicted = find_conflicted_scaffold_files(ctx.project_root)
         if conflicted:
-            return CheckResult(
-                "fail",
+            for path, line in conflicted:
+                reporter.error(f"{path}:{line}")
+            return reporter.found(
                 f"{len(conflicted)} scaffold file(s) with unresolved "
-                "merge conflict markers",
-                details=[f"{path}:{line}" for path, line in conflicted],
+                "merge conflict markers"
             )
-        return CheckResult("pass", "no unresolved merge conflict markers")
+        return reporter.passed("no unresolved merge conflict markers")
 
-    @app.check("cross-repo-path-sources")
-    def check_cross_repo_path_sources(ctx):
+    @app.error_check("cross-repo-path-sources")
+    def check_cross_repo_path_sources(ctx, reporter):
         """[tool.uv.sources] path entries must stay inside the repository."""
         root_str = str(ctx.project_root)
         if not os.path.isfile(os.path.join(root_str, "pyproject.toml")):
-            return CheckResult("skip", "no pyproject.toml")
+            return reporter.skipped("no pyproject.toml")
 
         workspace_root = getattr(ctx, "workspace_root", None)
         boundary = str(workspace_root) if workspace_root else root_str
         offenders = find_cross_repo_path_sources(root_str, boundary_root=boundary)
         if offenders:
-            return CheckResult(
-                "fail",
+            for pkg, declared, resolved in offenders:
+                reporter.error(f'{pkg}: path = "{declared}" resolves to {resolved}')
+            return reporter.found(
                 f"{len(offenders)} [tool.uv.sources] path source(s) resolve "
                 "outside the repository -- depend on the registry release and "
-                "keep local overrides in dev-sources.toml.local-only",
-                details=[
-                    f'{pkg}: path = "{declared}" resolves to {resolved}'
-                    for pkg, declared, resolved in offenders
-                ],
+                "keep local overrides in dev-sources.toml.local-only"
             )
-        return CheckResult("pass", "no cross-repo path sources")
+        return reporter.passed("no cross-repo path sources")
 
-    @app.check("dev-overlay-drift")
-    def check_dev_overlay_drift(ctx):
+    @app.error_check("dev-overlay-drift")
+    def check_dev_overlay_drift(ctx, reporter):
         """Declared dev-sync overlays must remain editable-installed.
 
         `rlsbl dev sync` overlays local editable checkouts of sibling projects
@@ -838,20 +837,6 @@ def register_project_checks(app):
         the venv's dist-info direct_url.json for each overlay: a package that
         is no longer an editable install of its declared path is a hard failure
         naming the package and the exact `rlsbl dev sync` remediation.
-
-        Complementary to the release-time `_abort_on_version_skew` guard
-        (commands/release/validate.py), which reads dev-sources.toml.local-only
-        and compares each checkout's version against the registry. That guard
-        answers "is the overlaid dependency ahead of its published release?";
-        this check answers "is the overlay still actually installed?" --
-        different inputs (the sentinel vs the overrides file), different
-        failures, both protecting local dev and local releases from
-        stale-code hazards. They never contradict: the skew guard can pass
-        while the overlay is wiped, and vice versa.
-
-        Skips cleanly when no sentinel exists: absence means no overlays were
-        declared (e.g. a fresh CI checkout, where the gitignored sentinel never
-        existed) -- the honest not-applicable state, never a failure.
         """
         from ..overlay_state import (
             OVERLAY_HEALTHY,
@@ -865,13 +850,12 @@ def register_project_checks(app):
         try:
             sentinel = load_sentinel(root)
         except MalformedSentinelError as e:
-            # A corrupt sentinel must fail loudly, never SKIP: reading it as
-            # "no overlays" would hide overlays that may in fact be wiped.
-            return CheckResult("fail", str(e))
+            reporter.error(str(e))
+            return reporter.found(str(e))
         if sentinel is None:
-            return CheckResult("skip", "no dev overlays declared (no sentinel)")
+            return reporter.skipped("no dev overlays declared (no sentinel)")
         if not sentinel:
-            return CheckResult("skip", "sentinel declares no overlays")
+            return reporter.skipped("sentinel declares no overlays")
 
         drifted = []
         for entry in sentinel:
@@ -881,13 +865,11 @@ def register_project_checks(app):
                 drifted.append(detail)
 
         if drifted:
-            return CheckResult(
-                "fail",
+            for detail in drifted:
+                reporter.error(detail)
+            return reporter.found(
                 f"{len(drifted)} of {len(sentinel)} dev overlay(s) wiped or "
                 "missing -- a bare `uv sync`/`uv run` reinstalled registry "
-                "wheels; run `rlsbl dev sync` to restore editable overlays",
-                details=drifted,
+                "wheels; run `rlsbl dev sync` to restore editable overlays"
             )
-        return CheckResult(
-            "pass", f"all {len(sentinel)} dev overlay(s) editable-installed"
-        )
+        return reporter.passed(f"all {len(sentinel)} dev overlay(s) editable-installed")

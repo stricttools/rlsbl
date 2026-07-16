@@ -12,8 +12,6 @@ import json
 import os
 import subprocess
 
-from strictcli import CheckResult
-
 from ..utils import get_check_timeout, tag_exists_locally
 from ..workspace import WorkspaceProject, members_of, project_is_dev_only
 from ._common import (
@@ -26,42 +24,25 @@ from . import PROJECT_MANIFESTS
 def register_workspace_checks(app):
     """Register workspace-tag checks on *app*."""
 
-    @app.check("workspace-ci-router")
-    def check_workspace_ci_router(ctx):
+    @app.error_check("workspace-ci-router")
+    def check_workspace_ci_router(ctx, reporter):
         """ci-router.yml must exist at the repo root."""
         router = os.path.join(str(ctx.workspace_root), ".github", "workflows", "ci-router.yml")
         if os.path.isfile(router):
-            return CheckResult("pass", "ci-router.yml exists")
-        return CheckResult("fail", "ci-router.yml not found")
+            return reporter.passed("ci-router.yml exists")
+        reporter.error("ci-router.yml not found")
+        return reporter.found("ci-router.yml not found")
 
-    @app.check("workspace-ci-synced")
-    def check_workspace_ci_synced(ctx):
-        """Each project's CI jobs must be inlined into the shared ci-router.yml.
-
-        Inline sync (``rlsbl monorepo sync``) no longer writes per-project
-        ``{name}-ci.yml`` files at the root -- it inlines every project's CI
-        jobs into a single ``ci-router.yml`` keyed ``<prefix>-<job>`` where the
-        prefixes come from ``_router_ci_job_keys`` (the same source of truth the
-        sync writer and publish gate use). This check parses that router and
-        verifies each project contributes at least one job for every prefix.
-
-        Projects whose detected targets all lack the ``ci_templates`` capability
-        are exempt (they produce no CI workflow). dev_node members are excluded
-        upstream by the ``workspace:non_dev_node`` scope.
-        """
+    @app.error_check("workspace-ci-synced")
+    def check_workspace_ci_synced(ctx, reporter):
+        """Each project's CI jobs must be inlined into the shared ci-router.yml."""
         from ..targets import detect_targets, TARGETS, resolve_releasable_config_dir
         from ..ci_router import _router_ci_job_keys
         from ruamel.yaml import YAML
 
-        # First pass: determine which in-scope projects require inlining,
-        # applying the ci_templates exemption. Only if at least one project
-        # needs inlining do we require the router to exist.
-        required = []  # (name, [prefixes])
+        required = []
         skipped = 0
         for proj in ctx.projects:
-            # ci_templates exemption: skip projects whose detected targets all
-            # lack ci_templates. If detection fails or returns nothing, assume
-            # CI is needed (conservative: don't skip checks we can't evaluate).
             proj_dir = os.path.join(str(ctx.workspace_root), proj["path"])
             rel_dir = resolve_releasable_config_dir(proj, ctx.workspace_root)
             try:
@@ -83,29 +64,25 @@ def register_workspace_checks(app):
             msg = "no in-scope projects require CI inlining"
             if skipped:
                 msg += f" ({skipped} skipped, no ci_templates capability)"
-            return CheckResult("pass", msg)
+            return reporter.passed(msg)
 
         router_path = os.path.join(
             str(ctx.workspace_root), ".github", "workflows", "ci-router.yml"
         )
         if not os.path.isfile(router_path):
-            return CheckResult(
-                "fail",
-                "ci-router.yml not found -- run `rlsbl monorepo sync`",
-            )
+            reporter.error("ci-router.yml not found -- run `rlsbl monorepo sync`")
+            return reporter.found("ci-router.yml not found -- run `rlsbl monorepo sync`")
         try:
             with open(router_path, "r", encoding="utf-8") as f:
                 router = YAML(typ="safe").load(f)
         except Exception as e:
-            return CheckResult("fail", f"cannot parse ci-router.yml: {e}")
+            reporter.error(f"cannot parse ci-router.yml: {e}")
+            return reporter.found(f"cannot parse ci-router.yml: {e}")
 
         router_jobs = set((router or {}).get("jobs", {}).keys())
 
         missing = []
         for name, prefixes in required:
-            # Router jobs are keyed <prefix>-<orig>. A project is inlined when,
-            # for every CI-file prefix it contributes, the router has at least
-            # one job under that prefix.
             for prefix in prefixes:
                 if not any(
                     k == prefix or k.startswith(prefix + "-") for k in router_jobs
@@ -113,21 +90,18 @@ def register_workspace_checks(app):
                     missing.append(f"{name} ({prefix})")
 
         if missing:
-            return CheckResult(
-                "fail",
-                f"projects not inlined in ci-router.yml: {', '.join(missing)}",
-                details=[
-                    f"{m}: no jobs keyed for this project in ci-router.yml"
-                    for m in missing
-                ],
+            for m in missing:
+                reporter.error(f"{m}: no jobs keyed for this project in ci-router.yml")
+            return reporter.found(
+                f"projects not inlined in ci-router.yml: {', '.join(missing)}"
             )
         msg = f"all {len(required)} project(s) inlined in ci-router.yml"
         if skipped:
             msg += f" ({skipped} skipped, no ci_templates capability)"
-        return CheckResult("pass", msg)
+        return reporter.passed(msg)
 
-    @app.check("workspace-targets")
-    def check_workspace_targets(ctx):
+    @app.error_check("workspace-targets")
+    def check_workspace_targets(ctx, reporter):
         """Every project must have at least one detectable target."""
         from ..targets import collect_releasable_targets, detect_targets, resolve_releasable_config_dir
 
@@ -136,9 +110,6 @@ def register_workspace_checks(app):
                 return proj.releasable is False
             return proj.get("releasable") is False
 
-        # Filter out projects that don't need targets:
-        # - dev_only projects (can't release)
-        # - releasable=false projects (explicitly non-releasable)
         checkable = [
             proj for proj in ctx.projects
             if not project_is_dev_only(proj) and not _is_releasable_false(proj)
@@ -151,11 +122,10 @@ def register_workspace_checks(app):
             if not targets:
                 missing.append(proj["name"])
 
-        # Verify union of targets per releasable is non-empty
         from ..errors import ConfigError
 
         missing_releasables = []
-        banned_releasables = []  # (name, error message) for banned targets: []
+        banned_releasables = []
         for rel in ctx.releasables:
             member_projs = members_of(rel.name, ctx.projects)
             try:
@@ -166,11 +136,13 @@ def register_workspace_checks(app):
             if not target_names:
                 missing_releasables.append(rel.name)
 
-        details = [f"{n}: no release target found" for n in missing]
-        details += [f"releasable '{r}': no targets across any member" for r in missing_releasables]
-        details += [f"releasable '{r}': {msg}" for r, msg in banned_releasables]
-
         if missing or missing_releasables or banned_releasables:
+            for n in missing:
+                reporter.error(f"{n}: no release target found")
+            for r in missing_releasables:
+                reporter.error(f"releasable '{r}': no targets across any member")
+            for r, msg in banned_releasables:
+                reporter.error(f"releasable '{r}': {msg}")
             parts = []
             if missing:
                 parts.append(f"no targets detected: {', '.join(missing)}")
@@ -181,24 +153,23 @@ def register_workspace_checks(app):
                     f"releasable(s) with banned empty targets: "
                     f"{', '.join(n for n, _ in banned_releasables)}"
                 )
-            return CheckResult("fail", "; ".join(parts), details=details)
+            return reporter.found("; ".join(parts))
 
-        skipped = len(ctx.projects) - len(checkable)
+        skipped_count = len(ctx.projects) - len(checkable)
         rel_count = len(ctx.releasables)
         msg = f"all {len(checkable)} project(s) have targets"
-        if skipped:
-            msg += f" ({skipped} skipped)"
+        if skipped_count:
+            msg += f" ({skipped_count} skipped)"
         if rel_count:
             msg += f", {rel_count} releasable(s) verified"
-        return CheckResult("pass", msg)
+        return reporter.passed(msg)
 
-    @app.check("workspace-unregistered")
-    def check_workspace_unregistered(ctx):
+    @app.error_check("workspace-unregistered")
+    def check_workspace_unregistered(ctx, reporter):
         """No project directories on disk should be missing from workspace.toml."""
         root = str(ctx.workspace_root)
         registered_paths = {proj["path"].rstrip("/") for proj in ctx.projects}
 
-        # Determine gitignored directories
         gitignored = set()
         try:
             result = subprocess.run(
@@ -227,13 +198,11 @@ def register_workspace_checks(app):
             dir_path = os.path.join(root, entry)
             if not os.path.isdir(dir_path):
                 continue
-            # Check for rlsbl scaffolding (universal indicator)
             if os.path.isfile(os.path.join(dir_path, RLSBL_CONFIG)):
                 found_project_dirs.add(entry)
                 continue
             for manifest in PROJECT_MANIFESTS:
                 if os.path.isfile(os.path.join(dir_path, manifest)):
-                    # Skip private npm workspace roots (not real projects)
                     if manifest == "package.json":
                         try:
                             with open(os.path.join(dir_path, manifest)) as f:
@@ -245,8 +214,6 @@ def register_workspace_checks(app):
                     found_project_dirs.add(entry)
                     break
 
-        # Filter out directories that are parents of registered paths
-        # (e.g., "web" is a parent if "web/frontend" is registered)
         found_project_dirs -= {
             d for d in found_project_dirs
             if any(rp.startswith(d + "/") for rp in registered_paths)
@@ -254,15 +221,13 @@ def register_workspace_checks(app):
 
         unregistered = sorted(found_project_dirs - registered_paths)
         if unregistered:
-            return CheckResult(
-                "fail",
-                f"{len(unregistered)} unregistered project(s)",
-                details=[f"{d}: has manifest but not in workspace.toml" for d in unregistered],
-            )
-        return CheckResult("pass", "no unregistered projects")
+            for d in unregistered:
+                reporter.error(f"{d}: has manifest but not in workspace.toml")
+            return reporter.found(f"{len(unregistered)} unregistered project(s)")
+        return reporter.passed("no unregistered projects")
 
-    @app.check("workspace-stale-entries")
-    def check_workspace_stale_entries(ctx):
+    @app.error_check("workspace-stale-entries")
+    def check_workspace_stale_entries(ctx, reporter):
         """No workspace.toml entries should point to missing or manifest-less dirs."""
         root = str(ctx.workspace_root)
 
@@ -272,7 +237,6 @@ def register_workspace_checks(app):
             if not os.path.isdir(dir_path):
                 stale.append(proj["path"])
                 continue
-            # Check for rlsbl scaffolding (universal indicator)
             if os.path.isfile(os.path.join(dir_path, RLSBL_CONFIG)):
                 continue
             has_manifest = any(
@@ -282,31 +246,26 @@ def register_workspace_checks(app):
                 stale.append(proj["path"])
 
         if stale:
-            return CheckResult(
-                "fail",
-                f"{len(stale)} stale workspace entry(ies)",
-                details=[f"{s}: directory missing or no manifest" for s in stale],
-            )
-        return CheckResult("pass", "no stale entries")
+            for s in stale:
+                reporter.error(f"{s}: directory missing or no manifest")
+            return reporter.found(f"{len(stale)} stale workspace entry(ies)")
+        return reporter.passed("no stale entries")
 
-    @app.check("dev-only-boundary")
-    def check_dev_only_boundary(ctx):
+    @app.error_check("dev-only-boundary")
+    def check_dev_only_boundary(ctx, reporter):
         """Non-dev-only projects must not have runtime deps on dev-only projects."""
-        # Build lookup: project name -> project dict
         projects_by_name = {p["name"]: p for p in ctx.projects}
 
-        # Find all dev-only projects
         dev_only_names = [
             name for name, proj in projects_by_name.items()
             if project_is_dev_only(proj)
         ]
 
         if not dev_only_names:
-            return CheckResult("pass", "no dev-only projects")
+            return reporter.passed("no dev-only projects")
 
         violations = []
         for dev_name in dev_only_names:
-            # Collect non-dev dependents: runtime and explicit scopes
             dependents = set()
             for scope in ("runtime", "explicit"):
                 try:
@@ -327,38 +286,28 @@ def register_workspace_checks(app):
                     )
 
         if violations:
-            return CheckResult(
-                "fail",
-                f"{len(violations)} boundary violation(s)",
-                details=violations,
-            )
-        return CheckResult("pass", "dev-only boundary clean")
+            for v in violations:
+                reporter.error(v)
+            return reporter.found(f"{len(violations)} boundary violation(s)")
+        return reporter.passed("dev-only boundary clean")
 
-    @app.check("unversioned-boundary")
-    def check_unversioned_boundary(ctx):
-        """Releasable projects must not have runtime deps on unversioned projects.
-
-        An unversioned project (``releasable = false``, not dev-only) is
-        skipped by changelog coverage entirely, so its changes would ship
-        inside consumer releases with zero changelog trail. Dev-only
-        projects are excluded here -- they are dev-only-boundary's job.
-        """
+    @app.error_check("unversioned-boundary")
+    def check_unversioned_boundary(ctx, reporter):
+        """Releasable projects must not have runtime deps on unversioned projects."""
         from ..workspace import project_is_releasable
 
         projects_by_name = {p["name"]: p for p in ctx.projects}
 
-        # Unversioned: explicitly releasable = false, but not dev-only
         unversioned_names = [
             name for name, proj in projects_by_name.items()
             if proj.get("releasable") is False and not project_is_dev_only(proj)
         ]
 
         if not unversioned_names:
-            return CheckResult("pass", "no unversioned projects")
+            return reporter.passed("no unversioned projects")
 
         violations = []
         for unv_name in unversioned_names:
-            # Collect releasable dependents: runtime and explicit scopes
             dependents = set()
             for scope in ("runtime", "explicit"):
                 try:
@@ -380,20 +329,14 @@ def register_workspace_checks(app):
                     )
 
         if violations:
-            return CheckResult(
-                "fail",
-                f"{len(violations)} boundary violation(s)",
-                details=violations,
-            )
-        return CheckResult("pass", "unversioned boundary clean")
+            for v in violations:
+                reporter.error(v)
+            return reporter.found(f"{len(violations)} boundary violation(s)")
+        return reporter.passed("unversioned boundary clean")
 
-    @app.check("dead-workspace-packages")
-    def check_dead_workspace_packages(ctx):
-        """Library packages must be imported by at least one workspace sibling.
-
-        Published releasable members (publish_mode != "none", with pipelines) are
-        exempt -- they are consumed externally via a package registry.
-        """
+    @app.warn_check("dead-workspace-packages")
+    def check_dead_workspace_packages(ctx, reporter):
+        """Library packages must be imported by at least one workspace sibling."""
         from ..dep_validation import find_dead_workspace_packages
         from ..member_context import resolve_member_context
         from ..pipelines import load_pipelines
@@ -401,7 +344,6 @@ def register_workspace_checks(app):
 
         import_cache = _build_dep_import_cache(ctx)
 
-        # Build set of published member names for exemption
         published_members = set()
         for rel in ctx.releasables:
             rel_members = members_of(rel.name, ctx.projects)
@@ -429,17 +371,14 @@ def register_workspace_checks(app):
             msg = "all library packages have workspace importers"
             if published_members:
                 msg += f" ({len(published_members)} published member(s) exempt)"
-            return CheckResult("pass", msg)
+            return reporter.passed(msg)
 
-        details = [d.message for d in dead]
-        return CheckResult(
-            "warn",
-            f"{len(dead)} dead workspace package(s)",
-            details=details,
-        )
+        for d in dead:
+            reporter.warn(d.message)
+        return reporter.found(f"{len(dead)} dead workspace package(s)")
 
-    @app.check("subtree-remote-reachable")
-    def check_subtree_remote_reachable(ctx):
+    @app.error_check("subtree-remote-reachable")
+    def check_subtree_remote_reachable(ctx, reporter):
         """Every project with subtree_remote must have a reachable remote."""
         from ..utils import run as _run
 
@@ -456,20 +395,17 @@ def register_workspace_checks(app):
                 errors.append(f"{proj['name']}: subtree remote unreachable: {remote}")
 
         if checked == 0:
-            return CheckResult("skip", "no projects have subtree_remote")
+            return reporter.skipped("no projects have subtree_remote")
 
         if errors:
-            return CheckResult(
-                "fail",
-                f"{len(errors)} unreachable subtree remote(s)",
-                details=errors,
-            )
-        return CheckResult("pass", f"all {checked} subtree remote(s) reachable")
+            for err in errors:
+                reporter.error(err)
+            return reporter.found(f"{len(errors)} unreachable subtree remote(s)")
+        return reporter.passed(f"all {checked} subtree remote(s) reachable")
 
-    @app.check("workspace-unbuildable")
-    def check_workspace_unbuildable(ctx):
+    @app.error_check("workspace-unbuildable")
+    def check_workspace_unbuildable(ctx, reporter):
         """Detect workspace members that fail ``uv sync --all-packages``."""
-        # Only relevant when there are pypi-target projects in the workspace
         from ..targets import detect_targets, resolve_releasable_config_dir
 
         root = str(ctx.workspace_root)
@@ -483,7 +419,7 @@ def register_workspace_checks(app):
                 break
 
         if not has_pypi:
-            return CheckResult("skip", "no pypi-target projects in workspace")
+            return reporter.skipped("no pypi-target projects in workspace")
 
         timeout = get_check_timeout(ctx.config)
         try:
@@ -495,21 +431,23 @@ def register_workspace_checks(app):
                 timeout=timeout,
             )
         except FileNotFoundError:
-            return CheckResult("skip", "uv not installed")
+            return reporter.skipped("uv not installed")
         except subprocess.TimeoutExpired:
-            return CheckResult("fail", f"uv sync --all-packages --dry-run timed out after {timeout}s")
+            reporter.error(f"uv sync --all-packages --dry-run timed out after {timeout}s")
+            return reporter.found(f"uv sync --all-packages --dry-run timed out after {timeout}s")
 
         if result.returncode == 0:
-            return CheckResult("pass", "all workspace members buildable")
+            return reporter.passed("all workspace members buildable")
 
-        # Parse stderr for details about the failure
         stderr = result.stderr.strip()
         details = [line for line in stderr.splitlines() if line.strip()]
         summary = details[0] if details else "uv sync --all-packages --dry-run failed"
-        return CheckResult("fail", summary, details=details)
+        for detail in details:
+            reporter.error(detail)
+        return reporter.found(summary)
 
-    @app.check("deps-unused")
-    def check_deps_unused(ctx):
+    @app.error_check("deps-unused")
+    def check_deps_unused(ctx, reporter):
         """Declared workspace deps must be imported by at least one source file."""
         from ..dep_validation import check_unused_deps, load_dep_overrides
 
@@ -522,9 +460,6 @@ def register_workspace_checks(app):
         for proj in ctx.projects:
             name = proj["name"]
             project_dir = os.path.join(root, proj["path"])
-            # When the same dep is declared with multiple scopes, hard
-            # scopes ("runtime"/"explicit") take precedence over optional
-            # ones ("dev"/"peer"): declared hard anywhere means hard.
             manifest_deps_with_scope: dict[str, str] = {}
             for d in ctx.graph.dependencies(name):
                 if manifest_deps_with_scope.get(d.name) in ("runtime", "explicit"):
@@ -537,15 +472,13 @@ def register_workspace_checks(app):
             all_errors.extend(errors)
 
         if all_errors:
-            return CheckResult(
-                "fail",
-                f"{len(all_errors)} unused dependency(ies)",
-                details=all_errors,
-            )
-        return CheckResult("pass", "no unused workspace dependencies")
+            for err in all_errors:
+                reporter.error(err)
+            return reporter.found(f"{len(all_errors)} unused dependency(ies)")
+        return reporter.passed("no unused workspace dependencies")
 
-    @app.check("deps-undeclared")
-    def check_deps_undeclared(ctx):
+    @app.error_check("deps-undeclared")
+    def check_deps_undeclared(ctx, reporter):
         """Source files must not import workspace packages not declared as deps."""
         from ..dep_validation import check_undeclared_deps
 
@@ -565,15 +498,13 @@ def register_workspace_checks(app):
             all_errors.extend(errors)
 
         if all_errors:
-            return CheckResult(
-                "fail",
-                f"{len(all_errors)} undeclared dependency(ies)",
-                details=all_errors,
-            )
-        return CheckResult("pass", "no undeclared workspace dependencies")
+            for err in all_errors:
+                reporter.error(err)
+            return reporter.found(f"{len(all_errors)} undeclared dependency(ies)")
+        return reporter.passed("no undeclared workspace dependencies")
 
-    @app.check("deps-runtime-test-only")
-    def check_deps_runtime_test_only(ctx):
+    @app.warn_check("deps-runtime-test-only")
+    def check_deps_runtime_test_only(ctx, reporter):
         """Runtime deps used only in test code should be dev deps instead."""
         from ..dep_validation import check_runtime_test_only
 
@@ -596,15 +527,13 @@ def register_workspace_checks(app):
                 )
 
         if all_flagged:
-            return CheckResult(
-                "warn",
-                f"{len(all_flagged)} runtime dep(s) used only in tests",
-                details=all_flagged,
-            )
-        return CheckResult("pass", "no runtime deps used only in tests")
+            for f in all_flagged:
+                reporter.warn(f)
+            return reporter.found(f"{len(all_flagged)} runtime dep(s) used only in tests")
+        return reporter.passed("no runtime deps used only in tests")
 
-    @app.check("deps-dev-in-lib")
-    def check_deps_dev_in_lib(ctx):
+    @app.error_check("deps-dev-in-lib")
+    def check_deps_dev_in_lib(ctx, reporter):
         """Dev deps must not be imported in production code."""
         from ..dep_validation import check_dev_in_lib
 
@@ -625,22 +554,19 @@ def register_workspace_checks(app):
                 )
 
         if all_flagged:
-            return CheckResult(
-                "fail",
-                f"{len(all_flagged)} dev dep(s) imported in production code",
-                details=all_flagged,
-            )
-        return CheckResult("pass", "no dev deps imported in production code")
+            for f in all_flagged:
+                reporter.error(f)
+            return reporter.found(f"{len(all_flagged)} dev dep(s) imported in production code")
+        return reporter.passed("no dev deps imported in production code")
 
-    @app.check("deps-stale")
-    def check_deps_stale(ctx):
+    @app.error_check("deps-stale")
+    def check_deps_stale(ctx, reporter):
         """Intra-workspace dependency constraints must satisfy current versions."""
         from ..constraints import _evaluate_constraint
         from ..targets import TARGETS, detect_targets, resolve_releasable_config_dir
 
         root = str(ctx.workspace_root)
 
-        # Build version lookup: project name -> current version
         project_versions = {}
         for proj in ctx.projects:
             proj_dir = os.path.join(root, proj["path"])
@@ -665,7 +591,6 @@ def register_workspace_checks(app):
             name = proj["name"]
             deps = ctx.graph.dependencies(name)
             for dep in deps:
-                # Only evaluate versioned constraints (not workspace/path/explicit)
                 if dep.dep_type != "versioned":
                     continue
                 current_version = project_versions.get(dep.name)
@@ -679,36 +604,32 @@ def register_workspace_checks(app):
                     )
 
         if errors:
-            return CheckResult(
-                "fail",
-                f"{len(errors)} stale dependency constraint(s)",
-                details=errors,
-            )
-        return CheckResult("pass", "all intra-workspace constraints are current")
+            for err in errors:
+                reporter.error(err)
+            return reporter.found(f"{len(errors)} stale dependency constraint(s)")
+        return reporter.passed("all intra-workspace constraints are current")
 
-    @app.check("layers-violations")
-    def check_layers_violations(ctx):
+    @app.error_check("layers-violations")
+    def check_layers_violations(ctx, reporter):
         """Dependency edges must not violate layer ordering."""
         from ..layers import check_layer_violations, load_layer_config
 
         config = load_layer_config(str(ctx.workspace_root))
         if config is None:
-            return CheckResult("skip", "layers not configured")
+            return reporter.skipped("layers not configured")
 
         violations = check_layer_violations(ctx.projects, config, ctx.graph)
         if violations:
-            return CheckResult(
-                "fail",
-                f"{len(violations)} layer violation(s)",
-                details=violations,
-            )
-        return CheckResult("pass", "no layer violations")
+            for v in violations:
+                reporter.error(v)
+            return reporter.found(f"{len(violations)} layer violation(s)")
+        return reporter.passed("no layer violations")
 
-    @app.check("test-suite-workspace")
-    def check_test_suite_workspace(ctx):
+    @app.error_check("test-suite-workspace")
+    def check_test_suite_workspace(ctx, reporter):
         """Run tests for affected workspace projects."""
         if ctx.push_stdin is None:
-            return CheckResult("skip", "not in push context")
+            return reporter.skipped("not in push context")
 
         from ..prepush_utils import _parse_stdin_refs
         from ..git_util import affected_projects as _affected, get_push_changed_files
@@ -718,22 +639,21 @@ def register_workspace_checks(app):
         stdin_lines = ctx.push_stdin.strip().splitlines()
         refs = _parse_stdin_refs(stdin_lines)
         if refs is None:
-            return CheckResult("skip", "no refs parsed from push stdin")
+            return reporter.skipped("no refs parsed from push stdin")
 
         changed_files = get_push_changed_files(refs)
         if changed_files is None:
-            return CheckResult("skip", "could not determine changed files")
+            return reporter.skipped("could not determine changed files")
 
         affected = _affected(changed_files, ctx.projects)
 
         if not affected:
-            return CheckResult("pass", "no affected projects need testing")
+            return reporter.passed("no affected projects need testing")
 
         recognized = {"pypi", "go", "npm", "maven"}
         failed_projects = []
         passed_count = 0
 
-        # Pre-detect targets so we know if any pypi projects need syncing
         project_targets = []
         has_pypi = False
         for proj in affected:
@@ -751,15 +671,14 @@ def register_workspace_checks(app):
             if target_name == "pypi":
                 has_pypi = True
 
-        # Run uv sync once at workspace root for all pypi sub-projects
         if has_pypi:
             timeout = get_check_timeout(ctx.config)
             if not sync_workspace(str(ctx.workspace_root), check_timeout=timeout):
-                return CheckResult("fail", "uv sync --all-packages failed at workspace root")
+                reporter.error("uv sync --all-packages failed at workspace root")
+                return reporter.found("uv sync --all-packages failed at workspace root")
 
         for proj, project_dir, target_name in project_targets:
             if target_name is None:
-                # No testable target -- skip this project
                 continue
 
             passed = run_project_tests(
@@ -774,22 +693,18 @@ def register_workspace_checks(app):
                 failed_projects.append(proj["name"])
 
         if failed_projects:
-            return CheckResult(
-                "fail",
-                f"tests failed for: {', '.join(failed_projects)}",
-            )
-        return CheckResult("pass", f"{passed_count} project(s) tests passed")
+            reporter.error(f"tests failed for: {', '.join(failed_projects)}")
+            return reporter.found(f"tests failed for: {', '.join(failed_projects)}")
+        return reporter.passed(f"{passed_count} project(s) tests passed")
 
-    @app.check("scaffold-gitignore-stale")
-    def check_scaffold_gitignore_stale(ctx):
+    @app.warn_check("scaffold-gitignore-stale")
+    def check_scaffold_gitignore_stale(ctx, reporter):
         """Workspace project .gitignore files must contain rlsbl-managed entries."""
         from importlib.resources import files as pkg_files
 
-        # Load expected entries from the scaffold gitignore template
         template_text = (
             pkg_files("rlsbl") / "templates" / "shared" / "gitignore.tpl"
         ).read_text()
-        # Only check rlsbl-specific entries (lines containing ".rlsbl")
         rlsbl_entries = [
             line.strip()
             for line in template_text.splitlines()
@@ -797,7 +712,7 @@ def register_workspace_checks(app):
         ]
 
         if not rlsbl_entries:
-            return CheckResult("pass", "no rlsbl-specific gitignore entries in template")
+            return reporter.passed("no rlsbl-specific gitignore entries in template")
 
         ws_root = str(ctx.workspace_root)
         missing_projects = []
@@ -806,18 +721,14 @@ def register_workspace_checks(app):
             proj_dir = os.path.join(ws_root, proj["path"])
             gitignore_path = os.path.join(proj_dir, ".gitignore")
             if not os.path.isfile(gitignore_path):
-                missing_projects.append(
-                    f"{proj['name']}: .gitignore not found"
-                )
+                missing_projects.append(f"{proj['name']}: .gitignore not found")
                 continue
 
             try:
                 with open(gitignore_path, encoding="utf-8") as f:
                     gitignore_lines = {line.strip() for line in f}
             except OSError:
-                missing_projects.append(
-                    f"{proj['name']}: could not read .gitignore"
-                )
+                missing_projects.append(f"{proj['name']}: could not read .gitignore")
                 continue
 
             missing_entries = [
@@ -830,29 +741,28 @@ def register_workspace_checks(app):
                 )
 
         if missing_projects:
-            return CheckResult(
-                "warn",
-                f"{len(missing_projects)} project(s) with stale .gitignore",
-                details=missing_projects,
-            )
-        return CheckResult("pass", "all project .gitignore files are up to date")
+            for mp in missing_projects:
+                reporter.warn(mp)
+            return reporter.found(f"{len(missing_projects)} project(s) with stale .gitignore")
+        return reporter.passed("all project .gitignore files are up to date")
 
-    @app.check("root-rlsbl-conflict")
-    def check_root_rlsbl_conflict(ctx):
+    @app.error_check("root-rlsbl-conflict")
+    def check_root_rlsbl_conflict(ctx, reporter):
         """Root .rlsbl/ must not coexist with .rlsbl-monorepo/."""
         root = str(ctx.workspace_root)
         has_rlsbl = os.path.isdir(os.path.join(root, ".rlsbl"))
         has_monorepo = os.path.isdir(os.path.join(root, ".rlsbl-monorepo"))
         if has_rlsbl and has_monorepo:
-            return CheckResult(
-                "fail",
+            msg = (
                 "root .rlsbl/ conflicts with .rlsbl-monorepo/ "
-                "— remove root .rlsbl/ after migrating its contents to the releasable",
+                "-- remove root .rlsbl/ after migrating its contents to the releasable"
             )
-        return CheckResult("pass", "no root config conflict")
+            reporter.error(msg)
+            return reporter.found(msg)
+        return reporter.passed("no root config conflict")
 
-    @app.check("go-companion-tags")
-    def check_go_companion_tags(ctx):
+    @app.warn_check("go-companion-tags")
+    def check_go_companion_tags(ctx, reporter):
         """Releasables with publishing Go members should have companion tags."""
         from ..errors import ConfigError
         from ..member_context import resolve_member_context
@@ -860,7 +770,7 @@ def register_workspace_checks(app):
         from ..workspace import read_releasable_version
 
         if not ctx.releasables:
-            return CheckResult("skip", "no releasables defined")
+            return reporter.skipped("no releasables defined")
 
         root = str(ctx.workspace_root)
         missing = []
@@ -872,26 +782,16 @@ def register_workspace_checks(app):
             if not member_projs:
                 continue
 
-            # Read the releasable's current version. An unreadable version
-            # is a check FAILURE naming the releasable, not a silent skip --
-            # same no-silent-skip rule as broken member configs below.
             try:
                 version = read_releasable_version(root, rel.name)
             except Exception as e:
-                config_errors.append(
-                    f"{rel.name}: cannot read releasable version: {e}"
-                )
+                config_errors.append(f"{rel.name}: cannot read releasable version: {e}")
                 continue
 
             for proj in member_projs:
                 pkg_path = proj["path"]
                 abs_pkg = os.path.join(root, pkg_path)
 
-                # Resolve effective config and targets with releasable
-                # inheritance (single source of truth: member_context).
-                # A broken member config is a check FAILURE, not a silent
-                # skip -- the release flow hard-errors on the same config,
-                # so the check must not disagree about the member set.
                 rel_dir = resolve_releasable_config_dir(proj, ctx.workspace_root)
                 try:
                     member = resolve_member_context(
@@ -901,117 +801,81 @@ def register_workspace_checks(app):
                         continue
                     has_go = any(e.name == "go" for e in member.targets)
                 except ConfigError as e:
-                    config_errors.append(
-                        f"{rel.name}/{proj['name']}: member config error: {e}"
-                    )
+                    config_errors.append(f"{rel.name}/{proj['name']}: member config error: {e}")
                     continue
                 if not has_go:
                     continue
 
                 checked_any = True
 
-                # Check if the companion tag exists
                 sep = "" if pkg_path.endswith("/") else "/"
                 expected_tag = f"{pkg_path}{sep}v{version}"
                 if not tag_exists_locally(expected_tag, cwd=root):
-                    missing.append(
-                        f"{rel.name}/{proj['name']}: missing companion tag {expected_tag}"
-                    )
+                    missing.append(f"{rel.name}/{proj['name']}: missing companion tag {expected_tag}")
 
         if config_errors:
-            return CheckResult(
-                "fail",
-                f"{len(config_errors)} releasable/member config error(s)",
-                details=config_errors,
-            )
+            for ce in config_errors:
+                reporter.warn(ce)
+            return reporter.found(f"{len(config_errors)} releasable/member config error(s)")
 
         if not checked_any:
-            return CheckResult("skip", "no publishing Go members in releasables")
+            return reporter.skipped("no publishing Go members in releasables")
 
         if missing:
-            return CheckResult(
-                "warn",
-                f"{len(missing)} Go companion tag(s) missing",
-                details=missing,
-            )
-        return CheckResult("pass", "all Go companion tags exist")
+            for m in missing:
+                reporter.warn(m)
+            return reporter.found(f"{len(missing)} Go companion tag(s) missing")
+        return reporter.passed("all Go companion tags exist")
 
-    @app.check("releasable-residue")
-    def check_releasable_residue(ctx):
+    @app.error_check("releasable-residue")
+    def check_releasable_residue(ctx, reporter):
         """Releasable member packages must not carry per-package release state."""
         from ..releasable_cleanup import verify_minimal_rlsbl
 
         if not ctx.releasables:
-            return CheckResult("skip", "no releasables defined")
+            return reporter.skipped("no releasables defined")
 
         root = str(ctx.workspace_root)
         findings = []
         for rel in ctx.releasables:
             for proj in members_of(rel.name, ctx.projects):
                 abs_pkg = os.path.join(root, proj["path"])
-                # Root-path members are exempt: their .rlsbl/ and root
-                # CHANGELOG.md are workspace-level files.
                 if os.path.realpath(abs_pkg) == os.path.realpath(root):
                     continue
                 for entry in verify_minimal_rlsbl(abs_pkg):
-                    findings.append(
-                        f"{rel.name}/{proj['name']}: .rlsbl/{entry}"
-                    )
+                    findings.append(f"{rel.name}/{proj['name']}: .rlsbl/{entry}")
 
         if findings:
-            return CheckResult(
-                "fail",
+            for f in findings:
+                reporter.error(f)
+            return reporter.found(
                 f"{len(findings)} per-package release-state residue item(s); "
-                f"run `rlsbl monorepo cleanup` to remove them",
-                details=findings,
+                f"run `rlsbl monorepo cleanup` to remove them"
             )
-        return CheckResult("pass", "no per-package release-state residue")
+        return reporter.passed("no per-package release-state residue")
 
-    @app.check("member-pytest-config")
-    def check_member_pytest_config(ctx):
+    @app.error_check("member-pytest-config")
+    def check_member_pytest_config(ctx, reporter):
         """Members with tests must pin their own pytest rootdir when the root
-        has a conftest.py.
-
-        pytest resolves ``rootdir`` by walking upward from the test paths
-        looking for a config file (``pyproject.toml`` with
-        ``[tool.pytest.ini_options]``, ``pytest.ini``, ``tox.ini``, or
-        ``setup.cfg``). A workspace member whose ``pyproject.toml`` declares NO
-        ``[tool.pytest.ini_options]`` provides no such anchor, so rootdir
-        escapes UP to the workspace root -- where a ``conftest.py`` lives. The
-        member then silently loads the root ``conftest.py`` (fixtures,
-        plugins, options) and any root pytest config, changing test behaviour
-        without the member declaring it.
-
-        The fix: give the member its own ``[tool.pytest.ini_options]`` table
-        (even empty, with ``testpaths = ["tests"]``) so pytest's rootdir stays
-        pinned to the member.
-
-        Hard error, no bypass. Skips entirely when the workspace root has no
-        ``conftest.py`` (no hazard exists).
-        """
+        has a conftest.py."""
         import tomllib
 
         root = str(ctx.workspace_root)
         if not os.path.isfile(os.path.join(root, "conftest.py")):
-            return CheckResult(
-                "skip",
-                "workspace root has no conftest.py; no pytest rootdir-escape hazard",
+            return reporter.skipped(
+                "workspace root has no conftest.py; no pytest rootdir-escape hazard"
             )
 
         findings = []
         for proj in ctx.projects:
             abs_pkg = os.path.join(root, proj["path"])
-            # Root-path members share the workspace root's conftest -- exempt.
             if os.path.realpath(abs_pkg) == os.path.realpath(root):
                 continue
 
             pyproject = os.path.join(abs_pkg, "pyproject.toml")
-            # Only Python members can escape via pytest rootdir, and the fix
-            # (a [tool.pytest.ini_options] table) requires a pyproject.toml.
             if not os.path.isfile(pyproject):
                 continue
 
-            # Does the member ship tests pytest would collect?
             if not os.path.isdir(os.path.join(abs_pkg, "tests")):
                 continue
 
@@ -1019,8 +883,6 @@ def register_workspace_checks(app):
                 with open(pyproject, "rb") as f:
                     data = tomllib.load(f)
             except (OSError, tomllib.TOMLDecodeError):
-                # Unparseable member pyproject: cannot confirm the anchor
-                # exists -- treat as a finding rather than silently passing.
                 findings.append(proj["name"])
                 continue
 
@@ -1029,20 +891,16 @@ def register_workspace_checks(app):
                 findings.append(proj["name"])
 
         if findings:
-            return CheckResult(
-                "fail",
+            for name in findings:
+                reporter.error(
+                    f"{name}: add a [tool.pytest.ini_options] table to "
+                    f'{name}/pyproject.toml (e.g. testpaths = ["tests"]) to '
+                    "pin pytest's rootdir to the member"
+                )
+            return reporter.found(
                 f"{len(findings)} member(s) with tests but no own "
                 "[tool.pytest.ini_options] while the workspace root has a "
                 "conftest.py -- pytest's rootdir escapes to the workspace "
-                "root, silently loading the root conftest and its config",
-                details=[
-                    f"{name}: add a [tool.pytest.ini_options] table to "
-                    f"{name}/pyproject.toml (e.g. testpaths = [\"tests\"]) to "
-                    "pin pytest's rootdir to the member"
-                    for name in findings
-                ],
+                "root, silently loading the root conftest and its config"
             )
-        return CheckResult(
-            "pass",
-            "all members with tests pin their own pytest config",
-        )
+        return reporter.passed("all members with tests pin their own pytest config")

@@ -6,16 +6,14 @@ prepush-manual-warning.
 
 import os
 
-from strictcli import CheckResult
-
 from ..workspace import project_is_releasable
 
 
 def register_prepush_checks(app):
     """Register prepush-tag checks on *app*."""
 
-    @app.check("prepush-changelog-coverage")
-    def check_prepush_changelog_coverage(ctx):
+    @app.error_check("prepush-changelog-coverage")
+    def check_prepush_changelog_coverage(ctx, reporter):
         """Every pushed commit must have a JSONL changelog entry."""
         from ..changelog import changes_dir_exists
         from ..prepush_utils import (
@@ -26,12 +24,12 @@ def register_prepush_checks(app):
         from ..git_util import affected_projects, filter_commits_for_project, get_push_changed_files
 
         if ctx.push_stdin is None:
-            return CheckResult("skip", "not in push context")
+            return reporter.skipped("not in push context")
 
         stdin_lines = ctx.push_stdin.strip().splitlines()
         refs = _parse_stdin_refs(stdin_lines)
         if refs is None:
-            return CheckResult("skip", "no refs parsed from push stdin")
+            return reporter.skipped("no refs parsed from push stdin")
 
         # Monorepo mode: check each affected project independently
         if ctx.workspace_root is not None:
@@ -46,21 +44,19 @@ def register_prepush_checks(app):
             ws_root = str(ctx.workspace_root)
             changed_files = get_push_changed_files(refs)
             if changed_files is None:
-                return CheckResult("skip", "could not determine changed files")
+                return reporter.skipped("could not determine changed files")
 
             projects = load_workspace(ws_root)
             affected = affected_projects(changed_files, projects)
             if not affected:
-                return CheckResult("pass", "no affected projects")
+                return reporter.passed("no affected projects")
 
             all_pushed = _get_pushed_commits(refs)
             if all_pushed is None:
-                return CheckResult("skip", "could not determine pushed commits")
+                return reporter.skipped("could not determine pushed commits")
 
             failures = []
 
-            # In explicit releasable mode, group projects by releasable
-            # and check at the releasable level (shared changes dir).
             if is_explicit_mode(ws_root) and getattr(ctx, "releasables", None):
                 from ..git_util import filter_commits_for_releasable
 
@@ -86,7 +82,6 @@ def register_prepush_checks(app):
                     if error:
                         failures.append(f"{rel.name}: {error}")
             else:
-                # Implicit mode: check each project independently
                 for proj in affected:
                     if not project_is_releasable(proj):
                         continue
@@ -101,15 +96,16 @@ def register_prepush_checks(app):
                         failures.append(f"{proj['name']}: {error}")
 
             if failures:
-                return CheckResult("fail", "; ".join(failures))
-            return CheckResult("pass", f"all {len(affected)} affected project(s) covered")
+                msg = "; ".join(failures)
+                reporter.error(msg)
+                return reporter.found(msg)
+            return reporter.passed(f"all {len(affected)} affected project(s) covered")
 
         # Single-project mode
         root_str = str(ctx.project_root)
         if not changes_dir_exists(root_str):
-            return CheckResult("skip", "JSONL changelog not set up")
+            return reporter.skipped("JSONL changelog not set up")
 
-        # Check coverage mode
         from ..changelog.files import read_coverage_unit
         coverage_unit = read_coverage_unit(ctx.config)
         if coverage_unit == "changeset-file":
@@ -117,26 +113,27 @@ def register_prepush_checks(app):
             from ..prepush_utils import check_changeset_file_coverage
             changed_files = get_push_changed_files(refs)
             if changed_files is None:
-                return CheckResult("skip", "could not determine changed files")
+                return reporter.skipped("could not determine changed files")
             changes_dir = get_changes_dir(root_str)
             error = check_changeset_file_coverage(
                 changed_files, changes_dir=changes_dir,
             )
             if error is not None:
-                return CheckResult("fail", error)
-            return CheckResult("pass", "changeset-file coverage satisfied")
+                reporter.error(error)
+                return reporter.found(error)
+            return reporter.passed("changeset-file coverage satisfied")
 
         error = _check_jsonl_changelog(root_str, refs)
         if error is not None:
-            return CheckResult("fail", error)
-        return CheckResult("pass", "all pushed commits covered")
+            reporter.error(error)
+            return reporter.found(error)
+        return reporter.passed("all pushed commits covered")
 
-    @app.check("prepush-gitignore-guard")
-    def check_prepush_gitignore_guard(ctx):
+    @app.error_check("prepush-gitignore-guard")
+    def check_prepush_gitignore_guard(ctx, reporter):
         """rlsbl-managed files must not be gitignored."""
         from ..prepush_utils import _check_gitignore_guard
 
-        # In explicit releasable mode, also check releasable-level files
         extra_paths = None
         if (
             ctx.workspace_root is not None
@@ -163,17 +160,18 @@ def register_prepush_checks(app):
 
         error = _check_gitignore_guard(str(ctx.project_root), extra_paths=extra_paths)
         if error is not None:
-            return CheckResult("fail", error)
-        return CheckResult("pass", "no rlsbl-managed files are gitignored")
+            reporter.error(error)
+            return reporter.found(error)
+        return reporter.passed("no rlsbl-managed files are gitignored")
 
-    @app.check("prepush-manual-warning")
-    def check_prepush_manual_warning(ctx):
+    @app.warn_check("prepush-manual-warning")
+    def check_prepush_manual_warning(ctx, reporter):
         """Warn when pushing to a release branch outside rlsbl release."""
         from ..prepush_utils import _get_release_branches
         from ..git_util import detect_manual_push_branches
 
         if ctx.push_stdin is None:
-            return CheckResult("skip", "not in push context")
+            return reporter.skipped("not in push context")
 
         stdin_lines = ctx.push_stdin.strip().splitlines()
         release_branches = _get_release_branches(ctx)
@@ -183,8 +181,10 @@ def register_prepush_checks(app):
 
         if pushed_release_branches:
             branches_str = ", ".join(sorted(set(pushed_release_branches)))
-            return CheckResult(
-                "warn",
-                f"manual push to release branch ({branches_str}) -- not via 'rlsbl release'",
+            reporter.warn(
+                f"manual push to release branch ({branches_str}) -- not via 'rlsbl release'"
             )
-        return CheckResult("pass", "not pushing to a release branch")
+            return reporter.found(
+                f"manual push to release branch ({branches_str}) -- not via 'rlsbl release'"
+            )
+        return reporter.passed("not pushing to a release branch")

@@ -14,19 +14,19 @@ Tokens:
 
 from dataclasses import replace
 
-from strictcli import CheckResult
+from strictcli import SkipCheck
 
 from ..check_context import WorkspaceCheckContext
 from ..workspace import project_is_dev_only, project_is_releasable
 
 
 def scope_adapter(ctx, scope_string):
-    """Interpret *scope_string* and return a filtered context or a CheckResult.
+    """Interpret *scope_string* and return a filtered context or a SkipCheck.
 
     Each colon-separated token is processed left-to-right.  If a token
-    produces a CheckResult (skip/fail), processing stops and that result
-    is returned.  Otherwise, the token transforms the context (e.g. by
-    filtering ``ctx.projects``).
+    produces a SkipCheck, processing stops and that directive is returned.
+    Otherwise, the token transforms the context (e.g. by filtering
+    ``ctx.projects``).
 
     Unknown tokens are silently ignored (pass through).
     """
@@ -34,7 +34,7 @@ def scope_adapter(ctx, scope_string):
 
     for token in tokens:
         result = _apply_token(ctx, token)
-        if isinstance(result, CheckResult):
+        if isinstance(result, SkipCheck):
             return result
         ctx = result
 
@@ -44,11 +44,11 @@ def scope_adapter(ctx, scope_string):
 def _apply_token(ctx, token):
     """Apply a single scope token to *ctx*.
 
-    Returns either a new context (filtered copy) or a CheckResult.
+    Returns either a new context (filtered copy) or a SkipCheck.
     """
     if token == "workspace":
         if not isinstance(ctx, WorkspaceCheckContext):
-            return CheckResult("skip", "not a monorepo workspace")
+            return SkipCheck(reason="not a monorepo workspace")
         return ctx
 
     if token == "non_dev_only":
@@ -77,7 +77,7 @@ def _apply_token(ctx, token):
 
     if token == "push":
         if ctx.push_stdin is None:
-            return CheckResult("skip", "not in push context")
+            return SkipCheck(reason="not in push context")
         return ctx
 
     # Unknown token: pass through

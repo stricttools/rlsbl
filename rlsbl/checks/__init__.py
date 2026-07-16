@@ -1,11 +1,14 @@
 """Project checks registered on the strictcli check system.
 
-Each check is registered via ``@app.check("name")`` and receives a
-:class:`~rlsbl.context.ProjectContext` (or its
-:class:`~rlsbl.check_context.WorkspaceCheckContext` subclass).
+Each check is registered via ``@app.error_check("name")`` or
+``@app.warn_check("name")`` and receives ``(ctx, reporter)`` where *ctx*
+is a :class:`~rlsbl.context.ProjectContext` (or its
+:class:`~rlsbl.check_context.WorkspaceCheckContext` subclass) and
+*reporter* is an ``ErrorReporter`` or ``WarnReporter``.
 
-The check functions return :class:`strictcli.CheckResult` with lowercase
-status strings: ``"pass"``, ``"fail"``, ``"warn"``, ``"skip"``.
+Check functions accumulate problems via ``reporter.error(text)`` /
+``reporter.warn(text)`` and finalize with ``reporter.passed(msg)``,
+``reporter.skipped(reason)``, or ``reporter.found(summary)``.
 """
 
 import os
