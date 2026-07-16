@@ -51,19 +51,32 @@ def _require_gitleaks():
 _ARTIFACT_PATTERNS = ["*.whl", "*.tar.gz", "*.tgz", "*.zip"]
 
 
-def _find_artifacts(project_dir):
+def _find_artifacts(project_dir, target_paths=None):
     """Discover built artifacts in dist/ under the project directory.
+
+    When *target_paths* is provided (a dict or iterable of paths), each
+    target's dist/ is scanned independently so that subdirectory
+    targets' artifacts are found even when the project root has no
+    dist/ of its own. The project root's dist/ is always included
+    (deduped by absolute path).
 
     Returns a list of absolute paths to scannable archive files
     (.whl, .tar.gz, .tgz, .zip).
     """
-    dist_dir = os.path.join(project_dir, "dist")
-    if not os.path.isdir(dist_dir):
-        return []
+    dirs_to_scan = [os.path.join(project_dir, "dist")]
+    if target_paths:
+        paths = target_paths.values() if isinstance(target_paths, dict) else target_paths
+        for p in paths:
+            candidate = os.path.join(p, "dist")
+            if os.path.abspath(candidate) not in {os.path.abspath(d) for d in dirs_to_scan}:
+                dirs_to_scan.append(candidate)
 
     artifacts = []
-    for pattern in _ARTIFACT_PATTERNS:
-        artifacts.extend(glob.glob(os.path.join(dist_dir, pattern)))
+    for dist_dir in dirs_to_scan:
+        if not os.path.isdir(dist_dir):
+            continue
+        for pattern in _ARTIFACT_PATTERNS:
+            artifacts.extend(glob.glob(os.path.join(dist_dir, pattern)))
     return sorted(set(artifacts))
 
 
@@ -152,7 +165,7 @@ def _run_gitleaks(scan_dir, config_path=None):
     return result.returncode, result.stdout, result.stderr
 
 
-def scan_artifacts_for_secrets(project_dir, log=None):
+def scan_artifacts_for_secrets(project_dir, log=None, target_paths=None):
     """Scan all built artifacts in dist/ for leaked secrets.
 
     This is a hard gate: if gitleaks finds any secrets, the release
@@ -161,6 +174,10 @@ def scan_artifacts_for_secrets(project_dir, log=None):
     Args:
         project_dir: path to the project root (dist/ is expected here).
         log: optional callable for status messages.
+        target_paths: optional dict (or iterable of paths) mapping target
+            names to directory paths. When provided, each target's
+            dist/ is scanned in addition to the project root's dist/,
+            so subdirectory targets' artifacts are covered.
 
     Raises:
         FileNotFoundError: if gitleaks is not installed.
@@ -172,7 +189,7 @@ def scan_artifacts_for_secrets(project_dir, log=None):
 
     _require_gitleaks()
 
-    artifacts = _find_artifacts(project_dir)
+    artifacts = _find_artifacts(project_dir, target_paths=target_paths)
     if not artifacts:
         log("Secret scan: no artifacts found in dist/, skipping")
         return

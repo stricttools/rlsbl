@@ -31,7 +31,7 @@ class CargoPipeline(TokenPipeline):
             run("cargo", ["publish"], env={
                 **os.environ,
                 "CARGO_REGISTRY_TOKEN": token,
-            })
+            }, cwd=dir_path)
             print(f"Published to crates.io: {version}")
         except subprocess.CalledProcessError as exc:
             raise RuntimeError(f"cargo publish failed: {exc}") from exc

@@ -62,7 +62,7 @@ class DenoPipeline(TokenPipeline):
             run("deno", ["publish"], env={
                 **os.environ,
                 "DENO_TOKEN": token,
-            })
+            }, cwd=dir_path)
             print(f"Published to JSR: {version}")
         except subprocess.CalledProcessError as exc:
             raise RuntimeError(f"deno publish failed: {exc}") from exc

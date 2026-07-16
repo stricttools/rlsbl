@@ -67,7 +67,7 @@ class NpmPipeline(TokenPipeline):
             run("npm", args, env={
                 **os.environ,
                 "NPM_TOKEN": token,
-            })
+            }, cwd=dir_path)
             print(f"Published to npm: {version}")
         except subprocess.CalledProcessError as exc:
             raise RuntimeError(f"npm publish failed: {exc}") from exc

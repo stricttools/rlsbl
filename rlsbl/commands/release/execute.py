@@ -1152,7 +1152,7 @@ def _run_release_mutating(state: ReleaseState):
         # any push or publish. This is a hard, non-bypassable gate.
         from ...secret_scan import scan_artifacts_for_secrets, SecretScanError
         try:
-            scan_artifacts_for_secrets(project_dir, log=log)
+            scan_artifacts_for_secrets(project_dir, log=log, target_paths=target_paths)
         except SecretScanError as e:
             raise ReleaseAbortError(str(e))
 
