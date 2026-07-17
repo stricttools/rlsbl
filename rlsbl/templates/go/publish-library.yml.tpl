@@ -35,7 +35,7 @@ jobs:
     steps:
       - uses: {{action "actions/checkout"}}
         with:
-          ref: ${{ inputs.tag || github.ref_name }}
+          ref: ${{ inputs.tag || github.event.release.tag_name }}
       - uses: {{action "actions/setup-go"}}
         with:
           go-version-file: go.mod
@@ -57,7 +57,7 @@ jobs:
           #   - monorepo subdir member:  <subdir>/v0.22.0
           # Strip the releasable "<name>@" prefix, then the subdir "<path>/"
           # prefix, then the leading "v".
-          TAG="${{ inputs.tag || github.ref_name }}"
+          TAG="${{ inputs.tag || github.event.release.tag_name }}"
           TAG="${TAG##*@}"
           TAG="${TAG##*/}"
           VERSION="${TAG#v}"
