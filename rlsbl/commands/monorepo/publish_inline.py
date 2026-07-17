@@ -155,12 +155,37 @@ _SETUP_VERSION_FILE_KEYS = {
 }
 
 
+def _compose_project_subpath(project_path: str, sub: str) -> str:
+    """Anchor a per-target *sub* path under *project_path*.
+
+    Mirrors :func:`inject_job_metadata`'s working-directory composition, but
+    string-based so packages-dir's trailing ``dist/`` slash is preserved
+    (``os.path.normpath`` would strip it, and consumers/tests rely on it).
+
+    The merged-publish generator pre-injects each subdir target's own
+    subpath into these inputs (e.g. ``py/dist/`` for a pypi target living in
+    ``py/``). This composes that subpath under the project's path rather than
+    overwriting it with a root-anchored value. Behaviour is unchanged for
+    targets at the project root (``sub`` already correct relative to the
+    repo root) and for inputs already anchored under *project_path*
+    (idempotent -- never double-prefixed).
+    """
+    if project_path in (".", "", "./"):
+        return sub
+    if sub == project_path or sub.startswith(f"{project_path}/"):
+        return sub
+    return f"{project_path}/{sub}"
+
+
 def rewrite_action_paths(jobs: dict, project_path: str) -> dict:
     """Rewrite action inputs that contain file paths so they are relative to *project_path*.
 
     Handles:
-    - ``pypa/gh-action-pypi-publish``: sets ``with.packages-dir`` to ``{project_path}/dist/``
-    - ``actions/setup-{go,python,node}``: prefixes version-file paths with *project_path*
+    - ``pypa/gh-action-pypi-publish``: composes ``with.packages-dir`` (default
+      ``dist/``) under *project_path*, preserving any per-target subpath the
+      merged-publish generator pre-injected.
+    - ``actions/setup-{go,python,node}``: composes version-file paths under
+      *project_path*, likewise preserving pre-injected per-target subpaths.
 
     Returns a new dict; the original *jobs* is not mutated.
     """
@@ -173,7 +198,10 @@ def rewrite_action_paths(jobs: dict, project_path: str) -> dict:
             # PyPI publish action
             if "pypa/gh-action-pypi-publish" in uses:
                 with_block = step.setdefault("with", {})
-                with_block["packages-dir"] = f"{project_path}/dist/"
+                existing_pkg = with_block.get("packages-dir") or "dist/"
+                with_block["packages-dir"] = _compose_project_subpath(
+                    project_path, existing_pkg
+                )
 
             # Setup actions with version-file inputs
             for action_substring, version_key in _SETUP_VERSION_FILE_KEYS.items():
@@ -181,8 +209,10 @@ def rewrite_action_paths(jobs: dict, project_path: str) -> dict:
                     with_block = step.get("with", {})
                     if version_key in with_block:
                         val = with_block[version_key]
-                        if isinstance(val, str) and not val.startswith(f"{project_path}/"):
-                            with_block[version_key] = f"{project_path}/{val}"
+                        if isinstance(val, str):
+                            with_block[version_key] = _compose_project_subpath(
+                                project_path, val
+                            )
 
     return jobs
 

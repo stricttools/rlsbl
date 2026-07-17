@@ -393,6 +393,60 @@ class TestRewriteActionPaths:
         rewrite_action_paths(jobs, "pkg")
         assert jobs == original
 
+    def test_preinjected_packages_dir_subpath_composed_at_root(self):
+        # A monorepo root publisher (project_path ".") whose pypi target lives
+        # in the "py" subdir arrives with packages-dir already pre-injected as
+        # "py/dist/" by the merged-publish generator. It must be preserved
+        # (root-relative), NOT overwritten to a root-anchored "./dist/".
+        jobs = {
+            "publish": {
+                "steps": [
+                    {
+                        "uses": "pypa/gh-action-pypi-publish@release/v1",
+                        "with": {"packages-dir": "py/dist/"},
+                    },
+                ]
+            }
+        }
+        result = rewrite_action_paths(jobs, ".")
+        step = result["publish"]["steps"][0]
+        assert step["with"]["packages-dir"] == "py/dist/"
+
+    def test_preinjected_packages_dir_subpath_composed_under_member(self):
+        # A member at "packages/core" whose pypi target lives in a nested "py"
+        # subdir arrives with packages-dir "py/dist/". It composes under the
+        # member path, NOT overwriting the subpath away.
+        jobs = {
+            "publish": {
+                "steps": [
+                    {
+                        "uses": "pypa/gh-action-pypi-publish@release/v1",
+                        "with": {"packages-dir": "py/dist/"},
+                    },
+                ]
+            }
+        }
+        result = rewrite_action_paths(jobs, "packages/core")
+        step = result["publish"]["steps"][0]
+        assert step["with"]["packages-dir"] == "packages/core/py/dist/"
+
+    def test_preinjected_version_file_subpath_composed_at_root(self):
+        # go-version-file pre-injected as "gopkg/go.mod" for a root publisher
+        # with a subdir go target composes cleanly (root-relative).
+        jobs = {
+            "build": {
+                "steps": [
+                    {
+                        "uses": "actions/setup-go@v5",
+                        "with": {"go-version-file": "gopkg/go.mod"},
+                    },
+                ]
+            }
+        }
+        result = rewrite_action_paths(jobs, ".")
+        step = result["build"]["steps"][0]
+        assert step["with"]["go-version-file"] == "gopkg/go.mod"
+
 
 # ---------------------------------------------------------------------------
 # resolve_permissions tests
