@@ -1,6 +1,6 @@
 ---
 title: rlsbl.publish_gate
-description: "Single source of truth for the publish CI gate, generating the GitHub Actions gate job that blocks publishing until all CI checks pass on the release co..."
+description: "Publish CI gate job: resolves the release commit marker-first from the Release body, then collapses retried check-runs to the latest so a superseded CI failure can't block publishing."
 generated: true
 nav_group: "API Reference"
 nav_order: 114
