@@ -105,6 +105,31 @@ class TestClaimName:
         # The raw internal tag should not be what is shown to the user.
         assert "appears taken on npm: moniker." not in err
 
+    @patch("rlsbl.commands.check._check_single_name")
+    def test_claim_taken_moniker_shows_all_conflicting_packages(self, mock_check, capsys):
+        """A multi-conflict moniker collision surfaces every colliding package + the rule.
+
+        The taken branch prefers result["note"], which now enumerates the full
+        conflict list rather than only the first package.
+        """
+        rule = "npm strips dashes, dots, and underscores: these share one moniker"
+        mock_check.return_value = {
+            "name": "foobar", "registry": "npm", "status": "taken",
+            "variants": None, "reason": "moniker",
+            "conflicts": ["foo-bar", "foo.bar"],
+            "conflict_rule": rule,
+            "note": f"moniker collision with 'foo-bar', 'foo.bar' — {rule}",
+        }
+
+        with pytest.raises(SystemExit) as exc_info:
+            run_cmd("npm", ["foobar"], {"yes": False})
+        assert exc_info.value.code == 1
+
+        err = capsys.readouterr().err
+        assert "foo-bar" in err
+        assert "foo.bar" in err
+        assert rule in err
+
     @patch("rlsbl.commands.claim_name.subprocess.run")
     @patch("rlsbl.commands.check._check_single_name")
     def test_claim_taken_with_yes_publishes(self, mock_check, mock_run, real_tmpdir):

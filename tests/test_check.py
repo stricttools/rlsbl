@@ -9,6 +9,7 @@ import pytest
 
 from conftest import FakeResponse
 from rlsbl.commands.check import (
+    _NPM_MONIKER_RULE,
     _apply_ultranorm_check,
     _check_single_name,
     _check_stdlib_collision,
@@ -700,6 +701,98 @@ class TestNpmMonikerIntegration:
         assert result["status"] == "error"
         assert "npm moniker check failed" in result["error"]
         assert "Connection refused" in result["error"]
+
+
+class TestNpmConflictEnumeration:
+    """Multi-conflict enumeration: every colliding name + the rule appear in output.
+
+    Regression: both npm moniker paths built the note from only the FIRST
+    conflict (hard[0] / conflicts[0]), hiding the other colliding packages even
+    though the classifiers returned the full list.
+    """
+
+    @patch("rlsbl.commands.check.check_github_availability")
+    @patch("rlsbl.commands.check._search_npm_similar")
+    @patch("rlsbl.commands.check._check_variants")
+    @patch("rlsbl.commands.check.check_npm_availability")
+    def test_hard_collision_enumerates_all_conflicts(
+        self, mock_npm, mock_variants, mock_similar, mock_gh
+    ):
+        """Multiple hard moniker collisions are all listed in note + structured keys."""
+        mock_npm.return_value = {"status": "available"}
+        # Both variants strip to the same moniker as "foobar".
+        mock_variants.return_value = ["foo-bar", "foo.bar"]
+        mock_similar.return_value = []
+        mock_gh.return_value = {"status": "available", "count": 0}
+
+        result = _check_single_name("foobar", "npm")
+        assert result["status"] == "taken"
+        assert result["reason"] == "moniker"
+        # Structured (machine-readable) representation carries the full list.
+        assert set(result["conflicts"]) == {"foo-bar", "foo.bar"}
+        assert result["conflict_rule"] == _NPM_MONIKER_RULE
+        # The human note enumerates every conflict and states the rule.
+        assert "foo-bar" in result["note"]
+        assert "foo.bar" in result["note"]
+        assert _NPM_MONIKER_RULE in result["note"]
+
+    @patch("rlsbl.commands.check.check_github_availability")
+    @patch("rlsbl.commands.check._search_npm_similar")
+    @patch("rlsbl.commands.check._check_variants")
+    @patch("rlsbl.commands.check.check_npm_availability")
+    def test_search_path_enumerates_all_conflicts(
+        self, mock_npm, mock_variants, mock_similar, mock_gh
+    ):
+        """Multiple registry-search conflicts are all listed in note + structured keys."""
+        mock_npm.return_value = {"status": "available"}
+        mock_variants.return_value = []  # no local hard collision
+        mock_similar.return_value = ["foo-bar", "foo.bar"]
+        mock_gh.return_value = {"status": "available", "count": 0}
+
+        result = _check_single_name("foobar", "npm")
+        assert result["status"] == "taken"
+        assert result["reason"] == "moniker"
+        assert set(result["conflicts"]) == {"foo-bar", "foo.bar"}
+        assert result["conflict_rule"] == _NPM_MONIKER_RULE
+        assert "foo-bar" in result["note"]
+        assert "foo.bar" in result["note"]
+        assert _NPM_MONIKER_RULE in result["note"]
+
+    def test_check_name_output_shows_all_conflicts(self):
+        """check-name verbose output prints every conflicting package + the rule."""
+        note = f"moniker collision with 'foo-bar', 'foo.bar' — {_NPM_MONIKER_RULE}"
+        result = {
+            "name": "foobar", "registry": "npm", "status": "taken",
+            "reason": "moniker", "variants": [],
+            "conflicts": ["foo-bar", "foo.bar"],
+            "conflict_rule": _NPM_MONIKER_RULE,
+            "note": note,
+        }
+        with patch("sys.stdout", new=StringIO()) as out:
+            exit_code = _format_single_result(result)
+        text = out.getvalue()
+        assert exit_code == 1
+        assert "foo-bar" in text
+        assert "foo.bar" in text
+        assert _NPM_MONIKER_RULE in text
+
+    def test_single_conflict_output_stays_clean(self):
+        """A single conflict renders without a trailing comma or empty enumeration."""
+        note = f"moniker collision with 'self-doc' — {_NPM_MONIKER_RULE}"
+        result = {
+            "name": "selfdoc", "registry": "npm", "status": "taken",
+            "reason": "moniker", "variants": [],
+            "conflicts": ["self-doc"],
+            "conflict_rule": _NPM_MONIKER_RULE,
+            "note": note,
+        }
+        with patch("sys.stdout", new=StringIO()) as out:
+            _format_single_result(result)
+        text = out.getvalue()
+        assert "'self-doc'" in text
+        # No dangling comma from a one-element enumeration.
+        assert "'self-doc'," not in text
+        assert "with 'self-doc' —" in note
 
 
 class TestUltranormIntegration:

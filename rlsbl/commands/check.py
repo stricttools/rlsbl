@@ -418,6 +418,19 @@ def _check_variants(name, check_fn, get_variants_fn, delay_ms=0):
     return similar
 
 
+# Human-readable normalization rules, stated explicitly in conflict notes so
+# the reader understands *why* the listed names collide with the candidate.
+_NPM_MONIKER_RULE = "npm strips dashes, dots, and underscores: these share one moniker"
+
+
+def _enumerate_conflicts(conflicts):
+    """Render a conflict list as a comma-separated, single-quoted enumeration.
+
+    Example: ``["foo-bar", "foo.bar"]`` -> ``"'foo-bar', 'foo.bar'"``.
+    """
+    return ", ".join(f"'{c}'" for c in conflicts)
+
+
 def _classify_variant_collisions(name, taken_variants, registry):
     """Classify taken variants as hard normalization collisions or soft similar names.
 
@@ -480,6 +493,10 @@ def _check_single_name(name, registry, delay_ms=0):
         - error: error message if status is "error" (absent otherwise)
         - note: informational note (go/github only, absent otherwise)
         - github_count: number of GitHub repos (only when registry is "github")
+        - conflicts: full list of colliding package names (npm moniker collisions
+          only; the machine-readable form of the enumerated ``note``)
+        - conflict_rule: the normalization rule that makes the conflicts collide
+          (accompanies ``conflicts``)
     """
     result = {"name": name, "registry": registry, "status": "", "variants": None, "reason": None}
 
@@ -497,7 +514,12 @@ def _check_single_name(name, registry, delay_ms=0):
             if hard:
                 result["status"] = "taken"
                 result["reason"] = "moniker"
-                result["note"] = f"moniker collision with '{hard[0]}' (npm strips punctuation)"
+                result["conflicts"] = hard
+                result["conflict_rule"] = _NPM_MONIKER_RULE
+                result["note"] = (
+                    f"moniker collision with {_enumerate_conflicts(hard)} "
+                    f"— {_NPM_MONIKER_RULE}"
+                )
             result["variants"] = soft
             try:
                 conflicts = _search_npm_similar(name)
@@ -513,7 +535,12 @@ def _check_single_name(name, registry, delay_ms=0):
             if conflicts and result["status"] != "taken":
                 result["status"] = "taken"
                 result["reason"] = "moniker"
-                result["note"] = f"moniker conflict with '{conflicts[0]}' (npm strips punctuation)"
+                result["conflicts"] = conflicts
+                result["conflict_rule"] = _NPM_MONIKER_RULE
+                result["note"] = (
+                    f"moniker conflict with {_enumerate_conflicts(conflicts)} "
+                    f"— {_NPM_MONIKER_RULE}"
+                )
 
     elif registry == "pypi":
         stdlib_module = _check_stdlib_collision(name)
