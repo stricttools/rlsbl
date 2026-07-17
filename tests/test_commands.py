@@ -1471,8 +1471,11 @@ class TestReleaseRollbackOnPushFailure:
             get_state_path, load_release_state,
         )
 
-        # Run release -- push_if_needed raises CalledProcessError post-TAGGED
-        with pytest.raises(subprocess.CalledProcessError):
+        # Run release -- push_if_needed raises CalledProcessError post-TAGGED.
+        # run_cmd now catches expected push failures (raw CalledProcessError
+        # included) and exits cleanly via SystemExit(1) instead of letting the
+        # subprocess error propagate, so the batch loop can catch it uniformly.
+        with pytest.raises(SystemExit) as _exc:
             with patch("sys.stdout", new_callable=StringIO):
                 run_cmd(_rc(), {
                     "yes": True,
@@ -1480,6 +1483,7 @@ class TestReleaseRollbackOnPushFailure:
                 },
                 ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}),
 )
+        assert _exc.value.code == 1
 
         # HEAD must NOT be rolled back -- the release commits are preserved.
         post_sha = subprocess.run(

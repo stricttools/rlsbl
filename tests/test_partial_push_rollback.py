@@ -383,7 +383,10 @@ class TestPostTaggedPushResumable:
             patch("rlsbl.commands.release.push_if_needed", side_effect=branch_timeout),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
         ):
-            with pytest.raises(GitError):
+            # run_cmd catches the post-TAGGED GitError and exits cleanly via
+            # SystemExit(1) (the resume guidance is printed first by the
+            # resumable-push handler), rather than propagating the GitError.
+            with pytest.raises(SystemExit) as _exc:
                 run_cmd(
                     _rc(),
                     {"yes": True, "quiet": False},
@@ -392,6 +395,7 @@ class TestPostTaggedPushResumable:
                         config={"publish_mode": "ci", "pipelines": {}},
                     ),
                 )
+        assert _exc.value.code == 1
 
         assert not reset_hard_called, \
             "git reset --hard must NOT run for a post-TAGGED branch-push timeout"
@@ -435,8 +439,10 @@ class TestPostTaggedPushResumable:
             patch("rlsbl.commands.release.push_if_needed"),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
         ):
-            # Raw TimeoutExpired is converted to GitError at the call site.
-            with pytest.raises(GitError):
+            # Raw TimeoutExpired is converted to GitError at the call site,
+            # which run_cmd then catches and turns into a clean SystemExit(1)
+            # (after the resumable-push handler prints resume guidance).
+            with pytest.raises(SystemExit) as _exc:
                 run_cmd(
                     _rc(),
                     {"yes": True, "quiet": False},
@@ -445,6 +451,7 @@ class TestPostTaggedPushResumable:
                         config={"publish_mode": "ci", "pipelines": {}},
                     ),
                 )
+        assert _exc.value.code == 1
 
         assert not reset_hard_called, \
             "git reset --hard must NOT run for a post-TAGGED tag-push timeout"

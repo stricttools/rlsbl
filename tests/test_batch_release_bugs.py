@@ -274,8 +274,24 @@ def _run_batch(ws, quiet=False):
 
 @pytest.fixture
 def _no_commit_noise():
-    """Silence the plan/archive commits (real safegit/git) during batch tests."""
-    with patch("rlsbl.commands.monorepo.batch_release.commit_files"):
+    """Silence the plan/archive commits (real safegit/git) during batch tests
+    and model the remote as mirroring locally-created tags.
+
+    ``item_is_released`` now also requires the tag to exist on the remote
+    (``tag_exists_on_remote``). The test git repos have no reachable origin, so
+    the live ``git ls-remote`` would raise. A released item's tag is pushed in
+    reality, so we mirror the remote off the local tag set: a locally-tagged
+    item counts as pushed, an un-tagged (e.g. interrupted) one does not.
+    """
+    from rlsbl.utils import tag_exists_locally
+
+    with (
+        patch("rlsbl.commands.monorepo.batch_release.commit_files"),
+        patch(
+            "rlsbl.commands.monorepo.batch_plan.tag_exists_on_remote",
+            side_effect=lambda tag, cwd=None: tag_exists_locally(tag, cwd=cwd),
+        ),
+    ):
         yield
 
 
