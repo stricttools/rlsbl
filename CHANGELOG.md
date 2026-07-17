@@ -2,7 +2,9 @@
 
 # Changelog
 
-## Unreleased
+## 0.107.0
+
+State-model completion with primary-target designation, legacy field deletion, rename-releasable command, save_workspace in-place editing, claim-name conflict enumeration, and fleet sweep script.
 
 ### Features
 
