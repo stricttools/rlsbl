@@ -303,17 +303,40 @@ def validate_config_schema(config, *, project_dir=None):
         )
 
 
-def validate_pipelines_config(config):
+def _detect_go_artifact_kind(project_root=".") -> str:
+    """Detect whether a Go project is a library or binary.
+
+    Returns ``"library"`` when the project has no ``package main`` entry
+    points (pure module), ``"binary"`` otherwise. Gracefully falls back to
+    ``"binary"`` when introspection fails (e.g. ``go`` not on PATH).
+
+    Lives in config.py (not commands.init_cmd) so config validation can
+    reuse it for the ``artifact`` error-message suggestion without a
+    commands->config import cycle.
+    """
+    try:
+        from .go_introspect import list_main_packages
+        mains = list_main_packages(str(project_root))
+        return "library" if not mains else "binary"
+    except Exception:
+        return "binary"
+
+
+def validate_pipelines_config(config, project_root="."):
     """Validate the ``pipelines`` section of a project config.
 
     Raises ``ConfigError`` if:
     - ``pipelines`` is present but not a dict
     - An entry is not a dict
     - An entry is missing ``type`` (str) or ``local`` (bool)
-    - ``type`` is not a registered pipeline type
+    - A ``go`` pipeline is missing ``artifact`` or its value is not
+      ``binary``/``library``
     - ``assets`` is true but ``max_asset_size_mb`` is missing or not a positive int
     - ``custom_assets`` is present but ``max_asset_size_mb`` is missing or not a positive int
     - ``custom_assets`` entries are malformed (missing ``name`` or ``build``)
+
+    ``project_root`` is used only to auto-detect a suggested ``artifact``
+    value for the go-pipeline error message.
     """
     from rlsbl.pipelines import PIPELINE_TYPES
 
@@ -374,6 +397,28 @@ def validate_pipelines_config(config):
                     f"pipeline '{name}' (type npm).provenance must be a boolean, "
                     f"got {type(entry['provenance']).__name__}. Use true for a "
                     "public repository or false for a private one."
+                )
+
+        # go pipelines must declare the artifact kind explicitly. There is no
+        # default: the value selects which publish workflow is scaffolded
+        # (library -> module-proxy verification; binary -> goreleaser), and a
+        # wrong guess produces a broken workflow. Detection only feeds the
+        # error-message suggestion -- the operator must commit the choice.
+        if ptype == "go":
+            if "artifact" not in entry:
+                suggestion = _detect_go_artifact_kind(project_root)
+                raise ConfigError(
+                    f"pipeline '{name}' (type go) is missing required key "
+                    "'artifact'. Set it to \"binary\" (a CLI/command whose "
+                    "GitHub Release assets are built by goreleaser) or "
+                    "\"library\" (an importable module verified against the "
+                    "Go module proxy). There is no default. Auto-detected "
+                    f'suggestion for this project: "{suggestion}".'
+                )
+            if entry["artifact"] not in ("binary", "library"):
+                raise ConfigError(
+                    f"pipeline '{name}' (type go).artifact must be "
+                    f'"binary" or "library", got {entry["artifact"]!r}.'
                 )
 
         # assets validation

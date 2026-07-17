@@ -17,6 +17,7 @@ from ..ci_yaml import (
 )
 from ..errors import ConfigError
 from ..config import (
+    _detect_go_artifact_kind,
     _project_config,
     read_deploy_config,
     read_json_config,
@@ -1441,21 +1442,6 @@ def _print_private_summary():
     print('  Python: uv pip install "pkg @ git+ssh://git@github.com/owner/repo@vX.Y.Z"')
     print("  npm:    npm install git+ssh://git@github.com/owner/repo#vX.Y.Z")
     print("  Go:     go get github.com/owner/repo@vX.Y.Z")
-
-
-def _detect_go_artifact_kind(project_root) -> str:
-    """Detect whether a Go project is a library or binary.
-
-    Returns ``"library"`` when the project has no ``package main`` entry
-    points (pure module), ``"binary"`` otherwise. Gracefully falls back
-    to ``"binary"`` when introspection fails (e.g. ``go`` not on PATH).
-    """
-    try:
-        from ..go_introspect import list_main_packages
-        mains = list_main_packages(str(project_root))
-        return "library" if not mains else "binary"
-    except Exception:
-        return "binary"
 
 
 def _ensure_pipeline_config(registries, ctx):
