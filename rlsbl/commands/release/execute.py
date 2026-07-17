@@ -332,6 +332,64 @@ def _sync_lockfiles(target_paths, files_to_commit, log):
                     log(f"Lockfile updated: {lockfile}")
 
 
+def _publish_standalone_pipelines(
+    ctx, target_paths, primary_path, new_version, state_path, log
+):
+    """Publish every configured pipeline for a standalone / implicit-mode release.
+
+    Each pipeline publishes from its own linked target's path
+    (``target_paths[pipeline.target]``) so multi-target projects whose
+    targets live in distinct subdirectories publish the right artifacts.
+    Targetless (``target is None``) deploy pipelines fall back to
+    *primary_path* (the registry/root path).
+
+    Resume support: ``published_targets`` in the release state tracks
+    completed pipelines so a re-run skips them. On failure, partial progress
+    is persisted and a ``PostReleaseError`` is raised.
+    """
+    # Resolve load_pipelines through the package __init__ so that
+    # mock.patch("rlsbl.commands.release.load_pipelines") is honoured
+    # (mirrors the resolution used inside _execute_release).
+    from . import load_pipelines
+    from ...errors import PostReleaseError
+
+    existing_state = load_release_state(state_path) or {}
+    already_published = set(existing_state.get("published_targets", []))
+    published = list(already_published)
+
+    release_pipelines = load_pipelines(ctx.config)
+    for pl_name, pl in release_pipelines.items():
+        if pl_name in already_published:
+            log(f"  Pipeline '{pl_name}': skipped (already published)")
+            continue
+        # Defensive read (mirrors PublishPipeline.publication_probe): the
+        # target link is set by load_pipelines but may be absent on a
+        # targetless deploy pipeline -- fall back to the primary/root path.
+        pl_target = getattr(pl, "target", None)
+        pl_path = target_paths.get(pl_target, primary_path)
+        try:
+            pl.publish(pl_path, new_version, ctx=ctx)
+        except Exception as e:
+            partial = load_release_state(state_path) or {}
+            partial["published_targets"] = published
+            save_release_state(state_path, partial)
+            save_step_failure(
+                state_path, "PIPELINES_PUBLISHED",
+                f"pipeline '{pl_name}': {e}",
+            )
+            raise PostReleaseError(
+                f"pipeline '{pl_name}' publish failed: {e}. "
+                f"Release state has been preserved; fix the issue and "
+                f"run `rlsbl release resume` to re-attempt the publish."
+            ) from e
+        published.append(pl_name)
+
+    final_state = load_release_state(state_path) or {}
+    final_state["published_targets"] = published
+    save_release_state(state_path, final_state)
+    return published
+
+
 def archive_blog_body(releases_dir, version):
     """Archive unreleased.md to v{version}.md during release finalization.
 
@@ -1144,7 +1202,7 @@ def _run_release_mutating(state: ReleaseState):
         # to dist/ without pruning older versions' artifacts; scanning those
         # stale files could surface old secrets or slow the release.
         from ...secret_scan import clean_stale_artifacts
-        clean_stale_artifacts(project_dir, log=log)
+        clean_stale_artifacts(project_dir, log=log, target_paths=target_paths)
 
         # Build step: primary target (e.g. pypi builds a wheel, maven runs
         # gradle/mvn, pgdesign validates the schema).  Failures propagate to
@@ -1891,44 +1949,13 @@ def _run_release_mutating(state: ReleaseState):
                 _pub_state_final["published_members"] = _published_members
                 save_release_state(_state_path, _pub_state_final)
             else:
-                # Standalone / implicit mode: single publish pass from
-                # representative config.
-                # Resume support: state tracks published_targets set so
-                # completed pipelines are skipped on retry.
-                _existing_state_pub2 = load_release_state(_state_path) or {}
-                _already_published_targets = set(
-                    _existing_state_pub2.get("published_targets", [])
+                # Standalone / implicit mode: each pipeline publishes from its
+                # own linked target's path (multi-target subdir support), with
+                # resume tracking. See _publish_standalone_pipelines.
+                _publish_standalone_pipelines(
+                    ctx, target_paths, primary_path, new_version,
+                    _state_path, log,
                 )
-                _published_targets = list(_already_published_targets)
-
-                release_pipelines = load_pipelines(ctx.config)
-                for pl_name, pl in release_pipelines.items():
-                    if pl_name in _already_published_targets:
-                        log(f"  Pipeline '{pl_name}': skipped (already published)")
-                        continue
-                    try:
-                        pl.publish(primary_path, new_version, ctx=ctx)
-                    except Exception as e:
-                        from ...errors import PostReleaseError
-                        # Save partial progress so resume skips done pipelines
-                        _pub2_state = load_release_state(_state_path) or {}
-                        _pub2_state["published_targets"] = _published_targets
-                        save_release_state(_state_path, _pub2_state)
-                        save_step_failure(
-                            _state_path, "PIPELINES_PUBLISHED",
-                            f"pipeline '{pl_name}': {e}",
-                        )
-                        raise PostReleaseError(
-                            f"pipeline '{pl_name}' publish failed: {e}. "
-                            f"Release state has been preserved; fix the issue and "
-                            f"run `rlsbl release resume` to re-attempt the publish."
-                        ) from e
-                    _published_targets.append(pl_name)
-
-                # Persist final published_targets list in state
-                _pub2_final = load_release_state(_state_path) or {}
-                _pub2_final["published_targets"] = _published_targets
-                save_release_state(_state_path, _pub2_final)
 
         save_step(_state_path, "PIPELINES_PUBLISHED")
         _completed.add("PIPELINES_PUBLISHED")
