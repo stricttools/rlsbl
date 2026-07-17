@@ -2,6 +2,17 @@
 
 # Changelog
 
+## Unreleased
+
+### Features
+
+- New `rlsbl monorepo rename-releasable <old> <new>` command: renames a releasable group across workspace.toml and its state directory, regenerates publish gate prefixes, and pushes a boundary alias tag for the current version when the tag format contains {name}. Idempotent and crash-safe.
+
+### Fixes
+
+- **Publish gate marker read is now retried.** The gate retries reading the `rlsbl-ci-sha` marker from the GitHub Release body (5 attempts, 5s apart) before falling back to $GITHUB_SHA, so GitHub API read-replica lag on a freshly created release no longer causes the gate to poll the wrong commit and time out.
+- **check-name / claim-name conflict enumeration.** PyPI and crates.io normalization collisions now list every conflicting package and the normalization rule, matching npm's existing behavior. Previously only the first collision was shown.
+
 ## 0.106.0
 
 Publish-gate reliability (check-run dedup + recorded CI SHA), in-place release retry, snapshot-before-tag, post-push failure-state fixes, per-target publish paths, unscoped npm wrapper, required Go artifact key, and claim-name conflict enumeration.
