@@ -1808,7 +1808,10 @@ class TestGoPipeline:
 
     def test_template_mappings(self):
         from rlsbl.pipelines.go import GoPipeline
-        p = GoPipeline("go", "go", True, {})
+        # artifact is mandatory (no default); binary selects the goreleaser
+        # publish template. The missing-key hard error is covered in
+        # tests/test_go_artifact_split.py.
+        p = GoPipeline("go", "go", True, {"artifact": "binary"})
         mappings = p.template_mappings(None)
         assert len(mappings) == 1
         assert "publish.yml" in mappings[0]["target"]
