@@ -1,1 +1,2 @@
 {"id":"18c32fa75d4e65cb32f2bb9651794b19bef23d52e66392c5","commits":["c3691e4beeb475c925816910d25e7140e8c757ad","7c996fa30e971c513f842a5c7ea856072986d360"],"user_facing":false}
+{"id":"18c3322ea7a6c41d1ea1ab2f1df840bd8ef6380b0cc462b2","commits":["5d9c9856d9d5c662360fb2b1aa37aa55122632a9"],"user_facing":true,"description":"**Fix.** Corrected positional argument order for `monorepo rename-releasable`: now reads `<old> <new>` matching `mv`/`git mv` convention.","type":"fix"}
