@@ -1,5 +1,5 @@
 ---
-description: "Configuration reference for rlsbl: config.json project settings with pipelines and batch limits, workspace.toml for monorepos, and selfdoc.json for documentation."
+description: "Configuration reference for rlsbl: config.json settings (pipelines, batch limits, check_timeout, test block), workspace.toml, and selfdoc.json."
 ---
 
 # Configuration reference
@@ -63,7 +63,7 @@ Example:
 
 ### test
 
-The optional `test` block selects *which* tests run during the built-in test step, per release target. It maps a target name to a block of per-target options:
+The optional `test` block selects *which* tests run during the built-in test step of a release, on a per-target basis. It maps a release target name to a block of per-target options, letting you scope a target's test run down to a chosen subset (for example, excluding slow integration tests from the PyPI run). It maps a target name to a block of per-target options:
 
 ```json
 {
