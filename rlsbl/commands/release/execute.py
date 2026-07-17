@@ -1638,8 +1638,14 @@ def _run_release_mutating(state: ReleaseState):
 
     try:
         if not _gh_release_already_exists:
+            # Append a machine-parseable CI-SHA marker so the publish gate can
+            # read exactly which commit CI runs on. pushed_sha is HEAD after
+            # the (post-reorg) tag/push, i.e. the pushed branch tip = tag tip.
+            _ci_sha = pushed_sha.strip()
+            notes_body = (changelog_entry or "").rstrip("\n")
+            notes_body = f"{notes_body}\n\n<!-- rlsbl-ci-sha: {_ci_sha} -->\n"
             with open(writing_file, "w", encoding="utf-8") as f:
-                f.write(changelog_entry or "")
+                f.write(notes_body)
             os.rename(writing_file, notes_file)
             # Retry gh release create with race-condition detection.
             # GitHub API can return an error even when the release was actually created,
