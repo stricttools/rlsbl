@@ -208,14 +208,13 @@ def _resume_cmd_inner(saved_state, flags, *, ctx):
     primary_path = target_paths.get(registry, project_dir)
 
     # Resolve the canonical (target, pipeline) pairs for the release flow.
-    # Best-effort: see the comment at the main release path.
-    _resolved_targets = None
-    try:
-        from ...member_context import resolve_member_context as _rmc_resume
-        _resume_member = _rmc_resume(project_dir, releasable_config_dir=_rel_cfg_dir)
-        _resolved_targets = _resume_member.resolved_targets
-    except Exception:
-        pass
+    # Required (no fallback): the mutating phase derives everything from this
+    # list. The primary record is the saved registry (release file include[0]).
+    from ...member_context import resolve_member_context as _rmc_resume
+    _resume_member = _rmc_resume(
+        project_dir, releasable_config_dir=_rel_cfg_dir, primary_name=registry,
+    )
+    _resolved_targets = _resume_member.resolved_targets
 
     # Read current version from disk (the version bump may already be done)
     try:
@@ -268,11 +267,6 @@ def _resume_cmd_inner(saved_state, flags, *, ctx):
     if changes_dir is None and changes_dir_exists(project_dir):
         changes_dir = get_changes_dir(project_dir)
 
-    secondary_targets = resolve_release_targets(
-        registry, flags, project_dir=project_dir, config=config,
-        releasable_config_dir=_rel_cfg_dir,
-    )
-
     lock_dir = ".rlsbl-monorepo" if monorepo_name else ".rlsbl"
     lock_root = monorepo_root if monorepo_name else project_root
     skip_lock = flags.get("skip-lock", False)
@@ -281,15 +275,12 @@ def _resume_cmd_inner(saved_state, flags, *, ctx):
 
     try:
         _run_release_mutating(ReleaseState(
-            registry=registry,
-            target=target,
             new_version=new_version,
             current_version=current_version,
             bump_type=bump_type,
             tag=tag,
             branch=branch,
-            primary_path=primary_path,
-            target_paths=target_paths,
+            resolved_targets=_resolved_targets,
             lock_dir=lock_dir,
             changes_dir=changes_dir,
             monorepo_name=monorepo_name,
@@ -303,8 +294,6 @@ def _resume_cmd_inner(saved_state, flags, *, ctx):
             context=context,
             pre_existing_dirty=set(),
             hook_generated=set(),
-            secondary_targets=secondary_targets,
-            resolved_targets=_resolved_targets,
             include=saved_state.get("include", []),
             exclude=saved_state.get("exclude", []),
             preid=saved_state.get("preid", ""),
@@ -561,17 +550,14 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     primary_path = target_paths.get(registry, project_dir)
 
     # Resolve the canonical (target, pipeline) pairs for the release flow.
-    # Best-effort: resolved_targets enhance the release flow but are not
-    # required for backward compat. If target detection fails (e.g. config
-    # has no "targets" key), the legacy scalar fields on ReleaseState are
-    # used instead.
-    _resolved_targets = None
-    try:
-        from ...member_context import resolve_member_context as _rmc_main
-        _main_member = _rmc_main(project_dir, releasable_config_dir=_rel_cfg_dir)
-        _resolved_targets = _main_member.resolved_targets
-    except Exception:
-        pass
+    # Required (no fallback): the mutating phase derives the registry, primary
+    # path, and target/secondary maps solely from this list. The primary
+    # record is the release file's include[0] (registry).
+    from ...member_context import resolve_member_context as _rmc_main
+    _main_member = _rmc_main(
+        project_dir, releasable_config_dir=_rel_cfg_dir, primary_name=registry,
+    )
+    _resolved_targets = _main_member.resolved_targets
 
     current_version, new_version, bump_type, tag = compute_release_version(
         target, primary_path, release_config.bump,
@@ -1005,11 +991,6 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         return
 
     # --- Execute release ---
-    secondary_targets = resolve_release_targets(
-        registry, flags, project_dir=project_dir, config=ctx.config,
-        releasable_config_dir=_rel_cfg_dir,
-    )
-
     lock_dir = ".rlsbl-monorepo" if monorepo_name else ".rlsbl"
     lock_root = monorepo_root if monorepo_name else project_root
     skip_lock = flags.get("skip-lock", False)
@@ -1064,15 +1045,12 @@ def _run_cmd_inner(release_config, flags, *, ctx):
 
     try:
         _run_release_mutating(ReleaseState(
-            registry=registry,
-            target=TARGETS[registry],
             new_version=new_version,
             current_version=current_version,
             bump_type=bump_type,
             tag=tag,
             branch=branch,
-            primary_path=primary_path,
-            target_paths=target_paths,
+            resolved_targets=_resolved_targets,
             lock_dir=lock_dir,
             changes_dir=changes_dir,
             monorepo_name=monorepo_name,
@@ -1086,8 +1064,6 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             context=release_config.context,
             pre_existing_dirty=pre_existing_dirty,
             hook_generated=hook_generated,
-            secondary_targets=secondary_targets,
-            resolved_targets=_resolved_targets,
             include=list(release_config.include),
             exclude=list(release_config.exclude),
             preid=release_config.preid,

@@ -551,30 +551,44 @@ def _sync_member_package_versions(
                 log(f"Synced version to member {pkg_path}: {', '.join(modified)}")
 
 
+def _target_paths_from_resolved(resolved_targets) -> dict:
+    """Map target name -> directory path from a resolved-targets list.
+
+    Deduplicates by target name (keeps the first occurrence for each name,
+    matching the order of ``resolved_targets``). A target served by multiple
+    pipelines appears once.
+    """
+    paths: dict[str, str] = {}
+    for rt in resolved_targets:
+        if rt.name not in paths:
+            paths[rt.name] = rt.path
+    return paths
+
+
 @dataclasses.dataclass
 class ReleaseState:
     """All state needed by _run_release_mutating, grouped logically.
 
     ``resolved_targets`` is the canonical list of publishable
-    (target, pipeline) pairs (see :class:`ResolvedTarget`). The legacy
-    scalar fields ``registry``, ``target``, ``primary_path``,
-    ``target_paths``, and ``secondary_targets`` are derived from it via
-    helper methods so existing consumers keep working during the
-    transition.
+    (target, pipeline) pairs (see :class:`ResolvedTarget`); exactly one of
+    them is marked ``primary``. The mutating flow derives the registry name,
+    the registry-target instance (``TARGETS[registry]``), the primary path,
+    the full target-path map, and the secondary-target map from this list
+    (see :attr:`primary` and :func:`_target_paths_from_resolved`). No legacy
+    scalar identity/path fields are stored.
     """
 
-    # Identity
-    registry: str
-    target: object  # TARGETS[registry] instance -- replaces both 'reg' and 'target' params
+    # Identity / version
     new_version: str
     current_version: str
     bump_type: str | None
     tag: str
     branch: str
 
+    # Canonical per-(target, pipeline) records; exactly one is primary.
+    resolved_targets: list
+
     # Paths
-    primary_path: str | None = None
-    target_paths: dict | None = None
     lock_dir: str = ".rlsbl"
     changes_dir: str | None = None  # resolved changes dir (releasable or per-project)
 
@@ -596,15 +610,8 @@ class ReleaseState:
     # State
     pre_existing_dirty: set | None = None
     hook_generated: set | None = None
-    secondary_targets: dict | None = None
     companion_tags: list[str] = dataclasses.field(default_factory=list)
     completed_steps: list[str] = dataclasses.field(default_factory=list)
-
-    # Resolved targets (Phase 6.3): the canonical per-(target, pipeline)
-    # records. When set, the legacy scalar fields above are derivable
-    # from this list; when None, the legacy fields are used directly
-    # (backward compat for callers that have not migrated yet).
-    resolved_targets: list | None = None
 
     # Release config fields (persisted in state file for resume)
     include: list[str] = dataclasses.field(default_factory=list)
@@ -618,32 +625,21 @@ class ReleaseState:
     log: object = None  # callable
     ctx: object = None  # ProjectContext
 
-    # -- Derivation helpers ---------------------------------------------------
+    @property
+    def primary(self):
+        """The primary :class:`ResolvedTarget` (the ``include[0]`` record).
 
-    def get_target_paths(self) -> dict:
-        """Derive target_paths from resolved_targets when available.
-
-        Returns a dict mapping target name -> directory path. Deduplicates
-        by target name (keeps the first occurrence for each name, matching
-        the order of resolved_targets).
+        The release flow requires exactly one primary record; a resolved list
+        with none marked is a programming error (the primary name must be
+        threaded through from the release file).
         """
-        if self.resolved_targets is not None:
-            paths: dict[str, str] = {}
-            for rt in self.resolved_targets:
-                if rt.name not in paths:
-                    paths[rt.name] = rt.path
-            return paths
-        return self.target_paths or {}
-
-    def get_secondary_targets(self) -> dict:
-        """Derive secondary_targets from resolved_targets when available.
-
-        Returns all target_paths entries except the primary (registry).
-        """
-        if self.resolved_targets is not None:
-            paths = self.get_target_paths()
-            return {k: v for k, v in paths.items() if k != self.registry}
-        return self.secondary_targets or {}
+        for rt in self.resolved_targets:
+            if rt.primary:
+                return rt
+        raise ReleaseAbortError(
+            "resolved_targets has no primary record; the release flow requires "
+            "exactly one primary target (from the release file's include[0])."
+        )
 
 
 def _run_release_mutating(state: ReleaseState):
@@ -651,9 +647,16 @@ def _run_release_mutating(state: ReleaseState):
     # Unpack frequently-used state into locals for readability and to preserve
     # the existing closure/reference patterns (commit_msg, primary_path, and
     # target_paths are conditionally reassigned below).
-    registry = state.registry
-    target = state.target
-    reg = state.target  # 'reg' and 'target' were always the same object
+    # Derive identity/paths from the canonical resolved-targets list. The
+    # primary record supplies the registry name and primary path; the full
+    # target-path map (and thus the secondary map) come from the whole list.
+    # The registry-target INSTANCE (TARGETS[registry]) is resolved after the
+    # late-bound import block below.
+    primary_rt = state.primary
+    registry = primary_rt.name
+    primary_path = primary_rt.path
+    target_paths = _target_paths_from_resolved(state.resolved_targets)
+    secondary_targets = {k: v for k, v in target_paths.items() if k != registry}
     flags = state.flags
     quiet = state.quiet
     log = state.log
@@ -663,15 +666,12 @@ def _run_release_mutating(state: ReleaseState):
     tag = state.tag
     branch = state.branch
     changelog_entry = state.changelog_entry
-    secondary_targets = state.get_secondary_targets()
     monorepo_name = state.monorepo_name
     monorepo_project_path = state.monorepo_project_path
     releasable_name = state.releasable_name
     member_package_paths = state.member_package_paths
     releasable_tag_format_str = state.releasable_tag_format
     commit_msg = state.commit_msg
-    primary_path = state.primary_path
-    target_paths = state.target_paths
     lock_dir = state.lock_dir
     pre_existing_dirty = state.pre_existing_dirty
     hook_generated = state.hook_generated
@@ -719,6 +719,11 @@ def _run_release_mutating(state: ReleaseState):
         _read_release_metadata_full,
     )
 
+    # Registry-target instance for the primary target (needs TARGETS, imported
+    # just above). 'reg' and 'target' were always the same object.
+    target = TARGETS[registry]
+    reg = target
+
     project_root = ctx.project_root
     monorepo_root = ctx.workspace_root
     project_dir = str(project_root)
@@ -751,16 +756,6 @@ def _run_release_mutating(state: ReleaseState):
 
     if commit_msg is None:
         commit_msg = tag
-    if primary_path is None:
-        primary_path = project_dir
-    if target_paths is None:
-        derived = state.get_target_paths()
-        if derived:
-            target_paths = derived
-        else:
-            target_paths = resolve_target_paths(
-                project_dir, releasable_config_dir=_releasable_cfg_dir,
-            )
 
     # git status --porcelain outputs paths relative to the repo root.
     # Compute the repo root so vpath can produce matching relative paths.

@@ -7,14 +7,40 @@ from unittest.mock import patch
 
 import pytest
 
+import rlsbl.commands.release as _release_mod
 from rlsbl.commands.release.execute import ReleaseState
 from rlsbl.context import ProjectContext
 from rlsbl.deploy import DeployResult
+from rlsbl.resolved_target import ResolvedTarget
+from rlsbl.targets import TargetEntry
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+_FakeTarget = type("FakeTarget", (), {
+    "version_file": lambda self, dir_path=None: None,
+    "write_version": lambda self, p, v, ctx=None: [],
+    "build": lambda self, p, v, *, config=None: None,
+    "tag_format": lambda self, v: f"v{v}",
+})
+
+
+def _npm_primary_resolved(repo_path, monkeypatch):
+    """Register a fake npm registry target and return a primary-marked list.
+
+    Replaces the former ``registry="npm"`` + ``target=FakeTarget()`` scalar
+    fields on ReleaseState: the mutating flow now derives the registry name and
+    instance from the primary ResolvedTarget and ``TARGETS[name]``.
+    """
+    monkeypatch.setitem(_release_mod.TARGETS, "npm", _FakeTarget())
+    entry = TargetEntry(name="npm", path=str(repo_path))
+    return [ResolvedTarget(
+        target=entry, path=str(repo_path), pipeline=None,
+        publish_mode="ci", artifact_kind=None, primary=True,
+    )]
+
 
 def _minimal_target(**overrides):
     """Return a minimal valid deploy target dict, with optional overrides."""
@@ -90,13 +116,7 @@ class TestReleaseWithDeployTargets:
         monkeypatch.setattr("rlsbl.commands.release.get_changes_dir", lambda *a, **kw: ".rlsbl/changes")
 
         _run_release_mutating(ReleaseState(
-            registry="npm",
-            target=type("FakeTarget", (), {
-                "version_file": lambda self, dir_path=None: None,
-                "write_version": lambda self, p, v, ctx=None: [],
-                "build": lambda self, p, v, *, config=None: None,
-                "tag_format": lambda self, v: f"v{v}",
-            })(),
+            resolved_targets=_npm_primary_resolved(mock_git_repo, monkeypatch),
             flags={"yes": True, "auto-tag": False},
             quiet=False,
             log=lambda msg: None,
@@ -181,13 +201,7 @@ class TestReleaseDeployFailureContinues:
 
         # Should NOT raise -- deploy failure is non-fatal
         _run_release_mutating(ReleaseState(
-            registry="npm",
-            target=type("FakeTarget", (), {
-                "version_file": lambda self, dir_path=None: None,
-                "write_version": lambda self, p, v, ctx=None: [],
-                "build": lambda self, p, v, *, config=None: None,
-                "tag_format": lambda self, v: f"v{v}",
-            })(),
+            resolved_targets=_npm_primary_resolved(mock_git_repo, monkeypatch),
             flags={"yes": True, "auto-tag": False},
             quiet=False,
             log=lambda msg: None,
@@ -247,13 +261,7 @@ class TestReleaseNoDeployConfig:
         monkeypatch.setattr("rlsbl.commands.release.get_changes_dir", lambda *a, **kw: ".rlsbl/changes")
 
         _run_release_mutating(ReleaseState(
-            registry="npm",
-            target=type("FakeTarget", (), {
-                "version_file": lambda self, dir_path=None: None,
-                "write_version": lambda self, p, v, ctx=None: [],
-                "build": lambda self, p, v, *, config=None: None,
-                "tag_format": lambda self, v: f"v{v}",
-            })(),
+            resolved_targets=_npm_primary_resolved(mock_git_repo, monkeypatch),
             flags={"yes": True, "auto-tag": False},
             quiet=False,
             log=lambda msg: None,
@@ -314,13 +322,7 @@ class TestReleaseDeployConfigErrors:
         monkeypatch.setattr("rlsbl.commands.release.get_changes_dir", lambda *a, **kw: ".rlsbl/changes")
 
         _run_release_mutating(ReleaseState(
-            registry="npm",
-            target=type("FakeTarget", (), {
-                "version_file": lambda self, dir_path=None: None,
-                "write_version": lambda self, p, v, ctx=None: [],
-                "build": lambda self, p, v, *, config=None: None,
-                "tag_format": lambda self, v: f"v{v}",
-            })(),
+            resolved_targets=_npm_primary_resolved(mock_git_repo, monkeypatch),
             flags={"yes": True, "auto-tag": False},
             quiet=False,
             log=lambda msg: None,
@@ -384,13 +386,7 @@ class TestReleaseStopsAtFirstDeployFailure:
         monkeypatch.setattr("rlsbl.commands.release.get_changes_dir", lambda *a, **kw: ".rlsbl/changes")
 
         _run_release_mutating(ReleaseState(
-            registry="npm",
-            target=type("FakeTarget", (), {
-                "version_file": lambda self, dir_path=None: None,
-                "write_version": lambda self, p, v, ctx=None: [],
-                "build": lambda self, p, v, *, config=None: None,
-                "tag_format": lambda self, v: f"v{v}",
-            })(),
+            resolved_targets=_npm_primary_resolved(mock_git_repo, monkeypatch),
             flags={"yes": True, "auto-tag": False},
             quiet=False,
             log=lambda msg: None,

@@ -76,13 +76,24 @@ POST_RELEASE_STEPS = (
 # The canonical ordered list of ALL release steps.
 RELEASE_STEPS = MUTATING_STEPS + POST_RELEASE_STEPS
 
-# Steps whose failure aborts the release (state preserved, resumable).
-# Snapshot regeneration is now a pre-tag mutating step (it must land before
-# the tag so the tag is the push tip); as such it is FATAL like its mutating
-# neighbors -- a failure aborts and rolls back rather than completing with a
-# recorded failure marker. Deploy and post-release hooks remain non-fatal:
-# their failures are recorded and loudly reported, but the release completes
-# and the state file is cleared.
+# Steps whose failure aborts the release (state preserved, resumable). "Fatal"
+# means the release stops; it does NOT mean the same recovery for every step.
+# Fatal steps split into two tiers around the tag:
+#
+#   - Pre-tag fatal steps (VERSION_BUMPED .. TAGGED, incl. the pre-tag
+#     SNAPSHOT_REGENERATED): a failure ROLLS BACK -- `git reset --hard` to the
+#     pre-release HEAD plus orphan-artifact cleanup -- leaving the tree as if
+#     the release never started. Snapshot regeneration was moved pre-tag (the
+#     tag must be the push tip), so it rolls back like its mutating neighbors
+#     rather than completing with a recorded failure marker.
+#   - Post-tag fatal steps (PUSHED, GITHUB_RELEASE, ASSETS_UPLOADED,
+#     PIPELINES_PUBLISHED): NO rollback. The tag and finalized changelog /
+#     release-file artifacts are preserved on disk; the failure is recorded and
+#     `rlsbl release resume` re-attempts from the failed step via idempotent
+#     guards.
+#
+# Deploy and post-release hooks remain non-fatal: their failures are recorded
+# and loudly reported, but the release completes and the state file is cleared.
 FATAL_STEPS = frozenset(MUTATING_STEPS) | {
     "ASSETS_UPLOADED",
     "PIPELINES_PUBLISHED",

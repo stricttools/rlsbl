@@ -110,8 +110,7 @@ class TestReleaseStateReleasable:
     def test_defaults_are_none(self):
         """Releasable fields default to None when not set."""
         state = ReleaseState(
-            registry="pypi",
-            target=MagicMock(),
+            resolved_targets=[],
             new_version="1.0.0",
             current_version="0.9.0",
             bump_type="minor",
@@ -125,8 +124,7 @@ class TestReleaseStateReleasable:
     def test_explicit_mode_fields(self):
         """In explicit mode, releasable fields are populated."""
         state = ReleaseState(
-            registry="pypi",
-            target=MagicMock(),
+            resolved_targets=[],
             new_version="2.0.0",
             current_version="1.0.0",
             bump_type="major",

@@ -24,8 +24,9 @@ def _make_release_context(tmp_path):
     """Build a minimal project context for _run_cmd_inner tests."""
     rlsbl_dir = tmp_path / ".rlsbl"
     rlsbl_dir.mkdir(exist_ok=True)
-    (rlsbl_dir / "config.json").write_text(json.dumps({"publish_mode": "ci"}))
-    return make_ctx(tmp_path, config={"publish_mode": "ci"})
+    _cfg = {"publish_mode": "ci", "targets": ["pypi"]}
+    (rlsbl_dir / "config.json").write_text(json.dumps(_cfg))
+    return make_ctx(tmp_path, config=_cfg)
 
 
 def _make_release_config():
