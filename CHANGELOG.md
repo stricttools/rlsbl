@@ -2,6 +2,37 @@
 
 # Changelog
 
+## Unreleased
+
+### Breaking
+
+- **npm binary wrapper config changed.** The npm binary wrapper (Go/Zig targets) now activates via `{"npm_wrapper": {"enabled": true}}` instead of the removed `scope` key, and publishes bare per-platform package names (`<bin>-linux-x64`) instead of scoped `@scope/name` names. A stale `scope`/`npm_scope` key is now a hard error.
+- **Go pipelines now require an explicit `artifact` key.** Every `type: "go"` pipeline must declare `artifact` as `"binary"` or `"library"` -- there is no default. The validation error names both values and includes an auto-detected suggestion.
+
+### Features
+
+- **Documented `check_timeout`/`RLSBL_CHECK_TIMEOUT` and the `test` config block.** The configuration reference now covers the check subprocess timeout budget and per-target test-selection filters (e.g. pytest markers).
+- **Pipeline docs cover the required go `artifact` key.** `docs/pipelines.md` documents that go pipelines must declare `artifact` (`binary`/`library`, no default), how the library tag/version handling works, and that private modules use `publish_mode` `"none"`.
+
+### Fixes
+
+- **Publish gate resilience.** The CI gate now collapses retried check-runs to the latest per name (a stale failure from a superseded CI run no longer blocks publishing forever) and resolves the exact release commit from an rlsbl-ci-sha marker in the GitHub Release body, falling back to $GITHUB_SHA for older releases.
+- **Publish retry from main, and router regeneration on upgrade.** A `workflow_dispatch` retry of the monorepo publish router fired at `ref=main` with `inputs.tag` set now matches the releasing project's jobs (and docker/zig publish steps) instead of silently skipping them. The publish cache also records the rlsbl version, so an upgrade that changes the router generator forces `monorepo sync` to regenerate `publish.yml` even when no member workflow changed.
+- **Auto-retry reruns CI in place.** When `rlsbl watch` auto-retries a failed CI run, it now reruns the same run in place (`gh run rerun`) instead of dispatching a fresh workflow run. This avoids creating a duplicate check-run (which poisoned the publish gate) and retries on the failed commit rather than branch HEAD. If the rerun also fails, its failing-step log tail is printed alongside the run URL.
+- **Monorepo release tag is now the pushed tip.** The monorepo snapshot commit is created before the release tag instead of after the push, so the tag points at the exact commit CI runs on.
+- **Docker/Zig publish skip-detection.** Publish workflows dispatched at a branch with an explicit tag input no longer mis-detect the already-published state; the skip check now uses the resolved release tag.
+- **Cleaner release push failures.** A push that fails after the release is tagged now prints a concise error with resume guidance instead of a Python traceback, and a tag push that only stalled transiently is retried and, on success, continues straight into GitHub Release creation instead of stopping.
+- **Safer batch-release completion.** A monorepo batch item is only treated as released (and skipped/archived) when its tag is confirmed on the remote, not merely tagged locally; the batch file is never archived while any item still has an in-progress release. This prevents a failed-to-push release from being silently dropped.
+- **check-name / claim-name now list all conflicting packages.** When an npm name collides with multiple existing packages after punctuation stripping, every colliding package is shown (not just the first), with the normalization rule stated explicitly.
+- **Go library pipeline fails loudly on a missing `artifact` key.** Selecting the publish workflow with no `artifact` configured now raises a clear error instead of silently assuming a binary.
+- **Go library publish workflow verifies the right module and version.** The module path is baked from `go.mod` at scaffold time (correct for monorepo subdirectory modules) and the version is derived correctly from plain (`v1.2.3`), releasable (`<name>@v1.2.3`), and subdir (`<subdir>/v1.2.3`) release tags. Private modules should use `publish_mode` `"none"`.
+- **Retry-safe publish tag resolution.** Go and Maven Central publish workflows now derive the release tag from the workflow_dispatch `tag` input (falling back to the ref), so retrying a publish at ref=main no longer mis-resolves the version to `main`.
+- **Subdirectory publish workflows for single-target projects.** Scaffolding a lone target that lives in a subdirectory now produces a publish workflow that runs in that subdirectory (correct working-directory and rewritten package paths), instead of a root-anchored one.
+- **Correct working-directory for monorepo root publishers with subdirectory targets.** Inlined publish jobs for a root package whose target lives in a subdirectory now run in that subdirectory.
+- **Multi-target local publish.** In a standalone release, each pipeline now publishes from its own linked target's subdirectory instead of the primary target's path, so multi-target projects with targets in distinct subdirectories publish the correct artifacts.
+- **Per-target stale-artifact cleaning.** The pre-build artifact clean now clears each subdirectory target's own dist/ (not just the project root's), so a multi-target release's secret scan is scoped to freshly built artifacts across all targets.
+- **Monorepo subdir publish paths.** A monorepo root publisher with a target in a subdirectory now renders composed packages-dir/version-file inputs in the generated publish workflow instead of root-anchored ones, so the correct artifacts and version files are used.
+
 ## 0.105.1
 
 Fix CI regression in dry-run preflight + monorepo recovery dispatch.
