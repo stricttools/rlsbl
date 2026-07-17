@@ -12,10 +12,14 @@ publish before CI reported. Every publish workflow therefore starts with a
 
 The gate resolves the release commit MARKER-FIRST: it reads the exact commit
 CI ran on from the ``<!-- rlsbl-ci-sha: <40-hex> -->`` marker rlsbl writes
-into the GitHub Release body, and falls back to ``$GITHUB_SHA`` (the tag's
-commit for both ``release: published`` and ``workflow_dispatch`` at the tag
-ref) for older releases that predate the marker. It never reads the release
-event payload (dispatch retries have none). It then polls the GitHub checks
+into the GitHub Release body. A freshly created release can lag on a GitHub
+API read replica, so the marker read is RETRIED (``GATE_MARKER_ATTEMPTS``
+attempts, ``GATE_MARKER_RETRY_SECONDS`` apart) before concluding the marker
+is absent; only then does it fall back to ``$GITHUB_SHA`` (the tag's commit
+for both ``release: published`` and ``workflow_dispatch`` at the tag ref) for
+older releases that predate the marker. It never reads the release event
+payload (dispatch retries have none), so the resolution path is uniform for
+release events and dispatch retries alike. It then polls the GitHub checks
 API until the releasing project's CI check runs complete, collapsing retried
 same-named check-runs to the latest so a superseded failure cannot block.
 
@@ -44,6 +48,12 @@ GATE_JOB_KEY = "gate"
 GATE_TIMEOUT_MINUTES = "20"
 GATE_GRACE_MINUTES = "5"
 GATE_POLL_SECONDS = "15"
+# Marker read is retried because a just-created GitHub Release can lag on an
+# API read replica: the rlsbl-ci-sha marker is written at release creation but
+# may not be visible on the first read. Retrying avoids a missed marker (which
+# in HEAD-drift scenarios would poll the wrong commit and time out).
+GATE_MARKER_ATTEMPTS = "5"
+GATE_MARKER_RETRY_SECONDS = "5"
 
 # One publish pipeline per tag: a dispatch retry at the same tag queues
 # behind an in-flight run instead of racing it. Publishes are never
@@ -102,28 +112,48 @@ def ci_check_regex_for_targets(targets: list[str]) -> str:
 GATE_POLL_SCRIPT = """\
 set -euo pipefail
 
-# Commit resolution -- explicit two-step order (never reads the release
-# event payload; dispatch retries have none):
+# Commit resolution -- explicit marker-first order (never reads the release
+# event payload; dispatch retries have none, so this path is uniform for
+# release events and dispatch retries alike):
 #   (1) Marker: rlsbl writes the exact commit CI ran on into the GitHub
 #       Release body as a machine-parseable line of the form
 #           <!-- rlsbl-ci-sha: <40-hex> -->
 #       Prefer it when present -- it pins the precise commit and is immune to
-#       ref races. The tag is inputs.tag (TAG_INPUT) when dispatched with an
-#       explicit override, else GITHUB_REF_NAME (matches the router resolver).
+#       ref races. A just-created release can lag on a GitHub API read replica
+#       (the marker is written at release creation but may not be visible on
+#       the first read), so RETRY the read GATE_MARKER_ATTEMPTS times,
+#       GATE_MARKER_RETRY_SECONDS apart, before concluding it is absent. The
+#       tag is inputs.tag (TAG_INPUT) when dispatched with an explicit
+#       override, else GITHUB_REF_NAME (matches the router resolver).
 #   (2) Fallback: older releases predate the marker, so fall back to
 #       $GITHUB_SHA, the tag's commit for both release and dispatch-at-tag.
+extract_ci_sha() {
+  # Emit the first rlsbl-ci-sha marker SHA found on stdin, if any.
+  sed -n 's/.*<!-- rlsbl-ci-sha: \\([0-9a-f]\\{40\\}\\) -->.*/\\1/p' | head -n1
+}
 tag="${TAG_INPUT:-$GITHUB_REF_NAME}"
+marker_attempts="${GATE_MARKER_ATTEMPTS:-5}"
+marker_retry_seconds="${GATE_MARKER_RETRY_SECONDS:-5}"
 sha=""
-if body="$(gh release view "$tag" --json body --jq .body 2>/dev/null)"; then
-  sha="$(printf '%s\\n' "$body" \\
-    | sed -n 's/.*<!-- rlsbl-ci-sha: \\([0-9a-f]\\{40\\}\\) -->.*/\\1/p' \\
-    | head -n1)"
-fi
+attempt=1
+while [ "$attempt" -le "$marker_attempts" ]; do
+  if body="$(gh release view "$tag" --json body --jq .body 2>/dev/null)"; then
+    sha="$(printf '%s\\n' "$body" | extract_ci_sha)"
+  fi
+  if [ -n "$sha" ]; then
+    break
+  fi
+  if [ "$attempt" -lt "$marker_attempts" ]; then
+    echo "Publish gate: rlsbl-ci-sha marker not yet visible in the '$tag' release body (attempt $attempt/$marker_attempts); retrying in ${marker_retry_seconds}s..."
+    sleep "$marker_retry_seconds"
+  fi
+  attempt=$(( attempt + 1 ))
+done
 if [ -n "$sha" ]; then
   echo "Publish gate: resolved release commit from rlsbl-ci-sha marker in the '$tag' release body."
 else
   sha="$GITHUB_SHA"
-  echo "Publish gate: no rlsbl-ci-sha marker in the '$tag' release body; falling back to \\$GITHUB_SHA."
+  echo "Publish gate: no rlsbl-ci-sha marker after $marker_attempts attempt(s) on the '$tag' release body; falling back to \\$GITHUB_SHA."
 fi
 echo "Publish gate: waiting for CI on $GITHUB_REF_NAME (commit $sha)"
 echo "Check-run name filter: $CI_CHECK_REGEX"
@@ -227,6 +257,8 @@ def build_gate_job(check_regex: str | None = None, resolver_script: str | None =
         "GATE_TIMEOUT_MINUTES": GATE_TIMEOUT_MINUTES,
         "GATE_GRACE_MINUTES": GATE_GRACE_MINUTES,
         "GATE_POLL_SECONDS": GATE_POLL_SECONDS,
+        "GATE_MARKER_ATTEMPTS": GATE_MARKER_ATTEMPTS,
+        "GATE_MARKER_RETRY_SECONDS": GATE_MARKER_RETRY_SECONDS,
     }
     if check_regex is not None:
         env["CI_CHECK_REGEX"] = check_regex

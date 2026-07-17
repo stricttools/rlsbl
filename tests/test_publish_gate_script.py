@@ -240,15 +240,60 @@ def _write_fake_gh(dir_path, body_for_tag: dict):
     return gh_path
 
 
-def _resolve_sha(tmp_path, body_for_tag, env):
-    """Run the resolution prologue with a fake gh and return resolved sha."""
-    bindir = tmp_path / "bin"
-    bindir.mkdir()
-    _write_fake_gh(str(bindir), body_for_tag)
+def _write_sequenced_gh(dir_path, bodies):
+    """Write a fake ``gh`` that answers ``release view`` with a SEQUENCE.
+
+    ``bodies`` is a list of body strings; the Nth invocation of
+    ``gh release view`` returns ``bodies[N]`` (the last element repeats once
+    the sequence is exhausted). This models GitHub API read-replica lag: an
+    early read returns a marker-less body, a later read returns the marker.
+    A ``None`` element makes that invocation exit non-zero (release absent).
+    Records invocations to ``gh_calls.log``.
+    """
+    gh_path = os.path.join(dir_path, "gh")
+    payload = json.dumps(bodies)
+    script = textwrap.dedent(
+        f"""\
+        #!/usr/bin/env bash
+        echo "$@" >> "{dir_path}/gh_calls.log"
+        if [ "$1" = "release" ] && [ "$2" = "view" ]; then
+          python3 - "{dir_path}" <<'PY'
+        import json, os, sys
+        d = sys.argv[1]
+        bodies = json.loads({payload!r})
+        cpath = os.path.join(d, "counter")
+        try:
+            n = int(open(cpath).read())
+        except Exception:
+            n = 0
+        open(cpath, "w").write(str(n + 1))
+        body = bodies[min(n, len(bodies) - 1)]
+        if body is None:
+            sys.exit(1)
+        print(body, end="")
+        PY
+          exit $?
+        fi
+        exit 1
+        """
+    )
+    with open(gh_path, "w", encoding="utf-8") as f:
+        f.write(script)
+    os.chmod(gh_path, 0o755)
+    return gh_path
+
+
+def _resolve_with_bindir(bindir, env):
+    """Run the resolution prologue against a prepared fake-gh bindir.
+
+    Marker-retry sleeps default to 0s so retry paths run instantly; tests that
+    need real attempt counts pass ``GATE_MARKER_ATTEMPTS`` explicitly.
+    """
     script = RESOLUTION_PROLOGUE + '\nprintf "RESOLVED=%s\\n" "$sha"\n'
     run_env = dict(env)
     run_env["PATH"] = f"{bindir}{os.pathsep}" + os.environ["PATH"]
     run_env.setdefault("CI_CHECK_REGEX", "^(test)$")
+    run_env.setdefault("GATE_MARKER_RETRY_SECONDS", "0")
     proc = _run_bash(script, run_env)
     assert proc.returncode == 0, proc.stderr
     line = [
@@ -256,6 +301,14 @@ def _resolve_sha(tmp_path, body_for_tag, env):
     ]
     assert line, proc.stdout + proc.stderr
     return line[0][len("RESOLVED=") :], proc
+
+
+def _resolve_sha(tmp_path, body_for_tag, env):
+    """Run the resolution prologue with a static fake gh and return resolved sha."""
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    _write_fake_gh(str(bindir), body_for_tag)
+    return _resolve_with_bindir(bindir, env)
 
 
 @requires_jq
@@ -323,3 +376,76 @@ class TestMarkerShaResolution:
         calls = (tmp_path / "bin" / "gh_calls.log").read_text()
         assert "release view v2.0.0" in calls
         assert "release view main" not in calls
+
+    def test_marker_appears_on_second_attempt(self, tmp_path):
+        """(g) Read-replica lag: the first read returns a marker-less body,
+        the second read returns the marker. The retry loop resolves via the
+        marker path (not the fallback) and stops as soon as it appears."""
+        bindir = tmp_path / "bin"
+        bindir.mkdir()
+        _write_sequenced_gh(
+            str(bindir),
+            [
+                "Release notes -- marker not replicated yet.\n",
+                f"Release notes\n\n<!-- rlsbl-ci-sha: {self.MARKER_SHA} -->\n",
+            ],
+        )
+        sha, proc = _resolve_with_bindir(
+            bindir,
+            {
+                "GITHUB_REF_NAME": "v1.2.3",
+                "GITHUB_SHA": self.FALLBACK_SHA,
+                "GATE_MARKER_ATTEMPTS": "5",
+                "GATE_MARKER_RETRY_SECONDS": "0",
+            },
+        )
+        assert sha == self.MARKER_SHA
+        # Exactly two reads: miss, then hit -- the loop stops on success.
+        calls = (bindir / "gh_calls.log").read_text()
+        assert calls.count("release view") == 2
+        # The first miss is logged distinctly from the final decision.
+        assert "not yet visible" in proc.stdout
+        assert "resolved release commit from rlsbl-ci-sha marker" in proc.stdout
+
+    def test_marker_never_appears_falls_back_after_n_attempts(self, tmp_path):
+        """(h) The marker never becomes visible: after exactly
+        GATE_MARKER_ATTEMPTS reads the gate falls back to $GITHUB_SHA, and the
+        final fallback message is distinct from the per-attempt retry logs."""
+        bindir = tmp_path / "bin"
+        bindir.mkdir()
+        _write_sequenced_gh(str(bindir), ["Release notes with no marker.\n"])
+        sha, proc = _resolve_with_bindir(
+            bindir,
+            {
+                "GITHUB_REF_NAME": "v1.2.3",
+                "GITHUB_SHA": self.FALLBACK_SHA,
+                "GATE_MARKER_ATTEMPTS": "3",
+                "GATE_MARKER_RETRY_SECONDS": "0",
+            },
+        )
+        assert sha == self.FALLBACK_SHA
+        calls = (bindir / "gh_calls.log").read_text()
+        assert calls.count("release view") == 3
+        # Retry messages on attempts 1 and 2, final fallback message once.
+        assert proc.stdout.count("not yet visible") == 2
+        assert "after 3 attempt(s)" in proc.stdout
+        assert "falling back to $GITHUB_SHA" in proc.stdout
+
+    def test_dispatch_path_unaffected_falls_back_after_retries(self, tmp_path):
+        """(i) A dispatch retry whose release has no marker (and no release
+        event payload exists) still resolves via the same API-read retry loop
+        and falls back to $GITHUB_SHA -- the path is uniform with release
+        events, no payload branch."""
+        sha, proc = _resolve_sha(
+            tmp_path,
+            {},  # release absent for every tag -> gh exits non-zero each read
+            {
+                "GITHUB_REF_NAME": "v9.9.9",
+                "GITHUB_SHA": self.FALLBACK_SHA,
+                "GATE_MARKER_ATTEMPTS": "2",
+                "GATE_MARKER_RETRY_SECONDS": "0",
+            },
+        )
+        assert sha == self.FALLBACK_SHA
+        calls = (tmp_path / "bin" / "gh_calls.log").read_text()
+        assert calls.count("release view") == 2
