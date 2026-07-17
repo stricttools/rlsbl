@@ -1,8 +1,8 @@
 {
   "_hash_version": 3,
   "en/changelog.md": {
-    "content": "6f70372ecc46c6510bce09584c076135877d0101097e42a10918702672cae554",
-    "description": "6c68eedb0703c733395d8d7f50f92dd4706aa6922d699df586b535bafc135c8f",
+    "content": "7526ef3dfd23f30ac509766596f80cd4915c9d5b5ed29f30f7d573c7b3e97dbd",
+    "description": "1f04cdff9f6331b412de55c968b96b507f71207d09961e67312e2d58b50e7c9a",
     "source_docstring": "4fff13535641ef3e9f7c8663fb4854a94edccb3e370b2f4d2721a69393f06594"
   },
   "en/checks.md": {
@@ -120,8 +120,8 @@
     "schema_hash": "f8bf9ba425f6c5fc5c87e49de0e6aec4cf84b3d3e31382d3c3c1fce78c511e57"
   },
   "en/configuration.md": {
-    "content": "72f191e3f4158af8551680b98283f5e19b191b92b4112031c72fdb547c84cc7b",
-    "description": "042bcf973e6829da33417dca69796dbc6b34602e7077be577ab62029d91a32c0",
+    "content": "9ae8bfa61207ec3dea335f90f9e668ee8fa736e550f1ce5b6401df83e96ad963",
+    "description": "2ed26bf70bcd2609c749e4e84f20633cb79d82bbcb7382403a068ad5a8f3a1f0",
     "source_docstring": "2f48ecdf7f2d481b41a9ab57a44f19e50288df0eadfd022d57a26bef4c4915d3"
   },
   "en/dep-validation.md": {
