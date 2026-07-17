@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.105.0",
+  "version": "0.105.1",
   "description": "",
   "language": "python",
   "base_url": "https://rlsbl.smmh.dev",
@@ -980,5 +980,5 @@
       ]
     }
   ],
-  "last_gen": "2026-07-16T17:04:29.874510+00:00"
+  "last_gen": "2026-07-17T14:59:33.235057+00:00"
 }
