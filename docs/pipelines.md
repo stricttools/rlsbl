@@ -43,6 +43,7 @@ Pipelines are configured in `.rlsbl/config.json` under the `pipelines` key. Each
 | --- | --- | --- | --- |
 | `type` | string | Yes | One of the 9 built-in pipeline types (see table below) |
 | `local` | bool | Yes | Whether to publish from the developer machine. `false` means CI handles it. |
+| `artifact` | string | Yes (type `go`) | `binary` or `library`. Selects the go publish workflow. No default. See [go](#go). |
 | `token_var` | string | No | Env var name for the publish token. Each type has a default. |
 | `username_var` | string | No | Env var for username auth (docker only). |
 | `password_var` | string | No | Env var for password auth (docker only). |
@@ -228,7 +229,14 @@ PyPI publishing happens in CI; docs deploy happens locally in a post-release hoo
 - **Auth pattern:** No authentication. Go modules are published by pushing a tagged commit — the Go module proxy picks it up automatically.
 - **Publish command:** Notifies the Go module proxy (`proxy.golang.org`) by requesting the module at the new version, then runs `go install <path>` for every path declared in `install_paths`.
 - **CI template:** Minimal — Go publish is just the tag push plus a proxy notification step.
-- **Quirks:** Reads the module path from `go.mod` to construct the proxy notification URL. Pipelines with `local: true` **must** declare `install_paths` (a list of main-package dirs relative to the project root, e.g. `["./cmd/mytool"]`). Missing or invalid declarations are hard errors; each declared path is validated against `go list` (it must be a `package main` dir). There is no auto-detection fallback — detection only validates declarations.
+- **Required `artifact` key:** Every `type: "go"` pipeline **must** declare `artifact`, either `"binary"` or `"library"`. There is no default. The value selects the publish workflow that gets scaffolded:
+  - `"binary"` — a CLI/command whose GitHub Release assets are built by goreleaser (`publish.yml`).
+  - `"library"` — an importable module verified against the Go module proxy (`publish-library.yml`); no goreleaser, no release assets.
+
+  A wrong or missing value produces a broken workflow, so validation is a hard error rather than a silent guess. `rlsbl scaffold` sets the key automatically by auto-detecting the project layout (a project with no `package main` is a library, otherwise a binary), and the validation error message includes the same auto-detected suggestion — but the operator must commit the choice explicitly.
+- **Library tag handling:** The library publish workflow bakes the module path from `go.mod` at scaffold time (correct even for monorepo subdirectory modules, whose proxy-visible tags are the companion subdir tag `<subdir>/vX.Y.Z`) and derives the version from the release tag, handling plain (`v1.2.3`), releasable (`<name>@v1.2.3`), and subdir (`<subdir>/v1.2.3`) tag formats.
+- **Private modules:** A private Go module cannot be verified against the public proxy (`proxy.golang.org` refuses to serve private modules). Private Go libraries must set `publish_mode` `"none"` in `.rlsbl/config.json`, which suppresses the publish job entirely — no publish workflow is scaffolded.
+- **Quirks:** Pipelines with `local: true` **must** declare `install_paths` (a list of main-package dirs relative to the project root, e.g. `["./cmd/mytool"]`). Missing or invalid declarations are hard errors; each declared path is validated against `go list` (it must be a `package main` dir). There is no auto-detection fallback — detection only validates declarations.
 
 ### cargo
 
