@@ -321,66 +321,180 @@ def _get_releasable_value(proj):
     return val
 
 
-def save_workspace(root, projects, releasables=None):
-    """Write workspace.toml atomically using tomlkit for clean TOML output.
+def _build_project_table(d):
+    """Build a fresh tomlkit table for a project dict.
 
-    Preserves top-level sections, comments, and formatting from the existing
-    file by reading it with tomlkit first and modifying the ``[[projects]]``
-    array in-place.  Falls back to creating a new document when the file does
-    not yet exist.
+    Key order: ``path``, ``name``, then all remaining keys sorted. This
+    matches the layout used when scaffolding a brand-new workspace.toml.
+    """
+    table = tomlkit.table()
+    table.add("path", d["path"])
+    table.add("name", d["name"])
+    for key in sorted(d.keys()):
+        if key not in ("path", "name"):
+            table.add(key, d[key])
+    return table
+
+
+def _build_releasable_table(d):
+    """Build a fresh tomlkit table for a releasable desired-dict.
+
+    ``d`` carries ``name`` and (optionally) ``tag_format``.
+    """
+    table = tomlkit.table()
+    table.add("name", d["name"])
+    if "tag_format" in d:
+        table.add("tag_format", d["tag_format"])
+    return table
+
+
+def _update_table_fields(table, desired):
+    """Update a tomlkit table in place to match ``desired`` (a plain dict).
+
+    - Existing keys are reassigned only when their value actually changed
+      (so untouched keys keep their original formatting and inline comments).
+    - New keys are appended (preserving the order of already-present keys).
+    - Keys absent from ``desired`` are removed.
+
+    Intra-table comments attached to surviving keys are preserved by tomlkit.
+    """
+    for key, value in desired.items():
+        if key in table:
+            if table[key] != value:
+                table[key] = value
+        else:
+            table.add(key, value)
+    for key in list(table.keys()):
+        if key not in desired:
+            del table[key]
+
+
+def _sync_aot_in_place(aot, desired_list, id_key, build_fn):
+    """Reconcile an existing tomlkit array-of-tables with a desired list.
+
+    Items are matched by identity (``id_key``: ``path`` for projects,
+    ``name`` for releasables). Matched tables are updated field-by-field in
+    place (preserving comments and key order). Tables whose identity is not
+    in ``desired_list`` are removed. Desired items with no matching table are
+    appended (in desired order) as fresh tables with a leading blank line so
+    they read like the surrounding array-of-tables.
+    """
+    desired_by_id = {d[id_key]: d for d in desired_list}
+
+    # Remove tables whose identity is no longer desired (iterate back-to-front
+    # so index deletion stays valid).
+    for idx in range(len(aot) - 1, -1, -1):
+        if aot[idx][id_key] not in desired_by_id:
+            del aot[idx]
+
+    # Update the survivors in place.
+    present_ids = set()
+    for item in aot:
+        ident = item[id_key]
+        present_ids.add(ident)
+        _update_table_fields(item, desired_by_id[ident])
+
+    # Append newcomers in desired order.
+    for d in desired_list:
+        if d[id_key] not in present_ids:
+            table = build_fn(d)
+            table.trivia.indent = "\n"
+            aot.append(table)
+
+
+def save_workspace(root, projects, releasables=None):
+    """Write workspace.toml atomically, editing the existing document in place.
+
+    When the file already exists it is parsed with tomlkit and the
+    ``[[projects]]`` (and, when requested, ``[[releasables]]``) arrays-of-tables
+    are reconciled surgically: matched items (by ``path`` for projects and
+    ``name`` for releasables) are updated field-by-field, absent items are
+    removed, and new items are appended. Untouched tables, intra-table
+    comments, key order, and every other top-level section are preserved
+    byte-for-byte. When the file does not yet exist, a fresh document is
+    created.
 
     When ``releasables`` is passed (a list of Releasable instances), the
-    ``[[releasables]]`` section is replaced.  When ``releasables`` is None,
-    any existing ``[[releasables]]`` section is preserved as-is.  Pass an
-    empty list to explicitly remove the section.
+    ``[[releasables]]`` section is reconciled in place. When ``releasables`` is
+    None, any existing ``[[releasables]]`` section is preserved untouched. Pass
+    an empty list to explicitly remove the section.
 
     Creates .rlsbl-monorepo/ directory if it doesn't exist.
     """
+    from tomlkit.items import AoT
+
     ws_dir = os.path.join(root, WORKSPACE_DIR)
     os.makedirs(ws_dir, exist_ok=True)
 
     target = os.path.join(ws_dir, WORKSPACE_FILE)
 
-    # Read existing document to preserve non-project sections/comments.
     if os.path.isfile(target):
         with open(target, encoding="utf-8") as f:
             doc = tomlkit.loads(f.read())
-        # Remove old projects key so we can replace it.
-        if "projects" in doc:
-            del doc["projects"]
     else:
         doc = tomlkit.document()
 
-    # Handle releasables section.
+    # --- releasables section ---
     if releasables is not None:
-        if "releasables" in doc:
-            del doc["releasables"]
-        if releasables:
-            raot = tomlkit.aot()
-            for rel in releasables:
-                table = tomlkit.table()
-                table.add("name", rel.name)
-                if rel.tag_format != DEFAULT_TAG_FORMAT:
-                    table.add("tag_format", rel.tag_format)
-                raot.append(table)
-            doc.add("releasables", raot)
+        # Preserve an explicit ``tag_format`` key that already exists in the
+        # file even when it equals the default -- omitting it would silently
+        # delete an operator-written line. New releasables still omit the
+        # default for clean output.
+        existing_rels = doc.get("releasables")
+        explicit_tf_names = set()
+        if isinstance(existing_rels, AoT):
+            for t in existing_rels:
+                if "tag_format" in t:
+                    explicit_tf_names.add(t["name"])
+
+        desired_rels = []
+        for rel in releasables:
+            d = {"name": rel.name}
+            if rel.tag_format != DEFAULT_TAG_FORMAT or rel.name in explicit_tf_names:
+                d["tag_format"] = rel.tag_format
+            desired_rels.append(d)
+
+        if not desired_rels:
+            # Explicit removal.
+            if "releasables" in doc:
+                del doc["releasables"]
+        else:
+            if isinstance(existing_rels, AoT) and len(existing_rels) > 0:
+                _sync_aot_in_place(
+                    existing_rels, desired_rels, "name", _build_releasable_table
+                )
+            else:
+                if "releasables" in doc:
+                    del doc["releasables"]
+                raot = tomlkit.aot()
+                for d in desired_rels:
+                    raot.append(_build_releasable_table(d))
+                doc.add("releasables", raot)
     # When releasables is None, the existing section (if any) is preserved.
 
-    if not projects:
-        # Empty AoT produces no output in tomlkit; use inline array instead
+    # --- projects section ---
+    desired_projs = [
+        proj.to_dict() if isinstance(proj, WorkspaceProject) else dict(proj)
+        for proj in projects
+    ]
+    if not desired_projs:
+        # Empty AoT produces no output in tomlkit; use inline array instead.
+        if "projects" in doc:
+            del doc["projects"]
         doc.add("projects", tomlkit.array())
     else:
-        aot = tomlkit.aot()
-        for proj in projects:
-            d = proj.to_dict() if isinstance(proj, WorkspaceProject) else proj
-            table = tomlkit.table()
-            table.add("path", d["path"])
-            table.add("name", d["name"])
-            for key in sorted(d.keys()):
-                if key not in ("path", "name"):
-                    table.add(key, d[key])
-            aot.append(table)
-        doc.add("projects", aot)
+        existing = doc.get("projects")
+        if isinstance(existing, AoT) and len(existing) > 0:
+            _sync_aot_in_place(
+                existing, desired_projs, "path", _build_project_table
+            )
+        else:
+            if "projects" in doc:
+                del doc["projects"]
+            aot = tomlkit.aot()
+            for d in desired_projs:
+                aot.append(_build_project_table(d))
+            doc.add("projects", aot)
 
     tmp = target + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
