@@ -820,7 +820,7 @@ def _run_release_mutating(state: ReleaseState):
             return True
         return isinstance(_exc, GitError) and "timed out" in str(_exc).lower()
 
-    def _handle_resumable_push_failure(_exc):
+    def _handle_resumable_push_failure(_exc) -> bool:
         """Classify a post-TAGGED push failure as RESUMABLE (no rollback).
 
         Once the release is TAGGED and its changelog / release-file
@@ -834,10 +834,17 @@ def _run_release_mutating(state: ReleaseState):
         a best-effort tag-push retry is attempted first (transient stalls
         often clear on retry); a recovered tag push marks PUSHED complete so
         resume picks up at GITHUB_RELEASE.
+
+        Returns True when the outstanding tag push recovered on retry (PUSHED
+        marked complete): the caller then falls through into the remaining
+        post-push steps (GITHUB_RELEASE, ...) instead of aborting. Returns
+        False when the push is still outstanding and the release must stop
+        with resume guidance.
         """
         _timed_out = _is_push_timeout(_exc)
         _retry_env = {**os.environ, "RLSBL_RELEASE_PUSH": "1"}
         _retry_timeout = get_push_timeout(ctx.config)
+        _recovered = False
         if branch_pushed:
             # Branch commits are already on the remote; only the tag push
             # is outstanding. Retry it a couple of times before giving up.
@@ -852,9 +859,15 @@ def _run_release_mutating(state: ReleaseState):
                     log(f"Tag push succeeded on retry {_attempt + 1}")
                     save_step(_state_path, "PUSHED")
                     _completed.add("PUSHED")
+                    _recovered = True
                     break
                 except Exception:
                     pass
+        if _recovered:
+            # The outstanding tag push cleared on retry; the release is fully
+            # pushed. Signal the caller to continue with the post-push steps
+            # rather than aborting with resume guidance.
+            return True
         if "PUSHED" not in _completed:
             # Record the failed PUSHED step (fatal + resumable). This does
             # NOT gate resume-skip; resume re-attempts PUSHED via its own
@@ -882,6 +895,7 @@ def _run_release_mutating(state: ReleaseState):
                 "Fix the issue and resume:\n  rlsbl release resume",
                 file=sys.stderr,
             )
+        return False
 
     def _warn_rollback_residuals():
         """Postcondition check: warn if the working tree is not clean after a
@@ -1502,12 +1516,20 @@ def _run_release_mutating(state: ReleaseState):
             branch_pushed = True
             log("Skipping push (already done)")
         else:
-            # Check if branch push is needed
+            # Check if branch push is needed via a LIVE remote comparison
+            # (git ls-remote) rather than the local origin/<branch> tracking
+            # ref. The tracking ref can be stale when the last fetch predates a
+            # concurrent push, which would wrongly skip the push and leave the
+            # branch behind the remote. This aligns with the tag_exists_on_remote
+            # check just below, which is also a live ls-remote query.
             _local_head = run("git", ["rev-parse", "HEAD"]).strip()
             _branch_needs_push = True
             try:
-                _remote_head = run("git", ["rev-parse", f"origin/{branch}"]).strip()
-                if _local_head == _remote_head:
+                _ls_out = run(
+                    "git", ["ls-remote", "origin", f"refs/heads/{branch}"]
+                ).strip()
+                _remote_head = _ls_out.split()[0] if _ls_out else None
+                if _remote_head and _local_head == _remote_head:
                     _branch_needs_push = False
                     branch_pushed = True
                     log("Skipping branch push (remote already at local HEAD)")
@@ -1547,8 +1569,10 @@ def _run_release_mutating(state: ReleaseState):
             # Post-TAGGED failure: canonical resumable state. Preserve
             # everything and record a failed PUSHED marker instead of
             # rolling back (which would destroy exactly what resume needs).
-            _handle_resumable_push_failure(e)
-            raise
+            # A recovered tag-push retry falls through into the post-push
+            # steps below; otherwise re-raise to abort with resume guidance.
+            if not _handle_resumable_push_failure(e):
+                raise
         # Pre-TAGGED failure -- safe to roll back locally,
         # but only if no foreign commits or dirty files would be destroyed.
         _guard_rollback(pre_release_sha, _state_path)
@@ -1571,9 +1595,11 @@ def _run_release_mutating(state: ReleaseState):
         if "TAGGED" in _completed:
             # Post-TAGGED failure (push failed / timed out): canonical
             # resumable state. Preserve everything and record a failed
-            # PUSHED marker instead of rolling back.
-            _handle_resumable_push_failure(e)
-            raise
+            # PUSHED marker instead of rolling back. A recovered tag-push
+            # retry falls through into the post-push steps below; otherwise
+            # re-raise to abort with resume guidance.
+            if not _handle_resumable_push_failure(e):
+                raise
         # Pre-TAGGED failure -- safe to roll back locally,
         # but only if no foreign commits or dirty files would be destroyed.
         _guard_rollback(pre_release_sha, _state_path)

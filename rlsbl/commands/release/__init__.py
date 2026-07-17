@@ -18,7 +18,7 @@ from ...changelog import (
     validate_unreleased,
 )
 from ...changelog.generate import _read_release_metadata, _read_release_metadata_full
-from ...errors import ConfigError, PostReleaseError
+from ...errors import ConfigError, PostReleaseError, RlsblError  # noqa: F401  (ConfigError re-exported for execute.py)
 from ...git_util import validate_subtree_remote_ssh_host
 from ...config import read_deploy_config, read_json_config, should_tag, update_last_build_release
 from ...pipelines import load_pipelines
@@ -117,11 +117,28 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
     try:
         _run_cmd_inner(release_config, flags, ctx=ctx)
     except PostReleaseError as e:
+        # Already-printed post-mutation failure: emit only if it carries a
+        # message, then exit non-zero.
         if str(e):
             print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
-    except (ReleaseValidationError, HookError, ConfigError) as e:
+    except (ReleaseValidationError, HookError, RlsblError) as e:
+        # All expected release failures print a clean one-line error and exit
+        # non-zero: the release-flow control exceptions (ReleaseValidationError,
+        # HookError) plus every RlsblError subclass (ConfigError, GitError,
+        # VersionError, ...). A post-TAGGED push GitError arrives here after the
+        # resumable-push handler already printed its resume guidance. Genuine
+        # bugs (KeyError, AttributeError, ...) are NOT caught and keep their
+        # tracebacks.
         print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except subprocess.CalledProcessError as e:
+        # A failed push (or other git subprocess) can surface as a raw
+        # CalledProcessError rather than a typed GitError. Print its stderr if
+        # present, then exit cleanly instead of dumping a traceback.
+        if getattr(e, "stderr", None):
+            print(f"Command error: {e.stderr.strip()}", file=sys.stderr)
+        print(f"Error: push failed ({e})", file=sys.stderr)
         sys.exit(1)
 
 
@@ -140,8 +157,16 @@ def resume_cmd(saved_state: dict, flags: dict | None = None, *, ctx):
         sys.exit(1)
     except ReleaseAbortError:
         sys.exit(1)
-    except (ReleaseValidationError, HookError, ConfigError) as e:
+    except (ReleaseValidationError, HookError, RlsblError) as e:
+        # Mirror run_cmd: every expected release failure (control exceptions
+        # plus all RlsblError subclasses incl. GitError) exits cleanly; genuine
+        # bugs keep their tracebacks.
         print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except subprocess.CalledProcessError as e:
+        if getattr(e, "stderr", None):
+            print(f"Command error: {e.stderr.strip()}", file=sys.stderr)
+        print(f"Error: push failed ({e})", file=sys.stderr)
         sys.exit(1)
 
 
