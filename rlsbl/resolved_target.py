@@ -23,6 +23,7 @@ already-detected targets and already-loaded pipelines, so this module never
 touches disk or the pipeline registry.
 """
 
+import dataclasses
 from dataclasses import dataclass
 from typing import Any, Optional
 
@@ -46,6 +47,11 @@ class ResolvedTarget:
         artifact_kind: the pipeline config's ``artifact`` value where present
             (e.g. Go's ``library`` / ``binary``, wired in a later phase), or
             ``None``. Carried as the raw config value.
+        primary: whether this record is the release's primary/registry target.
+            At most one record in a resolved list is primary; the release flow
+            derives the registry name, registry-target instance, and primary
+            path from it. Defaults to ``False``; set by :func:`resolve_targets`
+            when a ``primary_name`` is supplied.
     """
 
     target: Any
@@ -53,6 +59,7 @@ class ResolvedTarget:
     pipeline: Optional[Any]
     publish_mode: str
     artifact_kind: Optional[Any]
+    primary: bool = False
 
     @property
     def name(self) -> str:
@@ -96,7 +103,8 @@ def partition_pipelines(pipelines: dict) -> tuple[dict, list]:
     return by_target, deploys
 
 
-def resolve_targets(targets: list, pipelines: dict, publish_mode: str) -> list:
+def resolve_targets(targets: list, pipelines: dict, publish_mode: str,
+                    primary_name: Optional[str] = None) -> list:
     """Resolve targets + linked pipelines into a flat list of ResolvedTargets.
 
     One :class:`ResolvedTarget` is produced per (target, linked pipeline) pair.
@@ -104,12 +112,22 @@ def resolve_targets(targets: list, pipelines: dict, publish_mode: str) -> list:
     Target-less pipelines are excluded here (see ``partition_pipelines`` /
     ``deploys``).
 
+    When ``primary_name`` is given (the release file's ``include[0]``), exactly
+    one record is marked ``primary=True``: the FIRST record (in config /
+    detection order) whose ``name`` equals ``primary_name``. When a target is
+    served by multiple pipelines, the records for that target are contiguous
+    and the first is chosen -- a deterministic, config-order choice. If no
+    record matches ``primary_name`` (or it is ``None``), nothing is marked;
+    non-release contexts (version sync, workspace checks) leave it unset.
+
     Args:
         targets: detected target entries (list of ``TargetEntry``).
         pipelines: loaded pipelines (dict name -> pipeline, from
             ``load_pipelines``).
         publish_mode: the member's effective ``publish_mode`` string, carried
             verbatim onto every produced record.
+        primary_name: the primary/registry target name (``include[0]`` from the
+            release file), or ``None`` when no primary is known.
 
     Raises:
         ConfigError: if a pipeline links a target name absent from ``targets``
@@ -157,6 +175,15 @@ def resolve_targets(targets: list, pipelines: dict, publish_mode: str) -> list:
                     artifact_kind=artifact_kind,
                 )
             )
+
+    # Mark the primary record: the first (config/detection-order) record whose
+    # name matches primary_name. Records are frozen, so rebuild the chosen one.
+    if primary_name is not None:
+        for i, rt in enumerate(resolved):
+            if rt.name == primary_name:
+                resolved[i] = dataclasses.replace(rt, primary=True)
+                break
+
     return resolved
 
 

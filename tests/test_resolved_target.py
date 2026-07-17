@@ -200,6 +200,85 @@ class TestResolveTargets:
 
 
 # ---------------------------------------------------------------------------
+# resolve_targets: primary designation
+# ---------------------------------------------------------------------------
+
+
+class TestResolveTargetsPrimary:
+    def test_no_primary_name_marks_nothing(self):
+        targets = [TargetEntry(name="pypi", path="/p"),
+                   TargetEntry(name="npm", path="/p")]
+        result = resolve_targets(targets, {}, "ci")
+        assert all(not rt.primary for rt in result)
+
+    def test_exactly_one_primary_marked(self):
+        targets = [TargetEntry(name="pypi", path="/p"),
+                   TargetEntry(name="npm", path="/p")]
+        result = resolve_targets(targets, {}, "ci", primary_name="pypi")
+        primaries = [rt for rt in result if rt.primary]
+        assert len(primaries) == 1
+        assert primaries[0].name == "pypi"
+
+    def test_primary_follows_include_not_detection_order(self):
+        # Detection order is [npm, pypi]; the release's include[0] is "pypi",
+        # so the primary must be pypi regardless of detection order.
+        targets = [TargetEntry(name="npm", path="/p"),
+                   TargetEntry(name="pypi", path="/p")]
+        result = resolve_targets(targets, {}, "ci", primary_name="pypi")
+        primaries = [rt for rt in result if rt.primary]
+        assert len(primaries) == 1
+        assert primaries[0].name == "pypi"
+        # npm (detected first) is not primary
+        assert all(not rt.primary for rt in result if rt.name == "npm")
+
+    def test_primary_first_pair_when_target_has_multiple_pipelines(self):
+        # A target served by two pipelines yields two records; only the first
+        # (config-order) is marked primary.
+        targets = [TargetEntry(name="npm", path="/p")]
+        pipelines = {
+            "public": _pipe("public", "npm", pipeline_type="npm"),
+            "mirror": _pipe("mirror", "npm", pipeline_type="npm"),
+        }
+        result = resolve_targets(targets, pipelines, "ci", primary_name="npm")
+        primaries = [rt for rt in result if rt.primary]
+        assert len(primaries) == 1
+        assert primaries[0].pipeline.name == "public"
+
+    def test_unmatched_primary_name_marks_nothing(self):
+        targets = [TargetEntry(name="pypi", path="/p")]
+        result = resolve_targets(targets, {}, "ci", primary_name="npm")
+        assert all(not rt.primary for rt in result)
+
+
+class TestMemberContextPrimary:
+    def test_member_context_threads_primary_name(self, tmp_path):
+        config = {
+            "publish_mode": "ci",
+            "targets": ["pypi"],
+        }
+        proj = _make_standalone(
+            tmp_path, config,
+            {"pyproject.toml": '[project]\nname = "p"\nversion = "1.0.0"\n'},
+        )
+        ctx = resolve_member_context(str(proj), primary_name="pypi")
+        primaries = [rt for rt in ctx.resolved_targets if rt.primary]
+        assert len(primaries) == 1
+        assert primaries[0].name == "pypi"
+
+    def test_member_context_no_primary_by_default(self, tmp_path):
+        config = {
+            "publish_mode": "ci",
+            "targets": ["pypi"],
+        }
+        proj = _make_standalone(
+            tmp_path, config,
+            {"pyproject.toml": '[project]\nname = "p"\nversion = "1.0.0"\n'},
+        )
+        ctx = resolve_member_context(str(proj))
+        assert all(not rt.primary for rt in ctx.resolved_targets)
+
+
+# ---------------------------------------------------------------------------
 # MemberContext integration (on-disk fixtures mirroring fleet shapes)
 # ---------------------------------------------------------------------------
 

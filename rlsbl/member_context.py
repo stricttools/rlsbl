@@ -26,9 +26,10 @@ class MemberContext:
     without triggering target detection.
     """
 
-    def __init__(self, member_dir, releasable_config_dir=None):
+    def __init__(self, member_dir, releasable_config_dir=None, primary_name=None):
         self.member_dir = member_dir
         self.releasable_config_dir = releasable_config_dir
+        self.primary_name = primary_name
 
         from .config import read_project_config
 
@@ -83,12 +84,17 @@ class MemberContext:
         publishes per pipeline). Target-less pipelines are excluded -- see
         :attr:`deploy_pipelines`.
 
-        Additive: existing consumers keep using ``targets`` / ``target_paths`` /
-        ``publish_mode`` unchanged.
+        When this context was created with a ``primary_name`` (the release
+        file's ``include[0]``), exactly one record is marked ``primary=True``.
+        Non-release contexts (version sync, workspace checks) pass no primary
+        and leave every record unmarked.
         """
         from .resolved_target import resolve_targets
 
-        return resolve_targets(self.targets, self.pipelines, self.publish_mode)
+        return resolve_targets(
+            self.targets, self.pipelines, self.publish_mode,
+            primary_name=self.primary_name,
+        )
 
     @property
     def deploy_pipelines(self) -> list:
@@ -103,7 +109,8 @@ class MemberContext:
         return deploys
 
 
-def resolve_member_context(member_dir, releasable_config_dir=None) -> MemberContext:
+def resolve_member_context(member_dir, releasable_config_dir=None,
+                           primary_name=None) -> MemberContext:
     """Resolve a member directory's effective merged config and detected targets.
 
     Args:
@@ -111,5 +118,11 @@ def resolve_member_context(member_dir, releasable_config_dir=None) -> MemberCont
         releasable_config_dir: optional path to the releasable's state
             directory (e.g. ``.rlsbl-monorepo/releasables/<name>/``) for
             config inheritance. None for standalone/implicit-mode projects.
+        primary_name: optional primary/registry target name (the release
+            file's ``include[0]``); when given, ``resolved_targets`` marks the
+            matching record ``primary=True``. None outside the release flow.
     """
-    return MemberContext(member_dir, releasable_config_dir=releasable_config_dir)
+    return MemberContext(
+        member_dir, releasable_config_dir=releasable_config_dir,
+        primary_name=primary_name,
+    )
