@@ -3,6 +3,7 @@
 import json
 import os
 import subprocess
+import threading
 
 import pytest
 from unittest.mock import patch, MagicMock, call
@@ -526,22 +527,22 @@ class TestAutoRetry:
     @patch("rlsbl.commands.watch.time")
     @patch("rlsbl.commands.watch.run_gh")
     def test_retry_attempted_on_first_failure(self, mock_run_gh, mock_time, capsys):
-        """When a workflow fails, _watch_single_run triggers a retry."""
+        """When a workflow fails, _watch_single_run reruns it in place."""
         ci_run = {"databaseId": 100, "name": "CI", "headBranch": "main"}
 
-        # run_gh calls: original watch, log fetch, retry trigger, run list poll, retry watch
+        # run_gh calls: original watch, log fetch, rerun, retry watch
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
             "",  # gh run view --log-failed (empty tail -> unknown -> retry)
-            "",  # gh workflow run succeeds
-            json.dumps([{"databaseId": 200, "name": "CI", "status": "in_progress", "createdAt": "2026-01-01"}]),  # gh run list
-            "",  # retry watch succeeds
+            "",  # gh run rerun <id>
+            "",  # retry watch (same id) succeeds
         ]
 
         result = _watch_single_run(ci_run, "test-label", "user/repo")
 
         assert result["passed"] is True
         assert result["name"] == "CI"
+        assert result["run_id"] == "100"  # in-place rerun keeps the run id
         err = capsys.readouterr().err
         assert "CI failed, retrying once..." in err
         assert "retry passed" in err
@@ -549,67 +550,71 @@ class TestAutoRetry:
     @patch("rlsbl.commands.watch.time")
     @patch("rlsbl.commands.watch.run_gh")
     def test_retry_success_reports_overall_success(self, mock_run_gh, mock_time, capsys):
-        """When the retry passes, the overall result is success."""
+        """When the rerun passes, the overall result is success (same run id)."""
         ci_run = {"databaseId": 100, "name": "CI", "headBranch": "main"}
 
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
             "",  # gh run view --log-failed (empty tail -> unknown -> retry)
-            "",  # gh workflow run trigger
-            json.dumps([{"databaseId": 200, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]),  # gh run list
+            "",  # gh run rerun <id>
             "",  # retry watch succeeds
         ]
 
         result = _watch_single_run(ci_run, "test-label", "user/repo")
         assert result["passed"] is True
-        assert result["run_id"] == "200"
+        assert result["run_id"] == "100"
 
     @patch("rlsbl.commands.watch.time")
     @patch("rlsbl.commands.watch.run_gh")
     def test_double_failure_reports_failure(self, mock_run_gh, mock_time, capsys):
-        """When both original and retry fail, the result is failure."""
+        """When both the original and the rerun fail, the result is failure."""
         ci_run = {"databaseId": 100, "name": "CI", "headBranch": "main"}
 
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
             "",  # gh run view --log-failed (empty tail -> unknown -> retry)
-            "",  # gh workflow run trigger
-            json.dumps([{"databaseId": 200, "name": "CI", "status": "in_progress", "createdAt": "2026-01-01"}]),  # gh run list
+            "",  # gh run rerun <id>
             subprocess.CalledProcessError(1, "gh"),  # retry watch also fails
+            "some retry failure output",  # gh run view --log-failed (retry tail)
         ]
 
         result = _watch_single_run(ci_run, "test-label", "user/repo")
 
         assert result["passed"] is False
-        assert result["run_id"] == "200"
+        assert result["run_id"] == "100"
         err = capsys.readouterr().err
         assert "retry also failed" in err
 
+    @patch("rlsbl.commands.watch.time")
     @patch("rlsbl.commands.watch.run_gh")
-    def test_no_retry_without_branch(self, mock_run_gh, capsys):
-        """When headBranch is missing, no retry is attempted."""
+    def test_retry_without_branch_still_reruns(self, mock_run_gh, mock_time, capsys):
+        """An in-place rerun keys off the run id, so a missing headBranch does
+        not suppress the retry (unlike the old branch-ref dispatch)."""
         ci_run = {"databaseId": 100, "name": "CI"}  # no headBranch
 
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
-            "",  # gh run view --log-failed (empty tail; retry still gated by branch)
+            "",  # gh run view --log-failed (empty tail -> unknown -> retry)
+            "",  # gh run rerun <id>
+            "",  # retry watch succeeds
         ]
 
         result = _watch_single_run(ci_run, "test-label", "user/repo")
-        assert result["passed"] is False
+        assert result["passed"] is True
+        assert result["run_id"] == "100"
         err = capsys.readouterr().err
-        assert "retrying" not in err
+        assert "CI failed, retrying once..." in err
 
     @patch("rlsbl.commands.watch.time")
     @patch("rlsbl.commands.watch.run_gh")
     def test_retry_trigger_failure_returns_original_failure(self, mock_run_gh, mock_time, capsys):
-        """When the retry trigger itself fails, the original failure is returned."""
+        """When the rerun trigger itself fails, the original failure is returned."""
         ci_run = {"databaseId": 100, "name": "CI", "headBranch": "main"}
 
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
             "",  # gh run view --log-failed (empty tail -> unknown -> retry)
-            subprocess.CalledProcessError(1, "gh"),  # gh workflow run trigger fails
+            subprocess.CalledProcessError(1, "gh"),  # gh run rerun trigger fails
         ]
 
         result = _watch_single_run(ci_run, "test-label", "user/repo")
@@ -620,36 +625,42 @@ class TestAutoRetry:
 
 
 class TestRetryWorkflow:
-    """Unit tests for _retry_workflow."""
+    """Unit tests for _retry_workflow (in-place rerun)."""
 
     @patch("rlsbl.commands.watch.time")
     @patch("rlsbl.commands.watch.run_gh")
     def test_retry_passes(self, mock_run_gh, mock_time, capsys):
-        """Successful retry returns passed=True."""
+        """A successful rerun returns passed=True with the same run id."""
         mock_run_gh.side_effect = [
-            "",  # gh workflow run trigger
-            json.dumps([{"databaseId": 300, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]),  # gh run list
-            "",  # retry watch succeeds
+            "",  # gh run rerun <id>
+            "",  # retry watch (same id) succeeds
         ]
 
-        result = _retry_workflow("CI", "main", "user/repo", "test-label", "100")
+        result = _retry_workflow("CI", "user/repo", "test-label", "100")
         assert result is not None
         assert result["passed"] is True
-        assert result["run_id"] == "300"
+        assert result["run_id"] == "100"
 
     @patch("rlsbl.commands.watch.time")
     @patch("rlsbl.commands.watch.run_gh")
-    def test_retry_run_not_found(self, mock_run_gh, mock_time, capsys):
-        """When the retry run never appears, returns None."""
-        # First call succeeds (trigger), remaining calls fail (all polls)
-        mock_run_gh.side_effect = [
-            "",  # gh workflow run trigger
-        ] + [Exception("not found")] * 15  # all poll attempts fail
+    def test_rerun_invoked_with_failed_run_id(self, mock_run_gh, mock_time):
+        """(a)+(b) The trigger is a FULL `gh run rerun <failed_run_id>` -- never
+        a fresh `gh workflow run` dispatch that would create a duplicate
+        check-run."""
+        calls = []
 
-        result = _retry_workflow("CI", "main", "user/repo", "test-label", "100")
-        assert result is None
-        err = capsys.readouterr().err
-        assert "retry run not found" in err
+        def side_effect(args, **kwargs):
+            calls.append(args)
+            return ""
+
+        mock_run_gh.side_effect = side_effect
+        result = _retry_workflow("CI", "user/repo", "test-label", "12345")
+
+        assert result["run_id"] == "12345"
+        # (b) rerun invoked with the in-scope failed run id.
+        assert ["run", "rerun", "12345"] in calls
+        # (a) no fresh dispatch remains in the retry path.
+        assert not any(c[:2] == ["workflow", "run"] for c in calls)
 
 
 class TestNotifyUrl:
@@ -820,71 +831,64 @@ class TestRetryDedup:
     @patch("rlsbl.commands.watch.time")
     @patch("rlsbl.commands.watch.run_gh")
     def test_multiple_runs_same_workflow_retry_once(self, mock_run_gh, mock_time, capsys):
-        """Three CI runs fail concurrently but only one retry is dispatched."""
+        """Three CI runs fail concurrently but only one in-place rerun fires."""
         runs = [
             {"databaseId": 100, "name": "CI", "headBranch": "main"},
             {"databaseId": 200, "name": "CI", "headBranch": "main"},
             {"databaseId": 300, "name": "CI", "headBranch": "main"},
         ]
 
-        # All gh calls now go through run_gh(args, ...) where args is the
-        # list without "gh".  Since threads run concurrently, we use
-        # side_effect as a function that inspects the args.
-
-        workflow_run_call_count = 0
+        # All gh calls go through run_gh(args, ...) where args is the list
+        # without "gh". Threads run concurrently, so the side_effect inspects
+        # args and tracks per-run-id watch counts under a lock: the first watch
+        # of every run fails; the single rerun's second watch succeeds.
+        rerun_count = 0
+        watch_counts = {}
+        lock = threading.Lock()
 
         def run_gh_side_effect(args, **kwargs):
-            nonlocal workflow_run_call_count
+            nonlocal rerun_count
             if args[:2] == ["run", "watch"]:
-                run_id = args[2]
-                # Original watches (IDs 100, 200, 300) all fail
-                if run_id in ("100", "200", "300"):
+                rid = args[2]
+                with lock:
+                    watch_counts[rid] = watch_counts.get(rid, 0) + 1
+                    first = watch_counts[rid] == 1
+                if first:
                     raise subprocess.CalledProcessError(1, "gh")
-                # Retry watch (ID 400) succeeds
+                return ""  # the rerun's second watch succeeds
+            elif args[:2] == ["run", "rerun"]:
+                with lock:
+                    rerun_count += 1
                 return ""
-            elif args[:2] == ["workflow", "run"]:
-                workflow_run_call_count += 1
-                return ""
-            elif args[:2] == ["run", "list"]:
-                return json.dumps(
-                    [{"databaseId": 400, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]
-                )
+            elif args[:2] == ["run", "view"]:
+                return "read tcp: i/o timeout"  # transient tail -> retry gate opens
             return ""
 
         mock_run_gh.side_effect = run_gh_side_effect
 
         results = _watch_runs(runs, "test-label", "user/repo")
 
-        # Only ONE retry should have been dispatched
-        assert workflow_run_call_count == 1, (
-            f"Expected exactly 1 retry dispatch, got {workflow_run_call_count}"
-        )
+        # Only ONE rerun should have fired (dedup by workflow name)
+        assert rerun_count == 1, f"Expected exactly 1 rerun, got {rerun_count}"
 
         # All 3 runs should produce results
         assert len(results) == 3
 
-        # Exactly one result should be the retry success (run_id 400),
-        # the other two should be the original failures (run_ids 100/200/300)
-        retry_results = [r for r in results if r.get("run_id") == "400"]
-        original_failures = [r for r in results if r.get("run_id") in ("100", "200", "300")]
-
-        assert len(retry_results) == 1
-        assert retry_results[0]["passed"] is True
-        assert retry_results[0]["name"] == "CI"
-
-        assert len(original_failures) == 2
-        for r in original_failures:
-            assert r["passed"] is False
-            assert r["name"] == "CI"
+        # Exactly one result passed (the rerun winner); the other two failed.
+        passed = [r for r in results if r["passed"]]
+        failed = [r for r in results if not r["passed"]]
+        assert len(passed) == 1
+        assert len(failed) == 2
+        assert all(r["name"] == "CI" for r in results)
 
 
 class TestLatePollRetryDedup:
-    """Tests that retry runs dispatched during the initial watch are not
-    re-watched or re-retried when they reappear in the late re-poll.
+    """Tests that an in-place rerun is not re-watched or re-retried when it
+    reappears in the late re-poll.
 
-    A retry dispatched via `gh workflow run` executes on the same commit SHA,
-    so the late re-poll (`gh run list --commit`) includes it. It must be
-    recognized as a known retry run, not treated as a late-starting workflow.
+    An in-place rerun (`gh run rerun`) reuses the failed run's own id, so the
+    late re-poll (`gh run list --commit`) sees that already-known id and never
+    treats it as a late-starting workflow.
     """
 
     @patch("rlsbl.commands.watch._notify")
@@ -896,45 +900,43 @@ class TestLatePollRetryDedup:
     def test_retry_run_not_treated_as_late_run(
         self, mock_run, mock_run_gh, mock_time, mock_poll, mock_audit, mock_notify
     ):
-        """A failed CI run is retried once; the retry run showing up in the
-        re-poll is neither watched again nor retried again."""
+        """A failed CI run is reran in place; because the rerun keeps the run
+        id, the re-poll (which sees that same id) never treats it as a
+        late-starting run or reruns it again."""
         ci_run = {"databaseId": 100, "name": "CI", "headBranch": "main"}
         lint_run = {"databaseId": 101, "name": "Lint", "headBranch": "main"}
-        retry_run = {"databaseId": 400, "name": "CI", "headBranch": "main"}
 
         mock_poll.side_effect = [
-            [ci_run, lint_run],             # initial discovery
-            [ci_run, lint_run, retry_run],  # late re-poll sees the retry run
+            [ci_run, lint_run],  # initial discovery
+            [ci_run, lint_run],  # late re-poll: same ids (reran 100 unchanged)
         ]
         mock_run.side_effect = [
             "abc123full",  # git rev-parse
             "v1.0.0",      # git describe
         ]
 
-        dispatch_count = 0
+        rerun_count = 0
         watch_calls = []
+        lock = threading.Lock()
 
         def run_gh_side_effect(args, **kwargs):
-            nonlocal dispatch_count
+            nonlocal rerun_count
             if args[:2] == ["repo", "view"]:
                 return json.dumps({"nameWithOwner": "user/repo", "name": "repo"})
             if args[:2] == ["run", "watch"]:
-                run_id = args[2]
-                watch_calls.append(run_id)
-                if run_id == "101":
+                rid = args[2]
+                with lock:
+                    watch_calls.append(rid)
+                if rid == "101":
                     return ""  # Lint passes
-                # CI original and any retry runs fail
+                # CI original and its rerun both fail.
                 raise subprocess.CalledProcessError(1, "gh")
-            if args[:2] == ["workflow", "run"]:
-                dispatch_count += 1
+            if args[:2] == ["run", "rerun"]:
+                with lock:
+                    rerun_count += 1
                 return ""
-            if args[:2] == ["run", "list"]:
-                # First dispatch produces run 400; a buggy second dispatch
-                # would produce run 500.
-                rid = 400 if dispatch_count == 1 else 500
-                return json.dumps(
-                    [{"databaseId": rid, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]
-                )
+            if args[:2] == ["run", "view"]:
+                return "read tcp: i/o timeout"  # transient tail
             return ""
 
         mock_run_gh.side_effect = run_gh_side_effect
@@ -942,19 +944,15 @@ class TestLatePollRetryDedup:
         with pytest.raises(SystemExit) as exc_info:
             run_cmd(None, ["abc123"], {})
 
-        assert exc_info.value.code == 1  # CI and its retry failed
+        assert exc_info.value.code == 1  # CI and its rerun failed
 
-        # Exactly ONE retry dispatch: the retry run reappearing in the
-        # re-poll must not trigger another `gh workflow run`.
-        assert dispatch_count == 1, (
-            f"Expected exactly 1 retry dispatch, got {dispatch_count}"
+        # Exactly ONE rerun, and run 100 watched exactly twice (initial +
+        # rerun), never a third time as a "late run".
+        assert rerun_count == 1, f"Expected exactly 1 rerun, got {rerun_count}"
+        assert watch_calls.count("100") == 2, (
+            f"Run 100 watched {watch_calls.count('100')} times: {watch_calls}"
         )
-        # The retry run is watched exactly once (during the retry), never
-        # again as a "late run".
-        assert watch_calls.count("400") == 1, (
-            f"Retry run 400 watched {watch_calls.count('400')} times: {watch_calls}"
-        )
-        # Audit sees one result per workflow: CI retry failure + Lint pass.
+        # Audit sees one result per workflow: CI rerun failure + Lint pass.
         audit_arg = mock_audit.call_args[0][0]
         assert len(audit_arg) == 2, f"Expected 2 results, got {audit_arg}"
 
@@ -968,39 +966,38 @@ class TestLatePollRetryDedup:
         self, mock_run, mock_run_gh, mock_time, mock_poll, mock_audit, mock_notify
     ):
         """Retry dedup must also apply when the initial pool has exactly one
-        run: the single-run path must use the same shared-state machinery, so
-        the retry run appearing in the re-poll is not re-watched/re-retried."""
+        run: the single-run path uses the same shared-state machinery, so the
+        reran run appearing in the re-poll is not re-watched/re-retried."""
         ci_run = {"databaseId": 100, "name": "CI", "headBranch": "main"}
-        retry_run = {"databaseId": 400, "name": "CI", "headBranch": "main"}
 
         mock_poll.side_effect = [
-            [ci_run],             # initial discovery: single run
-            [ci_run, retry_run],  # late re-poll sees the retry run
+            [ci_run],  # initial discovery: single run
+            [ci_run],  # late re-poll: same id (reran 100 unchanged)
         ]
         mock_run.side_effect = [
             "abc123full",  # git rev-parse
             "v1.0.0",      # git describe
         ]
 
-        dispatch_count = 0
+        rerun_count = 0
         watch_calls = []
+        lock = threading.Lock()
 
         def run_gh_side_effect(args, **kwargs):
-            nonlocal dispatch_count
+            nonlocal rerun_count
             if args[:2] == ["repo", "view"]:
                 return json.dumps({"nameWithOwner": "user/repo", "name": "repo"})
             if args[:2] == ["run", "watch"]:
-                watch_calls.append(args[2])
-                # Original run and all retry runs fail
+                with lock:
+                    watch_calls.append(args[2])
+                # Original run and its rerun both fail.
                 raise subprocess.CalledProcessError(1, "gh")
-            if args[:2] == ["workflow", "run"]:
-                dispatch_count += 1
+            if args[:2] == ["run", "rerun"]:
+                with lock:
+                    rerun_count += 1
                 return ""
-            if args[:2] == ["run", "list"]:
-                rid = 400 if dispatch_count == 1 else 500
-                return json.dumps(
-                    [{"databaseId": rid, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]
-                )
+            if args[:2] == ["run", "view"]:
+                return "read tcp: i/o timeout"  # transient tail
             return ""
 
         mock_run_gh.side_effect = run_gh_side_effect
@@ -1010,167 +1007,62 @@ class TestLatePollRetryDedup:
 
         assert exc_info.value.code == 1
 
-        assert dispatch_count == 1, (
-            f"Expected exactly 1 retry dispatch, got {dispatch_count}"
+        assert rerun_count == 1, f"Expected exactly 1 rerun, got {rerun_count}"
+        assert watch_calls.count("100") == 2, (
+            f"Run 100 watched {watch_calls.count('100')} times: {watch_calls}"
         )
-        assert watch_calls.count("400") == 1, (
-            f"Retry run 400 watched {watch_calls.count('400')} times: {watch_calls}"
-        )
-        # Audit sees exactly one result: the CI retry failure.
+        # Audit sees exactly one result: the CI rerun failure.
         audit_arg = mock_audit.call_args[0][0]
         assert len(audit_arg) == 1, f"Expected 1 result, got {audit_arg}"
 
 
-class TestRetryAttachment:
-    """Tests that _retry_workflow attaches to the actual dispatched retry run,
-    not to the just-failed original run (or another known run) that `gh run
-    list --limit 1` may still report as the newest run before the dispatched
-    run appears."""
+class TestRerunFailureLogTail:
+    """Tests for the retry-failure log tail (feature 1.5b): when the in-place
+    rerun ALSO fails, the failing-step log tail is printed alongside the run
+    URL, and a broken fetch never breaks the return path."""
 
     @patch("rlsbl.commands.watch.time")
     @patch("rlsbl.commands.watch.run_gh")
-    def test_retry_does_not_attach_to_original_failed_run(self, mock_run_gh, mock_time, capsys):
-        """When the dispatched retry run has not appeared yet, the poll must
-        keep waiting instead of attaching to the original failed run."""
-        ci_run = {"databaseId": 100, "name": "CI", "headBranch": "main"}
+    def test_rerun_failure_prints_log_tail(self, mock_run_gh, mock_time, capsys):
+        """(d) On a double failure, the rerun's failing-step log tail is
+        printed next to the run URL."""
+        mock_run_gh.side_effect = [
+            "",                                                 # gh run rerun <id>
+            subprocess.CalledProcessError(1, "gh"),             # retry watch fails
+            "FAILED tests/test_x.py::test_y - assert 1 == 2",   # gh run view --log-failed (retry tail)
+        ]
 
-        list_calls = 0
+        result = _retry_workflow("CI", "user/repo", "test-label", "100")
 
-        def run_gh_side_effect(args, **kwargs):
-            nonlocal list_calls
-            if args[:2] == ["run", "watch"]:
-                if args[2] == "100":
-                    # Original run fails (both on the initial watch and if a
-                    # buggy retry attaches to it and watches it again)
-                    raise subprocess.CalledProcessError(1, "gh")
-                return ""  # the real retry run (400) passes
-            if args[:2] == ["workflow", "run"]:
-                return ""
-            if args[:2] == ["run", "list"]:
-                list_calls += 1
-                if list_calls == 1:
-                    # Dispatched run not visible yet: newest run is still the
-                    # just-failed original
-                    return json.dumps(
-                        [{"databaseId": 100, "name": "CI", "status": "completed", "createdAt": "2026-01-01"}]
-                    )
-                return json.dumps(
-                    [{"databaseId": 400, "name": "CI", "status": "queued", "createdAt": "2026-01-02"}]
-                )
-            return ""
-
-        mock_run_gh.side_effect = run_gh_side_effect
-
-        result = _watch_single_run(ci_run, "test-label", "user/repo")
-
-        # The retry must attach to the dispatched run (400), not report a
-        # bogus result from re-watching the original failed run (100).
-        assert result["run_id"] == "400", (
-            f"Retry attached to wrong run: {result}"
-        )
-        assert result["passed"] is True
-        assert list_calls >= 2, "Poll must retry until a new run ID appears"
+        assert result["passed"] is False
+        assert result["run_id"] == "100"
+        err = capsys.readouterr().err
+        assert "retry also failed" in err
+        assert "retry failure log tail:" in err
+        assert "FAILED tests/test_x.py::test_y" in err
+        # The run URL is still printed alongside the tail.
+        assert "https://github.com/user/repo/actions/runs/100" in err
 
     @patch("rlsbl.commands.watch.time")
     @patch("rlsbl.commands.watch.run_gh")
-    def test_retry_does_not_attach_to_known_run(self, mock_run_gh, mock_time):
-        """A run ID already in known_ids (e.g. another initial run or a
-        previously dispatched retry) is never mistaken for the new retry."""
-        list_calls = 0
+    def test_rerun_failure_log_fetch_broken_returns_cleanly(self, mock_run_gh, mock_time, capsys):
+        """(e) When the retry-tail log fetch is broken, a loud note is printed
+        and the failure result is still returned (fetch never breaks return)."""
+        mock_run_gh.side_effect = [
+            "",                                          # gh run rerun <id>
+            subprocess.CalledProcessError(1, "gh"),      # retry watch fails
+            subprocess.TimeoutExpired("gh", 30),         # gh run view --log-failed fails
+        ]
 
-        def run_gh_side_effect(args, **kwargs):
-            nonlocal list_calls
-            if args[:2] == ["workflow", "run"]:
-                return ""
-            if args[:2] == ["run", "list"]:
-                list_calls += 1
-                if list_calls == 1:
-                    # Newest run is another already-known run, not our retry
-                    return json.dumps(
-                        [{"databaseId": 101, "name": "CI", "status": "in_progress", "createdAt": "2026-01-01"}]
-                    )
-                return json.dumps(
-                    [{"databaseId": 400, "name": "CI", "status": "queued", "createdAt": "2026-01-02"}]
-                )
-            if args[:2] == ["run", "watch"]:
-                return ""
-            return ""
+        result = _retry_workflow("CI", "user/repo", "test-label", "100")
 
-        mock_run_gh.side_effect = run_gh_side_effect
-
-        known_ids = {"100", "101"}
-        result = _retry_workflow("CI", "main", "user/repo", "test-label", "100", known_ids)
-
-        assert result is not None
-        assert result["run_id"] == "400"
-        # The identified retry run is recorded in the shared known-IDs set
-        assert "400" in known_ids
-
-    @patch("rlsbl.commands.watch.time")
-    @patch("rlsbl.commands.watch.run_gh")
-    def test_retry_uses_shared_known_ids_lock(self, mock_run_gh, mock_time, capsys):
-        """A caller-provided known_ids_lock is honored: known_ids reads and
-        writes happen under it (lock discipline for pool-thread mutation)."""
-        import threading
-
-        def run_gh_side_effect(args, **kwargs):
-            if args[:2] == ["workflow", "run"]:
-                return ""
-            if args[:2] == ["run", "list"]:
-                return json.dumps(
-                    [{"databaseId": 500, "name": "CI", "status": "queued", "createdAt": "2026-01-02"}]
-                )
-            if args[:2] == ["run", "watch"]:
-                return ""
-            return ""
-
-        mock_run_gh.side_effect = run_gh_side_effect
-
-        class TrackingLock:
-            def __init__(self):
-                self._lock = threading.Lock()
-                self.acquisitions = 0
-
-            def __enter__(self):
-                self.acquisitions += 1
-                return self._lock.__enter__()
-
-            def __exit__(self, *exc):
-                return self._lock.__exit__(*exc)
-
-        known_ids = {"100"}
-        lock = TrackingLock()
-        result = _retry_workflow("CI", "main", "user/repo", "test-label", "100",
-                                 known_ids, lock)
-
-        assert result is not None
-        assert result["run_id"] == "500"
-        assert "500" in known_ids
-        # At least two guarded accesses: the unknown-candidate read and the
-        # retry-id write.
-        assert lock.acquisitions >= 2
-
-    @patch("rlsbl.commands.watch.time")
-    @patch("rlsbl.commands.watch.run_gh")
-    def test_retry_not_found_when_only_original_appears(self, mock_run_gh, mock_time, capsys):
-        """If every poll only ever shows the original failed run, the retry
-        is reported as not found instead of attaching to the original."""
-
-        def run_gh_side_effect(args, **kwargs):
-            if args[:2] == ["workflow", "run"]:
-                return ""
-            if args[:2] == ["run", "list"]:
-                return json.dumps(
-                    [{"databaseId": 100, "name": "CI", "status": "completed", "createdAt": "2026-01-01"}]
-                )
-            return ""
-
-        mock_run_gh.side_effect = run_gh_side_effect
-
-        result = _retry_workflow("CI", "main", "user/repo", "test-label", "100")
-
-        assert result is None
-        assert "retry run not found" in capsys.readouterr().err
+        assert result["passed"] is False
+        assert result["run_id"] == "100"
+        err = capsys.readouterr().err
+        assert "retry also failed" in err
+        assert "could not fetch retry failure logs" in err
+        # URL still printed despite the broken fetch.
+        assert "https://github.com/user/repo/actions/runs/100" in err
 
 
 class TestClassifyFailure:
@@ -1320,15 +1212,14 @@ class TestRetryClassification:
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),   # original watch fails
             "read tcp: i/o timeout",                  # gh run view --log-failed
-            "",                                       # gh workflow run trigger
-            json.dumps([{"databaseId": 200, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]),
-            "",                                       # retry watch succeeds
+            "",                                       # gh run rerun <id>
+            "",                                       # retry watch (same id) succeeds
         ]
 
         result = _watch_single_run(ci_run, "test-label", "user/repo")
 
         assert result["passed"] is True
-        assert result["run_id"] == "200"
+        assert result["run_id"] == "100"
         err = capsys.readouterr().err
         assert "failure log tail:" in err
         assert "i/o timeout" in err
@@ -1343,15 +1234,14 @@ class TestRetryClassification:
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),   # original watch fails
             "something totally unrecognized happened",  # gh run view --log-failed
-            "",                                       # gh workflow run trigger
-            json.dumps([{"databaseId": 200, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]),
-            "",                                       # retry watch succeeds
+            "",                                       # gh run rerun <id>
+            "",                                       # retry watch (same id) succeeds
         ]
 
         result = _watch_single_run(ci_run, "test-label", "user/repo")
 
         assert result["passed"] is True
-        assert result["run_id"] == "200"
+        assert result["run_id"] == "100"
         err = capsys.readouterr().err
         assert "CI failed, retrying once..." in err
 
@@ -1365,15 +1255,14 @@ class TestRetryClassification:
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),          # original watch fails
             subprocess.TimeoutExpired("gh", 30),             # gh run view --log-failed fails
-            "",                                              # gh workflow run trigger
-            json.dumps([{"databaseId": 200, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]),
-            "",                                              # retry watch succeeds
+            "",                                              # gh run rerun <id>
+            "",                                              # retry watch (same id) succeeds
         ]
 
         result = _watch_single_run(ci_run, "test-label", "user/repo")
 
         assert result["passed"] is True
-        assert result["run_id"] == "200"
+        assert result["run_id"] == "100"
         err = capsys.readouterr().err
         assert "could not fetch failure logs" in err
         assert "retrying without classification" in err
