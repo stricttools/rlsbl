@@ -129,7 +129,18 @@ def inject_job_metadata(jobs: dict, tag_prefix: str, working_dir: str) -> dict:
 
         defaults = job.get("defaults", {})
         run_block = defaults.get("run", {})
-        run_block["working-directory"] = working_dir
+        # Compose the project's path with any per-target working-directory the
+        # merged-publish generator already injected (a target living in a
+        # subdirectory of the project). Absent a pre-injected value the result
+        # is exactly *working_dir* (the project path) -- unchanged behaviour for
+        # every project whose targets sit at the project root.
+        existing_wd = run_block.get("working-directory")
+        if existing_wd and existing_wd != ".":
+            run_block["working-directory"] = os.path.normpath(
+                os.path.join(working_dir, existing_wd)
+            )
+        else:
+            run_block["working-directory"] = working_dir
         defaults["run"] = run_block
         job["defaults"] = defaults
 
@@ -351,9 +362,21 @@ def _render_root_publisher_jobs(
     tvars = _build_project_template_vars(project_dir, root)
     tvars["year"] = str(datetime.now().year)
 
-    # target_paths={} -> every target's path defaults to "." (repo root),
-    # so no working-directory/packages-dir subdir rewriting occurs here.
-    merged_yaml = _generate_merged_publish(targets, tvars, target_paths={})
+    # Real per-target paths so a subdir target (e.g. {"name": "npm",
+    # "path": "npm"}) gets defaults.run.working-directory injected plus
+    # packages-dir/version-file input rewriting, exactly like the standalone
+    # scaffold. detect_targets returns paths anchored at project_dir; make
+    # them relative to project_dir (the root publisher's dir == repo root) so
+    # a root target resolves to "." (no rewriting) and a subdir target to its
+    # offset within the repo.
+    target_paths = {
+        e.name: os.path.relpath(e.path, project_dir)
+        for e in entries
+        if e.name in TARGETS
+    }
+    merged_yaml = _generate_merged_publish(
+        targets, tvars, target_paths=target_paths
+    )
     workflow = parse_publish_workflow_content(
         merged_yaml, source=f"<rendered root publisher {project['name']}>"
     )
