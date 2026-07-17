@@ -485,6 +485,57 @@ class TestRecoveryDispatch(unittest.TestCase):
             self.assertIn("inputs.tag || github.event.release.tag_name", content,
                           f"{name} missing tag-based checkout ref")
 
+    def test_no_publish_template_reads_github_ref_name_directly(self):
+        """No publish template reads GITHUB_REF_NAME in a shell body.
+
+        A direct GITHUB_REF_NAME read mis-resolves to the branch (e.g. "main")
+        on a workflow_dispatch retry at ref=main with inputs.tag set. The tag
+        must reach the shell via a RELEASE_TAG step env with an inputs.tag
+        fallback instead.
+        """
+        import os, glob
+
+        tpl_dir = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "rlsbl", "templates",
+        )
+        templates = sorted(glob.glob(os.path.join(tpl_dir, "*/publish*.yml.tpl")))
+
+        for tpl_path in templates:
+            with open(tpl_path) as f:
+                content = f.read()
+            name = os.path.basename(os.path.dirname(tpl_path)) + "/" + os.path.basename(tpl_path)
+            self.assertNotIn("GITHUB_REF_NAME", content,
+                             f"{name} reads GITHUB_REF_NAME directly (mis-resolves on retry)")
+
+    def test_go_binary_template_derives_tag_via_release_tag_env(self):
+        """go/publish.yml.tpl derives TAG from the RELEASE_TAG step env."""
+        import os
+
+        tpl_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "rlsbl", "templates", "go", "publish.yml.tpl",
+        )
+        with open(tpl_path) as f:
+            content = f.read()
+        self.assertIn("RELEASE_TAG: ${{ inputs.tag || github.ref_name }}", content)
+        self.assertIn('TAG="${RELEASE_TAG}"', content)
+        self.assertNotIn("GITHUB_REF_NAME", content)
+
+    def test_maven_central_template_derives_version_via_release_tag_env(self):
+        """maven/publish-central.yml.tpl derives VERSION from the RELEASE_TAG step env."""
+        import os
+
+        tpl_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "rlsbl", "templates", "maven", "publish-central.yml.tpl",
+        )
+        with open(tpl_path) as f:
+            content = f.read()
+        self.assertIn("RELEASE_TAG: ${{ inputs.tag || github.ref_name }}", content)
+        self.assertIn('VERSION="${RELEASE_TAG#v}"', content)
+        self.assertNotIn("GITHUB_REF_NAME", content)
+
     def test_retry_config_has_tag_field(self):
         """RetryConfig has a tag field."""
         from rlsbl.release_file import RetryConfig
