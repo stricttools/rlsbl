@@ -16,7 +16,6 @@ import os
 import pytest
 
 from rlsbl.errors import WorkspaceError
-from rlsbl.snapshot import generate_snapshot
 from rlsbl.workspace import (
     DEFAULT_TAG_FORMAT,
     Releasable,
@@ -648,104 +647,6 @@ releasable = "core"
             assert len(loaded_rels) == 1
             assert loaded_rels[0].name == "core"
             assert projects[0].releasable == "core"
-
-
-# ---------------------------------------------------------------------------
-# Snapshot: releasable section
-# ---------------------------------------------------------------------------
-
-
-class TestSnapshotReleasables:
-    """generate_snapshot() includes releasable information when provided."""
-
-    def test_no_releasables_backward_compat(self, tmp_path):
-        """Without releasables, snapshot has no releasables section."""
-        root, projects = _make_workspace_with_targets(tmp_path, [
-            {"name": "alpha", "path": "packages/alpha", "target": "pypi",
-             "version": "1.0.0"},
-        ])
-        graph = WorkspaceGraph(root, projects)
-        snapshot = generate_snapshot(root, projects, graph)
-        assert "releasables" not in snapshot
-        assert "releasable" not in snapshot["packages"]["alpha"]
-
-    def test_explicit_releasables_single_member(self, tmp_path):
-        """With explicit releasables, each project maps to its releasable."""
-        root, projects = _make_workspace_with_targets(tmp_path, [
-            {"name": "alpha", "path": "packages/alpha", "target": "pypi",
-             "version": "1.0.0", "releasable": "alpha"},
-            {"name": "beta", "path": "packages/beta", "target": "pypi",
-             "version": "0.2.0", "releasable": "beta"},
-        ])
-        graph = WorkspaceGraph(root, projects)
-        releasables = [Releasable(name="alpha"), Releasable(name="beta")]
-        snapshot = generate_snapshot(root, projects, graph, releasables=releasables)
-
-        assert "releasables" in snapshot
-        assert set(snapshot["releasables"].keys()) == {"alpha", "beta"}
-        assert snapshot["releasables"]["alpha"]["members"] == ["alpha"]
-        assert snapshot["releasables"]["alpha"]["version"] is None
-        assert snapshot["releasables"]["alpha"]["tag_format"] == DEFAULT_TAG_FORMAT
-
-    def test_explicit_releasables(self, tmp_path):
-        """With explicit releasables, members are derived correctly."""
-        root, projects = _make_workspace_with_targets(tmp_path, [
-            {"name": "a", "path": "packages/a", "target": "pypi",
-             "version": "1.0.0", "releasable": "core"},
-            {"name": "b", "path": "packages/b", "target": "pypi",
-             "version": "1.0.0", "releasable": "core"},
-            {"name": "c", "path": "packages/c", "target": "pypi",
-             "version": "0.5.0", "releasable": "www"},
-        ])
-        graph = WorkspaceGraph(root, projects)
-        releasables = [
-            Releasable(name="core"),
-            Releasable(name="www", tag_format="v{version}"),
-        ]
-        snapshot = generate_snapshot(root, projects, graph, releasables=releasables)
-
-        assert snapshot["releasables"]["core"]["members"] == ["a", "b"]
-        assert snapshot["releasables"]["www"]["members"] == ["c"]
-        assert snapshot["releasables"]["www"]["tag_format"] == "v{version}"
-
-    def test_per_package_releasable_field(self, tmp_path):
-        """Each package entry gets a releasable field."""
-        root, projects = _make_workspace_with_targets(tmp_path, [
-            {"name": "a", "path": "packages/a", "target": "pypi",
-             "version": "1.0.0", "releasable": "core"},
-            {"name": "b", "path": "packages/b", "target": "pypi",
-             "version": "1.0.0", "releasable": False},
-        ])
-        graph = WorkspaceGraph(root, projects)
-        releasables = [Releasable(name="core")]
-        snapshot = generate_snapshot(root, projects, graph, releasables=releasables)
-
-        assert snapshot["packages"]["a"]["releasable"] == "core"
-        assert snapshot["packages"]["b"]["releasable"] is None
-
-    def test_explicit_releasable_package_field(self, tmp_path):
-        """Package with releasable field gets it in snapshot."""
-        root, projects = _make_workspace_with_targets(tmp_path, [
-            {"name": "alpha", "path": "packages/alpha", "target": "pypi",
-             "version": "1.0.0", "releasable": "alpha"},
-        ])
-        graph = WorkspaceGraph(root, projects)
-        releasables = [Releasable(name="alpha")]
-        snapshot = generate_snapshot(root, projects, graph, releasables=releasables)
-
-        assert snapshot["packages"]["alpha"]["releasable"] == "alpha"
-
-    def test_dev_node_package_releasable_null(self, tmp_path):
-        """dev_node packages get releasable=null in snapshot."""
-        root, projects = _make_workspace_with_targets(tmp_path, [
-            {"name": "tests", "path": "packages/tests", "target": "pypi",
-             "version": "0.1.0", "dev_node": True},
-        ])
-        graph = WorkspaceGraph(root, projects)
-        releasables = []
-        snapshot = generate_snapshot(root, projects, graph, releasables=releasables)
-
-        assert snapshot["packages"]["tests"]["releasable"] is None
 
 
 # ---------------------------------------------------------------------------

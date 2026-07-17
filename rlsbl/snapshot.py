@@ -5,22 +5,19 @@ import os
 from datetime import datetime, timezone
 
 from .targets import detect_targets, resolve_releasable_config_dir, TARGETS
-from .workspace import WORKSPACE_DIR, WorkspaceProject, members_of, project_is_dev_only, project_is_releasable
+from .workspace import WORKSPACE_DIR, project_is_dev_only, project_is_releasable
 
 
 SNAPSHOT_FILE = "snapshot.json"
 
 
-def generate_snapshot(root, projects, graph, releasables=None):
+def generate_snapshot(root, projects, graph):
     """Build the snapshot dict from workspace data.
 
     Args:
         root: absolute path to the monorepo root.
         projects: list of project dicts from load_workspace().
         graph: WorkspaceGraph instance.
-        releasables: optional list of Releasable instances. When provided,
-            the snapshot includes a ``releasables`` section and per-package
-            ``releasable`` fields.
 
     Returns a dict matching the snapshot schema.
     """
@@ -60,17 +57,6 @@ def generate_snapshot(root, projects, graph, releasables=None):
             "test_only": proj.get("test_only", False),
         }
 
-        # Add releasable field when releasables are provided.
-        if releasables is not None:
-            rel_val = proj.get("releasable")
-            if rel_val is None:
-                # Implicit mode: project is its own releasable (unless non-releasable)
-                pkg_entry["releasable"] = name if project_is_releasable(proj) else None
-            elif rel_val is False:
-                pkg_entry["releasable"] = None
-            else:
-                pkg_entry["releasable"] = rel_val
-
         packages[name] = pkg_entry
 
     # Compute graph metadata
@@ -93,21 +79,6 @@ def generate_snapshot(root, projects, graph, releasables=None):
             "topological_order": topo_order,
         },
     }
-
-    # Add releasables section when releasables are provided.
-    if releasables is not None:
-        releasables_section = {}
-        for rel in releasables:
-            member_projs = members_of(rel.name, projects)
-            releasables_section[rel.name] = {
-                "members": sorted(
-                    p.name if isinstance(p, WorkspaceProject) else p["name"]
-                    for p in member_projs
-                ),
-                "version": None,
-                "tag_format": rel.tag_format,
-            }
-        result["releasables"] = releasables_section
 
     return result
 
