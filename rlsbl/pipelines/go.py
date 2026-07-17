@@ -36,10 +36,18 @@ class GoPipeline(BasePipeline):
 
     def template_mappings(self, ctx) -> list[dict[str, str]]:
         # Library projects use a lightweight module-availability verification
-        # publish template instead of goreleaser. The artifact kind is set by
-        # _ensure_pipeline_config (auto-detected) or declared explicitly in
-        # config.json.
-        artifact = self.config.get("artifact", "binary")
+        # publish template instead of goreleaser. The artifact kind is
+        # mandatory -- there is no default. validate_pipelines_config
+        # guarantees presence at check/release time; a config constructed
+        # without validation must still fail loudly rather than silently
+        # assume "binary".
+        artifact = self.config.get("artifact")
+        if artifact not in ("library", "binary"):
+            raise ConfigError(
+                f"go pipeline '{self.name}' requires 'artifact' set to "
+                f'"binary" or "library" (got {artifact!r}). Add the key to '
+                "the pipeline entry in .rlsbl/config.json."
+            )
         if artifact == "library":
             tpl = "publish-library.yml.tpl"
         else:
