@@ -178,39 +178,25 @@ class TestHomebrewTemplateRendering:
 
 
 class TestNpmWrapperTemplateVars:
-    """Test npmScope and npmPublishJobs generation."""
-
-    def test_npm_scope_with_config(self, tmp_path, monkeypatch):
-        """npmScope set when npm_wrapper.scope configured."""
-        monkeypatch.chdir(tmp_path)
-        _setup_go_project(tmp_path)
-        config_dir = tmp_path / ".rlsbl"
-        config_dir.mkdir()
-        (config_dir / "config.json").write_text(
-            '{"npm_wrapper": {"scope": "@testuser"}}'
-        )
-        vars_ = TARGETS["go"].template_vars(str(tmp_path), make_ctx(tmp_path))
-        assert vars_["npmScope"] == "@testuser"
-
-    def test_npm_scope_empty_without_config(self, tmp_path, monkeypatch):
-        """npmScope is empty when npm_wrapper not configured."""
-        monkeypatch.chdir(tmp_path)
-        _setup_go_project(tmp_path)
-        vars_ = TARGETS["go"].template_vars(str(tmp_path), make_ctx(tmp_path))
-        assert vars_.get("npmScope", "") == ""
+    """Test the npm_wrapper.enabled gate and npmPublishJobs generation."""
 
     def test_npm_publish_jobs_with_config(self, tmp_path, monkeypatch):
-        """npmPublishJobs generated when npm_wrapper.scope configured."""
+        """npmPublishJobs generated when npm_wrapper.enabled is true (bare names)."""
         monkeypatch.chdir(tmp_path)
         _setup_go_project(tmp_path)
         config_dir = tmp_path / ".rlsbl"
         config_dir.mkdir()
         (config_dir / "config.json").write_text(
-            '{"npm_wrapper": {"scope": "@testuser"}}'
+            '{"npm_wrapper": {"enabled": true}}'
         )
         vars_ = TARGETS["go"].template_vars(str(tmp_path), make_ctx(tmp_path))
-        assert "npm publish" in vars_.get("npmPublishJobs", "")
-        assert "needs:" in vars_.get("npmPublishJobs", "")
+        jobs = vars_.get("npmPublishJobs", "")
+        assert "npm publish" in jobs
+        assert "needs:" in jobs
+        # Bare per-platform names -- no @scope/ prefix.
+        assert "testproject-linux-x64" in jobs
+        assert "@scope" not in jobs
+        assert "/testproject" not in jobs
 
     def test_npm_publish_jobs_empty_without_config(self, tmp_path, monkeypatch):
         """npmPublishJobs is empty when npm_wrapper not configured."""
@@ -218,6 +204,34 @@ class TestNpmWrapperTemplateVars:
         _setup_go_project(tmp_path)
         vars_ = TARGETS["go"].template_vars(str(tmp_path), make_ctx(tmp_path))
         assert vars_.get("npmPublishJobs", "") == ""
+
+    def test_npm_publish_jobs_empty_when_disabled(self, tmp_path, monkeypatch):
+        """npmPublishJobs empty when npm_wrapper.enabled is false."""
+        monkeypatch.chdir(tmp_path)
+        _setup_go_project(tmp_path)
+        config_dir = tmp_path / ".rlsbl"
+        config_dir.mkdir()
+        (config_dir / "config.json").write_text(
+            '{"npm_wrapper": {"enabled": false}}'
+        )
+        vars_ = TARGETS["go"].template_vars(str(tmp_path), make_ctx(tmp_path))
+        assert vars_.get("npmPublishJobs", "") == ""
+
+    def test_old_scope_config_hard_errors(self, tmp_path, monkeypatch):
+        """A stale npm_wrapper.scope config must hard-error, not be ignored."""
+        from rlsbl.npm_wrapper import NpmWrapperConfigError
+
+        monkeypatch.chdir(tmp_path)
+        _setup_go_project(tmp_path)
+        config_dir = tmp_path / ".rlsbl"
+        config_dir.mkdir()
+        (config_dir / "config.json").write_text(
+            '{"npm_wrapper": {"scope": "@testuser"}}'
+        )
+        with pytest.raises(NpmWrapperConfigError) as exc:
+            TARGETS["go"].template_vars(str(tmp_path), make_ctx(tmp_path))
+        assert "scope" in str(exc.value)
+        assert "enabled" in str(exc.value)
 
 
 # ---------------------------------------------------------------------------
@@ -237,7 +251,7 @@ class TestNpmWrapperTemplateMappings:
         config_dir = tmp_path / ".rlsbl"
         config_dir.mkdir()
         (config_dir / "config.json").write_text(
-            '{"npm_wrapper": {"scope": "@testuser"}}'
+            '{"npm_wrapper": {"enabled": true}}'
         )
         mappings = TARGETS["go"].shared_template_mappings(make_ctx(tmp_path))
         targets = [m["target"] for m in mappings]
@@ -270,7 +284,7 @@ class TestNpmWrapperTemplateMappings:
         config_dir = tmp_path / ".rlsbl"
         config_dir.mkdir()
         (config_dir / "config.json").write_text(
-            '{"npm_wrapper": {"scope": "@user"}}'
+            '{"npm_wrapper": {"enabled": true}}'
         )
         mappings = TARGETS["go"].shared_template_mappings(make_ctx(tmp_path))
         targets = [m["target"] for m in mappings]
@@ -288,33 +302,33 @@ class TestNpmWrapperTemplateRendering:
     def test_wrapper_package_json_renders(self):
         """Wrapper package.json template renders valid JSON."""
         template = open(_shared_template_path("npm-wrapper/package.json.tpl")).read()
-        vars_ = {"npmScope": "@testuser", "binCommand": "mycli"}
+        vars_ = {"binCommand": "mycli"}
         content, unreplaced = process_template(template, vars_)
         assert unreplaced == []
         data = json.loads(content)
-        assert data["name"] == "@testuser/mycli"
-        assert "@testuser/mycli-linux-x64" in data["optionalDependencies"]
+        assert data["name"] == "mycli"
+        assert "mycli-linux-x64" in data["optionalDependencies"]
 
     def test_platform_package_json_renders(self):
         """Platform package.json template renders valid JSON."""
         template = open(
             _shared_template_path("npm-wrapper/platform-linux-x64.json.tpl")
         ).read()
-        vars_ = {"npmScope": "@testuser", "binCommand": "mycli"}
+        vars_ = {"binCommand": "mycli"}
         content, _ = process_template(template, vars_)
         data = json.loads(content)
-        assert data["name"] == "@testuser/mycli-linux-x64"
+        assert data["name"] == "mycli-linux-x64"
         assert data["os"] == ["linux"]
         assert data["cpu"] == ["x64"]
 
     def test_bin_script_renders(self):
         """Bin script template renders with correct platform mappings."""
         template = open(_shared_template_path("npm-wrapper/bin-index.js.tpl")).read()
-        vars_ = {"npmScope": "@testuser", "binCommand": "mycli"}
+        vars_ = {"binCommand": "mycli"}
         content, unreplaced = process_template(template, vars_)
         assert unreplaced == []
-        assert "@testuser/mycli-linux-x64" in content
-        assert "@testuser/mycli-win32-x64" in content
+        assert "mycli-linux-x64" in content
+        assert "mycli-win32-x64" in content
         assert "mycli.exe" in content  # Windows binary name
 
 

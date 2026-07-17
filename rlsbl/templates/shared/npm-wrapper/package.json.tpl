@@ -1,17 +1,17 @@
 {
-  "name": "{{npmScope}}/{{binCommand}}",
+  "name": "{{binCommand}}",
   "version": "0.0.0",
   "description": "{{binCommand}} - distributed via npm",
   "bin": {
     "{{binCommand}}": "bin/index.js"
   },
   "optionalDependencies": {
-    "{{npmScope}}/{{binCommand}}-linux-x64": "0.0.0",
-    "{{npmScope}}/{{binCommand}}-linux-arm64": "0.0.0",
-    "{{npmScope}}/{{binCommand}}-darwin-x64": "0.0.0",
-    "{{npmScope}}/{{binCommand}}-darwin-arm64": "0.0.0",
-    "{{npmScope}}/{{binCommand}}-win32-x64": "0.0.0",
-    "{{npmScope}}/{{binCommand}}-win32-arm64": "0.0.0"
+    "{{binCommand}}-linux-x64": "0.0.0",
+    "{{binCommand}}-linux-arm64": "0.0.0",
+    "{{binCommand}}-darwin-x64": "0.0.0",
+    "{{binCommand}}-darwin-arm64": "0.0.0",
+    "{{binCommand}}-win32-x64": "0.0.0",
+    "{{binCommand}}-win32-arm64": "0.0.0"
   },
   "license": "MIT"
 }

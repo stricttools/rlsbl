@@ -69,6 +69,7 @@ def _publish_templates():
 RENDER_VARS = {
     "publishGate": gate_job_template_snippet("^(test)( \\(.*\\))?$"),
     "registryUrl": "https://registry.npmjs.org",
+    "modulePath": "github.com/owner/repo",
     "zig.projectName": "myproj",
     "zig.minRequiredZig": "0.13.0",
     # Block-insertion vars: empty so the base template stands alone.
@@ -245,13 +246,13 @@ class TestNpmWrapperJobsGated:
                 binary_name="mytool",
             )
         ]
-        out = build_npm_publish_jobs("@scope", "mytool", artifacts)
+        out = build_npm_publish_jobs("mytool", artifacts)
         assert "needs: [gate, goreleaser]" in out
 
     def test_npm_publish_jobs_custom_depends_on_still_gated(self):
         artifacts = []
         out = build_npm_publish_jobs(
-            "@scope", "mytool", artifacts, depends_on="build-and-upload"
+            "mytool", artifacts, depends_on="build-and-upload"
         )
         assert "needs: [gate, build-and-upload]" in out
 
@@ -306,7 +307,7 @@ class TestMergedPublishGate:
                 binary_name="mytool",
             )
         ]
-        npm_jobs = build_npm_publish_jobs("@scope", "mytool", artifacts)
+        npm_jobs = build_npm_publish_jobs("mytool", artifacts)
         result = _generate_merged_publish(
             ["go", "pypi"],
             template_vars={"npmPublishJobs": npm_jobs, "homebrewEnv": ""},

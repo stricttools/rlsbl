@@ -37,6 +37,52 @@ class PlatformArtifact:
     binary_name: str
 
 
+class NpmWrapperConfigError(ValueError):
+    """Raised when npm_wrapper config carries a removed scoped-name key.
+
+    Scoped npm names (``@scope/name``) are banned by ecosystem policy, so the
+    old ``scope``/``npm_scope`` activation keys were removed. The wrapper now
+    activates via ``{"npm_wrapper": {"enabled": true}}`` and publishes bare
+    per-platform names.
+    """
+
+
+def npm_wrapper_enabled(config: dict | None) -> bool:
+    """Return whether the npm binary-wrapper family is enabled for this config.
+
+    Activation is an explicit boolean gate: ``{"npm_wrapper": {"enabled":
+    true}}``. This mirrors the ``crates_wrapper.enabled`` gate.
+
+    Hard-errors (``NpmWrapperConfigError``) if the config carries the removed
+    ``scope``/``npm_scope`` key, which used to activate scoped npm names
+    (``@scope/name``). Scoped names are banned by ecosystem policy; the wrapper
+    now publishes bare suffixed names like ``<bin>-linux-x64``. Never silently
+    ignore the old key -- an operator with a stale config must be told exactly
+    why it stopped working.
+    """
+    cfg = config or {}
+    wrapper_cfg = cfg.get("npm_wrapper", {})
+    banned_locations = []
+    if "scope" in wrapper_cfg:
+        banned_locations.append("npm_wrapper.scope")
+    if "npm_scope" in wrapper_cfg:
+        banned_locations.append("npm_wrapper.npm_scope")
+    if "npm_scope" in cfg:
+        banned_locations.append("npm_scope")
+    if banned_locations:
+        keys = ", ".join(banned_locations)
+        raise NpmWrapperConfigError(
+            f"Removed config key(s): {keys}. Scoped npm names (@scope/name) "
+            "are banned by ecosystem policy, so the scope key was removed. "
+            "The npm binary wrapper now publishes bare per-platform names "
+            "like '<bin>-linux-x64'. Remove the key and enable the wrapper "
+            'with {"npm_wrapper": {"enabled": true}} instead. Note: each '
+            "per-platform package name must be independently approved "
+            "(check-name'd) like any other package name."
+        )
+    return bool(wrapper_cfg.get("enabled", False))
+
+
 DEFAULT_PLATFORMS: list[PlatformSpec] = [
     PlatformSpec("linux-x64", "linux", "x64"),
     PlatformSpec("linux-arm64", "linux", "arm64"),
@@ -92,7 +138,6 @@ def build_artifacts(
 
 
 def build_npm_publish_jobs(
-    npm_scope: str,
     bin_command: str,
     artifacts: list[PlatformArtifact],
     depends_on: str = "goreleaser",
@@ -143,12 +188,12 @@ def build_npm_publish_jobs(
     extract_script = "\n          ".join(extract_lines)
 
     # Build the per-platform probe + publish step script.
-    # Each platform package probes its own @scope/name-platform@version
+    # Each platform package probes its own bare name-platform@version
     # before publishing. If already published, the publish is skipped.
     publish_lines = []
     for artifact in artifacts:
         d = artifact.npm_platform
-        pkg_name = f"{npm_scope}/{bin_command}-{d}"
+        pkg_name = f"{bin_command}-{d}"
         publish_lines.append(
             f'if npm view "{pkg_name}@${{VERSION}}" version 2>/dev/null; then'
         )
@@ -208,7 +253,7 @@ def build_npm_publish_jobs(
       - name: Check if wrapper already published
         id: check-wrapper
         run: |
-          WRAPPER_NAME="{npm_scope}/{bin_command}"
+          WRAPPER_NAME="{bin_command}"
           if npm view "${{WRAPPER_NAME}}@${{VERSION}}" version 2>/dev/null; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "Already published: ${{WRAPPER_NAME}}@${{VERSION}}"

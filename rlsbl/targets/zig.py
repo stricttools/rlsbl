@@ -9,6 +9,7 @@ from ..npm_wrapper import (
     build_artifacts,
     build_npm_publish_jobs,
     load_platform_config,
+    npm_wrapper_enabled,
     npm_wrapper_template_mappings,
 )
 
@@ -121,16 +122,16 @@ class ZigTarget(BaseTarget):
 
         is_library = self._is_library(dir_path)
 
-        # npm binary wrapper support
-        npm_wrapper_config = config.get("npm_wrapper", {}) if config else {}
-        npm_scope = npm_wrapper_config.get("scope", "")
+        # npm binary wrapper support -- explicit enabled gate; hard-errors
+        # if the removed scope/npm_scope key is present.
+        npm_wrapper_on = npm_wrapper_enabled(config or {})
 
         npm_publish_jobs = ""
-        if npm_scope and not is_library:
+        if npm_wrapper_on and not is_library:
             specs = load_platform_config(config or {})
             artifacts = build_artifacts(specs, name, _zig_archive_fn)
             npm_publish_jobs = build_npm_publish_jobs(
-                npm_scope, name, artifacts, depends_on="build-and-upload"
+                name, artifacts, depends_on="build-and-upload"
             )
 
         return TemplateVars(self.name, {
@@ -139,7 +140,6 @@ class ZigTarget(BaseTarget):
             "minRequiredZig": min_zig,
             "projectName": name,
             "isLibrary": is_library,
-            "npmScope": npm_scope,
             "npmPublishJobs": npm_publish_jobs,
         })
 
@@ -153,8 +153,7 @@ class ZigTarget(BaseTarget):
         mappings = super().shared_template_mappings(ctx)
         if not self._is_library(str(ctx.project_root)):
             config = ctx.config if ctx else {}
-            npm_wrapper_config = config.get("npm_wrapper", {})
-            if npm_wrapper_config.get("scope"):
+            if npm_wrapper_enabled(config):
                 mappings.extend(npm_wrapper_template_mappings())
         return mappings
 

@@ -15,6 +15,7 @@ from ..npm_wrapper import (
     build_artifacts,
     build_npm_publish_jobs,
     load_platform_config,
+    npm_wrapper_enabled,
     npm_wrapper_template_mappings,
 )
 from ..crates_wrapper import (
@@ -252,9 +253,9 @@ class GoTarget(BaseTarget):
             # silent "." fallback that produces a broken .goreleaser.yml.
             goreleaser_main = resolve_main_package_dir(dir_path, config or {})
 
-        # npm binary wrapper support
-        npm_wrapper_config = config.get("npm_wrapper", {}) if config else {}
-        npm_scope = npm_wrapper_config.get("scope", "")
+        # npm binary wrapper support -- explicit enabled gate; hard-errors
+        # if the removed scope/npm_scope key is present.
+        npm_wrapper_on = npm_wrapper_enabled(config or {})
 
         # Homebrew tap support via goreleaser brews section
         homebrew_config = config.get("homebrew", {}) if config else {}
@@ -285,13 +286,17 @@ class GoTarget(BaseTarget):
 
         # npm wrapper publish job
         npm_publish_jobs = ""
-        if npm_scope and not is_library:
+        if npm_wrapper_on and not is_library:
             specs = load_platform_config(config or {})
             artifacts = build_artifacts(specs, short_name, _go_archive_fn)
             npm_publish_jobs = build_npm_publish_jobs(
-                npm_scope, short_name, artifacts
+                short_name, artifacts
             )
-            publish_setup += "\n- Add NPM_TOKEN secret for npm binary wrapper publishing"
+            publish_setup += (
+                "\n- Add NPM_TOKEN secret for npm binary wrapper publishing"
+                "\n- Approve (check-name) each bare per-platform package name"
+                " (<bin>-<platform>) before first publish"
+            )
 
         # crates.io wrapper publish job
         crates_publish_jobs = ""
@@ -314,7 +319,6 @@ class GoTarget(BaseTarget):
             "repoName": repo_name,
             "githubOwner": github_owner,
             "binCommand": short_name,
-            "npmScope": npm_scope,
             "publishSetup": publish_setup,
             "goreleaserMain": goreleaser_main,
             "brewsSection": brews_section,
@@ -374,8 +378,7 @@ class GoTarget(BaseTarget):
             return mappings
         if not self._is_library(project_root):
             config = ctx.config if ctx else {}
-            npm_wrapper_config = config.get("npm_wrapper", {})
-            if npm_wrapper_config.get("scope"):
+            if npm_wrapper_enabled(config):
                 mappings.extend(npm_wrapper_template_mappings())
             crates_wrapper_config = config.get("crates_wrapper", {})
             if crates_wrapper_config.get("enabled"):

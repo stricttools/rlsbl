@@ -330,11 +330,11 @@ class TestNpmWrapperPerPackageProbes(unittest.TestCase):
             PlatformArtifact("darwin-arm64", "darwin", "arm64", "b.tar.gz", "tar xzf", "mycli"),
         ]
 
-        result = build_npm_publish_jobs("@scope", "mycli", artifacts)
+        result = build_npm_publish_jobs("mycli", artifacts)
 
-        # Each platform package should have an npm view probe
-        self.assertIn('npm view "@scope/mycli-linux-x64@${VERSION}"', result)
-        self.assertIn('npm view "@scope/mycli-darwin-arm64@${VERSION}"', result)
+        # Each platform package should have an npm view probe (bare names)
+        self.assertIn('npm view "mycli-linux-x64@${VERSION}"', result)
+        self.assertIn('npm view "mycli-darwin-arm64@${VERSION}"', result)
         self.assertIn("Already published:", result)
 
     def test_wrapper_package_has_probe(self):
@@ -347,7 +347,7 @@ class TestNpmWrapperPerPackageProbes(unittest.TestCase):
             PlatformArtifact("linux-x64", "linux", "x64", "a.tar.gz", "tar xzf", "mycli"),
         ]
 
-        result = build_npm_publish_jobs("@scope", "mycli", artifacts)
+        result = build_npm_publish_jobs("mycli", artifacts)
 
         self.assertIn("Check if wrapper already published", result)
         self.assertIn("check-wrapper", result)

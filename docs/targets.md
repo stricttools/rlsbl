@@ -170,7 +170,7 @@ Each target has an `ecosystem` string used for display and grouping in commands 
 - Monorepo tag format uses path prefix: `{path}/v{version}` (Go module proxy convention)
 - Detects library vs binary projects via `go list` (any `package main` package, regardless of file names or layout)
 - GoReleaser integration for binary projects; library projects need no publish step. Ambiguous multi-main layouts require `install_paths` on the go pipeline config.
-- npm binary wrapper support via `npm_wrapper` config
+- npm binary wrapper support, activated with `{"npm_wrapper": {"enabled": true}}` in `.rlsbl/config.json`. Per-platform packages publish under bare suffixed names (`<bin>-linux-x64`, `<bin>-darwin-arm64`, ...) plus a meta wrapper named `<bin>`. Scoped npm names (`@scope/name`) are banned by ecosystem policy; each bare per-platform name must be independently approved (`rlsbl check-name`) like any other package name. A stale `npm_wrapper.scope`/`npm_scope` key is a hard error.
 - Homebrew tap support via `homebrew` config
 - `dev_install`: `go install <install_paths>` from the go pipeline config (no venv concept); undeclared `install_paths` is a hard error
 
@@ -217,7 +217,7 @@ Each target has an `ecosystem` string used for display and grouping in commands 
 
 - Detection: `build.zig.zon` or `build.zig`
 - Version stored in `VERSION` file with automatic `build.zig.zon` synchronization
-- npm binary wrapper support for cross-compiled binaries
+- npm binary wrapper support for cross-compiled binaries, activated with `{"npm_wrapper": {"enabled": true}}`. Publishes bare per-platform names (`<bin>-linux-x64`, ...) plus a meta wrapper named `<bin>`; scoped names are banned and each name needs explicit `rlsbl check-name` approval. A stale `npm_wrapper.scope`/`npm_scope` key is a hard error.
 - Cross-compilation target map for 6 platforms (linux/darwin/win32, x64/arm64)
 
 ### docker

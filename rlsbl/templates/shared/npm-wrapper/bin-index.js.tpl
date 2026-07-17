@@ -5,12 +5,12 @@ const { spawnSync } = require("child_process");
 const path = require("path");
 
 const PLATFORMS = {
-  "linux x64": "{{npmScope}}/{{binCommand}}-linux-x64",
-  "linux arm64": "{{npmScope}}/{{binCommand}}-linux-arm64",
-  "darwin x64": "{{npmScope}}/{{binCommand}}-darwin-x64",
-  "darwin arm64": "{{npmScope}}/{{binCommand}}-darwin-arm64",
-  "win32 x64": "{{npmScope}}/{{binCommand}}-win32-x64",
-  "win32 arm64": "{{npmScope}}/{{binCommand}}-win32-arm64",
+  "linux x64": "{{binCommand}}-linux-x64",
+  "linux arm64": "{{binCommand}}-linux-arm64",
+  "darwin x64": "{{binCommand}}-darwin-x64",
+  "darwin arm64": "{{binCommand}}-darwin-arm64",
+  "win32 x64": "{{binCommand}}-win32-x64",
+  "win32 arm64": "{{binCommand}}-win32-arm64",
 };
 
 const key = `${platform} ${arch}`;

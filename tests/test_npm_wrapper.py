@@ -1,12 +1,16 @@
 """Tests for rlsbl.npm_wrapper platform models and helpers."""
 
+import pytest
+
 from rlsbl.npm_wrapper import (
     DEFAULT_PLATFORMS,
+    NpmWrapperConfigError,
     PlatformArtifact,
     PlatformSpec,
     build_artifacts,
     build_npm_publish_jobs,
     load_platform_config,
+    npm_wrapper_enabled,
     npm_wrapper_template_mappings,
 )
 
@@ -176,18 +180,18 @@ class TestBuildNpmPublishJobs:
 
     def test_returns_string(self):
         artifacts = self._make_go_artifacts()
-        result = build_npm_publish_jobs("@testuser", "mycli", artifacts)
+        result = build_npm_publish_jobs("mycli", artifacts)
         assert isinstance(result, str)
 
     def test_contains_npm_publish_job(self):
         artifacts = self._make_go_artifacts()
-        result = build_npm_publish_jobs("@testuser", "mycli", artifacts)
+        result = build_npm_publish_jobs("mycli", artifacts)
         assert "npm-publish:" in result
         assert "needs: [gate, goreleaser]" in result
 
     def test_contains_extract_steps_for_all_platforms(self):
         artifacts = self._make_go_artifacts()
-        result = build_npm_publish_jobs("@testuser", "mycli", artifacts)
+        result = build_npm_publish_jobs("mycli", artifacts)
         assert "tar xzf mycli_${VERSION}_linux_amd64.tar.gz -C npm-wrapper/linux-x64/" in result
         assert "tar xzf mycli_${VERSION}_linux_arm64.tar.gz -C npm-wrapper/linux-arm64/" in result
         assert "tar xzf mycli_${VERSION}_darwin_amd64.tar.gz -C npm-wrapper/darwin-x64/" in result
@@ -197,24 +201,36 @@ class TestBuildNpmPublishJobs:
 
     def test_contains_publish_steps_for_all_platforms(self):
         artifacts = self._make_go_artifacts()
-        result = build_npm_publish_jobs("@testuser", "mycli", artifacts)
+        result = build_npm_publish_jobs("mycli", artifacts)
         for spec in DEFAULT_PLATFORMS:
             assert f"cd npm-wrapper/{spec.npm_platform} && npm publish --access public" in result
 
+    def test_uses_bare_per_platform_names(self):
+        """Per-platform probe names are bare-suffixed, never @scope-prefixed."""
+        artifacts = self._make_go_artifacts()
+        result = build_npm_publish_jobs("mycli", artifacts)
+        assert 'npm view "mycli-linux-x64@${VERSION}"' in result
+        assert 'npm view "mycli-win32-arm64@${VERSION}"' in result
+        # The meta wrapper package uses the bare bin command name.
+        assert 'WRAPPER_NAME="mycli"' in result
+        # No scoped npm names anywhere (action pins like @v6 are fine).
+        assert "@scope" not in result
+        assert "/mycli" not in result
+
     def test_contains_version_stamp_step(self):
         artifacts = self._make_go_artifacts()
-        result = build_npm_publish_jobs("@testuser", "mycli", artifacts)
+        result = build_npm_publish_jobs("mycli", artifacts)
         assert "Stamp version" in result
         assert "0.0.0/$VERSION" in result
 
     def test_contains_wrapper_publish_step(self):
         artifacts = self._make_go_artifacts()
-        result = build_npm_publish_jobs("@testuser", "mycli", artifacts)
+        result = build_npm_publish_jobs("mycli", artifacts)
         assert "cd npm-wrapper && npm publish --access public" in result
 
     def test_contains_npm_token_env(self):
         artifacts = self._make_go_artifacts()
-        result = build_npm_publish_jobs("@testuser", "mycli", artifacts)
+        result = build_npm_publish_jobs("mycli", artifacts)
         assert "NODE_AUTH_TOKEN" in result
         assert "NPM_TOKEN" in result
 
@@ -229,31 +245,66 @@ class TestBuildNpmPublishJobs:
             return (f"{{name}}_{{version}}_{spec.npm_platform}.tar.gz", "tar xzf", name)
 
         artifacts = build_artifacts(specs, "tool", archive_fn)
-        result = build_npm_publish_jobs("@scope", "tool", artifacts)
+        result = build_npm_publish_jobs("tool", artifacts)
         assert "linux-x64" in result
         assert "darwin-arm64" in result
         assert "win32-x64" not in result
         assert "linux-arm64" not in result
 
     def test_empty_artifacts_still_valid(self):
-        result = build_npm_publish_jobs("@scope", "tool", [])
+        result = build_npm_publish_jobs("tool", [])
         assert "npm-publish:" in result
         assert "npm publish" in result
 
     def test_default_depends_on_goreleaser(self):
         """Default depends_on produces needs: [gate, goreleaser] (Go convention)."""
         artifacts = self._make_go_artifacts()
-        result = build_npm_publish_jobs("@testuser", "mycli", artifacts)
+        result = build_npm_publish_jobs("mycli", artifacts)
         assert "needs: [gate, goreleaser]" in result
 
     def test_custom_depends_on(self):
         """Custom depends_on overrides the job dependency (e.g. Zig)."""
         artifacts = self._make_go_artifacts()
         result = build_npm_publish_jobs(
-            "@testuser", "mycli", artifacts, depends_on="build-and-upload"
+            "mycli", artifacts, depends_on="build-and-upload"
         )
         assert "needs: [gate, build-and-upload]" in result
         assert "goreleaser" not in result
+
+
+class TestNpmWrapperEnabled:
+    """Tests for the npm_wrapper_enabled activation gate."""
+
+    def test_enabled_true(self):
+        assert npm_wrapper_enabled({"npm_wrapper": {"enabled": True}}) is True
+
+    def test_enabled_false(self):
+        assert npm_wrapper_enabled({"npm_wrapper": {"enabled": False}}) is False
+
+    def test_missing_wrapper_config(self):
+        assert npm_wrapper_enabled({}) is False
+
+    def test_none_config(self):
+        assert npm_wrapper_enabled(None) is False
+
+    def test_missing_enabled_key_defaults_false(self):
+        assert npm_wrapper_enabled({"npm_wrapper": {"platforms": []}}) is False
+
+    def test_old_scope_key_hard_errors(self):
+        with pytest.raises(NpmWrapperConfigError) as exc:
+            npm_wrapper_enabled({"npm_wrapper": {"scope": "@user"}})
+        msg = str(exc.value)
+        assert "npm_wrapper.scope" in msg
+        assert "enabled" in msg
+        assert "banned" in msg.lower()
+
+    def test_npm_scope_key_in_wrapper_hard_errors(self):
+        with pytest.raises(NpmWrapperConfigError):
+            npm_wrapper_enabled({"npm_wrapper": {"npm_scope": "@user"}})
+
+    def test_top_level_npm_scope_hard_errors(self):
+        with pytest.raises(NpmWrapperConfigError):
+            npm_wrapper_enabled({"npm_scope": "@user"})
 
 
 class TestNpmWrapperTemplateMappings:

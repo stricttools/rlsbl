@@ -23,7 +23,6 @@ class TestNpmWrapperProvenance:
 
     def test_without_provenance(self):
         result = build_npm_publish_jobs(
-            npm_scope="@scope",
             bin_command="myapp",
             artifacts=[_minimal_artifact()],
             provenance=False,
@@ -33,7 +32,6 @@ class TestNpmWrapperProvenance:
 
     def test_with_provenance_adds_flag(self):
         result = build_npm_publish_jobs(
-            npm_scope="@scope",
             bin_command="myapp",
             artifacts=[_minimal_artifact()],
             provenance=True,
@@ -42,7 +40,6 @@ class TestNpmWrapperProvenance:
 
     def test_with_provenance_adds_id_token_permission(self):
         result = build_npm_publish_jobs(
-            npm_scope="@scope",
             bin_command="myapp",
             artifacts=[_minimal_artifact()],
             provenance=True,
@@ -52,7 +49,6 @@ class TestNpmWrapperProvenance:
     def test_provenance_on_platform_publish(self):
         """--provenance appears in the platform package publish commands."""
         result = build_npm_publish_jobs(
-            npm_scope="@scope",
             bin_command="myapp",
             artifacts=[_minimal_artifact()],
             provenance=True,
@@ -63,7 +59,6 @@ class TestNpmWrapperProvenance:
     def test_provenance_on_wrapper_publish(self):
         """--provenance appears in the wrapper package publish command."""
         result = build_npm_publish_jobs(
-            npm_scope="@scope",
             bin_command="myapp",
             artifacts=[_minimal_artifact()],
             provenance=True,
@@ -76,7 +71,6 @@ class TestNpmWrapperProvenance:
     def test_default_is_no_provenance(self):
         """Without the provenance parameter, no provenance flag is emitted."""
         result = build_npm_publish_jobs(
-            npm_scope="@scope",
             bin_command="myapp",
             artifacts=[_minimal_artifact()],
         )

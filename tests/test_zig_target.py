@@ -3,6 +3,8 @@
 import os
 import tempfile
 
+import pytest
+
 from conftest import make_ctx
 from rlsbl.targets.zig import ZigTarget, ZIG_TARGET_MAP, _zig_archive_fn
 from rlsbl.targets.protocol import ReleaseTarget
@@ -376,7 +378,7 @@ class TestZigArchiveFunction:
 
 
 class TestZigNpmWrapperTemplateVars:
-    """Test npmScope and npmPublishJobs generation for Zig target."""
+    """Test the npm_wrapper.enabled gate and npmPublishJobs generation for Zig."""
 
     def _setup_zig_binary_project(self, d):
         """Create a minimal Zig binary project in directory d."""
@@ -398,25 +400,9 @@ class TestZigNpmWrapperTemplateVars:
             monkeypatch.chdir(d)
             vars_ = target.template_vars(d, make_ctx(d))
             assert vars_.get("npmPublishJobs", "") == ""
-            assert vars_.get("npmScope", "") == ""
-
-    def test_npm_scope_with_config(self, monkeypatch):
-        """npmScope set when npm_wrapper.scope configured."""
-        target = ZigTarget()
-        with tempfile.TemporaryDirectory() as d:
-            self._setup_zig_binary_project(d)
-            config_dir = os.path.join(d, ".rlsbl")
-            os.makedirs(config_dir)
-            _write(
-                os.path.join(config_dir, "config.json"),
-                '{"npm_wrapper": {"scope": "@ziguser"}}',
-            )
-            monkeypatch.chdir(d)
-            vars_ = target.template_vars(d, make_ctx(d))
-            assert vars_["npmScope"] == "@ziguser"
 
     def test_npm_publish_jobs_with_config(self, monkeypatch):
-        """npmPublishJobs generated when npm_wrapper.scope configured."""
+        """npmPublishJobs generated when npm_wrapper.enabled is true (bare names)."""
         target = ZigTarget()
         with tempfile.TemporaryDirectory() as d:
             self._setup_zig_binary_project(d)
@@ -424,7 +410,7 @@ class TestZigNpmWrapperTemplateVars:
             os.makedirs(config_dir)
             _write(
                 os.path.join(config_dir, "config.json"),
-                '{"npm_wrapper": {"scope": "@ziguser"}}',
+                '{"npm_wrapper": {"enabled": true}}',
             )
             monkeypatch.chdir(d)
             vars_ = target.template_vars(d, make_ctx(d))
@@ -435,6 +421,27 @@ class TestZigNpmWrapperTemplateVars:
             assert "cp my-zig-project-x86_64-linux npm-wrapper/linux-x64/" in jobs
             assert "cp my-zig-project-aarch64-macos npm-wrapper/darwin-arm64/" in jobs
             assert "cp my-zig-project-x86_64-windows.exe npm-wrapper/win32-x64/" in jobs
+            # Bare per-platform names -- no @scope/ prefix.
+            assert "my-zig-project-linux-x64" in jobs
+            assert "@scope" not in jobs
+            assert "/my-zig-project" not in jobs
+
+    def test_old_scope_config_hard_errors(self, monkeypatch):
+        """A stale npm_wrapper.scope config must hard-error, not be ignored."""
+        from rlsbl.npm_wrapper import NpmWrapperConfigError
+
+        target = ZigTarget()
+        with tempfile.TemporaryDirectory() as d:
+            self._setup_zig_binary_project(d)
+            config_dir = os.path.join(d, ".rlsbl")
+            os.makedirs(config_dir)
+            _write(
+                os.path.join(config_dir, "config.json"),
+                '{"npm_wrapper": {"scope": "@ziguser"}}',
+            )
+            monkeypatch.chdir(d)
+            with pytest.raises(NpmWrapperConfigError):
+                target.template_vars(d, make_ctx(d))
 
     def test_library_no_npm_wrapper_even_with_config(self, monkeypatch):
         """Library projects don't get npm wrapper even with config."""
@@ -445,7 +452,7 @@ class TestZigNpmWrapperTemplateVars:
             os.makedirs(config_dir)
             _write(
                 os.path.join(config_dir, "config.json"),
-                '{"npm_wrapper": {"scope": "@ziguser"}}',
+                '{"npm_wrapper": {"enabled": true}}',
             )
             monkeypatch.chdir(d)
             vars_ = target.template_vars(d, make_ctx(d))
@@ -466,7 +473,7 @@ class TestZigNpmWrapperTemplateMappings:
             os.makedirs(config_dir)
             _write(
                 os.path.join(config_dir, "config.json"),
-                '{"npm_wrapper": {"scope": "@ziguser"}}',
+                '{"npm_wrapper": {"enabled": true}}',
             )
             monkeypatch.chdir(d)
             mappings = target.shared_template_mappings(make_ctx(d))
@@ -499,7 +506,7 @@ class TestZigNpmWrapperTemplateMappings:
             os.makedirs(config_dir)
             _write(
                 os.path.join(config_dir, "config.json"),
-                '{"npm_wrapper": {"scope": "@ziguser"}}',
+                '{"npm_wrapper": {"enabled": true}}',
             )
             monkeypatch.chdir(d)
             mappings = target.shared_template_mappings(make_ctx(d))
