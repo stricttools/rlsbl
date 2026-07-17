@@ -1,5 +1,5 @@
 ---
-description: "All 18 rlsbl release targets -- npm, PyPI, Go, Cargo (crates.io), Docker, Flutter, and more -- with auto-detection, the ReleaseTarget protocol, and capabilities."
+description: "All 18 rlsbl release targets -- npm, PyPI, Go, Cargo, Docker, Flutter, and more -- with auto-detection, the ReleaseTarget protocol, capabilities, and the unscoped npm binary wrapper."
 ---
 
 # Release targets

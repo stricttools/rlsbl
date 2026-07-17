@@ -1,5 +1,5 @@
 ---
-description: "Pipeline architecture for publish orchestration — types, auth patterns, custom assets, capability gating, and migration from the old publish key."
+description: "Pipeline architecture for publish orchestration — types, auth patterns, custom assets, capability gating, and the required Go artifact key selecting binary vs library publishing."
 ---
 
 # Pipelines
