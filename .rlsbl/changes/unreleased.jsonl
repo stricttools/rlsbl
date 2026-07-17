@@ -1,3 +1,4 @@
 {"id":"18c322272c8ea433822da79762834bdc9b59a9b1b4b263bb","commits":["77c1328416ad3348d8b8e4c7cb30f24a8551b3b9"],"user_facing":true,"description":"**Publish gate marker read is now retried.** The gate retries reading the `rlsbl-ci-sha` marker from the GitHub Release body (5 attempts, 5s apart) before falling back to $GITHUB_SHA, so GitHub API read-replica lag on a freshly created release no longer causes the gate to poll the wrong commit and time out.","type":"fix"}
 {"id":"18c322320bbf87c8c42a45ae94e04e38a7b347b406b3c5d1","commits":["22a7233abcae6a38af66bd22314e45132ec6c29e"],"user_facing":false}
 {"id":"18c322b56d28242b6d13094ce13744de86a794ec24b73cce","commits":["122f9814b4edfd7f378f582abf7746daeb28c798"],"user_facing":false}
+{"id":"18c322c4540726712691fa50c5704fe79cf88f7feb8fccec","commits":["01771b252cd69d2920de3c82ed38505455bd5ac3"],"user_facing":false}
