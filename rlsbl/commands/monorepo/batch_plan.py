@@ -29,9 +29,11 @@ are both computed against the persisted plan.
 import json
 import os
 import stat
+import subprocess
+import sys
 from dataclasses import dataclass
 
-from ...utils import tag_exists_locally
+from ...utils import tag_exists_locally, tag_exists_on_remote
 
 
 PLAN_FILENAME = "unreleased.plan.json"
@@ -293,15 +295,36 @@ def read_live_version(workspace_root, item: PlanItem, projects, section_type):
 def item_is_released(workspace_root, item: PlanItem, projects, section_type) -> bool:
     """Skip predicate: True iff the item's release provably already happened.
 
-    An item is released iff its live version equals the plan's target_version
-    AND the plan's tag exists locally. Any other state (version mismatch, tag
-    absent) means the item is not verifiably released and must proceed -- a
-    genuinely inconsistent intermediate state will then fail loudly downstream.
+    An item is released iff its live version equals the plan's target_version,
+    the plan's tag exists locally, AND the tag also exists on the remote. Any
+    other state (version mismatch, tag absent locally or on the remote) means
+    the item is not verifiably released and must proceed -- a genuinely
+    inconsistent intermediate state will then fail loudly downstream.
+
+    The remote-tag requirement closes a gap where a release tagged and version-
+    bumped locally but never pushed (push failed) would look "released" and get
+    skipped/archived, silently dropping the publish.
     """
     live = read_live_version(workspace_root, item, projects, section_type)
     if live is None:
         return False
-    return live == item.target_version and tag_exists_locally(item.tag)
+    if not (live == item.target_version and tag_exists_locally(item.tag)):
+        return False
+    # Require remote evidence too: a local tag alone can belong to a release
+    # whose push never reached origin.
+    try:
+        if not tag_exists_on_remote(item.tag):
+            return False
+    except subprocess.CalledProcessError as e:
+        # An inconclusive ls-remote (network/auth blip) must never be read as
+        # "released": treat the item as not-released and say so loudly.
+        print(
+            f"rlsbl: WARNING: could not verify remote tag {item.tag} for "
+            f"{item.name} ({e}); treating {item.name} as not yet released.",
+            file=sys.stderr,
+        )
+        return False
+    return True
 
 
 def plan_all_released(workspace_root, plan: BatchPlan, projects) -> bool:

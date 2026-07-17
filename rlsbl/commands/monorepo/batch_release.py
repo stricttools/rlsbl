@@ -553,6 +553,34 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
             log(f"Watch CI: rlsbl watch {last_sha}")
 
 
+def _plan_items_in_progress(plan, workspace_root, projects):
+    """Return the names of plan items with an on-disk in-progress.json.
+
+    A per-item release state file means that item's release did not run to
+    completion (it crashed mid-flight or is mid-resume). A successful release
+    clears its state file, so a lingering one is evidence of an unfinished
+    release that the batch archive must not strand.
+    """
+    from ..release.release_state import get_state_path
+    from ...workspace_types import get_releasable_dir
+
+    project_by_name = {p["name"]: p for p in projects}
+    stranded = []
+    for name in plan.items:
+        if plan.section_type == "releasables":
+            rel_dir = get_releasable_dir(workspace_root, name)
+            state_path = get_state_path(workspace_root, releasable_dir=rel_dir)
+        else:
+            project = project_by_name.get(name)
+            if project is None:
+                continue
+            project_dir = os.path.join(workspace_root, project["path"])
+            state_path = get_state_path(project_dir)
+        if os.path.exists(state_path):
+            stranded.append(name)
+    return stranded
+
+
 def _archive_batch_if_complete(batch_path, plan, workspace_root, projects, log):
     """State-driven archive gate: finalize iff every plan item is released.
 
@@ -560,12 +588,23 @@ def _archive_batch_if_complete(batch_path, plan, workspace_root, projects, log):
     called both at the batch-loop tail and (via the repair pass) at the start
     of the command. When no plan exists (dry-run never reaches here), it is a
     no-op.
+
+    Beyond the released-per-plan check, it refuses to archive when ANY plan
+    item still has an in-progress.json on disk -- an unfinished/resumable
+    release must never be silently archived away.
     """
     if plan is None:
         return
     if not plan_all_released(workspace_root, plan, projects):
         log(
             "Not archiving batch file: some plan items are not yet released."
+        )
+        return
+    stranded = _plan_items_in_progress(plan, workspace_root, projects)
+    if stranded:
+        log(
+            "Not archiving batch file: in-progress release state exists for "
+            f"{', '.join(stranded)}. Resume or roll back those releases first."
         )
         return
     _finalize_batch_file(batch_path, log)
