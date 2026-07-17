@@ -261,7 +261,7 @@ class TestInjectJobMetadata:
         jobs = {"publish": {"runs-on": "ubuntu-latest", "steps": []}}
         result = inject_job_metadata(jobs, "strictcli/v", "packages/strictcli")
 
-        assert result["publish"]["if"] == "startsWith(github.ref_name, 'strictcli/v')"
+        assert result["publish"]["if"] == "startsWith(inputs.tag || github.ref_name, 'strictcli/v')"
 
     def test_adds_working_directory(self):
         jobs = {"publish": {"runs-on": "ubuntu-latest", "steps": []}}
@@ -510,8 +510,8 @@ class TestTransformProjectJobs:
         assert npm_job["needs"] == ["gate", "strictcli-pypi"]
 
         # if: condition added
-        assert pypi_job["if"] == "startsWith(github.ref_name, 'strictcli/v')"
-        assert npm_job["if"] == "startsWith(github.ref_name, 'strictcli/v')"
+        assert pypi_job["if"] == "startsWith(inputs.tag || github.ref_name, 'strictcli/v')"
+        assert npm_job["if"] == "startsWith(inputs.tag || github.ref_name, 'strictcli/v')"
 
         # working-directory injected
         assert pypi_job["defaults"]["run"]["working-directory"] == "packages/strictcli"
@@ -693,8 +693,8 @@ class TestGenerateInlinePublishRouter:
         pypi_job = parsed["jobs"]["mypkg-pypi"]
         npm_job = parsed["jobs"]["mylib-npm"]
 
-        assert pypi_job["if"] == "startsWith(github.ref_name, 'mypkg@v')"
-        assert npm_job["if"] == "startsWith(github.ref_name, 'mylib@v')"
+        assert pypi_job["if"] == "startsWith(inputs.tag || github.ref_name, 'mypkg@v')"
+        assert npm_job["if"] == "startsWith(inputs.tag || github.ref_name, 'mylib@v')"
 
     def test_no_top_level_permissions(self, tmp_path):
         root = str(tmp_path)
@@ -804,7 +804,7 @@ class TestRootPublisher:
         for k in pub_keys:
             needs = jobs[k]["needs"]
             assert needs == "gate" or "gate" in needs
-            assert jobs[k]["if"] == "startsWith(github.ref_name, 'orxtra@v')"
+            assert jobs[k]["if"] == "startsWith(inputs.tag || github.ref_name, 'orxtra@v')"
         # The mandatory configured regex is baked into the shared gate.
         assert regex in result
 
@@ -1099,7 +1099,7 @@ class TestIntegrationRealWorkflows:
         assert "strictcli-npm" in jobs
 
         # Both have correct if condition
-        expected_if = "startsWith(github.ref_name, 'strictcli@v')"
+        expected_if = "startsWith(inputs.tag || github.ref_name, 'strictcli@v')"
         assert jobs["strictcli-pypi"]["if"] == expected_if
         assert jobs["strictcli-npm"]["if"] == expected_if
 
@@ -1314,3 +1314,166 @@ class TestIntegrationRealWorkflows:
         assert reloaded["on"] == {"release": {"types": ["published"]}}
         assert reloaded["name"] == "Publish Router"
         assert reloaded["jobs"] == workflow["jobs"]
+
+
+# ---------------------------------------------------------------------------
+# inputs.tag || github.ref_name fallback (dispatch-at-main retry semantics)
+# ---------------------------------------------------------------------------
+
+
+class TestInputsTagFallback:
+    """Router job conditions and target templates must fall back to
+    ``inputs.tag`` before ``github.ref_name`` so a workflow_dispatch retry
+    fired at ref=main (with ``inputs.tag`` set to the release tag) still
+    matches the releasing project's jobs instead of skipping them all.
+    """
+
+    def test_inject_job_metadata_condition_uses_fallback(self):
+        jobs = {"publish": {"runs-on": "ubuntu-latest", "steps": []}}
+        result = inject_job_metadata(jobs, "pkga@v", "packages/pkga")
+        # Exact condition string: dispatched-at-main semantics require the
+        # inputs.tag operand to precede github.ref_name.
+        assert (
+            result["publish"]["if"]
+            == "startsWith(inputs.tag || github.ref_name, 'pkga@v')"
+        )
+
+    def test_router_conditions_carry_fallback(self, tmp_path):
+        root = str(tmp_path)
+        _setup_publish_project(root, "packages/mypkg", PYPI_PUBLISH_WF)
+        _setup_publish_project(root, "packages/mylib", NPM_PUBLISH_WF)
+
+        projects = [
+            {"name": "mypkg", "path": "packages/mypkg"},
+            {"name": "mylib", "path": "packages/mylib"},
+        ]
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            side_effect=lambda proj, _root, **kw: f"{proj['name']}@v",
+        ):
+            result = generate_inline_publish_router(projects, root)
+
+        parsed = _safe_load(result)
+        assert (
+            parsed["jobs"]["mypkg-pypi"]["if"]
+            == "startsWith(inputs.tag || github.ref_name, 'mypkg@v')"
+        )
+        assert (
+            parsed["jobs"]["mylib-npm"]["if"]
+            == "startsWith(inputs.tag || github.ref_name, 'mylib@v')"
+        )
+
+    def test_no_bare_ref_name_in_generated_router(self, tmp_path):
+        """Grep-style guard: every ``github.ref_name`` in the generated
+        router must be part of an ``inputs.tag || github.ref_name`` compound.
+        No bare occurrence may survive in a job body or condition.
+        """
+        import re
+
+        root = str(tmp_path)
+        _setup_publish_project(root, "packages/mypkg", PYPI_PUBLISH_WF)
+        _setup_publish_project(root, "packages/mylib", NPM_PUBLISH_WF)
+
+        projects = [
+            {"name": "mypkg", "path": "packages/mypkg"},
+            {"name": "mylib", "path": "packages/mylib"},
+        ]
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            side_effect=lambda proj, _root, **kw: f"{proj['name']}@v",
+        ):
+            result = generate_inline_publish_router(projects, root)
+
+        for m in re.finditer(r"github\.ref_name", result):
+            preceding = result[max(0, m.start() - 14):m.start()]
+            assert preceding.endswith("inputs.tag || "), (
+                "bare github.ref_name found in generated router "
+                f"(context: {result[max(0, m.start() - 40):m.start() + 14]!r})"
+            )
+
+    def test_docker_template_render_carries_fallback(self):
+        from rlsbl.commands.init_cmd import process_template
+        from rlsbl.targets.docker import DockerTarget
+
+        tpl = os.path.join(DockerTarget().template_dir(), "publish.yml.tpl")
+        with open(tpl, encoding="utf-8") as f:
+            content = f.read()
+        rendered, _ = process_template(
+            content,
+            {"publishGate": "  gate:\n    runs-on: ubuntu-latest\n    steps: []"},
+        )
+        assert (
+            "build-args: VERSION=${{ inputs.tag || github.ref_name }}" in rendered
+        )
+        assert (
+            "enable=${{ !contains(inputs.tag || github.ref_name, '-') }}"
+            in rendered
+        )
+
+    def test_zig_template_render_carries_fallback(self):
+        from rlsbl.commands.init_cmd import process_template
+        from rlsbl.targets.zig import ZigTarget
+
+        tpl = os.path.join(ZigTarget().template_dir(), "publish.yml.tpl")
+        with open(tpl, encoding="utf-8") as f:
+            content = f.read()
+        rendered, _ = process_template(
+            content,
+            {
+                "publishGate": "  gate:\n    runs-on: ubuntu-latest\n    steps: []",
+                "npmPublishJobs": "",
+                "zig": {"projectName": "mytool", "minRequiredZig": "0.13.0"},
+            },
+        )
+        assert (
+            'gh release upload "${{ inputs.tag || github.ref_name }}"' in rendered
+        )
+
+
+# ---------------------------------------------------------------------------
+# Router cache versioning (rlsbl version invalidates the publish cache)
+# ---------------------------------------------------------------------------
+
+
+class TestRouterCacheVersioning:
+    """A new rlsbl version can change the router generator without altering
+    any member ``publish.yml`` hash. The cache must carry the rlsbl version so
+    a version bump forces regeneration; same members + same version still skip.
+    """
+
+    def _projects_and_root(self, tmp_path):
+        root = str(tmp_path)
+        _setup_publish_project(root, "packages/mypkg", PYPI_PUBLISH_WF)
+        return [{"name": "mypkg", "path": "packages/mypkg"}], root
+
+    def test_hashes_include_rlsbl_version(self, tmp_path):
+        import rlsbl
+
+        projects, root = self._projects_and_root(tmp_path)
+        hashes = compute_publish_hashes(projects, root)
+        assert hashes["__rlsbl_version__"] == rlsbl.__version__
+
+    def test_changed_version_forces_regeneration(self, tmp_path):
+        projects, root = self._projects_and_root(tmp_path)
+        current = compute_publish_hashes(projects, root)
+
+        # Same member hashes, but a stale rlsbl version in the cache.
+        cached = dict(current)
+        cached["__rlsbl_version__"] = "0.0.0-old"
+
+        router = os.path.join(tmp_path, "publish.yml")
+        with open(router, "w") as f:
+            f.write("dummy")
+
+        assert should_regenerate_router(cached, current, router) is True
+
+    def test_same_version_preserves_skip(self, tmp_path):
+        projects, root = self._projects_and_root(tmp_path)
+        current = compute_publish_hashes(projects, root)
+        cached = dict(current)  # identical members AND version
+
+        router = os.path.join(tmp_path, "publish.yml")
+        with open(router, "w") as f:
+            f.write("dummy")
+
+        assert should_regenerate_router(cached, current, router) is False

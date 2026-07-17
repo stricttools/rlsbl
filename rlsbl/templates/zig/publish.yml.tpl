@@ -90,7 +90,7 @@ jobs:
       - name: Upload release assets
         if: steps.check-zig.outputs.skip != 'true'
         run: |
-          gh release upload "${{ github.ref_name }}" \
+          gh release upload "${{ inputs.tag || github.ref_name }}" \
             {{zig.projectName}}-x86_64-linux \
             {{zig.projectName}}-aarch64-linux \
             {{zig.projectName}}-x86_64-macos \

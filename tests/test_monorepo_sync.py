@@ -220,8 +220,8 @@ class TestRouterGeneration:
         assert router.exists()
         content = router.read_text()
         # Inline router has inlined jobs with tag prefix conditions
-        assert "startsWith(github.ref_name, 'tooling@v')" in content
-        assert "startsWith(github.ref_name, 'core@v')" in content
+        assert "startsWith(inputs.tag || github.ref_name, 'tooling@v')" in content
+        assert "startsWith(inputs.tag || github.ref_name, 'core@v')" in content
         # Jobs are inlined (prefixed job keys), not reusable workflow calls
         assert "tooling-publish:" in content
         assert "core-publish:" in content

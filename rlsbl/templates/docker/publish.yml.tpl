@@ -62,11 +62,11 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=semver,pattern=\{{version}}
-            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
+            type=raw,value=latest,enable=${{ !contains(inputs.tag || github.ref_name, '-') }}
       - uses: {{action "docker/build-push-action"}}
         if: steps.check-docker.outputs.skip != 'true'
         with:
           context: .
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          build-args: VERSION=${{ github.ref_name }}
+          build-args: VERSION=${{ inputs.tag || github.ref_name }}

@@ -240,7 +240,7 @@ class TestRouterJobStructure:
             content = generate_inline_publish_router(projects, root)
         parsed = _safe_load(content)
         job = parsed["jobs"]["mylib-publish"]
-        assert job["if"] == "startsWith(github.ref_name, 'mylib@v')"
+        assert job["if"] == "startsWith(inputs.tag || github.ref_name, 'mylib@v')"
 
     def test_job_has_working_directory(self, tmp_path):
         root = str(tmp_path)

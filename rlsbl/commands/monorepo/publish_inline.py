@@ -125,7 +125,7 @@ def inject_job_metadata(jobs: dict, tag_prefix: str, working_dir: str) -> dict:
         # retries at the tag ref. The release event payload is empty on
         # dispatches, so matching github.event.release.tag_name would skip
         # every job on a retry.
-        job["if"] = f"startsWith(github.ref_name, '{tag_prefix}')"
+        job["if"] = f"startsWith(inputs.tag || github.ref_name, '{tag_prefix}')"
 
         defaults = job.get("defaults", {})
         run_block = defaults.get("run", {})
@@ -488,8 +488,16 @@ def compute_publish_hashes(projects: list, root: str) -> dict:
     Returns a dict mapping project name to the hex digest of its
     ``publish.yml`` content, or ``None`` if the project has no publish
     workflow.
+
+    A reserved ``__rlsbl_version__`` key carries the current rlsbl version.
+    Member publish.yml hashes don't change when only the router *generator*
+    changes across an rlsbl upgrade, so without this key a version bump that
+    alters router output would silently skip regeneration. Seeding the version
+    into the cache structure invalidates the cache on any rlsbl version change.
     """
-    result: dict = {}
+    from ... import __version__
+
+    result: dict = {"__rlsbl_version__": __version__}
     for project in projects:
         wf_path = os.path.join(
             root, project["path"], ".github", "workflows", "publish.yml"

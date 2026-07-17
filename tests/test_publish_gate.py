@@ -411,7 +411,7 @@ class TestTransformProjectJobs:
         wf = _write_member_publish(str(tmp_path), "pkga", MEMBER_PUBLISH_WITH_GATE)
         jobs = transform_project_jobs("pkga", "pkga", "pkga-v", wf)
         cond = jobs["pkga-publish"]["if"]
-        assert cond == "startsWith(github.ref_name, 'pkga-v')"
+        assert cond == "startsWith(inputs.tag || github.ref_name, 'pkga-v')"
 
 
 class TestRouterGate:
@@ -464,7 +464,7 @@ class TestRouterGate:
         projects = self._projects(tmp_path)
         result = generate_inline_publish_router(projects, str(tmp_path))
         assert "github.event.release.tag_name" not in result
-        assert "startsWith(github.ref_name, 'pkga@v')" in result
+        assert "startsWith(inputs.tag || github.ref_name, 'pkga@v')" in result
 
     def test_router_has_per_ref_concurrency(self, tmp_path):
         projects = self._projects(tmp_path)

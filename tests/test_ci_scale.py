@@ -290,7 +290,7 @@ class TestPublishRouterScale:
             job_key = f"{name}-publish"
             assert job_key in parsed["jobs"], f"Missing job {job_key}"
             job = parsed["jobs"][job_key]
-            expected = f"startsWith(github.ref_name, '{name}@v')"
+            expected = f"startsWith(inputs.tag || github.ref_name, '{name}@v')"
             assert job["if"] == expected
 
     def test_all_jobs_have_permissions(self, tmp_path):
