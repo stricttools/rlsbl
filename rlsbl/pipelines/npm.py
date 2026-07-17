@@ -19,6 +19,13 @@ class NpmPipeline(TokenPipeline):
         )
 
     def template_mappings(self, ctx) -> list[dict[str, str]]:
+        # Launcher artifact: wrapper-package that downloads a binary
+        # from a GitHub Release at npm install time (postinstall script).
+        if self.config.get("artifact") == "launcher":
+            return [
+                {"template": "publish-launcher.yml.tpl",
+                 "target": ".github/workflows/publish.yml"},
+            ]
         # Detect package manager to select the right publish template
         pm = self._detect_package_manager(ctx)
         if pm == "pnpm":

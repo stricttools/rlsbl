@@ -421,6 +421,58 @@ def validate_pipelines_config(config, project_root="."):
                     f'"binary" or "library", got {entry["artifact"]!r}.'
                 )
 
+        # Launcher artifact validation: any pipeline type can carry
+        # artifact="launcher" (currently npm and pypi). When present,
+        # ``wraps`` and ``binary_source`` are mandatory, and wraps must
+        # name another pipeline in the same config whose artifact is
+        # "binary".
+        if entry.get("artifact") == "launcher":
+            if "wraps" not in entry:
+                raise ConfigError(
+                    f"pipeline '{name}' has artifact=\"launcher\" but is "
+                    "missing required key 'wraps'. Set it to the name of "
+                    "the pipeline that produces the binary (e.g. "
+                    '"wraps": "go").'
+                )
+            if not isinstance(entry["wraps"], str):
+                raise ConfigError(
+                    f"pipeline '{name}'.wraps must be a string (pipeline "
+                    f"name), got {type(entry['wraps']).__name__}"
+                )
+            if "binary_source" not in entry:
+                raise ConfigError(
+                    f"pipeline '{name}' has artifact=\"launcher\" but is "
+                    "missing required key 'binary_source'. Set it to "
+                    '"github-release" (the only supported source).'
+                )
+            if entry["binary_source"] != "github-release":
+                raise ConfigError(
+                    f"pipeline '{name}'.binary_source must be "
+                    f'"github-release", got {entry["binary_source"]!r}.'
+                )
+            # Validate wraps references a real pipeline with artifact=binary
+            wraps_ref = entry["wraps"]
+            if wraps_ref not in pipelines:
+                known = ", ".join(sorted(pipelines.keys())) or "(none)"
+                raise ConfigError(
+                    f"pipeline '{name}'.wraps references '{wraps_ref}' "
+                    f"but no pipeline with that name exists. "
+                    f"Configured pipelines: {known}"
+                )
+            producer = pipelines[wraps_ref]
+            if not isinstance(producer, dict):
+                raise ConfigError(
+                    f"pipeline '{name}'.wraps references '{wraps_ref}' "
+                    f"which is not a valid pipeline dict"
+                )
+            if producer.get("artifact") != "binary":
+                raise ConfigError(
+                    f"pipeline '{name}'.wraps references '{wraps_ref}' "
+                    f"but that pipeline's artifact is "
+                    f"{producer.get('artifact')!r}, not \"binary\". "
+                    "A launcher can only wrap a binary producer."
+                )
+
         # assets validation
         if entry.get("assets"):
             max_size = entry.get("max_asset_size_mb")

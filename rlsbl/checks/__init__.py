@@ -121,6 +121,8 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "releasable-residue": "workspace",
     # --- member pytest rootdir-escape guard ---
     "member-pytest-config": "workspace",
+    # --- launcher pipeline checks ---
+    "wrapper-producer": None,
 }
 
 # Excluded targets: checks where a target is deliberately excluded because

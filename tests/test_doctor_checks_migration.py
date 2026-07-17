@@ -91,6 +91,8 @@ EXPECTED_CHECKS = [
     "releasable-residue",
     # Member pytest rootdir-escape guard
     "member-pytest-config",
+    # Launcher pipeline checks
+    "wrapper-producer",
 ]
 
 

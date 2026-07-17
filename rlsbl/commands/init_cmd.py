@@ -2052,6 +2052,41 @@ def _generate_merged_publish(targets, template_vars, target_paths=None,
             job["needs"] = needs[0] if len(needs) == 1 else needs
             merged_jobs[key_map[original_key]] = job
 
+    # Inject producer dependencies for launcher pipelines. A launcher's
+    # publish job must wait for the producer's publish job to finish
+    # (so the binary assets exist on the GitHub Release before the
+    # wrapper package is published).
+    if pipelines:
+        for pipeline in pipelines.values():
+            if pipeline.config.get("artifact") != "launcher":
+                continue
+            wraps_name = pipeline.config.get("wraps")
+            if not wraps_name:
+                continue
+            # Find the producer pipeline's target name -- that's the job
+            # key in merged_jobs (first job from producer gets target name).
+            producer = pipelines.get(wraps_name)
+            if producer is None:
+                continue
+            producer_target = getattr(producer, "target", None)
+            if producer_target is None or producer_target not in merged_jobs:
+                continue
+            # The launcher's job key is its own target name.
+            launcher_target = getattr(pipeline, "target", None)
+            if launcher_target is None or launcher_target not in merged_jobs:
+                continue
+            job = merged_jobs[launcher_target]
+            needs = job.get("needs", [])
+            if isinstance(needs, str):
+                needs = [needs]
+            elif not isinstance(needs, list):
+                needs = []
+            else:
+                needs = list(needs)
+            if producer_target not in needs:
+                needs.append(producer_target)
+            job["needs"] = needs[0] if len(needs) == 1 else needs
+
     # Guarantee workflow_dispatch is present
     if "workflow_dispatch" not in all_on_triggers:
         all_on_triggers["workflow_dispatch"] = None

@@ -442,7 +442,7 @@ class TestRecoveryDispatch(unittest.TestCase):
             "rlsbl", "templates",
         )
         templates = sorted(glob.glob(os.path.join(tpl_dir, "*/publish*.yml.tpl")))
-        self.assertEqual(len(templates), 13)
+        self.assertEqual(len(templates), 15)
 
         for tpl_path in templates:
             with open(tpl_path) as f:

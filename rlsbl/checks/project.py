@@ -869,3 +869,59 @@ def register_project_checks(app):
                 "wheels; run `rlsbl dev sync` to restore editable overlays"
             )
         return reporter.passed(f"all {len(sentinel)} dev overlay(s) editable-installed")
+
+    @app.error_check("wrapper-producer")
+    def check_wrapper_producer(ctx, reporter):
+        """Validate that launcher pipelines reference valid binary producers.
+
+        Every pipeline with ``artifact: "launcher"`` must have a ``wraps``
+        field naming another pipeline in the same config whose ``artifact``
+        is ``"binary"``. This is a structural invariant that prevents
+        publishing a wrapper package that references a nonexistent or
+        non-binary producer.
+        """
+        skip_reason = _virtual_root_skip_reason(ctx)
+        if skip_reason is not None:
+            return reporter.skipped(skip_reason)
+
+        config = ctx.config
+        pipelines = config.get("pipelines")
+        if not pipelines or not isinstance(pipelines, dict):
+            return reporter.skipped("no pipelines configured")
+
+        launchers = {
+            name: entry
+            for name, entry in pipelines.items()
+            if isinstance(entry, dict) and entry.get("artifact") == "launcher"
+        }
+        if not launchers:
+            return reporter.skipped("no launcher pipelines")
+
+        errors = []
+        for name, entry in launchers.items():
+            wraps = entry.get("wraps")
+            if not wraps:
+                errors.append(
+                    f"pipeline '{name}': artifact=\"launcher\" but "
+                    "'wraps' is missing"
+                )
+                continue
+            producer = pipelines.get(wraps)
+            if producer is None or not isinstance(producer, dict):
+                errors.append(
+                    f"pipeline '{name}': wraps='{wraps}' but no "
+                    f"pipeline named '{wraps}' exists"
+                )
+                continue
+            if producer.get("artifact") != "binary":
+                errors.append(
+                    f"pipeline '{name}': wraps='{wraps}' but that "
+                    f"pipeline's artifact is {producer.get('artifact')!r}, "
+                    "not \"binary\""
+                )
+
+        if errors:
+            for err in errors:
+                reporter.error(err)
+            return reporter.found(f"{len(errors)} wrapper-producer error(s)")
+        return reporter.passed("all launcher wraps references valid")

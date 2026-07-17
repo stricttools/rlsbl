@@ -24,6 +24,13 @@ class PypiPipeline(TokenPipeline):
         )
 
     def template_mappings(self, ctx) -> list[dict[str, str]]:
+        # Launcher artifact: wrapper-package that downloads a binary
+        # from a GitHub Release on first run (no pip postinstall hook).
+        if self.config.get("artifact") == "launcher":
+            return [
+                {"template": "publish-launcher.yml.tpl",
+                 "target": ".github/workflows/publish.yml"},
+            ]
         return [
             {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
         ]

@@ -300,3 +300,61 @@ PyPI publishing happens in CI; docs deploy happens locally in a post-release hoo
 - **Publish command:** `selfdoc deploy` (requires `selfdoc` on PATH). No Wrangler fallback.
 - **CI template:** Minimal — most Cloudflare Pages projects deploy locally from post-release hooks rather than CI.
 - **Quirks:** The simplest pipeline implementation. Primarily used for documentation sites that deploy alongside library releases. Requires `selfdoc` tool on PATH; errors if not found. 300-second timeout on the deploy command.
+
+## Launcher artifact kind
+
+The `artifact: "launcher"` pipeline kind produces a wrapper package that downloads a pre-built binary from a GitHub Release. This is for projects that have a Go (or other compiled) binary and want to distribute it via npm and/or PyPI as a convenience shim.
+
+### Config shape
+
+```json
+{
+  "pipelines": {
+    "go":   {"type": "go",   "local": false, "target": "go",   "artifact": "binary"},
+    "npm":  {"type": "npm",  "local": false, "target": "npm",  "artifact": "launcher",
+             "wraps": "go", "binary_source": "github-release", "provenance": true},
+    "pypi": {"type": "pypi", "local": false, "target": "pypi", "artifact": "launcher",
+             "wraps": "go", "binary_source": "github-release"}
+  }
+}
+```
+
+### Required keys
+
+| Key | Type | Description |
+| --- | --- | --- |
+| `artifact` | `"launcher"` | Selects the launcher publish template instead of the standard publish template |
+| `wraps` | string | Name of the pipeline that produces the binary. Must reference a pipeline with `artifact: "binary"`. |
+| `binary_source` | `"github-release"` | Where the launcher downloads binaries from. Only `"github-release"` is supported. |
+
+All three keys are mandatory when `artifact` is `"launcher"`. Missing or invalid values are hard errors at config validation and scaffold time.
+
+### Per-ecosystem binary_source semantics
+
+- **npm (`github-release`):** The wrapper package uses a `postinstall` script that downloads the binary from the GitHub Release at `npm install` time. The binary is cached locally after the first download. This is the standard npm binary distribution pattern.
+- **PyPI (`github-release`):** pip has no `postinstall` hook, so the wrapper package downloads the binary on first invocation to a platform-specific cache directory (`~/.cache/<tool>/` on Linux, `~/Library/Caches/<tool>/` on macOS). Subsequent invocations use the cached binary.
+
+Embedded platform wheels (building the binary into the wheel for each platform) are a different distribution model -- that is the per-platform binary-wrapper family, not the launcher. Launchers are download-at-install/run shims.
+
+### Manifest is the name authority
+
+Scaffold never invents or writes the package name field in the launcher target's manifest (`package.json` for npm, `pyproject.toml` for PyPI). The manifest at the launcher target's declared path is the name authority. If the manifest is absent, scaffold hard-errors and directs the user to create it with a `rlsbl check-name`'d name. Scaffold generates the shim code and fills non-name manifest fields around the pre-existing manifest.
+
+### Verification closures
+
+Two structural closures prevent broken wrapper packages from reaching registries:
+
+1. **`needs` dependency chain.** Every launcher publish job emits `needs: [gate, <producer-job-key>]` in the generated CI workflow. This ensures the binary producer's publish job (e.g., goreleaser) has finished and uploaded its assets before the launcher attempts to publish. The merged publish generator and the monorepo router both preserve this dependency. Without this, a shim could publish before its binary exists -- a permanently broken package on a registry that cannot un-publish.
+
+2. **URL verify-before-publish.** Before running `npm publish` or `uv publish`, the launcher workflow curls the constructed release-asset URL for a representative platform (linux/amd64) and hard-fails on HTTP 404. This catches goreleaser asset-naming drift (e.g., a custom `name_template` in `.goreleaser.yml`) at the release that introduced it, turning it into a red CI job instead of silent 404s for all future installs.
+
+### `wrapper-producer` check
+
+The `wrapper-producer` check (registered in the check system under the `project` and `preflight` tags) validates that every launcher pipeline's `wraps` field references an existing pipeline whose `artifact` is `"binary"`. This runs during `rlsbl check` and as part of the release preflight, catching misconfigurations before they reach CI.
+
+### Decision rule: launcher vs monorepo members
+
+- **One-off wrapper** (single Go binary distributed via npm or PyPI): use a subdirectory launcher target. The wrapper's `package.json` or `pyproject.toml` lives in a subdirectory (e.g., `packaging/npm/`), declared as an explicit target with a path.
+- **Complex multi-artifact** (multiple packages that need coordinated versioning): use monorepo members in a shared releasable. Each member gets its own version bump, changelog, and independent publish pipeline. Multi-artifact releasables publish every member at the shared version.
+
+Same-registry multiplicity is not a goal for launchers -- one launcher per registry per project.
