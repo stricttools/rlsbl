@@ -1572,13 +1572,13 @@ class TestWatchRetryTimeout:
     @patch(f"{MOD_WATCH}.time")
     @patch(f"{MOD_WATCH}.run_gh")
     def test_retry_watch_timeout(self, mock_run_gh, mock_time, capsys):
+        # In-place rerun: gh run rerun trigger, then gh run watch times out.
         mock_run_gh.side_effect = [
-            "",  # gh workflow run trigger
-            json.dumps([{"databaseId": 300, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]),  # gh run list (poll)
+            "",  # gh run rerun trigger
             subprocess.TimeoutExpired("gh", 3600),  # retry watch times out
         ]
         from rlsbl.commands.watch import _retry_workflow
-        result = _retry_workflow("CI", "main", "user/repo", "test", "100")
+        result = _retry_workflow("CI", "user/repo", "test", "100")
         assert result is not None
         assert result["passed"] is False
         assert "timed out" in capsys.readouterr().err
@@ -1590,13 +1590,13 @@ class TestWatchRetryGenericException:
     @patch(f"{MOD_WATCH}.time")
     @patch(f"{MOD_WATCH}.run_gh")
     def test_retry_watch_generic_error(self, mock_run_gh, mock_time, capsys):
+        # In-place rerun: gh run rerun trigger, then gh run watch raises.
         mock_run_gh.side_effect = [
-            "",  # gh workflow run trigger
-            json.dumps([{"databaseId": 300, "name": "CI", "status": "queued", "createdAt": "2026-01-01"}]),  # gh run list (poll)
+            "",  # gh run rerun trigger
             RuntimeError("unexpected"),  # retry watch fails
         ]
         from rlsbl.commands.watch import _retry_workflow
-        result = _retry_workflow("CI", "main", "user/repo", "test", "100")
+        result = _retry_workflow("CI", "user/repo", "test", "100")
         assert result is not None
         assert result["passed"] is False
         assert "retry error" in capsys.readouterr().err
@@ -1665,9 +1665,9 @@ class TestWatchRunsSingleRun:
         results = _watch_runs(runs, "test", "user/repo")
         assert len(results) == 1
         # Even a single run goes through the pool path with the shared
-        # retry-dedup state (retried_lock, retried_workflows, known_ids,
-        # known_ids_lock)
-        assert len(mock_single.call_args[0]) == 7
+        # retry-dedup state (ci_run, label, repo_slug, retried_lock,
+        # retried_workflows)
+        assert len(mock_single.call_args[0]) == 5
 
 
 class TestWatchRunCmdRunIdRepoError:
