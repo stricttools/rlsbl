@@ -1529,8 +1529,21 @@ def run_cmd(registry, args, flags, ctx):
 
     reg = TARGETS[registry]
 
+    # Resolve this target's directory from detection. A subdir target declares
+    # its path in .rlsbl/config.json ({"name": ..., "path": "subdir"}); a root
+    # target resolves to ".". Detection can raise on a partial config (config
+    # file present, no "targets" key) -- fall back to "." so
+    # _ensure_target_in_config heals it below, matching prior root-only behavior.
+    try:
+        _entries = detect_targets(".")
+        target_path = next(
+            (e.path for e in _entries if e.name == registry), "."
+        )
+    except ConfigError:
+        target_path = "."
+
     # Check that a project file exists
-    if not reg.check_project_exists("."):
+    if not reg.check_project_exists(target_path):
         print(f"Error: no {registry} project found in current directory.", file=sys.stderr)
         print(reg.get_project_init_hint(), file=sys.stderr)
         sys.exit(1)
@@ -1538,7 +1551,7 @@ def run_cmd(registry, args, flags, ctx):
     # Check for npm lockfile
     npm_lockfile_missing = False
     if registry == "npm":
-        npm_lockfile_missing = _check_npm_lockfile_missing()
+        npm_lockfile_missing = _check_npm_lockfile_missing(target_path)
 
     dry_run = flags.get("dry-run", False)
 
@@ -1567,7 +1580,7 @@ def run_cmd(registry, args, flags, ctx):
             _ensure_pipeline_config([registry], ctx)
 
         # Gather template variables
-        vars_dict = reg.template_vars(".", ctx)
+        vars_dict = reg.template_vars(target_path, ctx)
         from datetime import datetime
         vars_dict["year"] = str(datetime.now().year)
         # npm publish provenance flag, derived from the npm pipeline config.
@@ -1577,7 +1590,13 @@ def run_cmd(registry, args, flags, ctx):
         # runs on the release commit. The filter covers every scaffolded
         # target's CI job names.
         from ..publish_gate import ci_check_regex_for_targets, gate_job_template_snippet
-        gate_targets = list((ctx.config or {}).get("targets") or [])
+        # Config target entries may be dicts ({"name": ..., "path": ...}) for
+        # subdir targets; reduce to bare names before building the CI regex.
+        gate_targets = []
+        for t in (ctx.config or {}).get("targets") or []:
+            name = t.get("name") if isinstance(t, dict) else t
+            if name and name not in gate_targets:
+                gate_targets.append(name)
         if registry not in gate_targets:
             gate_targets.append(registry)
         vars_dict["publishGate"] = gate_job_template_snippet(
@@ -1597,17 +1616,24 @@ def run_cmd(registry, args, flags, ctx):
                 required_vars={"name", "registryUrl"},
             )
 
-        # Process pipeline publish templates (skip for publish_mode "none" and workspace roots)
+        # Publish workflow: route through the SAME merged generator the
+        # multi-target path uses, with a one-element target list. This unifies
+        # the two paths so a lone subdir target gets defaults.run.working-directory
+        # injected and packages-dir/version-file inputs rewritten, instead of the
+        # root-anchored publish.yml the old per-pipeline raw render produced.
+        # For a root target (path ".") no subdir rewriting occurs.
+        # (skip for publish_mode "none" and workspace roots)
         pipeline_plans = []
         if not private and not is_ws_root:
-            pipelines = load_pipelines(ctx.config)
-            for pipeline in pipelines.values():
-                p_mappings = pipeline.template_mappings(ctx)
-                p_dir = pipeline.template_dir()
-                if p_mappings and p_dir:
-                    pipeline_plans.extend(plan_mappings(
-                        p_dir, p_mappings, vars_dict,
-                    ))
+            _loaded_pipelines = load_pipelines(ctx.config)
+            publish_target = os.path.join(".github", "workflows", "publish.yml")
+            merged_content = _generate_merged_publish(
+                [registry], vars_dict, {registry: target_path},
+                pipelines=_loaded_pipelines,
+            )
+            pipeline_plans = [_plan_merged_publish(
+                publish_target, merged_content,
+            )]
 
         shared_plans = []
         if not flags.get("skip-shared"):
@@ -1667,7 +1693,7 @@ def run_cmd(registry, args, flags, ctx):
             created, skipped, warnings, registry=registry,
             flags=flags, registries=[registry],
             npm_lockfile_missing=npm_lockfile_missing,
-            target_paths={registry: "."},
+            target_paths={registry: target_path},
             project_root=project_root,
             config=ctx.config,
         )
