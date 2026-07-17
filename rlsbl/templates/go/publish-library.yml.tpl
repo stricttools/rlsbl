@@ -40,6 +40,8 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Verify module is available on proxy
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           # The module path is baked at scaffold time from this module's
           # go.mod. It is the full import path -- including the monorepo
@@ -49,15 +51,16 @@ jobs:
           # no manual tag construction is needed here.
           MODULE="{{modulePath}}"
 
-          # Resolve the release tag with the same fallback the checkout uses,
-          # then normalise it to a bare version. Three tag shapes reach this
-          # step and all reduce to the trailing vX.Y.Z:
+          # RELEASE_TAG is resolved via step env (never inlined into the
+          # script -- inputs.tag is user-controlled). Normalise it to a bare
+          # version. Three tag shapes reach this step and all reduce to the
+          # trailing vX.Y.Z:
           #   - plain standalone:        v0.22.0
           #   - releasable-format:       go-strictcli@v0.22.0
           #   - monorepo subdir member:  <subdir>/v0.22.0
           # Strip the releasable "<name>@" prefix, then the subdir "<path>/"
           # prefix, then the leading "v".
-          TAG="${{ inputs.tag || github.event.release.tag_name }}"
+          TAG="${RELEASE_TAG}"
           TAG="${TAG##*@}"
           TAG="${TAG##*/}"
           VERSION="${TAG#v}"

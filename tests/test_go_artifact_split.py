@@ -182,9 +182,14 @@ class TestLibraryTemplateVersionExtraction:
         # module path is baked at scaffold time, not read from go.mod at runtime
         assert 'MODULE="{{modulePath}}"' in content
         assert "head -1 go.mod" not in content
-        # tag fallback present, using the repo-wide convention enforced by
-        # test_publish_probe.test_all_publish_templates_checkout_with_tag_ref
+        # checkout tag fallback present, using the repo-wide convention
+        # enforced by test_all_publish_templates_checkout_with_tag_ref
         assert "inputs.tag || github.event.release.tag_name" in content
+        # the run script never inlines ${{ }} (inputs.tag is user-controlled);
+        # the tag reaches the script via the RELEASE_TAG step env
+        assert "RELEASE_TAG: ${{ inputs.tag || github.ref_name }}" in content
+        assert 'TAG="${RELEASE_TAG}"' in content
+        assert "GITHUB_REF_NAME" not in content
 
 
 class TestGoLibraryPublishTemplate:
