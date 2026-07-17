@@ -21,6 +21,8 @@ Project-level configuration file created by `rlsbl config init` or `rlsbl scaffo
 | release_branches | array | Branch names that trigger the manual-release-push warning. Default: `["main", "master"]` when absent. An empty list is a hard error -- either omit the key entirely or list at least one branch. |
 | changelog_format | string | Controls the format of generated CHANGELOG.md. Default: `"grouped"`. Currently the only supported value, which produces version sections with `### Breaking`, `### Features`, `### Fixes` sub-headers. |
 | batch_limits | object | Limits and exclusions for changelog batch-size validation checks. See [batch_limits](#batch_limits) below. |
+| check_timeout | int | Timeout in seconds for check subprocesses (built-in tests, etc.). Default: 120. Overridable per-invocation via the `RLSBL_CHECK_TIMEOUT` env var (precedence: env > config > default). A declared budget, not a bypass — the check still hard-fails on a real hang. |
+| test | object | Per-target test-selection filters. See [test](#test) below. |
 
 Configuration precedence for tagging: CLI flag (`--no-tag`) > project config > user config (`~/.rlsbl/config.json`) > default (true).
 
@@ -58,6 +60,26 @@ Example:
   }
 }
 ```
+
+### test
+
+The optional `test` block selects *which* tests run during the built-in test step, per release target. It maps a target name to a block of per-target options:
+
+```json
+{
+  "test": {
+    "pypi": {
+      "markers": "not integration"
+    }
+  }
+}
+```
+
+- `pypi.markers` is passed to pytest as `-m <markers>`, restricting the run to matching tests. Only `pypi.markers` is recognized today; the shape is built so future per-target options (Go build tags, npm script selection) slot in without reshaping.
+- An absent `test` section — or an absent target key — means "run everything", byte-identical to the prior behavior.
+- Everything must be declared: unknown target names and unknown inner keys are hard errors (no silent tolerance of typos like `marker`), and an empty `markers` string is rejected.
+
+This is a **selection filter, not a gate bypass**. It narrows the set of tests that run; it does not let a failing test pass or suppress test failures.
 
 ### Pipeline config
 
@@ -179,6 +201,7 @@ Some CLI flags override config.json keys for a single invocation, providing temp
 | `--allow-dirty` | (none) | release only | Skips clean working tree check |
 | `--watch`/`--no-watch` | (none) | release only | Controls CI monitoring after push |
 | `RLSBL_PUSH_TIMEOUT` env | `push_timeout` | project | Push timeout in seconds (default 120) |
+| `RLSBL_CHECK_TIMEOUT` env | `check_timeout` | project | Check subprocess timeout in seconds (default 120). Precedence: env > config > default. A declared budget, not a bypass — the check still hard-fails on a real hang. |
 
 Global flags `--dry-run`, `--yes`, and `--quiet` are runtime-only and have no `config.json` equivalent. They affect the current invocation but are never persisted to configuration.
 

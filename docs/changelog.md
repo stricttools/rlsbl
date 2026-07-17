@@ -29,6 +29,7 @@ This system provides:
 - `unreleased.jsonl` accumulates entries between releases
 - At release time, it is renamed to the version file (e.g., `0.28.0.jsonl`) and locked read-only
 - Per-version `.md` files are generated alongside JSONL files for quick reference
+- Unlike the 444-immutable `.jsonl` files, the per-version `.md` files are writable and regenerated in place on every release. If a `.md` file has been deliberately locked read-only, generation is handled gracefully: an idempotent, compare-first atomic writer skips the write when the content is already identical and never errors on a locked-but-current file
 - `CHANGELOG.md` at the project root aggregates all versions (newest first)
 
 ## Entry schema
