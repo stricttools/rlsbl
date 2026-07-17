@@ -338,7 +338,11 @@ class TestRollbackClobberInReleaseFlow:
                   side_effect=subprocess.CalledProcessError(1, ["git", "push"], stderr="push failed")),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
         ):
-            with pytest.raises((RollbackClobberError, subprocess.CalledProcessError)):
+            # The push fails AFTER tagging, which is the canonical resumable
+            # state: no rollback runs (so the foreign commit is never at risk),
+            # and run_cmd converts the raw push CalledProcessError into a clean
+            # SystemExit(1) instead of propagating it.
+            with pytest.raises(SystemExit) as _exc:
                 run_cmd(
                     rc,
                     {"yes": True, "quiet": True},
@@ -348,3 +352,4 @@ class TestRollbackClobberInReleaseFlow:
                         config={"publish_mode": "ci", "pipelines": {}},
                     ),
                 )
+        assert _exc.value.code == 1

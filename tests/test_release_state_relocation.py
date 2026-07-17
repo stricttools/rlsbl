@@ -503,6 +503,10 @@ class TestBatchOrchestratorAlignment:
             patch("rlsbl.commands.release.run_gh", return_value=""),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
             patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
+            # The mocked release pushes the tag; model the remote as having it
+            # so the batch archive gate (item_is_released) sees it as released.
+            patch("rlsbl.commands.monorepo.batch_plan.tag_exists_on_remote",
+                  return_value=True),
         ):
             _cmd_batch_release(
                 {"yes": True, "quiet": True, "dry-run": False},
