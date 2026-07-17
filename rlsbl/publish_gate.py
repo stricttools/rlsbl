@@ -10,11 +10,14 @@ publish before CI reported. Every publish workflow therefore starts with a
 - the merged multi-target publish workflow embeds :func:`build_gate_job`;
 - the monorepo publish router embeds :func:`build_router_gate_job`.
 
-The gate resolves the release commit REF-BASED: ``$GITHUB_SHA`` is the tag's
-commit both for ``release: published`` runs and for ``workflow_dispatch``
-runs at the tag ref. It never reads the release event payload (dispatch
-retries have none). It then polls the GitHub checks API until the releasing
-project's CI check runs complete.
+The gate resolves the release commit MARKER-FIRST: it reads the exact commit
+CI ran on from the ``<!-- rlsbl-ci-sha: <40-hex> -->`` marker rlsbl writes
+into the GitHub Release body, and falls back to ``$GITHUB_SHA`` (the tag's
+commit for both ``release: published`` and ``workflow_dispatch`` at the tag
+ref) for older releases that predate the marker. It never reads the release
+event payload (dispatch retries have none). It then polls the GitHub checks
+API until the releasing project's CI check runs complete, collapsing retried
+same-named check-runs to the latest so a superseded failure cannot block.
 
 Conclusion semantics (explicit, no silent waits):
 
@@ -99,10 +102,29 @@ def ci_check_regex_for_targets(targets: list[str]) -> str:
 GATE_POLL_SCRIPT = """\
 set -euo pipefail
 
-# Ref-based commit resolution: GITHUB_SHA is the tag's commit for both
-# release-triggered runs and workflow_dispatch retries at the tag ref.
-# Never read the release event payload -- dispatch retries have none.
-sha="$GITHUB_SHA"
+# Commit resolution -- explicit two-step order (never reads the release
+# event payload; dispatch retries have none):
+#   (1) Marker: rlsbl writes the exact commit CI ran on into the GitHub
+#       Release body as a machine-parseable line of the form
+#           <!-- rlsbl-ci-sha: <40-hex> -->
+#       Prefer it when present -- it pins the precise commit and is immune to
+#       ref races. The tag is inputs.tag (TAG_INPUT) when dispatched with an
+#       explicit override, else GITHUB_REF_NAME (matches the router resolver).
+#   (2) Fallback: older releases predate the marker, so fall back to
+#       $GITHUB_SHA, the tag's commit for both release and dispatch-at-tag.
+tag="${TAG_INPUT:-$GITHUB_REF_NAME}"
+sha=""
+if body="$(gh release view "$tag" --json body --jq .body 2>/dev/null)"; then
+  sha="$(printf '%s\\n' "$body" \\
+    | sed -n 's/.*<!-- rlsbl-ci-sha: \\([0-9a-f]\\{40\\}\\) -->.*/\\1/p' \\
+    | head -n1)"
+fi
+if [ -n "$sha" ]; then
+  echo "Publish gate: resolved release commit from rlsbl-ci-sha marker in the '$tag' release body."
+else
+  sha="$GITHUB_SHA"
+  echo "Publish gate: no rlsbl-ci-sha marker in the '$tag' release body; falling back to \\$GITHUB_SHA."
+fi
 echo "Publish gate: waiting for CI on $GITHUB_REF_NAME (commit $sha)"
 echo "Check-run name filter: $CI_CHECK_REGEX"
 # Timeout, grace window, and poll interval come from the job env above;
@@ -122,11 +144,19 @@ while :; do
   # Match this project's CI check runs by name; exclude check runs that
   # belong to THIS workflow run (the gate itself and the queued publish
   # jobs would otherwise deadlock the poll loop).
+  # A retried CI run creates a BRAND-NEW check-run with the same name as the
+  # old one, so a stale failure would block the gate forever. Project id and
+  # started_at, then reduce to the latest check-run per name (max started_at,
+  # numeric id as tiebreak for retries within the same second) BEFORE the
+  # pending / not-success logic runs. This way the newest run decides: still
+  # running -> wait; genuinely red -> hard fail.
   runs="$(jq -s --arg re "$CI_CHECK_REGEX" --arg run_id "$GITHUB_RUN_ID" '
     [ .[].check_runs[]
       | select(.name | test($re))
       | select((.details_url // "") | contains("/actions/runs/" + $run_id + "/") | not)
-      | {name, status, conclusion} ]' <<< "$resp")"
+      | {name, status, conclusion, id, started_at} ]
+    | group_by(.name)
+    | map(sort_by(.started_at, .id) | last)' <<< "$resp")"
   total="$(jq 'length' <<< "$runs")"
 
   if [ "$total" -eq 0 ]; then
