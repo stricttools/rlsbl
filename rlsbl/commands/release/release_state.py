@@ -50,11 +50,16 @@ STATE_FILENAME = "in-progress.json"
 SCRUB_RESULT_FILENAME = "scrub-result.json"
 
 # Ordered steps of the mutating phase (rolled back or resumed on failure).
+# SNAPSHOT_REGENERATED lands BEFORE TAGGED: the monorepo snapshot commit
+# must be created before the tag so the tag points at the branch tip that
+# is pushed (the commit CI runs on). It was previously a post-release step
+# emitted after the push; moving it pre-tag makes the tag the push tip.
 MUTATING_STEPS = (
     "VERSION_BUMPED",
     "COMMITTED",
     "CHANGELOG_FINALIZED",
     "RELEASE_FILE_FINALIZED",
+    "SNAPSHOT_REGENERATED",
     "TAGGED",
     "PUSHED",
     "GITHUB_RELEASE",
@@ -66,16 +71,18 @@ POST_RELEASE_STEPS = (
     "PIPELINES_PUBLISHED",
     "DEPLOYED",
     "POST_HOOKS_RUN",
-    "SNAPSHOT_REGENERATED",
 )
 
 # The canonical ordered list of ALL release steps.
 RELEASE_STEPS = MUTATING_STEPS + POST_RELEASE_STEPS
 
 # Steps whose failure aborts the release (state preserved, resumable).
-# Deploy, post-release hooks, and snapshot regeneration are non-fatal:
-# their failures are recorded and loudly reported, but the release
-# completes and the state file is cleared.
+# Snapshot regeneration is now a pre-tag mutating step (it must land before
+# the tag so the tag is the push tip); as such it is FATAL like its mutating
+# neighbors -- a failure aborts and rolls back rather than completing with a
+# recorded failure marker. Deploy and post-release hooks remain non-fatal:
+# their failures are recorded and loudly reported, but the release completes
+# and the state file is cleared.
 FATAL_STEPS = frozenset(MUTATING_STEPS) | {
     "ASSETS_UPLOADED",
     "PIPELINES_PUBLISHED",

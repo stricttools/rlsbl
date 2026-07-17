@@ -169,11 +169,14 @@ class TestCanonicalStepList:
     """The ordered canonical step list is the single source of truth."""
 
     def test_mutating_steps_order(self):
+        # SNAPSHOT_REGENERATED lands before TAGGED so the monorepo snapshot
+        # commit is the pushed branch tip (the commit CI runs on).
         assert MUTATING_STEPS == (
             "VERSION_BUMPED",
             "COMMITTED",
             "CHANGELOG_FINALIZED",
             "RELEASE_FILE_FINALIZED",
+            "SNAPSHOT_REGENERATED",
             "TAGGED",
             "PUSHED",
             "GITHUB_RELEASE",
@@ -185,7 +188,6 @@ class TestCanonicalStepList:
             "PIPELINES_PUBLISHED",
             "DEPLOYED",
             "POST_HOOKS_RUN",
-            "SNAPSHOT_REGENERATED",
         )
 
     def test_release_steps_is_concatenation(self):
@@ -201,10 +203,11 @@ class TestCanonicalStepList:
         # Asset upload and pipeline publish are fatal post-release steps
         assert "ASSETS_UPLOADED" in FATAL_STEPS
         assert "PIPELINES_PUBLISHED" in FATAL_STEPS
-        # Deploy, post-hooks, and snapshot are non-fatal
+        # Snapshot regeneration is now a pre-tag mutating step -> fatal.
+        assert "SNAPSHOT_REGENERATED" in FATAL_STEPS
+        # Deploy and post-hooks remain non-fatal
         assert "DEPLOYED" not in FATAL_STEPS
         assert "POST_HOOKS_RUN" not in FATAL_STEPS
-        assert "SNAPSHOT_REGENERATED" not in FATAL_STEPS
 
 
 class TestSaveStepValidation:
