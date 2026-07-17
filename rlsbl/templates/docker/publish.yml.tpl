@@ -42,9 +42,11 @@ jobs:
           gitleaks dir .
       - name: Check if already published
         id: check-docker
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           IMAGE="${REGISTRY}/${IMAGE_NAME}"
-          TAG="${GITHUB_REF_NAME#v}"
+          TAG="${RELEASE_TAG#v}"
           if docker manifest inspect "${IMAGE}:${TAG}" > /dev/null 2>&1; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "Already published: ${IMAGE}:${TAG}"
