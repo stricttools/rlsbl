@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.monorepo.releasable_rename
-description: "Rename a releasable group: ``rlsbl monorepo rename-releasable <old> <new>``."
+description: "Rename a releasable group across workspace.toml, state directories, and publish gate prefixes, with optional alias tag creation."
 generated: true
 nav_group: "API Reference"
 nav_order: 44
