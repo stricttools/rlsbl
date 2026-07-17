@@ -19,3 +19,6 @@ dist/
 docs/_build/
 .coverage
 .pytest-tmp/
+
+build/
+target/
