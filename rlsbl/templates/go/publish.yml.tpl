@@ -43,7 +43,7 @@ jobs:
       - name: Check if already published
         id: check-go
         run: |
-          TAG="${GITHUB_REF_NAME}"
+          TAG="${RELEASE_TAG}"
           if git ls-remote --tags origin "${TAG}" | grep -q "${TAG}"; then
             # Tag already pushed and goreleaser assets likely exist
             RELEASE_ASSETS=$(gh release view "${TAG}" --json assets -q '.assets | length' 2>/dev/null || echo "0")
@@ -53,6 +53,7 @@ jobs:
             fi
           fi
         env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: {{action "goreleaser/goreleaser-action"}}
         if: steps.check-go.outputs.skip != 'true'

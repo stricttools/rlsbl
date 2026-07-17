@@ -42,10 +42,12 @@ jobs:
           gitleaks dir .
       - name: Check if already published
         id: check-maven-central
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           GROUP_ID=$(grep '^group' build.gradle.kts 2>/dev/null | sed "s/.*= *[\"']\(.*\)[\"'].*/\1/" || grep '<groupId>' pom.xml 2>/dev/null | head -1 | sed 's/.*<groupId>\(.*\)<\/groupId>.*/\1/')
           ARTIFACT_ID=$(grep '^.*archivesBaseName\|^.*artifactId' build.gradle.kts 2>/dev/null | head -1 | sed "s/.*= *[\"']\(.*\)[\"'].*/\1/" || grep '<artifactId>' pom.xml 2>/dev/null | head -1 | sed 's/.*<artifactId>\(.*\)<\/artifactId>.*/\1/')
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${RELEASE_TAG#v}"
           if [ -n "${GROUP_ID}" ] && [ -n "${ARTIFACT_ID}" ]; then
             GROUP_PATH=$(echo "${GROUP_ID}" | tr '.' '/')
             if curl -sf "https://repo1.maven.org/maven2/${GROUP_PATH}/${ARTIFACT_ID}/${VERSION}/${ARTIFACT_ID}-${VERSION}.pom" > /dev/null 2>&1; then
