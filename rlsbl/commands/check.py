@@ -421,6 +421,8 @@ def _check_variants(name, check_fn, get_variants_fn, delay_ms=0):
 # Human-readable normalization rules, stated explicitly in conflict notes so
 # the reader understands *why* the listed names collide with the candidate.
 _NPM_MONIKER_RULE = "npm strips dashes, dots, and underscores: these share one moniker"
+_PYPI_NORMALIZED_RULE = "PyPI normalizes dashes, underscores, and dots to hyphens: these resolve identically"
+_CRATES_NORMALIZED_RULE = "crates.io treats hyphens and underscores as equivalent"
 
 
 def _enumerate_conflicts(conflicts):
@@ -564,7 +566,12 @@ def _check_single_name(name, registry, delay_ms=0):
                 if hard:
                     result["status"] = "taken"
                     result["reason"] = "normalized"
-                    result["note"] = f"normalization collision with '{hard[0]}' (registry rejects identical normalized names)"
+                    result["conflicts"] = hard
+                    result["conflict_rule"] = _PYPI_NORMALIZED_RULE
+                    result["note"] = (
+                        f"normalization collision with {_enumerate_conflicts(hard)} "
+                        f"— {_PYPI_NORMALIZED_RULE}"
+                    )
                 result["variants"] = soft  # only soft similar names shown as informational
 
     elif registry == "crates":
@@ -580,7 +587,12 @@ def _check_single_name(name, registry, delay_ms=0):
             if hard:
                 result["status"] = "taken"
                 result["reason"] = "normalized"
-                result["note"] = f"normalization collision with '{hard[0]}' (crates.io treats hyphens and underscores as equivalent)"
+                result["conflicts"] = hard
+                result["conflict_rule"] = _CRATES_NORMALIZED_RULE
+                result["note"] = (
+                    f"normalization collision with {_enumerate_conflicts(hard)} "
+                    f"— {_CRATES_NORMALIZED_RULE}"
+                )
             result["variants"] = soft
 
     elif registry == "go":
