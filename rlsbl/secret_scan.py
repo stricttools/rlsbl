@@ -63,13 +63,7 @@ def _find_artifacts(project_dir, target_paths=None):
     Returns a list of absolute paths to scannable archive files
     (.whl, .tar.gz, .tgz, .zip).
     """
-    dirs_to_scan = [os.path.join(project_dir, "dist")]
-    if target_paths:
-        paths = target_paths.values() if isinstance(target_paths, dict) else target_paths
-        for p in paths:
-            candidate = os.path.join(p, "dist")
-            if os.path.abspath(candidate) not in {os.path.abspath(d) for d in dirs_to_scan}:
-                dirs_to_scan.append(candidate)
+    dirs_to_scan = _dist_dirs(project_dir, target_paths=target_paths)
 
     artifacts = []
     for dist_dir in dirs_to_scan:
@@ -80,7 +74,26 @@ def _find_artifacts(project_dir, target_paths=None):
     return sorted(set(artifacts))
 
 
-def clean_stale_artifacts(project_dir, log=None):
+def _dist_dirs(project_dir, target_paths=None):
+    """Collect the dist/ directories to scan/clean.
+
+    Always includes the project root's dist/. When *target_paths* is
+    provided (a dict or iterable of paths), each target's dist/ is added
+    too (deduped by absolute path), so subdirectory targets are covered.
+    """
+    dirs = [os.path.join(project_dir, "dist")]
+    if target_paths:
+        paths = target_paths.values() if isinstance(target_paths, dict) else target_paths
+        seen = {os.path.abspath(d) for d in dirs}
+        for p in paths:
+            candidate = os.path.join(p, "dist")
+            if os.path.abspath(candidate) not in seen:
+                dirs.append(candidate)
+                seen.add(os.path.abspath(candidate))
+    return dirs
+
+
+def clean_stale_artifacts(project_dir, log=None, target_paths=None):
     """Remove pre-existing build artifacts from dist/ before a fresh build.
 
     Build tools (e.g. ``uv build``, ``npm pack``) write new artifacts into
@@ -103,8 +116,10 @@ def clean_stale_artifacts(project_dir, log=None):
     runtime tool behavior (not user data), so plain ``os.remove`` is used
     rather than saferm.
 
-    Note: this scoping logic is intentionally a cohesive, standalone function
-    so a later phase can relocate it to per-target build boundaries cleanly.
+    When *target_paths* is provided (a dict or iterable of paths), each
+    target's dist/ is cleaned in addition to the project root's dist/, so
+    subdirectory targets' stale artifacts are scoped out before the scan
+    (mirroring how :func:`scan_artifacts_for_secrets` discovers them).
 
     Returns the list of absolute paths that were removed.
     """
@@ -112,18 +127,17 @@ def clean_stale_artifacts(project_dir, log=None):
         def log(msg):
             print(msg)
 
-    dist_dir = os.path.join(project_dir, "dist")
-    if not os.path.isdir(dist_dir):
-        return []
-
     removed = []
-    for pattern in _ARTIFACT_PATTERNS:
-        for path in glob.glob(os.path.join(dist_dir, pattern)):
-            try:
-                os.remove(path)
-                removed.append(path)
-            except OSError:
-                pass  # Best-effort: a file we cannot remove is not fatal.
+    for dist_dir in _dist_dirs(project_dir, target_paths=target_paths):
+        if not os.path.isdir(dist_dir):
+            continue
+        for pattern in _ARTIFACT_PATTERNS:
+            for path in glob.glob(os.path.join(dist_dir, pattern)):
+                try:
+                    os.remove(path)
+                    removed.append(path)
+                except OSError:
+                    pass  # Best-effort: a file we cannot remove is not fatal.
 
     if removed:
         log(f"Cleared {len(removed)} stale artifact(s) from dist/ before build:")
