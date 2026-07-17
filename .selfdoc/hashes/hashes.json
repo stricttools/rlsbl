@@ -2,7 +2,7 @@
   "_hash_version": 3,
   "en/changelog.md": {
     "content": "7526ef3dfd23f30ac509766596f80cd4915c9d5b5ed29f30f7d573c7b3e97dbd",
-    "description": "1f04cdff9f6331b412de55c968b96b507f71207d09961e67312e2d58b50e7c9a",
+    "description": "814f06314710a4f68b54bc2c1f9ff80717945f6cbc12d246d603ef32a911d314",
     "source_docstring": "4fff13535641ef3e9f7c8663fb4854a94edccb3e370b2f4d2721a69393f06594"
   },
   "en/checks.md": {
@@ -120,8 +120,8 @@
     "schema_hash": "f8bf9ba425f6c5fc5c87e49de0e6aec4cf84b3d3e31382d3c3c1fce78c511e57"
   },
   "en/configuration.md": {
-    "content": "9ae8bfa61207ec3dea335f90f9e668ee8fa736e550f1ce5b6401df83e96ad963",
-    "description": "2ed26bf70bcd2609c749e4e84f20633cb79d82bbcb7382403a068ad5a8f3a1f0",
+    "content": "a8591e6ae8e4d3c4ad435b2e0095e7d9736d9cebfceecc637b3bcba904a35876",
+    "description": "86f0a5917e16f7e5b663eca840a270afb0b57907c90d4a952683bb6145c96674",
     "source_docstring": "2f48ecdf7f2d481b41a9ab57a44f19e50288df0eadfd022d57a26bef4c4915d3"
   },
   "en/dep-validation.md": {
