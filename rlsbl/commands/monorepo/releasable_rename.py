@@ -1,0 +1,442 @@
+"""Rename a releasable group: ``rlsbl monorepo rename-releasable <old> <new>``.
+
+Renaming a releasable is a coordinated, idempotent operation:
+
+1. Rewrite ``workspace.toml`` in place -- the ``[[releasables]]`` table's
+   ``name`` field and every member project's ``releasable`` field -- preserving
+   comments and key order.
+2. Move the releasable's state directory
+   (``.rlsbl-monorepo/releasables/<old>`` -> ``<new>``).
+3. Delete the moved ``changes/.validated`` cache (the tag glob changes, so the
+   validation cache is stale).
+4. Re-run ``monorepo sync`` to regenerate the publish gate prefixes and CI
+   router.
+5. Commit all of the above as a single commit.
+
+Then, last, when the releasable's ``tag_format`` contains ``{name}`` (so the
+tag prefix actually changes), a boundary alias tag for the current version is
+created at the commit the old current-version tag points to and pushed. This
+is the single sanctioned remote action. Historical releases stay under the old
+prefix and are no longer managed by ``rlsbl release edit/deprecate/yank``.
+
+The flow is idempotent: a crash between the local commit and the tag push is
+healed by re-running the command, which detects the already-renamed state and
+finishes the tag step.
+"""
+
+import os
+import re
+import subprocess
+
+import tomlkit
+from tomlkit.items import AoT
+
+from ...errors import WorkspaceError
+from ...release_file import get_batch_release_file_path
+from ...utils import check_gh_auth, check_gh_installed, commit_files, run
+from ...workspace import (
+    WORKSPACE_DIR,
+    WORKSPACE_FILE,
+    get_releasable_changes_dir,
+    get_releasable_dir,
+    is_explicit_mode,
+    load_releasables,
+    load_workspace,
+    members_of,
+    read_releasable_version,
+)
+
+
+_NAME_RE = re.compile(r"^[a-z][a-z0-9-]*$")
+
+
+def validate_releasable_name(name):
+    """Validate a releasable name against the ``[a-z][a-z0-9-]*`` charset.
+
+    Raises WorkspaceError when the name is not a string, is empty, or contains
+    characters outside the allowed set (lowercase letters, digits, hyphens,
+    starting with a letter).
+    """
+    if not isinstance(name, str) or not _NAME_RE.match(name):
+        raise WorkspaceError(
+            f"invalid releasable name '{name}': must match [a-z][a-z0-9-]* "
+            "(lowercase letter first, then lowercase letters, digits, or hyphens)"
+        )
+
+
+# ---------------------------------------------------------------------------
+# git helpers (all local, cwd=workspace_root)
+# ---------------------------------------------------------------------------
+
+
+def _is_clean_tree(root):
+    """Return True when the git working tree at ``root`` is clean."""
+    status = run("git", ["status", "--porcelain"], cwd=root)
+    return len(status.strip()) == 0
+
+
+def _tag_exists_local(root, tag):
+    """Return True when ``tag`` exists as a local git tag."""
+    try:
+        run("git", ["rev-parse", "--verify", "--quiet", f"refs/tags/{tag}"], cwd=root)
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
+def _tag_exists_remote(root, remote, tag):
+    """Return True when ``tag`` exists on ``remote``."""
+    try:
+        out = run("git", ["ls-remote", "--tags", remote, tag], cwd=root)
+    except subprocess.CalledProcessError:
+        return False
+    return bool(out.strip())
+
+
+def _resolve_tag_commit(root, tag):
+    """Resolve ``tag`` to the commit SHA it points to, or None if absent."""
+    try:
+        sha = run("git", ["rev-parse", f"{tag}^{{commit}}"], cwd=root)
+    except subprocess.CalledProcessError:
+        return None
+    sha = sha.strip()
+    return sha if len(sha) == 40 else None
+
+
+def _saferm_file(path):
+    """Delete a stale cache file via saferm (audit trail; -f skips if missing)."""
+    subprocess.run(
+        [
+            "saferm", "delete", "-f",
+            "--description",
+            "Removing stale changelog validation cache after releasable rename",
+            path,
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
+# ---------------------------------------------------------------------------
+# workspace.toml in-place rename (reuses tomlkit in-place editing, like 5.1)
+# ---------------------------------------------------------------------------
+
+
+def _apply_workspace_rename(root, old, new):
+    """Rewrite workspace.toml in place: releasable name + member fields.
+
+    Locates the ``[[releasables]]`` table whose ``name`` equals ``old`` and
+    rewrites only its ``name`` field, then rewrites every ``[[projects]]``
+    table whose ``releasable`` equals ``old`` to ``new``. All other content --
+    comments, key order, unrelated tables -- is preserved byte-for-byte.
+
+    Returns True when the file was changed, False when it was already renamed
+    (idempotent no-op).
+    """
+    path = os.path.join(root, WORKSPACE_DIR, WORKSPACE_FILE)
+    with open(path, encoding="utf-8") as f:
+        doc = tomlkit.loads(f.read())
+
+    changed = False
+
+    rels = doc.get("releasables")
+    if isinstance(rels, AoT):
+        for table in rels:
+            if table.get("name") == old:
+                table["name"] = new
+                changed = True
+
+    projs = doc.get("projects")
+    if isinstance(projs, AoT):
+        for table in projs:
+            if table.get("releasable") == old:
+                table["releasable"] = new
+                changed = True
+
+    if changed:
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(tomlkit.dumps(doc))
+        os.replace(tmp, path)
+
+    return changed
+
+
+# ---------------------------------------------------------------------------
+# local mutations (steps 1-5) and the alias-tag step (last)
+# ---------------------------------------------------------------------------
+
+
+def _apply_local_rename(root, old, new):
+    """Perform the local mutations (steps 1-5) and commit them as one commit.
+
+    Structured as a standalone callable so tests can invoke it (simulating a
+    crash right after the commit, before the tag push) and then run the full
+    command to verify the tag step is healed on re-run.
+    """
+    # Step 1: in-place workspace.toml edit.
+    _apply_workspace_rename(root, old, new)
+
+    # Step 2: move the releasable state directory (git sees a rename).
+    old_dir = get_releasable_dir(root, old)
+    new_dir = get_releasable_dir(root, new)
+    if os.path.isdir(old_dir) and not os.path.isdir(new_dir):
+        os.rename(old_dir, new_dir)
+
+    # Step 3: drop the moved changes/.validated cache (stale after prefix change).
+    validated = os.path.join(get_releasable_changes_dir(root, new), ".validated")
+    if os.path.exists(validated):
+        _saferm_file(validated)
+
+    # Step 3b: invalidate the publish-router cache. Its hash keys on project
+    # *names* and publish.yml *content*, neither of which changes on a
+    # releasable rename -- but the gate prefix (derived from the releasable's
+    # tag_format) does. Dropping the cache forces sync to regenerate the
+    # router with the new prefix.
+    from .publish_inline import PUBLISH_CACHE_FILENAME
+    publish_cache = os.path.join(root, WORKSPACE_DIR, PUBLISH_CACHE_FILENAME)
+    if os.path.exists(publish_cache):
+        _saferm_file(publish_cache)
+
+    # Step 4: re-run sync (no auto-commit -- we commit everything once below).
+    from .sync import _cmd_sync
+    _cmd_sync({"auto-commit": False}, project_root=root)
+
+    # Step 5: one commit of everything (workspace.toml, moved dir, workflows,
+    # publish cache, .validated deletion). safegit stages the rename and the
+    # deletion under these paths.
+    commit_files(
+        f"monorepo: rename releasable {old} -> {new}",
+        [WORKSPACE_DIR, os.path.join(".github", "workflows")],
+        allow_failure=False,
+        cwd=root,
+    )
+
+
+def _finish_alias_tag(root, old_tag, new_tag, remote):
+    """Create the boundary alias tag and push it, idempotently.
+
+    Returns a status dict describing what was (or would have been) done.
+    """
+    local = _tag_exists_local(root, new_tag)
+    remote_has = _tag_exists_remote(root, remote, new_tag)
+
+    if local and remote_has:
+        return {"status": "already_done", "tag": new_tag}
+
+    if not local:
+        commit = _resolve_tag_commit(root, old_tag)
+        if commit is None:
+            # No current-version tag to alias -- releasable was never released
+            # at this version. Nothing to carry forward.
+            return {"status": "no_source_tag", "old_tag": old_tag, "tag": new_tag}
+        run("git", ["tag", new_tag, commit], cwd=root)
+
+    # Push ONLY the alias tag -- the single sanctioned remote action.
+    run("git", ["push", remote, new_tag], cwd=root, timeout=120)
+    return {"status": "created", "tag": new_tag}
+
+
+def _unmanaged_history_note(old_prefix, new_prefix):
+    """Return the note printed after a prefix-changing rename."""
+    return (
+        f"Note: historical releases remain tagged under the old prefix "
+        f"'{old_prefix}'. They are no longer managed by rlsbl release "
+        f"edit/deprecate/yank, which now operate on the new prefix "
+        f"'{new_prefix}'. Only the current version was aliased forward."
+    )
+
+
+# ---------------------------------------------------------------------------
+# preflight
+# ---------------------------------------------------------------------------
+
+
+def _check_no_inflight(root, releasables):
+    """Hard-error when a release is in flight (workspace or member state)."""
+    batch_file = get_batch_release_file_path(root)
+    if os.path.isfile(batch_file):
+        raise WorkspaceError(
+            f"a workspace release file is in flight: {batch_file}. "
+            "Finish or remove the release before renaming."
+        )
+    for rel in releasables:
+        in_progress = os.path.join(
+            get_releasable_dir(root, rel.name), "releases", "in-progress.json"
+        )
+        if os.path.isfile(in_progress):
+            raise WorkspaceError(
+                f"releasable '{rel.name}' has a release in progress: "
+                f"{in_progress}. Resume or abort it before renaming."
+            )
+
+
+# ---------------------------------------------------------------------------
+# public entry point
+# ---------------------------------------------------------------------------
+
+
+def rename_releasable(workspace_root, old_name, new_name, *, dry_run=False,
+                      yes=False, remote="origin"):
+    """Rename releasable ``old_name`` to ``new_name`` in a monorepo workspace.
+
+    See the module docstring for the full ordered flow. Returns a result dict
+    describing what was done (or, in dry-run, what would be done).
+
+    Raises WorkspaceError on any preflight failure.
+    """
+    root = str(workspace_root)
+
+    if not is_explicit_mode(root):
+        raise WorkspaceError(
+            "rename-releasable requires explicit mode "
+            "([[releasables]] in workspace.toml)."
+        )
+
+    projects = load_workspace(root)
+    releasables = load_releasables(root, projects)
+    names = {r.name for r in releasables}
+    project_names = {p.name for p in projects}
+
+    old_dir = get_releasable_dir(root, old_name)
+    new_dir = get_releasable_dir(root, new_name)
+
+    old_present = old_name in names
+    new_present = new_name in names
+    dir_moved = os.path.isdir(new_dir) and not os.path.isdir(old_dir)
+
+    # ---- resume path: local rename already committed; only the tag remains ----
+    if new_present and not old_present and dir_moved:
+        target_rel = next(r for r in releasables if r.name == new_name)
+        tag_format = target_rel.tag_format
+        version = read_releasable_version(root, new_name)
+        result = {
+            "mode": "resume",
+            "old": old_name,
+            "new": new_name,
+            "tag_format": tag_format,
+            "version": version,
+            "tag": None,
+        }
+        if "{name}" in tag_format:
+            old_tag = tag_format.format(name=old_name, version=version)
+            new_tag = tag_format.format(name=new_name, version=version)
+            if not dry_run:
+                if not check_gh_installed() or not check_gh_auth():
+                    raise WorkspaceError(
+                        "gh CLI is not installed or not authenticated "
+                        "(run 'gh auth login')."
+                    )
+                tag_result = _finish_alias_tag(root, old_tag, new_tag, remote)
+                result["tag"] = tag_result
+            else:
+                result["planned_tag"] = new_tag
+                result["planned_push"] = f"git push {remote} {new_tag}"
+            result["note"] = _unmanaged_history_note(
+                tag_format.format(name=old_name, version=""),
+                tag_format.format(name=new_name, version=""),
+            )
+        return result
+
+    # ---- fresh-run preflight (all hard errors) ----
+    validate_releasable_name(new_name)
+
+    if old_name == new_name:
+        raise WorkspaceError("old and new releasable names are identical.")
+    if not old_present:
+        raise WorkspaceError(
+            f"releasable '{old_name}' not found "
+            f"(available: {sorted(names)})."
+        )
+    if new_present:
+        raise WorkspaceError(
+            f"releasable '{new_name}' already exists."
+        )
+    if new_name in project_names:
+        raise WorkspaceError(
+            f"'{new_name}' collides with an existing project name."
+        )
+    if os.path.isdir(new_dir):
+        raise WorkspaceError(
+            f"target releasable directory already exists: {new_dir}."
+        )
+    if not _is_clean_tree(root):
+        raise WorkspaceError(
+            "working tree is not clean. Commit or set aside changes first."
+        )
+    _check_no_inflight(root, releasables)
+
+    if not dry_run and not (check_gh_installed() and check_gh_auth()):
+        raise WorkspaceError(
+            "gh CLI is not installed or not authenticated (run 'gh auth login')."
+        )
+
+    target_rel = next(r for r in releasables if r.name == old_name)
+    tag_format = target_rel.tag_format
+    version = read_releasable_version(root, old_name)
+    name_in_format = "{name}" in tag_format
+    members = members_of(old_name, projects)
+    member_names = [m.name for m in members]
+
+    old_tag = tag_format.format(name=old_name, version=version)
+    new_tag = tag_format.format(name=new_name, version=version)
+
+    result = {
+        "mode": "rename",
+        "old": old_name,
+        "new": new_name,
+        "tag_format": tag_format,
+        "version": version,
+        "members": member_names,
+        "name_in_format": name_in_format,
+        "tag": None,
+    }
+
+    # ---- dry-run: full plan, zero mutations ----
+    if dry_run:
+        plan = [
+            f"1. edit workspace.toml: releasable '{old_name}' -> '{new_name}' "
+            f"and {len(member_names)} member(s) ({', '.join(member_names)})",
+            f"2. move directory {get_releasable_dir(root, old_name)} -> "
+            f"{new_dir}",
+            "3. delete moved changes/.validated cache (saferm)",
+            "4. re-run monorepo sync (regenerate publish gate prefixes/router)",
+            f"5. commit: 'monorepo: rename releasable {old_name} -> {new_name}'",
+        ]
+        if name_in_format:
+            plan.append(
+                f"6. create alias tag '{new_tag}' at the commit of '{old_tag}'"
+            )
+            plan.append(f"7. git push {remote} {new_tag}")
+            result["note"] = _unmanaged_history_note(
+                tag_format.format(name=old_name, version=""),
+                tag_format.format(name=new_name, version=""),
+            )
+        else:
+            plan.append(
+                "6. name-only rename (tag_format has no {name}); "
+                "no alias tag, no push"
+            )
+        result["plan"] = plan
+        result["planned_tag"] = new_tag if name_in_format else None
+        result["planned_push"] = (
+            f"git push {remote} {new_tag}" if name_in_format else None
+        )
+        return result
+
+    # ---- mutations (steps 1-5) ----
+    _apply_local_rename(root, old_name, new_name)
+
+    # ---- alias tag + push (last) ----
+    if name_in_format:
+        tag_result = _finish_alias_tag(root, old_tag, new_tag, remote)
+        result["tag"] = tag_result
+        result["note"] = _unmanaged_history_note(
+            tag_format.format(name=old_name, version=""),
+            tag_format.format(name=new_name, version=""),
+        )
+    else:
+        result["name_only"] = True
+
+    return result

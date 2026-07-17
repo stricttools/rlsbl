@@ -1538,6 +1538,51 @@ def cmd_mono_migrate_releasable(dry_run, yes, releasable_name, **_kwargs):
             print(f"  Cleaned up: {len(cleanup)} per-package directories")
 
 
+@mono.command(name="rename-releasable", help="Rename a releasable group. Rewrites the [[releasables]] name and every member's releasable field in workspace.toml (preserving comments), moves the releasable's state directory, drops the stale changelog validation cache, re-runs monorepo sync to regenerate publish gate prefixes, and commits everything as one commit. When the tag_format contains {name}, a boundary alias tag for the current version is created at the old tag's commit and pushed; historical releases stay under the old prefix. Idempotent: a crash between the commit and the tag push is healed by re-running.")
+@strictcli.arg(name="old_name", help="Current name of the releasable group in workspace.toml")
+@strictcli.arg(name="new_name", help="New name for the releasable group")
+def cmd_mono_rename_releasable(dry_run, yes, old_name, new_name, **_kwargs):
+    root = _require_project_root()
+    from .workspace import find_workspace_root
+    ws_root = find_workspace_root(str(root))
+    if ws_root is None:
+        print("Error: No workspace found. Run 'rlsbl monorepo init' first.", file=sys.stderr)
+        sys.exit(1)
+    from .commands.monorepo.releasable_rename import rename_releasable
+    try:
+        result = rename_releasable(
+            ws_root, old_name, new_name, dry_run=dry_run, yes=yes,
+        )
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    if dry_run:
+        print(f"Would rename releasable '{old_name}' -> '{new_name}'")
+        for step in result.get("plan", []):
+            print(f"  {step}")
+        if result.get("note"):
+            print(result["note"])
+        return
+
+    print(f"Renamed releasable '{old_name}' -> '{new_name}'")
+    if result.get("members"):
+        print(f"  Members updated: {', '.join(result['members'])}")
+    tag = result.get("tag")
+    if tag:
+        status = tag.get("status")
+        if status == "created":
+            print(f"  Alias tag pushed: {tag['tag']}")
+        elif status == "already_done":
+            print(f"  Alias tag already present: {tag['tag']}")
+        elif status == "no_source_tag":
+            print(f"  No current-version tag '{tag['old_tag']}' to alias; skipped tag step")
+    elif result.get("name_only"):
+        print("  Name-only rename (tag_format has no {name}); no alias tag needed")
+    if result.get("note"):
+        print(result["note"])
+
+
 # ---------------------------------------------------------------------------
 # dev group
 # ---------------------------------------------------------------------------
