@@ -1,0 +1,14 @@
+{"id":"18c322272c8ea433822da79762834bdc9b59a9b1b4b263bb","commits":["77c1328416ad3348d8b8e4c7cb30f24a8551b3b9"],"user_facing":true,"description":"**Publish gate marker read is now retried.** The gate retries reading the `rlsbl-ci-sha` marker from the GitHub Release body (5 attempts, 5s apart) before falling back to $GITHUB_SHA, so GitHub API read-replica lag on a freshly created release no longer causes the gate to poll the wrong commit and time out.","type":"fix"}
+{"id":"18c322320bbf87c8c42a45ae94e04e38a7b347b406b3c5d1","commits":["22a7233abcae6a38af66bd22314e45132ec6c29e"],"user_facing":false}
+{"id":"18c322b56d28242b6d13094ce13744de86a794ec24b73cce","commits":["122f9814b4edfd7f378f582abf7746daeb28c798"],"user_facing":false}
+{"id":"18c322c4540726712691fa50c5704fe79cf88f7feb8fccec","commits":["01771b252cd69d2920de3c82ed38505455bd5ac3"],"user_facing":false}
+{"id":"18c323a8badb50970a1dffcb219141a0bbed75b886224b44","commits":["408569e95206e0ac1a27971b5b04f5440c7c5974"],"user_facing":false}
+{"id":"18c323aa514207480491c1ff02774ff88fd724f8a268bcab","commits":["3e6a972de0159b225b2702a131ff751b91c98f6e"],"user_facing":false}
+{"id":"18c324dff231fa01adc58a7a72aa4250b702e4bc381f9bf8","commits":["1d5b2cfc152c1f6d2b239274f583a01127645c9a"],"user_facing":true,"description":"New `rlsbl monorepo rename-releasable <old> <new>` command: renames a releasable group across workspace.toml and its state directory, regenerates publish gate prefixes, and pushes a boundary alias tag for the current version when the tag format contains {name}. Idempotent and crash-safe.","type":"feature"}
+{"id":"18c3271cc5331a41b65cdb47c7c94945b11677358340b65c","commits":["26b57c5bb7743d4a6117f91068aea142ffe5c6be"],"user_facing":true,"description":"**check-name / claim-name conflict enumeration.** PyPI and crates.io normalization collisions now list every conflicting package and the normalization rule, matching npm's existing behavior. Previously only the first collision was shown.","type":"fix"}
+{"id":"18c328d9ca4b63afccbd3e71eb554d4fa1cbbbe421252997","commits":["47104a519295468f1496ea73c6cd2ac30db10fcf"],"user_facing":false}
+{"id":"18c328dec76f9b7abf698f1854ed47039dc43fbc451a377b","commits":["65a193b63732f6407306cdd59257919861884f9d"],"user_facing":false}
+{"id":"18c328e902ea5f04f9454b3b4427415bb4912a62211d096f","commits":["e4aed659452cf637fe4b50f4e36942e117d67d02"],"user_facing":false}
+{"id":"18c328f5bb18af6a681e1d207604454e9ae4bad02d19228d","commits":["d3b1050505d33632ac75e39ae0e10e0d4b4147cf"],"user_facing":false}
+{"id":"18c329590b081a9dcc3dd1a94f2a402881d3ea5d009c1af6","commits":["8138d6aa0c65abeacf462e1681c9bdbc89487262"],"user_facing":false}
+{"id":"18c329885dc757cb204710eebb5246fdaf9135ca95ea7e4c","commits":["504b2e3f33bd850889544082cef5efd0b4c00f5e"],"user_facing":false}
