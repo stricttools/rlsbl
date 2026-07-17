@@ -1539,8 +1539,8 @@ def cmd_mono_migrate_releasable(ctx, dry_run, yes, releasable_name, **_kwargs):
 
 
 @mono.command(name="rename-releasable", help="Rename a releasable group. Rewrites the [[releasables]] name and every member's releasable field in workspace.toml (preserving comments), moves the releasable's state directory, drops the stale changelog validation cache, re-runs monorepo sync to regenerate publish gate prefixes, and commits everything as one commit. When the tag_format contains {name}, a boundary alias tag for the current version is created at the old tag's commit and pushed; historical releases stay under the old prefix. Idempotent: a crash between the commit and the tag push is healed by re-running.")
-@strictcli.arg(name="old_name", help="Current name of the releasable group in workspace.toml")
 @strictcli.arg(name="new_name", help="New name for the releasable group")
+@strictcli.arg(name="old_name", help="Current name of the releasable group in workspace.toml")
 def cmd_mono_rename_releasable(ctx, dry_run, yes, old_name, new_name, **_kwargs):
     root = _require_project_root()
     from .workspace import find_workspace_root
