@@ -31,7 +31,7 @@ def _run_release_init(tmp_path, target_entries, monkeypatch):
     with patch("rlsbl.targets.detect_targets", return_value=target_entries):
         # Import here so the patched detect_targets is used
         from rlsbl import cmd_release_init
-        cmd_release_init()
+        cmd_release_init(None)
 
 
 class TestReleaseInitSingleTarget:
@@ -245,7 +245,7 @@ class TestReleaseInitRefuseUnlessPristine:
         with _patch("rlsbl.targets.detect_targets", side_effect=racing_detect_targets):
             from rlsbl import cmd_release_init
             with pytest.raises(SystemExit) as exc_info:
-                cmd_release_init()
+                cmd_release_init(None)
         assert exc_info.value.code == 1
         assert release_path.read_text() == filled_text
 
@@ -403,7 +403,7 @@ class TestReleaseInitCommitFailureLoud:
              patch.object(utils, "commit_files", side_effect=boom):
             from rlsbl import cmd_release_init
             with pytest.raises(SystemExit) as exc_info:
-                cmd_release_init()
+                cmd_release_init(None)
 
         assert exc_info.value.code == 1
         err = capsys.readouterr().err
@@ -420,7 +420,7 @@ class TestReleaseInitCommitFailureLoud:
         entries = [TargetEntry(name="pypi", path=str(tmp_path))]
         with patch("rlsbl.targets.detect_targets", return_value=entries):
             from rlsbl import cmd_release_init
-            cmd_release_init()  # must not raise
+            cmd_release_init(None)  # must not raise
         assert (tmp_path / ".rlsbl" / "releases" / "unreleased.toml").exists()
 
 
@@ -448,7 +448,7 @@ class TestReleaseInitMonorepo:
         monkeypatch.chdir(str(pkg_dir))
         with patch("rlsbl.targets.detect_targets", return_value=entries):
             from rlsbl import cmd_release_init
-            cmd_release_init()
+            cmd_release_init(None)
 
         # The release file should be in the package's directory, not the workspace root
         release_path = pkg_dir / ".rlsbl" / "releases" / "unreleased.toml"

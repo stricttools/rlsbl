@@ -171,5 +171,5 @@ class TestClaimNameCratesTarget:
         # Verify it does not reject 'crates' as unknown
         with patch("rlsbl._variadic_args", ["my-crate"]):
             with patch("rlsbl.commands.claim_name.run_cmd") as mock_run:
-                cmd_claim_name(target="crates", yes=True)
+                cmd_claim_name(None, target="crates", yes=True)
                 mock_run.assert_called_once_with("crates", ["my-crate"], {"yes": True})

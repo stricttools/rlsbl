@@ -14,7 +14,7 @@ class TestCheckNameMultiTarget(unittest.TestCase):
         """Passing --target npm --target pypi should call run_cmd for both."""
         from rlsbl import cmd_check_name
 
-        cmd_check_name(target=["npm", "pypi"], delay="200")
+        cmd_check_name(None, target=["npm", "pypi"], delay="200")
 
         self.assertEqual(mock_run_cmd.call_count, 2)
         # First call with npm
@@ -30,7 +30,7 @@ class TestCheckNameMultiTarget(unittest.TestCase):
 
         with patch("sys.stderr") as mock_stderr:
             with self.assertRaises(SystemExit) as cm:
-                cmd_check_name(target=["invalid"], delay="200")
+                cmd_check_name(None, target=["invalid"], delay="200")
             self.assertEqual(cm.exception.code, 1)
 
     def test_multiple_invalid_targets_listed(self):
@@ -41,7 +41,7 @@ class TestCheckNameMultiTarget(unittest.TestCase):
         captured = StringIO()
         with patch("sys.stderr", captured):
             with self.assertRaises(SystemExit) as cm:
-                cmd_check_name(target=["bad1", "bad2"], delay="200")
+                cmd_check_name(None, target=["bad1", "bad2"], delay="200")
             self.assertEqual(cm.exception.code, 1)
         output = captured.getvalue()
         self.assertIn("'bad1'", output)
@@ -53,7 +53,7 @@ class TestCheckNameMultiTarget(unittest.TestCase):
         """Passing a single --target pypi should only call run_cmd once."""
         from rlsbl import cmd_check_name
 
-        cmd_check_name(target=["pypi"], delay="200")
+        cmd_check_name(None, target=["pypi"], delay="200")
 
         self.assertEqual(mock_run_cmd.call_count, 1)
         self.assertEqual(mock_run_cmd.call_args_list[0][0][0], "pypi")
@@ -63,7 +63,7 @@ class TestCheckNameMultiTarget(unittest.TestCase):
         from rlsbl import cmd_check_name
 
         with self.assertRaises(SystemExit) as cm:
-            cmd_check_name(target=[], delay="200")
+            cmd_check_name(None, target=[], delay="200")
         self.assertEqual(cm.exception.code, 1)
 
 

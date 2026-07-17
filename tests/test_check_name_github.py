@@ -25,7 +25,7 @@ class TestGithubValidTarget:
         """Passing --target github should call run_cmd with 'github'."""
         from rlsbl import cmd_check_name
 
-        cmd_check_name(target=["github"], delay="200")
+        cmd_check_name(None, target=["github"], delay="200")
         assert mock_run_cmd.call_count == 1
         assert mock_run_cmd.call_args_list[0][0][0] == "github"
 
@@ -35,7 +35,7 @@ class TestGithubValidTarget:
         """--target npm --target github should call run_cmd for both."""
         from rlsbl import cmd_check_name
 
-        cmd_check_name(target=["npm", "github"], delay="200")
+        cmd_check_name(None, target=["npm", "github"], delay="200")
         assert mock_run_cmd.call_count == 2
         targets_called = [c[0][0] for c in mock_run_cmd.call_args_list]
         assert "npm" in targets_called

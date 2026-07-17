@@ -250,7 +250,7 @@ class TestWrapperThreading:
     def test_add_wrapper_threads_dry_run(self, mock_add, _root):
         import rlsbl
 
-        rlsbl.cmd_chlog_add(
+        rlsbl.cmd_chlog_add(None, 
             commits="abc", description="d", type="fix",
             user_facing=True, auto_commit=True, allow_batch=False,
             dry_run=True,
@@ -263,7 +263,7 @@ class TestWrapperThreading:
     def test_amend_wrapper_threads_dry_run(self, mock_amend, _root):
         import rlsbl
 
-        rlsbl.cmd_chlog_amend(
+        rlsbl.cmd_chlog_amend(None, 
             version="0.1.0", commits="abc", id="", description="d", type="fix",
             user_facing=True, validate_hashes=True,
             dry_run=True,
@@ -276,7 +276,7 @@ class TestWrapperThreading:
     def test_edit_wrapper_threads_dry_run(self, mock_edit, _root):
         import rlsbl
 
-        rlsbl.cmd_chlog_edit(
+        rlsbl.cmd_chlog_edit(None, 
             commits="abc", id="", type="fix", description="d",
             user_facing=None, auto_commit=True,
             dry_run=True,

@@ -394,7 +394,7 @@ class TestCmdReleaseMissingFile:
         from rlsbl import cmd_release_run
 
         with pytest.raises(SystemExit) as exc_info:
-            cmd_release_run(
+            cmd_release_run(None, 
                 dry_run=False,
                 yes=True,
                 quiet=True,
@@ -428,7 +428,7 @@ class TestCmdReleaseInvalidFile:
         from rlsbl import cmd_release_run
 
         with pytest.raises(SystemExit) as exc_info:
-            cmd_release_run(
+            cmd_release_run(None, 
                 dry_run=False,
                 yes=True,
                 quiet=True,

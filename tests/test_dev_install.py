@@ -686,7 +686,7 @@ def test_cli_global_and_venv_are_mutually_exclusive():
     with _pytest.raises(SystemExit) as excinfo:
         # We expect the handler to bail before touching the filesystem, so
         # passing no project setup is fine.
-        cmd_dev_install(
+        cmd_dev_install(None, 
             all=False,
             include="",
             exclude="",

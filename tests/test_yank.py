@@ -403,7 +403,7 @@ class TestCmdReleaseYankDelegation:
     @patch("rlsbl.commands.yank.run_cmd")
     def test_delegates(self, mock_run, _):
         import rlsbl
-        rlsbl.cmd_release_yank(
+        rlsbl.cmd_release_yank(None, 
             reason="security", use="1.2.4",
             dry_run=True, yes=True, version="1.2.3",
         )

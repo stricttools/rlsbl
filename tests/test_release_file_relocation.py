@@ -497,7 +497,7 @@ class TestCliReadsReleasableReleaseFile:
         monkeypatch.chdir(core)
 
         with patch("rlsbl.commands.release.run_cmd") as mock_run:
-            rlsbl_mod.cmd_release_run(
+            rlsbl_mod.cmd_release_run(None, 
                 dry_run=False, yes=True, quiet=True,
                 allow_dirty=False, watch=False, watch_async=False,
                 bump="", description="", preid="",

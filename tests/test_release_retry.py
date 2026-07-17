@@ -1136,7 +1136,7 @@ class TestCmdReleaseRetryCleanup(unittest.TestCase):
                  patch("rlsbl.release_file.get_retry_file_path", return_value=retry_path):
                 with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
                     with self.assertRaises(SystemExit) as ctx:
-                        cmd_release_retry(
+                        cmd_release_retry(None, 
                             dry_run=False,
                             yes=True,
                             quiet=True,

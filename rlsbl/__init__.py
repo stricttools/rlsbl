@@ -253,7 +253,7 @@ release_group = app.group("release", help="Release orchestration commands. Provi
 @strictcli.flag(name="bump", type=str, help="Bump type: patch, minor, major, hotfix, prerelease. Skips the release file.", default="")
 @strictcli.flag(name="description", type=str, help="Short release description summarizing the changes (required with --bump)", default="")
 @strictcli.flag(name="preid", type=str, help="Pre-release identifier: alpha, beta, rc, stable. Only valid with --bump.", default="")
-def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, watch_async, bump, description, preid, **_kwargs):
+def cmd_release_run(ctx, dry_run, yes, quiet, allow_dirty, watch, watch_async, bump, description, preid, **_kwargs):
     root = _require_sub_project_root(
         workspace_root_guidance=(
             "Error: `rlsbl release run` must run inside a sub-project, not "
@@ -387,7 +387,7 @@ def cmd_release_run(dry_run, yes, quiet, allow_dirty, watch, watch_async, bump, 
         ]),
     ],
 )
-def cmd_release_resume(dry_run, yes, quiet, watch, watch_async, **_kwargs):
+def cmd_release_resume(ctx, dry_run, yes, quiet, watch, watch_async, **_kwargs):
     from .commands.release.release_state import (
         StateResolutionError,
         load_release_state,
@@ -478,7 +478,7 @@ def cmd_release_resume(dry_run, yes, quiet, watch, watch_async, **_kwargs):
 
 
 @release_group.command(name="init", help="Scaffold a .rlsbl/releases/unreleased.toml file by auto-detecting project targets. The generated file contains a default bump type (patch), an include list of all detected targets, and per-target configuration sections for Flutter targets.")
-def cmd_release_init(**_kwargs):
+def cmd_release_init(ctx, **_kwargs):
     root = _require_sub_project_root(
         workspace_root_guidance=(
             "Error: `rlsbl release init` must run inside a sub-project, not "
@@ -500,7 +500,7 @@ def cmd_release_init(**_kwargs):
         ]),
     ],
 )
-def cmd_release_retry(dry_run, yes, quiet, watch, watch_async, **_kwargs):
+def cmd_release_retry(ctx, dry_run, yes, quiet, watch, watch_async, **_kwargs):
     root = _require_sub_project_root(
         workspace_root_guidance=(
             "Error: `rlsbl release retry` must run inside a sub-project, "
@@ -557,7 +557,7 @@ def cmd_release_retry(dry_run, yes, quiet, watch, watch_async, **_kwargs):
 @strictcli.flag(name="target", type=str, help="Target a specific registry (auto-detected if omitted)", default="")
 @strictcli.flag(name="json", type=bool, default=False, help="Output version, branch, tag, and coverage as machine-readable JSON")
 @strictcli.flag(name="registry", type=bool, default=False, help="Query the package registry for the latest published version")
-def cmd_status(target, json, registry, **_kwargs):
+def cmd_status(ctx, target, json, registry, **_kwargs):
     root = _require_sub_project_root(
         workspace_root_guidance=(
             "Error: `rlsbl status` must run inside a sub-project, not at "
@@ -584,7 +584,7 @@ def cmd_status(target, json, registry, **_kwargs):
 @strictcli.flag(name="auto-commit", type=bool, default=True, help="Auto-commit scaffolded files after writing them to disk")
 @strictcli.flag(name="skip-shared", type=bool, default=False, help="Skip processing of shared workflow templates across targets")
 @strictcli.flag(name="auto-tag", type=bool, default=True, help="Add or update the rlsbl GitHub topic tag on this invocation")
-def cmd_scaffold(target, publish_mode, auto_commit, skip_shared, auto_tag, dry_run, **_kwargs):
+def cmd_scaffold(ctx, target, publish_mode, auto_commit, skip_shared, auto_tag, dry_run, **_kwargs):
     # Scaffold is special: if a project root exists, resolve it for use as
     # scaffold_root; if not, stay in cwd (for new projects).
     # If the current directory has project markers (pyproject.toml,
@@ -666,7 +666,7 @@ def cmd_scaffold(target, publish_mode, auto_commit, skip_shared, auto_tag, dry_r
 @app.command(name="check-name", help="Query npm, PyPI, crates.io, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.")
 @strictcli.flag(name="target", type=str, help="Registry to query for name availability (npm, pypi, crates, go, or github); repeatable", repeatable=True, unique=True)
 @strictcli.flag(name="delay", type=str, help="Milliseconds to wait between consecutive registry API queries (default: 200)", default="200")
-def cmd_check_name(target, delay, **_kwargs):
+def cmd_check_name(ctx, target, delay, **_kwargs):
     # --target is required for check-name; with repeatable=True, target is a list
     targets = target if target else []
     if not targets:
@@ -700,7 +700,7 @@ def cmd_check_name(target, delay, **_kwargs):
 
 @app.command(name="claim-name", help="Claim a name on a package registry by publishing a minimal placeholder package. Runs check-name first, then publishes if available.")
 @strictcli.flag(name="target", type=str, help="Target package registry to publish the placeholder to (npm, pypi, or crates)", default="")
-def cmd_claim_name(target, yes, **_kwargs):
+def cmd_claim_name(ctx, target, yes, **_kwargs):
     if not target:
         print(
             "Error: --target is required. "
@@ -734,7 +734,7 @@ def cmd_claim_name(target, yes, **_kwargs):
 
 @release_group.command(name="edit", help="Sync the GitHub Release notes for a given version with the corresponding CHANGELOG.md entry. Defaults to the current version if none is specified. Use --dry-run to preview changes without updating GitHub.")
 @strictcli.arg(name="version", help="Version whose GitHub Release notes to sync (defaults to current version)", required=False)
-def cmd_release_edit(dry_run, version=None, **_kwargs):
+def cmd_release_edit(ctx, dry_run, version=None, **_kwargs):
     root = _require_sub_project_root(
         workspace_root_guidance=(
             "Error: `rlsbl release edit` must run inside a sub-project, not "
@@ -755,7 +755,7 @@ def cmd_release_edit(dry_run, version=None, **_kwargs):
 @release_group.command(name="undo", help="Revert a release. Without --version, reverts the latest release (deletes GitHub Release, removes git tag, reverts version bump commit). With --version, reverts a non-latest release if it is provably unpublished (probes registries for evidence, deletes GitHub Release + tag only, un-finalizes changelog).")
 @strictcli.flag(name="target", type=str, help="Target a specific registry for version detection (auto-detected if omitted)", default="")
 @strictcli.flag(name="version", type=str, help="Version to undo (for non-latest releases that are provably unpublished)", default="")
-def cmd_release_undo(target, version, yes, dry_run, **_kwargs):
+def cmd_release_undo(ctx, target, version, yes, dry_run, **_kwargs):
     root = _require_project_root()
     from .workspace import find_workspace_root
     monorepo_root = find_workspace_root(str(root))
@@ -773,7 +773,7 @@ def cmd_release_undo(target, version, yes, dry_run, **_kwargs):
 @strictcli.flag(name="reason", type=str, help="Human-readable explanation of why this version is being deprecated", default="")
 @strictcli.flag(name="use", type=str, help="Suggest this version as a replacement in the deprecation notice", default="")
 @strictcli.arg(name="version", help="Semver string of the release to deprecate, with or without v prefix (e.g. 0.9.1)")
-def cmd_release_deprecate(reason, use, dry_run, yes, version, **_kwargs):
+def cmd_release_deprecate(ctx, reason, use, dry_run, yes, version, **_kwargs):
     root = _require_sub_project_root(
         workspace_root_guidance=(
             "Error: `rlsbl release deprecate` must run inside a sub-project, not "
@@ -800,7 +800,7 @@ def cmd_release_deprecate(reason, use, dry_run, yes, version, **_kwargs):
 @strictcli.flag(name="reason", type=str, help="Human-readable explanation of why this version is being yanked", default="")
 @strictcli.flag(name="use", type=str, help="Suggest this version as a replacement in the yank notice", default="")
 @strictcli.arg(name="version", help="Semver string of the release to yank, with or without v prefix (e.g. 0.9.1)")
-def cmd_release_yank(reason, use, dry_run, yes, version, **_kwargs):
+def cmd_release_yank(ctx, reason, use, dry_run, yes, version, **_kwargs):
     root = _require_sub_project_root(
         workspace_root_guidance=(
             "Error: `rlsbl release yank` must run inside a sub-project, not "
@@ -852,7 +852,7 @@ def cmd_release_yank(reason, use, dry_run, yes, version, **_kwargs):
 @strictcli.flag(name="replace", type=str, help="Match mode: literal text to substitute for each match (mutually exclusive with --mangle)", default="")
 @strictcli.flag(name="mangle", type=bool, negatable=False, default=False, help="Match mode: replace matched content with random ASCII of same length (mutually exclusive with --replace)")
 @strictcli.flag(name="reason", type=str, help="Reason for scrubbing (required, used in commit message)", default="")
-def cmd_release_scrub(pattern, file, recipe, replace, mangle, from_commit, entire_history, reason, dry_run, yes, **_kwargs):
+def cmd_release_scrub(ctx, pattern, file, recipe, replace, mangle, from_commit, entire_history, reason, dry_run, yes, **_kwargs):
     if replace and mangle:
         print("Error: --replace and --mangle are mutually exclusive", file=sys.stderr)
         sys.exit(1)
@@ -882,7 +882,7 @@ def cmd_release_scrub(pattern, file, recipe, replace, mangle, from_commit, entir
 
 @app.command(name="discover", help="Search GitHub for repositories tagged with the rlsbl topic and list them. Use --mine to filter results to only your own repositories. Requires the gh CLI to be authenticated.")
 @strictcli.flag(name="mine", type=bool, default=False, help="Filter results to only show repositories owned by the authenticated GitHub user")
-def cmd_discover(mine, **_kwargs):
+def cmd_discover(ctx, mine, **_kwargs):
     flags = {"mine": mine}
     from .commands.discover import run_cmd
     run_cmd(None, [], flags)
@@ -898,7 +898,7 @@ def cmd_discover(mine, **_kwargs):
 @strictcli.flag(name="as-daemon-child", type=bool, negatable=False, default=False, help="Internal: run as the detached watcher child spawned by --watch-async (fire-and-forget notifications, pidfile cleanup on exit). Not intended for direct use.")
 @strictcli.flag(name="stop", type=bool, negatable=False, default=False, help="Stop a running detached watcher started with --watch-async. With a SHA, stops that watcher; without, stops the single live watcher (errors and lists candidates when several are live).")
 @strictcli.arg(name="sha", help="Git commit SHA whose CI workflows to monitor (defaults to HEAD if omitted)", required=False)
-def cmd_watch(target, run_id, as_daemon_child, stop, sha=None, **_kwargs):
+def cmd_watch(ctx, target, run_id, as_daemon_child, stop, sha=None, **_kwargs):
     if sha and run_id:
         print("Error: cannot use both SHA and --run-id", file=sys.stderr)
         sys.exit(1)
@@ -919,7 +919,7 @@ def cmd_watch(target, run_id, as_daemon_child, stop, sha=None, **_kwargs):
 # ---------------------------------------------------------------------------
 
 @app.command(name="pre-push-check", help="Verify that CHANGELOG.md contains an entry matching the current project version. Designed to run as a git pre-push hook to prevent pushing releases without documented changes.")
-def cmd_pre_push_check(**_kwargs):
+def cmd_pre_push_check(ctx, **_kwargs):
     print(
         "Error: pre-push-check was removed. Run 'rlsbl scaffold' to update your hook.",
         file=sys.stderr,
@@ -932,7 +932,7 @@ def cmd_pre_push_check(**_kwargs):
 # ---------------------------------------------------------------------------
 
 @app.command(name="prs", help="List all open pull requests for the current repository using the GitHub CLI. Shows PR number, title, author, and branch for a quick overview of pending work.")
-def cmd_prs(**_kwargs):
+def cmd_prs(ctx, **_kwargs):
     from .commands.prs import run_cmd
     run_cmd(None, [], {})
 
@@ -942,7 +942,7 @@ def cmd_prs(**_kwargs):
 # ---------------------------------------------------------------------------
 
 @app.command(name="push", help="Push the current branch to origin with preflight checks: branch guard (refuses release branches), changelog coverage validation with actionable remediation hints, and behind-remote detection. Use `rlsbl release run` for release branches.")
-def cmd_push(yes, quiet, **_kwargs):
+def cmd_push(ctx, yes, quiet, **_kwargs):
     root = _require_sub_project_root(
         workspace_root_guidance=(
             "Error: `rlsbl push` must run inside a sub-project, not at "
@@ -962,7 +962,7 @@ def cmd_push(yes, quiet, **_kwargs):
 
 @app.command(name="unreleased", help="List commits between the latest release tag and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain text or JSON to help prepare the next release.")
 @strictcli.flag(name="json", type=bool, default=False, help="Output the unreleased commit list and coverage status as machine-readable JSON")
-def cmd_unreleased(json, **_kwargs):
+def cmd_unreleased(ctx, json, **_kwargs):
     root = _require_sub_project_root(
         workspace_root_guidance=(
             "Error: `rlsbl unreleased` must run inside a sub-project, not "
@@ -980,7 +980,7 @@ def cmd_unreleased(json, **_kwargs):
 # ---------------------------------------------------------------------------
 
 @app.command(name="targets", help="List all release targets detected in the current project directory, showing which ecosystems (npm, PyPI, Go, Cargo, etc.) are active based on manifest files found.")
-def cmd_targets(**_kwargs):
+def cmd_targets(ctx, **_kwargs):
     root = _require_sub_project_root(
         workspace_root_guidance=(
             "Error: `rlsbl targets` must run inside a sub-project, not at "
@@ -1000,7 +1000,7 @@ def cmd_targets(**_kwargs):
 @strictcli.flag(name="height", type=str, help="Height of the recorded GIF in pixels (default: 600)", default="600")
 @strictcli.flag(name="font-size", type=str, help="Terminal font size in pixels for the recording (default: 24)", default="24")
 @strictcli.flag(name="duration", type=str, help="Total recording duration in seconds before auto-stop (default: 10)", default="10")
-def cmd_record_gif(width, height, font_size, duration, **_kwargs):
+def cmd_record_gif(ctx, width, height, font_size, duration, **_kwargs):
     root = _require_sub_project_root(
         workspace_root_guidance=(
             "Error: `rlsbl record-gif` must run inside a sub-project, not "
@@ -1020,7 +1020,7 @@ def cmd_record_gif(width, height, font_size, duration, **_kwargs):
 @app.command(name="deploy", help="Run the configured deployment pipeline for the project. Supports named deploy targets and dry-run preview of what would be deployed. Branch restrictions are always enforced.")
 @strictcli.flag(name="target", type=str, help="Registry whose deploy pipeline to run (auto-detected if omitted)", default="")
 @strictcli.arg(name="target_name", help="Named deploy target from the project's deploy configuration to execute", required=False)
-def cmd_deploy(target, dry_run, target_name=None, **_kwargs):
+def cmd_deploy(ctx, target, dry_run, target_name=None, **_kwargs):
     root = _require_sub_project_root(
         workspace_root_guidance=(
             "Error: `rlsbl deploy` must run inside a sub-project, not at "
@@ -1041,7 +1041,7 @@ def cmd_deploy(target, dry_run, target_name=None, **_kwargs):
 
 @app.command(name="commit", help="Commit one or more files with an Autogenerated trailer, marking the commit as machine-generated so it is automatically exempted from changelog coverage checks.")
 @strictcli.flag(name="message", short="m", type=str, help="Commit message for the autogenerated-file commit (added with Autogenerated trailer)")
-def cmd_commit(message, **_kwargs):
+def cmd_commit(ctx, message, **_kwargs):
     # Files come from _variadic_args (extracted before strictcli parsing)
     files = _variadic_args
     if not files:
@@ -1065,7 +1065,7 @@ chlog = app.group("changelog", help="Structured changelog management using JSONL
 @strictcli.flag(name="user-facing", type=bool, default=True, help="Mark this entry as user-facing (included in generated CHANGELOG.md output)")
 @strictcli.flag(name="auto-commit", type=bool, default=True, help="Auto-commit unreleased.jsonl after appending the entry")
 @strictcli.flag(name="allow-batch", type=bool, default=False, help="Auto-create an exclusion if this entry exceeds the commit batch limit")
-def cmd_chlog_add(commits, description, type, user_facing, auto_commit, allow_batch, dry_run, **_kwargs):
+def cmd_chlog_add(ctx, commits, description, type, user_facing, auto_commit, allow_batch, dry_run, **_kwargs):
     root = _require_sub_project_root(
         workspace_root_guidance=(
             "Error: `rlsbl changelog add` must run inside a sub-project, "
@@ -1089,7 +1089,7 @@ def cmd_chlog_add(commits, description, type, user_facing, auto_commit, allow_ba
 
 @chlog.command(name="generate", help="Compile all validated JSONL changelog entries into a formatted CHANGELOG.md file. Groups entries by type (features, fixes, breaking changes) under the appropriate version heading, preserving existing changelog content for previous releases. Use --dry-run to preview the generated Markdown output without writing to disk, which is useful for reviewing before committing.")
 @strictcli.flag(name="auto-commit", type=bool, default=True, help="Auto-commit generated CHANGELOG.md and per-version .md files")
-def cmd_chlog_generate(dry_run, auto_commit, **_kwargs):
+def cmd_chlog_generate(ctx, dry_run, auto_commit, **_kwargs):
     root = _require_sub_project_root(
         workspace_root_guidance=(
             "Error: `rlsbl changelog generate` must run inside a "
@@ -1110,7 +1110,7 @@ def cmd_chlog_generate(dry_run, auto_commit, **_kwargs):
 @strictcli.flag(name="type", type=str, help="Classification for the amended entry: feature, fix, or breaking (required if user-facing)", default="")
 @strictcli.flag(name="user-facing", type=bool, default=True, help="Mark the amended entry as user-facing (included in CHANGELOG.md output)")
 @strictcli.flag(name="validate-hashes", type=bool, default=True, help="Validate commit hashes via git rev-parse before appending")
-def cmd_chlog_amend(version, commits, id, description, type, user_facing, validate_hashes, dry_run, **_kwargs):
+def cmd_chlog_amend(ctx, version, commits, id, description, type, user_facing, validate_hashes, dry_run, **_kwargs):
     root = _require_sub_project_root(
         workspace_root_guidance=(
             "Error: `rlsbl changelog amend` must run inside a sub-project, "
@@ -1139,7 +1139,7 @@ def cmd_chlog_amend(version, commits, id, description, type, user_facing, valida
 @strictcli.flag(name="description", type=str, help="Replacement description text for the matched changelog entry", default="")
 @strictcli.flag(name="user-facing", type=bool, default=None, help="Set user_facing status on the matched entry (--user-facing to set true, --no-user-facing to set false)")
 @strictcli.flag(name="auto-commit", type=bool, default=True, help="Automatically commit the edited JSONL changelog file to git after modification")
-def cmd_chlog_edit(commits, id, type, description, user_facing, auto_commit, dry_run, **_kwargs):
+def cmd_chlog_edit(ctx, commits, id, type, description, user_facing, auto_commit, dry_run, **_kwargs):
     root = _require_sub_project_root(
         workspace_root_guidance=(
             "Error: `rlsbl changelog edit` must run inside a sub-project, "
@@ -1164,7 +1164,7 @@ def cmd_chlog_edit(commits, id, type, description, user_facing, auto_commit, dry
 @strictcli.flag(name="map-file", type=str, help="Path to a file of 'old_sha new_sha' lines (same format as git's post-rewrite hook)", default="")
 @strictcli.flag(name="from-journal", type=bool, default=False, help="Read the commit map from safegit's rewrite journal (.git/safegit/rewrite-maps.jsonl)")
 @strictcli.flag(name="stdin", type=bool, default=False, help="Read the old/new SHA map from stdin (for piping from git's post-rewrite hook)")
-def cmd_chlog_remap(map_file, from_journal, stdin, dry_run, **_kwargs):
+def cmd_chlog_remap(ctx, map_file, from_journal, stdin, dry_run, **_kwargs):
     root = _require_sub_project_root(
         workspace_root_guidance=(
             "Error: `rlsbl changelog remap` must run inside a sub-project, "
@@ -1191,7 +1191,7 @@ mono = app.group("monorepo", help="Manage monorepo workspaces with multiple inde
 
 @mono.command(name="init", help="Create a new monorepo workspace by generating the .rlsbl-monorepo directory and an empty workspace.toml configuration file at the current directory. This must be run at the repository root before adding individual projects with the add subcommand. Each workspace tracks multiple independently-versioned projects that share a single git repository.")
 @strictcli.flag(name="auto-commit", type=bool, default=True, help="Automatically commit the generated workspace.toml configuration file to git")
-def cmd_mono_init(auto_commit, **_kwargs):
+def cmd_mono_init(ctx, auto_commit, **_kwargs):
     # monorepo init does NOT require a pre-existing .rlsbl/ marker --
     # it bootstraps a fresh workspace. Resolve to CWD instead of
     # _require_project_root(), but refuse if CWD is inside an existing
@@ -1227,7 +1227,7 @@ def cmd_mono_init(auto_commit, **_kwargs):
 @strictcli.flag(name="releasable", type=str, help="Releasable group this project belongs to (name of a [[releasables]] entry, or 'false' to opt out of versioning)", default="")
 @strictcli.flag(name="auto-commit", type=bool, default=True, help="Auto-commit workspace.toml and trigger scaffold/sync commits")
 @strictcli.arg(name="path", help="Relative path from the repo root to the project directory to register")
-def cmd_mono_add(name, target, watch, subtree_remote, depends_on, library, dev_only, releasable, auto_commit, path, **_kwargs):
+def cmd_mono_add(ctx, name, target, watch, subtree_remote, depends_on, library, dev_only, releasable, auto_commit, path, **_kwargs):
     root = _require_project_root()
     flags = {}
     if name:
@@ -1254,14 +1254,14 @@ def cmd_mono_add(name, target, watch, subtree_remote, depends_on, library, dev_o
 
 @mono.command(name="remove", help="Unregister a project from the monorepo workspace.toml by its path. This removes the project entry from the workspace configuration file but does not delete any files, directories, or git history on disk. The project's code remains intact and can be re-added later with the add subcommand if needed.")
 @strictcli.arg(name="path", help="Relative path from the repo root of the project to unregister from workspace.toml")
-def cmd_mono_remove(path, **_kwargs):
+def cmd_mono_remove(ctx, path, **_kwargs):
     root = _require_project_root()
     from .commands.monorepo import _cmd_remove
     _cmd_remove([path], {}, project_root=root)
 
 
 @mono.command(name="list", help="Display all projects registered in the monorepo workspace.toml file. For each project, shows the project name, relative path from the repo root, target registry for publishing, and any configured options such as watch patterns, subtree remotes, inter-project dependencies, and whether the project is marked as a library.")
-def cmd_mono_list(**_kwargs):
+def cmd_mono_list(ctx, **_kwargs):
     root = _require_project_root()
     from .commands.monorepo import _cmd_list
     _cmd_list({}, project_root=root)
@@ -1269,14 +1269,14 @@ def cmd_mono_list(**_kwargs):
 
 @mono.command(name="sync", help="Inline every project's CI jobs into a single generated ci-router.yml (and publish jobs into publish.yml) in the shared .github/workflows directory at the repository root. Jobs are inlined rather than routed via reusable-workflow calls because GitHub rejects workflows that reference 20 or more reusable workflows. Stale per-project workflow copies at the root are removed via saferm.")
 @strictcli.flag(name="auto-commit", type=bool, default=True, help="Auto-commit merged workflow files in .github/workflows/")
-def cmd_mono_sync(auto_commit, **_kwargs):
+def cmd_mono_sync(ctx, auto_commit, **_kwargs):
     root = _require_project_root()
     from .commands.monorepo import _cmd_sync
     _cmd_sync({"auto-commit": auto_commit}, project_root=root)
 
 
 @mono.command(name="status", help="Show the current version, last release tag, and number of unreleased commits for every project in the monorepo workspace. Provides a quick overview of which projects have pending changes and are ready for their next release. Projects with zero unreleased commits are shown as up-to-date.")
-def cmd_mono_status(**_kwargs):
+def cmd_mono_status(ctx, **_kwargs):
     root = _require_project_root()
     from .commands.monorepo import _cmd_status
     _cmd_status({}, project_root=root)
@@ -1287,7 +1287,7 @@ def cmd_mono_status(**_kwargs):
 @strictcli.flag(name="prefix", type=str, help="String to prepend to each project name before checking availability", default="")
 @strictcli.flag(name="suffix", type=str, help="String to append to each project name before checking availability", default="")
 @strictcli.flag(name="delay", type=str, help="Milliseconds to wait between consecutive registry API queries (default: 200)", default="200")
-def cmd_mono_check_names(target, prefix, suffix, delay, **_kwargs):
+def cmd_mono_check_names(ctx, target, prefix, suffix, delay, **_kwargs):
     root = _require_project_root()
     flags = {"target": target, "prefix": prefix, "suffix": suffix, "delay": delay}
     from .commands.monorepo import _cmd_check_names
@@ -1295,7 +1295,7 @@ def cmd_mono_check_names(target, prefix, suffix, delay, **_kwargs):
 
 
 @mono.command(name="outdated", help="Scan all projects in the monorepo workspace for intra-workspace dependencies that reference older versions than what is currently available in the workspace. Lists each outdated dependency with the referenced version and the latest available version, helping identify which downstream projects need a version bump after upstream releases.")
-def cmd_mono_outdated(**_kwargs):
+def cmd_mono_outdated(ctx, **_kwargs):
     root = _require_project_root()
     from .commands.monorepo import _cmd_outdated
     _cmd_outdated({}, project_root=root)
@@ -1303,7 +1303,7 @@ def cmd_mono_outdated(**_kwargs):
 
 @mono.command(name="snapshot", help="Generate a committed JSON artifact at .rlsbl-monorepo/snapshot.json summarizing all packages, versions, dependencies, and graph structure. Use --check to verify the snapshot is up-to-date without regenerating it (exits 1 if stale).")
 @strictcli.flag(name="check", type=bool, default=False, help="Verify snapshot.json is up-to-date (exit 1 if stale)")
-def cmd_mono_snapshot(check, **_kwargs):
+def cmd_mono_snapshot(ctx, check, **_kwargs):
     root = _require_project_root()
     from .commands.monorepo import _cmd_snapshot
     _cmd_snapshot({"check": check}, project_root=root)
@@ -1311,7 +1311,7 @@ def cmd_mono_snapshot(check, **_kwargs):
 
 @mono.command(name="mirror", help="Initialize a subtree mirror repository for a monorepo project by performing a full git subtree split of the project's history, pushing the extracted tree to the configured subtree_remote URL, cloning the resulting standalone mirror repository, running rlsbl scaffold to generate CI workflows for independent publishing, and pushing the scaffolded mirror to its remote.")
 @strictcli.arg(name="project", help="Name of the workspace project to split and push as a standalone mirror repo")
-def cmd_mono_mirror(project, **_kwargs):
+def cmd_mono_mirror(ctx, project, **_kwargs):
     root = _require_project_root()
     from .commands.monorepo import _cmd_mirror
     _cmd_mirror({"project": project}, project_root=root)
@@ -1323,7 +1323,7 @@ def cmd_mono_mirror(project, **_kwargs):
 @strictcli.flag(name="root", type=str, help="Filter to show only transitive dependencies reachable from this package", default="")
 @strictcli.flag(name="reverse", type=str, help="Filter to show only transitive reverse dependencies of this package", default="")
 @strictcli.flag(name="depth", type=int, help="Maximum number of dependency hops to traverse from the root or reverse node")
-def cmd_mono_graph(format, output, root, reverse, depth=None, **_kwargs):
+def cmd_mono_graph(ctx, format, output, root, reverse, depth=None, **_kwargs):
     flags = {"format": format}
     if output:
         flags["output"] = output
@@ -1342,7 +1342,7 @@ def cmd_mono_graph(format, output, root, reverse, depth=None, **_kwargs):
 @strictcli.flag(name="format", type=str, help="Output serialization format for the impact report: json or text (default: text)", default="text")
 @strictcli.flag(name="depth", type=int, help="Maximum number of dependency hops to traverse when computing transitive impact")
 @strictcli.flag(name="since", type=str, help="Git ref to diff against HEAD (e.g. HEAD~3, v1.0.0)", default="")
-def cmd_mono_impact(format, depth=None, since="", **_kwargs):
+def cmd_mono_impact(ctx, format, depth=None, since="", **_kwargs):
     args = _variadic_args
     flags = {"format": format}
     if depth is not None:
@@ -1368,7 +1368,7 @@ mono_release = mono.group("release", help="Release commands for monorepo workspa
     ],
 )
 @strictcli.flag(name="allow-dirty", type=bool, help="Skip the clean working tree check and allow releasing with uncommitted changes")
-def cmd_mono_release_run(dry_run, yes, quiet, allow_dirty, watch, watch_async, **_kwargs):
+def cmd_mono_release_run(ctx, dry_run, yes, quiet, allow_dirty, watch, watch_async, **_kwargs):
     from .commands.release.shared import build_release_flags
     flags = build_release_flags(dry_run, yes, quiet, allow_dirty, watch=watch,
                                 watch_async=watch_async)
@@ -1379,14 +1379,14 @@ def cmd_mono_release_run(dry_run, yes, quiet, allow_dirty, watch, watch_async, *
 
 @mono_release.command(name="init", help="Scaffold a batch release file for all workspace projects by auto-detecting each project's release targets and generating per-package configuration sections. Creates .rlsbl-monorepo/releases/unreleased.toml with a [packages.<name>] section for each non-dev-node project, pre-populated with bump type, description, and include lists. Packages with no unreleased commits since their last tag are rendered as commented-out sections.")
 @strictcli.flag(name="packages", type=str, help="Comma-separated package names to include (default: all)", default="")
-def cmd_mono_release_init(packages, **_kwargs):
+def cmd_mono_release_init(ctx, packages, **_kwargs):
     root = _require_project_root()
     from .commands.monorepo import _cmd_batch_release_init
     _cmd_batch_release_init(project_root=root, packages=packages or None)
 
 
 @mono_release.command(name="order", help="Compute and display the topological release order for all projects in the monorepo workspace based on their declared depends-on relationships. Projects with no dependencies are listed first, followed by projects that depend on them, ensuring each project is released only after its dependencies. Detects and reports circular dependency errors.")
-def cmd_mono_release_order(**_kwargs):
+def cmd_mono_release_order(ctx, **_kwargs):
     root = _require_project_root()
     from .commands.monorepo import _cmd_release_order
     _cmd_release_order({}, project_root=root)
@@ -1395,7 +1395,7 @@ def cmd_mono_release_order(**_kwargs):
 @mono.command(name="extract", help="Extract a package from the monorepo into a new standalone repository. Clones the monorepo, runs git filter-repo to keep only the package's history, migrates changelog entries, creates .rlsbl/ config in the new repo, and removes the project from workspace.toml.")
 @strictcli.arg(name="package_name", help="Name of the package as defined in workspace.toml to extract into a standalone repo")
 @strictcli.arg(name="target_path", help="Filesystem path where the new standalone repository will be created")
-def cmd_mono_extract(dry_run, package_name, target_path, **_kwargs):
+def cmd_mono_extract(ctx, dry_run, package_name, target_path, **_kwargs):
     root = _require_project_root()
     from .workspace import find_workspace_root
     ws_root = find_workspace_root(str(root))
@@ -1419,7 +1419,7 @@ def cmd_mono_extract(dry_run, package_name, target_path, **_kwargs):
 @strictcli.flag(name="releasable", type=str, help="Releasable group to assign the absorbed package to", default="")
 @strictcli.arg(name="source_path", help="Filesystem path to the external git repository to absorb")
 @strictcli.arg(name="package_name", help="Name to assign to the absorbed package in the monorepo workspace.toml")
-def cmd_mono_absorb(dry_run, releasable, source_path, package_name, **_kwargs):
+def cmd_mono_absorb(ctx, dry_run, releasable, source_path, package_name, **_kwargs):
     root = _require_project_root()
     from .workspace import find_workspace_root
     ws_root = find_workspace_root(str(root))
@@ -1446,7 +1446,7 @@ def cmd_mono_absorb(dry_run, releasable, source_path, package_name, **_kwargs):
 @mono.command(name="extract-releasable", help="Extract all member packages of a releasable into a new repository. If the releasable has one member, creates a single-project repo. If it has multiple members, creates a new monorepo with workspace.toml. Migrates changelog entries for each member and removes all extracted projects from the source workspace.")
 @strictcli.arg(name="releasable_name", help="Name of the releasable group in workspace.toml to extract")
 @strictcli.arg(name="target_path", help="Filesystem path where the new repository will be created")
-def cmd_mono_extract_releasable(dry_run, releasable_name, target_path, **_kwargs):
+def cmd_mono_extract_releasable(ctx, dry_run, releasable_name, target_path, **_kwargs):
     root = _require_project_root()
     from .workspace import find_workspace_root
     ws_root = find_workspace_root(str(root))
@@ -1473,7 +1473,7 @@ def cmd_mono_extract_releasable(dry_run, releasable_name, target_path, **_kwargs
 
 
 @mono.command(name="cleanup", help="Remove per-package release-state residue from releasable member packages: .rlsbl/changes/, .rlsbl/releases/, .rlsbl/bases/, .rlsbl/lint/, .rlsbl/version, per-package CHANGELOG.md, and .rlsbl/config.json when identical to the releasable-level config. Per-package hooks/ directories are preserved (live feature), and members whose path is the workspace root are exempt. Deletions go through saferm (audit trail, recoverable) and are committed automatically. Requires an explicit-mode workspace ([[releasables]] in workspace.toml). Detect residue first with `rlsbl check --name releasable-residue`.")
-def cmd_mono_cleanup(dry_run, yes, **_kwargs):
+def cmd_mono_cleanup(ctx, dry_run, yes, **_kwargs):
     root = _require_project_root()
     from .workspace import find_workspace_root, is_explicit_mode
     ws_root = find_workspace_root(str(root))
@@ -1493,7 +1493,7 @@ def cmd_mono_cleanup(dry_run, yes, **_kwargs):
 
 @mono.command(name="migrate-releasable", help="Migrate a releasable from per-package release state to the releasable model. Detects current state, consolidates per-package changelogs and versions into the releasable directory, creates a releasable-format migration tag, and removes orphaned per-package .rlsbl/changes/ and .rlsbl/releases/ directories. Requires the workspace to be in explicit mode (with [[releasables]] in workspace.toml).")
 @strictcli.arg(name="releasable_name", help="Name of the releasable group in workspace.toml to migrate")
-def cmd_mono_migrate_releasable(dry_run, yes, releasable_name, **_kwargs):
+def cmd_mono_migrate_releasable(ctx, dry_run, yes, releasable_name, **_kwargs):
     root = _require_project_root()
     from .workspace import find_workspace_root
     ws_root = find_workspace_root(str(root))
@@ -1541,7 +1541,7 @@ def cmd_mono_migrate_releasable(dry_run, yes, releasable_name, **_kwargs):
 @mono.command(name="rename-releasable", help="Rename a releasable group. Rewrites the [[releasables]] name and every member's releasable field in workspace.toml (preserving comments), moves the releasable's state directory, drops the stale changelog validation cache, re-runs monorepo sync to regenerate publish gate prefixes, and commits everything as one commit. When the tag_format contains {name}, a boundary alias tag for the current version is created at the old tag's commit and pushed; historical releases stay under the old prefix. Idempotent: a crash between the commit and the tag push is healed by re-running.")
 @strictcli.arg(name="old_name", help="Current name of the releasable group in workspace.toml")
 @strictcli.arg(name="new_name", help="New name for the releasable group")
-def cmd_mono_rename_releasable(dry_run, yes, old_name, new_name, **_kwargs):
+def cmd_mono_rename_releasable(ctx, dry_run, yes, old_name, new_name, **_kwargs):
     root = _require_project_root()
     from .workspace import find_workspace_root
     ws_root = find_workspace_root(str(root))
@@ -1597,7 +1597,7 @@ dev = app.group("dev", help="Developer utilities for locally working with rlsbl 
 @strictcli.flag(name="uninstall", type=bool, default=False, help="Reverse a previous dev install (where supported by the target)")
 @strictcli.flag(name="global", type=bool, help="Install as a global tool/symlink. This is the default behavior when neither --global nor --venv is passed. Mutually exclusive with --venv.", default=False)
 @strictcli.flag(name="venv", type=bool, help="Install into the project's local environment only (e.g. uv sync, npm install). Mutually exclusive with --global.", default=False)
-def cmd_dev_install(all, include, exclude, uninstall, global_, venv, **_kwargs):
+def cmd_dev_install(ctx, all, include, exclude, uninstall, global_, venv, **_kwargs):
     if global_ and venv:
         print(
             "Error: --global and --venv are mutually exclusive.",
@@ -1631,7 +1631,7 @@ def cmd_dev_install(all, include, exclude, uninstall, global_, venv, **_kwargs):
 
 
 @dev.command(name="sync", help="Overlay local editable checkouts of sibling projects onto this project's locked environment. Reads dev-sources.toml.local-only for overlay entries, runs uv sync --inexact excluding overlaid packages, then uv pip install -e per entry. Requires UV_NO_SYNC=1 in the environment to prevent bare uv run from reverting overlays.")
-def cmd_dev_sync(**_kwargs):
+def cmd_dev_sync(ctx, **_kwargs):
     from .commands.dev_sync import OVERRIDES_FILENAME, run_sync
     root = _require_sub_project_root(
         workspace_root_guidance=(
@@ -1646,7 +1646,7 @@ def cmd_dev_sync(**_kwargs):
 
 
 @dev.command(name="status", help="Report the state of local dev-sync overlays: for each package recorded in the dev-overlays sentinel, show its declared editable checkout path and version alongside the venv's actual install (editable at the expected path, WIPED back to a registry wheel, or missing entirely). Exits 1 if any overlay drifted so scripts and pre-run guards can detect a silent wipe by a bare uv sync or uv run; exits 0 when all overlays are intact or none are declared.")
-def cmd_dev_status(**_kwargs):
+def cmd_dev_status(ctx, **_kwargs):
     from .commands.dev_sync import SENTINEL_FILENAME, run_status
     root = _require_sub_project_root(
         workspace_root_guidance=(
