@@ -48,8 +48,8 @@
   },
   "project_id": "rlsbl",
   "name": "rlsbl",
-  "version": "0.106.0",
-  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 52 commands organized into 15 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
+  "version": "0.107.0",
+  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 53 commands organized into 15 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
   "global_flags": [
     {
       "name": "dry-run",
@@ -1113,6 +1113,20 @@
             {
               "name": "releasable_name",
               "help": "Name of the releasable group in workspace.toml to migrate"
+            }
+          ]
+        },
+        "rename-releasable": {
+          "name": "rename-releasable",
+          "help": "Rename a releasable group. Rewrites the [[releasables]] name and every member's releasable field in workspace.toml (preserving comments), moves the releasable's state directory, drops the stale changelog validation cache, re-runs monorepo sync to regenerate publish gate prefixes, and commits everything as one commit. When the tag_format contains {name}, a boundary alias tag for the current version is created at the old tag's commit and pushed; historical releases stay under the old prefix. Idempotent: a crash between the commit and the tag push is healed by re-running.",
+          "args": [
+            {
+              "name": "new_name",
+              "help": "New name for the releasable group"
+            },
+            {
+              "name": "old_name",
+              "help": "Current name of the releasable group in workspace.toml"
             }
           ]
         }

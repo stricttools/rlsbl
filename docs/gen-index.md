@@ -53,6 +53,7 @@ order: 90
 - [rlsbl.commands.monorepo.impact](rlsbl-commands-monorepo-impact.html)
 - [rlsbl.commands.monorepo.mirror_cmd](rlsbl-commands-monorepo-mirror_cmd.html)
 - [rlsbl.commands.monorepo.publish_inline](rlsbl-commands-monorepo-publish_inline.html)
+- [rlsbl.commands.monorepo.releasable_rename](rlsbl-commands-monorepo-releasable_rename.html)
 - [rlsbl.commands.monorepo.snapshot_cmd](rlsbl-commands-monorepo-snapshot_cmd.html)
 - [rlsbl.commands.monorepo.sync](rlsbl-commands-monorepo-sync.html)
 - [rlsbl.commands.prs](rlsbl-commands-prs.html)

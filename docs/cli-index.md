@@ -11,9 +11,9 @@ order: 91
 
 # rlsbl CLI Reference
 
-Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 52 commands organized into 15 top-level commands and 4 command groups (release, changelog, monorepo, dev).
+Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 53 commands organized into 15 top-level commands and 4 command groups (release, changelog, monorepo, dev).
 
-Version: 0.106.0
+Version: 0.107.0
 
 ## Commands
 

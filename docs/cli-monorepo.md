@@ -188,3 +188,14 @@ Migrate a releasable from per-package release state to the releasable model. Det
 | Name | Required | Description |
 | --- | --- | --- |
 | `releasable_name` | yes | Name of the releasable group in workspace.toml to migrate |
+
+## monorepo rename-releasable
+
+Rename a releasable group. Rewrites the [[releasables]] name and every member's releasable field in workspace.toml (preserving comments), moves the releasable's state directory, drops the stale changelog validation cache, re-runs monorepo sync to regenerate publish gate prefixes, and commits everything as one commit. When the tag_format contains {name}, a boundary alias tag for the current version is created at the old tag's commit and pushed; historical releases stay under the old prefix. Idempotent: a crash between the commit and the tag push is healed by re-running.
+
+### Arguments
+
+| Name | Required | Description |
+| --- | --- | --- |
+| `new_name` | yes | New name for the releasable group |
+| `old_name` | yes | Current name of the releasable group in workspace.toml |
