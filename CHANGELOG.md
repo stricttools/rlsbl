@@ -2,7 +2,21 @@
 
 # Changelog
 
-## Unreleased
+## 0.106.0
+
+Publish-gate reliability (check-run dedup + recorded CI SHA), in-place release retry, snapshot-before-tag, post-push failure-state fixes, per-target publish paths, unscoped npm wrapper, required Go artifact key, and claim-name conflict enumeration.
+
+<details>
+<summary>Context</summary>
+
+This release hardens the publish pipeline against retry-poisoning and post-tag commit drift:
+the CI gate now resolves the exact commit CI ran on from a recorded marker and collapses retried
+check-runs to the latest, so a superseded failure can no longer block a legitimate publish, and
+retries rerun in place rather than spawning divergent state. It also completes the path-aware
+publishing model: each target publishes from its own subdirectory, the npm binary wrapper uses
+bare unscoped names, and Go pipelines must declare an explicit binary/library artifact key.
+
+</details>
 
 ### Breaking
 
