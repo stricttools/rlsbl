@@ -1,1 +1,2 @@
 {"id":"18c31291853afcafc428b18716804895af0ece34590d813a","commits":["7e14c1f542884c1d14cee05f406af1d30d34d347"],"user_facing":false}
+{"id":"18c317f5d241a4f8ddd3805a582c4129841591f10a2ad29a","commits":["3b4f39068485eef15f7f4ec44820c24a41e11c3a"],"user_facing":true,"description":"**Publish gate resilience.** The CI gate now collapses retried check-runs to the latest per name, so a stale failure from a superseded CI run no longer blocks publishing forever.","type":"fix"}
