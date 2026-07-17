@@ -1573,24 +1573,27 @@ def _run_release_mutating(state: ReleaseState):
             # steps below; otherwise re-raise to abort with resume guidance.
             if not _handle_resumable_push_failure(e):
                 raise
-        # Pre-TAGGED failure -- safe to roll back locally,
-        # but only if no foreign commits or dirty files would be destroyed.
-        _guard_rollback(pre_release_sha, _state_path)
-        run("git", ["reset", "--hard", pre_release_sha])
-        # State file is useless after local rollback -- clean it up.
-        from ...release_file import get_releases_dir as _get_releases_dir
-        _cleanup_release_artifacts(
-            project_dir, new_version, changes_dir=state.changes_dir,
-            releases_dir=_get_releases_dir(project_dir, releasable_dir=_releasable_cfg_dir),
-        )
-        clear_release_state(_state_path)
-        print(str(e), file=sys.stderr)
-        print(
-            f"Local state has been rolled back to {pre_release_sha[:10]}.",
-            file=sys.stderr,
-        )
-        _warn_rollback_residuals()
-        raise
+            # Recovered: the retry cleared the outstanding push. Fall through
+            # (no rollback) so the post-push steps below the try/except run.
+        else:
+            # Pre-TAGGED failure -- safe to roll back locally,
+            # but only if no foreign commits or dirty files would be destroyed.
+            _guard_rollback(pre_release_sha, _state_path)
+            run("git", ["reset", "--hard", pre_release_sha])
+            # State file is useless after local rollback -- clean it up.
+            from ...release_file import get_releases_dir as _get_releases_dir
+            _cleanup_release_artifacts(
+                project_dir, new_version, changes_dir=state.changes_dir,
+                releases_dir=_get_releases_dir(project_dir, releasable_dir=_releasable_cfg_dir),
+            )
+            clear_release_state(_state_path)
+            print(str(e), file=sys.stderr)
+            print(
+                f"Local state has been rolled back to {pre_release_sha[:10]}.",
+                file=sys.stderr,
+            )
+            _warn_rollback_residuals()
+            raise
     except Exception as e:
         if "TAGGED" in _completed:
             # Post-TAGGED failure (push failed / timed out): canonical
@@ -1600,43 +1603,46 @@ def _run_release_mutating(state: ReleaseState):
             # re-raise to abort with resume guidance.
             if not _handle_resumable_push_failure(e):
                 raise
-        # Pre-TAGGED failure -- safe to roll back locally,
-        # but only if no foreign commits or dirty files would be destroyed.
-        _guard_rollback(pre_release_sha, _state_path)
-        # Delete tag (may not exist yet) and reset commits so the working
-        # tree looks like it did before the release attempt.
-        try:
-            run("git", ["tag", "-d", tag])
-        except Exception:
-            pass
-        # Clean up companion tags (best-effort)
-        for ctag in state.companion_tags:
+            # Recovered: the retry cleared the outstanding push. Fall through
+            # (no rollback) so the post-push steps below the try/except run.
+        else:
+            # Pre-TAGGED failure -- safe to roll back locally,
+            # but only if no foreign commits or dirty files would be destroyed.
+            _guard_rollback(pre_release_sha, _state_path)
+            # Delete tag (may not exist yet) and reset commits so the working
+            # tree looks like it did before the release attempt.
             try:
-                run("git", ["tag", "-d", ctag])
+                run("git", ["tag", "-d", tag])
             except Exception:
                 pass
-        run("git", ["reset", "--hard", pre_release_sha])
-        # State file is useless after local rollback -- clean it up.
-        from ...release_file import get_releases_dir as _get_releases_dir
-        _cleanup_release_artifacts(
-            project_dir, new_version, changes_dir=state.changes_dir,
-            releases_dir=_get_releases_dir(project_dir, releasable_dir=_releasable_cfg_dir),
-        )
-        clear_release_state(_state_path)
-        if hasattr(e, 'stderr') and e.stderr:
-            print(f"Command error: {e.stderr.strip()}", file=sys.stderr)
-        print(
-            f"Error: release failed. Local state has been rolled back to {pre_release_sha[:10]}.",
-            file=sys.stderr,
-        )
-        print(
-            "No push happened (the failure occurred before tagging), so nothing "
-            "on the remote needs fixing. Address the error above and re-run:\n"
-            "  rlsbl release run",
-            file=sys.stderr,
-        )
-        _warn_rollback_residuals()
-        raise
+            # Clean up companion tags (best-effort)
+            for ctag in state.companion_tags:
+                try:
+                    run("git", ["tag", "-d", ctag])
+                except Exception:
+                    pass
+            run("git", ["reset", "--hard", pre_release_sha])
+            # State file is useless after local rollback -- clean it up.
+            from ...release_file import get_releases_dir as _get_releases_dir
+            _cleanup_release_artifacts(
+                project_dir, new_version, changes_dir=state.changes_dir,
+                releases_dir=_get_releases_dir(project_dir, releasable_dir=_releasable_cfg_dir),
+            )
+            clear_release_state(_state_path)
+            if hasattr(e, 'stderr') and e.stderr:
+                print(f"Command error: {e.stderr.strip()}", file=sys.stderr)
+            print(
+                f"Error: release failed. Local state has been rolled back to {pre_release_sha[:10]}.",
+                file=sys.stderr,
+            )
+            print(
+                "No push happened (the failure occurred before tagging), so nothing "
+                "on the remote needs fixing. Address the error above and re-run:\n"
+                "  rlsbl release run",
+                file=sys.stderr,
+            )
+            _warn_rollback_residuals()
+            raise
 
     # Capture the pushed commit SHA now, before any post-release hooks that
     # might create new commits and move HEAD past the release commit.
