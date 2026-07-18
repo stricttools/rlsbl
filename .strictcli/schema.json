@@ -48,7 +48,7 @@
   },
   "project_id": "rlsbl",
   "name": "rlsbl",
-  "version": "0.107.0",
+  "version": "0.108.0",
   "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 53 commands organized into 15 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
   "global_flags": [
     {
@@ -122,7 +122,7 @@
         {
           "name": "verbose",
           "type": "bool",
-          "help": "Show full details for passing checks in addition to failures and warnings",
+          "help": "Show per-check notes and durations (including on passing checks) plus a trailing pass/fail/warn/skip count summary",
           "default": false,
           "negatable": true
         }
@@ -1121,12 +1121,12 @@
           "help": "Rename a releasable group. Rewrites the [[releasables]] name and every member's releasable field in workspace.toml (preserving comments), moves the releasable's state directory, drops the stale changelog validation cache, re-runs monorepo sync to regenerate publish gate prefixes, and commits everything as one commit. When the tag_format contains {name}, a boundary alias tag for the current version is created at the old tag's commit and pushed; historical releases stay under the old prefix. Idempotent: a crash between the commit and the tag push is healed by re-running.",
           "args": [
             {
-              "name": "new_name",
-              "help": "New name for the releasable group"
-            },
-            {
               "name": "old_name",
               "help": "Current name of the releasable group in workspace.toml"
+            },
+            {
+              "name": "new_name",
+              "help": "New name for the releasable group"
             }
           ]
         }
@@ -1910,6 +1910,19 @@
       "needs_network": false,
       "depends_on": [],
       "scope": "workspace:non_dev_node"
+    },
+    "wrapper-producer": {
+      "tags": [
+        "project",
+        "preflight"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [
+        "config-schema"
+      ]
     }
   }
 }
