@@ -2,7 +2,16 @@
 
 # Changelog
 
-## Unreleased
+## 0.108.0
+
+Launcher artifact kind for wrapper-package publishing, handler migration to ctx-first signatures, and rename-releasable argument order fix.
+
+<details>
+<summary>Context</summary>
+
+Adds `artifact: "launcher"` pipeline kind that produces npm/PyPI shim packages downloading pre-built binaries from GitHub Releases. All 52 command handlers migrated to strictcli v0.29.0 ctx-first + Outcome signatures. The `monorepo rename-releasable` positional argument order now matches `mv` convention (`<old> <new>`).
+
+</details>
 
 ### Features
 
