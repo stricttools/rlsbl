@@ -2,6 +2,16 @@
 
 # Changelog
 
+## Unreleased
+
+### Features
+
+- **New feature.** Launcher artifact kind (`artifact: "launcher"`) for wrapper-package publishing. Launcher pipelines produce npm/PyPI shim packages that download a pre-built binary from a GitHub Release at install or first-run time. Includes config validation (`wraps`, `binary_source` required), `wrapper-producer` check, `needs` dependency chain in CI workflows, and URL verify-before-publish step.
+
+### Fixes
+
+- **Fix.** Corrected positional argument order for `monorepo rename-releasable`: now reads `<old> <new>` matching `mv`/`git mv` convention.
+
 ## 0.107.0
 
 State-model completion with primary-target designation, legacy field deletion, rename-releasable command, save_workspace in-place editing, claim-name conflict enumeration, and fleet sweep script.
