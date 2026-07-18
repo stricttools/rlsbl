@@ -1,6 +1,6 @@
 ---
 title: rlsbl monorepo
-description: "Manage a monorepo workspace of independently-versioned projects: init, add or remove projects, generate the inlined CI router, and compute release order."
+description: "Manage a monorepo workspace: init, add/remove projects, sync CI router, release coordination, rename releasables, and dependency graph analysis."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 9

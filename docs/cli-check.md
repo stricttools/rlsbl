@@ -1,6 +1,6 @@
 ---
 title: rlsbl check
-description: "Check whether one or more package names are available on npm, PyPI, or other supported registries, with configurable inter-request delay."
+description: "Run project checks registered via the check framework, covering changelog validation, workspace health, and release preflight."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 2
