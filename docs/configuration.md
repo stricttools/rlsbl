@@ -91,6 +91,9 @@ Each entry in `pipelines` is keyed by a user-chosen name and must have:
 | --- | --- | --- | --- |
 | `type` | string | Yes | One of the 9 built-in pipeline types (see below) |
 | `local` | bool | Yes | Whether to publish from the developer machine. When `false`, CI handles publishing. |
+| `artifact` | string | Yes (type `go`); optional for `npm`/`pypi` | Selects the publish workflow variant. Go pipelines require `"binary"` or `"library"`. npm/pypi pipelines accept `"launcher"` for wrapper-package publishing. See [pipelines docs](pipelines.md#launcher-artifact-kind). |
+| `wraps` | string | When `artifact` is `"launcher"` | Name of the pipeline that produces the binary. Must reference a pipeline with `artifact: "binary"`. |
+| `binary_source` | string | When `artifact` is `"launcher"` | Where the launcher downloads binaries from. Only `"github-release"` is supported. |
 | `token_var` | string | No | Env var name for the publish token. Each type has a default (e.g. `NPM_TOKEN` for npm). |
 | `username_var` | string | No | Env var name for username auth (used by docker). |
 | `password_var` | string | No | Env var name for password auth (used by docker). |
