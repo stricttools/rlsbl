@@ -197,5 +197,5 @@ Rename a releasable group. Rewrites the [[releasables]] name and every member's 
 
 | Name | Required | Description |
 | --- | --- | --- |
-| `new_name` | yes | New name for the releasable group |
 | `old_name` | yes | Current name of the releasable group in workspace.toml |
+| `new_name` | yes | New name for the releasable group |

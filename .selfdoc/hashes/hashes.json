@@ -54,7 +54,7 @@
     "schema_hash": "e94a74f595e95db44dea31614d5117ba1e387be38cba93c026ce73ae90a796d9"
   },
   "en/cli-index.md": {
-    "content": "2a6a3e6c16d2526437e4b914fcf5c113f387b23a69e5c3b23c9ed8a77392f3c0",
+    "content": "8f3adbd5403e7bd170cced4e4944742161cae3d9026ee07d1023167b153df638",
     "description": "3e97def3f73b8e72ae1147e1ad3b8c31a9459f8426045a2079b68028733fccd2",
     "seed_hash": "3e97def3f73b8e72ae1147e1ad3b8c31a9459f8426045a2079b68028733fccd2"
   },
@@ -120,8 +120,8 @@
     "schema_hash": "f8bf9ba425f6c5fc5c87e49de0e6aec4cf84b3d3e31382d3c3c1fce78c511e57"
   },
   "en/configuration.md": {
-    "content": "a8591e6ae8e4d3c4ad435b2e0095e7d9736d9cebfceecc637b3bcba904a35876",
-    "description": "86f0a5917e16f7e5b663eca840a270afb0b57907c90d4a952683bb6145c96674",
+    "content": "c47cd1ba3d630cd272e10bedb368440081150c2fee96200754151b7741d3dbb5",
+    "description": "f15959dd9b0b665cd7ce19b5efa060b6b20005407d4e768e220fa544562bebf9",
     "source_docstring": "2f48ecdf7f2d481b41a9ab57a44f19e50288df0eadfd022d57a26bef4c4915d3"
   },
   "en/dep-validation.md": {
@@ -165,8 +165,8 @@
     "description": "ca9471a2ce000308cfb11084b3f86109c722f10f835ddddab6dae624881b77d6"
   },
   "en/pipelines.md": {
-    "content": "b323881b67ae2b4d8bcc88bd4e07e076f0d5caf52534205e921c15790aab65e2",
-    "description": "d36be97df04e36085c1feb53596203296e70518b504ea89c45bc758c4f860776"
+    "content": "a052b98594927574b6f143e7ad1951ab5ae92259b74ae9e3cd874da9e8753293",
+    "description": "58c446f481b0df1720b6bdce1821c8e7ae97e7afab2ee1ff43da4c351028169a"
   },
   "en/release-workflow.md": {
     "content": "c8d865ccf563d95f30f7db77b87a26b5336f2b85f20100be4233ee377e69cb3c",
