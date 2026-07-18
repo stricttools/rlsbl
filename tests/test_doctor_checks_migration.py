@@ -93,6 +93,8 @@ EXPECTED_CHECKS = [
     "member-pytest-config",
     # Launcher pipeline checks
     "wrapper-producer",
+    # CLI test-coverage (auto-registered by strictcli test_coverage=True)
+    "cli-test-coverage",
 ]
 
 

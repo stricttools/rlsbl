@@ -161,6 +161,7 @@ app = strictcli.App(
         strictcli.Flag(name="quiet", type=bool, default=False, help="Suppress non-essential output"),
     ],
     checks_path=Path(__file__).parent / "data" / "checks.toml",
+    test_coverage=True,
 )
 
 
