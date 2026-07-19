@@ -227,3 +227,63 @@ class TestTemplateFilesExist:
             "rlsbl", "templates", "shared", "crates-wrapper", "src", "main.rs.tpl",
         )
         assert os.path.isfile(path), f"Missing template: {path}"
+
+
+def _crates_template(*parts):
+    path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)),
+        "rlsbl", "templates", "shared", "crates-wrapper", *parts,
+    )
+    with open(path) as f:
+        return f.read()
+
+
+class TestBuildRsChecksumVerification:
+    """build.rs.tpl must sha256-verify the downloaded archive before extracting.
+
+    Mirrors the good/corrupted assertion style of the npm launcher shim tests:
+    goreleaser publishes checksums.txt to the same release, so the wrapper must
+    fetch it, match the archive's line, compute sha256, and hard-fail on any
+    mismatch, missing entry, or missing checksums.txt -- never extract an
+    unverified binary.
+    """
+
+    def test_uses_sha256_via_sha2_crate(self):
+        c = _crates_template("build.rs.tpl")
+        assert "use sha2::" in c
+        assert "Sha256" in c
+        assert "hasher.update" in c
+
+    def test_fetches_checksums_txt_from_same_release(self):
+        c = _crates_template("build.rs.tpl")
+        assert "checksums.txt" in c
+        assert "releases/download/v{version}/checksums.txt" in c
+
+    def test_verification_sits_between_download_and_extract(self):
+        c = _crates_template("build.rs.tpl")
+        download = c.index("Failed to download {url}")
+        verify = c.index("Checksum mismatch")
+        extract = c.index("Extract the binary")
+        assert download < verify < extract
+
+    def test_hard_fails_on_hash_mismatch(self):
+        c = _crates_template("build.rs.tpl")
+        assert "Checksum mismatch for {archive_name}" in c
+        assert "expected {expected}, got {actual}" in c
+
+    def test_hard_fails_on_missing_checksum_entry(self):
+        c = _crates_template("build.rs.tpl")
+        assert "checksums.txt has no entry for {archive_name}" in c
+
+    def test_hard_fails_when_checksums_download_fails(self):
+        c = _crates_template("build.rs.tpl")
+        assert "Failed to download release checksums" in c
+
+    def test_hashes_the_downloaded_archive(self):
+        c = _crates_template("build.rs.tpl")
+        assert "fs::read(&archive_path)" in c
+
+    def test_cargo_toml_declares_sha2_build_dependency(self):
+        c = _crates_template("Cargo.toml.tpl")
+        assert "[build-dependencies]" in c
+        assert "sha2" in c

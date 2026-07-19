@@ -10,6 +10,9 @@ repository = "https://github.com/{{repoName}}"
 name = "{{binCommand}}"
 path = "src/main.rs"
 
+[build-dependencies]
+sha2 = "0.10"
+
 [package.metadata.binstall]
 pkg-url = "{ repo }/releases/download/v{ version }/{{binCommand}}_{ version }_{ target }{ archive-suffix }"
 bin-dir = "{{binCommand}}{ binary-ext }"

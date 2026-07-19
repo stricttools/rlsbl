@@ -9,6 +9,8 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 
+use sha2::{Digest, Sha256};
+
 const REPO: &str = "{{repoName}}";
 const BIN_NAME: &str = "{{binCommand}}";
 
@@ -47,6 +49,56 @@ fn main() {
         .status()
         .expect("failed to run curl");
     assert!(status.success(), "Failed to download {url}");
+
+    // Verify the archive against the release checksums.txt before extracting.
+    // goreleaser publishes a sha256 checksums.txt alongside the archives in the
+    // same release. A missing checksums.txt, a missing entry, or a hash mismatch
+    // is a hard failure -- never extract or exec an unverified binary.
+    let checksums_url = format!(
+        "https://github.com/{REPO}/releases/download/v{version}/checksums.txt"
+    );
+    let checksums_path = out_dir.join("checksums.txt");
+    let status = Command::new("curl")
+        .args(["-sSfL", "-o"])
+        .arg(&checksums_path)
+        .arg(&checksums_url)
+        .status()
+        .expect("failed to run curl");
+    assert!(
+        status.success(),
+        "Failed to download release checksums from {checksums_url}"
+    );
+
+    let checksums =
+        fs::read_to_string(&checksums_path).expect("failed to read checksums.txt");
+    let expected = checksums
+        .lines()
+        .find_map(|line| {
+            let mut parts = line.split_whitespace();
+            let digest = parts.next()?;
+            let name = parts.next()?;
+            if name == archive_name {
+                Some(digest.to_lowercase())
+            } else {
+                None
+            }
+        })
+        .unwrap_or_else(|| panic!("checksums.txt has no entry for {archive_name}"));
+
+    let archive_bytes = fs::read(&archive_path).expect("failed to read archive");
+    let mut hasher = Sha256::new();
+    hasher.update(&archive_bytes);
+    let actual: String = hasher
+        .finalize()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    assert!(
+        actual == expected,
+        "Checksum mismatch for {archive_name}: expected {expected}, got {actual}"
+    );
+
+    let _ = fs::remove_file(&checksums_path);
 
     // Extract the binary
     if archive_ext == "tar.gz" {
