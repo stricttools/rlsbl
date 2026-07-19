@@ -383,6 +383,57 @@ class TestBatchPlanIdempotency:
         assert any(n.startswith("batch-") and n.endswith(".toml") for n in names)
         assert any(n.startswith("batch-") and n.endswith(".plan.json") for n in names)
 
+    def test_early_pass_does_not_archive_when_item_in_progress(
+        self, mock_git_repo, capsys, bypass_upfront_validation, _no_commit_noise
+    ):
+        """The early repair pass must NOT archive the batch when a plan item
+        still has an on-disk in-progress.json, even if its tag exists (a failed
+        push can leave the tag locally while the release did not complete). The
+        batch file must survive so the stranded release can be resumed.
+        """
+        from rlsbl.commands.release.release_state import get_state_path
+
+        ws = mock_git_repo
+        _setup_batch_packages(ws, ["alpha", "beta"])
+
+        # Both items appear released per plan (manifests + tags), but beta still
+        # has a lingering in-progress.json -- an unfinished/resumable release.
+        plan = BatchPlan(
+            section_type="packages",
+            items={
+                "alpha": PlanItem("alpha", "0.1.0", "0.1.1", "alpha@v0.1.1", "pypi", "patch"),
+                "beta": PlanItem("beta", "0.1.0", "0.1.1", "beta@v0.1.1", "pypi", "patch"),
+            },
+        )
+        write_batch_plan(get_batch_plan_path(str(ws)), plan)
+        for n in ["alpha", "beta"]:
+            _set_pyproject_version(os.path.join(str(ws), n), "0.1.1")
+            _git_tag(ws, f"{n}@v0.1.1")
+
+        # Strand beta with an in-progress.json.
+        beta_state = get_state_path(os.path.join(str(ws), "beta"))
+        os.makedirs(os.path.dirname(beta_state), exist_ok=True)
+        with open(beta_state, "w", encoding="utf-8") as f:
+            f.write('{"new_version": "0.1.1", "tag": "beta@v0.1.1"}\n')
+
+        # Both items are already released (tags present), so the fall-through
+        # flow skips them without releasing; run_cmd must never be called.
+        def mock_run(release_config, flags, **kwargs):
+            raise AssertionError("must not release while an item is stranded")
+
+        with patch("rlsbl.commands.release.run_cmd", mock_run), \
+             patch("rlsbl.commands.monorepo.batch_release.validate_gh_push_access"):
+            _run_batch(ws)
+
+        # The batch file must NOT have been archived (neither by the early pass
+        # nor the loop tail) while beta is stranded.
+        releases_dir = os.path.dirname(get_batch_release_file_path(str(ws)))
+        names = os.listdir(releases_dir)
+        assert "unreleased.toml" in names, "must not archive a stranded batch"
+        assert not any(
+            n.startswith("batch-") and n.endswith(".toml") for n in names
+        ), "no archived batch file should exist"
+
     def test_happy_path_tail_archives_batch_and_plan(
         self, mock_git_repo, capsys, bypass_upfront_validation, _no_commit_noise
     ):

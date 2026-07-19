@@ -185,12 +185,18 @@ def _cmd_batch_release(flags, project_root):
 
         if not dry_run and plan_all_released(workspace_root, plan, projects):
             with rlsbl_lock(".rlsbl-monorepo", project_root=workspace_root):
-                _finalize_batch_file(batch_path, log)
-            log(
-                "Batch release already complete (all items released per plan); "
-                "archived the stale batch file and plan."
-            )
-            return
+                archived = _archive_batch_if_complete(
+                    batch_path, plan, workspace_root, projects, log,
+                )
+            if archived:
+                log(
+                    "Batch release already complete (all items released per "
+                    "plan); archived the stale batch file and plan."
+                )
+                return
+            # All released per plan, but a stranded in-progress.json blocks
+            # archival: fall through so the unfinished release can be resumed
+            # (or the operator can roll it back) -- never silently archive it.
 
     # Upfront validation: fail before releasing anything
     try:
@@ -594,20 +600,21 @@ def _archive_batch_if_complete(batch_path, plan, workspace_root, projects, log):
     release must never be silently archived away.
     """
     if plan is None:
-        return
+        return False
     if not plan_all_released(workspace_root, plan, projects):
         log(
             "Not archiving batch file: some plan items are not yet released."
         )
-        return
+        return False
     stranded = _plan_items_in_progress(plan, workspace_root, projects)
     if stranded:
         log(
             "Not archiving batch file: in-progress release state exists for "
             f"{', '.join(stranded)}. Resume or roll back those releases first."
         )
-        return
+        return False
     _finalize_batch_file(batch_path, log)
+    return True
 
 
 def _finalize_batch_file(batch_path, log):
