@@ -16144,5 +16144,815 @@
       "companion_tags": [],
       "github_release_deleted": true
     }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:26:06+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:26:06+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:26:07+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:26:07+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:26:25+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:26:25+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:26:26+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:26:26+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:26:27+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:26:28+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:36:45+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:36:45+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:36:46+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:36:46+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:36:53+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:36:53+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:36:53+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:36:54+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:36:54+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:36:55+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:52:57+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:52:57+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:52:58+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:52:58+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:53:06+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:53:06+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:53:06+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:53:07+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:53:07+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
+  },
+  {
+    "version": "1.0.0",
+    "tag": "v1.0.0",
+    "timestamp": "2026-07-18T19:53:08+0200",
+    "verdict": "cleared",
+    "reason": "at least one registry confirms unpublished, none confirms published",
+    "evidence": [
+      {
+        "source": "registry_probe",
+        "target": "npm",
+        "kind": "unpublished",
+        "message": "rlsbl@1.0.0 not found on npm"
+      },
+      {
+        "source": "registry_probe",
+        "target": "pypi",
+        "kind": "unpublished",
+        "message": "rlsbl==1.0.0 not found on PyPI"
+      }
+    ],
+    "operator_context": {
+      "is_latest": true,
+      "revert_shas": [],
+      "companion_tags": [],
+      "github_release_deleted": true
+    }
   }
 ]
