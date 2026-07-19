@@ -2,6 +2,24 @@
 
 # Changelog
 
+## 0.109.1
+
+Scaffold truthful status labels, crates wrapper checksum verification, corrected monorepo positional bindings, and Go dead-modules testdata exclusion
+
+<details>
+<summary>Context</summary>
+
+Found via the new CLI wiring coverage (which itself now covers all commands via the deterministic strictcli 0.32.x coverage check) plus fleet verification.
+
+</details>
+
+### Fixes
+
+- **Scaffold truthfulness.** Byte-identical files are reported as `unchanged` instead of `updated` during re-scaffold.
+- **Crates wrapper integrity.** The generated `build.rs` now sha256-verifies the downloaded release archive against `checksums.txt` and hard-fails on any mismatch.
+- **Fixed swapped arguments in monorepo extract/absorb/extract-releasable.** The two positional arguments now bind in the documented order shown in each command's help; previously the first argument you passed was silently bound to the second slot (and vice versa).
+- **Dead-package check no longer flags Go `testdata/` fixtures or test-only packages.** The Go dead-code detector now applies the same test-context exclusion as other languages, so package directories under `testdata/` (at any depth) and packages consisting solely of `*_test.go` files are never reported as dead.
+
 ## 0.109.0
 
 Structured external checks, declarative dead-module exclusions, check-name --json, launcher shim generation, and deterministic check verdicts
