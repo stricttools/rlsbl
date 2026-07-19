@@ -105,6 +105,11 @@ def test_no_scaffold_commit_hard_errors(tmp_path, monkeypatch):
     assert "g.txt" in msg               # names the offending file
     assert "delete" in msg              # remediation 1: delete + rescaffold
     assert "rlsbl scaffold" in msg      # remediation 2: commit under scaffold msg
+    # remediation 2 must warn that committing is destructive for customized files:
+    # base==committed content means the next scaffold replaces the customization.
+    assert "SAFE ONLY" in msg
+    assert "REPLACES" in msg
+    assert "unmodified template output" in msg
 
 
 def test_plan_mappings_does_not_write_base_during_analysis(tmp_path, monkeypatch):

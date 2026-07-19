@@ -752,7 +752,12 @@ def plan_mappings(template_dir, mappings, vars_dict, *, required_vars=None):
                     "absent files cleanly), or\n"
                     f"    - commit {target} with a commit message containing "
                     "'rlsbl scaffold' so its content becomes a reconstructable "
-                    "base."
+                    "base -- SAFE ONLY if the file is unmodified template output "
+                    "(what scaffold would generate). For a hand-CUSTOMIZED file "
+                    "this is destructive: base becomes the committed content, so "
+                    "the next scaffold REPLACES your customizations with the "
+                    "template. For those, keep the file out of scaffold management "
+                    "or manually reconcile it with the template first."
                 )
 
         if ours == base:
@@ -2492,7 +2497,13 @@ def _plan_merged_publish(publish_target, merged_content):
                 f"    - delete {publish_target} and re-run scaffold (it "
                 "regenerates absent files cleanly), or\n"
                 f"    - commit {publish_target} with a commit message containing "
-                "'rlsbl scaffold' so its content becomes a reconstructable base."
+                "'rlsbl scaffold' so its content becomes a reconstructable base "
+                "-- SAFE ONLY if the file is unmodified template output (what "
+                "scaffold would generate). For a hand-CUSTOMIZED file this is "
+                "destructive: base becomes the committed content, so the next "
+                "scaffold REPLACES your customizations with the template. For "
+                "those, keep the file out of scaffold management or manually "
+                "reconcile it with the template first."
             )
     if ours == base:
         plan = {
