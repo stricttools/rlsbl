@@ -1,3 +1,4 @@
 {"id":"18c3c2769d31090bc06f0395131542e3a19952704c823929","commits":["3050befd1e6a6435261c918f2aa7d1ba00a9aa97"],"user_facing":false}
 {"id":"18c3cbfb421d27fe0a648f577367439d889c78c8020e5055","commits":["7c59a5da1401823014c29c0f109f44d80a462b35"],"user_facing":false}
 {"id":"18c3cc9f673e1c658283bdbb97e9460cb278e3cec018fd6d","commits":["e9be01b5765f8ae7c9f52f5d287937b04e583357"],"user_facing":false}
+{"id":"18c3cd38e2335218a87d85725d4448f88318177f7537245a","commits":["1d0413d7a3e6466b9cb32dc725ee67d5a7231557"],"user_facing":true,"description":"**Scaffold truthfulness.** Byte-identical files are reported as `unchanged` instead of `updated` during re-scaffold.","type":"fix"}
