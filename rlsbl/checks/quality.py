@@ -10,6 +10,11 @@ from ..check_context import WorkspaceCheckContext
 from ..utils import get_check_timeout
 from ._common import _sibling_exclude_dirs
 
+# Minimum ruff release the ruff-lint check is built against: the JSON output
+# schema (code/message/fix/location/filename fields) and the default rule set
+# are pinned to this floor. Mirrors SAFEGIT_MIN_VERSION in release_scrub.py.
+RUFF_MIN_VERSION = (0, 15, 20)
+
 
 def register_quality_checks(app):
     """Register quality-tag checks on *app*."""
@@ -55,18 +60,65 @@ def register_quality_checks(app):
 
     @app.error_check("ruff-lint")
     def check_ruff_lint(ctx, reporter):
-        """Project must pass ruff lint checks."""
+        """Python (pypi) projects must pass ruff lint checks."""
+        import json as _json
+        import re as _re
         import subprocess as _sp
+        from collections import Counter
 
+        from ..targets import detect_targets, resolve_releasable_config_dir_for_ctx
         from ..utils import require_tool
 
+        rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
+        target_entries = detect_targets(
+            str(ctx.project_root), releasable_config_dir=rel_dir
+        )
+        target_names = {e.name for e in target_entries}
+        if "pypi" not in target_names:
+            return reporter.skipped("not a Python (pypi) project")
+
         if not require_tool("ruff", fatal=False):
-            return reporter.skipped("ruff not installed")
+            reporter.error(
+                "ruff is not installed -- add ruff to the project's dev "
+                "dependencies (e.g. `uv add --dev ruff`)"
+            )
+            return reporter.found("ruff is not installed")
 
         timeout = get_check_timeout(ctx.config)
+
+        # Version floor: the JSON output shape and rule set are pinned to a
+        # known-good floor, mirroring the SAFEGIT_MIN_VERSION pattern.
+        try:
+            version_proc = _sp.run(
+                ["ruff", "--version"],
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+        except (OSError, _sp.TimeoutExpired) as exc:
+            reporter.error(f"ruff --version failed to run: {exc}")
+            return reporter.found(f"ruff --version failed to run: {exc}")
+
+        version_str = (version_proc.stdout or version_proc.stderr or "").strip()
+        m = _re.search(r"(\d+)\.(\d+)\.(\d+)", version_str)
+        if not m:
+            reporter.error(f"cannot parse ruff version from {version_str!r}")
+            return reporter.found("cannot parse ruff version")
+        version_tuple = tuple(int(g) for g in m.groups())
+        if version_tuple < RUFF_MIN_VERSION:
+            found_ver = ".".join(str(p) for p in version_tuple)
+            min_ver = ".".join(str(p) for p in RUFF_MIN_VERSION)
+            reporter.error(
+                f"ruff >= {min_ver} required, found {found_ver} -- upgrade ruff"
+            )
+            return reporter.found(f"ruff {found_ver} is below the {min_ver} floor")
+
         try:
             result = _sp.run(
-                ["ruff", "check", str(ctx.project_root), "--quiet"],
+                [
+                    "ruff", "check", str(ctx.project_root),
+                    "--output-format=json", "--quiet",
+                ],
                 capture_output=True,
                 text=True,
                 timeout=timeout,
@@ -78,11 +130,43 @@ def register_quality_checks(app):
         if result.returncode == 0:
             return reporter.passed("ruff clean")
 
-        output = (result.stdout or result.stderr or "").strip()
-        lines = [ln for ln in output.splitlines() if ln.strip()]
-        for line in lines[:50]:
-            reporter.error(line)
-        return reporter.found(f"ruff reported {len(lines)} issue(s)")
+        raw = (result.stdout or "").strip()
+        try:
+            violations = _json.loads(raw) if raw else []
+        except _json.JSONDecodeError:
+            stderr = (result.stderr or "").strip()
+            reporter.error(f"ruff produced unparseable output: {stderr or raw}")
+            return reporter.found("ruff produced unparseable output")
+
+        if not violations:
+            # Non-zero exit with no parsed violations: surface the raw failure.
+            stderr = (result.stderr or "").strip()
+            reporter.error(f"ruff failed (exit {result.returncode}): {stderr}")
+            return reporter.found(f"ruff failed (exit {result.returncode})")
+
+        count = len(violations)
+        rule_counts = Counter(v.get("code") or "?" for v in violations)
+        fixable = sum(1 for v in violations if v.get("fix"))
+
+        for v in violations[:50]:
+            code = v.get("code") or "?"
+            msg = v.get("message", "")
+            filename = v.get("filename", "")
+            loc = v.get("location") or {}
+            row = loc.get("row")
+            col = loc.get("column")
+            if row is not None and col is not None:
+                where = f"{filename}:{row}:{col}"
+            elif row is not None:
+                where = f"{filename}:{row}"
+            else:
+                where = filename
+            reporter.error(f"{where}: {code} {msg}")
+
+        top = ", ".join(f"{code} x{n}" for code, n in rule_counts.most_common(3))
+        return reporter.found(
+            f"ruff reported {count} violation(s) [{top}]; {fixable} fixable"
+        )
 
     @app.warn_check("dead-modules")
     def check_dead_modules(ctx, reporter):

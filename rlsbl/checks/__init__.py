@@ -92,7 +92,8 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "library-lint": frozenset({"pypi", "go", "npm", "maven"}),
     # --- quality tag (universal) ---
     "scaffold-unreplaced-vars": None,
-    "ruff-lint": None,
+    # ruff-lint is Python-only: gated on a pypi target, mirroring dead-modules.
+    "ruff-lint": frozenset({"pypi"}),
     # --- phase 12 project checks ---
     "publish-mode-workflow": None,
     "npm-private-mismatch": frozenset({"npm"}),

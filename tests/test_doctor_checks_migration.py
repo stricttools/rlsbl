@@ -846,29 +846,75 @@ class TestLibraryLintCheck:
 # Functional tests: ruff-lint check
 # ---------------------------------------------------------------------------
 
+def _make_pypi(repo):
+    """Give *repo* a pypi target so ruff-lint applies."""
+    (repo / "pyproject.toml").write_text(
+        '[project]\nname = "pkg"\nversion = "0.1.0"\n'
+    )
+
+
 class TestRuffLintCheck:
-    """The ruff-lint check runs ruff against the project."""
+    """The ruff-lint check runs ruff against pypi-target projects."""
 
     def test_ruff_lint_pass_clean_project(self, mock_git_repo):
         """Clean Python file -> pass."""
+        _make_pypi(mock_git_repo)
         (mock_git_repo / "clean.py").write_text("x = 1\n")
         ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["ruff-lint"].impl(ctx)
         assert result.status == "pass"
         assert "clean" in result.message
 
-    def test_ruff_lint_fail_unused_import(self, mock_git_repo):
-        """File with unused import -> fail."""
+    def test_ruff_lint_skips_non_pypi(self, mock_git_repo):
+        """No pypi target -> skip (ruff-lint is Python-only)."""
+        (mock_git_repo / "bad.py").write_text("import os\n")
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
+        result = app._check_defs["ruff-lint"].impl(ctx)
+        assert result.status == "skip"
+        assert "pypi" in result.message
+
+    def test_ruff_lint_exact_violation_count(self, mock_git_repo):
+        """Exactly two unused imports -> exactly two violations (JSON count,
+        not the ~10x-inflated default-format line count)."""
+        _make_pypi(mock_git_repo)
+        (mock_git_repo / "bad.py").write_text("import os\nimport sys\n")
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
+        result = app._check_defs["ruff-lint"].impl(ctx)
+        assert result.status == "fail"
+        assert "2 violation(s)" in result.message
+        # Top rule codes and a fixable count are surfaced.
+        assert "F401" in result.message
+        assert "fixable" in result.message
+
+    def test_ruff_lint_fail_reports_per_violation(self, mock_git_repo):
+        """Each violation becomes an error line naming its file and rule code."""
+        _make_pypi(mock_git_repo)
         (mock_git_repo / "bad.py").write_text("import os\n")
         ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         result = app._check_defs["ruff-lint"].impl(ctx)
         assert result.status == "fail"
-        assert "issue" in result.message
+        assert any("F401" in p.text and "bad.py" in p.text for p in result.problems)
 
-    def test_ruff_lint_skip_when_not_installed(self, mock_git_repo):
-        """ruff not on PATH -> skip."""
+    def test_ruff_lint_fails_when_not_installed(self, mock_git_repo):
+        """ruff not on PATH -> hard fail (a pypi project cannot be linted)."""
+        _make_pypi(mock_git_repo)
         ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
         with patch("rlsbl.utils.require_tool", return_value=None):
             result = app._check_defs["ruff-lint"].impl(ctx)
-        assert result.status == "skip"
+        assert result.status == "fail"
         assert "not installed" in result.message
+
+    def test_ruff_lint_fails_below_version_floor(self, mock_git_repo):
+        """A sub-floor ruff version -> hard fail with the floor in the message."""
+        _make_pypi(mock_git_repo)
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
+
+        def fake_run(cmd, *a, **kw):
+            if cmd[:2] == ["ruff", "--version"]:
+                return subprocess.CompletedProcess(cmd, 0, stdout="ruff 0.10.0\n", stderr="")
+            raise AssertionError("ruff check must not run when version is below floor")
+
+        with patch("subprocess.run", side_effect=fake_run):
+            result = app._check_defs["ruff-lint"].impl(ctx)
+        assert result.status == "fail"
+        assert "0.15.20" in result.message
