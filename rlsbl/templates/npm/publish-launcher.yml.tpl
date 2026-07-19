@@ -51,6 +51,18 @@ jobs:
             exit 1
           fi
           echo "Binary asset verified (HTTP ${HTTP_CODE})"
+          # The shim verifies each download against checksums.txt (goreleaser
+          # emits this literal filename). If it is missing, every install would
+          # fail checksum verification -- catch it here, at the release.
+          CHECKSUMS_URL="https://github.com/${OWNER_REPO}/releases/download/${TAG}/checksums.txt"
+          echo "Checking checksums file: ${CHECKSUMS_URL}"
+          SUM_CODE=$(curl -sSL -o /dev/null -w '%{http_code}' "${CHECKSUMS_URL}")
+          if [ "${SUM_CODE}" = "404" ]; then
+            echo "::error::checksums.txt not found (HTTP ${SUM_CODE}): ${CHECKSUMS_URL}"
+            echo "The launcher shim verifies downloads against checksums.txt; without it, installs fail."
+            exit 1
+          fi
+          echo "Checksums file verified (HTTP ${SUM_CODE})"
         env:
           RELEASE_TAG: ${{ inputs.tag || github.event.release.tag_name }}
       - name: Check if already published

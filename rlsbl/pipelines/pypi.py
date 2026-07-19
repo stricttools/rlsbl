@@ -1,11 +1,43 @@
 """PyPI pipeline implementation that builds and publishes Python packages to PyPI, authenticating via PYPI_TOKEN or TWINE_PASSWORD credentials."""
 
 import os
+import re
 import subprocess
 import sys
+import tomllib
 
 from .base import TokenPipeline
 from ..utils import run
+
+
+def normalize_module_name(dist_name: str) -> str:
+    """Normalize a PyPI distribution name to an importable module name.
+
+    Lowercases and collapses runs of ``-``, ``_``, and ``.`` into a single
+    underscore (the standard import-name form of a distribution name).
+    """
+    return re.sub(r"[-_.]+", "_", dist_name.strip().lower())
+
+
+def launcher_module_name(subdir: str) -> str:
+    """Resolve the launcher module dir name from the target's pyproject.toml.
+
+    The module directory is named after the distribution's normalized name
+    so hatchling's default package auto-detection finds it. When the
+    manifest is absent (scaffold hard-errors on this separately) or has no
+    name, falls back to a neutral placeholder so callers that only need a
+    non-``publish`` path (e.g. publish-template resolution) do not crash.
+    """
+    pyproject = os.path.join(subdir, "pyproject.toml") if subdir != "." else "pyproject.toml"
+    try:
+        with open(pyproject, "rb") as f:
+            data = tomllib.load(f)
+        name = (data.get("project") or {}).get("name")
+        if name:
+            return normalize_module_name(name)
+    except (OSError, tomllib.TOMLDecodeError):
+        pass
+    return "launcher_pkg"
 
 
 class PypiPipeline(TokenPipeline):
@@ -26,10 +58,20 @@ class PypiPipeline(TokenPipeline):
     def template_mappings(self, ctx) -> list[dict[str, str]]:
         # Launcher artifact: wrapper-package that downloads a binary
         # from a GitHub Release on first run (no pip postinstall hook).
+        # In addition to the publish workflow, emit the first-run launcher
+        # module. Its directory must match the (normalized) distribution
+        # name so hatchling's auto-detection includes it in the wheel with
+        # no extra build config.
         if self.config.get("artifact") == "launcher":
+            subdir = self._linked_target_subdir(ctx)
+            module = launcher_module_name(subdir)
+            rel = f"{module}/__init__.py"
+            target = rel if subdir == "." else f"{subdir}/{rel}"
             return [
                 {"template": "publish-launcher.yml.tpl",
                  "target": ".github/workflows/publish.yml"},
+                {"template": "shim-launcher.py.tpl",
+                 "target": target},
             ]
         return [
             {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},

@@ -472,6 +472,21 @@ def validate_pipelines_config(config, project_root="."):
                     f"{producer.get('artifact')!r}, not \"binary\". "
                     "A launcher can only wrap a binary producer."
                 )
+            # A launcher only makes sense when publishing is enabled: its
+            # whole purpose is to ship a wrapper package to a public
+            # registry. publish_mode "none" suppresses all registry
+            # publishing, so a launcher under it is contradictory config --
+            # the shim code and CI publish job would be scaffolded but never
+            # run. Hard-error and name the relax-later path.
+            if config.get("publish_mode") == "none":
+                raise ConfigError(
+                    f"pipeline '{name}' has artifact=\"launcher\" but the "
+                    'project\'s publish_mode is "none", which suppresses all '
+                    "registry publishing. A launcher exists solely to publish "
+                    "a wrapper package, so this combination is contradictory. "
+                    'Set "publish_mode": "ci" in .rlsbl/config.json to publish '
+                    "the launcher via CI, or remove the launcher pipeline."
+                )
 
         # assets validation
         if entry.get("assets"):

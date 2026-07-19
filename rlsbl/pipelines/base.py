@@ -89,6 +89,28 @@ class BasePipeline:
     def template_mappings(self, ctx) -> list[dict[str, str]]:
         return []
 
+    def _linked_target_subdir(self, ctx) -> str:
+        """Resolve the directory of this pipeline's linked target.
+
+        Reads ``ctx.config["targets"]`` for an entry whose name matches this
+        pipeline's ``target`` link and returns its ``path`` (``"."`` for a
+        root target, or a subdirectory like ``"packaging/npm"``). Returns
+        ``"."`` when the target is unknown or ``ctx`` is unavailable (e.g.
+        unit tests passing ``ctx=None``).
+        """
+        target_name = getattr(self, "target", None) or self.config.get("target")
+        if target_name is None:
+            return "."
+        config = getattr(ctx, "config", None) if ctx is not None else None
+        if config:
+            for t in config.get("targets") or []:
+                if isinstance(t, dict):
+                    if t.get("name") == target_name:
+                        return t.get("path") or "."
+                elif t == target_name:
+                    return "."
+        return "."
+
     def build_custom_assets(self, dist_dir: str) -> list[str]:
         """Build custom assets defined in the pipeline config.
 

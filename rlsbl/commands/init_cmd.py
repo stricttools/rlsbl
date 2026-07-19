@@ -1624,6 +1624,7 @@ def run_cmd(registry, args, flags, ctx):
         # For a root target (path ".") no subdir rewriting occurs.
         # (skip for publish_mode "none" and workspace roots)
         pipeline_plans = []
+        shim_plans = []
         if not private and not is_ws_root:
             _loaded_pipelines = load_pipelines(ctx.config)
             publish_target = os.path.join(".github", "workflows", "publish.yml")
@@ -1634,6 +1635,12 @@ def run_cmd(registry, args, flags, ctx):
             pipeline_plans = [_plan_merged_publish(
                 publish_target, merged_content,
             )]
+            # Launcher shims: postinstall/first-run download code + manifest
+            # fill for any artifact="launcher" pipeline (fill-once manifest
+            # handling hard-errors on an absent manifest).
+            shim_plans = _plan_launcher_shims(
+                _loaded_pipelines, ctx, dry_run=dry_run
+            )
 
         shared_plans = []
         if not flags.get("skip-shared"):
@@ -1656,17 +1663,19 @@ def run_cmd(registry, args, flags, ctx):
             )
 
         if dry_run:
-            _print_dry_run_report([reg_plans, pipeline_plans, shared_plans],
-                                   registry=registry, registries=[registry])
+            _print_dry_run_report(
+                [reg_plans, pipeline_plans, shim_plans, shared_plans],
+                registry=registry, registries=[registry])
             return
 
         reg_created, reg_skipped, reg_warnings, reg_hashes = apply_plans(reg_plans)
         pipe_created, pipe_skipped, pipe_warnings, pipe_hashes = apply_plans(pipeline_plans)
+        shim_created, shim_skipped, shim_warnings, shim_hashes = apply_plans(shim_plans)
         shared_created, shared_skipped, shared_warnings, shared_hashes = apply_plans(shared_plans)
 
-        created = reg_created + pipe_created + shared_created
-        skipped = reg_skipped + pipe_skipped + shared_skipped
-        warnings = reg_warnings + pipe_warnings + shared_warnings
+        created = reg_created + pipe_created + shim_created + shared_created
+        skipped = reg_skipped + pipe_skipped + shim_skipped + shared_skipped
+        warnings = reg_warnings + pipe_warnings + shim_warnings + shared_warnings
 
         # Note when a Go project's main packages live under cmd/ only:
         # `go install module@latest` targets the module root, so users
@@ -1689,7 +1698,7 @@ def run_cmd(registry, args, flags, ctx):
         _skip_redundant_releasable_configs(project_root, warnings)
 
         _finalize_scaffold(
-            [reg_hashes, pipe_hashes, shared_hashes],
+            [reg_hashes, pipe_hashes, shim_hashes, shared_hashes],
             created, skipped, warnings, registry=registry,
             flags=flags, registries=[registry],
             npm_lockfile_missing=npm_lockfile_missing,
@@ -1858,6 +1867,205 @@ def _extract_jobs_section(lines):
         else:
             job_lines.append(line)
     return job_lines
+
+
+# Fields the launcher manifests must carry for the shim to work. The
+# wrapper-producer check consults these to detect a later deletion.
+LAUNCHER_NPM_MANIFEST_FIELDS = ("bin", "scripts.postinstall", "files")
+LAUNCHER_PYPI_SCRIPT_TABLE = "project.scripts"
+
+
+def _producer_target_subdir(producer_target_name, ctx):
+    """Resolve the producer target's directory from ctx config targets."""
+    config = getattr(ctx, "config", None) if ctx is not None else None
+    if config:
+        for t in config.get("targets") or []:
+            if isinstance(t, dict) and t.get("name") == producer_target_name:
+                return t.get("path") or "."
+    return "."
+
+
+def _resolve_launcher_shim_vars(pipeline, pipelines, ctx):
+    """Resolve shim template vars from the wrapped producer pipeline.
+
+    Follows ``pipeline.config["wraps"]`` -> producer pipeline -> its linked
+    target -> the target's ``binCommand``/``repoName`` template vars. These
+    feed goreleaser asset naming (``<PROJECT>_<VERSION>_<os>_<arch>``) and
+    the executable name baked into the shim. A resolution failure is a hard
+    scaffold-time error, not a silent empty substitution.
+    """
+    wraps = pipeline.config.get("wraps")
+    producer = pipelines.get(wraps) if pipelines else None
+    if producer is None:
+        raise ConfigError(
+            f"launcher pipeline '{pipeline.name}' wraps '{wraps}', which is "
+            "not a loaded pipeline. (This should have been caught by config "
+            "validation.)"
+        )
+    producer_target_name = getattr(producer, "target", None) or producer.config.get("target")
+    if not producer_target_name or producer_target_name not in TARGETS:
+        raise ConfigError(
+            f"launcher pipeline '{pipeline.name}': producer '{wraps}' has no "
+            f"resolvable linked target (got {producer_target_name!r})."
+        )
+    target_obj = TARGETS[producer_target_name]
+    producer_subdir = _producer_target_subdir(producer_target_name, ctx)
+    pvars = target_obj.template_vars(producer_subdir, ctx)
+    repo_name = (pvars.get("repoName") or "").strip()
+    bin_command = (pvars.get("binCommand") or "").strip()
+    asset_project = repo_name.rsplit("/", 1)[-1] if repo_name else ""
+    resolved = {
+        "githubRepo": repo_name,
+        "assetProject": asset_project,
+        "binaryName": bin_command,
+    }
+    missing = [k for k, v in resolved.items() if not v]
+    if missing:
+        raise ConfigError(
+            f"launcher pipeline '{pipeline.name}': cannot resolve "
+            f"{', '.join(sorted(missing))} from producer '{wraps}' "
+            f"(target '{producer_target_name}'). Ensure the producer declares "
+            "a github.com module path and a resolvable binary command name."
+        )
+    return resolved
+
+
+def _launcher_manifest_path(pipeline, subdir):
+    fname = "package.json" if pipeline.pipeline_type == "npm" else "pyproject.toml"
+    return fname if subdir == "." else os.path.join(subdir, fname)
+
+
+def _ensure_launcher_manifest(pipeline, subdir, shim_vars, *, dry_run=False):
+    """Fill-once manifest handling for a launcher target.
+
+    The manifest is the name authority: scaffold NEVER invents or writes the
+    package name. When the manifest is absent, hard-error and direct the user
+    to create it with their chosen (``rlsbl check-name``'d) name. When present,
+    fill ONLY the missing non-name fields required for the shim, exactly once;
+    existing values (and the name) are byte-preserved, so a second scaffold is
+    a no-op. Returns the distribution name from the manifest.
+    """
+    manifest_path = _launcher_manifest_path(pipeline, subdir)
+    if not os.path.exists(manifest_path):
+        print(
+            f"Error: launcher pipeline '{pipeline.name}' has no manifest at "
+            f"{manifest_path}. rlsbl never invents a package name -- create the "
+            f"manifest yourself with your chosen (rlsbl check-name'd) name, "
+            "then re-run scaffold.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    if pipeline.pipeline_type == "npm":
+        return _fill_npm_launcher_manifest(
+            manifest_path, shim_vars, dry_run=dry_run
+        )
+    return _fill_pypi_launcher_manifest(
+        manifest_path, shim_vars, dry_run=dry_run
+    )
+
+
+def _fill_npm_launcher_manifest(manifest_path, shim_vars, *, dry_run=False):
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        pkg = json.load(f)
+
+    binary_name = shim_vars["binaryName"]
+    changed = False
+    if "bin" not in pkg:
+        pkg["bin"] = {binary_name: "bin/launcher.cjs"}
+        changed = True
+    scripts = pkg.get("scripts")
+    if not isinstance(scripts, dict):
+        scripts = {}
+        pkg["scripts"] = scripts
+    if "postinstall" not in scripts:
+        scripts["postinstall"] = "node scripts/postinstall.cjs"
+        changed = True
+    if "files" not in pkg:
+        pkg["files"] = ["bin", "scripts", "vendor"]
+        changed = True
+
+    if changed and not dry_run:
+        with open(manifest_path, "w", encoding="utf-8") as f:
+            json.dump(pkg, f, indent=2)
+            f.write("\n")
+    return pkg.get("name")
+
+
+def _fill_pypi_launcher_manifest(manifest_path, shim_vars, *, dry_run=False):
+    import tomlkit
+
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        doc = tomlkit.parse(f.read())
+
+    project = doc.get("project")
+    dist_name = project.get("name") if project else None
+    binary_name = shim_vars["binaryName"]
+    from ..pipelines.pypi import normalize_module_name
+
+    module = normalize_module_name(dist_name) if dist_name else "launcher_pkg"
+    entry_point = f"{module}:main"
+
+    changed = False
+    if project is not None:
+        scripts = project.get("scripts")
+        if scripts is None:
+            scripts = tomlkit.table()
+            project["scripts"] = scripts
+            changed = True
+        if binary_name not in scripts:
+            scripts[binary_name] = entry_point
+            changed = True
+
+    if changed and not dry_run:
+        with open(manifest_path, "w", encoding="utf-8") as f:
+            f.write(tomlkit.dumps(doc))
+    return dist_name
+
+
+def _plan_launcher_shims(pipelines, ctx, *, dry_run=False):
+    """Plan shim source files (and fill manifests) for all launcher pipelines.
+
+    Returns a list of plan dicts for :func:`apply_plans`. Performs the
+    bespoke fill-once manifest handling first (hard-errors on an absent
+    manifest), then plans each launcher's non-workflow (shim) mappings with
+    producer-resolved template vars. The shim ``plan_mappings`` call is gated
+    by ``required_vars`` so a failed producer resolution is a hard error.
+    """
+    plans = []
+    if not pipelines:
+        return plans
+    wf_prefix = os.path.join(".github", "workflows", "")
+    for pipeline in pipelines.values():
+        if pipeline.config.get("artifact") != "launcher":
+            continue
+        subdir = pipeline._linked_target_subdir(ctx)
+        shim_vars = _resolve_launcher_shim_vars(pipeline, pipelines, ctx)
+        dist_name = _ensure_launcher_manifest(
+            pipeline, subdir, shim_vars, dry_run=dry_run
+        )
+        mappings = pipeline.template_mappings(ctx)
+        shim_mappings = [
+            m for m in mappings if not m["target"].startswith(wf_prefix)
+        ]
+        # Guard: shim destinations must never contain the substring
+        # "publish" -- the publish-template resolver selects mappings by that
+        # substring, so a shim named that way would be mistaken for a publish
+        # workflow. This is a structural invariant, enforced here + tested.
+        for m in shim_mappings:
+            if "publish" in m["target"]:
+                raise ConfigError(
+                    f"launcher shim target {m['target']!r} contains the "
+                    "reserved substring 'publish' (collides with publish-"
+                    "template resolution). This is a scaffold bug."
+                )
+        render_vars = dict(shim_vars)
+        render_vars["distName"] = dist_name or ""
+        plans.extend(plan_mappings(
+            pipeline.template_dir(), shim_mappings, render_vars,
+            required_vars={"binaryName", "githubRepo", "assetProject"},
+        ))
+    return plans
 
 
 def _resolve_publish_template(target_name, pipelines, templates_root):
@@ -2498,6 +2706,12 @@ def run_cmd_multi(registries_list, args, flags, ctx):
             merged_plans = [_plan_merged_publish(
                 publish_target, merged_content,
             )]
+            # Launcher shims ride the extra_plans wiring: their hashes flow
+            # into _finalize_scaffold via extra_hashes, so the orphan sweep
+            # will not delete them on the next scaffold.
+            extra_plans.extend(_plan_launcher_shims(
+                _loaded_pipelines, ctx, dry_run=dry_run
+            ))
 
         # Plan shared templates (once)
         shared_mappings = reg.shared_template_mappings(ctx)

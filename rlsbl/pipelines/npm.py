@@ -21,10 +21,20 @@ class NpmPipeline(TokenPipeline):
     def template_mappings(self, ctx) -> list[dict[str, str]]:
         # Launcher artifact: wrapper-package that downloads a binary
         # from a GitHub Release at npm install time (postinstall script).
+        # In addition to the publish workflow, emit the shim source files
+        # (postinstall downloader + bin exec stub) anchored under the
+        # launcher target's subdirectory.
         if self.config.get("artifact") == "launcher":
+            subdir = self._linked_target_subdir(ctx)
+            def _anchor(rel):
+                return rel if subdir == "." else f"{subdir}/{rel}"
             return [
                 {"template": "publish-launcher.yml.tpl",
                  "target": ".github/workflows/publish.yml"},
+                {"template": "shim-postinstall.cjs.tpl",
+                 "target": _anchor("scripts/postinstall.cjs")},
+                {"template": "shim-bin.cjs.tpl",
+                 "target": _anchor("bin/launcher.cjs")},
             ]
         # Detect package manager to select the right publish template
         pm = self._detect_package_manager(ctx)

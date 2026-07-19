@@ -14,6 +14,58 @@ import tomllib
 from ..errors import ConfigError
 
 
+def _launcher_target_subdir_from_config(config, launcher_entry):
+    """Resolve a launcher pipeline's linked target directory from config."""
+    target_name = launcher_entry.get("target")
+    if not target_name:
+        return "."
+    for t in config.get("targets") or []:
+        if isinstance(t, dict) and t.get("name") == target_name:
+            return t.get("path") or "."
+    return "."
+
+
+def _launcher_manifest_missing_fields(root, subdir, launcher_entry):
+    """Return the shim-critical manifest fields missing from a launcher target.
+
+    Only reports when the manifest exists (an absent manifest is a separate
+    scaffold-time hard error). For npm: ``bin``, ``scripts.postinstall``,
+    ``files``. For pypi: ``project.scripts``.
+    """
+    ptype = launcher_entry.get("type")
+    base = root if subdir == "." else os.path.join(root, subdir)
+    missing = []
+    if ptype == "npm":
+        manifest = os.path.join(base, "package.json")
+        if not os.path.exists(manifest):
+            return []
+        try:
+            with open(manifest, "r", encoding="utf-8") as f:
+                pkg = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            return []
+        if "bin" not in pkg:
+            missing.append("bin")
+        scripts = pkg.get("scripts")
+        if not isinstance(scripts, dict) or "postinstall" not in scripts:
+            missing.append("scripts.postinstall")
+        if "files" not in pkg:
+            missing.append("files")
+    elif ptype == "pypi":
+        manifest = os.path.join(base, "pyproject.toml")
+        if not os.path.exists(manifest):
+            return []
+        try:
+            with open(manifest, "rb") as f:
+                data = tomllib.load(f)
+        except (OSError, tomllib.TOMLDecodeError):
+            return []
+        scripts = (data.get("project") or {}).get("scripts")
+        if not isinstance(scripts, dict) or not scripts:
+            missing.append("project.scripts")
+    return missing
+
+
 def find_conflicted_scaffold_files(project_root):
     """Return ``(relpath, first_conflict_line)`` tuples for scaffold files
     with unresolved git merge conflict markers, sorted by path.
@@ -918,6 +970,26 @@ def register_project_checks(app):
                     f"pipeline '{name}': wraps='{wraps}' but that "
                     f"pipeline's artifact is {producer.get('artifact')!r}, "
                     "not \"binary\""
+                )
+
+        # Manifest field guard: once a launcher is scaffolded, its target
+        # manifest must keep the shim-critical fields. A later deletion breaks
+        # the published wrapper silently (postinstall/console-script would be
+        # gone), so flag it here, naming the field. Only runs when the
+        # manifest exists -- absence is a separate scaffold-time hard error.
+        root = str(getattr(ctx, "project_root", ".") or ".")
+        for name, entry in launchers.items():
+            producer = pipelines.get(entry.get("wraps"))
+            if producer is None or not isinstance(producer, dict):
+                continue  # already reported above
+            if producer.get("artifact") != "binary":
+                continue  # already reported above
+            subdir = _launcher_target_subdir_from_config(config, entry)
+            for field in _launcher_manifest_missing_fields(root, subdir, entry):
+                errors.append(
+                    f"pipeline '{name}': launcher manifest is missing required "
+                    f"field '{field}' (deleted after scaffold?). The published "
+                    "wrapper depends on it; restore it or re-run scaffold."
                 )
 
         if errors:
