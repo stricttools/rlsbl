@@ -41,8 +41,8 @@ class TestWorkspaceUnbuildableSkips:
         assert result.status == "skip"
         assert "no pypi-target" in result.message
 
-    def test_skips_uv_not_installed(self, mock_git_repo):
-        """uv not installed -> skip."""
+    def test_fails_uv_not_installed(self, mock_git_repo):
+        """uv not installed -> hard fail (a pypi workspace cannot be verified)."""
         proj_dir = mock_git_repo / "mylib"
         proj_dir.mkdir()
         (proj_dir / "pyproject.toml").write_text(
@@ -58,8 +58,8 @@ class TestWorkspaceUnbuildableSkips:
         )
         with patch("subprocess.run", side_effect=FileNotFoundError("uv")):
             result = app._check_defs["workspace-unbuildable"].impl(ctx)
-        assert result.status == "skip"
-        assert "uv not installed" in result.message
+        assert result.status == "fail"
+        assert "uv is not installed" in result.message
 
 
 class TestWorkspaceUnbuildablePass:

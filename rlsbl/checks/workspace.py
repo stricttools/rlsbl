@@ -431,7 +431,11 @@ def register_workspace_checks(app):
                 timeout=timeout,
             )
         except FileNotFoundError:
-            return reporter.skipped("uv not installed")
+            reporter.error(
+                "uv is not installed -- install uv "
+                "(https://docs.astral.sh/uv/) to verify workspace members build"
+            )
+            return reporter.found("uv is not installed")
         except subprocess.TimeoutExpired:
             reporter.error(f"uv sync --all-packages --dry-run timed out after {timeout}s")
             return reporter.found(f"uv sync --all-packages --dry-run timed out after {timeout}s")
