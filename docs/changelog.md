@@ -85,7 +85,7 @@ The command:
 
 ## Validation
 
-`rlsbl check --tag changelog` runs 9 checks covering hash resolution, commit coverage, schema conformance, and batch size limits. All 9 must pass before a release proceeds. Failed checks produce specific error messages identifying the exact entry or commit that caused the failure:
+`rlsbl check --tag changelog` runs 10 checks covering hash resolution, commit coverage, schema conformance, and batch size limits. All 10 must pass before a release proceeds. Failed checks produce specific error messages identifying the exact entry or commit that caused the failure:
 
 | # | Check | What it verifies |
 | --- | --- | --- |
