@@ -36,8 +36,41 @@ def _undo_cleared_gate(*_a, **_k):
     )
 
 
+# Per-test isolated project root, published by the autouse fixture below.
+# Undo/status coverage tests mock git but still let production code write the
+# audit journal and regenerate CHANGELOG.md at ``project_root``. Defaulting to
+# an isolated tmp dir (never ".") makes real-repo pollution structurally
+# impossible for any test that does not pass an explicit root.
+_ISOLATED_ROOT = {"path": None}
+
+
+@pytest.fixture(autouse=True)
+def _isolate_ctx_default(tmp_path):
+    # Seed the isolated root with a minimal valid rlsbl project so member-context
+    # config reads (publish_mode, coverage_unit) resolve here instead of falling
+    # back to the real repo. Undo coverage tests reach the evidence gate; without
+    # an explicit mock they were making live npm/PyPI probes (fixture version
+    # 1.0.0 not published -> CLEARED). Default the gate to CLEARED so they are
+    # deterministic and offline; tests that need a different verdict override it.
+    rlsbl_dir = tmp_path / ".rlsbl"
+    rlsbl_dir.mkdir(exist_ok=True)
+    (rlsbl_dir / "config.json").write_text(
+        json.dumps({
+            "publish_mode": "ci", "coverage_unit": "commit", "targets": ["npm"],
+        }) + "\n"
+    )
+    _ISOLATED_ROOT["path"] = tmp_path
+    with patch(
+        "rlsbl.commands.undo.run_evidence_gate", side_effect=_undo_cleared_gate,
+    ):
+        yield
+    _ISOLATED_ROOT["path"] = None
+
+
 # Convenience to build a minimal context
-def _ctx(root=".", config=None, workspace_root=None):
+def _ctx(root=None, config=None, workspace_root=None):
+    if root is None:
+        root = _ISOLATED_ROOT["path"] or Path(".")
     if isinstance(root, str):
         root = Path(root)
     if isinstance(workspace_root, str):
@@ -502,6 +535,58 @@ class TestUndoFinalizeOnlyReverted:
         # The finalize was undone: the finalized JSONL is gone again.
         assert not (repo / ".rlsbl" / "changes" / "1.0.0.jsonl").exists()
         assert "v1.0.0" not in _ghgit(repo, "tag", "-l").split()
+
+
+class TestUndoCoverageNeverPollutesRealRepo:
+    """Regression: the fully-mocked undo coverage path must never write the
+    audit journal or regenerate CHANGELOG.md into the real rlsbl repo.
+
+    Before the isolation fix, ``_ctx()`` defaulted ``project_root`` to ``"."``
+    (the real repo). With git mocked, ``_execute_plan`` wrote
+    ``.rlsbl/undo-audit.json`` and ``_restore_changelog`` regenerated
+    ``CHANGELOG.md`` in-place, and nothing cleaned them up -- the audit journal
+    accumulated hundreds of fixture-version records across test runs.
+    """
+
+    @patch(f"{MOD_UNDO}.run_evidence_gate", side_effect=_undo_cleared_gate)
+    @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
+    @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
+    @patch(f"{MOD_UNDO}.push_if_needed")
+    @patch(f"{MOD_UNDO}.get_current_branch", return_value="main")
+    @patch(f"{MOD_UNDO}.is_clean_tree", return_value=True)
+    @patch(f"{MOD_UNDO}.check_gh_auth", return_value=True)
+    @patch(f"{MOD_UNDO}.check_gh_installed", return_value=True)
+    @patch(f"{MOD_UNDO}.run_gh", return_value="")
+    @patch(f"{MOD_UNDO}.run")
+    def test_mocked_undo_path_leaves_real_repo_untouched(self, mock_run, *_):
+        from rlsbl.commands.undo import run_cmd
+
+        real_root = Path(__file__).resolve().parents[1]
+        journal = real_root / ".rlsbl" / "undo-audit.json"
+        changelog = real_root / "CHANGELOG.md"
+        j_before = journal.read_bytes()
+        c_before = changelog.read_bytes()
+
+        def fake_run(_cmd, args, **_kw):
+            if args[:1] == ["describe"] or args[:2] == ["log", "-1"]:
+                return "v1.0.0"
+            return ""
+
+        mock_run.side_effect = fake_run
+
+        try:
+            with patch("sys.stdout", new_callable=StringIO), \
+                 patch("sys.stderr", new_callable=StringIO):
+                run_cmd("npm", [], {"yes": True}, ctx=_ctx())
+            j_after = journal.read_bytes()
+            c_after = changelog.read_bytes()
+        finally:
+            # Self-heal the real repo so a failing (red) run leaves no trace.
+            journal.write_bytes(j_before)
+            changelog.write_bytes(c_before)
+
+        assert j_after == j_before, "undo audit journal was written into the real repo"
+        assert c_after == c_before, "CHANGELOG.md was regenerated in the real repo"
 
 
 # ============================================================================
