@@ -1351,6 +1351,52 @@ class TestFindDeadGoPackages:
         assert "internal/demo" not in dead
         assert "internal/secret" in dead
 
+    def test_testdata_packages_not_flagged(self, tmp_path):
+        """Go packages under a testdata/ dir (any depth) are never candidates.
+
+        testdata/ is a test-context directory at any depth (matching
+        _is_test_context Layer 1). Fixture packages living under it -- even
+        when they contain an ``internal/`` path component and nothing imports
+        them -- must not be reported as dead. This mirrors how the Python
+        detector excludes non-production files.
+        """
+        (tmp_path / "go.mod").write_text(self._GO_MOD)
+        (tmp_path / "main.go").write_text('package main\n\nfunc main() {}\n')
+
+        # A fixture tree under internal/detlint/testdata/ that itself embeds
+        # an internal/... path (a fake GOPATH-style layout for a linter test).
+        fixture = (
+            tmp_path / "internal" / "detlint" / "testdata"
+            / "src" / "example.com" / "app" / "internal" / "fixturepkg"
+        )
+        fixture.mkdir(parents=True)
+        (fixture / "fixturepkg.go").write_text(
+            'package fixturepkg\n\nfunc F() {}\n'
+        )
+
+        dead = find_dead_go_packages(str(tmp_path))
+        assert dead == []
+
+    def test_test_only_package_not_flagged(self, tmp_path):
+        """A package whose only .go files are *_test.go is never a candidate.
+
+        A directory containing solely test files (e.g. a golden-file
+        regression harness) defines no importable production package, so it
+        cannot be "dead" -- nothing can ever import it. It must not be flagged.
+        """
+        (tmp_path / "go.mod").write_text(self._GO_MOD)
+        (tmp_path / "main.go").write_text('package main\n\nfunc main() {}\n')
+
+        golden = tmp_path / "internal" / "golden"
+        golden.mkdir(parents=True)
+        (golden / "golden_test.go").write_text(
+            'package golden\n\nimport "testing"\n\n'
+            'func TestGolden(t *testing.T) {}\n'
+        )
+
+        dead = find_dead_go_packages(str(tmp_path))
+        assert "internal/golden" not in dead
+
 
 class TestFindDeadNpmModules:
     """find_dead_npm_modules detects unreachable npm source files."""

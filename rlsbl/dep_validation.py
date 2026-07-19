@@ -674,6 +674,12 @@ def find_dead_go_packages(
     # Identify internal package directories and their import paths
     internal_pkg_dirs: dict[str, str] = {}  # abs_dir -> full_import_path
     for filepath in all_go_files:
+        if _is_test_context(filepath, project_dir):
+            # Test-context files never define production packages: files under
+            # testdata/ (any depth) or named *_test.go. A fixture tree or a
+            # test-only package (e.g. a golden-file harness) is not importable
+            # production code, so it must not be a dead-package candidate.
+            continue
         pkg_dir = _go_package_dir(filepath)
         if pkg_dir in internal_pkg_dirs:
             continue
@@ -693,7 +699,10 @@ def find_dead_go_packages(
     # file_imports: list of (pkg_dir, set_of_import_paths) for non-test files
     file_imports: list[tuple[str, set[str]]] = []
     for filepath in all_go_files:
-        if os.path.basename(filepath).endswith("_test.go"):
+        if _is_test_context(filepath, project_dir):
+            # Test-context files' imports must not keep a production package
+            # alive (no test-only reachability, no testdata laundering). This
+            # subsumes the *_test.go check via _is_test_context Layer 3.
             continue
         pkg_dir_of_file = _go_package_dir(filepath)
         rel_pkg_dir = os.path.relpath(pkg_dir_of_file, project_dir)
