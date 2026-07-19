@@ -78,7 +78,7 @@ def _write_member(root, path, name, releasable, version="0.1.0"):
 
 
 def _build_monorepo(root, *, tag_format="{name}@v{version}", version="0.1.0",
-                    add_post_tag_commit=False):
+                    add_post_tag_commit=False, create_tag=True):
     """Build a real-git monorepo with one releasable ('beta', 2 members)."""
     _git(root, "init", "-q", "-b", "main")
     _git(root, "config", "user.email", "test@test.local")
@@ -115,8 +115,9 @@ def _build_monorepo(root, *, tag_format="{name}@v{version}", version="0.1.0",
 
     # Tag the releasable at the current version (only for {name} formats we
     # care about a scoped tag; for plain formats this is still valid).
-    the_tag = tag_format.format(name="beta", version=version)
-    _git(root, "tag", the_tag)
+    if create_tag:
+        the_tag = tag_format.format(name="beta", version=version)
+        _git(root, "tag", the_tag)
 
     if add_post_tag_commit:
         (root / "libs" / "beta-api" / "extra.txt").write_text("more\n")
@@ -157,7 +158,7 @@ class TestFullRename:
         # Sanity: the OLD prefix is in the generated publish.yml.
         assert "beta@v" in _publish_yml(root)
 
-        result = rr.rename_releasable(str(root), "beta", "beta2")
+        result = rr.rename_releasable(str(root), "beta", "beta2", yes=True)
 
         # workspace.toml renamed (releasable + members), comments/format intact.
         ws = _read_ws(root)
@@ -191,9 +192,9 @@ class TestFullRename:
         monkeypatch.chdir(root)
         _build_monorepo(root)
 
-        rr.rename_releasable(str(root), "beta", "beta2")
+        rr.rename_releasable(str(root), "beta", "beta2", yes=True)
         # Second run: resume path detects everything already done.
-        result = rr.rename_releasable(str(root), "beta", "beta2")
+        result = rr.rename_releasable(str(root), "beta", "beta2", yes=True)
         assert result["mode"] == "resume"
         assert result["tag"]["status"] == "already_done"
 
@@ -211,7 +212,7 @@ class TestCrashHealing:
         assert rr._is_clean_tree(str(root))
 
         # Re-run the full command -> resume path finishes the tag step.
-        result = rr.rename_releasable(str(root), "beta", "beta2")
+        result = rr.rename_releasable(str(root), "beta", "beta2", yes=True)
         assert result["mode"] == "resume"
         assert rr._tag_exists_local(str(root), "beta2@v0.1.0")
         assert rr._tag_exists_remote(str(root), "origin", "beta2@v0.1.0")
@@ -240,7 +241,7 @@ class TestCrashBeforeCommitHealing:
         # commit the pending rename, regenerate the gate prefix, THEN push the
         # alias tag -- never push a tag over an uncommitted rename with a stale
         # publish gate.
-        result = rr.rename_releasable(str(root), "beta", "beta2")
+        result = rr.rename_releasable(str(root), "beta", "beta2", yes=True)
 
         # The rename is now committed: clean tree.
         assert rr._is_clean_tree(str(root)), \
@@ -262,7 +263,7 @@ class TestNoNameTagFormat:
         _build_monorepo(root, tag_format="v{version}")
 
         before_tags = set(_git(root, "tag", "--list").splitlines())
-        result = rr.rename_releasable(str(root), "beta", "beta2")
+        result = rr.rename_releasable(str(root), "beta", "beta2", yes=True)
 
         # No alias tag created; name-only path taken.
         assert result.get("name_only") is True
@@ -282,7 +283,7 @@ class TestChangelogGlobResolves:
         monkeypatch.chdir(root)
         _build_monorepo(root, add_post_tag_commit=True)
 
-        rr.rename_releasable(str(root), "beta", "beta2")
+        rr.rename_releasable(str(root), "beta", "beta2", yes=True)
 
         projects = load_workspace(str(root))
         releasables = load_releasables(str(root), projects)
@@ -327,6 +328,79 @@ class TestDryRun:
         # Plan lists the tag push explicitly.
         assert result["planned_push"] == "git push origin beta2@v0.1.0"
         assert any("git push origin beta2@v0.1.0" in line for line in result["plan"])
+
+
+class TestNameOnlyRenameNoGhAuth:
+    def test_name_only_rename_does_not_require_gh(self, tmp_path, monkeypatch):
+        root = tmp_path / "repo"
+        root.mkdir()
+        monkeypatch.chdir(root)
+        # tag_format has no {name} -> no alias tag, no push -> gh auth not needed.
+        _build_monorepo(root, tag_format="v{version}")
+
+        # gh is explicitly unavailable; the name-only rename must still succeed.
+        with patch.object(rr, "check_gh_installed", return_value=False), \
+             patch.object(rr, "check_gh_auth", return_value=False):
+            result = rr.rename_releasable(str(root), "beta", "beta2", yes=True)
+
+        assert result.get("name_only") is True
+        assert result["tag"] is None
+        assert 'name = "beta2"' in _read_ws(root)
+        assert (root / ".rlsbl-monorepo" / "releasables" / "beta2").is_dir()
+
+
+class TestDevNodeMembersUntouched:
+    def test_releasable_false_project_is_not_renamed(self, tmp_path, monkeypatch, _gh_ok):
+        root = tmp_path / "repo"
+        root.mkdir()
+        monkeypatch.chdir(root)
+        _build_monorepo(root)
+
+        # Add a dev-node project (releasable = false) with full member files so
+        # sync can inline it, then commit.
+        _write_member(root, "tools/devnode", "devnode", "beta")
+        import tomlkit
+        ws_path = root / WORKSPACE_DIR / WORKSPACE_FILE
+        doc = tomlkit.loads(ws_path.read_text())
+        proj = tomlkit.table()
+        proj["path"] = "tools/devnode"
+        proj["name"] = "devnode"
+        proj["releasable"] = False
+        doc["projects"].append(proj)
+        ws_path.write_text(tomlkit.dumps(doc))
+        _git(root, "add", "-A")
+        _git(root, "commit", "-q", "-m", "add devnode")
+
+        rr.rename_releasable(str(root), "beta", "beta2", yes=True)
+
+        ws = _read_ws(root)
+        # beta members renamed, but the dev-node project's releasable stays false.
+        assert 'releasable = "beta2"' in ws
+        assert 'releasable = "beta"' not in ws
+        assert "releasable = false" in ws
+        devnode = next(p for p in load_workspace(str(root)) if p.name == "devnode")
+        assert devnode.releasable is False
+
+
+class TestNeverReleasedNoSourceTag:
+    def test_rename_of_never_released_releasable(self, tmp_path, monkeypatch, _gh_ok):
+        root = tmp_path / "repo"
+        root.mkdir()
+        monkeypatch.chdir(root)
+        # No current-version tag exists (releasable was never released).
+        _build_monorepo(root, create_tag=False)
+        assert not rr._tag_exists_local(str(root), "beta@v0.1.0")
+
+        result = rr.rename_releasable(str(root), "beta", "beta2", yes=True)
+
+        # The tag step reports there was nothing to alias.
+        assert result["tag"]["status"] == "no_source_tag"
+        assert result["tag"]["old_tag"] == "beta@v0.1.0"
+        # No alias tag was fabricated.
+        assert not rr._tag_exists_local(str(root), "beta2@v0.1.0")
+        # The local rename still completed and committed cleanly.
+        assert 'name = "beta2"' in _read_ws(root)
+        assert rr._is_clean_tree(str(root))
 
 
 class TestPreflight:

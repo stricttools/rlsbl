@@ -279,6 +279,32 @@ def _check_no_inflight(root, releasables):
             )
 
 
+def _confirm_rename(yes, old, new, alias_tag):
+    """Prompt for confirmation before any mutation. Returns True to proceed.
+
+    The function's contract is raise-or-return (never ``sys.exit``), so a
+    declined prompt is signalled by returning False; the caller returns an
+    ``aborted`` result. ``yes`` short-circuits to True for non-interactive use.
+    """
+    if yes:
+        return True
+    lines = [
+        f"\nThis will rename releasable '{old}' -> '{new}':",
+        "  - rewrite workspace.toml and move the releasable state directory",
+        "  - regenerate the publish gate prefix and commit the rename",
+    ]
+    if alias_tag:
+        lines.append(
+            f"  - create and PUSH the alias tag '{alias_tag}' to the remote"
+        )
+    lines.append("Proceed? [y/N] ")
+    try:
+        answer = input("\n".join(lines)).strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        return False
+    return answer == "y"
+
+
 # ---------------------------------------------------------------------------
 # public entry point
 # ---------------------------------------------------------------------------
@@ -353,6 +379,12 @@ def rename_releasable(workspace_root, old_name, new_name, *, dry_run=False,
                 "(run 'gh auth login')."
             )
 
+        if not _confirm_rename(
+            yes, old_name, new_name, new_tag if name_in_format else None,
+        ):
+            result["aborted"] = True
+            return result
+
         _apply_local_rename(root, old_name, new_name)
         if name_in_format:
             result["tag"] = _finish_alias_tag(root, old_tag, new_tag, remote)
@@ -388,11 +420,6 @@ def rename_releasable(workspace_root, old_name, new_name, *, dry_run=False,
         )
     _check_no_inflight(root, releasables)
 
-    if not dry_run and not (check_gh_installed() and check_gh_auth()):
-        raise WorkspaceError(
-            "gh CLI is not installed or not authenticated (run 'gh auth login')."
-        )
-
     target_rel = next(r for r in releasables if r.name == old_name)
     tag_format = target_rel.tag_format
     version = read_releasable_version(root, old_name)
@@ -402,6 +429,14 @@ def rename_releasable(workspace_root, old_name, new_name, *, dry_run=False,
 
     old_tag = tag_format.format(name=old_name, version=version)
     new_tag = tag_format.format(name=new_name, version=version)
+
+    # gh auth is only required when an alias tag will actually be created and
+    # pushed (tag_format contains {name}); a name-only rename touches no remote.
+    # Kept last among the preflights so it does not mask the other guards.
+    if not dry_run and name_in_format and not (check_gh_installed() and check_gh_auth()):
+        raise WorkspaceError(
+            "gh CLI is not installed or not authenticated (run 'gh auth login')."
+        )
 
     result = {
         "mode": "rename",
@@ -444,6 +479,13 @@ def rename_releasable(workspace_root, old_name, new_name, *, dry_run=False,
         result["planned_push"] = (
             f"git push {remote} {new_tag}" if name_in_format else None
         )
+        return result
+
+    # ---- confirmation (before ANY mutation) ----
+    if not _confirm_rename(
+        yes, old_name, new_name, new_tag if name_in_format else None,
+    ):
+        result["aborted"] = True
         return result
 
     # ---- mutations (steps 1-5) ----
