@@ -3,3 +3,4 @@
 {"id":"18c3cc9f673e1c658283bdbb97e9460cb278e3cec018fd6d","commits":["e9be01b5765f8ae7c9f52f5d287937b04e583357"],"user_facing":false}
 {"id":"18c3cd38e2335218a87d85725d4448f88318177f7537245a","commits":["1d0413d7a3e6466b9cb32dc725ee67d5a7231557"],"user_facing":true,"description":"**Scaffold truthfulness.** Byte-identical files are reported as `unchanged` instead of `updated` during re-scaffold.","type":"fix"}
 {"id":"18c3cd4aaf1e581271c10537b7ca4ca8bdc39ebad81aca61","commits":["e3258507d02bada352106dc2d874857710b8bd85"],"user_facing":true,"description":"**Crates wrapper integrity.** The generated `build.rs` now sha256-verifies the downloaded release archive against `checksums.txt` and hard-fails on any mismatch.","type":"fix"}
+{"id":"18c3cd63b936796d6ae6341e3ccc43c3a142fd6e12ff352e","commits":["e833805c3293d81b2f852328ac8bd8a49443e590"],"user_facing":false}
