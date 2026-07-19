@@ -1,5 +1,5 @@
 ---
-description: "Dependency validation checks: unused deps, undeclared deps, dead modules (with reason-gated dead-modules.toml exclusions and stale-exclusion detection), and circular dependency detection across workspace and per-file import graphs."
+description: "Dependency validation: unused/undeclared deps, dead modules with reason-gated exclusions, and circular dependency detection across workspaces and files."
 ---
 
 # Dependency validation

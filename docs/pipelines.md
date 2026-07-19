@@ -1,5 +1,5 @@
 ---
-description: "Pipeline architecture: types, auth patterns, custom assets, capability gating, the Go artifact key, and the launcher artifact kind -- checksum-verified download shims for npm/PyPI that wrap a GitHub-Release binary, with fill-once manifest fields."
+description: "Pipeline architecture: types, auth patterns, custom assets, capability gating, the Go artifact key, and checksum-verified launcher shims for npm/PyPI."
 ---
 
 # Pipelines
