@@ -8,9 +8,43 @@ import pytest
 
 from pathlib import Path
 
-from rlsbl.commands.release import _run_selfdoc_check, _run_selfdoc_gen, HookError
+from rlsbl.commands.release import (
+    _run_selfdoc_check, _run_selfdoc_gen, HookError,
+    _format_preflight_summary,
+)
 from rlsbl.context import ProjectContext
 from rlsbl.release_file import ReleaseConfig
+
+
+class _FakeResult:
+    """Minimal stand-in exposing the .name/.status accessors the summary reads."""
+
+    def __init__(self, name, status):
+        self.name = name
+        self.status = status
+
+
+class TestFormatPreflightSummary:
+    """Unit tests for the preflight success-summary formatter."""
+
+    def test_lists_only_passed_checks(self):
+        results = [
+            _FakeResult("test-suite", "pass"),
+            _FakeResult("dead-modules", "skip"),
+            _FakeResult("wrapper-producer", "pass"),
+        ]
+        summary = _format_preflight_summary(results)
+        assert summary == "Preflight: 2 checks passed (test-suite, wrapper-producer)"
+
+    def test_custom_label(self):
+        results = [_FakeResult("changelog-schema", "pass")]
+        summary = _format_preflight_summary(results, label="Changelog preflight")
+        assert summary == "Changelog preflight: 1 checks passed (changelog-schema)"
+
+    def test_none_when_nothing_passed(self):
+        results = [_FakeResult("test-suite", "skip")]
+        assert _format_preflight_summary(results) is None
+        assert _format_preflight_summary([]) is None
 
 
 def _rc(bump="patch", include=None, exclude=None):
@@ -537,3 +571,86 @@ class TestFullFlowOrder:
 
         # Full execution order: preflight-changelog -> pre-checks -> preflight -> pre-release
         assert execution_order == ["preflight-changelog", "pre-checks", "preflight", "pre-release"]
+
+    @patch("rlsbl.commands.release._run_release_mutating")
+    @patch("rlsbl.commands.release.resolve_release_targets", return_value=[])
+    @patch("rlsbl.commands.release.run", return_value="")
+    @patch("rlsbl.commands.release.commit_files", return_value=True)
+    @patch("rlsbl.commands.release.generate_changelog")
+    @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
+    @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
+    @patch("rlsbl.commands.release.validate_pipeline_config")
+    @patch("rlsbl.commands.release.validate_config_integrity")
+    @patch("rlsbl.commands.release.validate_ota_mode")
+    @patch("rlsbl.commands.release.validate_gh_cli")
+    @patch("rlsbl.commands.release.validate_gh_push_access")
+    @patch("rlsbl.commands.release.validate_clean_tree", return_value=set())
+    @patch("rlsbl.commands.release.validate_branch_and_remote", return_value="main")
+    @patch("rlsbl.commands.release.resolve_monorepo_context", return_value=(None, None, False, False, None))
+    @patch("rlsbl.commands.release.validate_changelog_state", return_value=None)
+    @patch("rlsbl.commands.release.validate_blog_body", return_value=(None, None))
+    @patch("rlsbl.commands.release._abort_on_scaffold_conflicts")
+    @patch("rlsbl.commands.release.resolve_target_paths", return_value={})
+    @patch("rlsbl.commands.release.compute_release_version", return_value=("1.0.0", "1.0.1", "patch", "v1.0.1"))
+    @patch("rlsbl.commands.release.extract_changelog_entry_from_text", return_value="- test")
+    @patch("rlsbl.commands.release.parse_porcelain_paths", return_value=set())
+    @patch("rlsbl.commands.release.build_hook_env", return_value={})
+    @patch("rlsbl.commands.release.get_hook_timeout", return_value=30)
+    @patch("rlsbl.commands.release.is_hook_customized", return_value=False)
+    @patch("rlsbl.commands.release._run_strictcli_schema_dump")
+    @patch("rlsbl.commands.release._run_selfdoc_gen")
+    @patch("rlsbl.commands.release._run_selfdoc_check")
+    @patch("rlsbl.commands.release._run_selfblog_post_generate")
+    @patch("rlsbl.commands.release.commit_files_if_changed")
+    def test_preflight_success_summary_logged(
+        self,
+        _commit_if_changed,
+        _selfdoc_post, _selfdoc_check, _selfdoc_gen, _schema_dump,
+        _hook_customized,
+        _hook_timeout, _hook_env, _porcelain,
+        _extract, _compute, _resolve_targets, _scaffold,
+        _validate_blog, _validate_changelog, _resolve_mono,
+        _validate_branch, _validate_clean, _validate_push_access, _validate_gh,
+        _validate_ota, _validate_config, _validate_pipeline,
+        _validate_targets,
+        _validate,
+        _gen_cl,
+        _commit_files,
+        mock_run,
+        _resolve_release_targets,
+        _mutating,
+        tmp_project,
+        capsys,
+    ):
+        """On success the standalone preflight logs a positive per-check
+        confirmation, with a distinct label for the changelog sub-run."""
+        _setup_npm_project(tmp_project, test_script=None)
+
+        def passing_run_checks(ctx, *, tag_expr=None, **kwargs):
+            if tag_expr == "preflight-changelog":
+                return ([_FakeResult("changelog-schema", "pass")], [], 0)
+            return (
+                [
+                    _FakeResult("test-suite", "pass"),
+                    _FakeResult("wrapper-producer", "pass"),
+                ],
+                [],
+                0,
+            )
+
+        with patch("rlsbl.app.run_checks", side_effect=passing_run_checks):
+            from rlsbl.commands.release import run_cmd
+
+            run_cmd(
+                _rc(),
+                {"quiet": False, "yes": True},
+                ctx=ProjectContext(
+                    project_root=Path(str(tmp_project)),
+                    workspace_root=None,
+                    config={"publish_mode": "ci", "pipelines": {}},
+                ),
+            )
+
+        out = capsys.readouterr().out
+        assert "Changelog preflight: 1 checks passed (changelog-schema)" in out
+        assert "Preflight: 2 checks passed (test-suite, wrapper-producer)" in out

@@ -105,6 +105,24 @@ from .release_state import (
 )
 
 
+def _format_preflight_summary(results, *, label="Preflight"):
+    """Format a one-line positive confirmation of the checks that passed.
+
+    *results* is an iterable of objects exposing ``.name`` and ``.status``
+    (``CheckRunResult`` from strictcli, or the external-check results). Only
+    checks that actually ran and passed (``status == "pass"``) are listed --
+    skipped and (impossible-at-success) failed checks are excluded.
+
+    Returns the summary string, or ``None`` when no check passed so the caller
+    can suppress an empty line. *label* distinguishes concurrent preflight runs
+    (e.g. the changelog sub-run) so two identical lines never appear.
+    """
+    passed = [r.name for r in results if r.status == "pass"]
+    if not passed:
+        return None
+    return f"{label}: {len(passed)} checks passed ({', '.join(passed)})"
+
+
 def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
             ctx):
     """Release command handler.
@@ -649,6 +667,11 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             raise HookError(
                 f"Changelog preflight checks failed ({len(_cl_failed)} failure(s))"
             )
+        _cl_summary = _format_preflight_summary(
+            _cl_results, label="Changelog preflight"
+        )
+        if _cl_summary:
+            log(_cl_summary)
 
         # Hotfix releases must not have user-facing changelog entries.
         # The preflight-changelog checks above validate structural integrity;
@@ -857,6 +880,12 @@ def _run_cmd_inner(release_config, flags, *, ctx):
                                     all_failed.append(
                                         f"{pkg_name}: {r.name}: {r.message}"
                                     )
+                        else:
+                            _member_summary = _format_preflight_summary(
+                                results, label=f"Preflight ({pkg_name})"
+                            )
+                            if _member_summary:
+                                log(_member_summary)
                 else:
                     # One run covering built-in + external preflight checks.
                     results, _impure_listed, exit_code = _rlsbl_app.run_checks(
@@ -872,6 +901,12 @@ def _run_cmd_inner(release_config, flags, *, ctx):
                                 all_failed.append(
                                     f"{pkg_name}: {r.name}: {r.message}"
                                 )
+                    else:
+                        _member_summary = _format_preflight_summary(
+                            results, label=f"Preflight ({pkg_name})"
+                        )
+                        if _member_summary:
+                            log(_member_summary)
             if all_failed:
                 for msg in all_failed:
                     print(f"  FAIL  {msg}", file=sys.stderr)
@@ -938,6 +973,9 @@ def _run_cmd_inner(release_config, flags, *, ctx):
                         raise HookError(
                             f"Preflight checks failed ({len(failed)} failure(s))"
                         )
+                    _pf_summary = _format_preflight_summary(results)
+                    if _pf_summary:
+                        log(_pf_summary)
             else:
                 # One run covering built-in + external preflight checks.
                 results, _impure_listed, exit_code = _rlsbl_app.run_checks(
@@ -958,6 +996,9 @@ def _run_cmd_inner(release_config, flags, *, ctx):
                     raise HookError(
                         f"Preflight checks failed ({len(failed)} failure(s))"
                     )
+                _pf_summary = _format_preflight_summary(results)
+                if _pf_summary:
+                    log(_pf_summary)
 
         # Run pre-release hook
         pre_release_script = os.path.join(project_dir, ".rlsbl", "hooks", "pre-release.sh")
