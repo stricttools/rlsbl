@@ -23,6 +23,7 @@ Project-level configuration file created by `rlsbl config init` or `rlsbl scaffo
 | batch_limits | object | Limits and exclusions for changelog batch-size validation checks. See [batch_limits](#batch_limits) below. |
 | check_timeout | int | Timeout in seconds for check subprocesses (built-in tests, etc.). Default: 120. Overridable per-invocation via the `RLSBL_CHECK_TIMEOUT` env var (precedence: env > config > default). A declared budget, not a bypass — the check still hard-fails on a real hang. |
 | test | object | Per-target test-selection filters. See [test](#test) below. |
+| external_checks | array | Config-declared subprocess checks that run during `rlsbl check` and the release preflight. Each entry declares a `kind` (`structured` or `freeform`). See [external_checks](#external_checks) below. |
 
 Configuration precedence for tagging: CLI flag (`--no-tag`) > project config > user config (`~/.rlsbl/config.json`) > default (true).
 
@@ -80,6 +81,94 @@ The optional `test` block selects *which* tests run during the built-in test ste
 - Everything must be declared: unknown target names and unknown inner keys are hard errors (no silent tolerance of typos like `marker`), and an empty `markers` string is rejected.
 
 This is a **selection filter, not a gate bypass**. It narrows the set of tests that run; it does not let a failing test pass or suppress test failures.
+
+### external_checks
+
+The `external_checks` array declares project-specific subprocess checks. Each check is selected by tag during `rlsbl check --tag <tag>` and during the release preflight; a non-zero exit is a hard failure with no bypass.
+
+Every entry **must** declare a `kind`. The marker is mandatory on purpose: a check whose scope rlsbl cannot see (an opaque shell command) must be a deliberate, visible declaration rather than an accident. Missing `kind`, an unknown `kind`, or any unrecognized key on an entry is a hard error.
+
+Common keys on both kinds:
+
+| Key | Type | Required | Description |
+| --- | --- | --- | --- |
+| `name` | string | Yes | Check name. Lowercase letters, digits, hyphens only (`[a-z][a-z0-9-]*`); glob metacharacters are rejected so a name can never pattern-match a built-in check. |
+| `tag` | string | Yes | The check tag under which this check is selected (e.g. `preflight`). |
+| `kind` | string | Yes | `"structured"` or `"freeform"`. |
+| `depends_on` | array | No | Names of checks that must run before this one. |
+| `cwd` | string | No | Working directory (absolute, or relative to the project root). |
+
+#### kind = "freeform"
+
+A freeform check runs an opaque `command` string through a shell. rlsbl does not understand its scope — the command is executed verbatim. Use this for anything that is not one of the built-in structured tools (npm scripts, Go tests, custom gate scripts, `uvx` tools, etc.).
+
+| Key | Type | Required | Description |
+| --- | --- | --- | --- |
+| `command` | string | Yes | Shell command. Its first token must resolve on `PATH` (or be an absolute path) — validated eagerly at registration. Environment assignments must use the explicit `env VAR=1 cmd` prefix form. |
+
+```json
+{
+  "external_checks": [
+    {
+      "name": "typecheck",
+      "kind": "freeform",
+      "command": "npm run check",
+      "tag": "preflight"
+    }
+  ]
+}
+```
+
+#### kind = "structured"
+
+A structured check names a known `tool` and an explicit `paths` list. rlsbl composes the argv itself and runs it **without a shell**, so paths are passed as discrete arguments (no word-splitting, no glob surprises). Because rlsbl controls the invocation, it can additionally guard the tool's config against scope that would silently override or narrow `paths` (see below).
+
+| Key | Type | Required | Description |
+| --- | --- | --- | --- |
+| `tool` | string | Yes | One of `mypy`, `ruff-check`, `ruff-format`. Any other value is a hard error whose message points you to a freeform entry. |
+| `paths` | array | Yes | Non-empty list of files/directories to check. This is the single source of truth for the tool's scope. |
+
+The adapters compose these argv (with `uv run` degrading to the right dependency group / extra so a tool declared outside the default `dev` group still resolves):
+
+| tool | composed argv |
+| --- | --- |
+| `mypy` | `uv run mypy <paths...>` |
+| `ruff-check` | `uv run ruff check <paths...>` |
+| `ruff-format` | `uv run ruff format --check <paths...>` |
+
+```json
+{
+  "external_checks": [
+    {
+      "name": "mypy-strict",
+      "kind": "structured",
+      "tool": "mypy",
+      "paths": ["mypackage", "tests"],
+      "tag": "preflight"
+    },
+    {
+      "name": "ruff-check",
+      "kind": "structured",
+      "tool": "ruff-check",
+      "paths": ["mypackage", "tests", "scripts", "docs"],
+      "tag": "preflight"
+    }
+  ]
+}
+```
+
+Structured checks require only `uv` on `PATH` (the tools themselves live in the project venv, invoked via `uv run`) — this is validated eagerly at registration.
+
+#### Competing-scope guards
+
+For every structured entry, rlsbl emits an additional pure, fast check named `<name>-scope-guard`. It hard-errors when the tool's own config file carries scope that competes with the entry's `paths`, because such config silently changes what actually gets checked:
+
+- **mypy guard.** mypy's `files` / `packages` / `modules` config keys are silently **overridden** by CLI paths — a scope declared there is dead but misleading. The guard reads `pyproject.toml` `[tool.mypy]`, `mypy.ini`, `.mypy.ini`, and `setup.cfg` `[mypy]`; any of those keys present is an error. Scope must live only in the structured entry's `paths`.
+- **ruff guard** (both `ruff-check` and `ruff-format`)**.** ruff's `include` / `extend-include` config keys silently **narrow** the directories passed explicitly on the CLI (confirmed on ruff 0.15.20). The guard reads `pyproject.toml` `[tool.ruff]`, `ruff.toml`, and `.ruff.toml`; `include` or `extend-include` present is an error. `exclude` / `extend-exclude` / `force-exclude` are **exempt** — those are bypassed by explicit paths (loud over-inclusion, not silent under-scoping).
+
+#### Timeout
+
+Both kinds route their subprocess timeout through the configured check budget — `check_timeout` in `.rlsbl/config.json` or the `RLSBL_CHECK_TIMEOUT` env var (precedence: env > config > default 120s). The budget is a declared limit, not a bypass: the check still hard-fails on a real hang.
 
 ### Pipeline config
 
