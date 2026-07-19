@@ -189,36 +189,57 @@ def register_quality_checks(app):
                 ws_root, ctx.project["path"], ctx.projects,
             ) or None
 
+        # Declared dead-module exclusions (legitimate non-entry points).
+        from ..dep_validation import load_dead_module_exclusions
+        config_dir = rel_dir if rel_dir is not None else os.path.join(root_str, ".rlsbl")
+        suppress = set(load_dead_module_exclusions(config_dir))
+
         all_dead: list[str] = []
         details: list[str] = []
 
         if "pypi" in target_names:
+            # Union-of-imports detector: thread suppress so a listed file's
+            # own imports cannot keep any other module alive (no laundering).
             from ..dep_validation import find_dead_modules
-            py_dead = find_dead_modules(root_str, exclude_dirs=exclude)
+            py_dead = find_dead_modules(root_str, exclude_dirs=exclude, suppress=suppress)
             all_dead.extend(py_dead)
             details.extend(f"{path}: not imported by any other module" for path in py_dead)
 
         if "go" in target_names:
+            # Union-of-imports detector: thread suppress (Go paths are
+            # package directories) to prevent entry-point laundering.
             from ..dep_validation import find_dead_go_packages
-            go_dead = find_dead_go_packages(root_str, exclude_dirs=exclude)
+            go_dead = find_dead_go_packages(root_str, exclude_dirs=exclude, suppress=suppress)
             all_dead.extend(go_dead)
             details.extend(f"{path}: internal package not imported outside itself" for path in go_dead)
 
+        # npm/Dart/JVM detectors are BFS-from-entry-points: a non-entry
+        # suppressed file's edges are never traversed, so subtracting the
+        # listed paths from the reported dead set is provably sufficient.
         if "npm" in target_names:
             from ..dep_validation import find_dead_npm_modules
-            npm_dead = find_dead_npm_modules(root_str, exclude_dirs=exclude)
+            npm_dead = [
+                p for p in find_dead_npm_modules(root_str, exclude_dirs=exclude)
+                if p not in suppress
+            ]
             all_dead.extend(npm_dead)
             details.extend(f"{path}: not reachable from any entry point" for path in npm_dead)
 
         if "dart" in target_names:
             from ..dep_validation import find_dead_dart_modules
-            dart_dead = find_dead_dart_modules(root_str, exclude_dirs=exclude)
+            dart_dead = [
+                p for p in find_dead_dart_modules(root_str, exclude_dirs=exclude)
+                if p not in suppress
+            ]
             all_dead.extend(dart_dead)
             details.extend(f"{path}: not reachable from any entry point" for path in dart_dead)
 
         if "maven" in target_names:
             from ..dep_validation import find_dead_jvm_modules
-            jvm_dead = find_dead_jvm_modules(root_str, exclude_dirs=exclude)
+            jvm_dead = [
+                p for p in find_dead_jvm_modules(root_str, exclude_dirs=exclude)
+                if p not in suppress
+            ]
             all_dead.extend(jvm_dead)
             details.extend(f"{path}: not reachable from any entry point" for path in jvm_dead)
 
@@ -227,6 +248,35 @@ def register_quality_checks(app):
                 reporter.warn(d)
             return reporter.found(f"{len(all_dead)} dead module(s)")
         return reporter.passed("no dead modules")
+
+    @app.error_check("dead-modules-stale")
+    def check_dead_modules_stale(ctx, reporter):
+        """Declared dead-module exclusions must point to existing files."""
+        from ..dep_validation import load_dead_module_exclusions
+        from ..targets import resolve_releasable_config_dir_for_ctx
+
+        root_str = str(ctx.project_root)
+        rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
+        config_dir = rel_dir if rel_dir is not None else os.path.join(root_str, ".rlsbl")
+        exclusions = load_dead_module_exclusions(config_dir)
+        if not exclusions:
+            return reporter.passed("no dead-module exclusions")
+
+        toml_rel = os.path.relpath(
+            os.path.join(config_dir, "dead-modules.toml"), root_str
+        )
+        stale = [
+            path for path in sorted(exclusions)
+            if not os.path.exists(os.path.join(root_str, path))
+        ]
+
+        if stale:
+            for s in stale:
+                reporter.error(
+                    f"{s}: declared in {toml_rel} but does not exist on disk"
+                )
+            return reporter.found(f"{len(stale)} stale dead-module exclusion(s)")
+        return reporter.passed("all dead-module exclusions exist")
 
     @app.warn_check("circular-deps")
     def check_circular_deps(ctx, reporter):
