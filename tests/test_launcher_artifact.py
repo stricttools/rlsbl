@@ -9,11 +9,18 @@ Config keys: ``artifact: "launcher"``, ``wraps: "<pipeline-name>"``,
 ``binary_source: "github-release"``.
 
 Coverage:
-- Config validation (wraps, binary_source required; wraps references valid binary)
-- Pipeline template_mappings selection
-- Template rendering (needs chain, verify step, RELEASE_TAG env pattern)
-- Manifest-as-name-authority (missing manifest -> hard error)
+- Config validation (wraps, binary_source required; wraps references valid
+  binary; launcher under publish_mode "none" is a hard error)
+- Pipeline template_mappings selection (workflow + shim mappings)
+- Template rendering (needs chain, verify step incl. checksums.txt probe,
+  RELEASE_TAG env pattern)
 - wrapper-producer check registration
+
+Shim generation, checksum verification, and manifest-as-name-authority
+(fill-once, missing-manifest hard error, field-deletion detection) are
+covered by the companion test modules test_launcher_shim_npm.py,
+test_launcher_shim_pypi.py, test_launcher_manifest.py, and
+test_launcher_end_to_end.py.
 """
 
 import os
@@ -119,6 +126,19 @@ class TestLauncherConfigValidation:
         with pytest.raises(ConfigError, match="binary"):
             validate_pipelines_config(config)
 
+    def test_launcher_publish_mode_none_fails(self):
+        """artifact=launcher under publish_mode 'none' is a hard error."""
+        config = self._base_config()
+        config["publish_mode"] = "none"
+        with pytest.raises(ConfigError, match="publish_mode"):
+            validate_pipelines_config(config)
+
+    def test_launcher_publish_mode_ci_passes(self):
+        """artifact=launcher under publish_mode 'ci' is fine."""
+        config = self._base_config()
+        config["publish_mode"] = "ci"
+        validate_pipelines_config(config)
+
     def test_launcher_pypi_valid(self):
         """pypi launcher passes validation with all required keys."""
         config = {
@@ -170,8 +190,13 @@ class TestLauncherTemplateMappings:
         )
         pipeline.target = "npm"
         mappings = pipeline.template_mappings(ctx=None)
-        assert len(mappings) == 1
-        assert mappings[0]["template"] == "publish-launcher.yml.tpl"
+        templates = {m["template"] for m in mappings}
+        # Workflow + both shim files.
+        assert "publish-launcher.yml.tpl" in templates
+        assert "shim-postinstall.cjs.tpl" in templates
+        assert "shim-bin.cjs.tpl" in templates
+        wf = [m for m in mappings if m["template"] == "publish-launcher.yml.tpl"]
+        assert wf[0]["target"] == ".github/workflows/publish.yml"
 
     def test_pypi_launcher_selects_launcher_template(self):
         """pypi pipeline with artifact=launcher selects publish-launcher.yml.tpl."""
@@ -186,8 +211,12 @@ class TestLauncherTemplateMappings:
         )
         pipeline.target = "pypi"
         mappings = pipeline.template_mappings(ctx=None)
-        assert len(mappings) == 1
-        assert mappings[0]["template"] == "publish-launcher.yml.tpl"
+        templates = {m["template"] for m in mappings}
+        # Workflow + first-run launcher module.
+        assert "publish-launcher.yml.tpl" in templates
+        assert "shim-launcher.py.tpl" in templates
+        wf = [m for m in mappings if m["template"] == "publish-launcher.yml.tpl"]
+        assert wf[0]["target"] == ".github/workflows/publish.yml"
 
     def test_npm_non_launcher_uses_regular_template(self):
         """npm pipeline without artifact=launcher uses the regular template."""
@@ -255,6 +284,20 @@ class TestLauncherTemplateFiles:
             content = f.read()
         assert "curl" in content or "wget" in content
         assert "404" in content or "verify" in content.lower()
+
+    def test_npm_template_has_checksums_probe(self):
+        """npm launcher verify step probes checksums.txt existence."""
+        tpl = os.path.join(_templates_root(), "npm", "publish-launcher.yml.tpl")
+        with open(tpl) as f:
+            content = f.read()
+        assert "checksums.txt" in content
+
+    def test_pypi_template_has_checksums_probe(self):
+        """pypi launcher verify step probes checksums.txt existence."""
+        tpl = os.path.join(_templates_root(), "pypi", "publish-launcher.yml.tpl")
+        with open(tpl) as f:
+            content = f.read()
+        assert "checksums.txt" in content
 
     def test_npm_template_needs_chain(self):
         """npm launcher template has needs referencing gate and producer."""
