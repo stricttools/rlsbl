@@ -667,7 +667,8 @@ def cmd_scaffold(ctx, target, publish_mode, auto_commit, skip_shared, auto_tag, 
 @app.command(name="check-name", help="Query npm, PyPI, crates.io, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.")
 @strictcli.flag(name="target", type=str, help="Registry to query for name availability (npm, pypi, crates, go, or github); repeatable", repeatable=True, unique=True)
 @strictcli.flag(name="delay", type=str, help="Milliseconds to wait between consecutive registry API queries (default: 200)", default="200")
-def cmd_check_name(ctx, target, delay, **_kwargs):
+@strictcli.flag(name="json", type=bool, default=False, help="Output results as machine-readable JSON: one object for a single name+target, a JSON array for multiple names and/or targets")
+def cmd_check_name(ctx, target, delay, json, **_kwargs):
     # --target is required for check-name; with repeatable=True, target is a list
     targets = target if target else []
     if not targets:
@@ -689,10 +690,22 @@ def cmd_check_name(ctx, target, delay, **_kwargs):
         sys.exit(1)
     # Names come from _variadic_args (extracted before strictcli parsing)
     names = _variadic_args
-    flags = {"delay": delay}
+    flags = {"delay": delay, "json": json}
     from .commands.check import run_cmd
+    # run_cmd no longer exits; loop every target, accumulate, and exit with the
+    # highest exit code across targets (a taken/error on any target propagates).
+    max_exit = 0
+    payloads = []
     for tgt in targets:
-        run_cmd(tgt, names, flags)
+        exit_code, payload = run_cmd(tgt, names, flags)
+        max_exit = max(max_exit, exit_code)
+        payloads.extend(payload)
+    if json:
+        import json as _json
+        # One object for a single name+target; a JSON array otherwise.
+        out = payloads[0] if len(payloads) == 1 else payloads
+        print(_json.dumps(out, indent=2))
+    sys.exit(max_exit)
 
 
 # ---------------------------------------------------------------------------

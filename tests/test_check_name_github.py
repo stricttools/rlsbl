@@ -25,7 +25,9 @@ class TestGithubValidTarget:
         """Passing --target github should call run_cmd with 'github'."""
         from rlsbl import cmd_check_name
 
-        cmd_check_name(None, target=["github"], delay="200")
+        mock_run_cmd.return_value = (0, [])
+        with pytest.raises(SystemExit):
+            cmd_check_name(None, target=["github"], delay="200", json=False)
         assert mock_run_cmd.call_count == 1
         assert mock_run_cmd.call_args_list[0][0][0] == "github"
 
@@ -35,7 +37,9 @@ class TestGithubValidTarget:
         """--target npm --target github should call run_cmd for both."""
         from rlsbl import cmd_check_name
 
-        cmd_check_name(None, target=["npm", "github"], delay="200")
+        mock_run_cmd.return_value = (0, [])
+        with pytest.raises(SystemExit):
+            cmd_check_name(None, target=["npm", "github"], delay="200", json=False)
         assert mock_run_cmd.call_count == 2
         targets_called = [c[0][0] for c in mock_run_cmd.call_args_list]
         assert "npm" in targets_called
@@ -213,15 +217,14 @@ class TestGithubMultiNameMode:
             {"status": "available", "count": 0},
             {"status": "exists", "count": 10, "note": "10 repos"},
         ]
-        with pytest.raises(SystemExit) as exc_info:
-            run_cmd("github", ["unique-name", "common-name"], {"delay": "0"})
+        exit_code, _ = run_cmd("github", ["unique-name", "common-name"], {"delay": "0"})
         captured = capsys.readouterr()
         assert "unique-name" in captured.out
         assert "common-name" in captured.out
         assert "no repos" in captured.out
         assert "10 repos" in captured.out
         # exit code 1 because at least one "exists"
-        assert exc_info.value.code == 1
+        assert exit_code == 1
 
 
 class TestClaimNameNoGithub:

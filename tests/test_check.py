@@ -376,15 +376,20 @@ class TestMultiNameCheck:
     @patch("rlsbl.commands.check._format_single_result")
     @patch("rlsbl.commands.check._check_single_name")
     def test_single_name_uses_verbose_format(self, mock_check, mock_format):
-        """A single name should use the verbose _format_single_result output."""
+        """A single name should use the verbose _format_single_result output.
+
+        run_cmd now returns (exit_code, payload) instead of calling sys.exit;
+        the CLI handler owns process exit.
+        """
         mock_check.return_value = {
             "name": "foo", "registry": "npm", "status": "available",
             "variants": [],
         }
         mock_format.return_value = 0
-        with pytest.raises(SystemExit) as exc_info:
-            run_cmd("npm", ["foo"], {})
-        assert exc_info.value.code == 0
+        exit_code, payload = run_cmd("npm", ["foo"], {})
+        assert exit_code == 0
+        assert len(payload) == 1
+        assert payload[0]["name"] == "foo"
         mock_check.assert_called_once_with("foo", "npm", delay_ms=200)
         mock_format.assert_called_once_with(mock_check.return_value)
 
@@ -401,9 +406,8 @@ class TestMultiNameCheck:
              "variants": []},
         ]
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            with pytest.raises(SystemExit) as exc_info:
-                run_cmd("npm", ["foo", "bar", "baz"], {})
-            assert exc_info.value.code == 1  # one name is taken
+            exit_code, _payload = run_cmd("npm", ["foo", "bar", "baz"], {})
+            assert exit_code == 1  # one name is taken
         output = mock_stdout.getvalue()
         lines = output.strip().split("\n")
         # header + 3 rows + blank + summary + batch note = 7 lines
@@ -430,18 +434,17 @@ class TestMultiNameCheck:
              "variants": []},
         ]
         with patch("sys.stdout", new_callable=StringIO):
-            with pytest.raises(SystemExit):
-                run_cmd("npm", ["a", "b", "c"], {"delay": "500"})
+            run_cmd("npm", ["a", "b", "c"], {"delay": "500"})
         # 3 names -> 2 delays between them
         assert mock_sleep.call_count == 2
         mock_sleep.assert_has_calls([call(0.5), call(0.5)])
 
-    def test_empty_args_prints_error_and_exits(self):
-        """No names should print an error to stderr and exit 1."""
+    def test_empty_args_prints_error_and_returns_exit_1(self):
+        """No names should print an error to stderr and return exit code 1."""
         with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
-            with pytest.raises(SystemExit) as exc_info:
-                run_cmd("npm", [], {})
-            assert exc_info.value.code == 1
+            exit_code, payload = run_cmd("npm", [], {})
+        assert exit_code == 1
+        assert payload == []
         assert "missing package name" in mock_stderr.getvalue()
 
 
@@ -1375,9 +1378,8 @@ class TestMultiNameSummary:
              "variants": []},
         ]
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            with pytest.raises(SystemExit) as exc_info:
-                run_cmd("npm", ["foo", "bar", "baz"], {})
-            assert exc_info.value.code == 1
+            exit_code, _ = run_cmd("npm", ["foo", "bar", "baz"], {})
+            assert exit_code == 1
         output = mock_stdout.getvalue()
         assert "Summary: 2 available, 1 taken (3 total)" in output
         # No error count in summary
@@ -1396,9 +1398,8 @@ class TestMultiNameSummary:
              "variants": []},
         ]
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            with pytest.raises(SystemExit) as exc_info:
-                run_cmd("npm", ["foo", "bar", "baz"], {})
-            assert exc_info.value.code == 2  # error is highest severity
+            exit_code, _ = run_cmd("npm", ["foo", "bar", "baz"], {})
+            assert exit_code == 2  # error is highest severity
         output = mock_stdout.getvalue()
         assert "Summary: 1 available, 1 taken, 1 error(s) (3 total)" in output
 
@@ -1415,9 +1416,8 @@ class TestMultiNameSummary:
              "variants": []},
         ]
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            with pytest.raises(SystemExit) as exc_info:
-                run_cmd("npm", ["foo", "bar", "baz"], {})
-            assert exc_info.value.code == 0
+            exit_code, _ = run_cmd("npm", ["foo", "bar", "baz"], {})
+            assert exit_code == 0
         output = mock_stdout.getvalue()
         assert "Summary: 3 available, 0 taken (3 total)" in output
         assert "error(s)" not in output
@@ -1433,9 +1433,8 @@ class TestMultiNameSummary:
              "variants": []},
         ]
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            with pytest.raises(SystemExit) as exc_info:
-                run_cmd("npm", ["foo", "bar"], {})
-            assert exc_info.value.code == 0
+            exit_code, _ = run_cmd("npm", ["foo", "bar"], {})
+            assert exit_code == 0
         output = mock_stdout.getvalue()
         assert "Checked with 200ms delay between names." in output
         assert "Increase --delay if rate limited." in output
@@ -1451,9 +1450,8 @@ class TestMultiNameSummary:
              "variants": []},
         ]
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            with pytest.raises(SystemExit) as exc_info:
-                run_cmd("npm", ["foo", "bar"], {"delay": "500"})
-            assert exc_info.value.code == 0
+            exit_code, _ = run_cmd("npm", ["foo", "bar"], {"delay": "500"})
+            assert exit_code == 0
         output = mock_stdout.getvalue()
         assert "Checked with 500ms delay between names." in output
         assert "Increase --delay if rate limited." not in output
@@ -1835,9 +1833,8 @@ class TestExitCodes:
             "variants": [], "reason": None,
         }
         with patch("sys.stdout", new_callable=StringIO):
-            with pytest.raises(SystemExit) as exc_info:
-                run_cmd("npm", ["my-new-pkg"], {})
-            assert exc_info.value.code == 0
+            exit_code, _ = run_cmd("npm", ["my-new-pkg"], {})
+            assert exit_code == 0
 
     @patch("rlsbl.commands.check._check_single_name")
     def test_run_cmd_single_taken_exits_1(self, mock_check):
@@ -1847,9 +1844,8 @@ class TestExitCodes:
             "variants": None, "reason": "registered",
         }
         with patch("sys.stdout", new_callable=StringIO):
-            with pytest.raises(SystemExit) as exc_info:
-                run_cmd("npm", ["express"], {})
-            assert exc_info.value.code == 1
+            exit_code, _ = run_cmd("npm", ["express"], {})
+            assert exit_code == 1
 
     @patch("rlsbl.commands.check._check_single_name")
     def test_run_cmd_single_error_exits_2(self, mock_check):
@@ -1861,9 +1857,8 @@ class TestExitCodes:
         }
         with patch("sys.stdout", new_callable=StringIO):
             with patch("sys.stderr", new_callable=StringIO):
-                with pytest.raises(SystemExit) as exc_info:
-                    run_cmd("npm", ["some-pkg"], {})
-                assert exc_info.value.code == 2
+                exit_code, _ = run_cmd("npm", ["some-pkg"], {})
+                assert exit_code == 2
 
     # -- Multi-name exit codes via run_cmd --
 
@@ -1878,9 +1873,8 @@ class TestExitCodes:
              "variants": []},
         ]
         with patch("sys.stdout", new_callable=StringIO):
-            with pytest.raises(SystemExit) as exc_info:
-                run_cmd("npm", ["a", "b"], {})
-            assert exc_info.value.code == 0
+            exit_code, _ = run_cmd("npm", ["a", "b"], {})
+            assert exit_code == 0
 
     @patch("rlsbl.commands.check.time.sleep")
     @patch("rlsbl.commands.check._check_single_name")
@@ -1893,9 +1887,8 @@ class TestExitCodes:
              "variants": []},
         ]
         with patch("sys.stdout", new_callable=StringIO):
-            with pytest.raises(SystemExit) as exc_info:
-                run_cmd("npm", ["a", "b"], {})
-            assert exc_info.value.code == 1
+            exit_code, _ = run_cmd("npm", ["a", "b"], {})
+            assert exit_code == 1
 
     @patch("rlsbl.commands.check.time.sleep")
     @patch("rlsbl.commands.check._check_single_name")
@@ -1908,9 +1901,8 @@ class TestExitCodes:
              "variants": []},
         ]
         with patch("sys.stdout", new_callable=StringIO):
-            with pytest.raises(SystemExit) as exc_info:
-                run_cmd("npm", ["a", "b"], {})
-            assert exc_info.value.code == 2
+            exit_code, _ = run_cmd("npm", ["a", "b"], {})
+            assert exit_code == 2
 
     @patch("rlsbl.commands.check.time.sleep")
     @patch("rlsbl.commands.check._check_single_name")
@@ -1923,9 +1915,8 @@ class TestExitCodes:
              "status": "exists", "variants": None},
         ]
         with patch("sys.stdout", new_callable=StringIO):
-            with pytest.raises(SystemExit) as exc_info:
-                run_cmd("go", ["github.com/fake/a", "github.com/gorilla/mux"], {})
-            assert exc_info.value.code == 1
+            exit_code, _ = run_cmd("go", ["github.com/fake/a", "github.com/gorilla/mux"], {})
+            assert exit_code == 1
 
 
 class TestCheckNameEndToEnd:

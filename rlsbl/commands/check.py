@@ -424,6 +424,43 @@ _NPM_MONIKER_RULE = "npm strips dashes, dots, and underscores: these share one m
 _PYPI_NORMALIZED_RULE = "PyPI normalizes dashes, underscores, and dots to hyphens: these resolve identically"
 _CRATES_NORMALIZED_RULE = "crates.io treats hyphens and underscores as equivalent"
 
+# Stable machine tokens for each collision mechanism.  Unlike the human
+# sentences above (which may be reworded), these tokens are a contract: JSON
+# consumers key off them.  Every structured conflict object carries exactly one.
+_RULE_TOKEN_NPM_MONIKER = "npm-moniker"
+_RULE_TOKEN_PYPI_SEPARATOR = "pypi-separator"
+_RULE_TOKEN_PYPI_ULTRANORM = "pypi-ultranorm"
+_RULE_TOKEN_CRATES_SEPARATOR = "crates-separator"
+_RULE_TOKEN_STDLIB = "stdlib"
+
+# Token -> human sentence.  Used to surface the rule sentences alongside the
+# machine tokens in JSON output.  ultranorm/stdlib get generic sentences here
+# (their per-name notes are built at the attach sites).
+_RULE_TOKEN_SENTENCES = {
+    _RULE_TOKEN_NPM_MONIKER: _NPM_MONIKER_RULE,
+    _RULE_TOKEN_PYPI_SEPARATOR: _PYPI_NORMALIZED_RULE,
+    _RULE_TOKEN_CRATES_SEPARATOR: _CRATES_NORMALIZED_RULE,
+    _RULE_TOKEN_PYPI_ULTRANORM: "PyPI blocks names that are visually similar (l/1/i and o/0 substitutions)",
+    _RULE_TOKEN_STDLIB: "PyPI blocks names that match Python standard library modules",
+}
+
+
+def _add_structured_conflicts(result, names, rule):
+    """Append ``{"name": ..., "rule": ...}`` objects to the unified conflict field.
+
+    This is the canonical machine-readable surface: every collision mechanism
+    (npm moniker, pypi separator, pypi ultranorm, crates separator, stdlib)
+    folds its conflicts into ``result["structured_conflicts"]`` via this helper.
+    The list is re-sorted by (name, rule) after each addition, so the final
+    ordering is deterministic regardless of attach-site order — and a name that
+    collides through two mechanisms at once contributes two distinct objects.
+    """
+    existing = result.get("structured_conflicts") or []
+    for name in names:
+        existing.append({"name": name, "rule": rule})
+    existing.sort(key=lambda c: (c["name"], c["rule"]))
+    result["structured_conflicts"] = existing
+
 
 def _enumerate_conflicts(conflicts):
     """Render a conflict list as a comma-separated, single-quoted enumeration.
@@ -522,6 +559,7 @@ def _check_single_name(name, registry, delay_ms=0):
                     f"moniker collision with {_enumerate_conflicts(hard)} "
                     f"— {_NPM_MONIKER_RULE}"
                 )
+                _add_structured_conflicts(result, hard, _RULE_TOKEN_NPM_MONIKER)
             result["variants"] = soft
             try:
                 conflicts = _search_npm_similar(name)
@@ -543,6 +581,7 @@ def _check_single_name(name, registry, delay_ms=0):
                     f"moniker conflict with {_enumerate_conflicts(conflicts)} "
                     f"— {_NPM_MONIKER_RULE}"
                 )
+                _add_structured_conflicts(result, conflicts, _RULE_TOKEN_NPM_MONIKER)
 
     elif registry == "pypi":
         stdlib_module = _check_stdlib_collision(name)
@@ -550,6 +589,7 @@ def _check_single_name(name, registry, delay_ms=0):
             result["status"] = "taken"
             result["reason"] = "stdlib"
             result["note"] = f"conflicts with Python stdlib module '{stdlib_module}'"
+            _add_structured_conflicts(result, [stdlib_module], _RULE_TOKEN_STDLIB)
         else:
             check_result = check_pypi_availability(name)
             result["status"] = check_result["status"]
@@ -572,6 +612,7 @@ def _check_single_name(name, registry, delay_ms=0):
                         f"normalization collision with {_enumerate_conflicts(hard)} "
                         f"— {_PYPI_NORMALIZED_RULE}"
                     )
+                    _add_structured_conflicts(result, hard, _RULE_TOKEN_PYPI_SEPARATOR)
                 result["variants"] = soft  # only soft similar names shown as informational
 
     elif registry == "crates":
@@ -593,6 +634,7 @@ def _check_single_name(name, registry, delay_ms=0):
                     f"normalization collision with {_enumerate_conflicts(hard)} "
                     f"— {_CRATES_NORMALIZED_RULE}"
                 )
+                _add_structured_conflicts(result, hard, _RULE_TOKEN_CRATES_SEPARATOR)
             result["variants"] = soft
 
     elif registry == "go":
@@ -819,43 +861,96 @@ def _apply_ultranorm_check(result, registry, delay_ms):
         result["status"] = "taken"
         result["reason"] = "ultranorm"
         result["ultranorm_conflicts"] = conflicts
+        _add_structured_conflicts(result, conflicts, _RULE_TOKEN_PYPI_ULTRANORM)
+
+
+def _result_exit_code(result):
+    """Compute the exit code for a single check result without printing.
+
+    Mirrors the codes the human formatters return: 2 = error, 1 = taken/exists,
+    0 = available/not_found.
+    """
+    if result["status"] == "error":
+        return 2
+    if result["status"] in ("taken", "exists"):
+        return 1
+    return 0
+
+
+def _result_to_json(result, exit_code):
+    """Project a check result dict onto the stable JSON surface for one name+target.
+
+    Carries the identity (name, target), status, reason, the unified
+    ``structured_conflicts`` field (from the collision mechanisms), the
+    human rule sentences for the tokens present, and the exit-relevant code.
+    Optional keys (note, error, github_count) appear only when set.
+    """
+    structured = result.get("structured_conflicts", [])
+    tokens = sorted({c["rule"] for c in structured})
+    obj = {
+        "name": result["name"],
+        "target": result["registry"],
+        "status": result["status"],
+        "reason": result.get("reason"),
+        "structured_conflicts": structured,
+        "rule_sentences": {t: _RULE_TOKEN_SENTENCES[t] for t in tokens},
+        "exit_code": exit_code,
+    }
+    if result.get("note"):
+        obj["note"] = result["note"]
+    if result.get("error"):
+        obj["error"] = result["error"]
+    if "github_count" in result:
+        obj["github_count"] = result["github_count"]
+    return obj
 
 
 def run_cmd(registry, args, flags):
-    """Check command handler.
+    """Check package name availability for one registry.
 
-    Checks package name availability on npm, PyPI, Go, or GitHub, and warns about similar names.
-    Accepts one or more package names as positional arguments.
+    Checks one or more names on ``registry``, warning about similar names.
+    Returns ``(exit_code, payload)`` where ``payload`` is a list of per-name
+    JSON objects (one per checked name).  The caller owns process exit and
+    aggregation across registries — this function never calls ``sys.exit``.
+
+    Human output is printed here (byte-identical to prior behavior) unless
+    ``flags["json"]`` is set, in which case nothing is printed and the caller
+    renders the accumulated payloads.
     """
+    json_mode = flags.get("json", False)
     names = args if args else []
     if not names:
         print(
             "Error: missing package name(s). Usage: rlsbl check <name> [<name2> ...] --target <npm|pypi|go|github>",
             file=sys.stderr,
         )
-        sys.exit(1)
+        return 1, []
 
     delay_ms = int(flags.get("delay", "200"))
 
     if len(names) == 1:
         result = _check_single_name(names[0], registry, delay_ms=delay_ms)
         _apply_ultranorm_check(result, registry, delay_ms)
-        exit_code = _format_single_result(result)
-        sys.exit(exit_code)
-    else:
-        rows = []
-        max_exit = 0
-        for i, name in enumerate(names):
-            result = _check_single_name(name, registry, delay_ms=delay_ms)
-            _apply_ultranorm_check(result, registry, delay_ms)
-            rows.append(_format_table_row(result))
-            if result["status"] == "error":
-                max_exit = max(max_exit, 2)
-            elif result["status"] in ("taken", "exists"):
-                max_exit = max(max_exit, 1)
-            if i < len(names) - 1:
-                time.sleep(delay_ms / 1000)
+        exit_code = _result_exit_code(result)
+        payload = [_result_to_json(result, exit_code)]
+        if not json_mode:
+            _format_single_result(result)
+        return exit_code, payload
 
+    rows = []
+    payload = []
+    max_exit = 0
+    for i, name in enumerate(names):
+        result = _check_single_name(name, registry, delay_ms=delay_ms)
+        _apply_ultranorm_check(result, registry, delay_ms)
+        ec = _result_exit_code(result)
+        payload.append(_result_to_json(result, ec))
+        rows.append(_format_table_row(result))
+        max_exit = max(max_exit, ec)
+        if i < len(names) - 1:
+            time.sleep(delay_ms / 1000)
+
+    if not json_mode:
         # Compute column widths for aligned output
         name_width = max(len(row["name"]) for row in rows)
         name_width = max(name_width, len("Name"))
@@ -880,4 +975,4 @@ def run_cmd(registry, args, flags):
             msg += " Increase --delay if rate limited."
         print(msg)
 
-        sys.exit(max_exit)
+    return max_exit, payload

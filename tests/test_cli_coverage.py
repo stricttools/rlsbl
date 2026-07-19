@@ -278,18 +278,20 @@ class TestCmdCheckName:
 
     def test_exits_when_no_target(self):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_check_name(None, target=[], delay="200")
+            rlsbl.cmd_check_name(None, target=[], delay="200", json=False)
         assert exc.value.code == 1
 
     def test_exits_on_invalid_targets(self):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_check_name(None, target=["bogus"], delay="200")
+            rlsbl.cmd_check_name(None, target=["bogus"], delay="200", json=False)
         assert exc.value.code == 1
 
     @patch("rlsbl.commands.check.run_cmd")
     def test_delegates_to_check_run_cmd(self, mock_run):
         rlsbl._variadic_args = ["my-package"]
-        rlsbl.cmd_check_name(None, target=["npm", "pypi"], delay="500")
+        mock_run.return_value = (0, [])
+        with pytest.raises(SystemExit):
+            rlsbl.cmd_check_name(None, target=["npm", "pypi"], delay="500", json=False)
         assert mock_run.call_count == 2
         assert mock_run.call_args_list[0][0][0] == "npm"
         assert mock_run.call_args_list[1][0][0] == "pypi"
