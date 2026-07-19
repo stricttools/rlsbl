@@ -1,9 +1,16 @@
 # Version bump type: patch, minor, major, hotfix, or prerelease
-bump = ""
+bump = "minor"
 # Short description of this release (required)
-description = ""
+description = "Structured external checks, declarative dead-module exclusions, check-name --json, launcher shim generation, and deterministic check verdicts"
 # Optional context explaining why these changes were made
-context = ""
+context = """
+Check verdicts no longer depend on which tools a machine has installed: missing tools now hard-fail instead of silently skipping, both in checks and in release test runners.
+external_checks gained an explicit structured/freeform schema with rlsbl-composed argv and competing-scope guards (breaking: the kind key is now required).
+dead-modules gained a reason-gated committed exclusion list.
+check-name gained --json plus a fix making multi-target checks actually check every target.
+The launcher pipeline kind is now end-to-end functional with checksum-verified download shims.
+rename-releasable crash recovery and batch-archival guards were hardened, and the release preflight now prints a positive success summary.
+"""
 # Pre-release identifier: alpha, beta, rc, or stable
 # preid = ""
 # Set to true to generate a blog post for this release
