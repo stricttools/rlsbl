@@ -436,12 +436,13 @@ class TestMavenTestExecutionMaven:
             assert result is True
             assert mock_run.call_args[0][0] == ["./gradlew", "test"]
 
-    def test_no_gradlew_no_pom_skips(self, tmp_project):
-        """When neither gradlew nor pom.xml exist, skips tests."""
+    def test_no_gradlew_no_pom_fails(self, tmp_project):
+        """When neither gradlew nor pom.xml exist, a declared maven target is a
+        broken declaration -> hard fail (no silent skip)."""
         with patch("rlsbl.testing.subprocess.run") as mock_run:
             result = run_project_tests("maven", project_dir=str(tmp_project))
 
-            assert result is True
+            assert result is False
             mock_run.assert_not_called()
 
 

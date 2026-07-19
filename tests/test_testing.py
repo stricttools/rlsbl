@@ -148,6 +148,17 @@ class TestPypiTarget:
             assert mock_run.call_count == 1
             assert mock_run.call_args[0][0] == ["python", "-m", "pytest"]
 
+    def test_pypi_no_uv_no_pytest_fails(self, tmp_project):
+        """Neither uv nor pytest installed -> hard fail (no silent skip)."""
+        with (
+            patch("rlsbl.testing.require_tool", return_value=None),
+            patch("rlsbl.testing.subprocess.run") as mock_run,
+        ):
+            result = run_project_tests("pypi", project_dir=str(tmp_project))
+
+            assert result is False
+            mock_run.assert_not_called()
+
 
 # ---------------------------------------------------------------------------
 # pypi test.pypi.markers config
@@ -341,13 +352,30 @@ class TestNpmTarget:
             assert result is True
             mock_run.assert_not_called()
 
-    def test_npm_skips_without_package_json(self, tmp_project):
-        """npm target skips when no package.json exists."""
+    def test_npm_no_package_json_fails(self, tmp_project):
+        """npm target hard-fails when no package.json exists (broken declaration)."""
         with patch("rlsbl.testing.subprocess.run") as mock_run:
             result = run_project_tests("npm", project_dir=str(tmp_project))
 
-            assert result is True
+            assert result is False
             mock_run.assert_not_called()
+
+    def test_npm_corrupt_package_json_fails(self, tmp_project):
+        """npm target hard-fails when package.json is unreadable."""
+        (tmp_project / "package.json").write_text("{ this is not json")
+        with patch("rlsbl.testing.subprocess.run") as mock_run:
+            result = run_project_tests("npm", project_dir=str(tmp_project))
+
+            assert result is False
+            mock_run.assert_not_called()
+
+    def test_npm_missing_tool_fails(self, tmp_project):
+        """npm not installed (FileNotFoundError) -> hard fail, not an exception."""
+        _setup_npm_project(tmp_project, test_script="jest")
+        with patch("rlsbl.testing.subprocess.run", side_effect=FileNotFoundError("npm")):
+            result = run_project_tests("npm", project_dir=str(tmp_project))
+
+            assert result is False
 
     def test_npm_failure_returns_false(self, tmp_project):
         """When npm test fails, returns False."""
@@ -357,6 +385,31 @@ class TestNpmTarget:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=1)
 
             result = run_project_tests("npm", project_dir=str(tmp_project))
+
+            assert result is False
+
+
+# ---------------------------------------------------------------------------
+# maven target
+# ---------------------------------------------------------------------------
+
+class TestMavenTarget:
+    """Tests for run_project_tests with maven target."""
+
+    def test_maven_no_build_file_fails(self, tmp_project):
+        """maven target with neither gradlew nor pom.xml -> hard fail
+        (a maven target was declared, so a missing manifest is broken, not n/a)."""
+        with patch("rlsbl.testing.subprocess.run") as mock_run:
+            result = run_project_tests("maven", project_dir=str(tmp_project))
+
+            assert result is False
+            mock_run.assert_not_called()
+
+    def test_maven_mvn_missing_tool_fails(self, tmp_project):
+        """mvn not installed (FileNotFoundError) -> hard fail, not an exception."""
+        (tmp_project / "pom.xml").write_text("<project></project>\n")
+        with patch("rlsbl.testing.subprocess.run", side_effect=FileNotFoundError("mvn")):
+            result = run_project_tests("maven", project_dir=str(tmp_project))
 
             assert result is False
 
@@ -562,14 +615,14 @@ class TestSyncWorkspace:
 
             assert result is False
 
-    def test_sync_workspace_no_uv(self, tmp_project):
-        """sync_workspace returns True when uv is not available."""
+    def test_sync_workspace_no_uv_fails(self, tmp_project):
+        """sync_workspace hard-fails when uv is not available."""
         with patch("rlsbl.testing.require_tool") as mock_tool:
             mock_tool.return_value = None
 
             result = sync_workspace(str(tmp_project))
 
-            assert result is True
+            assert result is False
 
 
 # ---------------------------------------------------------------------------

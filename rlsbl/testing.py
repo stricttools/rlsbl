@@ -29,7 +29,11 @@ def sync_workspace(
     Returns True on success, False on failure.
     """
     if not require_tool("uv", fatal=False):
-        return True
+        print(
+            "Error: uv is not installed; cannot sync the workspace.",
+            file=sys.stderr,
+        )
+        return False
 
     if not os.path.exists(os.path.join(workspace_root, "pyproject.toml")):
         return True
@@ -243,8 +247,11 @@ def _run_pypi_tests(
             print(f"Error: command timed out after {check_timeout}s: {fallback_cmd} {CHECK_TIMEOUT_HINT}", file=sys.stderr)
             return False
     else:
-        print("Warning: neither uv nor pytest found, skipping tests.", file=sys.stderr)
-        return True
+        print(
+            "Error: neither uv nor pytest is installed; cannot run tests.",
+            file=sys.stderr,
+        )
+        return False
 
     return result.returncode == 0
 
@@ -275,6 +282,9 @@ def _run_maven_tests(*, project_dir: str | None, check_timeout: int = 120) -> bo
         except subprocess.TimeoutExpired:
             print(f"Error: command timed out after {check_timeout}s: {cmd} {CHECK_TIMEOUT_HINT}", file=sys.stderr)
             return False
+        except FileNotFoundError:
+            print("Error: gradle (./gradlew) is not runnable; cannot run gradle tests.", file=sys.stderr)
+            return False
         return result.returncode == 0
 
     pom_path = os.path.join(effective_dir, "pom.xml")
@@ -285,32 +295,47 @@ def _run_maven_tests(*, project_dir: str | None, check_timeout: int = 120) -> bo
         except subprocess.TimeoutExpired:
             print(f"Error: command timed out after {check_timeout}s: {cmd} {CHECK_TIMEOUT_HINT}", file=sys.stderr)
             return False
+        except FileNotFoundError:
+            print("Error: mvn (Maven) is not installed; cannot run maven tests.", file=sys.stderr)
+            return False
         return result.returncode == 0
 
-    print("Warning: no gradlew or pom.xml found, skipping maven tests.", file=sys.stderr)
-    return True
+    print(
+        "Error: no gradlew or pom.xml found; cannot run maven/gradle tests.",
+        file=sys.stderr,
+    )
+    return False
 
 
 def _run_npm_tests(*, project_dir: str | None, check_timeout: int = 120) -> bool:
     """Run npm tests if a test script is defined in package.json."""
     pkg_path = os.path.join(project_dir, "package.json") if project_dir else "package.json"
-    if os.path.exists(pkg_path):
-        try:
-            with open(pkg_path, "r", encoding="utf-8") as f:
-                pkg = json.load(f)
-            if pkg.get("scripts", {}).get("test"):
-                npm_cmd = ["npm", "test"]
-                try:
-                    result = subprocess.run(npm_cmd, cwd=project_dir, timeout=check_timeout)
-                except subprocess.TimeoutExpired:
-                    print(f"Error: command timed out after {check_timeout}s: {npm_cmd} {CHECK_TIMEOUT_HINT}", file=sys.stderr)
-                    return False
-                return result.returncode == 0
-            else:
-                print("No test script in package.json, skipping tests.")
-                return True
-        except (json.JSONDecodeError, OSError):
-            print("Warning: could not read package.json, skipping tests.", file=sys.stderr)
-            return True
-    else:
+    if not os.path.exists(pkg_path):
+        print(
+            f"Error: no package.json found at {pkg_path}; cannot run npm tests.",
+            file=sys.stderr,
+        )
+        return False
+
+    try:
+        with open(pkg_path, "r", encoding="utf-8") as f:
+            pkg = json.load(f)
+    except (json.JSONDecodeError, OSError) as exc:
+        print(f"Error: could not read {pkg_path}: {exc}", file=sys.stderr)
+        return False
+
+    if not pkg.get("scripts", {}).get("test"):
+        # Nothing declared to run is a legitimate pass.
+        print("No test script in package.json, skipping tests.")
         return True
+
+    npm_cmd = ["npm", "test"]
+    try:
+        result = subprocess.run(npm_cmd, cwd=project_dir, timeout=check_timeout)
+    except subprocess.TimeoutExpired:
+        print(f"Error: command timed out after {check_timeout}s: {npm_cmd} {CHECK_TIMEOUT_HINT}", file=sys.stderr)
+        return False
+    except FileNotFoundError:
+        print("Error: npm is not installed; cannot run npm tests.", file=sys.stderr)
+        return False
+    return result.returncode == 0
