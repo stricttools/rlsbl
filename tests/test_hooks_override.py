@@ -434,6 +434,7 @@ class TestExternalChecksVsHookCustomization:
                 "name": "ext-preflight-check",
                 "command": "true",
                 "tag": "preflight",
+                "kind": "freeform",
             }],
         }
 
