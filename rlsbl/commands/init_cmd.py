@@ -761,14 +761,35 @@ def plan_mappings(template_dir, mappings, vars_dict, *, required_vars=None):
                 )
 
         if ours == base:
-            plan = {
-                "target": target,
-                "status": "updated",
-                "bucket": "created",
-                "action": "write",
-                "content": theirs,
-                "base_content": theirs,
-            }
+            if theirs == ours:
+                # Byte-identical result: the template matches the local file, so
+                # nothing changes. Writing the same bytes back is not an update --
+                # report "unchanged". Heal the base when it was reconstructed,
+                # mirroring the sibling branches below.
+                if heal_notice is not None:
+                    plan = {
+                        "target": target,
+                        "status": "unchanged, base healed",
+                        "bucket": "skipped",
+                        "action": "save_base_only",
+                        "base_content": theirs,
+                    }
+                else:
+                    plan = {
+                        "target": target,
+                        "status": "unchanged",
+                        "bucket": "skipped",
+                        "action": "none",
+                    }
+            else:
+                plan = {
+                    "target": target,
+                    "status": "updated",
+                    "bucket": "created",
+                    "action": "write",
+                    "content": theirs,
+                    "base_content": theirs,
+                }
         elif base == theirs:
             # Template unchanged since the base. When healing, persist the base
             # (save_base_only) so future runs need not re-reconstruct it;
@@ -2506,14 +2527,33 @@ def _plan_merged_publish(publish_target, merged_content):
                 "reconcile it with the template first."
             )
     if ours == base:
-        plan = {
-            "target": publish_target,
-            "status": "updated",
-            "bucket": "created",
-            "action": "write",
-            "content": merged_content,
-            "base_content": merged_content,
-        }
+        if merged_content == ours:
+            # Byte-identical result: the merged publish content matches the local
+            # file, so nothing changes. Report "unchanged" rather than "updated".
+            if heal_notice is not None:
+                plan = {
+                    "target": publish_target,
+                    "status": "unchanged, base healed",
+                    "bucket": "skipped",
+                    "action": "save_base_only",
+                    "base_content": merged_content,
+                }
+            else:
+                plan = {
+                    "target": publish_target,
+                    "status": "unchanged",
+                    "bucket": "skipped",
+                    "action": "none",
+                }
+        else:
+            plan = {
+                "target": publish_target,
+                "status": "updated",
+                "bucket": "created",
+                "action": "write",
+                "content": merged_content,
+                "base_content": merged_content,
+            }
     elif base == merged_content or ours == merged_content:
         if heal_notice is not None:
             plan = {

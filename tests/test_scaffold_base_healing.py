@@ -227,3 +227,56 @@ def test_plan_mappings_has_no_force_parameter():
     assert "force" not in params
     params2 = inspect.signature(process_mappings).parameters
     assert "force" not in params2
+
+
+# ---------------------------------------------------------------------------
+# "updated" label truthfulness (ours == base branch)
+# ---------------------------------------------------------------------------
+
+def test_rescaffold_identical_reports_unchanged_not_updated(tmp_path, monkeypatch):
+    """ours == base == theirs must report 'unchanged', never 'updated'.
+
+    A byte-identical re-scaffold writes nothing back; labeling it 'updated'
+    (bucket 'created', action 'write') was a truthfulness bug -- the file is
+    untouched, so it belongs in the skipped/none/unchanged vocabulary.
+    """
+    repo = tmp_path / "repo"
+    init_repo(repo)
+    target = "ci.txt"
+    content = "a\nb\nc\n"
+    tpl = _tpl_dir(repo, "ci.tpl", content)
+    monkeypatch.chdir(repo)
+    mappings = [{"template": "ci.tpl", "target": target}]
+
+    # First scaffold: file absent -> created, base saved.
+    apply_plans(plan_mappings(tpl, mappings, {}))
+    assert os.path.exists(repo / BASES_DIR / target)
+
+    # Re-scaffold with the identical template: ours == base == theirs.
+    plans = plan_mappings(tpl, mappings, {})
+    plan = next(p for p in plans if p["target"] == target)
+    assert plan["status"] == "unchanged"
+    assert plan["bucket"] == "skipped"
+    assert plan["action"] == "none"
+    assert "content" not in plan  # nothing is written back
+
+
+def test_rescaffold_real_template_change_still_reports_updated(tmp_path, monkeypatch):
+    """ours == base but template changed -> a genuine 'updated' must remain."""
+    repo = tmp_path / "repo"
+    init_repo(repo)
+    target = "ci.txt"
+    tpl = _tpl_dir(repo, "ci.tpl", "a\nb\nc\n")
+    monkeypatch.chdir(repo)
+    mappings = [{"template": "ci.tpl", "target": target}]
+
+    apply_plans(plan_mappings(tpl, mappings, {}))
+
+    # Template gains a line; local file untouched (ours == base != theirs).
+    (repo / "_tpls" / "ci.tpl").write_text("a\nb\nc\nd\n")
+    plans = plan_mappings(tpl, mappings, {})
+    plan = next(p for p in plans if p["target"] == target)
+    assert plan["status"] == "updated"
+    assert plan["bucket"] == "created"
+    assert plan["action"] == "write"
+    assert plan["content"] == "a\nb\nc\nd\n"
