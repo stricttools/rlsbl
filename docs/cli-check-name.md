@@ -1,6 +1,6 @@
 ---
 title: rlsbl check-name
-description: "Query npm, PyPI, crates.io, Go, or GitHub to check whether one or more package names are available. Supports repeatable --target (every named target is checked), a configurable --delay between queries, and --json for machine-readable single-object or array output."
+description: "Query npm, PyPI, crates.io, Go, or GitHub for package name availability. Supports repeatable --target, a configurable --delay, and --json output."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 3
