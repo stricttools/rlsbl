@@ -1,6 +1,6 @@
 ---
 title: rlsbl.external_checks
-description: "External check providers: config-declared subprocess checks."
+description: "External check providers: config-declared subprocess checks with a mandatory kind. freeform runs an opaque shell command; structured composes argv itself for a known tool (mypy, ruff-check, ruff-format) over explicit paths and emits a competing-scope guard. Registered via a strictcli check provider."
 generated: true
 nav_group: "API Reference"
 nav_order: 76

@@ -1,6 +1,6 @@
 ---
 title: rlsbl check-name
-description: "Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects"
+description: "Query npm, PyPI, crates.io, Go, or GitHub to check whether one or more package names are available. Supports repeatable --target (every named target is checked), a configurable --delay between queries, and --json for machine-readable single-object or array output."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 3
@@ -17,3 +17,4 @@ Query npm, PyPI, crates.io, or other registries to check whether one or more pac
 | --- | --- | --- | --- | --- | --- |
 | `--target` |  | str |  |  | Registry to query for name availability (npm, pypi, crates, go, or github); repeatable |
 | `--delay` |  | str | 200 |  | Milliseconds to wait between consecutive registry API queries (default: 200) |
+| `--json` |  | bool |  |  | Output results as machine-readable JSON: one object for a single name+target, a JSON array for multiple names and/or targets |
