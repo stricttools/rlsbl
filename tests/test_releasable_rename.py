@@ -217,6 +217,43 @@ class TestCrashHealing:
         assert rr._tag_exists_remote(str(root), "origin", "beta2@v0.1.0")
 
 
+class TestCrashBeforeCommitHealing:
+    def test_crash_before_commit_is_healed(self, tmp_path, monkeypatch, _gh_ok):
+        root = tmp_path / "repo"
+        root.mkdir()
+        monkeypatch.chdir(root)
+        _build_monorepo(root)
+
+        # Simulate a crash BEFORE the commit: apply the workspace.toml edit and
+        # the directory move (as _apply_local_rename would) but stop short of the
+        # sync + commit. The tree is now dirty and the gate prefix is stale.
+        rr._apply_workspace_rename(str(root), "beta", "beta2")
+        old_dir = get_releasable_dir(str(root), "beta")
+        new_dir = get_releasable_dir(str(root), "beta2")
+        os.rename(old_dir, new_dir)
+
+        assert not rr._is_clean_tree(str(root)), "precondition: uncommitted rename"
+        assert not rr._tag_exists_local(str(root), "beta2@v0.1.0")
+        assert "beta@v" in _publish_yml(root), "precondition: gate prefix still stale"
+
+        # Re-run the full command. A correct resume must HEAL completely:
+        # commit the pending rename, regenerate the gate prefix, THEN push the
+        # alias tag -- never push a tag over an uncommitted rename with a stale
+        # publish gate.
+        result = rr.rename_releasable(str(root), "beta", "beta2")
+
+        # The rename is now committed: clean tree.
+        assert rr._is_clean_tree(str(root)), \
+            "re-run must commit the pending rename, not leave a dirty tree"
+        # The gate prefix was regenerated and committed.
+        assert "beta2@v" in _publish_yml(root)
+        assert "'beta@v'" not in _publish_yml(root)
+        # The alias tag was created and pushed only after the commit.
+        assert rr._tag_exists_local(str(root), "beta2@v0.1.0")
+        assert rr._tag_exists_remote(str(root), "origin", "beta2@v0.1.0")
+        assert result["mode"] == "resume"
+
+
 class TestNoNameTagFormat:
     def test_name_only_rename_skips_alias_and_gate(self, tmp_path, monkeypatch, _gh_ok):
         root = tmp_path / "repo"

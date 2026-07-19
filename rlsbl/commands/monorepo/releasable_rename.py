@@ -33,7 +33,12 @@ from tomlkit.items import AoT
 
 from ...errors import WorkspaceError
 from ...release_file import get_batch_release_file_path
-from ...utils import check_gh_auth, check_gh_installed, commit_files, run
+from ...utils import (
+    check_gh_auth,
+    check_gh_installed,
+    commit_files_if_changed,
+    run,
+)
 from ...workspace import (
     WORKSPACE_DIR,
     WORKSPACE_FILE,
@@ -205,11 +210,13 @@ def _apply_local_rename(root, old, new):
 
     # Step 5: one commit of everything (workspace.toml, moved dir, workflows,
     # publish cache, .validated deletion). safegit stages the rename and the
-    # deletion under these paths.
-    commit_files(
+    # deletion under these paths. ``commit_files_if_changed`` makes this a no-op
+    # when the rename is already committed, so re-running the full tail on
+    # resume never produces a spurious/empty commit.
+    commit_files_if_changed(
         f"monorepo: rename releasable {old} -> {new}",
         [WORKSPACE_DIR, os.path.join(".github", "workflows")],
-        allow_failure=False,
+        skip_message="rename already committed; nothing to commit.",
         cwd=root,
     )
 
@@ -306,11 +313,20 @@ def rename_releasable(workspace_root, old_name, new_name, *, dry_run=False,
     new_present = new_name in names
     dir_moved = os.path.isdir(new_dir) and not os.path.isdir(old_dir)
 
-    # ---- resume path: local rename already committed; only the tag remains ----
+    # ---- resume path: the local rename was applied but may not have been fully
+    #      committed (a crash anywhere before the tag push). Run the FULL
+    #      idempotent tail -- ``_apply_local_rename`` (workspace rewrite no-ops
+    #      when done, dir move is guarded, saferm -f, sync is deterministic,
+    #      commit only when dirty) then ``_finish_alias_tag`` -- so any crash
+    #      window heals completely: the pending rename + regenerated gate get
+    #      committed BEFORE the alias tag is ever pushed. ----
     if new_present and not old_present and dir_moved:
         target_rel = next(r for r in releasables if r.name == new_name)
         tag_format = target_rel.tag_format
         version = read_releasable_version(root, new_name)
+        name_in_format = "{name}" in tag_format
+        old_tag = tag_format.format(name=old_name, version=version)
+        new_tag = tag_format.format(name=new_name, version=version)
         result = {
             "mode": "resume",
             "old": old_name,
@@ -319,24 +335,29 @@ def rename_releasable(workspace_root, old_name, new_name, *, dry_run=False,
             "version": version,
             "tag": None,
         }
-        if "{name}" in tag_format:
-            old_tag = tag_format.format(name=old_name, version=version)
-            new_tag = tag_format.format(name=new_name, version=version)
-            if not dry_run:
-                if not check_gh_installed() or not check_gh_auth():
-                    raise WorkspaceError(
-                        "gh CLI is not installed or not authenticated "
-                        "(run 'gh auth login')."
-                    )
-                tag_result = _finish_alias_tag(root, old_tag, new_tag, remote)
-                result["tag"] = tag_result
-            else:
-                result["planned_tag"] = new_tag
-                result["planned_push"] = f"git push {remote} {new_tag}"
+        if name_in_format:
             result["note"] = _unmanaged_history_note(
                 tag_format.format(name=old_name, version=""),
                 tag_format.format(name=new_name, version=""),
             )
+
+        if dry_run:
+            if name_in_format:
+                result["planned_tag"] = new_tag
+                result["planned_push"] = f"git push {remote} {new_tag}"
+            return result
+
+        if name_in_format and not (check_gh_installed() and check_gh_auth()):
+            raise WorkspaceError(
+                "gh CLI is not installed or not authenticated "
+                "(run 'gh auth login')."
+            )
+
+        _apply_local_rename(root, old_name, new_name)
+        if name_in_format:
+            result["tag"] = _finish_alias_tag(root, old_tag, new_tag, remote)
+        else:
+            result["name_only"] = True
         return result
 
     # ---- fresh-run preflight (all hard errors) ----
