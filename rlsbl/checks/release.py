@@ -42,7 +42,7 @@ def register_release_checks(app):
         reporter.warn(f"{tag} not found on origin")
         return reporter.found(f"{tag} not found on origin")
 
-    @app.warn_check("github-release")
+    @app.error_check("github-release")
     def check_github_release(ctx, reporter):
         """GitHub Release must exist for the current version tag."""
         from ..utils import check_gh_auth, check_gh_installed, run_gh, tag_exists_locally
@@ -55,9 +55,14 @@ def register_release_checks(app):
             return reporter.skipped(f"{tag} not created yet")
 
         if not check_gh_installed():
-            return reporter.skipped("gh CLI is not installed")
+            reporter.error(
+                "gh CLI is not installed -- install it from https://cli.github.com "
+                "so the GitHub Release can be verified"
+            )
+            return reporter.found("gh CLI is not installed")
         if not check_gh_auth():
-            return reporter.skipped("gh CLI is not authenticated")
+            reporter.error("gh CLI is not authenticated -- run `gh auth login`")
+            return reporter.found("gh CLI is not authenticated")
 
         try:
             run_gh(["release", "view", tag], config=ctx.config, cwd=str(ctx.project_root))

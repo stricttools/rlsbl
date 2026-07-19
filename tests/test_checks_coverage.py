@@ -227,10 +227,10 @@ class TestGithubReleaseCheck:
         ctx = make_ctx(repo)
         with patch("rlsbl.utils.check_gh_installed", return_value=False):
             result = app._check_defs["github-release"].impl(ctx)
-        assert result.status == "skip"
+        assert result.status == "fail"
         assert "not installed" in result.message
 
-    def test_gh_not_authenticated_skips(self, tmp_path, monkeypatch):
+    def test_gh_not_authenticated_fails(self, tmp_path, monkeypatch):
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
@@ -247,8 +247,10 @@ class TestGithubReleaseCheck:
             patch("rlsbl.utils.check_gh_auth", return_value=False),
         ):
             result = app._check_defs["github-release"].impl(ctx)
-        assert result.status == "skip"
+        assert result.status == "fail"
         assert "not authenticated" in result.message
+        # Actionable remediation names the exact command to run.
+        assert any("gh auth login" in p.text for p in result.problems)
 
     def test_release_exists_passes(self, tmp_path, monkeypatch):
         repo = tmp_path / "repo"

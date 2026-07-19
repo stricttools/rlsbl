@@ -89,7 +89,7 @@ depends_on = ["local-tag"]
 
 [checks.github-release]
 tags = ["release"]
-severity = "warn"
+severity = "error"
 fast = false
 pure = false
 needs_network = true
