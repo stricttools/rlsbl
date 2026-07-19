@@ -37,7 +37,8 @@ def load_dep_overrides(root: str) -> dict[tuple[str, str], str]:
     """Load dep-overrides.toml from the monorepo config directory.
 
     Returns a dict mapping (package, dep) to reason string.
-    Raises ValueError if an entry is missing a required 'reason' field.
+    Raises ConfigError if an entry is not a table or is missing a
+    required 'package', 'dep', or 'reason' field (or has an empty reason).
     Returns empty dict if the file does not exist.
     """
     path = os.path.join(root, WORKSPACE_DIR, "dep-overrides.toml")
@@ -67,6 +68,58 @@ def load_dep_overrides(root: str) -> dict[tuple[str, str], str]:
                 f"unused_allowed[{i}].reason must not be empty"
             )
         result[(entry["package"], entry["dep"])] = entry["reason"]
+
+    return result
+
+
+def load_dead_module_exclusions(config_dir: str) -> dict[str, str]:
+    """Load dead-modules.toml from a project's config directory.
+
+    Reads ``<config_dir>/dead-modules.toml`` and parses its
+    ``[[known_non_entry]]`` array of tables. Each entry declares a source
+    unit (``path``) that is legitimately unreachable by design (demo apps,
+    tool configs) together with a mandatory ``reason``. For standalone
+    projects ``config_dir`` is ``<project_root>/.rlsbl``; for releasable
+    members it is the releasable's state directory (resolved by the caller
+    via ``resolve_releasable_config_dir_for_ctx``).
+
+    Paths are relative to the project root and are interpreted per detector:
+    Python/npm/Dart/JVM paths name a source file; Go paths name a package
+    directory (Go's dead unit is a package directory, not a single file).
+
+    Returns a dict mapping each declared path to its reason string.
+    Returns an empty dict if the file does not exist.
+
+    Raises ConfigError if an entry is not a table, is missing 'path' or
+    'reason', has a non-string value, or has an empty 'path' or 'reason'.
+    """
+    path = os.path.join(config_dir, "dead-modules.toml")
+    if not os.path.isfile(path):
+        return {}
+
+    with open(path, "rb") as f:
+        data = tomllib.load(f)
+
+    result: dict[str, str] = {}
+    for i, entry in enumerate(data.get("known_non_entry", [])):
+        if not isinstance(entry, dict):
+            raise ConfigError(
+                f"known_non_entry[{i}] must be a table"
+            )
+        for key in ("path", "reason"):
+            if key not in entry:
+                raise ConfigError(
+                    f"known_non_entry[{i}] missing required key '{key}'"
+                )
+            if not isinstance(entry[key], str):
+                raise ConfigError(
+                    f"known_non_entry[{i}].{key} must be a string"
+                )
+            if not entry[key].strip():
+                raise ConfigError(
+                    f"known_non_entry[{i}].{key} must not be empty"
+                )
+        result[entry["path"]] = entry["reason"]
 
     return result
 
@@ -460,6 +513,7 @@ def _collect_init_exports(filepath: str) -> set[str]:
 def find_dead_modules(
     project_dir: str,
     exclude_dirs: list[str] | None = None,
+    suppress: set[str] | None = None,
 ) -> list[str]:
     """Find Python modules not referenced by any other module in the project.
 
@@ -475,10 +529,16 @@ def find_dead_modules(
         project_dir: absolute path to the project root.
         exclude_dirs: directory paths to skip during the walk
             (relative to project_dir or absolute).
+        suppress: set of relative file paths declared as legitimate
+            non-entry points. A suppressed file is removed from the
+            candidate set (never reported dead) AND from the import-union
+            reference set, so its own imports cannot keep any other module
+            alive (no entry-point laundering).
 
     Returns:
         list of relative paths of dead modules (e.g. ["mylib/unused.py"]).
     """
+    suppress = suppress or set()
     project_dir = os.path.realpath(project_dir)
 
     # Check this is a Python project
@@ -505,6 +565,10 @@ def find_dead_modules(
         first_component = rel.split(os.sep)[0]
         if first_component in _ROOT_NON_MODULE_DIRS:
             continue
+        if rel in suppress:
+            # Declared non-entry: not a candidate, and (below) its imports
+            # and __init__ exports are excluded from the reference union.
+            continue
         if os.path.basename(filepath) == "__init__.py":
             init_files.append(filepath)
             continue
@@ -522,6 +586,9 @@ def find_dead_modules(
     for filepath in production_files:
         rel = os.path.relpath(filepath, project_dir)
         if rel.split(os.sep)[0] in _ROOT_NON_MODULE_DIRS:
+            continue
+        if rel in suppress:
+            # Suppressed file's imports must not keep other modules alive.
             continue
         all_imports.update(_collect_python_imports(filepath, project_dir))
 
@@ -567,6 +634,7 @@ def _go_package_dir(filepath: str) -> str:
 def find_dead_go_packages(
     project_dir: str,
     exclude_dirs: list[str] | None = None,
+    suppress: set[str] | None = None,
 ) -> list[str]:
     """Find Go internal packages not referenced by any non-test code.
 
@@ -579,11 +647,19 @@ def find_dead_go_packages(
         project_dir: absolute path to the Go project root (where go.mod lives).
         exclude_dirs: directory paths to skip during the walk
             (relative to project_dir or absolute).
+        suppress: set of relative package-directory paths declared as
+            legitimate non-entry points (Go's dead unit is a package
+            DIRECTORY, so each path names a directory, e.g. "internal/demo").
+            A suppressed package is removed from the candidate set (never
+            reported dead) AND its files' imports are removed from the
+            reference union, so it cannot keep any other package alive
+            (no entry-point laundering).
 
     Returns:
         list of relative paths of dead internal packages
         (e.g. ["internal/unused"]).
     """
+    suppress = suppress or set()
     project_dir = os.path.realpath(project_dir)
 
     module_path = read_go_module_path(project_dir)
@@ -602,6 +678,9 @@ def find_dead_go_packages(
         if pkg_dir in internal_pkg_dirs:
             continue
         rel_dir = os.path.relpath(pkg_dir, project_dir)
+        if rel_dir in suppress:
+            # Declared non-entry package: not a candidate.
+            continue
         parts = rel_dir.split(os.sep)
         if "internal" in parts:
             import_path = module_path + "/" + rel_dir.replace(os.sep, "/")
@@ -617,6 +696,10 @@ def find_dead_go_packages(
         if os.path.basename(filepath).endswith("_test.go"):
             continue
         pkg_dir_of_file = _go_package_dir(filepath)
+        rel_pkg_dir = os.path.relpath(pkg_dir_of_file, project_dir)
+        if rel_pkg_dir in suppress:
+            # Suppressed package's imports must not keep other packages alive.
+            continue
         imports = {ip for ip, _fp, _ln in _go_scan_imports(filepath)}
         file_imports.append((pkg_dir_of_file, imports))
 
