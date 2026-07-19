@@ -54,7 +54,7 @@
     "schema_hash": "e94a74f595e95db44dea31614d5117ba1e387be38cba93c026ce73ae90a796d9"
   },
   "en/cli-index.md": {
-    "content": "ac0a445911dfa28a7ac5ed8f10c7e19a7b0c1073be9400fe54311fd2b5aeeb9c",
+    "content": "e700399dbf8e8ae4f3e9f26620f6fa2cccd3a5d928bfe3c46d3f203fb5a6d7b5",
     "description": "3e97def3f73b8e72ae1147e1ad3b8c31a9459f8426045a2079b68028733fccd2",
     "seed_hash": "3e97def3f73b8e72ae1147e1ad3b8c31a9459f8426045a2079b68028733fccd2"
   },
@@ -64,9 +64,9 @@
     "schema_hash": "6bf61b345615538d2a83180e7b498ab5eea7397122e629c8925c2d84f3d867ce"
   },
   "en/cli-monorepo.md": {
-    "content": "1f382701429edf07b28b453dfca5ef7e276c920c17101f1fa21b11b3c4a8a14d",
+    "content": "fc4ab86d0707d13be674ebde10e6daf9c11158089f4cbc5468701dde87bd2988",
     "description": "6c995e7599a23e1a592541f673adb27062e6a87c22717bb562385d20428091c7",
-    "schema_hash": "889cf29efea4323f7df411e182b344d1d00e022fa798e08352883360ff43fefd"
+    "schema_hash": "7a978cc2fb780b9a9edc07f17d94c20e396eb91d93421983f0f93bd30e9eb0d9"
   },
   "en/cli-pre-push-check.md": {
     "content": "8660161d226f3d579c70f2c99d5391bd177e57b1de28cc52c14f45668e1b94d5",
