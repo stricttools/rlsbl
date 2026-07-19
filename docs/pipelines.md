@@ -331,14 +331,27 @@ All three keys are mandatory when `artifact` is `"launcher"`. Missing or invalid
 
 ### Per-ecosystem binary_source semantics
 
-- **npm (`github-release`):** The wrapper package uses a `postinstall` script that downloads the binary from the GitHub Release at `npm install` time. The binary is cached locally after the first download. This is the standard npm binary distribution pattern.
-- **PyPI (`github-release`):** pip has no `postinstall` hook, so the wrapper package downloads the binary on first invocation to a platform-specific cache directory (`~/.cache/<tool>/` on Linux, `~/Library/Caches/<tool>/` on macOS). Subsequent invocations use the cached binary.
+- **npm (`github-release`):** The wrapper package ships a `postinstall` script (`scripts/postinstall.cjs`) that runs at `npm install` time. It maps `process.platform`/`process.arch` to goreleaser's OS/arch naming, downloads the matching release asset **and** the release's `checksums.txt`, SHA-256-verifies the asset against the matching `checksums.txt` line **before** installing it into the package's `vendor/` directory, and hard-fails on a checksum mismatch or a 404. A `bin/launcher.cjs` stub then execs the vendored binary, passing argv through. Node stdlib only -- zero runtime dependencies.
+- **PyPI (`github-release`):** pip has no `postinstall` hook, so the wrapper ships a console-script launcher module that downloads the binary on first invocation to a platform-specific cache directory (`~/.cache/<tool>/` on Linux, `~/Library/Caches/<tool>/` on macOS, `%LOCALAPPDATA%\<tool>\` on Windows), SHA-256-verifies it against the release's `checksums.txt`, then `os.exec`s it -- passing argv through. Subsequent invocations reuse the cached binary. Python stdlib only -- zero runtime dependencies.
 
 Embedded platform wheels (building the binary into the wheel for each platform) are a different distribution model -- that is the per-platform binary-wrapper family, not the launcher. Launchers are download-at-install/run shims.
 
 ### Manifest is the name authority
 
-Scaffold never invents or writes the package name field in the launcher target's manifest (`package.json` for npm, `pyproject.toml` for PyPI). The manifest at the launcher target's declared path is the name authority. If the manifest is absent, scaffold hard-errors and directs the user to create it with a `rlsbl check-name`'d name. Scaffold generates the shim code and fills non-name manifest fields around the pre-existing manifest.
+Scaffold never invents or writes the package name field in the launcher target's manifest (`package.json` for npm, `pyproject.toml` for PyPI). The manifest at the launcher target's declared path is the name authority. If the manifest is absent, scaffold hard-errors and directs the user to create it with a `rlsbl check-name`'d name.
+
+Around that pre-existing manifest, scaffold generates the shim code and fills **only the missing non-name fields, exactly once** -- never touching the name or any value the user already set, so a second scaffold is a byte-level no-op:
+
+- **npm:** `bin` (maps the command name to `bin/launcher.cjs`), `scripts.postinstall` (`node scripts/postinstall.cjs`), and `files` (so the shims ship in the tarball).
+- **PyPI:** the `[project.scripts]` console-script entry (mapping the command name to the launcher module's `main`).
+
+The `wrapper-producer` check additionally hard-errors if one of these required fields is later deleted from the manifest, naming the field -- a deletion would silently break the published wrapper.
+
+### Hard constraint: goreleaser default asset naming
+
+Launchers depend on goreleaser's **default** asset naming and the literal `checksums.txt` filename. The producer's `.goreleaser.yml` must emit assets named `<ProjectName>_<Version>_<Os>_<Arch>.<ext>` (tar.gz, or zip on Windows) and a checksum file named exactly `checksums.txt`. The scaffolded config does this out of the box.
+
+Both the CI verify step (which probes a representative asset URL and the `checksums.txt` URL for HTTP 404) and the install/first-run shims (which reconstruct these names to download and SHA-256-verify) are built on this contract. A custom `name_template` in `.goreleaser.yml` breaks it and is unsupported: the verify step turns the drift into a red publish job at the release that introduced it, rather than letting silent 404s reach every future install.
 
 ### Verification closures
 
