@@ -144,8 +144,8 @@ Extract a package from the monorepo into a new standalone repository. Clones the
 
 | Name | Required | Description |
 | --- | --- | --- |
-| `target_path` | yes | Filesystem path where the new standalone repository will be created |
 | `package_name` | yes | Name of the package as defined in workspace.toml to extract into a standalone repo |
+| `target_path` | yes | Filesystem path where the new standalone repository will be created |
 
 ## monorepo absorb
 
@@ -161,8 +161,8 @@ Absorb an external repository as a package in the monorepo. Runs git subtree add
 
 | Name | Required | Description |
 | --- | --- | --- |
-| `package_name` | yes | Name to assign to the absorbed package in the monorepo workspace.toml |
 | `source_path` | yes | Filesystem path to the external git repository to absorb |
+| `package_name` | yes | Name to assign to the absorbed package in the monorepo workspace.toml |
 
 ## monorepo extract-releasable
 
@@ -172,8 +172,8 @@ Extract all member packages of a releasable into a new repository. If the releas
 
 | Name | Required | Description |
 | --- | --- | --- |
-| `target_path` | yes | Filesystem path where the new repository will be created |
 | `releasable_name` | yes | Name of the releasable group in workspace.toml to extract |
+| `target_path` | yes | Filesystem path where the new repository will be created |
 
 ## monorepo cleanup
 
