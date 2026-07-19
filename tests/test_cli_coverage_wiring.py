@@ -472,13 +472,11 @@ class TestMonorepoDirectWiring:
 # the target. Each target's return_value is a realistic dict because the
 # handler formats it into a status line after the (patched) call returns.
 #
-# NOTE (reported anomaly): extract / absorb / extract-releasable declare their
-# two positional args in INVERTED order versus their documented usage. strictcli
-# binds positionals in @arg-decorator registration order (bottom decorator =
-# first positional), so e.g. `monorepo extract <A> <B>` binds A -> target_path
-# and B -> package_name, opposite of the help's `<package_name> <target_path>`.
-# The assertions below lock the CURRENT (inverted) wiring. rename-releasable
-# stacks its decorators in reverse and is therefore correct.
+# strictcli binds positionals in @arg-decorator registration order (bottom
+# decorator = first positional). extract / absorb / extract-releasable /
+# rename-releasable all stack their two @arg decorators bottom-first so the
+# binding matches the documented `<first> <second>` usage in each command's
+# help text. The assertions below lock that correct wiring.
 
 _FAKE_WS = "/fake/workspace"
 
@@ -494,10 +492,10 @@ class TestMonorepoWorkspaceGatedWiring:
         )
         assert result.exit_code == 0, result.stderr
         # cmd_extract(ws_root, package_name, target_path, dry_run=...)
-        # Inverted binding: first token -> target_path, second -> package_name.
+        # Documented order: `extract <package_name> <target_path>`.
         assert m.call_args[0][0] == _FAKE_WS
-        assert m.call_args[0][1] == "posB"  # package_name (second token)
-        assert m.call_args[0][2] == "posA"  # target_path (first token)
+        assert m.call_args[0][1] == "posA"  # package_name (first token)
+        assert m.call_args[0][2] == "posB"  # target_path (second token)
         assert m.call_args.kwargs["dry_run"] is True
 
     def test_absorb(self):
@@ -509,9 +507,10 @@ class TestMonorepoWorkspaceGatedWiring:
         )
         assert result.exit_code == 0, result.stderr
         # cmd_absorb(ws_root, source_path, package_name, releasable_name=..., dry_run=...)
+        # Documented order: `absorb <source_path> <package_name>`.
         assert m.call_args[0][0] == _FAKE_WS
-        assert m.call_args[0][1] == "posB"  # source_path (second token)
-        assert m.call_args[0][2] == "posA"  # package_name (first token)
+        assert m.call_args[0][1] == "posA"  # source_path (first token)
+        assert m.call_args[0][2] == "posB"  # package_name (second token)
         assert m.call_args.kwargs["dry_run"] is True
 
     def test_extract_releasable(self):
@@ -524,9 +523,10 @@ class TestMonorepoWorkspaceGatedWiring:
         )
         assert result.exit_code == 0, result.stderr
         # cmd_extract_releasable(ws_root, releasable_name, target_path, dry_run=...)
+        # Documented order: `extract-releasable <releasable_name> <target_path>`.
         assert m.call_args[0][0] == _FAKE_WS
-        assert m.call_args[0][1] == "posB"  # releasable_name (second token)
-        assert m.call_args[0][2] == "posA"  # target_path (first token)
+        assert m.call_args[0][1] == "posA"  # releasable_name (first token)
+        assert m.call_args[0][2] == "posB"  # target_path (second token)
         assert m.call_args.kwargs["dry_run"] is True
 
     def test_cleanup(self):

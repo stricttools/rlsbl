@@ -1407,8 +1407,8 @@ def cmd_mono_release_order(ctx, **_kwargs):
 
 
 @mono.command(name="extract", help="Extract a package from the monorepo into a new standalone repository. Clones the monorepo, runs git filter-repo to keep only the package's history, migrates changelog entries, creates .rlsbl/ config in the new repo, and removes the project from workspace.toml.")
-@strictcli.arg(name="package_name", help="Name of the package as defined in workspace.toml to extract into a standalone repo")
 @strictcli.arg(name="target_path", help="Filesystem path where the new standalone repository will be created")
+@strictcli.arg(name="package_name", help="Name of the package as defined in workspace.toml to extract into a standalone repo")
 def cmd_mono_extract(ctx, dry_run, package_name, target_path, **_kwargs):
     root = _require_project_root()
     from .workspace import find_workspace_root
@@ -1431,8 +1431,8 @@ def cmd_mono_extract(ctx, dry_run, package_name, target_path, **_kwargs):
 
 @mono.command(name="absorb", help="Absorb an external repository as a package in the monorepo. Runs git subtree add to import the source repo's history under the package name, adds the project to workspace.toml, and migrates changelog entries from the source repo's .rlsbl/changes/ directory.")
 @strictcli.flag(name="releasable", type=str, help="Releasable group to assign the absorbed package to", default="")
-@strictcli.arg(name="source_path", help="Filesystem path to the external git repository to absorb")
 @strictcli.arg(name="package_name", help="Name to assign to the absorbed package in the monorepo workspace.toml")
+@strictcli.arg(name="source_path", help="Filesystem path to the external git repository to absorb")
 def cmd_mono_absorb(ctx, dry_run, releasable, source_path, package_name, **_kwargs):
     root = _require_project_root()
     from .workspace import find_workspace_root
@@ -1458,8 +1458,8 @@ def cmd_mono_absorb(ctx, dry_run, releasable, source_path, package_name, **_kwar
 
 
 @mono.command(name="extract-releasable", help="Extract all member packages of a releasable into a new repository. If the releasable has one member, creates a single-project repo. If it has multiple members, creates a new monorepo with workspace.toml. Migrates changelog entries for each member and removes all extracted projects from the source workspace.")
-@strictcli.arg(name="releasable_name", help="Name of the releasable group in workspace.toml to extract")
 @strictcli.arg(name="target_path", help="Filesystem path where the new repository will be created")
+@strictcli.arg(name="releasable_name", help="Name of the releasable group in workspace.toml to extract")
 def cmd_mono_extract_releasable(ctx, dry_run, releasable_name, target_path, **_kwargs):
     root = _require_project_root()
     from .workspace import find_workspace_root
