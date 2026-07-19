@@ -59,6 +59,7 @@ EXPECTED_CHECKS = [
     "deps-runtime-test-only",
     "deps-dev-in-lib",
     "dead-modules",
+    "dead-modules-stale",
     "scaffold-unreplaced-vars",
     "ruff-lint",
     "dead-workspace-packages",
@@ -153,7 +154,8 @@ class TestCheckTags:
 
     @pytest.mark.parametrize("name", [
         "library-lint", "deps-runtime-test-only", "deps-dev-in-lib",
-        "dead-modules", "scaffold-unreplaced-vars", "ruff-lint",
+        "dead-modules", "dead-modules-stale", "scaffold-unreplaced-vars",
+        "ruff-lint",
     ])
     def test_quality_tag(self, name):
         assert "quality" in app._check_defs[name].tags

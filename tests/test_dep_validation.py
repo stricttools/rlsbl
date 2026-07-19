@@ -18,6 +18,7 @@ from rlsbl.dep_validation import (
     find_dead_modules,
     find_dead_npm_modules,
     find_dead_workspace_packages,
+    load_dead_module_exclusions,
     load_dep_overrides,
 )
 from rlsbl.lint.utils import walk_source_files
@@ -755,6 +756,82 @@ class TestLoadDepOverrides:
         assert result == {}
 
 
+class TestLoadDeadModuleExclusions:
+    """load_dead_module_exclusions reads the dead-modules.toml config file."""
+
+    def _write(self, config_dir, body):
+        config_dir.mkdir(parents=True, exist_ok=True)
+        (config_dir / "dead-modules.toml").write_text(body)
+
+    def test_valid_file(self, tmp_path):
+        """A well-formed exclusions file loads correctly."""
+        cfg = tmp_path / ".rlsbl"
+        self._write(
+            cfg,
+            '[[known_non_entry]]\n'
+            'path = "mylib/demo.py"\n'
+            'reason = "Demo app, unreachable by design"\n'
+        )
+        result = load_dead_module_exclusions(str(cfg))
+        assert result == {"mylib/demo.py": "Demo app, unreachable by design"}
+
+    def test_missing_file_returns_empty(self, tmp_path):
+        """Missing exclusions file returns an empty dict."""
+        result = load_dead_module_exclusions(str(tmp_path / ".rlsbl"))
+        assert result == {}
+
+    def test_missing_reason_raises(self, tmp_path):
+        """An entry without 'reason' raises ConfigError."""
+        cfg = tmp_path / ".rlsbl"
+        self._write(
+            cfg,
+            '[[known_non_entry]]\n'
+            'path = "mylib/demo.py"\n'
+        )
+        with pytest.raises(ConfigError, match="missing required key 'reason'"):
+            load_dead_module_exclusions(str(cfg))
+
+    def test_missing_path_raises(self, tmp_path):
+        """An entry without 'path' raises ConfigError."""
+        cfg = tmp_path / ".rlsbl"
+        self._write(
+            cfg,
+            '[[known_non_entry]]\n'
+            'reason = "some reason"\n'
+        )
+        with pytest.raises(ConfigError, match="missing required key 'path'"):
+            load_dead_module_exclusions(str(cfg))
+
+    def test_empty_reason_raises(self, tmp_path):
+        """An entry with empty 'reason' raises ConfigError."""
+        cfg = tmp_path / ".rlsbl"
+        self._write(
+            cfg,
+            '[[known_non_entry]]\n'
+            'path = "mylib/demo.py"\n'
+            'reason = "  "\n'
+        )
+        with pytest.raises(ConfigError, match="must not be empty"):
+            load_dead_module_exclusions(str(cfg))
+
+    def test_non_table_raises(self, tmp_path):
+        """A non-table entry raises ConfigError."""
+        cfg = tmp_path / ".rlsbl"
+        self._write(
+            cfg,
+            'known_non_entry = ["not-a-table"]\n'
+        )
+        with pytest.raises(ConfigError, match="must be a table"):
+            load_dead_module_exclusions(str(cfg))
+
+    def test_no_known_non_entry_section(self, tmp_path):
+        """File exists but has no known_non_entry key returns empty."""
+        cfg = tmp_path / ".rlsbl"
+        self._write(cfg, '# empty exclusions file\n')
+        result = load_dead_module_exclusions(str(cfg))
+        assert result == {}
+
+
 class TestNpmWorkspaceDep:
     """npm-specific dependency validation tests."""
 
@@ -1070,6 +1147,41 @@ class TestFindDeadModules:
         dead_link = find_dead_modules(str(link_dir))
         assert dead_link == dead_real
 
+    def test_suppressed_unit_never_dead(self, tmp_path):
+        """A suppressed module is never reported as dead."""
+        (tmp_path / "pyproject.toml").write_text('[project]\nname = "mylib"\n')
+        pkg = tmp_path / "mylib"
+        pkg.mkdir()
+        (pkg / "__init__.py").write_text("from .core import x\n")
+        (pkg / "core.py").write_text("x = 1\n")
+        (pkg / "demo.py").write_text("y = 2\n")
+
+        # Without suppression, demo.py is dead.
+        assert "mylib/demo.py" in find_dead_modules(str(tmp_path))
+        # Suppressed, it is not reported.
+        dead = find_dead_modules(str(tmp_path), suppress={"mylib/demo.py"})
+        assert "mylib/demo.py" not in dead
+
+    def test_suppressed_unit_does_not_launder(self, tmp_path):
+        """A suppressed file's imports must not keep an otherwise-dead module alive."""
+        (tmp_path / "pyproject.toml").write_text('[project]\nname = "mylib"\n')
+        pkg = tmp_path / "mylib"
+        pkg.mkdir()
+        (pkg / "__init__.py").write_text("")
+        # demo imports secret; secret is imported by nothing else.
+        (pkg / "demo.py").write_text("from mylib.secret import s\n")
+        (pkg / "secret.py").write_text("s = 1\n")
+
+        # Without suppression, demo keeps secret alive -> only demo is dead.
+        dead_no_suppress = find_dead_modules(str(tmp_path))
+        assert "mylib/secret.py" not in dead_no_suppress
+
+        # Suppressing demo removes its imports from the union: secret is dead,
+        # demo itself is not reported.
+        dead = find_dead_modules(str(tmp_path), suppress={"mylib/demo.py"})
+        assert "mylib/demo.py" not in dead
+        assert "mylib/secret.py" in dead
+
 
 class TestFindDeadGoPackages:
     """find_dead_go_packages detects unreferenced Go internal packages."""
@@ -1198,6 +1310,46 @@ class TestFindDeadGoPackages:
 
         dead = find_dead_go_packages(str(tmp_path))
         assert "internal/lonely" in dead
+
+    def test_suppressed_package_never_dead(self, tmp_path):
+        """A suppressed internal package (directory) is never reported as dead."""
+        (tmp_path / "go.mod").write_text(self._GO_MOD)
+        (tmp_path / "main.go").write_text('package main\n\nfunc main() {}\n')
+        demo = tmp_path / "internal" / "demo"
+        demo.mkdir(parents=True)
+        (demo / "demo.go").write_text('package demo\n\nfunc D() {}\n')
+
+        # Without suppression, internal/demo is dead.
+        assert "internal/demo" in find_dead_go_packages(str(tmp_path))
+        # Suppressed, it is not reported.
+        dead = find_dead_go_packages(str(tmp_path), suppress={"internal/demo"})
+        assert "internal/demo" not in dead
+
+    def test_suppressed_package_does_not_launder(self, tmp_path):
+        """A suppressed package's imports must not keep an otherwise-dead package alive."""
+        (tmp_path / "go.mod").write_text(self._GO_MOD)
+        (tmp_path / "main.go").write_text('package main\n\nfunc main() {}\n')
+        # demo imports secret; nothing else imports secret.
+        demo = tmp_path / "internal" / "demo"
+        demo.mkdir(parents=True)
+        (demo / "demo.go").write_text(
+            'package demo\n\n'
+            'import "github.com/user/myapp/internal/secret"\n\n'
+            'func D() { secret.S() }\n'
+        )
+        secret = tmp_path / "internal" / "secret"
+        secret.mkdir(parents=True)
+        (secret / "secret.go").write_text('package secret\n\nfunc S() {}\n')
+
+        # Without suppression, demo keeps secret alive -> only demo is dead.
+        dead_no_suppress = find_dead_go_packages(str(tmp_path))
+        assert "internal/secret" not in dead_no_suppress
+
+        # Suppressing demo removes its imports from the union: secret is dead,
+        # demo itself is not reported.
+        dead = find_dead_go_packages(str(tmp_path), suppress={"internal/demo"})
+        assert "internal/demo" not in dead
+        assert "internal/secret" in dead
 
 
 class TestFindDeadNpmModules:
@@ -2112,6 +2264,135 @@ class TestDepsChecksIntegration:
         assert result.status == "warn"
         assert "1 dead module" in result.message
 
+    def _write_exclusions(self, tmp_path, *paths):
+        cfg = tmp_path / ".rlsbl"
+        cfg.mkdir(parents=True, exist_ok=True)
+        body = "".join(
+            f'[[known_non_entry]]\npath = "{p}"\nreason = "by design"\n\n'
+            for p in paths
+        )
+        (cfg / "dead-modules.toml").write_text(body)
+
+    def test_dead_modules_python_suppressed(self, tmp_path):
+        """A Python module listed in dead-modules.toml is not reported by the check."""
+        from rlsbl.context import ProjectContext
+
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "mylib"\nversion = "0.1.0"\n'
+        )
+        pkg = tmp_path / "mylib"
+        pkg.mkdir()
+        (pkg / "__init__.py").write_text("from .core import run\n")
+        (pkg / "core.py").write_text("def run(): pass\n")
+        (pkg / "demo.py").write_text("def unused(): pass\n")
+        self._write_exclusions(tmp_path, "mylib/demo.py")
+
+        captured = self._capture_checks()
+        ctx = ProjectContext(project_root=Path(tmp_path), workspace_root=None, config={})
+        result = captured["dead-modules"](ctx)
+        assert result.status == "pass"
+
+    def test_dead_modules_npm_suppressed(self, tmp_path):
+        """An npm file listed in dead-modules.toml is not reported (post-hoc subtraction)."""
+        import json as _json
+        from rlsbl.context import ProjectContext
+
+        (tmp_path / "package.json").write_text(_json.dumps({
+            "name": "test",
+            "version": "1.0.0",
+            "main": "./src/index.js",
+        }))
+        src = tmp_path / "src"
+        src.mkdir()
+        (src / "index.js").write_text("module.exports = {};\n")
+        (src / "orphan.js").write_text("module.exports = {};\n")
+        self._write_exclusions(tmp_path, "src/orphan.js")
+
+        captured = self._capture_checks()
+        ctx = ProjectContext(project_root=Path(tmp_path), workspace_root=None, config={})
+        result = captured["dead-modules"](ctx)
+        assert result.status == "pass"
+
+    def test_dead_modules_maven_suppressed(self, tmp_path):
+        """A JVM file listed in dead-modules.toml is not reported (post-hoc subtraction)."""
+        from rlsbl.context import ProjectContext
+
+        (tmp_path / "pom.xml").write_text(
+            "<project>\n  <groupId>com.example</groupId>\n"
+            "  <artifactId>app</artifactId>\n  <version>1.0.0</version>\n</project>\n"
+        )
+        pkg = tmp_path / "src" / "main" / "java" / "com" / "example"
+        pkg.mkdir(parents=True)
+        (pkg / "Main.java").write_text(
+            "package com.example;\n\n"
+            "public class Main {\n"
+            "  public static void main(String[] args) {}\n"
+            "}\n"
+        )
+        (pkg / "Orphan.java").write_text(
+            "package com.example;\n\npublic class Orphan {}\n"
+        )
+        orphan_rel = os.path.join(
+            "src", "main", "java", "com", "example", "Orphan.java"
+        )
+        # Without suppression, Orphan.java is dead.
+        captured = self._capture_checks()
+        ctx = ProjectContext(project_root=Path(tmp_path), workspace_root=None, config={})
+        assert captured["dead-modules"](ctx).status == "warn"
+
+        self._write_exclusions(tmp_path, orphan_rel)
+        result = captured["dead-modules"](ctx)
+        assert result.status == "pass"
+
+    def test_dead_modules_stale_registered(self):
+        """dead-modules-stale check is registered."""
+        captured = self._capture_checks()
+        assert "dead-modules-stale" in captured
+
+    def test_dead_modules_stale_no_list_passes(self, tmp_path):
+        """No dead-modules.toml means nothing is stale."""
+        from rlsbl.context import ProjectContext
+
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "mylib"\nversion = "0.1.0"\n'
+        )
+        captured = self._capture_checks()
+        ctx = ProjectContext(project_root=Path(tmp_path), workspace_root=None, config={})
+        result = captured["dead-modules-stale"](ctx)
+        assert result.status == "pass"
+
+    def test_dead_modules_stale_valid_list_passes(self, tmp_path):
+        """A dead-modules.toml whose paths all exist passes."""
+        from rlsbl.context import ProjectContext
+
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "mylib"\nversion = "0.1.0"\n'
+        )
+        pkg = tmp_path / "mylib"
+        pkg.mkdir()
+        (pkg / "demo.py").write_text("x = 1\n")
+        self._write_exclusions(tmp_path, "mylib/demo.py")
+
+        captured = self._capture_checks()
+        ctx = ProjectContext(project_root=Path(tmp_path), workspace_root=None, config={})
+        result = captured["dead-modules-stale"](ctx)
+        assert result.status == "pass"
+
+    def test_dead_modules_stale_missing_path_fails(self, tmp_path):
+        """A dead-modules.toml path that does not exist on disk hard-fails."""
+        from rlsbl.context import ProjectContext
+
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "mylib"\nversion = "0.1.0"\n'
+        )
+        self._write_exclusions(tmp_path, "mylib/gone.py")
+
+        captured = self._capture_checks()
+        ctx = ProjectContext(project_root=Path(tmp_path), workspace_root=None, config={})
+        result = captured["dead-modules-stale"](ctx)
+        assert result.status == "fail"
+        assert "1 stale" in result.message
+
 
 class TestFindDeadWorkspacePackages:
     """find_dead_workspace_packages detects library packages with no workspace importers."""
@@ -2593,3 +2874,27 @@ class TestDeadDartModulesCheck:
         result = captured["dead-modules"](ctx)
         assert result.status == "warn"
         assert "1 dead module" in result.message
+
+    def test_dead_modules_dart_suppressed(self, tmp_path):
+        """A Dart file listed in dead-modules.toml is not reported (post-hoc subtraction)."""
+        from rlsbl.context import ProjectContext
+
+        (tmp_path / "pubspec.yaml").write_text(_PUBSPEC.format(name="mylib"))
+        lib = tmp_path / "lib"
+        lib.mkdir()
+        (lib / "mylib.dart").write_text("export 'src/core.dart';\n")
+        src = lib / "src"
+        src.mkdir()
+        (src / "core.dart").write_text("void core() {}\n")
+        (src / "orphan.dart").write_text("void orphan() {}\n")
+
+        cfg = tmp_path / ".rlsbl"
+        cfg.mkdir()
+        (cfg / "dead-modules.toml").write_text(
+            '[[known_non_entry]]\npath = "lib/src/orphan.dart"\nreason = "by design"\n'
+        )
+
+        captured = self._capture_checks()
+        ctx = ProjectContext(project_root=Path(tmp_path), workspace_root=None, config={})
+        result = captured["dead-modules"](ctx)
+        assert result.status == "pass"
