@@ -77,6 +77,31 @@ Detects source files that are unreachable from any entry point via BFS on the fi
 | npm | `find_dead_npm_modules()` | `package.json` exports/main/bin fields, resolved to source | All production `.js`/`.ts`/`.mjs`/`.cjs`/`.tsx` files |
 | Dart | `find_dead_dart_modules()` | `lib/<name>.dart` barrel file + `bin/*.dart` scripts | All production `.dart` files |
 
+#### Declarative dead-module exclusions
+
+Some source is legitimately unreachable by design -- demo applications, tool configuration modules, plugin shims loaded dynamically. To stop these from being reported as dead, list them in `dead-modules.toml`. For standalone projects the file lives at `.rlsbl/dead-modules.toml`; for releasable members it lives in the releasable's state directory (resolved the same way the check resolves its config).
+
+```toml
+[[known_non_entry]]
+path = "mylib/demo.py"
+reason = "Standalone demo app, intentionally not imported by the library"
+
+[[known_non_entry]]
+path = "internal/toolconfig"
+reason = "Config-only package consumed by an external tool"
+```
+
+Each entry requires a non-empty string `path` and a non-empty string `reason`. A missing key, a non-string value, an empty value, or a non-table entry is a hard `ConfigError`. The mandatory `reason` forces every exclusion to carry a documented justification.
+
+**Path semantics are per-language.** For Python, npm, Dart, and JVM (Maven) the `path` names a single source file. For **Go the `path` names a package directory** (Go's dead unit is a package directory, not an individual file), e.g. `internal/toolconfig`.
+
+**Listed units never become entry points (no laundering).** A suppressed unit is removed from the dead-candidate set so it is never reported, but it can never keep another module alive:
+
+- npm, Dart, and JVM use BFS from declared entry points. A suppressed non-entry file's outgoing edges are never traversed anyway, so the listed paths are simply subtracted from the reported dead set.
+- Python and Go use union-of-imports detection. Here the suppressed unit is removed from *both* the candidate set *and* the import-reference union, so its own imports cannot rescue an otherwise-dead module.
+
+**Stale entries hard-fail.** The `dead-modules-stale` check (severity: error) verifies that every `path` in `dead-modules.toml` still exists on disk. If a listed file or package directory has been moved or deleted, the check fails and names both the stale path and the file it was declared in, so exclusions cannot silently rot.
+
 ### circular-deps
 
 Detects circular dependencies by computing strongly connected components using Tarjan's algorithm on the file-level import graph. Only cycles involving 2 or more distinct nodes are reported as violations; self-loops (a file importing itself) are not flagged since they are harmless in all supported languages.
