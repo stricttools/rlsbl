@@ -1,5 +1,5 @@
 ---
-description: "Configuration reference for rlsbl: config.json settings (pipelines, launcher keys, batch limits, check_timeout, test block), and workspace.toml."
+description: "Configuration reference for rlsbl: config.json settings (pipelines, launcher keys, batch limits, check_timeout, test block, and structured/freeform external_checks) and workspace.toml."
 ---
 
 # Configuration reference
