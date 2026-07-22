@@ -967,7 +967,7 @@ def cmd_push(ctx, yes, quiet, dry_run, **_kwargs):
     ws_root = find_workspace_root(str(root))
     ctx = create_context(root, workspace_root=Path(ws_root) if ws_root else None)
     from .commands.push_cmd import run_push
-    run_push(ctx, yes=yes, quiet=quiet)
+    run_push(ctx, yes=yes, quiet=quiet, dry_run=dry_run)
 
 
 # ---------------------------------------------------------------------------

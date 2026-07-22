@@ -142,7 +142,7 @@ def _format_uncovered_hint(error_msg):
     return error_msg
 
 
-def run_push(ctx, *, yes, quiet):
+def run_push(ctx, *, yes, quiet, dry_run=False):
     """Execute the push command.
 
     Steps:
@@ -150,6 +150,10 @@ def run_push(ctx, *, yes, quiet):
     2. Preflight coverage check with remediation hints.
     3. Behind-remote refusal.
     4. Execute ``git push`` (without RLSBL_RELEASE_PUSH).
+
+    Under ``dry_run`` every preflight check (1-3) still runs, but the push
+    subprocess is not invoked: the command reports what it would push and
+    returns successfully.
     """
     branch = get_current_branch()
 
@@ -190,6 +194,12 @@ def run_push(ctx, *, yes, quiet):
     if behind_error:
         print(f"Error: {behind_error}", file=sys.stderr)
         sys.exit(1)
+
+    # Dry run: all preflight checks have passed; report and stop before any
+    # prompt or push.
+    if dry_run:
+        print(f"Dry run: would push {branch} to origin")
+        return
 
     # 4. Confirmation
     if not yes:

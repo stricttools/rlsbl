@@ -410,3 +410,80 @@ class TestNoReleasePushEnv:
             assert os.environ.get("RLSBL_RELEASE_PUSH") != "1"
         else:
             assert captured_env.get("RLSBL_RELEASE_PUSH") != "1"
+
+
+# ------------------------------------------------------------------
+# Test 7: --dry-run runs every preflight check but never pushes
+# ------------------------------------------------------------------
+
+
+class TestDryRunPush:
+    """--dry-run must run branch guard, coverage, and behind-remote checks,
+    then print what would be pushed WITHOUT invoking the push subprocess."""
+
+    def test_dry_run_does_not_push(self, push_repo, capsys):
+        """Covered + not-behind branch: dry-run prints the would-push line,
+        never calls git push, and exits 0 (returns normally)."""
+        run_git(push_repo, "checkout", "-b", "dev-dry")
+
+        (push_repo / "feature.py").write_text("def hello(): pass\n")
+        run_git(push_repo, "add", "feature.py")
+        run_git(push_repo, "commit", "-q", "-m", "add feature")
+        head_sha = git_head(push_repo)
+
+        changes = push_repo / ".rlsbl" / "changes"
+        entry = json.dumps({
+            "commits": [head_sha],
+            "user_facing": True,
+            "description": "Add hello feature",
+            "type": "feature",
+        })
+        (changes / "unreleased.jsonl").write_text(entry + "\n")
+        run_git(push_repo, "add", ".rlsbl")
+        run_git(push_repo, "commit", "-q", "-m", "changelog")
+
+        ctx = _make_push_ctx(push_repo)
+
+        push_calls = []
+        original_run = subprocess.run
+
+        def mock_run(cmd, *args, **kwargs):
+            if isinstance(cmd, list) and cmd[0] == "git" and "push" in cmd:
+                push_calls.append(cmd)
+                return subprocess.CompletedProcess(args=cmd, returncode=0)
+            return original_run(cmd, *args, **kwargs)
+
+        with patch("rlsbl.commands.push_cmd.subprocess.run", side_effect=mock_run):
+            # Must NOT raise SystemExit -- dry run is a successful no-op push.
+            run_push(ctx, yes=True, quiet=False, dry_run=True)
+
+        assert push_calls == [], "dry run must not invoke git push"
+        out = capsys.readouterr().out
+        assert "Dry run: would push" in out
+        assert "dev-dry" in out
+
+    def test_dry_run_still_enforces_coverage(self, push_repo):
+        """Preflight checks still run under dry-run: an uncovered commit blocks
+        the (would-be) push with a hard error, and nothing is pushed."""
+        run_git(push_repo, "checkout", "-b", "dev-dry-uncovered")
+
+        (push_repo / "uncovered.py").write_text("x = 1\n")
+        run_git(push_repo, "add", "uncovered.py")
+        run_git(push_repo, "commit", "-q", "-m", "uncovered change")
+
+        ctx = _make_push_ctx(push_repo)
+
+        push_calls = []
+        original_run = subprocess.run
+
+        def mock_run(cmd, *args, **kwargs):
+            if isinstance(cmd, list) and cmd[0] == "git" and "push" in cmd:
+                push_calls.append(cmd)
+                return subprocess.CompletedProcess(args=cmd, returncode=0)
+            return original_run(cmd, *args, **kwargs)
+
+        with patch("rlsbl.commands.push_cmd.subprocess.run", side_effect=mock_run):
+            with pytest.raises(SystemExit) as exc_info:
+                run_push(ctx, yes=True, quiet=False, dry_run=True)
+        assert exc_info.value.code == 1
+        assert push_calls == []
