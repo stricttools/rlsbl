@@ -516,7 +516,7 @@ class TestMutualExclusivity:
         """cmd_watch rejects SHA + --run-id combination."""
         import rlsbl
         with pytest.raises(SystemExit) as exc_info:
-            rlsbl.cmd_watch(None, target="", run_id=["123"], as_daemon_child=False,
+            rlsbl.cmd_watch(None, dry_run=False, yes=False, quiet=False, target="", run_id=["123"], as_daemon_child=False,
                             stop=False, sha="abc123")
         assert exc_info.value.code == 1
 

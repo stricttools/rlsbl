@@ -241,7 +241,7 @@ class TestCheckNameCratesTarget:
         from rlsbl import cmd_check_name
         mock_run_cmd.return_value = (0, [])
         with pytest.raises(SystemExit):
-            cmd_check_name(None, target=["crates"], delay="200", json=False)
+            cmd_check_name(None, dry_run=False, yes=False, quiet=False, target=["crates"], delay="200", json=False)
         mock_run_cmd.assert_called_once()
         assert mock_run_cmd.call_args[0][0] == "crates"
 
@@ -251,7 +251,7 @@ class TestCheckNameCratesTarget:
         from rlsbl import cmd_check_name
         mock_run_cmd.return_value = (0, [])
         with pytest.raises(SystemExit):
-            cmd_check_name(None, target=["npm", "crates"], delay="200", json=False)
+            cmd_check_name(None, dry_run=False, yes=False, quiet=False, target=["npm", "crates"], delay="200", json=False)
         assert mock_run_cmd.call_count == 2
         targets_called = [call[0][0] for call in mock_run_cmd.call_args_list]
         assert "npm" in targets_called

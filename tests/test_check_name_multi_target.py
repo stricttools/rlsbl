@@ -16,7 +16,7 @@ class TestCheckNameMultiTarget(unittest.TestCase):
 
         mock_run_cmd.return_value = (0, [])
         with self.assertRaises(SystemExit) as cm:
-            cmd_check_name(None, target=["npm", "pypi"], delay="200", json=False)
+            cmd_check_name(None, dry_run=False, yes=False, quiet=False, target=["npm", "pypi"], delay="200", json=False)
         self.assertEqual(cm.exception.code, 0)
 
         self.assertEqual(mock_run_cmd.call_count, 2)
@@ -36,7 +36,7 @@ class TestCheckNameMultiTarget(unittest.TestCase):
         # npm available (0), pypi taken (1) -> overall exit 1
         mock_run_cmd.side_effect = [(0, []), (1, [])]
         with self.assertRaises(SystemExit) as cm:
-            cmd_check_name(None, target=["npm", "pypi"], delay="200", json=False)
+            cmd_check_name(None, dry_run=False, yes=False, quiet=False, target=["npm", "pypi"], delay="200", json=False)
         self.assertEqual(cm.exception.code, 1)
         self.assertEqual(mock_run_cmd.call_count, 2)
 
@@ -46,7 +46,7 @@ class TestCheckNameMultiTarget(unittest.TestCase):
 
         with patch("sys.stderr") as mock_stderr:
             with self.assertRaises(SystemExit) as cm:
-                cmd_check_name(None, target=["invalid"], delay="200", json=False)
+                cmd_check_name(None, dry_run=False, yes=False, quiet=False, target=["invalid"], delay="200", json=False)
             self.assertEqual(cm.exception.code, 1)
 
     def test_multiple_invalid_targets_listed(self):
@@ -57,7 +57,7 @@ class TestCheckNameMultiTarget(unittest.TestCase):
         captured = StringIO()
         with patch("sys.stderr", captured):
             with self.assertRaises(SystemExit) as cm:
-                cmd_check_name(None, target=["bad1", "bad2"], delay="200", json=False)
+                cmd_check_name(None, dry_run=False, yes=False, quiet=False, target=["bad1", "bad2"], delay="200", json=False)
             self.assertEqual(cm.exception.code, 1)
         output = captured.getvalue()
         self.assertIn("'bad1'", output)
@@ -71,7 +71,7 @@ class TestCheckNameMultiTarget(unittest.TestCase):
 
         mock_run_cmd.return_value = (0, [])
         with self.assertRaises(SystemExit) as cm:
-            cmd_check_name(None, target=["pypi"], delay="200", json=False)
+            cmd_check_name(None, dry_run=False, yes=False, quiet=False, target=["pypi"], delay="200", json=False)
         self.assertEqual(cm.exception.code, 0)
 
         self.assertEqual(mock_run_cmd.call_count, 1)
@@ -82,7 +82,7 @@ class TestCheckNameMultiTarget(unittest.TestCase):
         from rlsbl import cmd_check_name
 
         with self.assertRaises(SystemExit) as cm:
-            cmd_check_name(None, target=[], delay="200", json=False)
+            cmd_check_name(None, dry_run=False, yes=False, quiet=False, target=[], delay="200", json=False)
         self.assertEqual(cm.exception.code, 1)
 
 

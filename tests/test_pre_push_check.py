@@ -46,7 +46,7 @@ class TestCmdPrePushCheckRemoved:
         from rlsbl import cmd_pre_push_check
 
         with pytest.raises(SystemExit) as exc_info:
-            cmd_pre_push_check(None)
+            cmd_pre_push_check(None, dry_run=False, yes=False, quiet=False)
 
         assert exc_info.value.code == 1
         captured = capsys.readouterr()

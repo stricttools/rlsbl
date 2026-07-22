@@ -205,7 +205,7 @@ class TestCmdReleaseDeprecateDelegation:
     @patch("rlsbl.commands.deprecate.run_cmd")
     def test_delegates(self, mock_run, _):
         import rlsbl
-        rlsbl.cmd_release_deprecate(None, 
+        rlsbl.cmd_release_deprecate(None, quiet=False, 
             reason="security", use="1.2.4",
             dry_run=True, yes=True, version="1.2.3",
         )
