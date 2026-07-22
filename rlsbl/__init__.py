@@ -774,7 +774,7 @@ def cmd_release_undo(ctx, target, version, yes, dry_run, quiet, **_kwargs):
     from .workspace import find_workspace_root
     monorepo_root = find_workspace_root(str(root))
     ctx = create_context(root, workspace_root=Path(monorepo_root) if monorepo_root else None)
-    flags = {"yes": yes, "version": version or None, "dry_run": dry_run}
+    flags = {"yes": yes, "version": version or None, "dry-run": dry_run}
     from .commands.undo import run_cmd
     run_cmd(target or None, [], flags, ctx=ctx)
 

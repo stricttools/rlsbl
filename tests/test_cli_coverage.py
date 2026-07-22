@@ -366,7 +366,7 @@ class TestCmdReleaseUndo:
         assert mock_run.call_args[1]["ctx"] is not None
         flags = mock_run.call_args[0][2]
         assert flags["version"] is None  # empty string -> None
-        assert flags["dry_run"] is False
+        assert flags["dry-run"] is False
 
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.workspace.find_workspace_root", return_value=None)
@@ -386,7 +386,7 @@ class TestCmdReleaseUndo:
         rlsbl.cmd_release_undo(None, quiet=False, target="", version="", yes=False, dry_run=True)
         mock_run.assert_called_once()
         flags = mock_run.call_args[0][2]
-        assert flags["dry_run"] is True
+        assert flags["dry-run"] is True
 
 
 # ============================================================================

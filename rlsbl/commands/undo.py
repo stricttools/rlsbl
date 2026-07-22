@@ -726,7 +726,7 @@ def run_cmd(registry, args, flags, *, ctx):
 
     _print_plan(plan)
 
-    if flags.get("dry_run"):
+    if flags.get("dry-run"):
         print("\n[dry-run] No changes were made.")
         return
 

@@ -278,7 +278,7 @@ class TestDryRun:
         remote_before = snapshot_remote_refs(repo)
         tree_before = git(repo, "rev-parse", "HEAD^{tree}")
 
-        gh = _run_undo(repo, {"yes": True, "dry_run": True})
+        gh = _run_undo(repo, {"yes": True, "dry-run": True})
 
         assert git(repo, "rev-parse", "HEAD") == head_before, "dry-run created no commit"
         assert git(repo, "tag", "-l") == tags_before, "dry-run deleted no tag"
