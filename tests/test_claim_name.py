@@ -35,7 +35,7 @@ class TestClaimName:
         mock_run.return_value = MagicMock(returncode=0)
 
         with patch.dict(os.environ, {"NPM_TOKEN": "tok123"}):
-            run_cmd("npm", ["my-pkg"], {"yes": False})
+            run_cmd("npm", ["my-pkg"], {"yes": True})
 
         mock_check.assert_called_once_with("my-pkg", "npm")
         mock_run.assert_called_once()
@@ -56,7 +56,7 @@ class TestClaimName:
         mock_run.return_value = MagicMock(returncode=0)
 
         with patch.dict(os.environ, {"PYPI_TOKEN": "tok456"}):
-            run_cmd("pypi", ["my-pkg"], {"yes": False})
+            run_cmd("pypi", ["my-pkg"], {"yes": True})
 
         mock_check.assert_called_once_with("my-pkg", "pypi")
         assert mock_run.call_count == 2
@@ -162,7 +162,7 @@ class TestClaimName:
 
         with patch.dict(os.environ, {"NPM_TOKEN": "tok123"}):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd("npm", ["my-pkg"], {"yes": False})
+                run_cmd("npm", ["my-pkg"], {"yes": True})
         assert exc_info.value.code == 1
 
     @patch("rlsbl.commands.claim_name.subprocess.run")
@@ -178,7 +178,7 @@ class TestClaimName:
 
         with patch.dict(os.environ, {"PYPI_TOKEN": "tok456"}):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd("pypi", ["my-pkg"], {"yes": False})
+                run_cmd("pypi", ["my-pkg"], {"yes": True})
         assert exc_info.value.code == 1
 
     @patch("rlsbl.commands.check._check_single_name")
@@ -200,5 +200,94 @@ class TestClaimName:
         env = {k: v for k, v in os.environ.items() if k not in ("PYPI_TOKEN", "UV_PUBLISH_TOKEN")}
         with patch.dict(os.environ, env, clear=True):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd("pypi", ["my-pkg"], {"yes": False})
+                run_cmd("pypi", ["my-pkg"], {"yes": True})
         assert exc_info.value.code == 1
+
+
+class TestClaimNameDryRun:
+    """--dry-run must run all preconditions (availability + token) but never
+    create a tempdir or invoke a publish subprocess, and must not prompt."""
+
+    @patch("builtins.input", return_value="n")
+    @patch("rlsbl.commands.claim_name.tempfile.mkdtemp")
+    @patch("rlsbl.commands.claim_name.subprocess.run")
+    @patch("rlsbl.commands.check._check_single_name")
+    def test_npm_dry_run_does_not_publish(self, mock_check, mock_run, mock_mkdtemp, mock_input, capsys):
+        mock_check.return_value = {"name": "my-pkg", "registry": "npm", "status": "available", "variants": None, "reason": None}
+        with patch.dict(os.environ, {"NPM_TOKEN": "tok123"}):
+            run_cmd("npm", ["my-pkg"], {"yes": False, "dry-run": True})
+        mock_run.assert_not_called()
+        mock_mkdtemp.assert_not_called()
+        mock_input.assert_not_called()
+        out = capsys.readouterr().out
+        assert "would publish" in out.lower()
+        assert "my-pkg" in out
+
+    @patch("builtins.input", return_value="n")
+    @patch("rlsbl.commands.claim_name.tempfile.mkdtemp")
+    @patch("rlsbl.commands.claim_name.subprocess.run")
+    @patch("rlsbl.commands.check._check_single_name")
+    def test_pypi_dry_run_does_not_publish(self, mock_check, mock_run, mock_mkdtemp, mock_input, capsys):
+        mock_check.return_value = {"name": "my-pkg", "registry": "pypi", "status": "available", "variants": None, "reason": None}
+        with patch.dict(os.environ, {"PYPI_TOKEN": "tok456"}):
+            run_cmd("pypi", ["my-pkg"], {"yes": False, "dry-run": True})
+        mock_run.assert_not_called()
+        mock_mkdtemp.assert_not_called()
+        mock_input.assert_not_called()
+        out = capsys.readouterr().out
+        assert "would publish" in out.lower()
+
+    @patch("builtins.input", return_value="n")
+    @patch("rlsbl.commands.claim_name._read_cargo_token", return_value="crates-tok")
+    @patch("rlsbl.commands.claim_name.tempfile.mkdtemp")
+    @patch("rlsbl.commands.claim_name.subprocess.run")
+    @patch("rlsbl.commands.check._check_single_name")
+    def test_crates_dry_run_does_not_publish(self, mock_check, mock_run, mock_mkdtemp, mock_token, mock_input, capsys):
+        mock_check.return_value = {"name": "my-crate", "registry": "crates", "status": "available", "variants": None, "reason": None}
+        run_cmd("crates", ["my-crate"], {"yes": False, "dry-run": True})
+        mock_run.assert_not_called()
+        mock_mkdtemp.assert_not_called()
+        # Dry run must not fire even the crates permanence prompt.
+        mock_input.assert_not_called()
+        out = capsys.readouterr().out
+        assert "would publish" in out.lower()
+
+
+class TestClaimNameConfirmation:
+    """An available name with neither --yes nor --dry-run must prompt before
+    publishing; declining aborts before any publish, accepting proceeds."""
+
+    @patch("builtins.input", return_value="n")
+    @patch("rlsbl.commands.claim_name.subprocess.run")
+    @patch("rlsbl.commands.check._check_single_name")
+    def test_available_prompt_declined_aborts(self, mock_check, mock_run, mock_input):
+        mock_check.return_value = {"name": "my-pkg", "registry": "npm", "status": "available", "variants": None, "reason": None}
+        with patch.dict(os.environ, {"NPM_TOKEN": "tok123"}):
+            with pytest.raises(SystemExit) as exc_info:
+                run_cmd("npm", ["my-pkg"], {"yes": False, "dry-run": False})
+        assert exc_info.value.code == 1
+        mock_input.assert_called_once()
+        mock_run.assert_not_called()
+
+    @patch("builtins.input", return_value="y")
+    @patch("rlsbl.commands.claim_name.subprocess.run")
+    @patch("rlsbl.commands.check._check_single_name")
+    def test_available_prompt_accepted_publishes(self, mock_check, mock_run, mock_input, real_tmpdir):
+        mock_check.return_value = {"name": "my-pkg", "registry": "npm", "status": "available", "variants": None, "reason": None}
+        mock_run.return_value = MagicMock(returncode=0)
+        with patch.dict(os.environ, {"NPM_TOKEN": "tok123"}):
+            run_cmd("npm", ["my-pkg"], {"yes": False, "dry-run": False})
+        mock_input.assert_called_once()
+        mock_run.assert_called_once()
+        assert mock_run.call_args[0][0] == ["npm", "publish", "--access", "public"]
+
+    @patch("builtins.input")
+    @patch("rlsbl.commands.claim_name.subprocess.run")
+    @patch("rlsbl.commands.check._check_single_name")
+    def test_yes_skips_prompt_and_publishes(self, mock_check, mock_run, mock_input, real_tmpdir):
+        mock_check.return_value = {"name": "my-pkg", "registry": "npm", "status": "available", "variants": None, "reason": None}
+        mock_run.return_value = MagicMock(returncode=0)
+        with patch.dict(os.environ, {"NPM_TOKEN": "tok123"}):
+            run_cmd("npm", ["my-pkg"], {"yes": True, "dry-run": False})
+        mock_input.assert_not_called()
+        mock_run.assert_called_once()

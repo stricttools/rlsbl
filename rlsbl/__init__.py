@@ -737,7 +737,7 @@ def cmd_claim_name(ctx, target, yes, dry_run, quiet, **_kwargs):
             file=sys.stderr,
         )
         sys.exit(1)
-    flags = {"yes": yes}
+    flags = {"yes": yes, "dry-run": dry_run}
     from .commands.claim_name import run_cmd
     run_cmd(target, names, flags)
 

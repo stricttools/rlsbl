@@ -172,4 +172,4 @@ class TestClaimNameCratesTarget:
         with patch("rlsbl._variadic_args", ["my-crate"]):
             with patch("rlsbl.commands.claim_name.run_cmd") as mock_run:
                 cmd_claim_name(None, dry_run=False, quiet=False, target="crates", yes=True)
-                mock_run.assert_called_once_with("crates", ["my-crate"], {"yes": True})
+                mock_run.assert_called_once_with("crates", ["my-crate"], {"yes": True, "dry-run": False})

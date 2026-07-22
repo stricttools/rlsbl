@@ -44,6 +44,7 @@ def run_cmd(target, args, flags):
         sys.exit(1)
 
     name = args[0]
+    dry_run = flags.get("dry-run", False)
 
     if target not in ("npm", "pypi", "crates"):
         print(f"Unsupported target: {target!r}. Must be 'npm', 'pypi', or 'crates'.", file=sys.stderr)
@@ -91,8 +92,9 @@ def run_cmd(target, args, flags):
                 file=sys.stderr,
             )
             sys.exit(1)
-        # Permanence confirmation: crates.io names are permanent
-        if not flags["yes"]:
+        # Permanence confirmation: crates.io names are permanent. Skipped on a
+        # dry run (no publish happens, so nothing permanent is claimed).
+        if not dry_run and not flags["yes"]:
             print(
                 f"WARNING: crates.io names are PERMANENT and cannot be deleted or unpublished.\n"
                 f"Claim '{name}'? [y/N] ",
@@ -103,6 +105,21 @@ def run_cmd(target, args, flags):
             if answer not in ("y", "yes"):
                 print("Aborted.", file=sys.stderr)
                 sys.exit(1)
+
+    if dry_run:
+        print(f"Dry run: would publish placeholder '{name}' to {target}")
+        return
+
+    # Confirmation before publishing a real placeholder package. Reached on the
+    # available path (yes=False) and on the yes-overridden taken/ambiguous paths
+    # (where flags["yes"] is True, so the prompt is skipped). --yes skips it.
+    if not flags.get("yes"):
+        answer = input(
+            f"Claim '{name}' on {target} by publishing a placeholder package? [y/N] "
+        ).strip().lower()
+        if answer not in ("y", "yes"):
+            print("Aborted.", file=sys.stderr)
+            sys.exit(1)
 
     tmpdir = tempfile.mkdtemp()
     try:
