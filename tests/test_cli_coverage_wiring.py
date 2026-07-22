@@ -253,7 +253,7 @@ class TestStandaloneWiring:
         assert result.exit_code == 0, result.stderr
         assert m.call_args[0][0] == "npm"
         assert m.call_args[0][1] == ["mypkg"]
-        assert m.call_args[0][2] == {"yes": False}
+        assert m.call_args[0][2] == {"yes": False, "dry-run": False}
 
     def test_commit(self):
         result, m = _dispatch(
