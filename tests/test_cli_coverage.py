@@ -961,6 +961,22 @@ class TestCmdMonoAbsorb:
 
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.workspace.find_workspace_root", return_value="/repo")
+    @patch("rlsbl.commands.monorepo.cmd_absorb")
+    def test_skipped_tags_logged(self, mock_absorb, mock_fwr, mock_rpr, capsys):
+        mock_absorb.return_value = {
+            "name": "pkg", "source_path": "/src", "dest_path": "pkgs/pkg",
+            "entries_migrated": 1, "tags_imported": ["pkg@v0.1.0"],
+            "skipped_tags": ["nightly", "legacy-build"],
+        }
+        rlsbl.cmd_mono_absorb(None, yes=False, quiet=False,
+            dry_run=False, name="", registry_name="", releasable="",
+            source_repo="/src", dest_path="pkgs/pkg",
+        )
+        out = capsys.readouterr().out
+        assert "Skipped 2 non-version tag(s): nightly, legacy-build" in out
+
+    @patch("rlsbl._require_project_root", return_value=Path("/fake"))
+    @patch("rlsbl.workspace.find_workspace_root", return_value="/repo")
     @patch("rlsbl.commands.monorepo.cmd_absorb", side_effect=ValueError("bad"))
     def test_error_exits(self, *_):
         with pytest.raises(SystemExit) as exc:

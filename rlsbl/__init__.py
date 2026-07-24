@@ -1443,6 +1443,9 @@ def cmd_mono_absorb(ctx, dry_run, yes, quiet, name, registry_name, releasable, s
         print(f"Absorbed '{result['name']}' from {result['source_path']} into {result['dest_path']}")
         print(f"  Changelog: {result['entries_migrated']} entries migrated")
         print(f"  Tags imported: {', '.join(result['tags_imported']) or 'none'}")
+        skipped = result.get("skipped_tags") or []
+        if skipped:
+            print(f"  Skipped {len(skipped)} non-version tag(s): {', '.join(skipped)}")
 
 
 @mono.command(name="extract-releasable", help="Extract all member packages of a releasable into a new repository. If the releasable has one member, creates a single-project repo. If it has multiple members, creates a new monorepo with workspace.toml. Migrates changelog entries for each member and removes all extracted projects from the source workspace.")
