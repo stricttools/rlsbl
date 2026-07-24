@@ -14,7 +14,6 @@ from ..changelog.files import (
     get_pending_dir,
     list_versioned_files,
     read_coverage_unit,
-    read_pending_files,
     read_unreleased,
     remap_jsonl_hashes,
     writable_jsonl,

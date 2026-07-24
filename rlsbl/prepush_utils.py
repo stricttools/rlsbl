@@ -252,12 +252,6 @@ def check_changeset_file_coverage(
     if not changed_files:
         return None
 
-    # Normalize the changes_dir prefix for matching
-    # The changes_dir path might be absolute, changed_files might be relative
-    # or vice versa. We normalize both by looking at the relative pattern.
-    pending_subdir = os.path.join("pending", "")  # "pending/"
-    changes_rel = ".rlsbl/changes/"
-
     has_pending = False
     has_non_exempt = False
 

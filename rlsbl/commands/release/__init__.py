@@ -195,7 +195,6 @@ def _resume_cmd_inner(saved_state, flags, *, ctx):
 
     project_root = ctx.project_root
     monorepo_root = ctx.workspace_root
-    config = ctx.config
     quiet = flags.get("quiet", False)
 
     def log(msg):

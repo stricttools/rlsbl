@@ -5,14 +5,11 @@ coverage with actionable remediation hints, behind-remote refusal, and
 a wrapped ``git push``. The pre-push hook still runs as a backstop.
 """
 
-import os
 import subprocess
 import sys
 
-from ..errors import ConfigError, GitError
 from ..prepush_utils import (
     _check_jsonl_changelog,
-    _get_pushed_commits,
     _get_release_branches,
 )
 from ..utils import get_current_branch, get_push_timeout, remote_branch_exists, run

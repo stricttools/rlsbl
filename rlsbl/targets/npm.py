@@ -52,7 +52,6 @@ class NpmTarget(BaseTarget):
     def publication_probe(self, dir_path, version, ctx=None):
         """Probe npm registry for a specific version of this package."""
         from ..publication_probe import PublicationProbeResult, PublicationStatus
-        from ..registry import query_npm_version
 
         pkg_name = self.read_name(dir_path, ctx)
         if not pkg_name:
