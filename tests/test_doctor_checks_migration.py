@@ -92,6 +92,8 @@ EXPECTED_CHECKS = [
     "releasable-residue",
     # Member pytest rootdir-escape guard
     "member-pytest-config",
+    # Mixed monorepo tag-scheme guard
+    "mixed-tag-schemes",
     # Launcher pipeline checks
     "wrapper-producer",
 ]

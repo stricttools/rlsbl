@@ -123,6 +123,8 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "releasable-residue": "workspace",
     # --- member pytest rootdir-escape guard ---
     "member-pytest-config": "workspace",
+    # --- mixed monorepo tag-scheme guard ---
+    "mixed-tag-schemes": "workspace",
     # --- launcher pipeline checks ---
     "wrapper-producer": None,
 }

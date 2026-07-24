@@ -908,3 +908,39 @@ def register_workspace_checks(app):
                 "root, silently loading the root conftest and its config"
             )
         return reporter.passed("all members with tests pin their own pytest config")
+
+    @app.error_check("mixed-tag-schemes")
+    def check_mixed_tag_schemes(ctx, reporter):
+        """A member dir must not mix Go's path-based tags with @-style tags.
+
+        Go publishes monorepo tags as ``{path}/v*``; every other target uses
+        ``{name}@v*``. A single member dir declaring both schemes yields an
+        ordering-dependent publish-router prefix. Report each such member.
+        """
+        from ..errors import ConfigError
+        from ..targets import detect_targets, resolve_releasable_config_dir
+        from ..commands.monorepo.sync import _mixed_tag_schemes, _mixed_scheme_error
+
+        root = str(ctx.workspace_root)
+        findings = []
+        for proj in ctx.projects:
+            if project_is_dev_only(proj):
+                continue
+            rel_dir = resolve_releasable_config_dir(proj, ctx.workspace_root)
+            try:
+                entries = detect_targets(
+                    os.path.join(root, proj["path"]), releasable_config_dir=rel_dir
+                )
+            except ConfigError:
+                continue
+            mixed = _mixed_tag_schemes(entries, proj["name"], proj["path"])
+            if mixed:
+                findings.append(_mixed_scheme_error(proj["path"], mixed))
+
+        if findings:
+            for f in findings:
+                reporter.error(f)
+            return reporter.found(
+                f"{len(findings)} member(s) mixing path-style and @-style tag schemes"
+            )
+        return reporter.passed("no members mix incompatible monorepo tag schemes")
