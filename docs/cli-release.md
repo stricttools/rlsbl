@@ -13,14 +13,14 @@ Release orchestration commands. Provides 9 subcommands covering the full release
 
 ## release run
 
-Bump version, validate the JSONL changelog, run tests and lint, commit, tag, push, and create a GitHub Release. Reads the bump type (patch, minor, major, or hotfix) and target selection from .rlsbl/releases/unreleased.toml, which can be scaffolded with rlsbl release init. Supports dry-run preview, non-interactive mode with --yes, and --allow-dirty to skip the clean working tree check.
+Bump version, validate the JSONL changelog, run tests and lint, commit, tag, push, and create a GitHub Release. Reads the bump type (patch, minor, major, or infra) and target selection from .rlsbl/releases/unreleased.toml, which can be scaffolded with rlsbl release init. Supports dry-run preview, non-interactive mode with --yes, and --allow-dirty to skip the clean working tree check.
 
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--allow-dirty` |  | bool |  |  | Skip the clean working tree check and allow releasing with uncommitted changes |
-| `--bump` |  | str |  |  | Bump type: patch, minor, major, hotfix, prerelease. Skips the release file. |
+| `--bump` |  | str |  |  | Bump type: patch, minor, major, infra, prerelease. Skips the release file. |
 | `--description` |  | str |  |  | Short release description summarizing the changes (required with --bump) |
 | `--preid` |  | str |  |  | Pre-release identifier: alpha, beta, rc, stable. Only valid with --bump. |
 | `--watch` |  | bool |  |  | After release, automatically watch CI runs to completion (--no-watch to skip) |
