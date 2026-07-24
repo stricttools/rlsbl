@@ -13,6 +13,7 @@ from ..ci_yaml import (
     parse_ci_workflow,
     emit_ci_workflow,
     inject_working_directory,
+    inject_services_into_ci_plans,
     rewrite_version_file_inputs,
 )
 from ..errors import ConfigError
@@ -1642,6 +1643,12 @@ def run_cmd(registry, args, flags, ctx):
                 required_vars={"name", "registryUrl"},
             )
 
+            # Inject CI service containers (config services/test_env) into the
+            # single-target CI workflow (ci.yml -> maps to this registry).
+            inject_services_into_ci_plans(
+                reg_plans, ctx.config or {}, single_target=registry,
+            )
+
         # Publish workflow: route through the SAME merged generator the
         # multi-target path uses, with a one-element target list. This unifies
         # the two paths so a lone subdir target gets defaults.run.working-directory
@@ -2742,6 +2749,12 @@ def run_cmd_multi(registries_list, args, flags, ctx):
                         extra_plans.extend(plan_mappings(
                             target_obj.template_dir(), [m], vars_dict,
                         ))
+
+            # Inject CI service containers (config services/test_env) into the
+            # per-target CI workflows (ci-<target>.yml). Each service is scoped
+            # to its declared targets, so a postgres service for the go target
+            # never lands in the pypi-wrapper CI.
+            inject_services_into_ci_plans(ci_plans, ctx.config or {})
 
         # Plan the merged publish workflow (skip for publish_mode "none" and workspace roots)
         # Load pipelines so _generate_merged_publish can use pipeline-driven
