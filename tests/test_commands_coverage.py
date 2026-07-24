@@ -1349,9 +1349,11 @@ class TestScrubMonorepoFallbackScan:
         (proj_dir / "CHANGELOG.md").write_text("## 1.0.0\n\n- found it\n")
 
         workspace_projects = [WorkspaceProject({"name": "alpha", "path": "pkg/alpha"})]
+        # A monorepo tag whose project prefix ("beta@") is not in the tag prefix
+        # index (only "alpha@" is) -- reaches the scan-all-projects fallback.
         safegit_result = json.dumps({
             "rewrites": {"old": "new"},
-            "tags": [{"refname": "refs/tags/weird-prefix-v1.0.0"}],
+            "tags": [{"refname": "refs/tags/beta@v1.0.0"}],
             "new_head": "abc",
         })
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True, "yes": True}
