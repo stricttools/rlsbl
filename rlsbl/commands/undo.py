@@ -234,8 +234,9 @@ def _find_latest_tag(uc):
 def _version_and_msg(uc, tag):
     """Return (bare_version, expected_version_bump_message) for a tag."""
     if uc.releasable_name or uc.monorepo_name:
-        m = re.search(r"v(\d+\.\d+\.\d+(?:-[a-z]+\.\d+)?)$", tag)
-        version_part = f"v{m.group(1)}" if m else tag
+        from ..tag_glob import TagMode, parse_version_tag
+        parsed = parse_version_tag(tag, mode=TagMode.PRERELEASE_INCLUSIVE)
+        version_part = f"v{parsed.version}" if parsed else tag
         name = uc.releasable_name or uc.monorepo_name
         return version_part.lstrip("v"), f"{name}: release {version_part}"
     return tag.lstrip("v"), tag
