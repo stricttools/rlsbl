@@ -1217,9 +1217,10 @@ def cmd_mono_init(ctx, auto_commit, dry_run, yes, quiet):
 @strictcli.flag(name="library", type=str, help="Mark as a shared library consumed by other workspace projects (true/false)", default="")
 @strictcli.flag(name="dev-only", type=str, help="Mark as a dev-only leaf node excluded from the dependency boundary guardrail (true/false)", default="")
 @strictcli.flag(name="releasable", type=str, help="Releasable group this project belongs to (name of a [[releasables]] entry, or 'false' to opt out of versioning)", default="")
+@strictcli.flag(name="registry-name", type=str, help="Package registry identity for this project (used verbatim for name checks; overrides prefix/suffix)", default="")
 @strictcli.flag(name="auto-commit", type=bool, default=True, help="Auto-commit workspace.toml and trigger scaffold/sync commits")
 @strictcli.arg(name="path", help="Relative path from the repo root to the project directory to register")
-def cmd_mono_add(ctx, name, target, watch, subtree_remote, depends_on, library, dev_only, releasable, auto_commit, dry_run, yes, quiet, path, **_kwargs):
+def cmd_mono_add(ctx, name, target, watch, subtree_remote, depends_on, library, dev_only, releasable, registry_name, auto_commit, dry_run, yes, quiet, path):
     root = _require_project_root()
     flags = {}
     if name:
@@ -1238,10 +1239,12 @@ def cmd_mono_add(ctx, name, target, watch, subtree_remote, depends_on, library, 
         flags["dev_only"] = dev_only
     if releasable:
         flags["releasable"] = releasable
+    if registry_name:
+        flags["registry-name"] = registry_name
     if not auto_commit:
         flags["auto-commit"] = False
     from .commands.monorepo import _cmd_add
-    _cmd_add([path], flags, project_root=root)
+    _cmd_add([path], flags, project_root=root, dry_run=dry_run)
 
 
 @mono.command(name="remove", help="Unregister a project from the monorepo workspace.toml by its path. This removes the project entry from the workspace configuration file but does not delete any files, directories, or git history on disk. The project's code remains intact and can be re-added later with the add subcommand if needed.")

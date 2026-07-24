@@ -116,3 +116,77 @@ class TestAddExplicitTarget:
         _cmd_add(["libs/docs"], {"target": "plain", "name": "my-docs"}, project_root=".")
         projects = load_workspace(str(mock_git_repo))
         assert projects[0]["name"] == "my-docs"
+
+
+class TestAddRegistryName:
+    def test_registry_name_written_to_workspace(self, mock_git_repo, capsys):
+        """--registry-name persists registry_name in the workspace project entry."""
+        _cmd_init({}, project_root=".")
+        bare_dir = os.path.join(str(mock_git_repo), "core")
+        os.makedirs(bare_dir)
+        _cmd_add(["core"], {"target": "plain", "registry-name": "my-registry-id"}, project_root=".")
+        projects = load_workspace(str(mock_git_repo))
+        assert projects[0]["name"] == "core"
+        assert projects[0].registry_name == "my-registry-id"
+
+    def test_no_registry_name_omits_field(self, mock_git_repo, capsys):
+        """Without --registry-name, the field is absent (empty default)."""
+        _cmd_init({}, project_root=".")
+        bare_dir = os.path.join(str(mock_git_repo), "core")
+        os.makedirs(bare_dir)
+        _cmd_add(["core"], {"target": "plain"}, project_root=".")
+        projects = load_workspace(str(mock_git_repo))
+        assert "registry_name" not in projects[0]
+
+
+class TestAddDryRun:
+    def test_dry_run_makes_zero_mutations(self, mock_git_repo, capsys):
+        """--dry-run validates and reports but does not mutate the workspace."""
+        _cmd_init({}, project_root=".")
+        bare_dir = os.path.join(str(mock_git_repo), "core")
+        os.makedirs(bare_dir)
+        capsys.readouterr()
+
+        subprocess_calls = []
+        original_run = __import__("subprocess").run
+
+        def capture_run(cmd, *args, **kwargs):
+            subprocess_calls.append(cmd)
+            if isinstance(cmd, list) and "rlsbl" in " ".join(str(c) for c in cmd):
+                return __import__("subprocess").CompletedProcess(cmd, 0)
+            return original_run(cmd, *args, **kwargs)
+
+        with patch("subprocess.run", side_effect=capture_run):
+            _cmd_add(["core"], {"target": "plain"}, project_root=".", dry_run=True)
+
+        # Workspace unchanged: project NOT added.
+        projects = load_workspace(str(mock_git_repo))
+        assert len(projects) == 0
+
+        # No scaffold or sync subprocess ran.
+        rlsbl_calls = [
+            c for c in subprocess_calls
+            if isinstance(c, list) and ("scaffold" in c or "sync" in c)
+        ]
+        assert rlsbl_calls == []
+
+        # Would-do report printed.
+        captured = capsys.readouterr()
+        assert "Would add" in captured.out or "would add" in captured.out.lower()
+
+    def test_dry_run_still_validates(self, mock_git_repo, capsys):
+        """--dry-run runs full validation: a missing directory still errors."""
+        _cmd_init({}, project_root=".")
+        with pytest.raises(SystemExit):
+            _cmd_add(["does-not-exist"], {"target": "plain"}, project_root=".", dry_run=True)
+
+    def test_dry_run_validates_name_uniqueness(self, mock_git_repo, capsys):
+        """--dry-run rejects a duplicate name just like a real add."""
+        _cmd_init({}, project_root=".")
+        os.makedirs(os.path.join(str(mock_git_repo), "core"))
+        os.makedirs(os.path.join(str(mock_git_repo), "core2"))
+        _cmd_add(["core"], {"target": "plain"}, project_root=".")
+        with pytest.raises(SystemExit):
+            _cmd_add(["core2"], {"target": "plain", "name": "core"}, project_root=".", dry_run=True)
+        captured = capsys.readouterr()
+        assert "already exists" in captured.err

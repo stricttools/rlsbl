@@ -9,7 +9,6 @@ from rlsbl import app
 # that work. Identified by handler function __name__.
 KWARGS_EXEMPT_HANDLERS = {
     "cmd_mono_absorb",
-    "cmd_mono_add",
     "cmd_mono_extract",
     "cmd_mono_extract_releasable",
 }

@@ -31,7 +31,7 @@ def _cmd_init(flags, project_root):
     commit_files("monorepo: init workspace", [rel_ws_file], allow_failure=True)
 
 
-def _cmd_add(args, flags, project_root):
+def _cmd_add(args, flags, project_root, dry_run=False):
     if not args:
         print("Error: Usage: rlsbl monorepo add <path> [--name <name>]", file=sys.stderr)
         sys.exit(1)
@@ -63,6 +63,7 @@ def _cmd_add(args, flags, project_root):
     library_raw = flags.get("library")
     dev_only_raw = flags.get("dev_only")
     releasable_raw = flags.get("releasable")
+    registry_name = flags.get("registry-name") or ""
 
     # Parse --library as boolean
     library = None
@@ -163,6 +164,23 @@ def _cmd_add(args, flags, project_root):
         project["dev_only"] = True
     if releasable_value is not None:
         project["releasable"] = releasable_value
+    if registry_name:
+        project["registry_name"] = registry_name
+
+    # Honest plan boundary: validation above has fully run. In dry-run we report
+    # exactly what would happen and make ZERO mutations -- no workspace write, no
+    # scaffold, no sync. Anything below this point mutates state.
+    if dry_run:
+        print(f"Would add project '{name}' at {path}")
+        print(f"  workspace.toml entry: {project}")
+        project_rlsbl = os.path.join(path, ".rlsbl", "config.json")
+        if not os.path.exists(project_rlsbl):
+            print(f"  Would scaffold '{name}' (no .rlsbl/config.json present)")
+        else:
+            print(f"  Would skip scaffold ('{name}' already scaffolded)")
+        print("  Would run: rlsbl monorepo sync (regenerate CI workflows)")
+        return
+
     projects.append(project)
     save_workspace(root, projects)
     print(f"Added project '{name}' at {path}")
