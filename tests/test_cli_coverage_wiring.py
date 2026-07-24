@@ -491,15 +491,16 @@ class TestMonorepoWorkspaceGatedWiring:
         result, m = _dispatch(
             ["--dry-run", "monorepo", "absorb", "posA", "posB"],
             "rlsbl.commands.monorepo.cmd_absorb",
-            ret={"package_name": "p", "source_path": "s", "source_branch": "b"},
+            ret={"name": "p", "source_path": "s", "dest_path": "posB",
+                 "tags_to_import": []},
             extra={"rlsbl.workspace.find_workspace_root": _FAKE_WS},
         )
         assert result.exit_code == 0, result.stderr
-        # cmd_absorb(ws_root, source_path, package_name, releasable_name=..., dry_run=...)
-        # Documented order: `absorb <source_path> <package_name>`.
+        # cmd_absorb(ws_root, source_repo, dest_path, name=..., dry_run=...)
+        # Documented order: `absorb <source_repo> <dest_path>`.
         assert m.call_args[0][0] == _FAKE_WS
-        assert m.call_args[0][1] == "posA"  # source_path (first token)
-        assert m.call_args[0][2] == "posB"  # package_name (second token)
+        assert m.call_args[0][1] == "posA"  # source_repo (first token)
+        assert m.call_args[0][2] == "posB"  # dest_path (second token)
         assert m.call_args.kwargs["dry_run"] is True
 
     def test_extract_releasable(self):

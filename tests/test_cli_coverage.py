@@ -735,17 +735,19 @@ class TestCmdMonoAdd:
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.monorepo._cmd_add")
     def test_delegates_with_all_flags(self, mock_add, _):
-        rlsbl.cmd_mono_add(None, dry_run=False, yes=False, quiet=False, 
+        rlsbl.cmd_mono_add(None, dry_run=False, yes=False, quiet=False,
             name="mylib", target="npm", watch="*.ts,*.js",
             subtree_remote="git@github.com:user/mylib.git",
             depends_on="core,utils", library="true", dev_only="true",
-            releasable="core", auto_commit=False, path="packages/mylib",
+            releasable="core", registry_name="mylib-npm", auto_commit=False,
+            path="packages/mylib",
         )
         mock_add.assert_called_once()
         flags = mock_add.call_args[0][1]
         assert flags["name"] == "mylib"
         assert flags["target"] == "npm"
         assert flags["watch"] == "*.ts,*.js"
+        assert flags["registry-name"] == "mylib-npm"
 
 
 class TestCmdMonoRemove:
@@ -925,8 +927,9 @@ class TestCmdMonoAbsorb:
     @patch("rlsbl.workspace.find_workspace_root", return_value=None)
     def test_exits_when_no_workspace(self, *_):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_mono_absorb(None, yes=False, quiet=False, 
-                dry_run=False, releasable="", source_path="/src", package_name="pkg",
+            rlsbl.cmd_mono_absorb(None, yes=False, quiet=False,
+                dry_run=False, name="", registry_name="", releasable="",
+                source_repo="/src", dest_path="pkgs/pkg",
             )
         assert exc.value.code == 1
 
@@ -935,10 +938,12 @@ class TestCmdMonoAbsorb:
     @patch("rlsbl.commands.monorepo.cmd_absorb")
     def test_dry_run(self, mock_absorb, *_):
         mock_absorb.return_value = {
-            "package_name": "pkg", "source_path": "/src", "source_branch": "main",
+            "name": "pkg", "source_path": "/src", "dest_path": "pkgs/pkg",
+            "tags_to_import": ["0.1.0", "0.2.0"],
         }
-        rlsbl.cmd_mono_absorb(None, yes=False, quiet=False, 
-            dry_run=True, releasable="core", source_path="/src", package_name="pkg",
+        rlsbl.cmd_mono_absorb(None, yes=False, quiet=False,
+            dry_run=True, name="", registry_name="", releasable="core",
+            source_repo="/src", dest_path="pkgs/pkg",
         )
 
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
@@ -946,11 +951,12 @@ class TestCmdMonoAbsorb:
     @patch("rlsbl.commands.monorepo.cmd_absorb")
     def test_real_run(self, mock_absorb, *_):
         mock_absorb.return_value = {
-            "package_name": "pkg", "source_path": "/src", "source_branch": "main",
-            "entries_migrated": 3, "files_written": 1,
+            "name": "pkg", "source_path": "/src", "dest_path": "pkgs/pkg",
+            "entries_migrated": 3, "tags_imported": ["pkg@v0.1.0"],
         }
-        rlsbl.cmd_mono_absorb(None, yes=False, quiet=False, 
-            dry_run=False, releasable="", source_path="/src", package_name="pkg",
+        rlsbl.cmd_mono_absorb(None, yes=False, quiet=False,
+            dry_run=False, name="", registry_name="", releasable="",
+            source_repo="/src", dest_path="pkgs/pkg",
         )
 
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
@@ -958,8 +964,9 @@ class TestCmdMonoAbsorb:
     @patch("rlsbl.commands.monorepo.cmd_absorb", side_effect=ValueError("bad"))
     def test_error_exits(self, *_):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_mono_absorb(None, yes=False, quiet=False, 
-                dry_run=False, releasable="", source_path="/src", package_name="pkg",
+            rlsbl.cmd_mono_absorb(None, yes=False, quiet=False,
+                dry_run=False, name="", registry_name="", releasable="",
+                source_repo="/src", dest_path="pkgs/pkg",
             )
         assert exc.value.code == 1
 
