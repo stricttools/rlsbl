@@ -271,9 +271,10 @@ def _latest_tag_for_glob(tag_glob):
         first_line = result.stdout.strip().split("\n")[0].strip() if result.stdout.strip() else ""
         if first_line:
             latest_tag = first_line
-            m = re.search(r"v(\d+\.\d+\.\d+)$", first_line)
-            if m:
-                latest_tag_version = m.group(1)
+            from ...tag_glob import TagMode, parse_version_tag
+            parsed = parse_version_tag(first_line, mode=TagMode.FINAL_ONLY)
+            if parsed:
+                latest_tag_version = parsed.version
     except Exception:
         pass
     return latest_tag, latest_tag_version
@@ -442,10 +443,11 @@ def _cmd_status(flags, project_root):
             first_line = result.stdout.strip().split("\n")[0].strip() if result.stdout.strip() else ""
             if first_line:
                 latest_tag = first_line
-                # Extract version from tag (handles both name@v1.2.3 and path/v1.2.3)
-                version_match = re.search(r"v(\d+\.\d+\.\d+)$", first_line)
-                if version_match:
-                    latest_tag_version = version_match.group(1)
+                # Extract version from tag (handles v1.2.3, name@v1.2.3, path/v1.2.3).
+                from ...tag_glob import TagMode, parse_version_tag
+                parsed = parse_version_tag(first_line, mode=TagMode.FINAL_ONLY)
+                if parsed:
+                    latest_tag_version = parsed.version
         except Exception:
             pass
 
