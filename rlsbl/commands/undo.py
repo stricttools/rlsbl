@@ -685,6 +685,10 @@ def _execute_plan(plan, uc, flags, ctx):
             should_push = answer == "y"
         except (EOFError, KeyboardInterrupt):
             should_push = False
+            print(
+                "\nSkipping push (stdin is not interactive); "
+                "pass --yes to push the rollback commits to origin."
+            )
     if should_push:
         try:
             branch = get_current_branch()
@@ -735,7 +739,11 @@ def run_cmd(registry, args, flags, *, ctx):
         try:
             answer = input("\nThis is destructive. Proceed? [y/N] ").strip().lower()
         except (EOFError, KeyboardInterrupt):
-            print("\nAborted.")
+            print(
+                "\nError: stdin is not interactive; pass --yes to confirm "
+                "this destructive release rollback.",
+                file=sys.stderr,
+            )
             sys.exit(1)
         if answer != "y":
             print("Aborted.")

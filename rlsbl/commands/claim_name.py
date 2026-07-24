@@ -101,7 +101,15 @@ def run_cmd(target, args, flags):
                 end="",
                 flush=True,
             )
-            answer = input().strip().lower()
+            try:
+                answer = input().strip().lower()
+            except (EOFError, KeyboardInterrupt):
+                print(
+                    f"\nError: stdin is not interactive; pass --yes to confirm "
+                    f"publishing a permanent placeholder to {target}.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
             if answer not in ("y", "yes"):
                 print("Aborted.", file=sys.stderr)
                 sys.exit(1)
@@ -114,9 +122,17 @@ def run_cmd(target, args, flags):
     # available path (yes=False) and on the yes-overridden taken/ambiguous paths
     # (where flags["yes"] is True, so the prompt is skipped). --yes skips it.
     if not flags.get("yes"):
-        answer = input(
-            f"Claim '{name}' on {target} by publishing a placeholder package? [y/N] "
-        ).strip().lower()
+        try:
+            answer = input(
+                f"Claim '{name}' on {target} by publishing a placeholder package? [y/N] "
+            ).strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print(
+                f"\nError: stdin is not interactive; pass --yes to confirm "
+                f"publishing a placeholder to {target}.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
         if answer not in ("y", "yes"):
             print("Aborted.", file=sys.stderr)
             sys.exit(1)

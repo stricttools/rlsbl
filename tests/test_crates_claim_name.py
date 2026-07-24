@@ -162,6 +162,31 @@ class TestClaimNameCrates:
             mock_input.assert_not_called()
 
 
+class TestClaimNameCratesPermanenceEOF:
+    """A non-interactive stdin at the crates permanence prompt must fail with a
+    clean hard error naming the permanent-placeholder consequence and the --yes
+    remediation -- never an EOFError traceback -- and never publish."""
+
+    @pytest.mark.parametrize("exc", [EOFError, KeyboardInterrupt])
+    @patch("rlsbl.commands.claim_name.subprocess.run")
+    @patch("rlsbl.commands.check._check_single_name")
+    @patch("rlsbl.commands.claim_name._read_cargo_token", return_value="cio_tok")
+    def test_permanence_prompt_eof_errors_with_remediation(self, mock_token, mock_check, mock_run, exc, capsys):
+        mock_check.return_value = {
+            "name": "my-crate", "registry": "crates", "status": "available",
+            "variants": None, "reason": None,
+        }
+        with patch("builtins.input", side_effect=exc()):
+            with pytest.raises(SystemExit) as exc_info:
+                run_cmd("crates", ["my-crate"], {"yes": False})
+        assert exc_info.value.code == 1
+        err = capsys.readouterr().err
+        assert "--yes" in err
+        assert "permanent" in err
+        assert "crates" in err
+        mock_run.assert_not_called()
+
+
 class TestClaimNameCratesTarget:
     """Tests for crates target acceptance in claim-name CLI."""
 

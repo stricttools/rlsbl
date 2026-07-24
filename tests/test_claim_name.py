@@ -291,3 +291,26 @@ class TestClaimNameConfirmation:
             run_cmd("npm", ["my-pkg"], {"yes": True, "dry-run": False})
         mock_input.assert_not_called()
         mock_run.assert_called_once()
+
+
+class TestClaimNamePublishPromptEOF:
+    """A closed/non-interactive stdin at the publish-placeholder prompt must
+    fail with a clean hard error naming the consequence and the --yes
+    remediation -- never an EOFError traceback."""
+
+    @pytest.mark.parametrize("exc", [EOFError, KeyboardInterrupt])
+    @patch("rlsbl.commands.claim_name.subprocess.run")
+    @patch("rlsbl.commands.check._check_single_name")
+    def test_publish_prompt_eof_errors_with_remediation(self, mock_check, mock_run, exc, capsys):
+        mock_check.return_value = {"name": "my-pkg", "registry": "npm", "status": "available", "variants": None, "reason": None}
+        with patch.dict(os.environ, {"NPM_TOKEN": "tok123"}), \
+             patch("builtins.input", side_effect=exc()):
+            with pytest.raises(SystemExit) as exc_info:
+                run_cmd("npm", ["my-pkg"], {"yes": False, "dry-run": False})
+        assert exc_info.value.code == 1
+        err = capsys.readouterr().err
+        assert "--yes" in err
+        assert "placeholder" in err
+        assert "npm" in err
+        # Never published on abort.
+        mock_run.assert_not_called()

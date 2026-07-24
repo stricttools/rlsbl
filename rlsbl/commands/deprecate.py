@@ -114,7 +114,11 @@ def run_cmd(args, flags, project_root):
         try:
             answer = input(prompt).strip().lower()
         except (EOFError, KeyboardInterrupt):
-            print("\nAborted.")
+            print(
+                f"\nError: stdin is not interactive; pass --yes to confirm "
+                f"marking {tag} as deprecated.",
+                file=sys.stderr,
+            )
             sys.exit(1)
         if answer != "y":
             print("Aborted.")

@@ -198,6 +198,37 @@ class TestBuildNotice(unittest.TestCase):
         self.assertEqual(result, "> **Deprecated:** Use v0.9.2 instead.")
 
 
+class TestDeprecateConfirmationEOF:
+    """A non-interactive stdin at the deprecate confirmation prompt must fail
+    with a clean hard error naming the deprecation consequence and the --yes
+    remediation -- never publish an edit, never a bare 'Aborted.'."""
+
+    @pytest.mark.parametrize("exc", [EOFError, KeyboardInterrupt])
+    @patch("rlsbl.commands.deprecate.check_gh_auth", return_value=True)
+    @patch("rlsbl.commands.deprecate.check_gh_installed", return_value=True)
+    @patch("rlsbl.commands.deprecate.run_gh")
+    @patch("rlsbl.commands.deprecate.find_workspace_root", return_value=None)
+    @patch("rlsbl.commands.deprecate.resolve_member_context", return_value=MagicMock(targets=[]))
+    def test_eof_at_confirmation_errors_with_remediation(
+        self, _detect, _ws_root, mock_run_gh, _gh_inst, _gh_auth, exc, capsys,
+    ):
+        mock_run_gh.side_effect = [
+            "",         # gh release view v0.9.1 (exists check)
+            "v0.9.2",   # gh release list (latest, not our target)
+        ]
+        with patch("builtins.input", side_effect=exc()):
+            with pytest.raises(SystemExit) as exc_info:
+                run_cmd(["0.9.1"], {"yes": False}, project_root=".")
+        assert exc_info.value.code == 1
+        err = capsys.readouterr().err
+        assert "--yes" in err
+        assert "deprecated" in err
+        # The gh release edit (the deprecation write) must never have run.
+        edit_calls = [c for c in mock_run_gh.call_args_list
+                      if c[0][0] and "edit" in c[0][0]]
+        assert edit_calls == []
+
+
 class TestCmdReleaseDeprecateDelegation:
     """Verify the CLI handler delegates correctly to the command module."""
 
