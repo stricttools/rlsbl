@@ -1080,6 +1080,80 @@ name = "extras"
 
 
 @skip_no_filter_repo
+class TestExtractRoundTrip:
+    """Absorb a released standalone repo into a monorepo, then extract it back
+    out, and assert the extracted repo is coherent: standalone tags restored,
+    zero foreign/mono-scheme tags, all changelog hashes resolve, coverage
+    passes, working tree committed and clean."""
+
+    def test_absorb_then_extract_is_coherent(self, tmp_path):
+        root = _setup_plain_monorepo(tmp_path)
+        source, _ = _setup_released_source_repo(tmp_path)
+
+        cmd_absorb(str(root), str(source), "packages/widget")
+
+        out = tmp_path / "widget_out"
+        result = cmd_extract(str(root), "widget", str(out))
+        assert result["package_name"] == "widget"
+
+        # 1. Standalone anchor tags restored at the right commits.
+        tags = _run_git(str(out), "tag", "-l").split()
+        assert "v0.1.0" in tags
+        assert "v0.2.0" in tags
+
+        # 2. Zero foreign / monorepo-scheme tags survive.
+        assert "widget@v0.1.0" not in tags
+        assert "widget@v0.2.0" not in tags
+        assert not any("@v" in t or t.endswith("/v0.1.0") for t in tags)
+
+        # 3. The v0.2.0 anchor is the newest reachable tag.
+        desc = _run_git(str(out), "describe", "--tags", "--match", "v*")
+        assert desc.startswith("v0.2.0")
+
+        # 4. Every surviving JSONL hash resolves in the extracted repo.
+        changes_dir = out / ".rlsbl" / "changes"
+        all_hashes = []
+        for jf in changes_dir.glob("*.jsonl"):
+            for entry in _parse_jsonl_hashes(str(jf)):
+                all_hashes.extend(entry.commits)
+        assert all_hashes  # sanity: there are hashes to check
+        for h in all_hashes:
+            _run_git(str(out), "cat-file", "-e", h + "^{commit}")
+
+        # 5. Changelog coverage passes in the extracted repo.
+        from rlsbl.changelog.validate import check_coverage
+
+        entries = _parse_jsonl_hashes(str(changes_dir / "unreleased.jsonl"))
+        prev_cwd = os.getcwd()
+        os.chdir(str(out))
+        try:
+            ok, details = check_coverage(entries, tag_glob="v*")
+        finally:
+            os.chdir(prev_cwd)
+        assert ok, details
+
+        # 6. The extracted repo self-committed: clean working tree.
+        assert _run_git(str(out), "status", "--porcelain") == ""
+
+        # 7. Source monorepo no longer lists the extracted package.
+        assert "widget" not in [p.name for p in load_workspace(str(root))]
+
+    def test_extract_translation_collision_is_hard_error(self, tmp_path):
+        """A pre-existing standalone tag colliding with a translated tag aborts
+        the extract with a clear error naming both tags."""
+        root = _setup_plain_monorepo(tmp_path)
+        source, _ = _setup_released_source_repo(tmp_path)
+        # Plant a standalone v0.2.0 in the monorepo -- it will be cloned into
+        # the extracted repo and collide with the widget@v0.2.0 translation.
+        cmd_absorb(str(root), str(source), "packages/widget")
+        _git_tag(root, "v0.2.0")
+
+        out = tmp_path / "widget_out"
+        with pytest.raises(ExtractError, match="collision"):
+            cmd_extract(str(root), "widget", str(out))
+
+
+@skip_no_filter_repo
 class TestCmdExtractReleasable:
     def test_dry_run(self, tmp_path):
         """Dry run returns member info without modifying anything."""
@@ -1143,6 +1217,51 @@ class TestCmdExtractReleasable:
         rel_names = [r.name for r in releasables]
         assert "core" not in rel_names
         assert "extras" in rel_names
+
+    def test_multi_member_recreates_releasable_and_keeps_tags(self, tmp_path):
+        """A multi-member extract recreates the [[releasables]] grouping and
+        KEEPS the releasable-scheme tags (translates nothing)."""
+        root, _ = _setup_monorepo_with_releasables(tmp_path)
+        # Tag the core releasable (shared scheme across pkgA/pkgB) plus a
+        # foreign extras tag that must be pruned.
+        _git_tag(root, "core@v0.1.0")
+        _git_tag(root, "extras@v0.3.0")
+        subprocess.run(["git", "add", WORKSPACE_DIR], cwd=str(root),
+                       check=True, capture_output=True, text=True)
+
+        target = tmp_path / "extracted_rel"
+        cmd_extract_releasable(str(root), "core", str(target))
+
+        # Releasable grouping recreated: load_releasables validates membership.
+        new_projects = load_workspace(str(target))
+        new_releasables = load_releasables(str(target), new_projects)
+        assert [r.name for r in new_releasables] == ["core"]
+        for p in new_projects:
+            assert p.releasable == "core"
+
+        tags = _run_git(str(target), "tag", "-l").split()
+        # Releasable-scheme tag kept unchanged; foreign extras tag pruned.
+        assert "core@v0.1.0" in tags
+        assert "extras@v0.3.0" not in tags
+
+        # Self-committed, clean tree.
+        assert _run_git(str(target), "status", "--porcelain") == ""
+
+    def test_single_member_translates_releasable_tags(self, tmp_path):
+        """A single-member extract translates the releasable-scheme tags to
+        standalone v{version} and prunes foreign tags."""
+        root, _ = _setup_monorepo_with_releasables(tmp_path)
+        _git_tag(root, "extras@v0.3.0")  # the single-member releasable's tag
+        _git_tag(root, "core@v0.1.0")    # foreign -- must be pruned
+
+        target = tmp_path / "extracted_extras"
+        cmd_extract_releasable(str(root), "extras", str(target))
+
+        tags = _run_git(str(target), "tag", "-l").split()
+        assert "v0.3.0" in tags
+        assert "extras@v0.3.0" not in tags
+        assert "core@v0.1.0" not in tags
+        assert _run_git(str(target), "status", "--porcelain") == ""
 
     def test_nonexistent_releasable_error(self, tmp_path):
         """Error when the releasable does not exist."""

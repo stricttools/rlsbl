@@ -7,10 +7,12 @@ Provides:
 - cmd_extract_releasable(): extract all member packages of a releasable
 """
 
+import dataclasses
 import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 
 from ...changelog.files import (
@@ -19,16 +21,24 @@ from ...changelog.files import (
     list_versioned_files,
     load_filter_repo_commit_map,
     remap_jsonl_hashes,
+    writable_jsonl,
 )
 from ...changelog.schema import parse_jsonl, serialize_entry
 from ...errors import RlsblError
-from ...tag_glob import TagMode, parse_version_tag
+from ...tag_glob import (
+    TagMode,
+    parse_version_tag,
+    releasable_tag_glob,
+    resolve_monorepo_tag_glob,
+)
 from ...utils import commit_files
 from ...workspace import (
     get_releasable_changes_dir,
+    is_explicit_mode,
     load_workspace,
     load_releasables,
     members_of,
+    resolve_releasable_for_project,
     save_workspace,
 )
 
@@ -63,6 +73,281 @@ def _run_git(cwd, *args):
         check=True,
     )
     return result.stdout.strip()
+
+
+def _run_filter_repo(cwd, *args):
+    """Run ``git-filter-repo`` in ``cwd``, wrapping failures in ExtractError.
+
+    Raw ``subprocess.CalledProcessError`` from a filter-repo run is an opaque
+    stack trace to the caller; wrap it so the extract flow reports a clean,
+    actionable error including filter-repo's own stderr.
+    """
+    try:
+        subprocess.run(
+            ["git-filter-repo", *args],
+            cwd=str(cwd), check=True, capture_output=True, text=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        raise ExtractError(
+            f"git-filter-repo failed (args: {' '.join(args)}):\n"
+            f"{exc.stderr or exc.stdout or exc}"
+        ) from exc
+
+
+def _ensure_git_identity(clone_path, source_path):
+    """Copy the source repo's committer identity into a fresh clone.
+
+    ``git clone`` does not carry over the source's *local* ``user.name`` /
+    ``user.email``, so a commit inside the clone can fail with "please tell me
+    who you are" in environments without a global identity. We read the
+    source's effective identity (local or global) and set it locally in the
+    clone. If the source has none configured, the clone inherits whatever
+    global identity exists (unchanged).
+    """
+    for key in ("user.name", "user.email"):
+        try:
+            val = _run_git(source_path, "config", "--get", key)
+        except subprocess.CalledProcessError:
+            continue
+        if val:
+            _run_git(clone_path, "config", key, val)
+
+
+def _git_tag_list(repo, pattern=None):
+    """Return the list of tags in ``repo``, optionally filtered by a glob."""
+    args = ["tag", "-l"]
+    if pattern is not None:
+        args.append(pattern)
+    out = _run_git(repo, *args)
+    return [t for t in out.splitlines() if t.strip()]
+
+
+def _commit_resolves(repo, commit_hash):
+    """Whether ``commit_hash`` resolves to an existing commit object in ``repo``."""
+    result = subprocess.run(
+        ["git", "cat-file", "-e", commit_hash + "^{commit}"],
+        cwd=str(repo), capture_output=True, text=True,
+    )
+    return result.returncode == 0
+
+
+def _translate_extract_tags(repo, own_glob, *, keep_own):
+    """Translate/prune tags in a freshly extracted repo.
+
+    A clone (then filter-repo) carries EVERY tag the monorepo had: the
+    extracted package's own monorepo-scheme tags, foreign packages' scheme
+    tags, and any pre-existing standalone ``v*`` tags -- all pointing at
+    rewritten commits.
+
+    - Tags matching ``own_glob`` are the extracted package's own tags. When
+      ``keep_own`` is False they are retagged as ``v{version}`` at the same
+      commit and the monorepo-scheme original is deleted; when True (a
+      multi-member releasable, whose releasable scheme stays valid) they are
+      left untouched.
+    - Any OTHER tag that parses as a monorepo/path-scheme version tag is a
+      foreign artifact and is deleted.
+    - Tags that do not parse as a version tag under any scheme (and standalone
+      ``v*`` tags that are not translation targets) are left in place, with a
+      log line for genuinely unrecognized tags.
+
+    Collision: when ``keep_own`` is False and a translated ``v{version}`` name
+    already exists (a pre-existing standalone tag), raise ExtractError naming
+    both tags -- never silently clobber.
+
+    Returns ``(translated_or_kept, deleted, left)`` tag-name lists.
+    """
+    all_tags = set(_git_tag_list(repo))
+    own_tags = _git_tag_list(repo, own_glob)
+    own_set = set(own_tags)
+
+    # Resolve each own tag to (old_tag, version, sha).
+    translations = []
+    for tag in own_tags:
+        parsed = parse_version_tag(tag, mode=TagMode.PRERELEASE_INCLUSIVE)
+        if parsed is None:
+            # Glob matched a non-version tag -- leave it alone.
+            continue
+        sha = _run_git(repo, "rev-list", "-n", "1", tag)
+        translations.append((tag, parsed.version, sha))
+
+    # Collision pre-check (before mutating anything) so we fail cleanly.
+    if not keep_own:
+        for old_tag, version, _sha in translations:
+            new_tag = f"v{version}"
+            if new_tag in all_tags and new_tag not in own_set:
+                raise ExtractError(
+                    f"tag translation collision: cannot rename '{old_tag}' to "
+                    f"'{new_tag}' because a tag named '{new_tag}' already "
+                    f"exists in the extracted repo. Resolve the conflicting "
+                    f"tag before extracting."
+                )
+
+    # Prune foreign scheme tags; leave unrecognized / standalone tags.
+    deleted = []
+    left = []
+    for tag in sorted(all_tags):
+        if tag in own_set:
+            continue
+        parsed = parse_version_tag(tag, mode=TagMode.PRERELEASE_INCLUSIVE)
+        if parsed is None:
+            left.append(tag)
+            print(
+                f"note: leaving unrecognized tag '{tag}' in extracted repo "
+                f"(matches no member tag scheme)",
+                file=sys.stderr,
+            )
+        elif parsed.scheme == "standalone":
+            # A pre-existing standalone tag -- valid in the extracted repo.
+            left.append(tag)
+        else:
+            _run_git(repo, "tag", "-d", tag)
+            deleted.append(tag)
+
+    # Apply translations (or keep own tags for multi-member releasables).
+    if keep_own:
+        return own_tags, deleted, left
+
+    translated = []
+    for old_tag, version, sha in translations:
+        new_tag = f"v{version}"
+        _run_git(repo, "tag", new_tag, sha)
+        _run_git(repo, "tag", "-d", old_tag)
+        translated.append(new_tag)
+    return translated, deleted, left
+
+
+def _prune_dangling_entries(changes_dir, repo_root):
+    """Drop changelog entries whose commits no longer resolve after a rewrite.
+
+    Runs AFTER :func:`remap_jsonl_hashes` has mapped every survivable hash to
+    its post-rewrite SHA. Any commit that still fails to resolve in
+    ``repo_root`` was pruned by the filter (or was never mappable):
+
+    - An entry with at least one surviving commit is kept, narrowed to just the
+      resolving hashes (a partial survival, logged).
+    - An entry whose EVERY commit fails to resolve is DROPPED entirely, with a
+      loud log line -- never left dangling with a null/stale hash.
+
+    Returns the number of entries dropped.
+    """
+    if not os.path.isdir(changes_dir):
+        return 0
+    dropped = 0
+    for name in sorted(os.listdir(changes_dir)):
+        if not name.endswith(".jsonl"):
+            continue
+        filepath = os.path.join(changes_dir, name)
+        entries = parse_jsonl(filepath)
+        new_entries = []
+        changed = False
+        for entry in entries:
+            surviving = [h for h in entry.commits if _commit_resolves(repo_root, h)]
+            if not surviving:
+                changed = True
+                dropped += 1
+                desc = entry.description or "(non-user-facing)"
+                print(
+                    f"note: dropping changelog entry '{desc}' from {name} -- "
+                    f"all referenced commits were pruned by the extract "
+                    f"rewrite",
+                    file=sys.stderr,
+                )
+                continue
+            if len(surviving) != len(entry.commits):
+                changed = True
+                print(
+                    f"note: narrowing changelog entry in {name} to surviving "
+                    f"commits ({len(surviving)}/{len(entry.commits)}) after "
+                    f"extract rewrite",
+                    file=sys.stderr,
+                )
+                new_entries.append(dataclasses.replace(entry, commits=surviving))
+            else:
+                new_entries.append(entry)
+        if not changed:
+            continue
+        content = "".join(serialize_entry(e) + "\n" for e in new_entries)
+        with writable_jsonl(filepath):
+            fd, tmp_path = tempfile.mkstemp(
+                dir=os.path.dirname(filepath), suffix=".tmp"
+            )
+            try:
+                os.write(fd, content.encode("utf-8"))
+                os.close(fd)
+                os.replace(tmp_path, filepath)
+            except BaseException:
+                if os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
+                raise
+    return dropped
+
+
+def _remap_and_prune(changes_dir, sha_map, repo_root):
+    """Remap migrated JSONL hashes to post-rewrite SHAs and drop dangling entries.
+
+    Combines :func:`remap_jsonl_hashes` (map old monorepo SHAs to the extracted
+    repo's new SHAs) with :func:`_prune_dangling_entries` (drop entries whose
+    commits were pruned). Used by both extract commands so remap + prune stay
+    identical across them.
+    """
+    if not os.path.isdir(changes_dir):
+        return
+    remap_jsonl_hashes(changes_dir, sha_map)
+    _prune_dangling_entries(changes_dir, repo_root)
+
+
+def _commit_extracted_state(repo):
+    """Commit the migrated/remapped/retagged .rlsbl state in an extracted repo.
+
+    The extracted repo is a fresh, non-shared clone, so a plain committed
+    snapshot is safe. Carries the Autogenerated trailer so the structural
+    migration commit is exempt from changelog coverage checks in the new repo.
+    Captures every working-tree change (workspace.toml/config edits, remapped
+    JSONL, migrated changelog files). No-op when the tree is already clean.
+    """
+    result = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=str(repo), capture_output=True, text=True, check=True,
+    )
+    paths = []
+    for line in result.stdout.splitlines():
+        if len(line) < 4:
+            continue
+        rest = line[3:]
+        if " -> " in rest:
+            rest = rest.split(" -> ", 1)[1]
+        rest = rest.strip().strip('"')
+        if rest:
+            paths.append(rest)
+    if not paths:
+        return
+    commit_files(
+        "chore: migrate rlsbl state from monorepo extract",
+        paths,
+        cwd=str(repo),
+    )
+
+
+def _resolve_own_tag_glob(workspace_root, project, projects):
+    """Resolve the extracted package's own monorepo tag glob.
+
+    Uses the project's releasable ``tag_format`` when the workspace is in
+    explicit mode and the project belongs to a releasable; otherwise the
+    project's first detected target's monorepo glob.
+    """
+    from ...errors import ConfigError
+
+    releasables = []
+    if is_explicit_mode(workspace_root):
+        releasables = load_releasables(workspace_root, projects)
+    rel = resolve_releasable_for_project(project, releasables)
+    try:
+        return resolve_monorepo_tag_glob(project, workspace_root, releasable=rel)
+    except ConfigError:
+        # A malformed/target-less package config must not crash extraction;
+        # fall back to the default monorepo tag scheme (matches absorb's tag
+        # resolver fallback).
+        return f"{project['name']}@v*"
 
 
 def _find_project(projects, package_name):
@@ -298,47 +583,28 @@ def cmd_extract(workspace_root, package_name, target_repo_path, *, dry_run=False
             "dry_run": True,
         }
 
+    # Resolve the extracted package's own tag glob BEFORE mutating the source
+    # (target detection reads the still-present package dir).
+    own_glob = _resolve_own_tag_glob(workspace_root, project, projects)
+
     # Clone the monorepo to target path
     _run_git(workspace_root, "clone", "--no-local", ".", target_repo_path)
+    _ensure_git_identity(target_repo_path, workspace_root)
 
-    # Run git filter-repo to keep only the package's directory
-    subprocess.run(
-        ["git-filter-repo", "--path", package_path, "--force"],
-        cwd=target_repo_path,
-        check=True,
-        capture_output=True,
-        text=True,
+    # Keep only the package's directory, then hoist it to the repo root. Both
+    # runs update ONE cumulative .git/filter-repo/commit-map.
+    _run_filter_repo(target_repo_path, "--path", package_path, "--force")
+    _run_filter_repo(
+        target_repo_path, "--path-rename", f"{package_path}/:", "--force"
     )
 
-    # After filter-repo, the package dir is at root level with its subpath.
-    # Move files from the subdirectory to root if the path has depth.
-    if "/" in package_path or os.sep in package_path:
-        subprocess.run(
-            [
-                "git-filter-repo",
-                "--path-rename", f"{package_path}/:",
-                "--force",
-            ],
-            cwd=target_repo_path,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-    else:
-        # Single-level path: rename pkg/ to root
-        subprocess.run(
-            [
-                "git-filter-repo",
-                "--path-rename", f"{package_path}/:",
-                "--force",
-            ],
-            cwd=target_repo_path,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+    commit_map_path = os.path.join(
+        target_repo_path, ".git", "filter-repo", "commit-map"
+    )
+    sha_map, _pruned = load_filter_repo_commit_map(commit_map_path)
 
-    # Migrate changelog
+    # Migrate changelog (writes verbatim old monorepo SHAs), then remap those
+    # to the rewritten SHAs and drop entries whose commits were pruned.
     source_changes_dir = get_changes_dir(
         os.path.join(workspace_root, package_path)
     )
@@ -350,12 +616,22 @@ def cmd_extract(workspace_root, package_name, target_repo_path, *, dry_run=False
         files_written, entries_migrated = _migrate_changelog_to_new_repo(
             source_changes_dir, target_changes_dir, package_path, workspace_root
         )
+        _remap_and_prune(target_changes_dir, sha_map, target_repo_path)
 
     # Create .rlsbl/ config
     source_config = os.path.join(
         workspace_root, package_path, ".rlsbl", "config.json"
     )
     _create_rlsbl_config(target_repo_path, source_config)
+
+    # Translate the package's monorepo-scheme tags to standalone v{version},
+    # and prune foreign packages' tags.
+    tags_translated, tags_deleted, _tags_left = _translate_extract_tags(
+        target_repo_path, own_glob, keep_own=False
+    )
+
+    # Commit the migrated + remapped + retagged state in the extracted repo.
+    _commit_extracted_state(target_repo_path)
 
     # Update source monorepo: remove project from workspace.toml
     _remove_project_from_workspace(workspace_root, package_name, projects)
@@ -366,6 +642,8 @@ def cmd_extract(workspace_root, package_name, target_repo_path, *, dry_run=False
         "package_path": package_path,
         "entries_migrated": entries_migrated,
         "files_written": files_written,
+        "tags_translated": tags_translated,
+        "tags_deleted": tags_deleted,
     }
 
 
@@ -770,39 +1048,33 @@ def cmd_extract_releasable(
             "dry_run": True,
         }
 
+    # The releasable's tag glob (e.g. "core@v*") is the same for every member.
+    own_glob = releasable_tag_glob(target_releasable.tag_format, releasable_name)
+
     # Clone the monorepo to target path
     _run_git(workspace_root, "clone", "--no-local", ".", target_repo_path)
+    _ensure_git_identity(target_repo_path, workspace_root)
 
-    # Run git filter-repo to keep only the member paths
+    # Keep only the member paths (one multi-path run). For a single-member
+    # releasable, hoist the lone package to the repo root. Both runs update the
+    # ONE cumulative .git/filter-repo/commit-map.
     filter_args = []
     for path in member_paths:
         filter_args.extend(["--path", path])
     filter_args.append("--force")
+    _run_filter_repo(target_repo_path, *filter_args)
 
-    subprocess.run(
-        ["git-filter-repo"] + filter_args,
-        cwd=target_repo_path,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-
-    # For single-member releasable, move files to root
     if not is_multi:
-        pkg_path = member_paths[0]
-        subprocess.run(
-            [
-                "git-filter-repo",
-                "--path-rename", f"{pkg_path}/:",
-                "--force",
-            ],
-            cwd=target_repo_path,
-            check=True,
-            capture_output=True,
-            text=True,
+        _run_filter_repo(
+            target_repo_path, "--path-rename", f"{member_paths[0]}/:", "--force"
         )
 
-    # Migrate changelogs
+    commit_map_path = os.path.join(
+        target_repo_path, ".git", "filter-repo", "commit-map"
+    )
+    sha_map, _pruned = load_filter_repo_commit_map(commit_map_path)
+
+    # Migrate changelogs, then remap + prune each member's changes dir.
     total_entries = 0
     total_files = 0
     for proj in member_projects:
@@ -824,22 +1096,38 @@ def cmd_extract_releasable(
             )
             total_files += fw
             total_entries += em
+            _remap_and_prune(target_changes_dir, sha_map, target_repo_path)
 
-    # Create config
+    # Create config + translate/keep tags.
     if is_multi:
-        # Create a monorepo workspace.toml in the new repo
+        # Recreate the monorepo workspace.toml in the new repo, preserving the
+        # [[releasables]] grouping and each member's releasable assignment so
+        # the releasable-scheme tags stay valid -- so those tags are KEPT
+        # (translate nothing); only foreign tags are pruned.
         new_projects = []
         from ...workspace import WorkspaceProject as WP
         for proj in member_projects:
-            new_proj = {"path": proj.path, "name": proj.name}
+            new_proj = {"path": proj.path, "name": proj.name, "releasable": releasable_name}
             new_projects.append(WP(new_proj))
-        save_workspace(target_repo_path, new_projects)
+        save_workspace(
+            target_repo_path, new_projects, releasables=[target_releasable]
+        )
+        tags_translated, tags_deleted, _left = _translate_extract_tags(
+            target_repo_path, own_glob, keep_own=True
+        )
     else:
-        # Single-project repo: create .rlsbl/ config
+        # Single-project repo: create .rlsbl/ config and translate the
+        # releasable-scheme tags to standalone v{version}.
         source_config = os.path.join(
             workspace_root, member_paths[0], ".rlsbl", "config.json"
         )
         _create_rlsbl_config(target_repo_path, source_config)
+        tags_translated, tags_deleted, _left = _translate_extract_tags(
+            target_repo_path, own_glob, keep_own=False
+        )
+
+    # Commit the migrated + remapped + retagged state in the extracted repo.
+    _commit_extracted_state(target_repo_path)
 
     # Update source monorepo: remove all member projects
     remaining = [p for p in projects if p.name not in member_names]
@@ -854,4 +1142,6 @@ def cmd_extract_releasable(
         "is_monorepo": is_multi,
         "entries_migrated": total_entries,
         "files_written": total_files,
+        "tags_translated": tags_translated,
+        "tags_deleted": tags_deleted,
     }
