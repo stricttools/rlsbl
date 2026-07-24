@@ -9,6 +9,8 @@ import subprocess
 import sys
 import tomllib
 import urllib.request
+from dataclasses import dataclass
+from enum import Enum
 
 from .errors import ConfigError, GitError, VersionError
 
@@ -302,6 +304,84 @@ def tag_exists_on_remote(tag, cwd=None):
     """Check whether a git tag exists on the origin remote."""
     output = run("git", ["ls-remote", "--tags", "origin", tag], cwd=cwd)
     return bool(output.strip())
+
+
+class RemoteTagState(Enum):
+    """Tri-state outcome of a commit-aware remote tag lookup."""
+
+    PRESENT = "present"
+    ABSENT = "absent"
+    INCONCLUSIVE = "inconclusive"
+
+
+@dataclass(frozen=True)
+class RemoteTagResult:
+    """Result of resolving a tag to its peeled commit on a remote.
+
+    Attributes:
+        state: PRESENT (tag found; ``commit`` is set), ABSENT (ls-remote
+            succeeded but no matching ref), or INCONCLUSIVE (ls-remote failed
+            due to network/auth/timeout; ``error`` carries the underlying text).
+        commit: the peeled commit SHA the tag points to. Only set when state
+            is PRESENT; None otherwise. For annotated tags this is the ``^{}``
+            peeled line (the commit), not the tag-object SHA.
+        error: underlying error text when state is INCONCLUSIVE; None otherwise.
+    """
+
+    state: RemoteTagState
+    commit: str | None = None
+    error: str | None = None
+
+
+def remote_tag_commit(tag, cwd=None, remote="origin"):
+    """Resolve a tag to the commit it points to on ``remote`` (default origin).
+
+    Runs ``git ls-remote --tags <remote> <tag>`` and returns a tri-state
+    ``RemoteTagResult``:
+
+    - PRESENT with the peeled commit SHA. For annotated tags, ls-remote prints
+      two lines -- ``<tag-object-sha> refs/tags/<tag>`` and
+      ``<commit-sha> refs/tags/<tag>^{}``. The ``^{}`` peeled line is the
+      commit and is preferred. For lightweight tags there is a single line
+      whose SHA is already the commit.
+    - ABSENT when ls-remote succeeds but returns no matching ref.
+    - INCONCLUSIVE when ls-remote fails (network, auth, timeout); the failure
+      text is carried in ``error``.
+
+    Both ``refs/tags/<tag>`` and ``refs/tags/<tag>^{}`` are passed as explicit
+    match patterns: a bare ``<tag>`` pattern matches only the direct ref and
+    suppresses the peeled ``^{}`` line, which would make annotated tags
+    false-negative to the tag-object SHA instead of the commit.
+    """
+    full_ref = f"refs/tags/{tag}"
+    try:
+        result = subprocess.run(
+            ["git", "ls-remote", "--tags", remote, full_ref, f"{full_ref}^{{}}"],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=cwd,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
+        error_text = getattr(e, "stderr", None) or str(e)
+        return RemoteTagResult(RemoteTagState.INCONCLUSIVE, error=str(error_text).strip())
+
+    direct = None
+    peeled = None
+    for line in result.stdout.splitlines():
+        parts = line.split()
+        if len(parts) != 2:
+            continue
+        sha, ref = parts
+        if ref == full_ref:
+            direct = sha
+        elif ref == f"{full_ref}^{{}}":
+            peeled = sha
+
+    commit = peeled or direct
+    if commit is None:
+        return RemoteTagResult(RemoteTagState.ABSENT)
+    return RemoteTagResult(RemoteTagState.PRESENT, commit=commit)
 
 
 def push_if_needed(branch, env=None, *, config):
