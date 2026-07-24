@@ -419,11 +419,13 @@ class TestNoReleasePushEnv:
 
 class TestDryRunPush:
     """--dry-run must run branch guard, coverage, and behind-remote checks,
-    then print what would be pushed WITHOUT invoking the push subprocess."""
+    then REHEARSE the push via `git push --dry-run --no-verify` (surfacing
+    remote-side rejections) WITHOUT performing a real push."""
 
-    def test_dry_run_does_not_push(self, push_repo, capsys):
-        """Covered + not-behind branch: dry-run prints the would-push line,
-        never calls git push, and exits 0 (returns normally)."""
+    def test_dry_run_rehearses_but_does_not_really_push(self, push_repo, capsys):
+        """Covered + not-behind branch: dry-run invokes exactly one git push,
+        which carries --dry-run and --no-verify (a rehearsal, not a real push),
+        prints the would-push line, and exits 0 (returns normally)."""
         run_git(push_repo, "checkout", "-b", "dev-dry")
 
         (push_repo / "feature.py").write_text("def hello(): pass\n")
@@ -454,13 +456,61 @@ class TestDryRunPush:
             return original_run(cmd, *args, **kwargs)
 
         with patch("rlsbl.commands.push_cmd.subprocess.run", side_effect=mock_run):
-            # Must NOT raise SystemExit -- dry run is a successful no-op push.
+            # Must NOT raise SystemExit -- rehearsal succeeds.
             run_push(ctx, yes=True, quiet=False, dry_run=True)
 
-        assert push_calls == [], "dry run must not invoke git push"
+        assert len(push_calls) == 1, "dry run rehearses with exactly one git push"
+        rehearsal = push_calls[0]
+        assert "--dry-run" in rehearsal, "rehearsal must be a --dry-run push"
+        assert "--no-verify" in rehearsal, "rehearsal must skip the local hook"
+        # No real push: every push invocation carried --dry-run.
+        assert all("--dry-run" in c for c in push_calls), "no real push in dry run"
         out = capsys.readouterr().out
         assert "Dry run: would push" in out
         assert "dev-dry" in out
+
+    def test_dry_run_remote_rejection_exits(self, push_repo, capsys):
+        """A rehearsal that the remote rejects (non-zero exit) must hard-error
+        and exit 1 -- the dry run reports the remote refusal instead of a
+        misleading success."""
+        run_git(push_repo, "checkout", "-b", "dev-dry-reject")
+
+        (push_repo / "feature.py").write_text("def hello(): pass\n")
+        run_git(push_repo, "add", "feature.py")
+        run_git(push_repo, "commit", "-q", "-m", "add feature")
+        head_sha = git_head(push_repo)
+
+        changes = push_repo / ".rlsbl" / "changes"
+        entry = json.dumps({
+            "commits": [head_sha],
+            "user_facing": True,
+            "description": "Add hello feature",
+            "type": "feature",
+        })
+        (changes / "unreleased.jsonl").write_text(entry + "\n")
+        run_git(push_repo, "add", ".rlsbl")
+        run_git(push_repo, "commit", "-q", "-m", "changelog")
+
+        ctx = _make_push_ctx(push_repo)
+
+        push_calls = []
+        original_run = subprocess.run
+
+        def mock_run(cmd, *args, **kwargs):
+            if isinstance(cmd, list) and cmd[0] == "git" and "push" in cmd:
+                push_calls.append(cmd)
+                # Remote rejects the rehearsal.
+                return subprocess.CompletedProcess(args=cmd, returncode=1)
+            return original_run(cmd, *args, **kwargs)
+
+        with patch("rlsbl.commands.push_cmd.subprocess.run", side_effect=mock_run):
+            with pytest.raises(SystemExit) as exc_info:
+                run_push(ctx, yes=True, quiet=False, dry_run=True)
+        assert exc_info.value.code == 1
+        assert len(push_calls) == 1
+        assert "--dry-run" in push_calls[0]
+        err = capsys.readouterr().err
+        assert "rehearsal" in err.lower()
 
     def test_dry_run_still_enforces_coverage(self, push_repo):
         """Preflight checks still run under dry-run: an uncovered commit blocks
@@ -487,3 +537,56 @@ class TestDryRunPush:
                 run_push(ctx, yes=True, quiet=False, dry_run=True)
         assert exc_info.value.code == 1
         assert push_calls == []
+
+
+# ------------------------------------------------------------------
+# Test 8: non-interactive stdin at the confirmation prompt
+# ------------------------------------------------------------------
+
+
+class TestConfirmationEOF:
+    """With yes=False and a closed/non-interactive stdin, the confirmation
+    prompt must fail with a clean hard error naming the origin-push consequence
+    and the --yes remediation -- never an EOFError traceback -- and never
+    invoke git push."""
+
+    @pytest.mark.parametrize("exc", [EOFError, KeyboardInterrupt])
+    def test_eof_at_confirmation_errors_with_remediation(self, push_repo, capsys, exc):
+        run_git(push_repo, "checkout", "-b", "dev-eof")
+
+        (push_repo / "feature.py").write_text("def hello(): pass\n")
+        run_git(push_repo, "add", "feature.py")
+        run_git(push_repo, "commit", "-q", "-m", "add feature")
+        head_sha = git_head(push_repo)
+
+        changes = push_repo / ".rlsbl" / "changes"
+        entry = json.dumps({
+            "commits": [head_sha],
+            "user_facing": True,
+            "description": "Add hello feature",
+            "type": "feature",
+        })
+        (changes / "unreleased.jsonl").write_text(entry + "\n")
+        run_git(push_repo, "add", ".rlsbl")
+        run_git(push_repo, "commit", "-q", "-m", "changelog")
+
+        ctx = _make_push_ctx(push_repo)
+
+        push_calls = []
+        original_run = subprocess.run
+
+        def mock_run(cmd, *args, **kwargs):
+            if isinstance(cmd, list) and cmd[0] == "git" and "push" in cmd:
+                push_calls.append(cmd)
+                return subprocess.CompletedProcess(args=cmd, returncode=0)
+            return original_run(cmd, *args, **kwargs)
+
+        with patch("rlsbl.commands.push_cmd.subprocess.run", side_effect=mock_run), \
+             patch("builtins.input", side_effect=exc()):
+            with pytest.raises(SystemExit) as exc_info:
+                run_push(ctx, yes=False, quiet=False)
+        assert exc_info.value.code == 1
+        assert push_calls == [], "no push on aborted confirmation"
+        err = capsys.readouterr().err
+        assert "--yes" in err
+        assert "origin" in err

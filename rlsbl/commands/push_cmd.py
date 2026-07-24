@@ -192,16 +192,47 @@ def run_push(ctx, *, yes, quiet, dry_run=False):
         print(f"Error: {behind_error}", file=sys.stderr)
         sys.exit(1)
 
-    # Dry run: all preflight checks have passed; report and stop before any
-    # prompt or push.
+    # Dry run: all preflight checks have passed; rehearse the real push with
+    # `git push --dry-run` so remote-side rejections (protected branch, stale
+    # ref, hook denial) surface without publishing anything. --no-verify skips
+    # the local pre-push hook so its coverage check is not run a second time
+    # (the preflights above already validated coverage).
     if dry_run:
+        timeout = get_push_timeout(ctx.config)
+        rehearsal_cmd = ["git", "push", "--dry-run", "--no-verify", "origin", branch]
+        if not remote_branch_exists(branch):
+            rehearsal_cmd = [
+                "git", "push", "--dry-run", "--no-verify", "-u", "origin", branch,
+            ]
+        if not quiet:
+            print(f"Dry run: rehearsing push of {branch} to origin...")
+        try:
+            result = subprocess.run(rehearsal_cmd, timeout=timeout, text=True)
+            if result.returncode != 0:
+                print("Error: push rehearsal failed", file=sys.stderr)
+                sys.exit(1)
+        except subprocess.TimeoutExpired:
+            print(
+                f"Error: push rehearsal timed out after {timeout}s -- "
+                f"remote state may be inconsistent",
+                file=sys.stderr,
+            )
+            sys.exit(1)
         print(f"Dry run: would push {branch} to origin")
         return
 
     # 4. Confirmation
     if not yes:
         print(f"Push branch '{branch}' to origin? [y/N] ", end="", flush=True)
-        answer = input().strip().lower()
+        try:
+            answer = input().strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print(
+                "\nError: stdin is not interactive; pass --yes to confirm "
+                "pushing to origin.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
         if answer not in ("y", "yes"):
             print("Aborted.", file=sys.stderr)
             sys.exit(1)
