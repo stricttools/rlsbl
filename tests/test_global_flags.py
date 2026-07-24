@@ -4,13 +4,9 @@ import inspect
 
 from rlsbl import app
 
-# Handlers that still carry **_kwargs (VAR_KEYWORD). Phases 3-5 remove these
-# registration blocks entirely; this list must shrink to empty by the end of
-# that work. Identified by handler function __name__.
-KWARGS_EXEMPT_HANDLERS = {
-    "cmd_mono_extract",
-    "cmd_mono_extract_releasable",
-}
+# No handler is permitted to carry **_kwargs (VAR_KEYWORD) any longer -- the
+# cycle-end state is zero exemptions.
+KWARGS_EXEMPT_HANDLERS = set()
 
 GLOBAL_FLAG_PARAMS = ("dry_run", "yes", "quiet")
 
