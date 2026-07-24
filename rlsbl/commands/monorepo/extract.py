@@ -334,20 +334,51 @@ def _resolve_own_tag_glob(workspace_root, project, projects):
     Uses the project's releasable ``tag_format`` when the workspace is in
     explicit mode and the project belongs to a releasable; otherwise the
     project's first detected target's monorepo glob.
-    """
-    from ...errors import ConfigError
 
+    Assumes the package's target config was already validated up front by
+    :func:`validate_extract_preconditions`. A broken target declaration is a
+    hard error THERE (before any history rewrite), never a silent fallback
+    here -- so this helper never has to swallow a ``ConfigError``.
+    """
     releasables = []
     if is_explicit_mode(workspace_root):
         releasables = load_releasables(workspace_root, projects)
     rel = resolve_releasable_for_project(project, releasables)
+    return resolve_monorepo_tag_glob(project, workspace_root, releasable=rel)
+
+
+def _assert_extract_target_config_valid(workspace_root, project, projects):
+    """Hard-error UP FRONT if the package's target declaration is broken.
+
+    A *broken* declaration is a ``.rlsbl/config.json`` that exists but has no
+    ``targets`` key (``detect_targets`` raises ``ConfigError``). A package with
+    NO config file at all is fine -- targets auto-detect. Releasable members
+    derive their tag scheme from the releasable ``tag_format`` and skip target
+    detection entirely, so they are never broken here.
+
+    Raising here (in the precondition gate, before the clone/filter-repo runs)
+    is what replaces the old silent fallback to the ``{name}@v*`` scheme.
+    """
+    from ...errors import ConfigError
+    from ...targets import detect_targets, resolve_releasable_config_dir
+
+    releasables = []
+    if is_explicit_mode(workspace_root):
+        releasables = load_releasables(workspace_root, projects)
+    if resolve_releasable_for_project(project, releasables) is not None:
+        return
+    rel_dir = resolve_releasable_config_dir(project, workspace_root)
+    proj_dir = os.path.join(str(workspace_root), project["path"])
     try:
-        return resolve_monorepo_tag_glob(project, workspace_root, releasable=rel)
-    except ConfigError:
-        # A malformed/target-less package config must not crash extraction;
-        # fall back to the default monorepo tag scheme (matches absorb's tag
-        # resolver fallback).
-        return f"{project['name']}@v*"
+        detect_targets(proj_dir, releasable_config_dir=rel_dir)
+    except ConfigError as e:
+        cfg_rel = os.path.join(project["path"], ".rlsbl", "config.json")
+        raise ExtractError(
+            f"package '{project['name']}' has a broken target declaration and "
+            f"cannot be extracted: {e} Add a \"targets\" key to {cfg_rel} (a "
+            f"package with no .rlsbl/config.json is fine -- targets are "
+            f"auto-detected)."
+        ) from e
 
 
 def _find_project(projects, package_name):
@@ -544,6 +575,8 @@ def validate_extract_preconditions(workspace_root, package_name, target_repo_pat
             f"target path already exists: {target_repo_path}"
         )
 
+    _assert_extract_target_config_valid(workspace_root, project, projects)
+
     return projects, project
 
 
@@ -693,7 +726,36 @@ def validate_absorb_preconditions(workspace_root, source_repo_path, dest_path, n
                 f"package '{name}' already exists in workspace"
             )
 
+    _assert_absorb_source_config_valid(source_repo_path)
+
     return projects
+
+
+def _assert_absorb_source_config_valid(source_repo_path):
+    """Hard-error UP FRONT (before any history rewrite) if the source repo's
+    target declaration is broken.
+
+    The source's ``.rlsbl/config.json`` becomes the absorbed package's config,
+    so a broken declaration (config file present but no ``targets`` key) would
+    otherwise surface only LATER -- after the merge landed -- as a silently
+    mis-schemed tag import. A source with NO config file at all is the
+    legitimate auto-detect path and passes.
+
+    Raising here replaces the old silent fallback to the ``{name}@v{version}``
+    scheme in :func:`_resolve_monorepo_tag_target`.
+    """
+    from ...errors import ConfigError
+    from ...targets import detect_targets
+
+    try:
+        detect_targets(source_repo_path)
+    except ConfigError as e:
+        raise ExtractError(
+            f"source repository '{source_repo_path}' has a broken target "
+            f"declaration and cannot be absorbed: {e} A repository with a "
+            f".rlsbl/config.json must include a \"targets\" key (a repository "
+            f"with no .rlsbl/config.json is fine -- targets are auto-detected)."
+        ) from e
 
 
 def _collect_source_tags(source_repo_path):
@@ -718,20 +780,18 @@ def _resolve_monorepo_tag_target(workspace_root, dest_path, name):
 
     The tag scheme is resolved from the absorbed package's first detected
     target (Go uses path-style ``{path}/v{version}``; others use
-    ``{name}@v{version}``). Falls back to the default monorepo scheme when no
-    target is detected.
+    ``{name}@v{version}``). Uses the default ``{name}@v{version}`` scheme when
+    no target is detected (a source with no config at all).
+
+    Assumes the source's target config was validated up front by
+    :func:`validate_absorb_preconditions`; a broken declaration is a hard error
+    there (before the merge), so this helper never swallows a ``ConfigError``.
     """
     from ...targets import TARGETS, detect_targets
-    from ...errors import ConfigError
 
     dest_full = os.path.join(workspace_root, dest_path)
     target = None
-    try:
-        target_entries = detect_targets(dest_full)
-    except ConfigError:
-        # The merge already landed; a malformed/absent target config must not
-        # crash tag import. Fall back to the default monorepo tag scheme.
-        target_entries = []
+    target_entries = detect_targets(dest_full)
     if target_entries and target_entries[0].name in TARGETS:
         target = TARGETS[target_entries[0].name]
 

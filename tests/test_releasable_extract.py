@@ -172,8 +172,8 @@ name = "pkgB"
     # Create config.json for pkgA
     config_dir = root / "pkgA" / ".rlsbl"
     config_dir.mkdir(exist_ok=True)
-    (config_dir / "config.json").write_text(json.dumps({"publish_mode": "ci"}) + "\n")
-    _make_commit(root, "pkgA/.rlsbl/config.json", json.dumps({"publish_mode": "ci"}) + "\n", "config for pkgA")
+    (config_dir / "config.json").write_text(json.dumps({"publish_mode": "ci", "targets": []}) + "\n")
+    _make_commit(root, "pkgA/.rlsbl/config.json", json.dumps({"publish_mode": "ci", "targets": []}) + "\n", "config for pkgA")
 
     # Commit workspace
     subprocess.run(
@@ -1279,3 +1279,117 @@ class TestCmdExtractReleasable:
 
         with pytest.raises(ExtractError, match="target path already exists"):
             cmd_extract_releasable(str(root), "core", str(target))
+
+
+# ---------------------------------------------------------------------------
+# Broken target-declaration guard (no-silent-degradation)
+# ---------------------------------------------------------------------------
+
+
+def _commit_all(repo, message):
+    subprocess.run(["git", "add", "-A"], cwd=str(repo),
+                   check=True, capture_output=True, text=True)
+    subprocess.run(["git", "commit", "-q", "-m", message], cwd=str(repo),
+                   check=True, capture_output=True, text=True)
+
+
+class TestBrokenTargetDeclarationGuard:
+    """A .rlsbl/config.json that exists but has no ``targets`` key is a broken
+    declaration -- extract/absorb must hard-error UP FRONT (before any history
+    rewrite) rather than silently importing wrongly-schemed tags. A repo with
+    NO config file at all is the legitimate auto-detect path and must succeed.
+    """
+
+    # --- absorb: validation level (no filter-repo needed) ---
+
+    def test_validate_absorb_broken_source_config_rejected(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
+        root = tmp_path / "monorepo"
+        root.mkdir()
+        save_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
+        source = _clean_source(tmp_path, name="broken_src")
+        os.makedirs(str(source / ".rlsbl"), exist_ok=True)
+        (source / ".rlsbl" / "config.json").write_text(
+            json.dumps({"publish_mode": "ci"}) + "\n"
+        )
+        _commit_all(source, "add broken config")
+
+        with pytest.raises(ExtractError, match="broken target declaration"):
+            validate_absorb_preconditions(str(root), str(source), "pkgs/new", "new_pkg")
+
+    def test_validate_absorb_no_config_source_ok(self, tmp_path, monkeypatch):
+        """A source with NO .rlsbl/config.json auto-detects and passes."""
+        monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
+        root = tmp_path / "monorepo"
+        root.mkdir()
+        save_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
+        source = _clean_source(tmp_path)  # no .rlsbl at all
+
+        projs = validate_absorb_preconditions(str(root), str(source), "pkgs/new", "new_pkg")
+        assert len(projs) == 1
+
+    def test_absorb_broken_config_hard_errors_pre_mutation(self, tmp_path, monkeypatch):
+        """End-to-end: a broken source config aborts before the monorepo is
+        touched (no clone, no merge, no workspace entry)."""
+        monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
+        root = _setup_plain_monorepo(tmp_path)
+        head_before = _run_git(str(root), "rev-parse", "HEAD")
+        source = tmp_path / "broken_src"
+        source.mkdir()
+        _init_git_repo(source)
+        os.makedirs(str(source / ".rlsbl"), exist_ok=True)
+        (source / ".rlsbl" / "config.json").write_text(
+            json.dumps({"publish_mode": "ci"}) + "\n"
+        )
+        _make_commit(source, "main.py", "print('x')\n", "add main")
+        _commit_all(source, "add broken config")
+
+        with pytest.raises(ExtractError, match="broken target declaration"):
+            cmd_absorb(str(root), str(source), "packages/widget")
+
+        # Pre-mutation: the monorepo is untouched.
+        assert _run_git(str(root), "rev-parse", "HEAD") == head_before
+        assert not (root / "packages" / "widget").exists()
+        assert "widget" not in [p.name for p in load_workspace(str(root))]
+
+    # --- extract: validation level (no filter-repo needed) ---
+
+    def test_validate_extract_broken_config_rejected(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
+        root = tmp_path / "mono"
+        root.mkdir()
+        save_workspace(str(root), [WorkspaceProject({"path": "pkg", "name": "pkg"})])
+        pkg_rlsbl = root / "pkg" / ".rlsbl"
+        os.makedirs(str(pkg_rlsbl), exist_ok=True)
+        (pkg_rlsbl / "config.json").write_text(json.dumps({"publish_mode": "ci"}) + "\n")
+
+        with pytest.raises(ExtractError, match="broken target declaration"):
+            validate_extract_preconditions(str(root), "pkg", str(tmp_path / "out"))
+
+    def test_validate_extract_no_config_ok(self, tmp_path, monkeypatch):
+        """A package with no .rlsbl/config.json auto-detects and passes."""
+        monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
+        root = tmp_path / "mono"
+        root.mkdir()
+        (root / "pkg").mkdir()
+        save_workspace(str(root), [WorkspaceProject({"path": "pkg", "name": "pkg"})])
+
+        projs, proj = validate_extract_preconditions(str(root), "pkg", str(tmp_path / "out"))
+        assert proj.name == "pkg"
+
+    def test_extract_broken_config_hard_errors_pre_mutation(self, tmp_path, monkeypatch):
+        """End-to-end: a broken package config aborts before the target repo is
+        created and before the source workspace is edited."""
+        monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
+        root, _ = _setup_monorepo(tmp_path)
+        # Break pkgA's declaration: config exists but declares no targets.
+        (root / "pkgA" / ".rlsbl" / "config.json").write_text(
+            json.dumps({"publish_mode": "ci"}) + "\n"
+        )
+        target = tmp_path / "extracted"
+
+        with pytest.raises(ExtractError, match="broken target declaration"):
+            cmd_extract(str(root), "pkgA", str(target))
+
+        assert not target.exists()
+        assert "pkgA" in [p.name for p in load_workspace(str(root))]
