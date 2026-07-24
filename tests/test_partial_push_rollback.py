@@ -437,6 +437,10 @@ class TestPostTaggedPushResumable:
             patch("rlsbl.commands.release.check_gh_auth", return_value=True),
             # Branch push succeeds (no-op) -> branch_pushed becomes True.
             patch("rlsbl.commands.release.push_if_needed"),
+            # Tag needs pushing (repo has no reachable origin, so the real
+            # commit-aware plan would be INCONCLUSIVE; force "push needed" so the
+            # fake tag push runs and raises the raw TimeoutExpired under test).
+            patch("rlsbl.commands.release.resolve_tag_push_plan", return_value=True),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
         ):
             # Raw TimeoutExpired is converted to GitError at the call site,

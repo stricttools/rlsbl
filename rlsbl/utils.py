@@ -384,6 +384,57 @@ def remote_tag_commit(tag, cwd=None, remote="origin"):
     return RemoteTagResult(RemoteTagState.PRESENT, commit=commit)
 
 
+def resolve_tag_push_plan(tags, cwd=None, remote="origin"):
+    """Commit-aware decision for pushing one or more release tags.
+
+    Each tag in ``tags`` must exist locally; its peeled commit is resolved via
+    ``git rev-parse refs/tags/<tag>^{}`` (which yields the commit for both
+    lightweight and annotated tags). For each tag the remote state is resolved
+    with :func:`remote_tag_commit`:
+
+    - INCONCLUSIVE (ls-remote failed): raise :class:`GitError` carrying the
+      underlying error. A release must never push blind after an inconclusive
+      remote probe -- the old bare ``except Exception: pass`` skip that pushed
+      anyway is exactly the bug this replaces.
+    - PRESENT at a different commit than the local tag: raise :class:`GitError`
+      naming the tag, the local SHA, and the divergent remote SHA. A tag must
+      never be force-moved by a release.
+    - PRESENT at the same commit: idempotent -- already pushed.
+    - ABSENT: needs pushing.
+
+    Returns ``True`` when at least one tag needs pushing (the caller runs the
+    push; git no-ops the already-present-identical refs pushed alongside the
+    missing ones -- verified: ``git push origin <present-identical> <absent>``
+    exits 0). Returns ``False`` when every tag is already present at the
+    matching commit (the caller skips the push entirely -- the idempotent
+    resume/re-entry case).
+    """
+    needs_push = False
+    for tag in tags:
+        local_commit = run(
+            "git", ["rev-parse", f"refs/tags/{tag}^{{}}"], cwd=cwd
+        ).strip()
+        result = remote_tag_commit(tag, cwd=cwd, remote=remote)
+        if result.state is RemoteTagState.INCONCLUSIVE:
+            raise GitError(
+                f"Could not determine the remote state of tag {tag} before "
+                f"pushing (ls-remote failed): {result.error}. Refusing to push "
+                f"blind -- resolve the remote access issue and retry."
+            )
+        if result.state is RemoteTagState.ABSENT:
+            needs_push = True
+            continue
+        # PRESENT: must point at the same commit as the local tag.
+        if result.commit != local_commit:
+            raise GitError(
+                f"Tag {tag} already exists on {remote} at a different commit "
+                f"(local {local_commit}, remote {result.commit}). Refusing to "
+                f"overwrite -- a release must never force-move an existing tag. "
+                f"Investigate the divergence before retrying."
+            )
+    return needs_push
+
+
 def push_if_needed(branch, env=None, *, config):
     """Push the branch to origin if local is ahead of remote.
 

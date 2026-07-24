@@ -151,8 +151,8 @@ class TestTransientTagPushRetrySuccess:
             patch("rlsbl.commands.release.validate_branch_and_remote",
                   return_value="main"),
             patch("rlsbl.commands.release.push_if_needed"),  # branch push OK
-            patch("rlsbl.commands.release.tag_exists_on_remote",
-                  return_value=False),  # tag not yet on remote -> push attempted
+            patch("rlsbl.commands.release.resolve_tag_push_plan",
+                  return_value=True),  # tag not yet on remote -> push attempted
             patch("rlsbl.commands.release.execute.time.sleep"),  # no retry delay
             patch("rlsbl.commands.release.run", side_effect=fake_run),
             patch("rlsbl.commands.release.run_gh", side_effect=fake_run_gh),
@@ -207,8 +207,8 @@ class TestLiveLsRemoteBranchSkip:
                   return_value="main"),
             patch("rlsbl.commands.release.push_if_needed",
                   side_effect=fake_push_if_needed),
-            patch("rlsbl.commands.release.tag_exists_on_remote",
-                  return_value=True),  # tag already on remote -> tag push skipped
+            patch("rlsbl.commands.release.resolve_tag_push_plan",
+                  return_value=False),  # tag already on remote -> tag push skipped
             patch("rlsbl.commands.release.run", side_effect=fake_run),
             patch("rlsbl.commands.release.run_gh", return_value=""),
         ):

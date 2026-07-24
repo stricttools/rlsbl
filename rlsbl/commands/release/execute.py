@@ -694,7 +694,7 @@ def _run_release_mutating(state: ReleaseState):
         get_current_branch,
         should_tag,
         tag_exists_locally,
-        tag_exists_on_remote,
+        resolve_tag_push_plan,
         TARGETS,
         load_pipelines,
         load_workspace,
@@ -901,14 +901,20 @@ def _run_release_mutating(state: ReleaseState):
         if branch_pushed:
             # Branch commits are already on the remote; only the tag push
             # is outstanding. Retry it a couple of times before giving up.
+            # Use the same commit-aware plan as the main PUSHED path: if a
+            # prior attempt already landed every tag at the matching commit
+            # (partial success then a stall), the plan reports no push needed
+            # and the retry cleanly marks PUSHED complete.
+            _all_tags = [tag] + list(state.companion_tags)
             for _attempt in range(2):
                 time.sleep(1)
                 try:
-                    run(
-                        "git",
-                        ["push", "origin", tag] + list(state.companion_tags),
-                        timeout=_retry_timeout, env=_retry_env,
-                    )
+                    if resolve_tag_push_plan(_all_tags):
+                        run(
+                            "git",
+                            ["push", "origin", tag] + list(state.companion_tags),
+                            timeout=_retry_timeout, env=_retry_env,
+                        )
                     log(f"Tag push succeeded on retry {_attempt + 1}")
                     save_step(_state_path, "PUSHED")
                     _completed.add("PUSHED")
@@ -1593,16 +1599,17 @@ def _run_release_mutating(state: ReleaseState):
                 push_if_needed(branch, env=push_env, config=ctx.config)
                 branch_pushed = True
 
-            # Check if tag push is needed
-            _tag_needs_push = True
-            try:
-                if tag_exists_on_remote(tag):
-                    _tag_needs_push = False
-                    log("Skipping tag push (remote tag already exists)")
-            except Exception:
-                pass
-
-            if _tag_needs_push:
+            # Check if tag push is needed. Commit-aware: verify EVERY release
+            # tag (primary + companions) that is already on the remote points
+            # at the same commit as the local tag. A divergent remote tag or an
+            # inconclusive remote probe is a hard error (resolve_tag_push_plan);
+            # an all-present-matching state is an idempotent skip; a mixed
+            # (some absent) state pushes all tags, and git no-ops the identical
+            # refs. This replaces the old bare tag_exists_on_remote skip that
+            # silently swallowed ls-remote failures and pushed regardless of the
+            # remote tag's commit.
+            _all_tags = [tag] + list(state.companion_tags)
+            if resolve_tag_push_plan(_all_tags):
                 import subprocess as _subprocess
                 try:
                     run("git", ["push", "origin", tag] + state.companion_tags, timeout=push_timeout, env=push_env)
@@ -1613,6 +1620,11 @@ def _run_release_mutating(state: ReleaseState):
                         f"state may be inconsistent. Check with: "
                         f"git ls-remote --tags origin {tag}"
                     ) from _e
+            else:
+                log(
+                    "Skipping tag push (all release tags already on remote at "
+                    "matching commits)"
+                )
 
             log(f"Pushed to origin/{branch}")
             save_step(_state_path, "PUSHED")

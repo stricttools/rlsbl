@@ -45,6 +45,7 @@ from ...utils import (
     push_if_needed,
     remote_branch_exists,
     require_tool,
+    resolve_tag_push_plan,
     run,
     run_gh,
     tag_exists_locally,
