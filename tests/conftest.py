@@ -304,6 +304,30 @@ def _mock_remote_tag_commit():
 
 
 @pytest.fixture(autouse=True)
+def _default_tag_push_plan():
+    """Neutralize the commit-aware tag-push probe by default.
+
+    The release PUSHED step calls ``resolve_tag_push_plan`` (which runs a live
+    ``git ls-remote origin`` per tag) to decide whether the tag push is needed
+    and to reject a divergent remote tag. Most release-flow tests mock the push
+    and run in repos with no reachable ``origin``, so an unmocked probe would
+    hard-error with "origin does not appear to be a git repository" -- exactly
+    the state the old ``tag_exists_on_remote`` skip swallowed.
+
+    Default to True ("push proceeds"), matching the pre-existing behavior these
+    tests relied on. Tests that specifically exercise the plan (skip vs push vs
+    divergence) patch ``rlsbl.commands.release.resolve_tag_push_plan`` with the
+    value under test; their inner patch nests over this one. The helper's own
+    unit tests call ``rlsbl.utils.resolve_tag_push_plan`` directly and are
+    unaffected by this release-boundary patch.
+    """
+    with patch(
+        "rlsbl.commands.release.resolve_tag_push_plan", return_value=True,
+    ):
+        yield
+
+
+@pytest.fixture(autouse=True)
 def _default_push_timeout(monkeypatch):
     """Pin the push timeout for all tests via the env var.
 
