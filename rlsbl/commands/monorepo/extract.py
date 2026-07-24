@@ -11,10 +11,19 @@ import json
 import os
 import shutil
 import subprocess
+import tempfile
 
-from ...changelog.files import get_changes_dir, read_unreleased, list_versioned_files
+from ...changelog.files import (
+    get_changes_dir,
+    read_unreleased,
+    list_versioned_files,
+    load_filter_repo_commit_map,
+    remap_jsonl_hashes,
+)
 from ...changelog.schema import parse_jsonl, serialize_entry
 from ...errors import RlsblError
+from ...tag_glob import TagMode, parse_version_tag
+from ...utils import commit_files
 from ...workspace import (
     get_releasable_changes_dir,
     load_workspace,
@@ -360,15 +369,21 @@ def cmd_extract(workspace_root, package_name, target_repo_path, *, dry_run=False
     }
 
 
-def validate_absorb_preconditions(workspace_root, source_repo_path, package_name):
+def validate_absorb_preconditions(workspace_root, source_repo_path, dest_path, name):
     """Validate that absorption can proceed.
 
-    Checks:
+    Checks (mirrors ``monorepo add`` for uniqueness):
+    - git-filter-repo is installed (the history rewrite depends on it)
     - Source repo exists and is a git repo
-    - Package name is not already in workspace.toml
+    - Source working tree is CLEAN -- the history filter only captures
+      committed state, so uncommitted changes would be silently dropped
+    - Destination path is not already registered in workspace.toml
+    - Package name is not already registered in workspace.toml
 
     Returns projects list.
     """
+    require_filter_repo()
+
     if not os.path.isdir(source_repo_path):
         raise ExtractError(
             f"source repo path does not exist: {source_repo_path}"
@@ -379,135 +394,313 @@ def validate_absorb_preconditions(workspace_root, source_repo_path, package_name
             f"source path is not a git repository: {source_repo_path}"
         )
 
+    status = _run_git(source_repo_path, "status", "--porcelain")
+    if status:
+        raise ExtractError(
+            f"source repository has uncommitted changes: {source_repo_path}. "
+            f"Commit or discard them before absorbing -- the history rewrite "
+            f"only captures committed state, so uncommitted changes would be "
+            f"silently lost."
+        )
+
     projects = load_workspace(workspace_root)
+    norm_dest = dest_path.rstrip("/")
     for proj in projects:
-        if proj.name == package_name:
+        if proj["path"].rstrip("/") == norm_dest:
             raise ExtractError(
-                f"package '{package_name}' already exists in workspace"
+                f"path '{dest_path}' already exists in workspace"
+            )
+        if proj["name"] == name:
+            raise ExtractError(
+                f"package '{name}' already exists in workspace"
             )
 
     return projects
 
 
-def _migrate_changelog_from_source(source_repo_path, target_changes_dir):
-    """Migrate changelog entries from a source repo into the monorepo's changes dir.
+def _collect_source_tags(source_repo_path):
+    """Return ``[(tag_name, commit_sha), ...]`` for every tag in the source repo.
 
-    Reads .rlsbl/changes/ from the source repo and writes entries into
-    target_changes_dir, appending to existing files.
-
-    Returns (files_written, entries_migrated) tuple.
+    ``commit_sha`` is the (full) commit the tag resolves to -- annotated tags
+    are dereferenced to their target commit via ``git rev-list``.
     """
-    source_changes_dir = get_changes_dir(source_repo_path)
-    if not os.path.isdir(source_changes_dir):
-        return 0, 0
+    out = _run_git(source_repo_path, "tag", "-l")
+    tags = []
+    for line in out.splitlines():
+        tag = line.strip()
+        if not tag:
+            continue
+        sha = _run_git(source_repo_path, "rev-list", "-n", "1", tag)
+        tags.append((tag, sha))
+    return tags
 
-    os.makedirs(target_changes_dir, exist_ok=True)
-    files_written = 0
-    entries_migrated = 0
 
-    # Migrate unreleased entries (append to existing)
-    source_unreleased = os.path.join(source_changes_dir, "unreleased.jsonl")
-    if os.path.isfile(source_unreleased):
-        source_entries = parse_jsonl(source_unreleased)
-        if source_entries:
-            target_unreleased = os.path.join(target_changes_dir, "unreleased.jsonl")
-            with open(target_unreleased, "a", encoding="utf-8") as f:
-                for entry in source_entries:
-                    f.write(serialize_entry(entry) + "\n")
-            files_written += 1
-            entries_migrated += len(source_entries)
+def _resolve_monorepo_tag_target(workspace_root, dest_path, name):
+    """Return a callable ``version -> monorepo tag string`` for the absorbed pkg.
 
-    # Migrate versioned entries
-    versioned = list_versioned_files(source_changes_dir)
-    for version_str, version_path in versioned:
-        version_entries = parse_jsonl(version_path)
-        if version_entries:
-            target_version = os.path.join(target_changes_dir, f"{version_str}.jsonl")
-            with open(target_version, "a", encoding="utf-8") as f:
-                for entry in version_entries:
-                    f.write(serialize_entry(entry) + "\n")
-            files_written += 1
-            entries_migrated += len(version_entries)
+    The tag scheme is resolved from the absorbed package's first detected
+    target (Go uses path-style ``{path}/v{version}``; others use
+    ``{name}@v{version}``). Falls back to the default monorepo scheme when no
+    target is detected.
+    """
+    from ...targets import TARGETS, detect_targets
+    from ...errors import ConfigError
 
-    return files_written, entries_migrated
+    dest_full = os.path.join(workspace_root, dest_path)
+    target = None
+    try:
+        target_entries = detect_targets(dest_full)
+    except ConfigError:
+        # The merge already landed; a malformed/absent target config must not
+        # crash tag import. Fall back to the default monorepo tag scheme.
+        target_entries = []
+    if target_entries and target_entries[0].name in TARGETS:
+        target = TARGETS[target_entries[0].name]
+
+    def make_tag(version):
+        if target is not None:
+            return target.monorepo_tag_format(name, version, path=dest_path)
+        return f"{name}@v{version}"
+
+    return make_tag
 
 
 def cmd_absorb(
-    workspace_root, source_repo_path, package_name, releasable_name=None,
-    *, dry_run=False
+    workspace_root, source_repo_path, dest_path, *,
+    name=None, registry_name="", releasable_name=None, dry_run=False
 ):
     """Absorb an external repository as a package in the monorepo.
 
+    Rewrites the source's history to live under ``dest_path`` (rather than a
+    verbatim subtree add), preserving its full commit history with rewritten
+    paths, importing its version tags under the monorepo tag scheme, and
+    remapping its JSONL changelog hashes to the new (post-rewrite) commits.
+
     Steps:
-    1. Run ``git subtree add --prefix=<package_name> <source_repo_path> <branch>``
-    2. Add project to workspace.toml with the specified releasable
-    3. Migrate changelog: read source repo's ``.rlsbl/changes/``, write to
-       the package's changelog in the monorepo
-    4. Return details for the caller to regenerate CI
+    1. Validate preconditions (filter-repo present, source clean, uniqueness).
+    2. Temp-clone the source and run ``git-filter-repo
+       --to-subdirectory-filter <dest_path>`` to relocate all files/history.
+    3. Fetch + merge (``--allow-unrelated-histories``) the rewritten history
+       into the monorepo -- this is the first commit.
+    4. Delete the bare ``v*`` tags the merge auto-followed in, and re-create
+       version tags under the monorepo scheme at the mapped commits.
+    5. Remap the arriving JSONL changelog hashes to the new commits. In
+       releasable mode, move the package's changes into the releasable's
+       changes dir and remove the per-package residue via saferm.
+    6. Register the project in workspace.toml and commit the follow-up
+       (workspace.toml + remap edits + residue removals).
 
     Args:
         workspace_root: path to the monorepo root.
         source_repo_path: path to the external repository.
-        package_name: name for the package in the monorepo.
+        dest_path: directory prefix (and workspace path) for the absorbed pkg.
+        name: workspace project name (default: basename of dest_path).
+        registry_name: optional registry identity recorded in workspace.toml.
         releasable_name: optional releasable to assign the package to.
-        dry_run: if True, validate but do not perform the absorption.
+        dry_run: if True, validate and report but do not perform the absorption.
 
     Returns:
-        A dict with absorption details: package_name, source_path,
-        entries_migrated, files_written.
+        A dict with absorption details.
     """
+    workspace_root = os.path.abspath(workspace_root)
+    source_repo_path = os.path.abspath(source_repo_path)
+    if name is None:
+        name = os.path.basename(dest_path.rstrip("/"))
+
     projects = validate_absorb_preconditions(
-        workspace_root, source_repo_path, package_name
+        workspace_root, source_repo_path, dest_path, name
     )
 
-    source_branch = _get_default_branch(source_repo_path)
+    # Classify the source's tags into importable version tags and the rest.
+    source_tags = _collect_source_tags(source_repo_path)
+    version_tags = []  # (tag_name, old_sha, version)
+    skipped_tags = []
+    for tag, old_sha in source_tags:
+        parsed = parse_version_tag(tag, mode=TagMode.PRERELEASE_INCLUSIVE)
+        if parsed is None:
+            skipped_tags.append(tag)
+        else:
+            version_tags.append((tag, old_sha, parsed.version))
 
     if dry_run:
         return {
-            "package_name": package_name,
+            "name": name,
+            "dest_path": dest_path,
             "source_path": source_repo_path,
-            "source_branch": source_branch,
+            "registry_name": registry_name,
+            "releasable_name": releasable_name,
+            "tags_to_import": [v for _, _, v in version_tags],
+            "skipped_tags": skipped_tags,
             "dry_run": True,
         }
 
-    # Run git subtree add
-    _run_git(
-        workspace_root, "subtree", "add",
-        f"--prefix={package_name}", source_repo_path, source_branch
-    )
+    # --- 2. Temp-clone + history rewrite ---
+    tmp_root = tempfile.mkdtemp(prefix="rlsbl-absorb-")
+    try:
+        clone_path = os.path.join(tmp_root, "clone")
+        _run_git(workspace_root, "clone", "--no-local", source_repo_path, clone_path)
+        subprocess.run(
+            ["git-filter-repo", "--to-subdirectory-filter", dest_path, "--force"],
+            cwd=clone_path, check=True, capture_output=True, text=True,
+        )
+        commit_map_path = os.path.join(
+            clone_path, ".git", "filter-repo", "commit-map"
+        )
+        sha_map, _pruned = load_filter_repo_commit_map(commit_map_path)
 
-    # Build project entry
-    new_project = {"path": package_name, "name": package_name}
+        # --- 3. Fetch + merge the rewritten history (first commit) ---
+        # The merge commit is structural (it re-imports already-released
+        # history), so it carries the Autogenerated trailer to stay exempt
+        # from changelog coverage.
+        _run_git(workspace_root, "fetch", clone_path)
+        _run_git(
+            workspace_root, "merge", "--allow-unrelated-histories",
+            "-m", f"monorepo: absorb {name} history",
+            "-m", "Autogenerated: true", "FETCH_HEAD",
+        )
+    finally:
+        shutil.rmtree(tmp_root, ignore_errors=True)
+
+    # --- 4. Tag hygiene: delete fetched bare tags, import monorepo tags ---
+    for tag, _old_sha in source_tags:
+        if _run_git(workspace_root, "tag", "-l", tag):
+            _run_git(workspace_root, "tag", "-d", tag)
+
+    make_tag = _resolve_monorepo_tag_target(workspace_root, dest_path, name)
+    tags_imported = []
+    for tag, old_sha, version in version_tags:
+        new_sha = sha_map.get(old_sha)
+        if new_sha is None:
+            # The tagged commit was pruned by the filter -- cannot place it.
+            continue
+        mono_tag = make_tag(version)
+        _run_git(workspace_root, "tag", mono_tag, new_sha)
+        tags_imported.append(mono_tag)
+
+    # --- 5. Register project + route/remap changelog ---
+    new_project = {"path": dest_path, "name": name}
+    if registry_name:
+        new_project["registry_name"] = registry_name
     if releasable_name is not None:
         new_project["releasable"] = releasable_name
 
-    # Add project to workspace.toml
     from ...workspace import WorkspaceProject
     projects.append(WorkspaceProject(new_project))
     save_workspace(workspace_root, projects)
 
-    # Migrate changelog from source repo.
-    # When absorbing into a releasable, route entries to the releasable's
-    # changes dir instead of the per-package dir.
+    dest_full = os.path.join(workspace_root, dest_path)
+    pkg_changes_dir = get_changes_dir(dest_full)
+
     if releasable_name is not None:
-        target_changes_dir = get_releasable_changes_dir(
-            workspace_root, releasable_name
+        # Route the absorbed package's changelog into the releasable's changes
+        # dir (remapped), then remove the per-package residue via saferm.
+        rel_changes_dir = get_releasable_changes_dir(workspace_root, releasable_name)
+        entries_migrated = _merge_changes_into_releasable(
+            pkg_changes_dir, rel_changes_dir
         )
+        remap_jsonl_hashes(rel_changes_dir, sha_map)
+        from ...releasable_cleanup import cleanup_per_package_release_state
+        cleanup_per_package_release_state(workspace_root, projects=projects)
     else:
-        target_changes_dir = get_changes_dir(
-            os.path.join(workspace_root, package_name)
-        )
-    files_written, entries_migrated = _migrate_changelog_from_source(
-        source_repo_path, target_changes_dir
-    )
+        entries_migrated = _count_jsonl_entries(pkg_changes_dir)
+        remap_jsonl_hashes(pkg_changes_dir, sha_map)
+
+    # --- 6. Follow-up commit: workspace.toml + remap edits + residue ---
+    _commit_absorb_followup(workspace_root, name)
 
     return {
-        "package_name": package_name,
+        "name": name,
+        "dest_path": dest_path,
         "source_path": source_repo_path,
-        "source_branch": source_branch,
+        "registry_name": registry_name,
+        "releasable_name": releasable_name,
         "entries_migrated": entries_migrated,
-        "files_written": files_written,
+        "tags_imported": tags_imported,
+        "skipped_tags": skipped_tags,
     }
+
+
+def _count_jsonl_entries(changes_dir):
+    """Total number of changelog entries across all JSONL files in a dir."""
+    if not os.path.isdir(changes_dir):
+        return 0
+    total = 0
+    unreleased = os.path.join(changes_dir, "unreleased.jsonl")
+    if os.path.isfile(unreleased):
+        total += len(parse_jsonl(unreleased))
+    for _version, path in list_versioned_files(changes_dir):
+        total += len(parse_jsonl(path))
+    return total
+
+
+def _merge_changes_into_releasable(pkg_changes_dir, rel_changes_dir):
+    """Move a package's arriving JSONL changes into a releasable's changes dir.
+
+    Unreleased entries are appended to the releasable's unreleased.jsonl.
+    Versioned files are copied over (skipped if a same-version file already
+    exists in the releasable dir, which would indicate a real collision the
+    operator must resolve). Returns the number of entries moved.
+    """
+    if not os.path.isdir(pkg_changes_dir):
+        return 0
+    os.makedirs(rel_changes_dir, exist_ok=True)
+    moved = 0
+
+    pkg_unreleased = os.path.join(pkg_changes_dir, "unreleased.jsonl")
+    if os.path.isfile(pkg_unreleased):
+        entries = parse_jsonl(pkg_unreleased)
+        if entries:
+            rel_unreleased = os.path.join(rel_changes_dir, "unreleased.jsonl")
+            with open(rel_unreleased, "a", encoding="utf-8") as f:
+                for entry in entries:
+                    f.write(serialize_entry(entry) + "\n")
+            moved += len(entries)
+
+    for version, path in list_versioned_files(pkg_changes_dir):
+        target = os.path.join(rel_changes_dir, f"{version}.jsonl")
+        if os.path.isfile(target):
+            continue
+        entries = parse_jsonl(path)
+        with open(target, "w", encoding="utf-8") as f:
+            for entry in entries:
+                f.write(serialize_entry(entry) + "\n")
+        moved += len(entries)
+
+    return moved
+
+
+def _commit_absorb_followup(workspace_root, name):
+    """Commit every working-tree change left after the absorb merge.
+
+    Captures the workspace.toml entry, remapped JSONL edits, moved changelog
+    files, and saferm'd residue deletions in a single follow-up commit. Uses
+    the Autogenerated trailer so the structural commit is exempt from
+    changelog coverage checks.
+    """
+    # Parse porcelain without stripping: each line is "XY <path>" and the
+    # leading status columns must be preserved (a global strip would eat the
+    # first line's leading space and corrupt its path).
+    result = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=str(workspace_root), capture_output=True, text=True, check=True,
+    )
+    paths = []
+    for line in result.stdout.splitlines():
+        if len(line) < 4:
+            continue
+        rest = line[3:]
+        if " -> " in rest:
+            rest = rest.split(" -> ", 1)[1]
+        rest = rest.strip().strip('"')
+        if rest:
+            paths.append(rest)
+    if not paths:
+        return
+    commit_files(
+        f"monorepo: absorb {name}",
+        paths,
+        cwd=str(workspace_root),
+    )
 
 
 def cmd_extract_releasable(

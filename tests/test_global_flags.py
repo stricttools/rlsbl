@@ -8,7 +8,6 @@ from rlsbl import app
 # registration blocks entirely; this list must shrink to empty by the end of
 # that work. Identified by handler function __name__.
 KWARGS_EXEMPT_HANDLERS = {
-    "cmd_mono_absorb",
     "cmd_mono_extract",
     "cmd_mono_extract_releasable",
 }

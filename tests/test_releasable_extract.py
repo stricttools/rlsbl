@@ -30,6 +30,7 @@ from rlsbl.commands.monorepo.extract import (
     _find_project,
     _run_git,
 )
+from rlsbl.changelog.schema import parse_jsonl as _parse_jsonl_hashes
 from rlsbl.workspace import (
     load_workspace,
     save_workspace,
@@ -519,56 +520,91 @@ class TestValidateExtractPreconditions:
 # ---------------------------------------------------------------------------
 
 
+def _clean_source(tmp_path, name="source"):
+    """Create a clean, committed git source repo suitable for absorb."""
+    repo = tmp_path / name
+    repo.mkdir()
+    _init_git_repo(repo)
+    _make_commit(repo, "main.py", "print('src')", "add main")
+    return repo
+
+
 class TestValidateAbsorbPreconditions:
-    def test_valid_preconditions(self, tmp_path):
-        """Happy path: source exists, is a git repo, name not taken."""
+    def test_valid_preconditions(self, tmp_path, monkeypatch):
+        """Happy path: source clean git repo, path and name both free."""
+        monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
         root = tmp_path / "monorepo"
         root.mkdir()
-        projects = [WorkspaceProject({"path": "existing", "name": "existing"})]
-        save_workspace(str(root), projects)
+        save_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
+        source = _clean_source(tmp_path)
 
-        source = tmp_path / "source"
-        source.mkdir()
-        (source / ".git").mkdir()
-
-        projs = validate_absorb_preconditions(str(root), str(source), "new_pkg")
+        projs = validate_absorb_preconditions(str(root), str(source), "pkgs/new", "new_pkg")
         assert len(projs) == 1
 
-    def test_source_not_exists(self, tmp_path):
+    def test_no_filter_repo(self, tmp_path, monkeypatch):
+        """Error when git-filter-repo is not installed."""
+        monkeypatch.setattr(shutil, "which", lambda n: None)
         root = tmp_path / "monorepo"
         root.mkdir()
-        projects = [WorkspaceProject({"path": "existing", "name": "existing"})]
-        save_workspace(str(root), projects)
+        save_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
+        source = _clean_source(tmp_path)
+
+        with pytest.raises(ExtractError, match="git-filter-repo is not installed"):
+            validate_absorb_preconditions(str(root), str(source), "new", "new_pkg")
+
+    def test_source_not_exists(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
+        root = tmp_path / "monorepo"
+        root.mkdir()
+        save_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
 
         with pytest.raises(ExtractError, match="does not exist"):
             validate_absorb_preconditions(
-                str(root), str(tmp_path / "nonexistent"), "pkg"
+                str(root), str(tmp_path / "nonexistent"), "new", "pkg"
             )
 
-    def test_source_not_git_repo(self, tmp_path):
+    def test_source_not_git_repo(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
         root = tmp_path / "monorepo"
         root.mkdir()
-        projects = [WorkspaceProject({"path": "existing", "name": "existing"})]
-        save_workspace(str(root), projects)
-
+        save_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
         source = tmp_path / "source"
         source.mkdir()
 
         with pytest.raises(ExtractError, match="not a git repository"):
-            validate_absorb_preconditions(str(root), str(source), "pkg")
+            validate_absorb_preconditions(str(root), str(source), "new", "pkg")
 
-    def test_duplicate_name(self, tmp_path):
+    def test_source_dirty_is_rejected(self, tmp_path, monkeypatch):
+        """A source with uncommitted changes is a hard error (would be dropped)."""
+        monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
         root = tmp_path / "monorepo"
         root.mkdir()
-        projects = [WorkspaceProject({"path": "existing", "name": "existing"})]
-        save_workspace(str(root), projects)
+        save_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
+        source = _clean_source(tmp_path)
+        (source / "uncommitted.txt").write_text("dirty\n")
 
-        source = tmp_path / "source"
-        source.mkdir()
-        (source / ".git").mkdir()
+        with pytest.raises(ExtractError, match="uncommitted changes"):
+            validate_absorb_preconditions(str(root), str(source), "new", "pkg")
 
-        with pytest.raises(ExtractError, match="already exists"):
-            validate_absorb_preconditions(str(root), str(source), "existing")
+    def test_duplicate_name(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
+        root = tmp_path / "monorepo"
+        root.mkdir()
+        save_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
+        source = _clean_source(tmp_path)
+
+        with pytest.raises(ExtractError, match="package 'existing' already exists"):
+            validate_absorb_preconditions(str(root), str(source), "different", "existing")
+
+    def test_duplicate_path(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
+        root = tmp_path / "monorepo"
+        root.mkdir()
+        save_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
+        source = _clean_source(tmp_path)
+
+        with pytest.raises(ExtractError, match="path 'existing' already exists"):
+            validate_absorb_preconditions(str(root), str(source), "existing", "brand_new")
 
 
 # ---------------------------------------------------------------------------
@@ -649,90 +685,322 @@ class TestCmdExtract:
 
 
 # ---------------------------------------------------------------------------
-# cmd_absorb (integration tests requiring git subtree)
+# cmd_absorb (history-rewrite integration tests)
 # ---------------------------------------------------------------------------
 
 
-class TestCmdAbsorb:
-    def test_dry_run(self, tmp_path):
-        """Dry run validates but does not modify the monorepo."""
-        root, _ = _setup_monorepo(tmp_path)
-        source, _ = _setup_source_repo(tmp_path)
+def _git_tag(repo, tag, ref="HEAD"):
+    subprocess.run(
+        ["git", "tag", tag, ref],
+        cwd=str(repo), check=True, capture_output=True, text=True,
+    )
 
-        result = cmd_absorb(
-            str(root), str(source), "new_pkg", dry_run=True
+
+def _make_multi_commit(repo, files, message):
+    """Write several files and commit them together, returning the hash."""
+    for rel, content in files.items():
+        fp = repo / rel
+        fp.parent.mkdir(parents=True, exist_ok=True)
+        fp.write_text(content)
+        subprocess.run(
+            ["git", "add", rel],
+            cwd=str(repo), check=True, capture_output=True, text=True,
         )
+    subprocess.run(
+        ["git", "commit", "-q", "-m", message],
+        cwd=str(repo), check=True, capture_output=True, text=True,
+    )
+    out = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=str(repo), capture_output=True, text=True, check=True,
+    )
+    return out.stdout.strip()
+
+
+def _setup_released_source_repo(tmp_path):
+    """Build a released npm source repo: 2 version tags, finalized JSONL,
+    plus one unreleased entry. Returns (repo_path, {"0.1.0": ..., ...}).
+    """
+    repo = tmp_path / "widget_src"
+    repo.mkdir()
+    _init_git_repo(repo)
+
+    os.makedirs(str(repo / ".rlsbl"), exist_ok=True)
+    (repo / ".rlsbl" / "config.json").write_text(
+        json.dumps({"publish_mode": "ci", "coverage_unit": "commit", "targets": ["npm"]}) + "\n"
+    )
+    # v0.1.0 feature commit
+    c1 = _make_multi_commit(
+        repo,
+        {
+            "package.json": json.dumps({"name": "widget", "version": "0.1.0"}) + "\n",
+            "src/index.js": "export const v = 1;\n",
+            ".rlsbl/config.json": json.dumps({"publish_mode": "ci", "coverage_unit": "commit", "targets": ["npm"]}) + "\n",
+        },
+        "feat: initial widget",
+    )
+    changes = repo / ".rlsbl" / "changes"
+    _write_changelog_entry(changes, "0.1.0.jsonl", [
+        ChangelogEntry(commits=[c1[:8]], user_facing=True,
+                       description="Initial widget", type="feature"),
+    ])
+    _make_commit(repo, ".rlsbl/changes/0.1.0.jsonl",
+                 (changes / "0.1.0.jsonl").read_text(), "changelog 0.1.0")
+    _git_tag(repo, "v0.1.0")
+
+    # v0.2.0 feature commit
+    c3 = _make_multi_commit(
+        repo,
+        {
+            "package.json": json.dumps({"name": "widget", "version": "0.2.0"}) + "\n",
+            "src/feature.js": "export const f = 2;\n",
+        },
+        "feat: v0.2.0 feature",
+    )
+    _write_changelog_entry(changes, "0.2.0.jsonl", [
+        ChangelogEntry(commits=[c3[:8]], user_facing=True,
+                       description="Widget feature", type="feature"),
+    ])
+    _make_commit(repo, ".rlsbl/changes/0.2.0.jsonl",
+                 (changes / "0.2.0.jsonl").read_text(), "changelog 0.2.0")
+    _git_tag(repo, "v0.2.0")
+
+    # Unreleased work
+    c5 = _make_commit(repo, "src/wip.js", "export const w = 3;\n", "feat: wip")
+    _write_changelog_entry(changes, "unreleased.jsonl", [
+        ChangelogEntry(commits=[c5[:8]], user_facing=True,
+                       description="Work in progress", type="feature"),
+    ])
+    _make_commit(repo, ".rlsbl/changes/unreleased.jsonl",
+                 (changes / "unreleased.jsonl").read_text(), "changelog wip")
+
+    return repo, {"c1": c1, "c3": c3, "c5": c5}
+
+
+def _setup_plain_monorepo(tmp_path):
+    """A minimal committed monorepo (no pre-existing package conflicts)."""
+    root = tmp_path / "mono"
+    root.mkdir()
+    _init_git_repo(root)
+    (root / "existing").mkdir()
+    _write_workspace(root, """
+[[projects]]
+path = "existing"
+name = "existing"
+""")
+    _make_commit(root, "existing/keep.txt", "keep\n", "add existing")
+    subprocess.run(["git", "add", WORKSPACE_DIR], cwd=str(root),
+                   check=True, capture_output=True, text=True)
+    subprocess.run(["git", "commit", "-q", "-m", "workspace"], cwd=str(root),
+                   check=True, capture_output=True, text=True)
+    return root
+
+
+class TestCmdAbsorbDryRun:
+    def test_dry_run_zero_mutations(self, tmp_path):
+        """Dry run reports tags to import but mutates nothing."""
+        root = _setup_plain_monorepo(tmp_path)
+        source, _ = _setup_released_source_repo(tmp_path)
+        head_before = _run_git(str(root), "rev-parse", "HEAD")
+
+        result = cmd_absorb(str(root), str(source), "packages/widget", dry_run=True)
         assert result["dry_run"] is True
-        assert result["package_name"] == "new_pkg"
+        assert result["name"] == "widget"
+        assert set(result["tags_to_import"]) == {"0.1.0", "0.2.0"}
 
-        # Workspace should still have only original packages
-        projects = load_workspace(str(root))
-        names = [p.name for p in projects]
-        assert "new_pkg" not in names
+        # Nothing changed: no new commit, no new project, no new dir.
+        assert _run_git(str(root), "rev-parse", "HEAD") == head_before
+        names = [p.name for p in load_workspace(str(root))]
+        assert "widget" not in names
+        assert not (root / "packages" / "widget").exists()
 
-    def test_basic_absorption(self, tmp_path):
-        """Absorb a source repo and verify workspace update."""
-        root, _ = _setup_monorepo(tmp_path)
-        source, _ = _setup_source_repo(tmp_path)
 
-        result = cmd_absorb(str(root), str(source), "new_pkg")
-        assert result["package_name"] == "new_pkg"
+@skip_no_filter_repo
+class TestAbsorbHistoryRewrite:
+    def test_full_history_rewrite(self, tmp_path, monkeypatch):
+        root = _setup_plain_monorepo(tmp_path)
+        source, hashes = _setup_released_source_repo(tmp_path)
 
-        # Workspace should include the new package
-        projects = load_workspace(str(root))
-        names = [p.name for p in projects]
-        assert "new_pkg" in names
+        result = cmd_absorb(str(root), str(source), "packages/widget")
+        assert result["name"] == "widget"
+        assert set(result["tags_imported"]) == {"widget@v0.1.0", "widget@v0.2.0"}
 
-        # The package directory should exist in the monorepo
-        assert os.path.isdir(str(root / "new_pkg"))
+        # 1. git log for the dest path shows full rewritten history.
+        log = _run_git(str(root), "log", "--oneline", "--", "packages/widget")
+        assert "initial widget" in log
+        assert "v0.2.0 feature" in log
+        assert "wip" in log
 
-    def test_absorb_with_releasable(self, tmp_path):
-        """Absorbed package gets the specified releasable field."""
-        root, _ = _setup_monorepo(tmp_path)
-        source, _ = _setup_source_repo(tmp_path)
+        # 2. describe resolves the imported monorepo-scheme tag.
+        desc = _run_git(str(root), "describe", "--tags", "--match", "widget@v*")
+        assert desc.startswith("widget@v0.2.0")
 
-        cmd_absorb(
-            str(root), str(source), "new_pkg",
+        # 3. every JSONL hash resolves in monorepo history.
+        changes_dir = root / "packages" / "widget" / ".rlsbl" / "changes"
+        all_hashes = []
+        for jf in changes_dir.glob("*.jsonl"):
+            for entry in _parse_jsonl_hashes(str(jf)):
+                all_hashes.extend(entry.commits)
+        assert all_hashes  # sanity: there are hashes to check
+        for h in all_hashes:
+            # cat-file -e raises via check=True if the object is missing.
+            _run_git(str(root), "cat-file", "-e", h + "^{commit}")
+
+        # 6. bare v* tags are absent (only monorepo-scheme tags remain).
+        tags = _run_git(str(root), "tag", "-l").split()
+        assert "v0.1.0" not in tags
+        assert "v0.2.0" not in tags
+        assert "widget@v0.1.0" in tags
+        assert "widget@v0.2.0" in tags
+
+    def test_compute_release_version_bumps_forward(self, tmp_path, monkeypatch):
+        """With imported tags, the package computes a forward bump -- the
+        destroyed-tag guard does not fire."""
+        root = _setup_plain_monorepo(tmp_path)
+        source, _ = _setup_released_source_repo(tmp_path)
+        cmd_absorb(str(root), str(source), "packages/widget")
+
+        from rlsbl.commands.release.validate import compute_release_version
+        import rlsbl.commands.release as release_mod
+        from rlsbl.utils import RemoteTagResult, RemoteTagState
+        from rlsbl.targets import TARGETS, detect_targets
+
+        monkeypatch.setattr(
+            release_mod, "remote_tag_commit",
+            lambda tag, **kw: RemoteTagResult(state=RemoteTagState.ABSENT),
+        )
+        monkeypatch.chdir(str(root))
+
+        dest_full = os.path.join(str(root), "packages", "widget")
+        entry = detect_targets(dest_full)[0]
+        target = TARGETS[entry.name]
+
+        cur, new, bump, tag = compute_release_version(
+            target, entry.path, "patch", "widget", "packages/widget",
+            lambda *a, **k: None, project_dir=dest_full,
+        )
+        assert cur == "0.2.0"
+        assert new == "0.2.1"  # patch bump forward, NOT a re-release of 0.2.0
+        assert bump == "patch"
+        assert tag == target.monorepo_tag_format("widget", "0.2.1", path="packages/widget")
+
+    def test_changelog_coverage_passes(self, tmp_path, monkeypatch):
+        """All unreleased package commits are covered with zero hand-fixups."""
+        root = _setup_plain_monorepo(tmp_path)
+        source, _ = _setup_released_source_repo(tmp_path)
+        cmd_absorb(str(root), str(source), "packages/widget")
+
+        from rlsbl.changelog.validate import check_coverage
+        from rlsbl.targets import TARGETS, detect_targets
+
+        dest_full = os.path.join(str(root), "packages", "widget")
+        entry_t = detect_targets(dest_full)[0]
+        target = TARGETS[entry_t.name]
+        tag_glob = target.monorepo_tag_glob("widget", path="packages/widget")
+
+        proj = None
+        for p in load_workspace(str(root)):
+            if p.name == "widget":
+                proj = p
+        assert proj is not None
+
+        changes_dir = root / "packages" / "widget" / ".rlsbl" / "changes"
+        entries = _parse_jsonl_hashes(str(changes_dir / "unreleased.jsonl"))
+
+        monkeypatch.chdir(str(root))
+        ok, details = check_coverage(entries, tag_glob=tag_glob, project=proj.to_dict())
+        assert ok, details
+
+    def test_working_tree_clean_after_absorb(self, tmp_path):
+        """Absorb self-commits: the working tree is clean afterward."""
+        root = _setup_plain_monorepo(tmp_path)
+        source, _ = _setup_released_source_repo(tmp_path)
+        cmd_absorb(str(root), str(source), "packages/widget", registry_name="widget-npm")
+
+        status = _run_git(str(root), "status", "--porcelain")
+        assert status == ""
+
+        proj = next(p for p in load_workspace(str(root)) if p.name == "widget")
+        assert proj["path"] == "packages/widget"
+        assert proj.registry_name == "widget-npm"
+
+    def test_source_dirty_rejected(self, tmp_path):
+        root = _setup_plain_monorepo(tmp_path)
+        source, _ = _setup_released_source_repo(tmp_path)
+        (source / "dirty.txt").write_text("x\n")
+        with pytest.raises(ExtractError, match="uncommitted changes"):
+            cmd_absorb(str(root), str(source), "packages/widget")
+
+
+@skip_no_filter_repo
+class TestAbsorbReleasable:
+    def test_releasable_routing_and_residue_removal(self, tmp_path):
+        """--releasable routes the changelog to the releasable dir and removes
+        the per-package residue."""
+        root = tmp_path / "mono_rel"
+        root.mkdir()
+        _init_git_repo(root)
+        _write_workspace(root, """
+[[projects]]
+path = "existing"
+name = "existing"
+releasable = "core"
+""", releasables_toml="""
+[[releasables]]
+name = "core"
+""")
+        (root / "existing").mkdir()
+        _make_commit(root, "existing/keep.txt", "keep\n", "add existing")
+        # Seed the releasable changes dir so routing appends into it.
+        rel_changes = root / ".rlsbl-monorepo" / "releasables" / "core" / "changes"
+        os.makedirs(str(rel_changes), exist_ok=True)
+        (rel_changes / "unreleased.jsonl").write_text("")
+        subprocess.run(["git", "add", WORKSPACE_DIR], cwd=str(root),
+                       check=True, capture_output=True, text=True)
+        subprocess.run(["git", "commit", "-q", "-m", "workspace"], cwd=str(root),
+                       check=True, capture_output=True, text=True)
+
+        source, _ = _setup_released_source_repo(tmp_path)
+        result = cmd_absorb(
+            str(root), str(source), "packages/widget",
             releasable_name="core",
         )
 
-        projects = load_workspace(str(root))
-        new_pkg = None
-        for p in projects:
-            if p.name == "new_pkg":
-                new_pkg = p
-                break
-        assert new_pkg is not None
-        assert new_pkg.releasable == "core"
+        # Project assigned to the releasable.
+        proj = next(p for p in load_workspace(str(root)) if p.name == "widget")
+        assert proj.releasable == "core"
 
-    def test_changelog_migration(self, tmp_path):
-        """Source repo's changelog entries are migrated to the monorepo."""
-        root, _ = _setup_monorepo(tmp_path)
-        source, _ = _setup_source_repo(tmp_path)
+        # Changelog routed into the releasable dir.
+        assert (rel_changes / "unreleased.jsonl").read_text().strip() != ""
 
-        result = cmd_absorb(str(root), str(source), "new_pkg")
-        assert result["entries_migrated"] >= 1
+        # Per-package changes residue removed.
+        assert not (root / "packages" / "widget" / ".rlsbl" / "changes").exists()
 
-        # Check that changelog files exist in the monorepo
-        changes_dir = root / "new_pkg" / ".rlsbl" / "changes"
-        assert changes_dir.is_dir()
+        # Self-committed: clean tree.
+        assert _run_git(str(root), "status", "--porcelain") == ""
 
-    def test_source_not_git_repo(self, tmp_path):
-        """Error when source is not a git repo."""
-        root, _ = _setup_monorepo(tmp_path)
-        source = tmp_path / "not_a_repo"
-        source.mkdir()
 
-        with pytest.raises(ExtractError, match="not a git repository"):
-            cmd_absorb(str(root), str(source), "new_pkg")
+class TestAbsorbCliBinding:
+    def test_positional_binding_order_locked(self):
+        """CLI positional order is source_repo FIRST, dest_path SECOND.
 
-    def test_duplicate_name(self, tmp_path):
-        """Error when package name already exists in workspace."""
-        root, _ = _setup_monorepo(tmp_path)
-        source, _ = _setup_source_repo(tmp_path)
+        strictcli binds bottom-decorator-first; this pins the order so a future
+        edit cannot silently invert the two positionals.
+        """
+        from rlsbl import app
 
-        with pytest.raises(ExtractError, match="already exists"):
-            cmd_absorb(str(root), str(source), "pkgA")
+        def walk(commands, groups, prefix):
+            for name, cmd in commands.items():
+                yield prefix + name, cmd
+            for gname, group in groups.items():
+                yield from walk(group.commands, group._groups, prefix + gname + " ")
+
+        cmd = None
+        for path, c in walk(app._commands, app._groups, ""):
+            if path == "monorepo absorb":
+                cmd = c
+        assert cmd is not None
+        assert [a.name for a in cmd.args] == ["source_repo", "dest_path"]
 
 
 # ---------------------------------------------------------------------------

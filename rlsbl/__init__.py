@@ -1410,11 +1410,13 @@ def cmd_mono_extract(ctx, dry_run, yes, quiet, package_name, target_path, **_kwa
         print(f"  Changelog: {result['entries_migrated']} entries in {result['files_written']} files")
 
 
-@mono.command(name="absorb", help="Absorb an external repository as a package in the monorepo. Runs git subtree add to import the source repo's history under the package name, adds the project to workspace.toml, and migrates changelog entries from the source repo's .rlsbl/changes/ directory.")
+@mono.command(name="absorb", help="Absorb an external repository as a package in the monorepo. Rewrites the source's history to live under the destination path, fetch-merges it (preserving full history with rewritten paths), imports its version tags under the monorepo tag scheme, and remaps its JSONL changelog hashes to the new commits.")
+@strictcli.flag(name="name", type=str, help="Workspace project name for the absorbed package (default: basename of the destination path)", default="")
+@strictcli.flag(name="registry-name", type=str, help="Package registry identity recorded in workspace.toml (used verbatim for name checks)", default="")
 @strictcli.flag(name="releasable", type=str, help="Releasable group to assign the absorbed package to", default="")
-@strictcli.arg(name="package_name", help="Name to assign to the absorbed package in the monorepo workspace.toml")
-@strictcli.arg(name="source_path", help="Filesystem path to the external git repository to absorb")
-def cmd_mono_absorb(ctx, dry_run, yes, quiet, releasable, source_path, package_name, **_kwargs):
+@strictcli.arg(name="dest_path", help="Destination directory (and workspace path) the source repo's history is rewritten under")
+@strictcli.arg(name="source_repo", help="Filesystem path to the external git repository to absorb")
+def cmd_mono_absorb(ctx, dry_run, yes, quiet, name, registry_name, releasable, source_repo, dest_path):
     root = _require_project_root()
     from .workspace import find_workspace_root
     ws_root = find_workspace_root(str(root))
@@ -1424,7 +1426,9 @@ def cmd_mono_absorb(ctx, dry_run, yes, quiet, releasable, source_path, package_n
     from .commands.monorepo import cmd_absorb
     try:
         result = cmd_absorb(
-            ws_root, source_path, package_name,
+            ws_root, source_repo, dest_path,
+            name=name or None,
+            registry_name=registry_name,
             releasable_name=releasable or None,
             dry_run=dry_run,
         )
@@ -1432,10 +1436,13 @@ def cmd_mono_absorb(ctx, dry_run, yes, quiet, releasable, source_path, package_n
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
     if dry_run:
-        print(f"Would absorb '{result['package_name']}' from {result['source_path']} (branch: {result['source_branch']})")
+        tags = ", ".join(result["tags_to_import"]) or "none"
+        print(f"Would absorb '{result['name']}' from {result['source_path']} into {result['dest_path']}")
+        print(f"  Version tags to import: {tags}")
     else:
-        print(f"Absorbed '{result['package_name']}' from {result['source_path']} (branch: {result['source_branch']})")
-        print(f"  Changelog: {result['entries_migrated']} entries in {result['files_written']} files")
+        print(f"Absorbed '{result['name']}' from {result['source_path']} into {result['dest_path']}")
+        print(f"  Changelog: {result['entries_migrated']} entries migrated")
+        print(f"  Tags imported: {', '.join(result['tags_imported']) or 'none'}")
 
 
 @mono.command(name="extract-releasable", help="Extract all member packages of a releasable into a new repository. If the releasable has one member, creates a single-project repo. If it has multiple members, creates a new monorepo with workspace.toml. Migrates changelog entries for each member and removes all extracted projects from the source workspace.")

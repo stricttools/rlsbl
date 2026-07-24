@@ -2,6 +2,7 @@
 
 import json
 import os
+import shutil
 import subprocess
 import time
 from unittest.mock import patch
@@ -266,7 +267,10 @@ def _mock_saferm():
         if isinstance(cmd, list) and cmd:
             if cmd[0] == "saferm":
                 target_file = cmd[-1]
-                if os.path.exists(target_file):
+                if os.path.isdir(target_file):
+                    # saferm delete -r removes directories; mirror that here.
+                    shutil.rmtree(target_file)
+                elif os.path.exists(target_file):
                     os.unlink(target_file)
                 return real_subprocess.CompletedProcess(args=cmd, returncode=0)
             if cmd[0] == "selfdoc":
