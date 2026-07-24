@@ -42,3 +42,4 @@
 {"id":"18c5493b8e5c147220d96abcce834d5fa29f44372a9a0c09","commits":["897da5decae9a6fb89473d6a88e6d69068ac43b0"],"user_facing":false}
 {"id":"18c5493ba33236b753a76efe9ad048ce9e44febb8542a58c","commits":["5f0ad607f155979c68f5e2b420c59f3524ebad61"],"user_facing":false}
 {"id":"18c549bebd0f517cd6acde82d12f4507b329763046fa82cb","commits":["b8c15c3ae3fb9a9f7982641cf1f7803bf81fe561"],"user_facing":true,"description":"**`monorepo extract` now produces a coherent standalone repo.** It translates the package's monorepo-scheme tags to standalone `v{version}` (multi-member releasable extracts keep the releasable scheme and recreate the `[[releasables]]` grouping), prunes foreign packages' tags, remaps changelog hashes to the rewritten commits (dropping entries whose commits were pruned), and self-commits the migrated state.","type":"feature"}
+{"id":"18c549c0365f4b4f61ceab50cec745aab8d10962cf290c78","commits":["dec9296288894b25d4f2f8f61cc8cdaaa5502560"],"user_facing":false}
