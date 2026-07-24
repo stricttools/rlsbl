@@ -203,6 +203,14 @@ class WorkspaceProject:
     def registry_name(self) -> str:
         return self._data.get("registry_name", "")
 
+    @property
+    def subtree_remote(self) -> str:
+        """URL of the standalone mirror repository for this project.
+
+        Empty string when the project has no subtree mirror configured.
+        """
+        return self._data.get("subtree_remote", "")
+
     def get(self, key, default=None):
         """Dict-like access for backward compatibility."""
         return self._data.get(key, default)

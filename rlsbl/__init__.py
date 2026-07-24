@@ -1301,12 +1301,12 @@ def cmd_mono_snapshot(ctx, check, dry_run, yes, quiet):
     _cmd_snapshot({"check": check}, project_root=root)
 
 
-@mono.command(name="mirror", help="Initialize a subtree mirror repository for a monorepo project by performing a full git subtree split of the project's history, pushing the extracted tree to the configured subtree_remote URL, cloning the resulting standalone mirror repository, running rlsbl scaffold to generate CI workflows for independent publishing, and pushing the scaffolded mirror to its remote.")
+@mono.command(name="mirror", help="Reconcile a monorepo project's subtree mirror toward its desired state. The mirror is a tool-owned, derived artifact: it observes the remote, then converges it to exactly one scaffold commit atop the current deterministic subtree split, force-pushing (with lease) as the routine write. A tripwire refuses to touch a mirror carrying foreign (hand-authored) commits. Use --dry-run to print a plan (converged, behind, scaffold-missing, contract-violated, or virgin) without writing.")
 @strictcli.arg(name="project", help="Name of the workspace project to split and push as a standalone mirror repo")
-def cmd_mono_mirror(ctx, project, dry_run, yes, quiet, **_kwargs):
+def cmd_mono_mirror(ctx, project, dry_run, yes, quiet):
     root = _require_project_root()
     from .commands.monorepo import _cmd_mirror
-    _cmd_mirror({"project": project}, project_root=root)
+    _cmd_mirror({"project": project, "dry-run": dry_run}, project_root=root)
 
 
 @mono.command(name="graph", help="Export the monorepo dependency graph in JSON, DOT (Graphviz), or indented text tree format. Supports filtering by a root package (transitive deps) or reverse package (transitive rdeps), with optional depth limiting. Use --output to write to a file instead of stdout.")
