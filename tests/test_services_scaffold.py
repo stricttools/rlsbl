@@ -151,6 +151,69 @@ class TestScoping:
         assert "postgres:" in out
 
 
+class TestPlanFixup:
+    """The injection post-processes scaffold plan action/status so apply_plans
+    writes the injected result -- but must not report a misleading "updated"
+    label when the on-disk file already matches the injected output."""
+
+    def test_no_services_leaves_plans_untouched(self):
+        """A project with no services/test_env config is a strict no-op: the
+        plan's action, status, and content are all unchanged."""
+        plan = {
+            "target": ".github/workflows/ci-go.yml",
+            "content": BASE_GO_CI,
+            "base_content": BASE_GO_CI,
+            "action": "skip",
+            "status": "unchanged",
+            "bucket": "skipped",
+        }
+        plans = [dict(plan)]
+        inject_services_into_ci_plans(plans, {})
+        assert plans[0] == plan
+
+    def test_rescaffold_identical_reports_unchanged(self, tmp_path, monkeypatch):
+        """A second scaffold run whose injected output is byte-identical to the
+        on-disk file reports 'unchanged' -- never a perpetual 'updated' label."""
+        monkeypatch.chdir(tmp_path)
+        wf = tmp_path / ".github" / "workflows"
+        wf.mkdir(parents=True)
+        injected = _inject(BASE_GO_CI)
+        (wf / "ci-go.yml").write_text(injected)
+        # A re-scaffold plan carrying the already-injected content, initially
+        # marked unchanged by plan_mappings' three-way merge.
+        plans = [{
+            "target": ".github/workflows/ci-go.yml",
+            "content": injected,
+            "base_content": BASE_GO_CI,
+            "action": "skip",
+            "status": "unchanged",
+            "bucket": "skipped",
+        }]
+        inject_services_into_ci_plans(plans, _pgdesign_config())
+        assert plans[0]["action"] != "write"
+        assert "updated" not in plans[0]["status"]
+
+    def test_first_scaffold_reports_updated_and_writes(self, tmp_path, monkeypatch):
+        """When the on-disk file lacks the services, the plan is flipped to a
+        write with an 'updated (CI services)' status."""
+        monkeypatch.chdir(tmp_path)
+        wf = tmp_path / ".github" / "workflows"
+        wf.mkdir(parents=True)
+        (wf / "ci-go.yml").write_text(BASE_GO_CI)  # plain, no services yet
+        plans = [{
+            "target": ".github/workflows/ci-go.yml",
+            "content": BASE_GO_CI,
+            "base_content": BASE_GO_CI,
+            "action": "skip",
+            "status": "unchanged",
+            "bucket": "skipped",
+        }]
+        inject_services_into_ci_plans(plans, _pgdesign_config())
+        assert plans[0]["action"] == "write"
+        assert "updated" in plans[0]["status"]
+        assert "services:" in plans[0]["content"]
+
+
 class TestMergeCleanliness:
     """A re-scaffold three-way merge preserves hand edits without conflicts."""
 
