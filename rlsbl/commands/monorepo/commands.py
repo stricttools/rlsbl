@@ -8,7 +8,7 @@ import time
 
 from ...git_util import validate_subtree_remote_ssh_host
 from ...utils import commit_files
-from ...workspace import find_workspace_root, load_workspace, save_workspace, WORKSPACE_DIR, WORKSPACE_FILE
+from ...workspace import find_workspace_root, load_workspace, save_workspace, WorkspaceProject, WORKSPACE_DIR, WORKSPACE_FILE
 from ...workspace_graph import WorkspaceGraph
 from ...targets import detect_targets, resolve_releasable_config_dir, TARGETS, TargetEntry
 
@@ -712,7 +712,14 @@ def _cmd_check_names(args, flags, project_root):
 
     rows = []
     for i, proj in enumerate(projects):
-        checked_name = prefix + proj["name"] + suffix
+        # A project's registry_name IS its registry identity: use it verbatim,
+        # bypassing prefix/suffix. Only fall back to prefix+name+suffix when no
+        # registry_name is declared.
+        registry_name = proj.registry_name if isinstance(proj, WorkspaceProject) else proj.get("registry_name", "")
+        if registry_name:
+            checked_name = registry_name
+        else:
+            checked_name = prefix + proj["name"] + suffix
         result = _check_single_name(checked_name, target)
         table_row = _format_table_row(result)
         rows.append({

@@ -8,7 +8,7 @@ from unittest.mock import patch, call
 import pytest
 
 from rlsbl.commands.monorepo import _cmd_check_names, _cmd_init, _cmd_add
-from rlsbl.workspace import WORKSPACE_DIR, WORKSPACE_FILE
+from rlsbl.workspace import WORKSPACE_DIR, WORKSPACE_FILE, load_workspace, save_workspace
 
 
 def _make_npm_project(base_path, subdir):
@@ -157,6 +157,58 @@ class TestPrefixAndSuffix:
 
         captured = capsys.readouterr()
         assert "@scope/core-lib" in captured.out
+
+
+def _set_registry_name(root, project_name, registry_name):
+    """Set registry_name on a workspace project and persist it."""
+    projects = load_workspace(root)
+    for proj in projects:
+        if proj["name"] == project_name:
+            proj["registry_name"] = registry_name
+    save_workspace(root, projects)
+
+
+class TestRegistryName:
+    @patch("rlsbl.commands.monorepo.commands.time.sleep")
+    @patch("rlsbl.commands.check._check_single_name")
+    def test_registry_name_used_verbatim(self, mock_check, mock_sleep, mock_git_repo, capsys):
+        """When registry_name is set, it is checked verbatim (no prefix/suffix)."""
+        _setup_workspace(mock_git_repo, ["core"])
+        _set_registry_name(".", "core", "my-core-pkg")
+        capsys.readouterr()
+
+        mock_check.side_effect = [
+            {"name": "my-core-pkg", "registry": "npm", "status": "available",
+             "variants": []},
+        ]
+
+        _cmd_check_names([], {"target": "npm", "prefix": "www-", "suffix": "-js"}, project_root=".")
+
+        # registry_name wins verbatim -- prefix/suffix are NOT applied.
+        mock_check.assert_called_once_with("my-core-pkg", "npm")
+        captured = capsys.readouterr()
+        assert "my-core-pkg" in captured.out
+        assert "www-" not in captured.out
+
+    @patch("rlsbl.commands.monorepo.commands.time.sleep")
+    @patch("rlsbl.commands.check._check_single_name")
+    def test_falls_back_to_prefix_suffix_when_unset(self, mock_check, mock_sleep, mock_git_repo, capsys):
+        """Projects without registry_name still get prefix+name+suffix."""
+        _setup_workspace(mock_git_repo, ["core", "api"])
+        _set_registry_name(".", "core", "custom-core")
+        capsys.readouterr()
+
+        mock_check.side_effect = [
+            {"name": "custom-core", "registry": "npm", "status": "available",
+             "variants": []},
+            {"name": "www-api", "registry": "npm", "status": "available",
+             "variants": []},
+        ]
+
+        _cmd_check_names([], {"target": "npm", "prefix": "www-"}, project_root=".")
+
+        mock_check.assert_any_call("custom-core", "npm")
+        mock_check.assert_any_call("www-api", "npm")
 
 
 class TestDelay:
