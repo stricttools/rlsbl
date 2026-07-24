@@ -46,3 +46,4 @@
 {"id":"18c54b00e2bf86116e709eea335645b68bb1c40385f33c1e","commits":["e876fbabfd5d5615b8c05cc5b06e13122cf26b0e"],"user_facing":true,"description":"**absorb/extract hard-error up front on broken target declarations.** `monorepo absorb` and `monorepo extract` now abort before any history rewrite when a package's `.rlsbl/config.json` exists but declares no `targets` key, instead of silently importing wrongly-schemed version tags that break version resolution later.","type":"fix"}
 {"id":"18c54b11000c27ceb7ccbc14f3b74a3896c038ed38205cd2","commits":["9df790d62ac296ba8b4ac6d519e5baec7268378e"],"user_facing":false}
 {"id":"18c54b2691463a158ec3235e50f440058e933e63de624be0","commits":["7128a32296c947806508170fbd66023781951f4b"],"user_facing":false}
+{"id":"18c54b279fad59ca85eee1ce4e9c40be9995f1c68592d69f","commits":["c790080dd5378d646f18b23a6f43081e7663685e"],"user_facing":false}
