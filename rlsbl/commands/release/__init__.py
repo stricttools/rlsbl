@@ -44,6 +44,8 @@ from ...utils import (
     is_clean_tree,
     push_if_needed,
     remote_branch_exists,
+    remote_tag_commit,
+    RemoteTagState,
     require_tool,
     resolve_tag_push_plan,
     run,

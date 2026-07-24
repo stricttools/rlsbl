@@ -333,7 +333,7 @@ class RemoteTagResult:
     error: str | None = None
 
 
-def remote_tag_commit(tag, cwd=None, remote="origin"):
+def remote_tag_commit(tag, cwd=None, remote="origin", timeout=30):
     """Resolve a tag to the commit it points to on ``remote`` (default origin).
 
     Runs ``git ls-remote --tags <remote> <tag>`` and returns a tri-state
@@ -361,6 +361,7 @@ def remote_tag_commit(tag, cwd=None, remote="origin"):
             text=True,
             check=True,
             cwd=cwd,
+            timeout=timeout,
         )
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
         error_text = getattr(e, "stderr", None) or str(e)

@@ -603,6 +603,29 @@ def compute_release_version(target, primary_path, bump_arg, monorepo_name,
     if tag_exists_locally(tag):
         raise ReleaseValidationError(f'tag "{tag}" already exists.')
 
+    # Pre-mutation remote collision check. The computed tag must not already
+    # exist on the remote at ANY commit. A remote-only stale tag (e.g. left by
+    # an interrupted or partially-undone release, possibly on another machine)
+    # would otherwise only surface at push time -- after the version bump and
+    # release commit have already mutated local state. Catching it here aborts
+    # cleanly before any mutation. An inconclusive remote probe is also fatal:
+    # a release must not start blind about whether its target tag is free.
+    from . import remote_tag_commit, RemoteTagState
+    _remote = remote_tag_commit(tag)
+    if _remote.state is RemoteTagState.PRESENT:
+        raise ReleaseValidationError(
+            f'tag "{tag}" already exists on origin at {_remote.commit}; the '
+            f'version may already be released or a stale remote tag is present. '
+            f'Investigate and delete the remote tag before releasing.'
+        )
+    if _remote.state is RemoteTagState.INCONCLUSIVE:
+        raise ReleaseValidationError(
+            f'could not verify whether tag "{tag}" exists on origin '
+            f'(ls-remote failed): {_remote.error}. A release must not start '
+            f'without confirming its target tag is free -- resolve the remote '
+            f'access issue and retry.'
+        )
+
     return current_version, new_version, bump_type, tag
 
 

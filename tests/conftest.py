@@ -280,6 +280,30 @@ def _mock_saferm():
 
 
 @pytest.fixture(autouse=True)
+def _mock_remote_tag_commit():
+    """Neutralize the pre-mutation remote tag collision probe by default.
+
+    ``compute_release_version`` runs a live ``git ls-remote`` against origin to
+    detect a remote tag colliding with the computed release tag (a real
+    network call). Left unmocked, every release-flow and compute-version test
+    would hit the actual origin of whatever repo the test process is in
+    (typically the rlsbl dev repo) -- slow, flaky, and network-dependent.
+
+    Default to ABSENT (no collision) so tests proceed offline. Tests that
+    specifically exercise the collision / inconclusive paths patch
+    ``rlsbl.commands.release.remote_tag_commit`` themselves (their inner patch
+    nests over this one and wins for the test's duration).
+    """
+    from rlsbl.utils import RemoteTagResult, RemoteTagState
+
+    with patch(
+        "rlsbl.commands.release.remote_tag_commit",
+        return_value=RemoteTagResult(RemoteTagState.ABSENT),
+    ):
+        yield
+
+
+@pytest.fixture(autouse=True)
 def _default_push_timeout(monkeypatch):
     """Pin the push timeout for all tests via the env var.
 
