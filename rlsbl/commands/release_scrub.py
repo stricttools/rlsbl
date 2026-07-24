@@ -28,6 +28,7 @@ from ..utils import (
     get_push_timeout,
 )
 from ..workspace import load_workspace
+from ..tag_glob import TagMode, parse_version_tag
 
 # Minimum safegit release the scrub flow is built against: the flow depends
 # on >= 0.22.0 for --remap-shas-in (in-history changelog hash remapping), the
@@ -1095,14 +1096,14 @@ def run_cmd(flags, *, ctx):
                         print(f"Warning: failed to delete release {tag_name}: {e}", file=sys.stderr)
                         continue
 
-                    # Extract version from tag name
-                    # Handle monorepo format: "project@v1.2.3" or "project/v1.2.3"
-                    # Handle standalone format: "v1.2.3"
-                    version_match = re.search(r"v(\d+\.\d+\.\d+)$", tag_name)
-                    if not version_match:
+                    # Extract version from tag name (final releases only -- a
+                    # prerelease suffix disqualifies the tag). Handles standalone
+                    # "v1.2.3", monorepo "project@v1.2.3", and path "project/v1.2.3".
+                    parsed_tag = parse_version_tag(tag_name, mode=TagMode.FINAL_ONLY)
+                    if not parsed_tag:
                         print(f"Warning: cannot extract version from tag {tag_name}", file=sys.stderr)
                         continue
-                    version = version_match.group(1)
+                    version = parsed_tag.version
 
                     # Find the right project's CHANGELOG.md
                     changelog_notes = None
@@ -1120,7 +1121,7 @@ def run_cmd(flags, *, ctx):
                             changelog_path = os.path.join(proj_path, "CHANGELOG.md")
                             if os.path.exists(changelog_path):
                                 changelog_notes = extract_changelog_entry(changelog_path, version)
-                        elif re.match(r"^v\d+\.\d+\.\d+$", tag_name):
+                        elif parsed_tag.scheme == "standalone":
                             # Standalone tag format (vX.Y.Z with no project prefix) -- use project root CHANGELOG
                             changelog_path = os.path.join(str(ctx.workspace_root), "CHANGELOG.md")
                             if os.path.exists(changelog_path):
@@ -1158,7 +1159,10 @@ def run_cmd(flags, *, ctx):
         if os.path.exists(scrub_result_path):
             os.unlink(scrub_result_path)
 
-        releases_count = sum(1 for t in tags if re.search(r"v\d+\.\d+\.\d+$", t.get("refname", "")))
+        releases_count = sum(
+            1 for t in tags
+            if parse_version_tag(t.get("refname", ""), mode=TagMode.FINAL_ONLY)
+        )
         repaired_count = len(scrub_data.get("remapped_files", []))
         repaired_note = (
             f" {repaired_count} changelog file(s) repaired from the rewrite "
