@@ -101,6 +101,48 @@ def releasable_tag_glob(tag_format: str, releasable_name: str) -> str:
     return tag_format.replace("{version}", "*").format(name=releasable_name)
 
 
+def _target_tag_scheme(target, name, path):
+    """Classify a target's monorepo tag scheme.
+
+    Returns ``"at"`` for the ``{name}@v*`` scheme (base default, used by all
+    targets except Go) or ``"path"`` for the ``{path}/v*`` scheme (Go's
+    path-based module-proxy tags). Classification is derived from the target's
+    own ``monorepo_tag_glob`` output so it stays correct if new targets adopt a
+    path-based scheme.
+    """
+    glob = target.monorepo_tag_glob(name, path=path)
+    return "at" if glob.endswith("@v*") else "path"
+
+
+def _mixed_tag_schemes(target_entries, name, path):
+    """Group a member's targets by tag scheme.
+
+    Returns a dict ``{scheme: [target_name, ...]}`` when the member's targets
+    span more than one tag scheme (the mixed-scheme hazard), otherwise
+    ``None``. Only targets present in ``TARGETS`` are considered.
+    """
+    from .targets import TARGETS
+
+    schemes: dict[str, list[str]] = {}
+    for te in target_entries:
+        if te.name not in TARGETS:
+            continue
+        scheme = _target_tag_scheme(TARGETS[te.name], name, path)
+        schemes.setdefault(scheme, []).append(te.name)
+    return schemes if len(schemes) > 1 else None
+
+
+def _mixed_scheme_error(project_path, mixed):
+    """Build the hard-error message for a mixed-tag-scheme member dir."""
+    path_names = ", ".join(mixed.get("path", []))
+    at_names = ", ".join(mixed.get("at", []))
+    return (
+        f"Member dir '{project_path}' declares targets with incompatible "
+        f"monorepo tag schemes: path-style ({path_names}) and @-style "
+        f"({at_names}). Declare separate member dirs or drop one target."
+    )
+
+
 def resolve_monorepo_tag_glob(project, workspace_root, releasable=None) -> str:
     """Return the ``git tag`` glob for a monorepo *project*.
 

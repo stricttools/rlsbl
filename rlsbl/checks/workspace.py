@@ -919,7 +919,7 @@ def register_workspace_checks(app):
         """
         from ..errors import ConfigError
         from ..targets import detect_targets, resolve_releasable_config_dir
-        from ..commands.monorepo.sync import _mixed_tag_schemes, _mixed_scheme_error
+        from ..tag_glob import _mixed_tag_schemes, _mixed_scheme_error
 
         root = str(ctx.workspace_root)
         findings = []
