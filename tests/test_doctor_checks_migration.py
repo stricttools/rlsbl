@@ -94,18 +94,46 @@ EXPECTED_CHECKS = [
     "member-pytest-config",
     # Launcher pipeline checks
     "wrapper-producer",
-    # CLI test-coverage (auto-registered by strictcli test_coverage=True)
-    "cli-test-coverage",
 ]
+
+# ``cli-test-coverage`` is a strictcli framework BUILT-IN check provider,
+# auto-registered because the app is constructed with ``test_coverage=True``.
+# It is NOT declared in checks.toml and is absent from ``app._check_defs``
+# until the check providers are materialized (``_materialize_check_providers``),
+# after which strictcli tracks it in ``app._provider_sourced_names``. It is
+# asserted separately from the TOML-declared checks above.
+BUILTIN_PROVIDER_CHECKS = ["cli-test-coverage"]
 
 
 class TestCheckDeclarations:
     """Every check must be declared in checks.toml and registered on the app."""
 
     def test_all_checks_declared(self):
-        """checks.toml defines exactly the expected checks."""
-        assert sorted(app._check_defs.keys()) == sorted(EXPECTED_CHECKS)
-        assert len(app._check_defs) == len(EXPECTED_CHECKS)
+        """checks.toml defines exactly the expected checks.
+
+        Once check providers are materialized, ``app._check_defs`` also holds
+        strictcli's built-in provider checks (e.g. ``cli-test-coverage``). Those
+        are tracked in ``app._provider_sourced_names`` and excluded here; they
+        are asserted separately in ``test_builtin_provider_checks_registered``.
+        """
+        app._materialize_check_providers()
+        toml_checks = set(app._check_defs) - set(app._provider_sourced_names)
+        assert sorted(toml_checks) == sorted(EXPECTED_CHECKS)
+        assert len(toml_checks) == len(EXPECTED_CHECKS)
+
+    def test_builtin_provider_checks_registered(self):
+        """strictcli's built-in provider checks are registered with impls.
+
+        ``cli-test-coverage`` is provided by the framework (the app is built
+        with ``test_coverage=True``), not declared in checks.toml. After
+        provider materialization it appears in both ``app._check_defs`` and
+        ``app._provider_sourced_names``.
+        """
+        app._materialize_check_providers()
+        for name in BUILTIN_PROVIDER_CHECKS:
+            assert name in app._provider_sourced_names
+            assert name in app._check_defs
+            assert app._check_defs[name].impl is not None
 
     @pytest.mark.parametrize("name", EXPECTED_CHECKS)
     def test_check_has_implementation(self, name):
@@ -116,7 +144,7 @@ class TestCheckDeclarations:
         """``rlsbl check --list`` outputs all check names."""
         result = app.test(["check", "--list"])
         assert result.exit_code == 0
-        for name in EXPECTED_CHECKS:
+        for name in EXPECTED_CHECKS + BUILTIN_PROVIDER_CHECKS:
             assert name in result.stdout
 
     def test_check_list_json(self):
@@ -125,7 +153,7 @@ class TestCheckDeclarations:
         assert result.exit_code == 0
         data = json.loads(result.stdout)
         names = [item["name"] for item in data]
-        assert sorted(names) == sorted(EXPECTED_CHECKS)
+        assert sorted(names) == sorted(EXPECTED_CHECKS + BUILTIN_PROVIDER_CHECKS)
 
 
 # ---------------------------------------------------------------------------
@@ -364,7 +392,7 @@ class TestCheckDryRun:
     def test_dry_run_lists_all_checks(self):
         result = app.test(["check", "--all", "--dry-run"])
         assert result.exit_code == 0
-        for name in EXPECTED_CHECKS:
+        for name in EXPECTED_CHECKS + BUILTIN_PROVIDER_CHECKS:
             assert name in result.stdout
 
 
