@@ -851,20 +851,15 @@ def _find_most_recent_tag(tags, cwd):
 
 
 def _extract_version_from_tag(tag):
-    """Extract the version string from a tag.
+    """Extract the version string from a tag (prerelease-inclusive).
 
-    Handles formats like:
-    - "v1.2.3" -> "1.2.3"
-    - "mylib@v1.2.3" -> "1.2.3"
-    - "path/v1.2.3" -> "1.2.3"
-
-    Returns None if no version pattern is found.
+    Handles ``v1.2.3``, ``mylib@v1.2.3``, and ``path/v1.2.3``, including
+    prerelease suffixes (``v1.0.0-rc.1``). Returns ``None`` for non-version tags.
+    Thin wrapper over the shared :func:`rlsbl.tag_glob.parse_version_tag`.
     """
-    import re
-    match = re.search(r"v(\d+\.\d+\.\d+(?:-[a-zA-Z0-9.]+)?)", tag)
-    if match:
-        return match.group(1)
-    return None
+    from .tag_glob import TagMode, parse_version_tag
+    result = parse_version_tag(tag, mode=TagMode.PRERELEASE_INCLUSIVE)
+    return result.version if result else None
 
 
 # ---------------------------------------------------------------------------
