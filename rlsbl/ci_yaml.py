@@ -278,6 +278,15 @@ def _inject_services_into_doc(doc, services, test_env):
             steps.insert(insert_idx + offset, step)
 
 
+def _inject_workflow_text(text, scoped_services, scoped_env):
+    """Parse *text*, inject services/env, and re-emit; passthrough on parse fail."""
+    doc = parse_ci_workflow(text)
+    if doc is None:
+        return text
+    _inject_services_into_doc(doc, scoped_services, scoped_env)
+    return _emit_ci_workflow_faithful(doc)
+
+
 def inject_services_into_ci_plans(plans, config, *, single_target=None):
     """Post-process scaffold *plans*, injecting CI service containers.
 
@@ -285,8 +294,14 @@ def inject_services_into_ci_plans(plans, config, *, single_target=None):
     target is a test CI workflow (``ci.yml`` / ``ci-<target>.yml``, never
     ``ci-custom.yml`` or publish workflows), injects the services scoped to
     that target plus ``test_env`` (scoped to the union of all service targets)
-    into both the rendered ``content`` and the ``base_content`` merge base, so
-    a re-scaffold re-generates identical output and lands without conflicts.
+    into both the rendered ``content`` and the ``base_content`` merge base.
+
+    The injection runs AFTER ``plan_mappings`` has computed the three-way merge
+    from the plain (service-less) template, so the merge may have stripped the
+    services out of the merged content -- this re-adds them idempotently and
+    also fixes up the plan's ``action``/``status`` so ``apply_plans`` actually
+    writes the result. ``base_content`` gets the services too, so the stored
+    merge base matches what scaffold now generates and a re-scaffold is clean.
 
     No-op when neither ``services`` nor ``test_env`` is declared.
     """
@@ -316,12 +331,41 @@ def inject_services_into_ci_plans(plans, config, *, single_target=None):
         if not scoped_services and not scoped_env:
             continue
 
-        for key in ("content", "base_content"):
-            text = plan.get(key)
-            if not text:
-                continue
-            doc = parse_ci_workflow(text)
-            if doc is None:
-                continue
-            _inject_services_into_doc(doc, scoped_services, scoped_env)
-            plan[key] = _emit_ci_workflow_faithful(doc)
+        # Determine the source text(s) to inject into. plan_mappings computes
+        # its plan from the PLAIN (service-less) template, so for an "unchanged"
+        # plan (base==ours==theirs) it carries neither ``content`` nor
+        # ``base_content`` -- only the on-disk file, which IS that plain
+        # rendered output. Fall back to reading it. ``target`` is project-root-
+        # relative during scaffold (cwd is the project root).
+        on_disk = None
+        if os.path.isfile(target_path):
+            with open(target_path, "r", encoding="utf-8") as f:
+                on_disk = f.read()
+
+        content_src = plan.get("content")
+        base_src = plan.get("base_content")
+        source = content_src if content_src is not None else on_disk
+        if source is None:
+            source = base_src
+        if source is None:
+            continue
+
+        new_content = _inject_workflow_text(source, scoped_services, scoped_env)
+        base_source = base_src if base_src is not None else source
+        new_base = _inject_workflow_text(base_source, scoped_services, scoped_env)
+
+        plan["content"] = new_content
+        plan["base_content"] = new_base
+
+        # Fix up action/status so apply_plans actually writes the injected
+        # result. Only write when the on-disk file differs (avoid churn on an
+        # idempotent re-scaffold); otherwise still persist the injected base so
+        # the stored merge base includes the services.
+        if on_disk != new_content:
+            plan["action"] = "write"
+            plan["status"] = "updated (CI services)"
+            plan["bucket"] = "created"
+        elif plan.get("action") not in ("write", "write_no_base"):
+            plan["action"] = "save_base_only"
+            plan["status"] = "unchanged"
+            plan["bucket"] = "skipped"
