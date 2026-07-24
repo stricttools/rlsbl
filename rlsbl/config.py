@@ -684,6 +684,251 @@ def _validate_pypi_test_block(block):
             )
 
 
+# ---------------------------------------------------------------------------
+# CI service-container config (``services`` + ``test_env``)
+# ---------------------------------------------------------------------------
+
+# Allowed keys at each level of a service definition. Unknown keys are hard
+# errors so typos (e.g. ``imagee``, ``retires``) surface loudly rather than
+# passing as a silent no-op.
+_SERVICE_KEYS = {"targets", "image", "ports", "env", "health", "setup"}
+_HEALTH_KEYS = {"cmd", "interval", "timeout", "retries"}
+_SETUP_KEYS = {"commands", "verify_sql", "verify_cmd"}
+
+
+def _declared_target_names(config):
+    """Return the set of target names declared in ``config['targets']``.
+
+    Target entries may be bare strings or ``{"name": ..., "path": ...}``
+    dicts. Returns an empty set when the key is absent (partial config) so the
+    caller can skip the cross-reference guard rather than reject everything.
+    """
+    names = set()
+    for t in config.get("targets") or []:
+        if isinstance(t, dict):
+            n = t.get("name")
+            if isinstance(n, str) and n:
+                names.add(n)
+        elif isinstance(t, str) and t:
+            names.add(t)
+    return names
+
+
+def _validate_scalar_map(value, where):
+    """Validate that *value* is a map of non-empty string keys to scalars."""
+    if not isinstance(value, dict):
+        raise ConfigError(f"{where} must be a map, got {type(value).__name__}")
+    for k, v in value.items():
+        if not isinstance(k, str) or not k.strip():
+            raise ConfigError(f"{where} keys must be non-empty strings")
+        if not isinstance(v, (str, int, float, bool)):
+            raise ConfigError(
+                f"{where}['{k}'] must be a scalar (string/number/bool), "
+                f"got {type(v).__name__}"
+            )
+
+
+def _validate_service(name, svc, declared_targets):
+    """Validate a single ``services`` entry. See :func:`validate_services_config`."""
+    if not isinstance(name, str) or not name.strip():
+        raise ConfigError("services: service name must be a non-empty string")
+    if not isinstance(svc, dict):
+        raise ConfigError(
+            f"services['{name}'] must be a map, got {type(svc).__name__}"
+        )
+
+    unknown = set(svc) - _SERVICE_KEYS
+    if unknown:
+        raise ConfigError(
+            f"services['{name}'] has unknown key(s): "
+            f"{', '.join(sorted(unknown))}. "
+            f"Allowed keys: {', '.join(sorted(_SERVICE_KEYS))}"
+        )
+
+    # targets: required, non-empty list of declared target names. Explicit
+    # scoping keeps a service off CI workflows it does not belong to (a
+    # postgres service for Go tests must not land in the pypi-wrapper CI).
+    targets = svc.get("targets")
+    if targets is None:
+        raise ConfigError(
+            f"services['{name}'] is missing required key 'targets' -- list the "
+            f"release target(s) whose CI workflow provisions this service "
+            f"(e.g. [\"go\"])"
+        )
+    if not isinstance(targets, list) or not targets:
+        raise ConfigError(
+            f"services['{name}'].targets must be a non-empty list of target names"
+        )
+    for t in targets:
+        if not isinstance(t, str) or not t.strip():
+            raise ConfigError(
+                f"services['{name}'].targets entries must be non-empty strings"
+            )
+        if declared_targets and t not in declared_targets:
+            raise ConfigError(
+                f"services['{name}'].targets references unknown target '{t}'. "
+                f"Declared targets: {', '.join(sorted(declared_targets))}"
+            )
+
+    # image: required string.
+    if "image" not in svc:
+        raise ConfigError(f"services['{name}'] is missing required key 'image'")
+    if not isinstance(svc["image"], str) or not svc["image"].strip():
+        raise ConfigError(f"services['{name}'].image must be a non-empty string")
+
+    # ports: optional list of "host:container" strings.
+    ports = svc.get("ports")
+    if ports is not None:
+        if not isinstance(ports, list):
+            raise ConfigError(
+                f"services['{name}'].ports must be a list, "
+                f"got {type(ports).__name__}"
+            )
+        for p in ports:
+            if not isinstance(p, str) or not p.strip():
+                raise ConfigError(
+                    f"services['{name}'].ports entries must be non-empty "
+                    f"strings (e.g. \"5432:5432\")"
+                )
+
+    # env: optional scalar map.
+    env = svc.get("env")
+    if env is not None:
+        _validate_scalar_map(env, f"services['{name}'].env")
+
+    # health: optional; requires cmd.
+    health = svc.get("health")
+    if health is not None:
+        if not isinstance(health, dict):
+            raise ConfigError(
+                f"services['{name}'].health must be a map, "
+                f"got {type(health).__name__}"
+            )
+        unknown_h = set(health) - _HEALTH_KEYS
+        if unknown_h:
+            raise ConfigError(
+                f"services['{name}'].health has unknown key(s): "
+                f"{', '.join(sorted(unknown_h))}. "
+                f"Allowed keys: {', '.join(sorted(_HEALTH_KEYS))}"
+            )
+        if "cmd" not in health:
+            raise ConfigError(
+                f"services['{name}'].health is missing required key 'cmd'"
+            )
+        if not isinstance(health["cmd"], str) or not health["cmd"].strip():
+            raise ConfigError(
+                f"services['{name}'].health.cmd must be a non-empty string"
+            )
+        for k in ("interval", "timeout"):
+            if k in health and (
+                not isinstance(health[k], str) or not health[k].strip()
+            ):
+                raise ConfigError(
+                    f"services['{name}'].health.{k} must be a non-empty string "
+                    f"(e.g. \"10s\")"
+                )
+        if "retries" in health and (
+            not isinstance(health["retries"], int) or isinstance(health["retries"], bool)
+        ):
+            raise ConfigError(
+                f"services['{name}'].health.retries must be an integer"
+            )
+
+    # setup: optional; requires commands, verify_sql xor verify_cmd.
+    setup = svc.get("setup")
+    if setup is not None:
+        if not isinstance(setup, dict):
+            raise ConfigError(
+                f"services['{name}'].setup must be a map, "
+                f"got {type(setup).__name__}"
+            )
+        unknown_s = set(setup) - _SETUP_KEYS
+        if unknown_s:
+            raise ConfigError(
+                f"services['{name}'].setup has unknown key(s): "
+                f"{', '.join(sorted(unknown_s))}. "
+                f"Allowed keys: {', '.join(sorted(_SETUP_KEYS))}"
+            )
+        commands = setup.get("commands")
+        if not isinstance(commands, list) or not commands:
+            raise ConfigError(
+                f"services['{name}'].setup requires a non-empty 'commands' list"
+            )
+        for c in commands:
+            if not isinstance(c, str) or not c.strip():
+                raise ConfigError(
+                    f"services['{name}'].setup.commands entries must be "
+                    f"non-empty strings"
+                )
+        if "verify_sql" in setup and "verify_cmd" in setup:
+            raise ConfigError(
+                f"services['{name}'].setup declares both 'verify_sql' and "
+                f"'verify_cmd'; they are mutually exclusive"
+            )
+        for k in ("verify_sql", "verify_cmd"):
+            if k in setup and (
+                not isinstance(setup[k], str) or not setup[k].strip()
+            ):
+                raise ConfigError(
+                    f"services['{name}'].setup.{k} must be a non-empty string"
+                )
+
+
+def validate_services_config(config):
+    """Validate the ``services`` and ``test_env`` sections of a project config.
+
+    ``services`` is a map of service-name to a definition::
+
+        {"services": {"postgres": {
+            "targets": ["go"],
+            "image": "postgres:17",
+            "ports": ["5432:5432"],
+            "env": {"POSTGRES_USER": "test"},
+            "health": {"cmd": "pg_isready -U test", "interval": "10s",
+                       "timeout": "5s", "retries": 5},
+            "setup": {"commands": ["apt-get update && ..."],
+                      "verify_sql": "SELECT ..."}
+        }}}
+
+    ``test_env`` is a sibling scalar map rendered into the CI test job's
+    ``env`` (values may reference the service, e.g. a DSN pointing at
+    ``localhost:5432``). ``test_env`` attaches to the union of every service's
+    ``targets``, so it requires at least one declared service.
+
+    Every service must declare ``targets`` (the release-target CI workflows it
+    is provisioned into) and ``image``. Unknown keys at any level are hard
+    errors. ``verify_sql`` and ``verify_cmd`` are mutually exclusive.
+
+    Absent ``services`` and ``test_env`` is valid (returns silently).
+
+    Raises ``ConfigError`` on any violation.
+    """
+    services = config.get("services")
+    test_env = config.get("test_env")
+    if services is None and test_env is None:
+        return
+
+    declared_targets = _declared_target_names(config)
+
+    if services is not None:
+        if not isinstance(services, dict):
+            raise ConfigError(
+                f"services must be a map of service-name to definition, "
+                f"got {type(services).__name__}"
+            )
+        for name, svc in services.items():
+            _validate_service(name, svc, declared_targets)
+
+    if test_env is not None:
+        _validate_scalar_map(test_env, "test_env")
+        if not services:
+            raise ConfigError(
+                "test_env is declared but no services are defined. test_env "
+                "attaches to the CI workflow(s) that provision services; add a "
+                "'services' entry or remove 'test_env'."
+            )
+
+
 def _read_unreleased_commits(config_path):
     """Read commit hashes from unreleased.jsonl adjacent to config_path.
 

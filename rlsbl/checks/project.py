@@ -586,11 +586,120 @@ def register_project_checks(app):
         except ConfigError as e:
             errors.append(str(e))
 
+        # Validate the optional CI service-container config (services/test_env)
+        from ..config import validate_services_config
+        try:
+            validate_services_config(config)
+        except ConfigError as e:
+            errors.append(str(e))
+
         if errors:
             for err in errors:
                 reporter.error(err)
             return reporter.found(f"{len(errors)} config error(s)")
         return reporter.passed("config schema valid")
+
+    @app.error_check("requires-services")
+    def check_requires_services(ctx, reporter):
+        """CI service containers declared in config must be provisioned on disk.
+
+        When ``services`` / ``test_env`` are declared, the rendered CI test
+        workflow for each service's target(s) must actually contain the service
+        and the ``test_env`` keys. A drift (config edited but scaffold not
+        re-run) is a hard error. Skips visibly when nothing is declared.
+        """
+        skip_reason = _virtual_root_skip_reason(ctx)
+        if skip_reason is not None:
+            return reporter.skipped(skip_reason)
+
+        config = ctx.config or {}
+        services = config.get("services") or {}
+        test_env = config.get("test_env") or {}
+        if not services and not test_env:
+            return reporter.skipped("no services or test_env declared")
+
+        from ..ci_yaml import parse_ci_workflow
+
+        root = str(ctx.project_root)
+        wf_dir = os.path.join(root, ".github", "workflows")
+        if not os.path.isdir(wf_dir):
+            msg = (
+                "config declares CI services/test_env but "
+                ".github/workflows/ does not exist -- run rlsbl scaffold"
+            )
+            reporter.error(msg)
+            return reporter.found(msg)
+
+        # Cache of resolved+parsed test jobs keyed by workflow basename.
+        _job_cache: dict[str, object] = {}
+
+        def _resolve_test_job(target):
+            """Return (basename, test_job) for a target's CI workflow, or None."""
+            for basename in (f"ci-{target}.yml", "ci.yml"):
+                if basename in _job_cache:
+                    cached = _job_cache[basename]
+                    return (basename, cached) if cached is not None else None
+                path = os.path.join(wf_dir, basename)
+                if not os.path.isfile(path):
+                    continue
+                with open(path, "r", encoding="utf-8") as f:
+                    doc = parse_ci_workflow(f.read())
+                job = None
+                if doc is not None:
+                    jobs = doc.get("jobs") or {}
+                    job = jobs.get("test") or (
+                        next(iter(jobs.values()), None) if jobs else None
+                    )
+                _job_cache[basename] = job
+                if job is not None:
+                    return (basename, job)
+            return None
+
+        errors = []
+        # Targets that carry test_env (union of every service's targets).
+        env_targets = set()
+        for name, svc in services.items():
+            for target in svc.get("targets") or []:
+                env_targets.add(target)
+                resolved = _resolve_test_job(target)
+                if resolved is None:
+                    errors.append(
+                        f"config declares service '{name}' for target "
+                        f"'{target}' but no CI workflow "
+                        f"(ci-{target}.yml or ci.yml) exists -- run rlsbl scaffold"
+                    )
+                    continue
+                basename, job = resolved
+                provisioned = job.get("services") or {}
+                if name not in provisioned:
+                    errors.append(
+                        f"config declares service '{name}' but "
+                        f".github/workflows/{basename} provisions no such "
+                        f"service -- re-run rlsbl scaffold"
+                    )
+
+        # test_env keys must be present in every workflow that carries services.
+        for target in sorted(env_targets):
+            if not test_env:
+                break
+            resolved = _resolve_test_job(target)
+            if resolved is None:
+                continue
+            basename, job = resolved
+            job_env = job.get("env") or {}
+            for key in test_env:
+                if key not in job_env:
+                    errors.append(
+                        f"config declares test_env key '{key}' but "
+                        f".github/workflows/{basename} sets no such env "
+                        f"var -- re-run rlsbl scaffold"
+                    )
+
+        if errors:
+            for err in errors:
+                reporter.error(err)
+            return reporter.found(f"{len(errors)} service provisioning error(s)")
+        return reporter.passed("declared CI services are provisioned")
 
     @app.error_check("license-file")
     def check_license_file(ctx, reporter):

@@ -440,6 +440,17 @@ pure = true
 needs_network = false
 depends_on = []
 
+# requires-services: when config declares CI service containers (services /
+# test_env), the rendered CI workflow(s) on disk must actually provision them.
+# Pure filesystem read (config + workflow YAML), no subprocess/network.
+[checks.requires-services]
+tags = ["project"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = ["config-schema"]
+
 # dev-sync overlay drift: reads the local dev-overlays sentinel and the venv's
 # dist-info direct_url.json (filesystem only -- no subprocess, no network, so
 # pure). In "preflight" so it blocks a LOCAL release when an overlay was wiped;

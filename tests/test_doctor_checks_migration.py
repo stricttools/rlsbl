@@ -74,6 +74,7 @@ EXPECTED_CHECKS = [
     "selfdoc-version-drift",
     "scaffold-conflicts",
     "cross-repo-path-sources",
+    "requires-services",
     "dev-overlay-drift",
     # Pre-push checks
     "prepush-changelog-coverage",
