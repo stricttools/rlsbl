@@ -58,7 +58,6 @@ order: 90
 - [rlsbl.commands.monorepo.sync](rlsbl-commands-monorepo-sync.html)
 - [rlsbl.commands.prs](rlsbl-commands-prs.html)
 - [rlsbl.commands.push_cmd](rlsbl-commands-push_cmd.html)
-- [rlsbl.commands.record_gif](rlsbl-commands-record_gif.html)
 - [rlsbl.commands.release](rlsbl-commands-release.html)
 - [rlsbl.commands.release.execute](rlsbl-commands-release-execute.html)
 - [rlsbl.commands.release.hooks](rlsbl-commands-release-hooks.html)
