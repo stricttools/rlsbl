@@ -1153,213 +1153,164 @@ class TestReleaseRetryDispatchWarning:
 # ============================================================================
 
 import rlsbl.commands.monorepo.mirror_cmd
-from rlsbl.commands.monorepo.mirror_cmd import _cmd_mirror
+from rlsbl.commands.monorepo import mirror_cmd as mirror_mod
+from rlsbl.commands.monorepo.mirror_cmd import _cmd_mirror, MirrorError, MirrorPlan
 
 
-class TestMirrorCmdSuccessPath:
-    """Test the success path of mirror_cmd via heavy mocking."""
+def _mirror_workspace(mock_git_repo, tmp_path):
+    """Create a workspace with a single ``mylib`` project pointing at a bare
+    subtree remote, and return the remote path. Shared setup for the
+    error-propagation tests below.
+    """
+    from rlsbl.workspace import WORKSPACE_DIR, save_workspace
 
-    def test_successful_subtree_split_and_push(self, mock_git_repo, tmp_path, monkeypatch, capsys):
-        """Mock the full subtree split + push + clone + scaffold path."""
-        from rlsbl.workspace import WORKSPACE_DIR, save_workspace
+    bare_repo = tmp_path / "bare-remote.git"
+    bare_repo.mkdir()
+    subprocess.run(["git", "init", "--bare", "-q"], cwd=str(bare_repo), check=True)
 
-        # Create a bare repo to serve as the subtree remote
-        bare_repo = tmp_path / "bare-remote.git"
-        bare_repo.mkdir()
-        subprocess.run(
-            ["git", "init", "--bare", "-q"],
-            cwd=str(bare_repo),
-            check=True,
-        )
+    proj_dir = mock_git_repo / "mylib"
+    proj_dir.mkdir()
+    (proj_dir / "package.json").write_text(
+        json.dumps({"name": "mylib", "version": "0.1.0"})
+    )
 
-        # Set up workspace with project
-        proj_dir = mock_git_repo / "mylib"
-        proj_dir.mkdir()
-        (proj_dir / "package.json").write_text(json.dumps({"name": "mylib", "version": "0.1.0"}))
+    proj = {"path": "mylib", "name": "mylib", "subtree_remote": str(bare_repo)}
+    (mock_git_repo / WORKSPACE_DIR).mkdir(exist_ok=True)
+    save_workspace(str(mock_git_repo), [proj])
 
-        proj = {"path": "mylib", "name": "mylib", "subtree_remote": str(bare_repo)}
-        ws_dir = mock_git_repo / WORKSPACE_DIR
-        ws_dir.mkdir(exist_ok=True)
-        save_workspace(str(mock_git_repo), [proj])
+    run_git(mock_git_repo, "add", "mylib")
+    run_git(mock_git_repo, "add", WORKSPACE_DIR)
+    run_git(mock_git_repo, "commit", "-q", "-m", "add workspace")
+    return str(bare_repo)
 
-        run_git(mock_git_repo, "add", "mylib")
-        run_git(mock_git_repo, "add", WORKSPACE_DIR)
-        run_git(mock_git_repo, "commit", "-q", "-m", "add workspace")
 
-        # Mock the subtree split and push (they need real git subtree support)
-        run_calls = []
-        original_run = subprocess.run
+# The reconciler rewrite (observe-then-converge) is exercised end-to-end
+# against real bare repos in tests/test_mirror_cmd.py. These tests deliberately
+# cover the NON-redundant slice: how the ``_cmd_mirror`` entry point routes
+# observation results and propagates ``MirrorError`` into process exits -- the
+# dispatch/error-shape seam, not the git plumbing.
 
-        def mock_run_fn(cmd, **kwargs):
-            if isinstance(cmd, list) and "subtree" in cmd:
-                # Create the temp branch manually to simulate subtree split
-                subprocess.run(
-                    ["git", "branch", "_rlsbl-mirror-tmp", "HEAD"],
-                    cwd=str(mock_git_repo),
-                    check=True,
-                    capture_output=True,
-                )
-                return MagicMock(returncode=0)
-            run_calls.append(cmd)
-            return original_run(cmd, **kwargs)
 
-        # We need to mock validate_subtree_remote_ssh_host since bare_repo is a local path
+class TestMirrorCmdConvergedShortCircuit:
+    """A converged plan must short-circuit: print 'Already converged' and never
+    enter the convergence path."""
+
+    def test_converged_plan_does_not_converge(self, mock_git_repo, tmp_path, monkeypatch, capsys):
+        _mirror_workspace(mock_git_repo, tmp_path)
         monkeypatch.setattr(
-            "rlsbl.commands.monorepo.mirror_cmd.validate_subtree_remote_ssh_host",
-            lambda remote, root: None,
+            mirror_mod, "validate_subtree_remote_ssh_host", lambda remote, root: None
         )
-
-        # Mock the entire clone+scaffold portion
-        monkeypatch.setattr(
-            "rlsbl.commands.monorepo.mirror_cmd.run",
-            lambda cmd, args, cwd=None: "",
+        plan = MirrorPlan(
+            state="converged",
+            split_sha="a" * 40,
+            remote_tip="b" * 40,
+            split_lineage_sha="a" * 40,
         )
-
-        # Mock subprocess.run for scaffold and other commands
+        monkeypatch.setattr(mirror_mod, "observe", lambda remote, root, path: plan)
+        converge_calls = {"n": 0}
         monkeypatch.setattr(
-            "subprocess.run",
-            lambda cmd, **kw: MagicMock(returncode=0, stdout="", stderr=""),
-        )
-
-        # Mock tempfile.mkdtemp
-        clone_dir = tmp_path / "clone"
-        clone_dir.mkdir()
-        (clone_dir / ".rlsbl").mkdir()
-        monkeypatch.setattr(
-            "tempfile.mkdtemp",
-            lambda **kw: str(clone_dir),
+            mirror_mod,
+            "_converge",
+            lambda *a, **k: converge_calls.__setitem__("n", converge_calls["n"] + 1),
         )
 
         _cmd_mirror({"project": "mylib"}, project_root=mock_git_repo)
 
-        captured = capsys.readouterr()
-        assert "Splitting subtree" in captured.out
+        assert converge_calls["n"] == 0
+        assert "Already converged" in capsys.readouterr().out
 
 
-class TestMirrorCmdSubtreeSplitFailure:
-    """Test mirror_cmd when subtree split fails."""
+class TestMirrorCmdContractViolationRefuses:
+    """A contract-violated plan must refuse to write and exit 1 with the
+    remediation guidance -- without invoking convergence."""
 
-    def test_subtree_split_failure_exits(self, mock_git_repo, tmp_path, monkeypatch, capsys):
-        from rlsbl.workspace import WORKSPACE_DIR, save_workspace
-
-        # Create a bare repo to serve as the subtree remote
-        bare_repo = tmp_path / "bare-remote.git"
-        bare_repo.mkdir()
-        subprocess.run(
-            ["git", "init", "--bare", "-q"],
-            cwd=str(bare_repo),
-            check=True,
-        )
-
-        proj_dir = mock_git_repo / "mylib"
-        proj_dir.mkdir()
-        (proj_dir / "package.json").write_text(json.dumps({"name": "mylib", "version": "0.1.0"}))
-
-        proj = {"path": "mylib", "name": "mylib", "subtree_remote": str(bare_repo)}
-        ws_dir = mock_git_repo / WORKSPACE_DIR
-        ws_dir.mkdir(exist_ok=True)
-        save_workspace(str(mock_git_repo), [proj])
-
-        run_git(mock_git_repo, "add", "mylib")
-        run_git(mock_git_repo, "add", WORKSPACE_DIR)
-        run_git(mock_git_repo, "commit", "-q", "-m", "add workspace")
-
+    def test_contract_violation_exits_without_converging(self, mock_git_repo, tmp_path, monkeypatch, capsys):
+        _mirror_workspace(mock_git_repo, tmp_path)
         monkeypatch.setattr(
-            "rlsbl.commands.monorepo.mirror_cmd.validate_subtree_remote_ssh_host",
-            lambda remote, root: None,
+            mirror_mod, "validate_subtree_remote_ssh_host", lambda remote, root: None
         )
-
-        # Make the run function raise CalledProcessError for subtree split
-        original_run = rlsbl.commands.monorepo.mirror_cmd.run
-
-        def mock_run(cmd, args, cwd=None):
-            if cmd == "git" and "subtree" in args:
-                raise subprocess.CalledProcessError(
-                    1, ["git", "subtree", "split"],
-                    stderr="fatal: not a valid object"
-                )
-            return original_run(cmd, args, cwd=cwd)
-
+        plan = MirrorPlan(
+            state="contract_violated",
+            split_sha="a" * 40,
+            remote_tip="c" * 40,
+            split_lineage_sha="a" * 40,
+            foreign_commits=[("d" * 40, ["src/hand_authored.py"])],
+        )
+        monkeypatch.setattr(mirror_mod, "observe", lambda remote, root, path: plan)
+        converge_calls = {"n": 0}
         monkeypatch.setattr(
-            "rlsbl.commands.monorepo.mirror_cmd.run", mock_run,
+            mirror_mod,
+            "_converge",
+            lambda *a, **k: converge_calls.__setitem__("n", converge_calls["n"] + 1),
         )
 
         with pytest.raises(SystemExit) as exc_info:
             _cmd_mirror({"project": "mylib"}, project_root=mock_git_repo)
+
         assert exc_info.value.code == 1
-        captured = capsys.readouterr()
-        assert "subtree split failed" in captured.err
+        assert converge_calls["n"] == 0
+        err = capsys.readouterr().err
+        assert "contract-violated" in err
+        assert "src/hand_authored.py" in err
 
 
-class TestMirrorCmdPushFailure:
-    """Test mirror_cmd when push to mirror fails."""
+class TestMirrorCmdObserveErrorPropagation:
+    """A ``MirrorError`` raised during observation (e.g. subtree split failure)
+    must become a clean exit-1 with the message on stderr -- not a traceback."""
 
-    def test_push_failure_cleans_up_branch(self, mock_git_repo, tmp_path, monkeypatch, capsys):
-        from rlsbl.workspace import WORKSPACE_DIR, save_workspace
-
-        bare_repo = tmp_path / "bare-remote.git"
-        bare_repo.mkdir()
-        subprocess.run(
-            ["git", "init", "--bare", "-q"],
-            cwd=str(bare_repo),
-            check=True,
-        )
-
-        proj_dir = mock_git_repo / "mylib"
-        proj_dir.mkdir()
-        (proj_dir / "package.json").write_text(json.dumps({"name": "mylib", "version": "0.1.0"}))
-
-        proj = {"path": "mylib", "name": "mylib", "subtree_remote": str(bare_repo)}
-        ws_dir = mock_git_repo / WORKSPACE_DIR
-        ws_dir.mkdir(exist_ok=True)
-        save_workspace(str(mock_git_repo), [proj])
-
-        run_git(mock_git_repo, "add", "mylib")
-        run_git(mock_git_repo, "add", WORKSPACE_DIR)
-        run_git(mock_git_repo, "commit", "-q", "-m", "add workspace")
-
+    def test_subtree_split_failure_propagates_as_exit(self, mock_git_repo, tmp_path, monkeypatch, capsys):
+        _mirror_workspace(mock_git_repo, tmp_path)
         monkeypatch.setattr(
-            "rlsbl.commands.monorepo.mirror_cmd.validate_subtree_remote_ssh_host",
-            lambda remote, root: None,
+            mirror_mod, "validate_subtree_remote_ssh_host", lambda remote, root: None
         )
 
-        call_count = {"n": 0}
+        orig_git = mirror_mod._git
 
-        def mock_run(cmd, args, cwd=None):
-            call_count["n"] += 1
-            if cmd == "git" and args[0] == "subtree":
-                # Create the temp branch to simulate subtree split
-                subprocess.run(
-                    ["git", "branch", "_rlsbl-mirror-tmp", "HEAD"],
-                    cwd=cwd,
-                    check=True,
-                    capture_output=True,
+        def fake_git(args, cwd=None, timeout=180):
+            if list(args[:2]) == ["subtree", "split"]:
+                return subprocess.CompletedProcess(
+                    args, 1, stdout="", stderr="fatal: not a valid object"
                 )
-                return ""
-            if cmd == "git" and args[0] == "push":
-                raise subprocess.CalledProcessError(
-                    1, ["git", "push"],
-                    stderr="remote: Permission denied"
-                )
-            if cmd == "git" and args[0] == "branch" and args[1] == "-D":
-                subprocess.run(
-                    ["git", "branch", "-D", args[2]],
-                    cwd=cwd,
-                    check=True,
-                    capture_output=True,
-                )
-                return ""
-            return ""
+            return orig_git(args, cwd=cwd, timeout=timeout)
 
-        monkeypatch.setattr(
-            "rlsbl.commands.monorepo.mirror_cmd.run", mock_run,
-        )
+        monkeypatch.setattr(mirror_mod, "_git", fake_git)
 
         with pytest.raises(SystemExit) as exc_info:
             _cmd_mirror({"project": "mylib"}, project_root=mock_git_repo)
+
         assert exc_info.value.code == 1
-        captured = capsys.readouterr()
-        assert "push to mirror failed" in captured.err
+        err = capsys.readouterr().err
+        assert "Error:" in err
+        assert "git subtree split failed" in err
+
+
+class TestMirrorCmdConvergeErrorPropagation:
+    """A ``MirrorError`` raised during convergence (e.g. push rejected) must
+    become a clean exit-1 with the message on stderr."""
+
+    def test_push_failure_during_converge_propagates_as_exit(self, mock_git_repo, tmp_path, monkeypatch, capsys):
+        _mirror_workspace(mock_git_repo, tmp_path)
+        monkeypatch.setattr(
+            mirror_mod, "validate_subtree_remote_ssh_host", lambda remote, root: None
+        )
+        # Virgin plan -> convergence needs a split push, which we make fail.
+        plan = MirrorPlan(state="virgin", split_sha="a" * 40)
+        monkeypatch.setattr(mirror_mod, "observe", lambda remote, root, path: plan)
+
+        def boom(remote, split_sha, expected_tip, root):
+            raise MirrorError(
+                "failed to push split to mirror: remote: Permission denied"
+            )
+
+        monkeypatch.setattr(mirror_mod, "_push_bare_split", boom)
+
+        with pytest.raises(SystemExit) as exc_info:
+            _cmd_mirror({"project": "mylib"}, project_root=mock_git_repo)
+
+        assert exc_info.value.code == 1
+        err = capsys.readouterr().err
+        assert "Error:" in err
+        assert "failed to push split to mirror" in err
 
 
 # ============================================================================

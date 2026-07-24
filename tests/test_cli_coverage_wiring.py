@@ -389,7 +389,7 @@ class TestMonorepoDirectWiring:
             "rlsbl.commands.monorepo._cmd_mirror",
         )
         assert result.exit_code == 0, result.stderr
-        assert _flags(m) == {"project": "myproj"}
+        assert _flags(m) == {"project": "myproj", "dry-run": False}
 
     def test_graph(self):
         result, m = _dispatch(
