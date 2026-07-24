@@ -9,6 +9,7 @@ dist/
 .rlsbl-notes-*.tmp
 .rlsbl/lock
 .rlsbl-monorepo/lock
+.scratch/
 .credentials.json
 .*-cache.json
 .env
