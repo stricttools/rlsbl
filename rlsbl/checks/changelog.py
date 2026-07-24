@@ -209,8 +209,8 @@ def register_changelog_checks(app):
             has_uf = any(e.user_facing for e in entries)
             if has_uf:
                 return reporter.passed("has user-facing entries")
-            reporter.warn('no user-facing entries (use bump = "hotfix" for infrastructure-only releases)')
-            return reporter.found('no user-facing entries (use bump = "hotfix" for infrastructure-only releases)')
+            reporter.warn('no user-facing entries (use bump = "infra" for infrastructure-only releases)')
+            return reporter.found('no user-facing entries (use bump = "infra" for infrastructure-only releases)')
 
         from ..changelog.validate import check_has_user_facing
 
@@ -240,7 +240,7 @@ def register_changelog_checks(app):
             return reporter.passed("has user-facing entries")
         for detail in all_details:
             reporter.warn(detail)
-        return reporter.found('no user-facing entries (use bump = "hotfix" for infrastructure-only releases)')
+        return reporter.found('no user-facing entries (use bump = "infra" for infrastructure-only releases)')
 
     @app.error_check("changelog-batch-commits")
     def check_changelog_batch_commits(ctx, reporter):

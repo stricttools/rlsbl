@@ -37,7 +37,7 @@ class TestReleaseDispatchTemplate:
         assert "minor" in content
         assert "major" in content
         assert "prerelease" in content
-        assert "hotfix" in content
+        assert "infra" in content
 
     def test_template_has_description_input(self):
         tpl = SHARED_TEMPLATE_DIR / ".github" / "workflows" / "release-dispatch.yml.tpl"

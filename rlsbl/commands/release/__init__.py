@@ -644,10 +644,10 @@ def _run_cmd_inner(release_config, flags, *, ctx):
                 config=config,
             )
 
-        # For hotfix releases, ignore warnings (the user-facing check
+        # For infra releases, ignore warnings (the user-facing check
         # produces a warning when no user-facing entries exist, which
-        # is expected for hotfix).
-        _cl_ignore_warn = (bump_type == "hotfix")
+        # is expected for infra).
+        _cl_ignore_warn = (bump_type == "infra")
         _cl_results, _cl_impure, _cl_exit = _rlsbl_app.run_checks(
             _changelog_ctx, tag_expr="preflight-changelog",
             ignore_warnings=_cl_ignore_warn,
@@ -675,15 +675,15 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         if _cl_summary:
             log(_cl_summary)
 
-        # Hotfix releases must not have user-facing changelog entries.
+        # Infra releases must not have user-facing changelog entries.
         # The preflight-changelog checks above validate structural integrity;
-        # this is a semantic constraint specific to the hotfix bump type.
-        if bump_type == "hotfix":
+        # this is a semantic constraint specific to the infra bump type.
+        if bump_type == "infra":
             from ...changelog.files import read_unreleased as _read_unreleased
-            _hotfix_entries = _read_unreleased(changes_dir)
-            if any(e.user_facing for e in _hotfix_entries):
+            _infra_entries = _read_unreleased(changes_dir)
+            if any(e.user_facing for e in _infra_entries):
                 raise ReleaseValidationError(
-                    "hotfix releases must not have user-facing changelog entries "
+                    "infra releases must not have user-facing changelog entries "
                     "— use patch, minor, or major instead"
                 )
 

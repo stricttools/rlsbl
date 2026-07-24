@@ -22,6 +22,8 @@ import tempfile
 
 import tomlkit
 
+from ..errors import ReleaseFileError
+from ..release_file import VALID_BUMP_TYPES
 from .files import get_changes_dir, list_versioned_files, read_unreleased
 from .schema import ChangelogEntry, parse_jsonl
 
@@ -94,7 +96,18 @@ def _read_release_metadata_full(project_path: str, version: str, *,
         context = ""
     if not isinstance(bump, str):
         bump = ""
-    return (description.strip(), context.strip(), bump.strip())
+    bump = bump.strip()
+    # Legacy hard error: a non-empty bump value that is not one of the current
+    # valid types (notably the legacy "hotfix", renamed to "infra") must not be
+    # silently mis-rendered. Fail loudly so the archived file is migrated.
+    if bump and bump not in VALID_BUMP_TYPES:
+        raise ReleaseFileError(
+            f'archived release file {toml_path} carries an unknown '
+            f'bump={bump!r}. If this is the legacy "hotfix" value, migrate it '
+            f'to "infra" (run the fleet archive migration or edit the file); '
+            f'valid bump types are {", ".join(VALID_BUMP_TYPES)}.'
+        )
+    return (description.strip(), context.strip(), bump)
 
 
 def generate_version_section(
@@ -137,8 +150,8 @@ def generate_version_section(
                 "<details>\n<summary>Context</summary>\n\n"
                 f"{context}\n\n</details>\n\n"
             )
-        if bump_type == "hotfix" and description:
-            section += f"### Hotfix\n\n- {description}\n"
+        if bump_type == "infra" and description:
+            section += f"### Infrastructure\n\n- {description}\n"
         else:
             section += "- No user-facing changes.\n"
         return section

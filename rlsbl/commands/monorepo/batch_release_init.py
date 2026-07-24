@@ -107,7 +107,7 @@ def _get_unreleased_commit_count(proj, workspace_root):
 def _build_pkg_section(proj, workspace_root, target_names):
     """Build a tomlkit table for a single package section."""
     pkg_table = tomlkit.table()
-    pkg_table.add(tomlkit.comment("Version bump type: patch, minor, major, hotfix, or prerelease"))
+    pkg_table.add(tomlkit.comment("Version bump type: patch, minor, major, infra, or prerelease"))
     pkg_table.add("bump", "")
     pkg_table.add(tomlkit.comment("Short description of this release (required)"))
     pkg_table.add("description", "")

@@ -120,24 +120,24 @@ class TestPrereleaseOnStableVersionError:
             bump_version("1.0.0", "prerelease", preid="alpha")
 
 
-class TestHotfixWithPreidError:
-    """Hotfix with preid is a hard error."""
+class TestInfraWithPreidError:
+    """Infra with preid is a hard error."""
 
-    def test_hotfix_with_alpha(self):
-        with pytest.raises(VersionError, match="hotfix releases cannot be pre-releases"):
-            bump_version("1.0.0", "hotfix", preid="alpha")
+    def test_infra_with_alpha(self):
+        with pytest.raises(VersionError, match="infra releases cannot be pre-releases"):
+            bump_version("1.0.0", "infra", preid="alpha")
 
-    def test_hotfix_with_beta(self):
-        with pytest.raises(VersionError, match="hotfix releases cannot be pre-releases"):
-            bump_version("1.0.0", "hotfix", preid="beta")
+    def test_infra_with_beta(self):
+        with pytest.raises(VersionError, match="infra releases cannot be pre-releases"):
+            bump_version("1.0.0", "infra", preid="beta")
 
-    def test_hotfix_with_rc(self):
-        with pytest.raises(VersionError, match="hotfix releases cannot be pre-releases"):
-            bump_version("0.5.0", "hotfix", preid="rc")
+    def test_infra_with_rc(self):
+        with pytest.raises(VersionError, match="infra releases cannot be pre-releases"):
+            bump_version("0.5.0", "infra", preid="rc")
 
-    def test_hotfix_without_preid_still_works(self):
-        """Hotfix without preid should still work as before."""
-        assert bump_version("1.2.3", "hotfix") == "1.2.4"
+    def test_infra_without_preid_still_works(self):
+        """Infra without preid should still work as before."""
+        assert bump_version("1.2.3", "infra") == "1.2.4"
 
 
 class TestStandardBumpWithoutPreid:

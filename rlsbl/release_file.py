@@ -14,7 +14,7 @@ import tomlkit
 from .errors import ReleaseFileError
 
 
-VALID_BUMP_TYPES = ("patch", "minor", "major", "hotfix", "prerelease")
+VALID_BUMP_TYPES = ("patch", "minor", "major", "infra", "prerelease")
 
 VALID_PREIDS = ("alpha", "beta", "rc", "stable")
 
@@ -26,7 +26,7 @@ VALID_TARGET_MODES = ("ota", "build")
 # name used in UI and documentation.
 @dataclass
 class ReleaseConfig:
-    bump: str  # "patch", "minor", "major", "hotfix", "prerelease"
+    bump: str  # "patch", "minor", "major", "infra", "prerelease"
     include: list[str]  # target names to release
     exclude: list[str]  # target names to skip
     targets: dict[str, dict] = field(default_factory=dict)  # per-target config
@@ -252,8 +252,8 @@ def _validate_release_config(data: dict, prefix: str = "") -> ReleaseConfig:
                 f"invalid preid {preid!r} "
                 f"(must be one of {VALID_PREIDS} or empty)"
             )
-        if bump == "hotfix":
-            raise err("hotfix releases cannot use preid (hotfix releases cannot be pre-releases)")
+        if bump == "infra":
+            raise err("infra releases cannot use preid (infra releases cannot be pre-releases)")
         if preid == "stable" and bump != "prerelease":
             raise err(
                 f'preid "stable" is only valid with bump = "prerelease" '

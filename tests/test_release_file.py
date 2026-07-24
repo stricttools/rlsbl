@@ -418,10 +418,10 @@ class TestReleaseFilePreid:
         with pytest.raises(ReleaseFileError, match="preid must be a string"):
             read_release_file(str(f))
 
-    def test_preid_with_hotfix_rejected(self, tmp_path):
+    def test_preid_with_infra_rejected(self, tmp_path):
         f = tmp_path / "release.toml"
-        f.write_text(self.BASE.format(bump="hotfix") + 'preid = "alpha"\n')
-        with pytest.raises(ReleaseFileError, match="hotfix releases cannot"):
+        f.write_text(self.BASE.format(bump="infra") + 'preid = "alpha"\n')
+        with pytest.raises(ReleaseFileError, match="infra releases cannot"):
             read_release_file(str(f))
 
     def test_preid_stable_with_non_prerelease_bump_rejected(self, tmp_path):

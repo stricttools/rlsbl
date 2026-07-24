@@ -242,7 +242,7 @@ release_group = app.group("release", help="Release orchestration commands. Provi
 
 @release_group.command(
     name="run",
-    help="Bump version, validate the JSONL changelog, run tests and lint, commit, tag, push, and create a GitHub Release. Reads the bump type (patch, minor, major, or hotfix) and target selection from .rlsbl/releases/unreleased.toml, which can be scaffolded with rlsbl release init. Supports dry-run preview, non-interactive mode with --yes, and --allow-dirty to skip the clean working tree check.",
+    help="Bump version, validate the JSONL changelog, run tests and lint, commit, tag, push, and create a GitHub Release. Reads the bump type (patch, minor, major, or infra) and target selection from .rlsbl/releases/unreleased.toml, which can be scaffolded with rlsbl release init. Supports dry-run preview, non-interactive mode with --yes, and --allow-dirty to skip the clean working tree check.",
     mutex=[
         strictcli.MutexGroup(flags=[
             strictcli.Flag(name="watch", type=bool, help="After release, automatically watch CI runs to completion (--no-watch to skip)"),
@@ -251,7 +251,7 @@ release_group = app.group("release", help="Release orchestration commands. Provi
     ],
 )
 @strictcli.flag(name="allow-dirty", type=bool, help="Skip the clean working tree check and allow releasing with uncommitted changes")
-@strictcli.flag(name="bump", type=str, help="Bump type: patch, minor, major, hotfix, prerelease. Skips the release file.", default="")
+@strictcli.flag(name="bump", type=str, help="Bump type: patch, minor, major, infra, prerelease. Skips the release file.", default="")
 @strictcli.flag(name="description", type=str, help="Short release description summarizing the changes (required with --bump)", default="")
 @strictcli.flag(name="preid", type=str, help="Pre-release identifier: alpha, beta, rc, stable. Only valid with --bump.", default="")
 def cmd_release_run(ctx, dry_run, yes, quiet, allow_dirty, watch, watch_async, bump, description, preid):

@@ -685,7 +685,7 @@ def _parse_prerelease_suffix(version):
 def bump_version(version, bump_type, preid=""):
     """Bump a semver version string by the given type.
 
-    Supported bump types: patch, minor, major, hotfix, prerelease.
+    Supported bump types: patch, minor, major, infra, prerelease.
 
     When preid is set with a standard bump (patch/minor/major), the bumped
     base version gets a pre-release suffix appended: e.g. minor + alpha
@@ -698,13 +698,13 @@ def bump_version(version, bump_type, preid=""):
     - If preid is higher in the ordering (alpha < beta < rc < stable): promote.
     - If preid is lower: error (cannot demote).
 
-    Hotfix with preid is a hard error.
+    Infra with preid is a hard error.
 
     Without preid, the existing behavior is preserved: strip any pre-release
     suffix and bump the base version normally.
     """
-    if bump_type == "hotfix" and preid:
-        raise VersionError("hotfix releases cannot be pre-releases")
+    if bump_type == "infra" and preid:
+        raise VersionError("infra releases cannot be pre-releases")
 
     # Parse base version
     base_version = version.split("-", 1)[0]
@@ -746,19 +746,19 @@ def bump_version(version, bump_type, preid=""):
         # Promote to new preid
         return f"{major}.{minor}.{patch}-{preid}.0"
 
-    # Standard bumps: patch, minor, major, hotfix
+    # Standard bumps: patch, minor, major, infra
     if bump_type == "major":
         new_base = f"{major + 1}.0.0"
     elif bump_type == "minor":
         new_base = f"{major}.{minor + 1}.0"
     elif bump_type == "patch":
         new_base = f"{major}.{minor}.{patch + 1}"
-    elif bump_type == "hotfix":
+    elif bump_type == "infra":
         new_base = f"{major}.{minor}.{patch + 1}"
     else:
         raise VersionError(
             f'Invalid bump type: "{bump_type}". '
-            f'Use patch, minor, major, hotfix, or prerelease.'
+            f'Use patch, minor, major, infra, or prerelease.'
         )
 
     if preid:

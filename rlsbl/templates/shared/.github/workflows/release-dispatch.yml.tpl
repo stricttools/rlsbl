@@ -12,7 +12,7 @@ on:
           - minor
           - major
           - prerelease
-          - hotfix
+          - infra
       description:
         description: 'Release description'
         required: true

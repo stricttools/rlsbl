@@ -577,15 +577,15 @@ def validate_unreleased(changes_dir: str, tag_glob: str | None = None, project=N
         "user_facing": check_has_user_facing(entries),
     }
 
-    # Hotfix releases exempt the user_facing requirement but forbid
+    # Infra releases exempt the user_facing requirement but forbid
     # user-facing entries (use patch/minor/major for those).
-    if bump_type == "hotfix":
+    if bump_type == "infra":
         checks["user_facing"] = (True, [])
         has_user_facing = any(e.user_facing for e in entries)
         if has_user_facing:
-            checks["hotfix_no_user_facing"] = (
+            checks["infra_no_user_facing"] = (
                 False,
-                ["hotfix releases must not have user-facing entries — use patch, minor, or major instead"],
+                ["infra releases must not have user-facing entries — use patch, minor, or major instead"],
             )
 
     overall = all(passed for passed, _ in checks.values())
