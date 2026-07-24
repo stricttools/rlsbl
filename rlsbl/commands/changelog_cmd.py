@@ -7,6 +7,7 @@ import sys
 import tempfile
 
 from ..changelog.files import (
+    NULL_SHA,
     append_entry,
     append_entry_to_version,
     enumerate_changelog_dirs,
@@ -978,6 +979,14 @@ def _parse_sha_map_lines(lines):
     ``<old-sha> <new-sha>`` (optionally followed by extra fields which
     are ignored). Blank lines and lines starting with ``#`` are skipped.
     Returns ``{old_sha: new_sha}``.
+
+    Hardened against being fed a raw git-filter-repo ``commit-map`` directly:
+
+    - The literal ``old new`` header row git-filter-repo writes is skipped
+      rather than ingested as a junk ``{"old": "new"}`` mapping.
+    - Rows whose target is the all-zeros null SHA (git-filter-repo's marker
+      for a pruned commit) are dropped with a warning. Keeping them would let
+      a real hash be rewritten to nothing, corrupting the changelog entry.
     """
     sha_map = {}
     for lineno, line in enumerate(lines, start=1):
@@ -991,7 +1000,17 @@ def _parse_sha_map_lines(lines):
                 file=sys.stderr,
             )
             continue
-        sha_map[parts[0]] = parts[1]
+        old, new = parts[0], parts[1]
+        if old == "old" and new == "new":
+            continue  # git-filter-repo commit-map header row
+        if new == NULL_SHA:
+            print(
+                f"Warning: ignoring line {lineno}: {old} maps to the null SHA "
+                f"(pruned commit); refusing to rewrite a real hash to nothing.",
+                file=sys.stderr,
+            )
+            continue
+        sha_map[old] = new
     return sha_map
 
 

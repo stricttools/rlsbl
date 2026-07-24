@@ -27,6 +27,11 @@ _PREID_RANK = {"alpha": 0, "beta": 1, "rc": 2}
 # Sort key type: (major, minor, patch, is_stable, preid_rank, counter)
 _SemverKey = tuple[int, int, int, int, int, int]
 
+# The all-zeros SHA git-filter-repo uses as the target for pruned commits.
+# Never a valid remap destination -- rewriting a real hash to this would
+# silently corrupt a changelog entry.
+NULL_SHA = "0" * 40
+
 
 @dataclass
 class RemapResult:
@@ -542,6 +547,43 @@ def remap_jsonl_hashes(changes_dir, sha_map) -> RemapReport:
         ))
 
     return RemapReport(results=results, unmapped=unmapped, ambiguous=ambiguous)
+
+
+def load_filter_repo_commit_map(path: str) -> "tuple[dict[str, str], list[str]]":
+    """Load a git-filter-repo ``commit-map`` into a clean ``{old: new}`` dict.
+
+    git-filter-repo writes ``.git/filter-repo/commit-map`` with two quirks
+    that make it unsafe to feed straight into :func:`remap_jsonl_hashes`:
+
+    - A header row of the literal tokens ``old`` and ``new`` (whitespace
+      padded). Ingested naively it becomes a junk ``{"old": "new"}`` entry.
+    - Pruned commits map to the all-zeros :data:`NULL_SHA`. Ingested naively
+      they would rewrite surviving real hashes to nothing, corrupting the
+      changelog. This is the actual corruption vector.
+
+    Returns ``(sha_map, pruned)`` where ``sha_map`` maps surviving old SHAs to
+    their new SHAs (header and null-target rows excluded) and ``pruned`` is the
+    list of old SHAs whose commits were dropped (null target), so callers can
+    log how many entries reference now-deleted commits.
+    """
+    sha_map: dict[str, str] = {}
+    pruned: list[str] = []
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            parts = stripped.split()
+            if len(parts) < 2:
+                continue
+            old, new = parts[0], parts[1]
+            if old == "old" and new == "new":
+                continue  # git-filter-repo header row
+            if new == NULL_SHA:
+                pruned.append(old)  # pruned commit -- has no surviving target
+                continue
+            sha_map[old] = new
+    return sha_map, pruned
 
 
 # ---------------------------------------------------------------------------

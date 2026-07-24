@@ -13,6 +13,7 @@ from .schema import (
 )
 
 from .files import (
+    NULL_SHA,
     RemapReport,
     RemapResult,
     append_entry,
@@ -23,6 +24,7 @@ from .files import (
     get_pending_dir,
     is_read_only,
     list_versioned_files,
+    load_filter_repo_commit_map,
     read_coverage_unit,
     read_pending_files,
     read_unreleased,
@@ -41,6 +43,8 @@ from .validate import validate_unreleased
 
 __all__ = [
     "ChangelogEntry",
+    "NULL_SHA",
+    "load_filter_repo_commit_map",
     "RemapReport",
     "finalize_changeset_version",
     "generate_entry_id",
