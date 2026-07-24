@@ -621,23 +621,6 @@ class TestCmdTargets:
 
 
 # ============================================================================
-# cmd_record_gif
-# ============================================================================
-
-
-class TestCmdRecordGif:
-    @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
-    @patch("rlsbl.context.create_context")
-    @patch("rlsbl.commands.record_gif.run_cmd")
-    def test_delegates(self, mock_run, *_):
-        rlsbl.cmd_record_gif(None, dry_run=False, yes=False, quiet=False, width="800", height="400", font_size="20", duration="5")
-        mock_run.assert_called_once()
-        flags = mock_run.call_args[0][2]
-        assert flags["width"] == "800"
-        assert flags["font-size"] == "20"
-
-
-# ============================================================================
 # cmd_deploy
 # ============================================================================
 

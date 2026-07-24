@@ -289,17 +289,6 @@ class TestStandaloneWiring:
         assert m.call_args.kwargs["yes"] is False
         assert m.call_args.kwargs["quiet"] is False
 
-    def test_record_gif(self):
-        result, m = _dispatch(
-            ["record-gif", "--width", "800", "--duration", "5"],
-            "rlsbl.commands.record_gif.run_cmd",
-        )
-        assert result.exit_code == 0, result.stderr
-        flags = m.call_args[0][2]
-        assert flags["width"] == "800"
-        assert flags["duration"] == "5"
-        assert flags["height"] == "600"
-
     def test_targets(self):
         result, m = _dispatch(["targets"], "rlsbl.commands.targets_cmd.run_cmd")
         assert result.exit_code == 0, result.stderr
