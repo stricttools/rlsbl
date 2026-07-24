@@ -49,7 +49,7 @@
   "project_id": "rlsbl",
   "name": "rlsbl",
   "version": "0.109.1",
-  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 53 commands organized into 15 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
+  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 52 commands organized into 14 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
   "global_flags": [
     {
       "name": "dry-run",
@@ -314,36 +314,6 @@
     "targets": {
       "name": "targets",
       "help": "List all release targets detected in the current project directory, showing which ecosystems (npm, PyPI, Go, Cargo, etc.) are active based on manifest files found."
-    },
-    "record-gif": {
-      "name": "record-gif",
-      "help": "Record an animated GIF demo of rlsbl commands using the vhs terminal recorder. Configurable width, height, font size, and duration for consistent, reproducible demo recordings.",
-      "flags": [
-        {
-          "name": "width",
-          "type": "str",
-          "help": "Width of the recorded GIF in pixels (default: 1200)",
-          "default": "1200"
-        },
-        {
-          "name": "height",
-          "type": "str",
-          "help": "Height of the recorded GIF in pixels (default: 600)",
-          "default": "600"
-        },
-        {
-          "name": "font-size",
-          "type": "str",
-          "help": "Terminal font size in pixels for the recording (default: 24)",
-          "default": "24"
-        },
-        {
-          "name": "duration",
-          "type": "str",
-          "help": "Total recording duration in seconds before auto-stop (default: 10)",
-          "default": "10"
-        }
-      ]
     },
     "deploy": {
       "name": "deploy",
