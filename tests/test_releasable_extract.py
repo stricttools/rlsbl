@@ -683,6 +683,36 @@ class TestCmdExtract:
         with pytest.raises(ExtractError, match="target path already exists"):
             cmd_extract(str(root), "pkgA", str(target))
 
+    def test_foreign_tag_pruned_orphan_scheme_tag_kept(self, tmp_path):
+        """Only tags matching another CURRENT member's glob are pruned; a
+        scheme-parsing tag matching no live member (e.g. this package's own
+        pre-rename history under an old prefix) is KEPT, never destroyed.
+
+        Both tags are planted at a commit that touches pkgA so they survive the
+        filter-repo path filter and reach the translation step:
+        - ``pkgB@v1.0.0`` matches the live member pkgB's glob -> pruned.
+        - ``oldpkgA@v0.5.0`` matches no live member glob (the pre-rename shape)
+          -> kept.
+        """
+        root, hashes = _setup_monorepo(tmp_path)
+        pkga_commit = hashes["pkgA"][0]
+        # Foreign live-member tag -- must be pruned.
+        _git_tag(root, "pkgB@v1.0.0", ref=pkga_commit)
+        # Orphan scheme tag matching no current member (pre-rename history of
+        # pkgA itself) -- must be KEPT under the conservative rule.
+        _git_tag(root, "oldpkgA@v0.5.0", ref=pkga_commit)
+
+        target = tmp_path / "extracted"
+        result = cmd_extract(str(root), "pkgA", str(target))
+
+        tags = _run_git(str(target), "tag", "-l").split()
+        # Foreign live-member tag pruned.
+        assert "pkgB@v1.0.0" not in tags
+        assert "pkgB@v1.0.0" in result["tags_deleted"]
+        # Orphan scheme tag kept -- not destroyed.
+        assert "oldpkgA@v0.5.0" in tags
+        assert "oldpkgA@v0.5.0" not in result["tags_deleted"]
+
 
 # ---------------------------------------------------------------------------
 # cmd_absorb (history-rewrite integration tests)

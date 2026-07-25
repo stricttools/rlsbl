@@ -131,7 +131,7 @@ def _commit_resolves(repo, commit_hash):
     return result.returncode == 0
 
 
-def _translate_extract_tags(repo, own_glob, *, keep_own):
+def _translate_extract_tags(repo, own_glob, foreign_globs, *, keep_own):
     """Translate/prune tags in a freshly extracted repo.
 
     A clone (then filter-repo) carries EVERY tag the monorepo had: the
@@ -144,8 +144,14 @@ def _translate_extract_tags(repo, own_glob, *, keep_own):
       commit and the monorepo-scheme original is deleted; when True (a
       multi-member releasable, whose releasable scheme stays valid) they are
       left untouched.
-    - Any OTHER tag that parses as a monorepo/path-scheme version tag is a
-      foreign artifact and is deleted.
+    - A tag matching one of ``foreign_globs`` (another CURRENT workspace
+      member's/releasable's resolved glob) is a genuine foreign artifact and is
+      deleted.
+    - A tag that parses as a monorepo/path-scheme version tag but matches NO
+      current member glob is KEPT with a log line. Such a tag is most likely
+      this package's OWN historical release under an old prefix (e.g. after a
+      releasable rename, ``oldname@vX``). Deleting it would destroy the
+      package's own release history, so the conservative rule keeps it.
     - Tags that do not parse as a version tag under any scheme (and standalone
       ``v*`` tags that are not translation targets) are left in place, with a
       log line for genuinely unrecognized tags.
@@ -159,6 +165,13 @@ def _translate_extract_tags(repo, own_glob, *, keep_own):
     all_tags = set(_git_tag_list(repo))
     own_tags = _git_tag_list(repo, own_glob)
     own_set = set(own_tags)
+
+    # Resolve the concrete set of tags that belong to another live member /
+    # releasable (the only tags safe to prune). A scheme-parsing tag NOT in
+    # this set is kept, never deleted.
+    foreign_tags = set()
+    for glob in foreign_globs:
+        foreign_tags.update(_git_tag_list(repo, glob))
 
     # Resolve each own tag to (old_tag, version, sha).
     translations = []
@@ -199,9 +212,22 @@ def _translate_extract_tags(repo, own_glob, *, keep_own):
         elif parsed.scheme == "standalone":
             # A pre-existing standalone tag -- valid in the extracted repo.
             left.append(tag)
-        else:
+        elif tag in foreign_tags:
+            # Matches another live member's/releasable's glob -- genuinely
+            # foreign, safe to prune.
             _run_git(repo, "tag", "-d", tag)
             deleted.append(tag)
+        else:
+            # Parses as a scheme tag but matches NO current member glob.
+            # Most likely this package's own pre-rename history under an old
+            # prefix -- keep it, never destroy release history.
+            left.append(tag)
+            print(
+                f"note: keeping unrecognized scheme tag '{tag}' in extracted "
+                f"repo -- possibly pre-rename history (matches no current "
+                f"member glob)",
+                file=sys.stderr,
+            )
 
     # Apply translations (or keep own tags for multi-member releasables).
     if keep_own:
@@ -345,6 +371,36 @@ def _resolve_own_tag_glob(workspace_root, project, projects):
         releasables = load_releasables(workspace_root, projects)
     rel = resolve_releasable_for_project(project, releasables)
     return resolve_monorepo_tag_glob(project, workspace_root, releasable=rel)
+
+
+def _other_member_globs(
+    workspace_root, projects, releasables,
+    *, exclude_project_names, exclude_releasable_names=frozenset(),
+):
+    """Resolve the tag globs of every workspace member/releasable NOT extracted.
+
+    Returns a set of ``git tag`` globs (e.g. ``{"pkgB@v*", "core@v*"}``) covering
+    every OTHER live member and releasable in the workspace. These globs identify
+    which scheme-parsing tags in a freshly extracted repo are genuinely foreign
+    (another live member's release history -- safe to prune) versus orphan tags
+    matching no current member. An orphan is most likely the extracted package's
+    OWN pre-rename history under an old prefix, which must be kept.
+
+    Must be called against the SOURCE workspace BEFORE the extracted project is
+    removed from workspace.toml (target detection reads the still-present member
+    dirs).
+    """
+    globs = set()
+    for proj in projects:
+        if proj.name in exclude_project_names:
+            continue
+        rel = resolve_releasable_for_project(proj, releasables)
+        globs.add(resolve_monorepo_tag_glob(proj, workspace_root, releasable=rel))
+    for rel in releasables:
+        if rel.name in exclude_releasable_names:
+            continue
+        globs.add(releasable_tag_glob(rel.tag_format, rel.name))
+    return globs
 
 
 def _assert_extract_target_config_valid(workspace_root, project, projects):
@@ -616,9 +672,22 @@ def cmd_extract(workspace_root, package_name, target_repo_path, *, dry_run=False
             "dry_run": True,
         }
 
-    # Resolve the extracted package's own tag glob BEFORE mutating the source
-    # (target detection reads the still-present package dir).
+    # Resolve the extracted package's own tag glob AND the other live members'
+    # globs BEFORE mutating the source (target detection reads the still-present
+    # package dirs). The foreign globs decide which scheme tags are safe to
+    # prune; scheme tags matching none of them are kept.
     own_glob = _resolve_own_tag_glob(workspace_root, project, projects)
+    releasables_src = []
+    if is_explicit_mode(workspace_root):
+        releasables_src = load_releasables(workspace_root, projects)
+    rel_of_extracted = resolve_releasable_for_project(project, releasables_src)
+    foreign_globs = _other_member_globs(
+        workspace_root, projects, releasables_src,
+        exclude_project_names={package_name},
+        exclude_releasable_names=(
+            {rel_of_extracted.name} if rel_of_extracted is not None else frozenset()
+        ),
+    )
 
     # Clone the monorepo to target path
     _run_git(workspace_root, "clone", "--no-local", ".", target_repo_path)
@@ -660,7 +729,7 @@ def cmd_extract(workspace_root, package_name, target_repo_path, *, dry_run=False
     # Translate the package's monorepo-scheme tags to standalone v{version},
     # and prune foreign packages' tags.
     tags_translated, tags_deleted, _tags_left = _translate_extract_tags(
-        target_repo_path, own_glob, keep_own=False
+        target_repo_path, own_glob, foreign_globs, keep_own=False
     )
 
     # Commit the migrated + remapped + retagged state in the extracted repo.
@@ -1111,6 +1180,15 @@ def cmd_extract_releasable(
     # The releasable's tag glob (e.g. "core@v*") is the same for every member.
     own_glob = releasable_tag_glob(target_releasable.tag_format, releasable_name)
 
+    # Resolve the other live members'/releasables' globs from the SOURCE
+    # workspace (before it is mutated). These decide which scheme tags are
+    # foreign (safe to prune); scheme tags matching none are kept.
+    foreign_globs = _other_member_globs(
+        workspace_root, projects, releasables,
+        exclude_project_names=set(member_names),
+        exclude_releasable_names={releasable_name},
+    )
+
     # Clone the monorepo to target path
     _run_git(workspace_root, "clone", "--no-local", ".", target_repo_path)
     _ensure_git_identity(target_repo_path, workspace_root)
@@ -1173,7 +1251,7 @@ def cmd_extract_releasable(
             target_repo_path, new_projects, releasables=[target_releasable]
         )
         tags_translated, tags_deleted, _left = _translate_extract_tags(
-            target_repo_path, own_glob, keep_own=True
+            target_repo_path, own_glob, foreign_globs, keep_own=True
         )
     else:
         # Single-project repo: create .rlsbl/ config and translate the
@@ -1183,7 +1261,7 @@ def cmd_extract_releasable(
         )
         _create_rlsbl_config(target_repo_path, source_config)
         tags_translated, tags_deleted, _left = _translate_extract_tags(
-            target_repo_path, own_glob, keep_own=False
+            target_repo_path, own_glob, foreign_globs, keep_own=False
         )
 
     # Commit the migrated + remapped + retagged state in the extracted repo.
