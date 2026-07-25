@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.monorepo.mirror_cmd
-description: "Monorepo mirror command that performs the initial git subtree split, pushes to a standalone mirror repository, and scaffolds CI workflows."
+description: "Monorepo mirror reconciler that converges a project's subtree mirror to a tool-owned derived state, with a plan-only dry-run and a contract tripwire that hard-errors on hand-authored commits."
 generated: true
 nav_group: "API Reference"
 nav_order: 42
