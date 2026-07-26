@@ -15,6 +15,9 @@ coherent. Monorepo mirror became a tool-owned plan/apply reconciler (force-with-
 with an exact tripwire). Tag push guards are now commit-aware (the silent-skip path is
 removed). CI service containers are declarative with an enforce check. Dual-registry
 support formalizes scan-depth pins and a mixed-scheme guard. record-gif was removed.
+The CI suite now runs inside a hermetic bwrap test sandbox: repo read-only, a
+throwaway writable copy, private tmpfs, no network, plus an always-on env-poisoning
+floor and a bare-run refusal guard.
 """
 # Pre-release identifier: alpha, beta, rc, or stable
 # preid = ""
