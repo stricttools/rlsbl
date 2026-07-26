@@ -176,7 +176,7 @@ class TestBatchUpfrontValidation:
             call_order.append("tree")
             return set()
 
-        def track_branch(flags):
+        def track_branch(flags, **kwargs):
             call_order.append("branch")
             return "main"
 

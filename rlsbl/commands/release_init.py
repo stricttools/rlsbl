@@ -134,6 +134,7 @@ def run_cmd(project_root):
     # is what determines whether there is a repo to commit into.
     commit_scaffold_file(
         "release: scaffold unreleased.toml", [release_path], cwd=project_dir,
+        expected_root=(monorepo_root or project_dir),
     )
 
     print(release_path)

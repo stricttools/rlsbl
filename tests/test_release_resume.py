@@ -561,7 +561,7 @@ class TestResumeWithWrongBranch:
         # cmd_release_resume validates the branch before calling resume_cmd.
         # Simulate that validation here directly.
         from rlsbl.utils import get_current_branch
-        current_branch = get_current_branch()
+        current_branch = get_current_branch(cwd=str(mock_git_repo))
         assert current_branch != saved["branch"], \
             "Test setup: should be on a different branch"
 

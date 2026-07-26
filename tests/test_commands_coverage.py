@@ -1997,7 +1997,7 @@ class TestBatchReleaseFileError:
 
         mock_read.side_effect = ReleaseFileError("bad format")
 
-        with patch("os.path.exists", return_value=True):
+        with patch("os.path.exists", return_value=True), patch(f"{MOD_BATCH}._run_root_selfdoc"):
             with pytest.raises(SystemExit) as exc:
                 _cmd_batch_release({}, Path("/ws/pkg"))
         assert exc.value.code == 1
@@ -2022,7 +2022,7 @@ class TestBatchReleaseReleasablesImplicitMode:
         batch.packages = {"rel1": MagicMock()}
         mocks[5].return_value = batch  # read_batch_release_file
 
-        with patch("os.path.exists", return_value=True):
+        with patch("os.path.exists", return_value=True), patch(f"{MOD_BATCH}._run_root_selfdoc"):
             with pytest.raises(SystemExit) as exc:
                 _cmd_batch_release({}, Path("/ws/pkg"))
         assert exc.value.code == 1
@@ -2052,7 +2052,7 @@ class TestBatchReleasePackagesMissing:
         proj.__getitem__ = lambda self, k: {"name": "existing"}[k]
         mock_load_ws.return_value = [proj]
 
-        with patch("os.path.exists", return_value=True):
+        with patch("os.path.exists", return_value=True), patch(f"{MOD_BATCH}._run_root_selfdoc"):
             with pytest.raises(SystemExit) as exc:
                 _cmd_batch_release({}, Path("/ws/pkg"))
         assert exc.value.code == 1
@@ -2083,7 +2083,7 @@ class TestBatchReleaseNonReleasable:
         proj.is_releasable = False
         mock_load_ws.return_value = [proj]
 
-        with patch("os.path.exists", return_value=True):
+        with patch("os.path.exists", return_value=True), patch(f"{MOD_BATCH}._run_root_selfdoc"):
             with pytest.raises(SystemExit) as exc:
                 _cmd_batch_release({}, Path("/ws/pkg"))
         assert exc.value.code == 1
@@ -2120,7 +2120,7 @@ class TestBatchReleaseCycleError:
         graph_inst.topological_order.side_effect = CycleError("cycle!")
         mock_graph.return_value = graph_inst
 
-        with patch("os.path.exists", return_value=True):
+        with patch("os.path.exists", return_value=True), patch(f"{MOD_BATCH}._run_root_selfdoc"):
             with pytest.raises(SystemExit) as exc:
                 _cmd_batch_release({}, Path("/ws/pkg"))
         assert exc.value.code == 1
@@ -2160,7 +2160,7 @@ class TestBatchReleasePackageFailure:
         graph_inst.topological_order.return_value = ["pkg-a"]
         mock_graph.return_value = graph_inst
 
-        with patch("os.path.exists", return_value=True):
+        with patch("os.path.exists", return_value=True), patch(f"{MOD_BATCH}._run_root_selfdoc"):
             with patch(f"{MOD_BATCH}._resolve_fresh_plan", return_value=None):
                 with patch("rlsbl.context.create_context", return_value=_ctx()):
                     with patch("rlsbl.commands.release.run_cmd", side_effect=SystemExit(1)):
@@ -2187,7 +2187,7 @@ class TestBatchReleaseReleasablesMissing:
         batch.packages = {"missing-rel": MagicMock()}
         mocks[5].return_value = batch
 
-        with patch("os.path.exists", return_value=True):
+        with patch("os.path.exists", return_value=True), patch(f"{MOD_BATCH}._run_root_selfdoc"):
             with patch("rlsbl.workspace.load_releasables", return_value=[]):
                 with pytest.raises(SystemExit) as exc:
                     _cmd_batch_release({}, Path("/ws/pkg"))
@@ -2221,7 +2221,7 @@ class TestBatchReleaseReleasableCycle:
         graph_inst.topological_order.side_effect = CycleError("cycle!")
         mock_graph.return_value = graph_inst
 
-        with patch("os.path.exists", return_value=True):
+        with patch("os.path.exists", return_value=True), patch(f"{MOD_BATCH}._run_root_selfdoc"):
             with patch("rlsbl.workspace.load_releasables", return_value=[rel]):
                 with pytest.raises(SystemExit) as exc:
                     _cmd_batch_release({}, Path("/ws/pkg"))
@@ -2257,7 +2257,7 @@ class TestBatchReleaseReleasableNoMembers:
         graph_inst.topological_order.return_value = []
         mock_graph.return_value = graph_inst
 
-        with patch("os.path.exists", return_value=True):
+        with patch("os.path.exists", return_value=True), patch(f"{MOD_BATCH}._run_root_selfdoc"):
             with patch(f"{MOD_BATCH}._resolve_fresh_plan", return_value=None):
                 with patch("rlsbl.workspace.load_releasables", return_value=[rel]):
                     with patch("rlsbl.workspace.members_of", return_value=[]):
@@ -2298,7 +2298,7 @@ class TestBatchReleaseReleasableFailure:
         member = MagicMock()
         member.__getitem__ = lambda self, k: {"name": "pkg-a", "path": "packages/pkg-a"}[k]
 
-        with patch("os.path.exists", return_value=True):
+        with patch("os.path.exists", return_value=True), patch(f"{MOD_BATCH}._run_root_selfdoc"):
             with patch(f"{MOD_BATCH}._resolve_fresh_plan", return_value=None):
                 with patch("rlsbl.workspace.load_releasables", return_value=[rel]):
                     with patch("rlsbl.workspace.members_of", return_value=[member]):

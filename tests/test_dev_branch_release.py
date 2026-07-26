@@ -250,7 +250,7 @@ class TestValidateBranchOnReleaseBranch:
         repo = dev_branch_repo
         run_git(repo, "checkout", "main")
 
-        result = validate_branch_and_remote({}, config={"release_branches": ["main"]})
+        result = validate_branch_and_remote({}, config={"release_branches": ["main"]}, cwd=str(repo))
         assert isinstance(result, BranchValidation)
         assert result.branch == "main"
         assert result.dev_branch is None
@@ -271,7 +271,7 @@ class TestValidateBranchOnDevBranch:
         assert result.stdout.strip() == "dev"
 
         result = validate_branch_and_remote(
-            {}, config={"release_branches": ["main"]},
+            {}, config={"release_branches": ["main"]}, cwd=str(repo),
         )
         assert isinstance(result, BranchValidation)
         assert result.branch == "main"
@@ -292,7 +292,7 @@ class TestValidateBranchOnDevBranch:
 
         with pytest.raises(ReleaseValidationError, match="cannot fast-forward"):
             validate_branch_and_remote(
-                {}, config={"release_branches": ["main"]},
+                {}, config={"release_branches": ["main"]}, cwd=str(repo),
             )
 
 
@@ -303,7 +303,7 @@ class TestValidateBranchDefaultConfig:
         """Without config, main and master are release branches."""
         repo = dev_branch_repo
         # On dev branch, main/master are defaults
-        result = validate_branch_and_remote({})
+        result = validate_branch_and_remote({}, cwd=str(repo))
         assert result.branch == "main"
         assert result.dev_branch == "dev"
         assert result.needs_ff_merge is True
@@ -415,7 +415,7 @@ class TestReleaseFromDevFFMerge:
         run_git(repo, "checkout", "main")
 
         result = validate_branch_and_remote(
-            {}, config={"release_branches": ["main"]},
+            {}, config={"release_branches": ["main"]}, cwd=str(repo),
         )
         assert result.needs_ff_merge is False
         assert result.dev_branch is None
@@ -495,7 +495,7 @@ class TestReleaseFromDevIntegration:
         run_git(repo, "commit", "-q", "-m", "feat: new feature")
 
         config = {"release_branches": ["main"]}
-        result = validate_branch_and_remote({}, config=config)
+        result = validate_branch_and_remote({}, config=config, cwd=str(repo))
 
         assert isinstance(result, BranchValidation)
         assert result.branch == "main"
@@ -514,7 +514,7 @@ class TestReleaseFromDevIntegration:
         run_git(repo, "commit", "-q", "-m", "feat: new feature")
 
         config = {"release_branches": ["production"]}
-        result = validate_branch_and_remote({}, config=config)
+        result = validate_branch_and_remote({}, config=config, cwd=str(repo))
 
         assert result.branch == "production"
         assert result.dev_branch == "dev"
@@ -525,7 +525,7 @@ class TestReleaseFromDevIntegration:
         repo = self._make_release_repo(tmp_path, monkeypatch)
 
         config = {"release_branches": ["main"]}
-        result = validate_branch_and_remote({}, config=config)
+        result = validate_branch_and_remote({}, config=config, cwd=str(repo))
 
         assert result.branch == "main"
         assert result.dev_branch is None

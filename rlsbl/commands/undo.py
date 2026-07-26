@@ -691,9 +691,9 @@ def _execute_plan(plan, uc, flags, ctx):
             )
     if should_push:
         try:
-            branch = get_current_branch()
+            branch = get_current_branch(cwd=plan.project_path)
             push_env = {**os.environ, "RLSBL_RELEASE_PUSH": "1"}
-            push_if_needed(branch, env=push_env, config=ctx.config)
+            push_if_needed(branch, env=push_env, config=ctx.config, cwd=plan.project_path)
             results.append(("Push", OK, "-"))
         except Exception:
             traceback.print_exc()

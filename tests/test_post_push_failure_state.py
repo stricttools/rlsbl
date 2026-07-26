@@ -196,7 +196,7 @@ class TestLiveLsRemoteBranchSkip:
                 return f"{head}\t{args[2]}"
             return real_run(cmd, args=args, timeout=timeout, env=env, cwd=cwd)
 
-        def fake_push_if_needed(branch, env=None, *, config):
+        def fake_push_if_needed(branch, env=None, *, config, cwd):
             push_if_needed_called.append(branch)
 
         with (

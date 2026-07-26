@@ -1596,7 +1596,7 @@ def _run_release_mutating(state: ReleaseState):
                 pass  # Remote branch might not exist yet
 
             if _branch_needs_push:
-                push_if_needed(branch, env=push_env, config=ctx.config)
+                push_if_needed(branch, env=push_env, config=ctx.config, cwd=project_dir)
                 branch_pushed = True
 
             # Check if tag push is needed. Commit-aware: verify EVERY release
@@ -1975,7 +1975,7 @@ def _run_release_mutating(state: ReleaseState):
         _deploy_failure = None
         deploy_targets, deploy_errors = read_deploy_config(ctx.config)
         if deploy_targets and not deploy_errors:
-            current_branch = get_current_branch()
+            current_branch = get_current_branch(cwd=project_dir)
             for target_config in deploy_targets:
                 print(f"\nDeploying to {target_config['name']}...")
                 result = deploy_target(target_config, current_branch)

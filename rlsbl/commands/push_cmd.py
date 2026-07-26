@@ -152,7 +152,7 @@ def run_push(ctx, *, yes, quiet, dry_run=False):
     subprocess is not invoked: the command reports what it would push and
     returns successfully.
     """
-    branch = get_current_branch()
+    branch = get_current_branch(cwd=str(ctx.project_root))
 
     # 1. Branch guard
     release_branches = _get_release_branches(ctx)

@@ -329,7 +329,7 @@ class BranchValidation:
         return hash(self.branch)
 
 
-def validate_branch_and_remote(flags, *, config=None):
+def validate_branch_and_remote(flags, *, config=None, cwd):
     """Validate branch state and determine the release branch.
 
     When invoked from a **release branch** (listed in ``release_branches``
@@ -345,13 +345,16 @@ def validate_branch_and_remote(flags, *, config=None):
     current branch, and ``needs_ff_merge=True``.  The actual ff-merge
     is deferred to the caller.
 
+    ``cwd`` is REQUIRED (keyword-only): the repo directory all git operations
+    (branch lookup, fetch, ancestry, rev-list) run from. No process-cwd default.
+
     Returns :class:`BranchValidation`.
     Raises :class:`ReleaseValidationError` on failure.
     """
     from . import run, get_current_branch, remote_branch_exists
     from ...prepush_utils import _get_release_branches
 
-    branch = get_current_branch()
+    branch = get_current_branch(cwd=cwd)
 
     # Determine which branches are release-only
     if config is not None:
@@ -366,7 +369,7 @@ def validate_branch_and_remote(flags, *, config=None):
     on_release_branch = branch in release_branches
 
     try:
-        run("git", ["fetch", "origin", "--quiet"])
+        run("git", ["fetch", "origin", "--quiet"], cwd=cwd)
     except Exception:
         print("Warning: could not fetch from origin. Skipping remote-ahead check.", file=sys.stderr)
         if on_release_branch:
@@ -380,7 +383,7 @@ def validate_branch_and_remote(flags, *, config=None):
 
     if on_release_branch:
         # Normal release from a release branch
-        if not remote_branch_exists(branch):
+        if not remote_branch_exists(branch, cwd=cwd):
             print(
                 f"Remote branch origin/{branch} does not exist yet. Skipping remote-ahead check.",
                 file=sys.stderr,
@@ -388,7 +391,7 @@ def validate_branch_and_remote(flags, *, config=None):
             return BranchValidation(branch)
 
         try:
-            behind_count = int(run("git", ["rev-list", "--count", f"HEAD..origin/{branch}"]))
+            behind_count = int(run("git", ["rev-list", "--count", f"HEAD..origin/{branch}"], cwd=cwd))
         except Exception as e:
             raise ReleaseValidationError(
                 f"could not check if local branch is behind origin: {e}\n"
@@ -407,7 +410,7 @@ def validate_branch_and_remote(flags, *, config=None):
 
     # Verify the target release branch exists locally
     try:
-        run("git", ["rev-parse", "--verify", f"refs/heads/{target_branch}"])
+        run("git", ["rev-parse", "--verify", f"refs/heads/{target_branch}"], cwd=cwd)
     except Exception:
         raise ReleaseValidationError(
             f'release branch "{target_branch}" does not exist locally. '
@@ -415,10 +418,10 @@ def validate_branch_and_remote(flags, *, config=None):
         )
 
     # Fetch and update the local tracking branch
-    if remote_branch_exists(target_branch):
+    if remote_branch_exists(target_branch, cwd=cwd):
         # Update the local release branch to match origin (fast-forward only)
         try:
-            run("git", ["fetch", "origin", f"{target_branch}:{target_branch}"])
+            run("git", ["fetch", "origin", f"{target_branch}:{target_branch}"], cwd=cwd)
         except Exception:
             # Non-fatal: the local branch might already be up to date,
             # or it might be checked out (can't update checked-out branch
@@ -432,6 +435,7 @@ def validate_branch_and_remote(flags, *, config=None):
         ["git", "merge-base", "--is-ancestor", target_branch, "HEAD"],
         capture_output=True,
         text=True,
+        cwd=cwd,
     )
     if result.returncode != 0:
         raise ReleaseValidationError(

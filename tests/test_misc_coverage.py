@@ -587,7 +587,7 @@ class TestDeployCmdAdditionalCoverage:
             return DeployResult("prod", False, "Health check failed", rolled_back=True)
 
         monkeypatch.setattr("rlsbl.commands.deploy_cmd.deploy_target", mock_deploy)
-        monkeypatch.setattr("rlsbl.commands.deploy_cmd.get_current_branch", lambda: "main")
+        monkeypatch.setattr("rlsbl.commands.deploy_cmd.get_current_branch", lambda **k: "main")
 
         with pytest.raises(SystemExit) as exc_info:
             deploy_run_cmd(

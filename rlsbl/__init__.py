@@ -431,7 +431,7 @@ def cmd_release_resume(ctx, dry_run, yes, quiet, watch, watch_async):
 
     # Validate: same branch
     from .utils import get_current_branch, run as _run
-    current_branch = get_current_branch()
+    current_branch = get_current_branch(cwd=str(ctx.project_root))
     saved_branch = saved.get("branch", "")
     if current_branch != saved_branch:
         print(

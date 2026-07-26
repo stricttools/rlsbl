@@ -35,11 +35,11 @@ class TestDetachedHead:
         )
 
         with pytest.raises(GitError, match="HEAD is detached"):
-            get_current_branch()
+            get_current_branch(cwd=str(mock_git_repo))
 
     def test_normal_branch_returns_name(self, mock_git_repo):
         """On a normal branch, get_current_branch() returns the branch name."""
-        result = get_current_branch()
+        result = get_current_branch(cwd=str(mock_git_repo))
         assert result == "main"
 
     def test_status_works_on_detached_head(self, mock_git_repo):
@@ -180,7 +180,7 @@ class TestPushTimeout:
                 subprocess.TimeoutExpired(cmd=["git", "push", "-u", "origin", "main"], timeout=120),
             ]
             with pytest.raises(GitError, match="Push timed out after 120s"):
-                push_if_needed("main", config={"push_timeout": 120})
+                push_if_needed("main", config={"push_timeout": 120}, cwd=".")
 
     @patch("rlsbl.utils.run")
     def test_timeout_raises_git_error_on_existing_branch(self, mock_run):
@@ -192,7 +192,7 @@ class TestPushTimeout:
                 subprocess.TimeoutExpired(cmd=["git", "push", "origin", "main"], timeout=120),
             ]
             with pytest.raises(GitError, match="Push timed out after 120s"):
-                push_if_needed("main", config={"push_timeout": 120})
+                push_if_needed("main", config={"push_timeout": 120}, cwd=".")
 
     @patch("rlsbl.utils.run")
     def test_no_push_when_up_to_date(self, mock_run):
@@ -203,7 +203,7 @@ class TestPushTimeout:
                 "abc123",  # git rev-parse origin/<branch> (same)
             ]
             # Should return without pushing
-            push_if_needed("main", config={"push_timeout": 120})
+            push_if_needed("main", config={"push_timeout": 120}, cwd=".")
 
         # Only two calls: local rev-parse and remote rev-parse. No push call.
         assert mock_run.call_count == 2

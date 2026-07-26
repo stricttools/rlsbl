@@ -45,7 +45,7 @@ def run_cmd(registry, args, flags, *, ctx):
         sys.exit(1)
 
     # 3. Get current branch
-    branch = get_current_branch()
+    branch = get_current_branch(cwd=str(ctx.project_root))
 
     # 4. Dry run
     if flags.get("dry-run"):

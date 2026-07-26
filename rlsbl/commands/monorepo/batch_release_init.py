@@ -304,7 +304,7 @@ def _scaffold_releasable_sections(workspace_root, projects, batch_path, filter_n
 
     commit_scaffold_file(
         "release: scaffold unreleased.toml", [batch_path],
-        cwd=workspace_root,
+        cwd=workspace_root, expected_root=workspace_root,
     )
 
     print(batch_path)
@@ -395,7 +395,7 @@ def _scaffold_package_sections(workspace_root, projects, batch_path, filter_name
 
     commit_scaffold_file(
         "release: scaffold unreleased.toml", [batch_path],
-        cwd=workspace_root,
+        cwd=workspace_root, expected_root=workspace_root,
     )
 
     print(batch_path)

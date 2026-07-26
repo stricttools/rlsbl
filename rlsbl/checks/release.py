@@ -77,7 +77,7 @@ def register_release_checks(app):
         from ..utils import get_current_branch, run
 
         root_str = str(ctx.project_root)
-        branch = get_current_branch()
+        branch = get_current_branch(cwd=root_str)
         try:
             output = run("git", ["rev-list", "--left-right", "--count",
                                   f"origin/{branch}...HEAD"], cwd=root_str)

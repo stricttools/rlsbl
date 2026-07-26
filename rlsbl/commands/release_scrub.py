@@ -1035,7 +1035,7 @@ def run_cmd(flags, *, ctx):
 
         if "BRANCH_PUSHED" not in completed:
             push_env = {**os.environ, "RLSBL_RELEASE_PUSH": "1"}
-            branch = get_current_branch()
+            branch = get_current_branch(cwd=str(ctx.project_root))
             branch_ref = f"refs/heads/{branch}"
             # Target: the local branch tip (new head plus the metadata commit).
             try:

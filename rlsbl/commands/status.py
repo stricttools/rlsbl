@@ -72,7 +72,7 @@ def _collect_status(registry, target_path=".", *, tag_glob=None, ctx, project=No
 
     # Git branch
     try:
-        branch = get_current_branch()
+        branch = get_current_branch(cwd=root_str)
     except GitError:
         branch = "(detached HEAD)"
     except Exception as e:

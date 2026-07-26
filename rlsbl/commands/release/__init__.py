@@ -457,14 +457,14 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     # always runs from the release branch).
     if flags.get("batch-mode", False):
         pre_existing_dirty = set()
-        branch = get_current_branch()
+        branch = get_current_branch(cwd=str(project_root))
         dev_branch = None
         needs_ff_merge = False
     else:
         validate_gh_cli()
         validate_gh_push_access(config)
         pre_existing_dirty = validate_clean_tree(flags)
-        branch_info = validate_branch_and_remote(flags, config=config)
+        branch_info = validate_branch_and_remote(flags, config=config, cwd=str(project_root))
         # Extract branch-role information for the release-from-dev flow.
         # BranchValidation.branch is the release branch (e.g. "main");
         # dev_branch is the branch we started from (e.g. "dev"), or None.

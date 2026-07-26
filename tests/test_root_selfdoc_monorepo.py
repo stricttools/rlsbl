@@ -109,6 +109,8 @@ class TestRunRootSelfdoc:
         ) as mock_check, patch(
             "rlsbl.commands.monorepo.batch_release.commit_files",
             side_effect=lambda *a, **k: commit_calls.append(1),
+        ), patch(
+            "rlsbl.commands.monorepo.batch_release.run", return_value="",
         ):
             _run_root_selfdoc(flags, str(tmp_path), lambda m: None)
 
@@ -148,6 +150,8 @@ class TestRunRootSelfdoc:
         with patch(
             "rlsbl.commands.monorepo.batch_release._run_selfdoc_gen",
             side_effect=HookError("selfdoc gen failed"),
+        ), patch(
+            "rlsbl.commands.monorepo.batch_release.run", return_value="",
         ):
             with pytest.raises(HookError, match="selfdoc gen failed"):
                 _run_root_selfdoc(flags, str(tmp_path), lambda m: None)
