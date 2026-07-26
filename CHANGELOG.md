@@ -2,6 +2,59 @@
 
 # Changelog
 
+## 0.110.0
+
+Absorb/extract round-trip overhaul, mirror reconciler, commit-aware tag guards, infra bump type, CI service containers, dual-registry formalization, handler safety hardening
+
+<details>
+<summary>Context</summary>
+
+This cycle hardens the release machinery along several fronts. The dry-run incident
+prompted prompt EOF handling, a push rehearsal step, and elimination of **_kwargs in
+handlers in favor of registry-enforced signatures. The bump-type rename (hotfix -> infra)
+came with a fleet archive migration; legacy bump values now hard-error rather than
+silently coerce. Absorb now rewrites history to the package prefix with tag import and
+changelog remap, eliminating the double-append class of bug. Extract gained tag
+translation, commit-map remap, and a self-commit so absorb/extract round-trips stay
+coherent. Monorepo mirror became a tool-owned plan/apply reconciler (force-with-lease
+with an exact tripwire). Tag push guards are now commit-aware (the silent-skip path is
+removed). CI service containers are declarative with an enforce check. Dual-registry
+support formalizes scan-depth pins and a mixed-scheme guard. record-gif was removed.
+The CI suite now runs inside a hermetic bwrap test sandbox: repo read-only, a
+throwaway writable copy, private tmpfs, no network, plus an always-on env-poisoning
+floor and a bare-run refusal guard.
+
+</details>
+
+### Breaking
+
+- **`rlsbl record-gif` removed.** The vhs-based demo-GIF recorder command has been removed.
+- `monorepo mirror` is now an idempotent plan/apply reconciler: the mirror is a tool-owned derived artifact, `--dry-run` prints a plan (converged/behind/scaffold-missing/contract-violated/virgin), convergence force-pushes with lease, a tripwire refuses mirrors carrying foreign hand-authored commits, and scaffold failures are hard errors.
+- **Bump type `hotfix` renamed to `infra`.** Use `bump = "infra"` for infrastructure-only releases; the legacy `hotfix` value is rejected, and encountering it in an archived release file is a hard error during changelog regeneration.
+- **`monorepo absorb` reshaped: `absorb <source_repo> <dest_path>`.** The second positional is now the destination path (with `--name` defaulting to its basename), plus new `--registry-name` and `--releasable` flags. Replaces the old `absorb <source_path> <package_name>` signature.
+
+### Features
+
+- **`rlsbl push --dry-run`.** Runs all preflight checks and shows what would be pushed without pushing.
+- **`rlsbl push --dry-run` now rehearses the push.** After the preflight checks it runs a real dry-run rehearsal, surfacing remote-side rejections (protected branch, stale ref) without performing a real push.
+- **`monorepo check-names` honors `registry_name`.** When a workspace project declares `registry_name`, it is checked verbatim on the registry (prefix/suffix are ignored), since that field is the package's true registry identity.
+- **CI service containers.** Declare `services` (image, ports, env, health checks, setup commands with SQL/command verification) and `test_env` in `.rlsbl/config.json`; `rlsbl scaffold` renders them into the per-target test CI workflow, and the new `requires-services` check hard-errors when a declared service is not provisioned on disk.
+- **`monorepo absorb` now rewrites history instead of a verbatim subtree add.** It relocates the source's full commit history under the destination prefix, imports version tags under the monorepo tag scheme, remaps JSONL changelog hashes to the new commits, routes changelogs to the releasable dir under `--releasable`, and self-commits the result.
+- **`monorepo extract` now produces a coherent standalone repo.** It translates the package's monorepo-scheme tags to standalone `v{version}` (multi-member releasable extracts keep the releasable scheme and recreate the `[[releasables]]` grouping), prunes foreign packages' tags, remaps changelog hashes to the rewritten commits (dropping entries whose commits were pruned), and self-commits the migrated state.
+- **Sandboxed test runner.** `scripts/test.sh` runs the suite inside a bwrap sandbox with the repo read-only, a throwaway writable copy, private tmpfs, and no network.
+
+### Fixes
+
+- **Fix.** `claim-name` now honors `--dry-run` (previously it published the placeholder package even in a dry run) and asks for confirmation before publishing; `--yes` skips the prompt.
+- **Confirmation prompts fail cleanly on non-interactive stdin.** `claim-name`, `push`, `release deprecate`, and `release undo` now emit a clear error naming the consequence and suggesting `--yes`, instead of an EOFError traceback, when stdin is closed.
+- **Mixed-scheme monorepo guard.** A monorepo member directory that declares both a Go target (path-based `{path}/v*` tags) and an @-style target (`{name}@v*`) now fails with a clear error instead of silently picking an ordering-dependent tag prefix. A new `mixed-tag-schemes` workspace check reports the same condition.
+- **Tag push safety.** Releases now verify that a matching remote tag points at the same commit before skipping the tag push; a divergent or unverifiable remote tag is a hard error instead of a silent skip.
+- **Pre-flight tag collision check.** A release now aborts before any local mutation if its computed tag already exists on the remote (or the remote cannot be reached to verify), instead of failing only at push time after the version bump and commit.
+- **`monorepo add` gains `--registry-name` and an honest `--dry-run`.** `--registry-name` records a project's registry identity in workspace.toml. `--dry-run` now fully validates and reports what would happen without adding the project, scaffolding, or syncing -- previously it silently scaffolded and synced for real.
+- **absorb/extract hard-error up front on broken target declarations.** `monorepo absorb` and `monorepo extract` now abort before any history rewrite when a package's `.rlsbl/config.json` exists but declares no `targets` key, instead of silently importing wrongly-schemed version tags that break version resolution later.
+- **Hardened release push guard.** The pre-push hook now honors the `RLSBL_RELEASE_PUSH` bypass only during an actual in-progress release (an `in-progress.json` state file must exist), so a stray environment variable can no longer silently disable the manual-push guard.
+- **Git operations are anchored to their project root.** Release, undo, deploy, status, and scrub now pass an explicit working directory to every branch/push/commit git call instead of relying on the process working directory, and the commit helpers refuse to write into a different repository than the one intended. This prevents release actions from accidentally operating on the wrong repository.
+
 ## 0.109.1
 
 Scaffold truthful status labels, crates wrapper checksum verification, corrected monorepo positional bindings, and Go dead-modules testdata exclusion
