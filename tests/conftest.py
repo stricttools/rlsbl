@@ -5,11 +5,200 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 import time
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+
+
+# ---------------------------------------------------------------------------
+# Three-layer test sandbox
+#
+# Layer 1 (this module, always-on): an env-poisoning floor installed in
+# ``pytest_configure`` so it binds before any test body or fixture runs. It
+# neutralizes every ambient credential / network / global-config vector so a
+# test can never reach the real developer identity, SSH agent, GitHub token,
+# or user/global git config -- see ``_install_env_poisoning_floor``.
+#
+# Layer 2 (scripts/test.sh): a bwrap sandbox that runs the FULL suite with the
+# real repo bound read-only, a writable ephemeral copy as cwd, private tmpfs
+# TMPDIR, and no network. It exports ``RLSBL_TEST_SANDBOX=1``. A bare-pytest
+# refusal (``pytest_collection_modifyitems`` below) blocks full-suite runs that
+# are NOT inside the sandbox, while keeping small targeted runs bare-runnable.
+#
+# Layer 3 (CI): the CI workflow runs the suite job inside the same bwrap
+# sandbox via scripts/test.sh.
+# ---------------------------------------------------------------------------
+
+# Session temp dir holding the Layer-1 throwaway HOME / git config. Created in
+# pytest_configure, removed in pytest_unconfigure. One per process (each xdist
+# worker installs its own, fully isolated).
+_SESSION_ENV_DIR = None
+
+# Layer-2 bare-pytest refusal threshold. A run collecting MORE than this many
+# tests is treated as a full-ish run and must go through scripts/test.sh (which
+# sets RLSBL_TEST_SANDBOX=1). Small targeted runs (a single file, a -k slice)
+# stay bare-runnable for fast inner-loop iteration -- the always-on Layer-1
+# floor plus the push/chdir guards still protect those.
+_SANDBOX_FULL_RUN_THRESHOLD = 50
+
+
+def _install_env_poisoning_floor():
+    """Layer 1: install the always-on env-poisoning floor (idempotent).
+
+    Runs once per process from ``pytest_configure`` (including each xdist
+    worker), before any test body or fixture executes. ``os.environ`` is
+    mutated directly rather than via ``monkeypatch`` because the floor is
+    session-wide and must outlive every individual test.
+    """
+    global _SESSION_ENV_DIR
+    if _SESSION_ENV_DIR is not None:
+        return
+
+    real_home = os.environ.get("HOME", "")
+
+    # Preserve the Go toolchain caches BEFORE repointing HOME. The module
+    # cache, build cache, and GOPATH all default to locations under the real
+    # HOME; a throwaway HOME would send Go into a cold rebuild and the
+    # ``safegit_bin`` fixture (go install of the pinned safegit) would refetch
+    # every dependency. Pin them explicitly at the real persistent locations.
+    gopath = os.environ.get("GOPATH") or (f"{real_home}/go" if real_home else None)
+    if gopath:
+        os.environ["GOPATH"] = gopath
+        os.environ.setdefault("GOMODCACHE", f"{gopath}/pkg/mod")
+    if real_home:
+        os.environ.setdefault("GOCACHE", f"{real_home}/.cache/go-build")
+
+    # Preserve the Python user-site base BEFORE repointing HOME. Tools like
+    # git-filter-repo install their importable module into
+    # ``$HOME/.local/lib/pythonX/site-packages`` (user site, derived from HOME).
+    # The extract / absorb / commit-map tests shell out to ``git filter-repo``
+    # (a system-python script that does ``import git_filter_repo``); a throwaway
+    # HOME would hide that module and the tool would die with ModuleNotFoundError.
+    # Pinning PYTHONUSERBASE keeps the real user site reachable regardless of
+    # HOME. This is toolchain preservation (like the Go caches above), not a
+    # credential vector -- user site holds packages, not secrets. The rlsbl test
+    # venv disables user site, so this cannot leak packages into the suite's own
+    # imports; it only matters for the system-python subprocesses git spawns.
+    if real_home:
+        os.environ.setdefault("PYTHONUSERBASE", f"{real_home}/.local")
+
+    session_dir = Path(tempfile.mkdtemp(prefix="rlsbl-test-env-"))
+    _SESSION_ENV_DIR = session_dir
+
+    # Throwaway HOME + XDG dirs so nothing reads (or writes) real dotfiles.
+    home = session_dir / "home"
+    home.mkdir()
+    (session_dir / "xdg-config").mkdir()
+    (session_dir / "xdg-data").mkdir()
+    os.environ["HOME"] = str(home)
+    os.environ["XDG_CONFIG_HOME"] = str(session_dir / "xdg-config")
+    os.environ["XDG_DATA_HOME"] = str(session_dir / "xdg-data")
+
+    # Throwaway git global + system config. Carries protocol.ssh.allow=never
+    # and a session commit identity so real-git fixtures that skip per-repo
+    # identity still commit.
+    #
+    # We deliberately do NOT set core.hooksPath here. core.hooksPath overrides
+    # REPO-LOCAL hooks too, which would silently disable the suite's real
+    # pre-push-hook tests (test_hook_v5_e2e, test_pre_push_check, ...). A global
+    # config cannot inject hooks on its own, so simply having no hooks entry in
+    # the throwaway global config is sufficient to keep real user/global hooks
+    # from firing -- and omitting hooksPath is required to keep the repo-local
+    # hook tests working.
+    gitconfig = session_dir / "gitconfig"
+    gitconfig.write_text(
+        "[user]\n"
+        "\tname = rlsbl-test\n"
+        "\temail = rlsbl-test@example.invalid\n"
+        '[protocol "ssh"]\n'
+        "\tallow = never\n"
+        "[init]\n"
+        "\tdefaultBranch = main\n"
+    )
+    os.environ["GIT_CONFIG_GLOBAL"] = str(gitconfig)
+    os.environ["GIT_CONFIG_SYSTEM"] = str(gitconfig)
+
+    # Transport lockdown: only the local ``file`` protocol may be used by git;
+    # ssh / proxy invocations hard-fail; no interactive or credential prompt
+    # can ever block a test or leak a real credential.
+    os.environ["GIT_ALLOW_PROTOCOL"] = "file"
+    os.environ["GIT_SSH_COMMAND"] = "/bin/false"
+    os.environ["GIT_PROXY_COMMAND"] = "/bin/false"
+    os.environ["GIT_TERMINAL_PROMPT"] = "0"
+    os.environ["GIT_ASKPASS"] = "/bin/false"
+
+    # Kill ambient credentials outright: no SSH agent socket, no GitHub token.
+    # Per-test ``mock_gh`` fixtures re-set a fake GITHUB_TOKEN via monkeypatch
+    # for the tests that need one.
+    os.environ.pop("SSH_AUTH_SOCK", None)
+    os.environ.pop("GITHUB_TOKEN", None)
+    os.environ.pop("GH_TOKEN", None)
+
+
+def pytest_unconfigure(config):
+    """Tear down the Layer-1 throwaway env directory for this process."""
+    global _SESSION_ENV_DIR
+    if _SESSION_ENV_DIR is not None:
+        shutil.rmtree(_SESSION_ENV_DIR, ignore_errors=True)
+        _SESSION_ENV_DIR = None
+
+
+def _enforce_sandbox_threshold(count):
+    """Raise ``UsageError`` if a bare run of ``count`` tests is too large.
+
+    No-op when inside the sandbox (``RLSBL_TEST_SANDBOX=1``) or when the run is
+    a small targeted slice (``count <= _SANDBOX_FULL_RUN_THRESHOLD``).
+    """
+    if os.environ.get("RLSBL_TEST_SANDBOX") == "1":
+        return
+    if count <= _SANDBOX_FULL_RUN_THRESHOLD:
+        return
+    raise pytest.UsageError(
+        f"Refusing to run {count} tests bare (> {_SANDBOX_FULL_RUN_THRESHOLD}). "
+        "A full-ish suite run must go through the bwrap sandbox:\n\n"
+        "    scripts/test.sh\n\n"
+        "The sandbox binds the real repo read-only, runs in a writable throwaway "
+        "copy on a private tmpfs, and has no network -- so a stray real git push, "
+        "an unanchored commit into the dev repo, or a live API call is physically "
+        "impossible. Small targeted runs stay allowed bare for iteration speed "
+        f"(<= {_SANDBOX_FULL_RUN_THRESHOLD} tests: a single file or a -k slice). "
+        "To run the full suite, use scripts/test.sh."
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    """Layer 2: refuse a bare full-ish run outside the bwrap sandbox.
+
+    Small targeted runs stay allowed bare so the inner development loop (run one
+    file, a ``-k`` slice) is fast; the dangerous full-suite class -- real git,
+    real subprocesses, thousands of fixtures -- is sandbox-only.
+
+    Enforcement is split by execution topology:
+    - Single process (no xdist): ``items`` is the full set here -- enforce.
+    - xdist worker (``PYTEST_XDIST_WORKER`` set): a shard; defer to the
+      controller so the error surfaces once, not once per worker.
+    - xdist controller (``numprocesses`` set): ``items`` is empty here because
+      workers do the collecting -- defer to
+      ``pytest_xdist_node_collection_finished`` which sees the real count.
+    """
+    if os.environ.get("PYTEST_XDIST_WORKER"):
+        return
+    if getattr(config.option, "numprocesses", None):
+        return
+    _enforce_sandbox_threshold(len(items))
+
+
+def pytest_xdist_node_collection_finished(node, ids):
+    """Layer 2 (xdist controller): enforce the threshold once collection lands.
+
+    The controller does not collect items itself; each worker reports its
+    collected ``ids`` here. All workers collect the same full set, so the first
+    report carries the true test count -- enforce on it.
+    """
+    _enforce_sandbox_threshold(len(ids))
 
 
 # ---------------------------------------------------------------------------
@@ -69,6 +258,9 @@ def pytest_configure(config):
                 f"commit junk (the Jul junk-commit incidents). Point TMPDIR at a "
                 f"location OUTSIDE the repository and re-run."
             )
+
+    # Layer 1: bind the env-poisoning floor now that TMPDIR is proven safe.
+    _install_env_poisoning_floor()
 
 
 @pytest.fixture(autouse=True)
