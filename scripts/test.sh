@@ -175,6 +175,34 @@ done
 ENV_EXTRA=()
 [ -n "${UV_PYTHON:-}" ] && ENV_EXTRA+=(--setenv UV_PYTHON "${UV_PYTHON}")
 
+# --- preflight: the two known sandbox-SETUP failures (distinct from test
+# failures) surface as a non-zero bwrap exit at startup, before the inner
+# command ever runs. Probe them with a trivial `--unshare-net` sandbox so we
+# can emit a targeted diagnostic instead of a bare bwrap error line. ---
+PROBE_ERR="$(mktemp "${TMPDIR:-/tmp}/rlsbl-bwrap-probe.XXXXXX")"
+if ! bwrap \
+      --unshare-net --unshare-pid --die-with-parent \
+      --ro-bind /usr /usr \
+      --symlink usr/bin /bin --symlink usr/lib /lib --symlink usr/lib64 /lib64 \
+      --proc /proc --dev /dev \
+      true 2>"${PROBE_ERR}"; then
+  {
+    echo "[sandbox] FATAL: bwrap could not create the --unshare-net sandbox."
+    echo "  Two known causes on CI runners (esp. Ubuntu 24.04):"
+    echo "    1. bubblewrap < 0.10 cannot configure loopback under --unshare-net"
+    echo "       ('loopback: Failed RTM_NEWADDR: Operation not permitted')."
+    echo "       Fix: use bubblewrap >= 0.11.0."
+    echo "    2. Ubuntu 24.04 restricts unprivileged user namespaces to"
+    echo "       AppArmor-profiled binaries; a source-built bwrap has no profile."
+    echo "       Fix: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0"
+    echo "  bwrap version: $(bwrap --version 2>/dev/null || echo unknown)"
+    echo "  bwrap stderr : $(tr '\n' ' ' <"${PROBE_ERR}")"
+  } >&2
+  rm -f "${PROBE_ERR}"
+  exit 1
+fi
+rm -f "${PROBE_ERR}"
+
 exec bwrap \
   "${BIND_ARGS[@]}" \
   "${ENV_EXTRA[@]}" \

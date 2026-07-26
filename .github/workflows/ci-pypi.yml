@@ -37,9 +37,35 @@ jobs:
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar xz -C /usr/local/bin gitleaks
       # Layer 3: run the suite inside the same bwrap sandbox as local dev
       # (scripts/test.sh) -- repo read-only, throwaway writable copy, no network.
-      # The apt package ships bubblewrap's AppArmor profile, which grants the
-      # unprivileged user namespace bwrap needs on Ubuntu 24.04 runners.
-      - name: Install bubblewrap
-        run: sudo apt-get update && sudo apt-get install -y bubblewrap
+      #
+      # We build bubblewrap from a pinned source tag instead of installing the
+      # apt package, for two reasons specific to Ubuntu 24.04 runners:
+      #   1. The apt package is bubblewrap 0.9.x, which cannot configure the
+      #      loopback interface under --unshare-net: it fails with
+      #      "bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted".
+      #      That netlink/loopback path was fixed in 0.10+; 0.11.0 works.
+      #   2. Ubuntu 24.04 restricts unprivileged user namespaces to AppArmor-
+      #      profiled binaries (kernel.apparmor_restrict_unprivileged_userns=1).
+      #      The apt package ships a profile; a source-built /usr/local/bin/bwrap
+      #      would not, so it would be denied the userns it needs. Runners have
+      #      passwordless sudo, so we relax that sysctl to allow unprivileged
+      #      userns for our source-built binary.
+      - name: Build bubblewrap 0.11.0 from source
+        run: |
+          set -euo pipefail
+          # Allow unprivileged user namespaces for the source-built bwrap (no
+          # AppArmor profile) -- see step comment above.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          sudo apt-get update
+          sudo apt-get install -y meson ninja-build libcap-dev
+          git clone --depth 1 --branch v0.11.0 \
+            https://github.com/containers/bubblewrap /tmp/bubblewrap-src
+          # -Dtests=false / -Dman=disabled keep the build to the bwrap binary
+          # only, so no docbook/xsltproc build deps are needed.
+          meson setup /tmp/bubblewrap-build /tmp/bubblewrap-src \
+            --prefix=/usr/local -Dtests=false -Dman=disabled
+          meson compile -C /tmp/bubblewrap-build
+          sudo meson install -C /tmp/bubblewrap-build
+          bwrap --version
       - name: Run tests in the bwrap sandbox
         run: scripts/test.sh
