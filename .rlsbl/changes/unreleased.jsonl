@@ -58,3 +58,4 @@
 {"id":"18c5e4bf43b4ac232ab0877f607a4ad68a4b6507261b5547","commits":["96f4e64a6edf2592a215b28d33c9b942e4cd7259"],"user_facing":true,"description":"**Git operations are anchored to their project root.** Release, undo, deploy, status, and scrub now pass an explicit working directory to every branch/push/commit git call instead of relying on the process working directory, and the commit helpers refuse to write into a different repository than the one intended. This prevents release actions from accidentally operating on the wrong repository.","type":"fix"}
 {"id":"18c5e5a31a1ec5d1251c0febaa964f5cb1c379fa350b9f4e","commits":["b2da43c6d52be9450d7910c60690ece3d96f1097"],"user_facing":false}
 {"id":"18c5e6b4748e157b188a5d2811ef47e6b84ecc33330c6a7f","commits":["5740ff1449692330e4c07628c87d2860615266c8"],"user_facing":false}
+{"id":"18c5e780f6367fc5101ddcb7818a47e988d68a3992418405","commits":["603816712d7f9682f3eebb78c94b3620997f738b"],"user_facing":false}
