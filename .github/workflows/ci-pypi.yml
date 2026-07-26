@@ -27,6 +27,16 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v7
+      # Pin a Go >= safegit's go.mod floor (currently go 1.25.7). scripts/test.sh
+      # runs with GOTOOLCHAIN=local (no toolchain auto-download), so the runner's
+      # OWN Go must already satisfy that floor -- otherwise the offline
+      # in-sandbox safegit build cannot fetch a newer toolchain and every
+      # Go-touching test fails. This installs Go into the hosted tool cache and
+      # puts it on PATH; scripts/test.sh resolves GOROOT dynamically and binds
+      # THIS toolchain into the sandbox (not the runner's older preinstalled Go).
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.12'
       - run: uv python install ${{ matrix.python-version }}
       # Warms the uv cache (network) so the in-sandbox offline `uv sync` succeeds.
       - run: uv sync --locked

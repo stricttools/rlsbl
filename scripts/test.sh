@@ -35,15 +35,56 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+# --- Go toolchain policy: NEVER auto-switch/download a toolchain. GOTOOLCHAIN=
+# local forces `go` to use exactly the installed toolchain for both the
+# pre-warm below and (via --setenv) the offline in-sandbox safegit build. With
+# auto-switching, a go.mod `go` directive newer than the installed Go makes the
+# outside pre-warm silently download a toolchain into the REAL module cache,
+# which the fresh-tmpfs GOMODCACHE inside the sandbox cannot re-fetch offline --
+# so `go` breaks in-sandbox and every Go-touching test dies. Pinning to local
+# turns that into an explicit, early, loud failure (see the floor check below)
+# instead of a cryptic in-sandbox network error. ---
+export GOTOOLCHAIN=local
+
+# Minimum Go language version required to build the pinned safegit. MUST match
+# (or exceed) safegit's go.mod `go` directive; bump this in lockstep when
+# safegit raises its floor. Kept explicit here because the floor must be
+# enforced BEFORE the pre-warm, when safegit's .mod may not yet be cached.
+GO_MIN_VERSION="1.25.7"
+
 # --- resolve the real toolchain paths (bound read-only into the sandbox) ---
 UV_BIN="$(command -v uv)"
 UV_CACHE="$(uv cache dir)"
 UV_PY_DIR="$(uv python dir)"
 GOMODCACHE="$(go env GOMODCACHE)"
 GO_DOWNLOAD_CACHE="${GOMODCACHE}/cache/download"
+# GOROOT is bound read-only into the sandbox and put on the sandbox PATH so the
+# in-sandbox `go` is the SAME toolchain resolved here -- not a stale
+# /usr/local/go. On CI, actions/setup-go installs a pinned Go into the hosted
+# tool cache (outside /usr), so hardcoding /usr/local/go would silently run the
+# runner's older preinstalled Go inside the sandbox.
+GOROOT_DIR="$(go env GOROOT)"
 # Host GOPATH/bin holds go-installed toolchain binaries the suite shells out to
 # (notably gitleaks, used by the release-flow secret-scan tests).
 GO_BIN_DIR="$(go env GOPATH)/bin"
+
+# --- Go version floor: fail loudly and early if the installed toolchain is too
+# old to build safegit under GOTOOLCHAIN=local (no download will rescue us). ---
+GO_VERSION="$(go env GOVERSION 2>/dev/null | sed 's/^go//')"
+if [ -z "${GO_VERSION}" ] || \
+   [ "$(printf '%s\n%s\n' "${GO_MIN_VERSION}" "${GO_VERSION}" | sort -V | head -1)" \
+     != "${GO_MIN_VERSION}" ]; then
+  {
+    echo "[sandbox] FATAL: Go ${GO_VERSION:-<unknown>} is too old."
+    echo "  Building the pinned safegit needs Go >= ${GO_MIN_VERSION}, and this"
+    echo "  sandbox pins GOTOOLCHAIN=local (no toolchain auto-download), so an"
+    echo "  older toolchain cannot be silently upgraded."
+    echo "  Fix: install Go >= ${GO_MIN_VERSION} (CI: actions/setup-go with a"
+    echo "  pinned go-version) before running this script."
+    echo "  go: $(command -v go) ($(go version 2>/dev/null || echo unavailable))"
+  } >&2
+  exit 1
+fi
 # git-filter-repo installs its importable module under the user-site base
 # ($HOME/.local/lib/pythonX/site-packages); bind that so extract/absorb tests
 # keep working under the throwaway HOME (mirrors Layer-1 PYTHONUSERBASE).
@@ -166,7 +207,10 @@ BIND_ARGS=(
   --tmpfs /sandbox-gocache
   --tmpfs /sandbox-gomodcache
 )
-for opt in "${USERBASE}/bin" "${USERBASE}/lib" "${GO_BIN_DIR}"; do
+# GOROOT is bound explicitly so the in-sandbox `go` is the resolved toolchain
+# (may live outside /usr, e.g. the CI hosted tool cache from actions/setup-go).
+# A GOROOT already under the /usr RO-bind just gets a harmless redundant bind.
+for opt in "${USERBASE}/bin" "${USERBASE}/lib" "${GO_BIN_DIR}" "${GOROOT_DIR}"; do
   [ -d "${opt}" ] && BIND_ARGS+=(--ro-bind "${opt}" "${opt}")
 done
 
@@ -209,7 +253,7 @@ exec bwrap \
   --chdir "${WORK}" \
   --setenv HOME /sandbox-home \
   --setenv TMPDIR /sandbox-tmp \
-  --setenv PATH "${USERBASE}/bin:${GO_BIN_DIR}:$(dirname "${UV_BIN}"):/usr/local/go/bin:/usr/local/bin:/usr/bin:/usr/sbin" \
+  --setenv PATH "${USERBASE}/bin:${GO_BIN_DIR}:$(dirname "${UV_BIN}"):${GOROOT_DIR}/bin:/usr/local/bin:/usr/bin:/usr/sbin" \
   --setenv LANG C.UTF-8 \
   --setenv RLSBL_TEST_SANDBOX 1 \
   --setenv UV_CACHE_DIR "${UV_CACHE}" \
@@ -222,4 +266,5 @@ exec bwrap \
   --setenv GOPATH /sandbox-home/go \
   --setenv GOPROXY "file://${GO_DOWNLOAD_CACHE}" \
   --setenv GOSUMDB off \
+  --setenv GOTOOLCHAIN local \
   bash -c "${INNER}"
