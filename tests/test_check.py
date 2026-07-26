@@ -157,9 +157,17 @@ class TestCheckGitHub:
 class TestCheckSingleName:
     """Tests for the _check_single_name structured result function."""
 
+    @patch("rlsbl.commands.check._search_npm_similar", return_value=[])
     @patch("rlsbl.commands.check.check_npm_availability")
-    def test_npm_available_result(self, mock_npm):
-        """Available npm name returns correct structured result."""
+    def test_npm_available_result(self, mock_npm, mock_search):
+        """Available npm name returns correct structured result.
+
+        The available path also runs the npm moniker search
+        (``_search_npm_similar``), which hits the live npm registry. Mock it so
+        this unit test is fully offline (an unmocked call is a real network
+        dependency -- it only "passed" bare because the registry happened to
+        return no conflicts for this fake name).
+        """
         mock_npm.return_value = {"status": "available"}
 
         result = _check_single_name("my-new-pkg", "npm")
