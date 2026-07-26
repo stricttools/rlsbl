@@ -53,3 +53,4 @@
 {"id":"18c57f82cc94bb232f693c524f254834afd9d93dd36d76c0","commits":["7f4fc80b57b2f85dae86baf511ea75508aec49bd"],"user_facing":false}
 {"id":"18c5e362c22807c3ab8b17f76ccf4b43ad31e14c32b23f5e","commits":["00fa74ba8d67ad8f89a0d11bb67efb59c9789b5b"],"user_facing":false}
 {"id":"18c5e362cc766d277f0a4285150a4681b4c5459814bad2cc","commits":["f954f937096237fa9c487c3d65e85e0ed936592a"],"user_facing":false}
+{"id":"18c5e383996797c2aef3a75bf5fa47cda6770624644669a1","commits":["14b2a0f56b5fcbd4509ec90a085e2f25c100fc82"],"user_facing":true,"description":"**Hardened release push guard.** The pre-push hook now honors the `RLSBL_RELEASE_PUSH` bypass only during an actual in-progress release (an `in-progress.json` state file must exist), so a stray environment variable can no longer silently disable the manual-push guard.","type":"fix"}
