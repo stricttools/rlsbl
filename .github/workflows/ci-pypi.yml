@@ -64,28 +64,39 @@ jobs:
       # migrate-releasable integration tests). That is desired coverage.
       - name: Install git-filter-repo
         run: sudo apt-get update && sudo apt-get install -y git-filter-repo
-      # Warm the uv cache for the FIXTURE projects' fresh dependency resolution.
+      # Warm the uv cache for the FIXTURE projects' fresh, lockfile-less uv work.
       # The `uv sync --locked` above warms rlsbl's own wheels from the lockfile,
       # but a locked sync does NOT populate the simple-index METADATA buckets
-      # (simple-v*) that a *fresh* (lockfile-less) resolution needs. Several
-      # tests drive the real release flow, whose built-in test step runs
-      # `uv run python -m pytest` inside a throwaway fixture project that has no
-      # lockfile -- so uv must resolve from scratch, and under the sandbox's
-      # UV_OFFLINE that fails unless the metadata is already cached. We warm it
-      # by doing one throwaway fresh `uv lock && uv sync` (network) declaring the
-      # UNION of deps those fixtures introduce.
+      # (simple-v*) that a *fresh* resolution needs, nor the build-backend
+      # packages a *fresh build* needs. Several tests drive the real release
+      # flow against a throwaway fixture project that has no lockfile, doing two
+      # things uv must satisfy from scratch (and, in the sandbox, offline):
       #
-      # Fixture-dep union (add here when a NEW uv-running fixture declares a dep
-      # NOT already in rlsbl's own dependency tree):
-      #   - pytest  -> tests/test_prerelease_integration.py (full-flow x2),
-      #                tests/test_release_hooks.py (release-flow hook tests)
-      # click/tomlkit/strictcli fixtures resolve fine because they ARE rlsbl
-      # runtime deps (their metadata is already in the cache); only pytest is a
-      # dev-only dep absent from a fresh index warm.
-      - name: Warm uv cache for fixture-project resolution
+      #   1. Built-in test step: `uv run python -m pytest` -> a fresh resolve of
+      #      the fixture's `dev = ["pytest"]` group. Needs pytest metadata+wheels.
+      #   2. Build step: `uv build --out-dir dist` (rlsbl/pipelines/build.py).
+      #      The fixtures declare NO [build-system], so uv uses the PEP 517
+      #      default backend and resolves `setuptools>=40.8.0` + wheel for an
+      #      isolated build env. rlsbl itself builds with hatchling, so the
+      #      locked sync never warms setuptools/wheel -- a fresh offline build
+      #      fails with `uv build ... exit 2` ("setuptools was not found").
+      #
+      # ONE throwaway project covers both: declare the fixture dep union AND omit
+      # [build-system] (matching the fixtures) so `uv build` pulls the same
+      # setuptools-fallback backend the fixtures need. Fixtures served:
+      #   - tests/test_prerelease_integration.py (full-flow x2)
+      #   - tests/test_release_hooks.py::TestHookCwdMonorepo (post-release cwd)
+      # All three build via the setuptools fallback; the prerelease pair also
+      # resolves pytest. Add a dep here when a NEW uv-running fixture declares
+      # one NOT already in rlsbl's own tree (click/tomlkit/strictcli are rlsbl
+      # runtime deps and already cached; only pytest is dev-only). A fixture that
+      # declares its own [build-system] (e.g. hatchling) would need that backend
+      # warmed here too.
+      - name: Warm uv cache for fixture-project resolution and build
         run: |
           set -euo pipefail
           WARM="$(mktemp -d)"
+          # No [build-system] -> PEP 517 setuptools fallback, matching fixtures.
           cat > "${WARM}/pyproject.toml" <<'EOF'
           [project]
           name = "rlsbl-fixture-cache-warm"
@@ -95,8 +106,14 @@ jobs:
           [dependency-groups]
           dev = ["pytest"]
           EOF
+          # A trivial package so setuptools auto-discovery has something to build.
+          mkdir -p "${WARM}/rlsbl_fixture_cache_warm"
+          : > "${WARM}/rlsbl_fixture_cache_warm/__init__.py"
+          # Warm pytest metadata+wheels (fresh resolve).
           uv lock --directory "${WARM}"
           uv sync --directory "${WARM}"
+          # Warm the setuptools-fallback build backend (isolated build env).
+          uv build --directory "${WARM}" --out-dir "${WARM}/dist"
       # Layer 3: run the suite inside the same bwrap sandbox as local dev
       # (scripts/test.sh) -- repo read-only, throwaway writable copy, no network.
       #
