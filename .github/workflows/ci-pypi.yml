@@ -20,14 +20,26 @@ jobs:
       matrix:
         # requires-python: >= 3.11
         python-version: ["3.12", "3.13", "3.14"]
+    # Pin the interpreter for every uv step (outer cache-warm + in-sandbox sync)
+    # so the matrix version is what actually runs the suite.
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v7
       - run: uv python install ${{ matrix.python-version }}
+      # Warms the uv cache (network) so the in-sandbox offline `uv sync` succeeds.
       - run: uv sync --locked
       - run: uv run python -c "import rlsbl"
       - name: Install gitleaks
         run: |
           GITLEAKS_VERSION=8.24.3
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar xz -C /usr/local/bin gitleaks
-      - run: uv run pytest --rootdir .
+      # Layer 3: run the suite inside the same bwrap sandbox as local dev
+      # (scripts/test.sh) -- repo read-only, throwaway writable copy, no network.
+      # The apt package ships bubblewrap's AppArmor profile, which grants the
+      # unprivileged user namespace bwrap needs on Ubuntu 24.04 runners.
+      - name: Install bubblewrap
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap
+      - name: Run tests in the bwrap sandbox
+        run: scripts/test.sh

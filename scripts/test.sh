@@ -40,6 +40,10 @@ GO_BIN_DIR="$(go env GOPATH)/bin"
 # keep working under the throwaway HOME (mirrors Layer-1 PYTHONUSERBASE).
 USERBASE="${HOME}/.local"
 
+# overlay-src requires the lower dir to exist; ensure the caches are present
+# (a fresh CI runner may not have populated them yet).
+mkdir -p "${UV_CACHE}" "${GOMODCACHE}"
+
 # Pinned safegit version -- MUST match rlsbl's declared SAFEGIT_MIN_VERSION so
 # the safegit_bin fixture's `go install ...@vX` is a cache hit offline.
 PIN_RAW="$(grep -oP 'SAFEGIT_MIN_VERSION\s*=\s*\(\K[0-9,\s]+' \
@@ -107,35 +111,49 @@ fi
 
 echo "[sandbox] bwrap: real repo RO, writable copy=${WORK}, no network, TMPDIR=tmpfs, safegit=${SAFEGIT_PIN}" >&2
 
+# Core binds (always present). Optional toolchain binds are appended only when
+# the path exists, so the same script runs on a dev box (git-filter-repo in
+# ~/.local, gitleaks in ~/go/bin) and on a bare CI runner (gitleaks in
+# /usr/local/bin, no ~/.local/lib) without a hard bwrap failure on a missing dir.
+BIND_ARGS=(
+  --unshare-net --unshare-pid --unshare-ipc --unshare-uts
+  --die-with-parent
+  --clearenv
+  --ro-bind /usr /usr
+  --symlink usr/bin /bin
+  --symlink usr/sbin /sbin
+  --symlink usr/lib /lib
+  --symlink usr/lib64 /lib64
+  --ro-bind /etc /etc
+  --proc /proc
+  --dev /dev
+  --tmpfs /tmp
+  --ro-bind "${REPO_ROOT}" "${REPO_ROOT}"
+  --ro-bind "${UV_BIN}" "${UV_BIN}"
+  --ro-bind "${UV_PY_DIR}" "${UV_PY_DIR}"
+  --overlay-src "${UV_CACHE}" --tmp-overlay "${UV_CACHE}"
+  --overlay-src "${GOMODCACHE}" --tmp-overlay "${GOMODCACHE}"
+  --bind "${WORK}" "${WORK}"
+  --tmpfs /sandbox-home
+  --tmpfs /sandbox-tmp
+  --tmpfs /sandbox-gocache
+)
+for opt in "${USERBASE}/bin" "${USERBASE}/lib" "${GO_BIN_DIR}"; do
+  [ -d "${opt}" ] && BIND_ARGS+=(--ro-bind "${opt}" "${opt}")
+done
+
+# Forward UV_PYTHON when set (the CI matrix uses it to pin the interpreter the
+# in-sandbox `uv sync` selects); left unset, uv picks the default interpreter.
+ENV_EXTRA=()
+[ -n "${UV_PYTHON:-}" ] && ENV_EXTRA+=(--setenv UV_PYTHON "${UV_PYTHON}")
+
 exec bwrap \
-  --unshare-net --unshare-pid --unshare-ipc --unshare-uts \
-  --die-with-parent \
-  --clearenv \
-  --ro-bind /usr /usr \
-  --symlink usr/bin /bin \
-  --symlink usr/sbin /sbin \
-  --symlink usr/lib /lib \
-  --symlink usr/lib64 /lib64 \
-  --ro-bind /etc /etc \
-  --proc /proc \
-  --dev /dev \
-  --tmpfs /tmp \
-  --ro-bind "${REPO_ROOT}" "${REPO_ROOT}" \
-  --ro-bind "${UV_BIN}" "${UV_BIN}" \
-  --ro-bind "${UV_PY_DIR}" "${UV_PY_DIR}" \
-  --ro-bind "${USERBASE}/bin" "${USERBASE}/bin" \
-  --ro-bind "${USERBASE}/lib" "${USERBASE}/lib" \
-  --ro-bind "${GO_BIN_DIR}" "${GO_BIN_DIR}" \
-  --overlay-src "${UV_CACHE}" --tmp-overlay "${UV_CACHE}" \
-  --overlay-src "${GOMODCACHE}" --tmp-overlay "${GOMODCACHE}" \
-  --bind "${WORK}" "${WORK}" \
-  --tmpfs /sandbox-home \
-  --tmpfs /sandbox-tmp \
-  --tmpfs /sandbox-gocache \
+  "${BIND_ARGS[@]}" \
+  "${ENV_EXTRA[@]}" \
   --chdir "${WORK}" \
   --setenv HOME /sandbox-home \
   --setenv TMPDIR /sandbox-tmp \
-  --setenv PATH "${USERBASE}/bin:${GO_BIN_DIR}:$(dirname "${UV_BIN}"):/usr/local/go/bin:/usr/bin:/usr/sbin" \
+  --setenv PATH "${USERBASE}/bin:${GO_BIN_DIR}:$(dirname "${UV_BIN}"):/usr/local/go/bin:/usr/local/bin:/usr/bin:/usr/sbin" \
   --setenv LANG C.UTF-8 \
   --setenv RLSBL_TEST_SANDBOX 1 \
   --setenv UV_CACHE_DIR "${UV_CACHE}" \
