@@ -48,7 +48,7 @@
   },
   "project_id": "rlsbl",
   "name": "rlsbl",
-  "version": "0.109.1",
+  "version": "0.110.0",
   "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 52 commands organized into 14 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
   "global_flags": [
     {
@@ -870,6 +870,12 @@
               "default": ""
             },
             {
+              "name": "registry-name",
+              "type": "str",
+              "help": "Package registry identity for this project (used verbatim for name checks; overrides prefix/suffix)",
+              "default": ""
+            },
+            {
               "name": "auto-commit",
               "type": "bool",
               "help": "Auto-commit workspace.toml and trigger scaffold/sync commits",
@@ -963,7 +969,7 @@
         },
         "mirror": {
           "name": "mirror",
-          "help": "Initialize a subtree mirror repository for a monorepo project by performing a full git subtree split of the project's history, pushing the extracted tree to the configured subtree_remote URL, cloning the resulting standalone mirror repository, running rlsbl scaffold to generate CI workflows for independent publishing, and pushing the scaffolded mirror to its remote.",
+          "help": "Reconcile a monorepo project's subtree mirror toward its desired state. The mirror is a tool-owned, derived artifact: it observes the remote, then converges it to exactly one scaffold commit atop the current deterministic subtree split, force-pushing (with lease) as the routine write. A tripwire refuses to touch a mirror carrying foreign (hand-authored) commits. Use --dry-run to print a plan (converged, behind, scaffold-missing, contract-violated, or virgin) without writing.",
           "args": [
             {
               "name": "project",
@@ -1045,8 +1051,20 @@
         },
         "absorb": {
           "name": "absorb",
-          "help": "Absorb an external repository as a package in the monorepo. Runs git subtree add to import the source repo's history under the package name, adds the project to workspace.toml, and migrates changelog entries from the source repo's .rlsbl/changes/ directory.",
+          "help": "Absorb an external repository as a package in the monorepo. Rewrites the source's history to live under the destination path, fetch-merges it (preserving full history with rewritten paths), imports its version tags under the monorepo tag scheme, and remaps its JSONL changelog hashes to the new commits.",
           "flags": [
+            {
+              "name": "name",
+              "type": "str",
+              "help": "Workspace project name for the absorbed package (default: basename of the destination path)",
+              "default": ""
+            },
+            {
+              "name": "registry-name",
+              "type": "str",
+              "help": "Package registry identity recorded in workspace.toml (used verbatim for name checks)",
+              "default": ""
+            },
             {
               "name": "releasable",
               "type": "str",
@@ -1056,12 +1074,12 @@
           ],
           "args": [
             {
-              "name": "source_path",
+              "name": "source_repo",
               "help": "Filesystem path to the external git repository to absorb"
             },
             {
-              "name": "package_name",
-              "help": "Name to assign to the absorbed package in the monorepo workspace.toml"
+              "name": "dest_path",
+              "help": "Destination directory (and workspace path) the source repo's history is rewritten under"
             }
           ]
         },
@@ -1762,6 +1780,18 @@
       "needs_network": false,
       "depends_on": []
     },
+    "requires-services": {
+      "tags": [
+        "project"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [
+        "config-schema"
+      ]
+    },
     "dev-overlay-drift": {
       "tags": [
         "project",
@@ -1897,6 +1927,17 @@
       "needs_network": false,
       "depends_on": [],
       "scope": "workspace:non_dev_node"
+    },
+    "mixed-tag-schemes": {
+      "tags": [
+        "workspace"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [],
+      "scope": "workspace"
     },
     "wrapper-producer": {
       "tags": [

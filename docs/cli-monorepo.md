@@ -37,6 +37,7 @@ Register a project directory in the monorepo workspace.toml configuration. The p
 | `--library` |  | str |  |  | Mark as a shared library consumed by other workspace projects (true/false) |
 | `--dev-only` |  | str |  |  | Mark as a dev-only leaf node excluded from the dependency boundary guardrail (true/false) |
 | `--releasable` |  | str |  |  | Releasable group this project belongs to (name of a [[releasables]] entry, or 'false' to opt out of versioning) |
+| `--registry-name` |  | str |  |  | Package registry identity for this project (used verbatim for name checks; overrides prefix/suffix) |
 | `--auto-commit` |  | bool | True |  | Auto-commit workspace.toml and trigger scaffold/sync commits |
 
 ### Arguments
@@ -102,7 +103,7 @@ Generate a committed JSON artifact at .rlsbl-monorepo/snapshot.json summarizing 
 
 ## monorepo mirror
 
-Initialize a subtree mirror repository for a monorepo project by performing a full git subtree split of the project's history, pushing the extracted tree to the configured subtree_remote URL, cloning the resulting standalone mirror repository, running rlsbl scaffold to generate CI workflows for independent publishing, and pushing the scaffolded mirror to its remote.
+Reconcile a monorepo project's subtree mirror toward its desired state. The mirror is a tool-owned, derived artifact: it observes the remote, then converges it to exactly one scaffold commit atop the current deterministic subtree split, force-pushing (with lease) as the routine write. A tripwire refuses to touch a mirror carrying foreign (hand-authored) commits. Use --dry-run to print a plan (converged, behind, scaffold-missing, contract-violated, or virgin) without writing.
 
 ### Arguments
 
@@ -149,20 +150,22 @@ Extract a package from the monorepo into a new standalone repository. Clones the
 
 ## monorepo absorb
 
-Absorb an external repository as a package in the monorepo. Runs git subtree add to import the source repo's history under the package name, adds the project to workspace.toml, and migrates changelog entries from the source repo's .rlsbl/changes/ directory.
+Absorb an external repository as a package in the monorepo. Rewrites the source's history to live under the destination path, fetch-merges it (preserving full history with rewritten paths), imports its version tags under the monorepo tag scheme, and remaps its JSONL changelog hashes to the new commits.
 
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
+| `--name` |  | str |  |  | Workspace project name for the absorbed package (default: basename of the destination path) |
+| `--registry-name` |  | str |  |  | Package registry identity recorded in workspace.toml (used verbatim for name checks) |
 | `--releasable` |  | str |  |  | Releasable group to assign the absorbed package to |
 
 ### Arguments
 
 | Name | Required | Description |
 | --- | --- | --- |
-| `source_path` | yes | Filesystem path to the external git repository to absorb |
-| `package_name` | yes | Name to assign to the absorbed package in the monorepo workspace.toml |
+| `source_repo` | yes | Filesystem path to the external git repository to absorb |
+| `dest_path` | yes | Destination directory (and workspace path) the source repo's history is rewritten under |
 
 ## monorepo extract-releasable
 
