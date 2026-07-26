@@ -392,15 +392,35 @@ class TestPrePushPrerelease:
     message matching, so pre-release versions work without changes.
     """
 
-    def test_release_push_env_skips_check(self):
+    def test_release_push_env_with_state_skips_check(self):
+        """Env var AND an in-progress release -> bypass honored."""
         from rlsbl.git_util import detect_manual_push_branches
 
         stdin_lines = [
             "refs/heads/main abc123 refs/heads/main def456"
         ]
         with patch.dict(os.environ, {"RLSBL_RELEASE_PUSH": "1"}):
-            result = detect_manual_push_branches(stdin_lines, ["main"])
+            result = detect_manual_push_branches(
+                stdin_lines, ["main"], release_in_progress=True,
+            )
         assert result == []
+
+    def test_release_push_env_without_state_runs_check(self):
+        """Env var but NO in-progress release -> bypass NOT honored.
+
+        Regression: a stray ``RLSBL_RELEASE_PUSH`` in the environment (e.g. a
+        leaked test env var) must not silently disable the manual-push guard.
+        """
+        from rlsbl.git_util import detect_manual_push_branches
+
+        stdin_lines = [
+            "refs/heads/main abc123 refs/heads/main def456"
+        ]
+        with patch.dict(os.environ, {"RLSBL_RELEASE_PUSH": "1"}):
+            result = detect_manual_push_branches(
+                stdin_lines, ["main"], release_in_progress=False,
+            )
+        assert result == ["main"]
 
     def test_no_release_push_env_detects_manual(self):
         from rlsbl.git_util import detect_manual_push_branches
@@ -411,8 +431,22 @@ class TestPrePushPrerelease:
         with patch.dict(os.environ, {}, clear=True):
             # Remove RLSBL_RELEASE_PUSH if present
             os.environ.pop("RLSBL_RELEASE_PUSH", None)
-            result = detect_manual_push_branches(stdin_lines, ["main"])
+            result = detect_manual_push_branches(
+                stdin_lines, ["main"], release_in_progress=True,
+            )
         assert result == ["main"]
+
+    def test_repo_has_in_progress_release_detects_state_file(self, tmp_path):
+        """repo_has_in_progress_release reflects the actual state file."""
+        from rlsbl.commands.release.release_state import (
+            get_state_path,
+            repo_has_in_progress_release,
+            save_release_state,
+        )
+
+        assert repo_has_in_progress_release(str(tmp_path)) is False
+        save_release_state(get_state_path(str(tmp_path)), {"completed_steps": []})
+        assert repo_has_in_progress_release(str(tmp_path)) is True
 
 
 class TestQuickBumpPreid:

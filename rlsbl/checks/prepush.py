@@ -173,10 +173,16 @@ def register_prepush_checks(app):
         if ctx.push_stdin is None:
             return reporter.skipped("not in push context")
 
+        from ..commands.release.release_state import repo_has_in_progress_release
+
         stdin_lines = ctx.push_stdin.strip().splitlines()
         release_branches = _get_release_branches(ctx)
+        in_progress = repo_has_in_progress_release(
+            str(ctx.project_root),
+            str(ctx.workspace_root) if ctx.workspace_root is not None else None,
+        )
         pushed_release_branches = detect_manual_push_branches(
-            stdin_lines, release_branches,
+            stdin_lines, release_branches, release_in_progress=in_progress,
         )
 
         if pushed_release_branches:

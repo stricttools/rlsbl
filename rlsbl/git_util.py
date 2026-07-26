@@ -240,17 +240,24 @@ def affected_projects(changed_files, projects):
     return result
 
 
-def detect_manual_push_branches(stdin_lines, release_branches):
+def detect_manual_push_branches(stdin_lines, release_branches, *, release_in_progress=False):
     """Return list of release branch names being pushed to manually.
 
     Parses pre-push hook stdin lines for ``refs/heads/<branch>`` patterns
     and returns branch names that match *release_branches*.
 
-    Returns an empty list if no release branches are being pushed to,
-    if *stdin_lines* is empty/None, or if ``RLSBL_RELEASE_PUSH`` is set
-    (indicating a legitimate release push).
+    Returns an empty list if no release branches are being pushed to, if
+    *stdin_lines* is empty/None, or if the push is a legitimate release push.
+
+    A release push is recognized ONLY when BOTH conditions hold:
+    ``RLSBL_RELEASE_PUSH=1`` is set AND *release_in_progress* is True (an
+    in-progress release state file exists for this repo). The env var alone is
+    no longer sufficient: a stray ``RLSBL_RELEASE_PUSH`` leaked into the
+    environment (e.g. a test process) must not silently disable the guard.
+    Callers determine *release_in_progress* via
+    :func:`rlsbl.commands.release.release_state.repo_has_in_progress_release`.
     """
-    if os.environ.get("RLSBL_RELEASE_PUSH") == "1":
+    if os.environ.get("RLSBL_RELEASE_PUSH") == "1" and release_in_progress:
         return []
     if not stdin_lines:
         return []
