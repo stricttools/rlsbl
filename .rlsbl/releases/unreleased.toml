@@ -1,9 +1,17 @@
 # Version bump type: patch, minor, major, infra, or prerelease
-bump = ""
+bump = "patch"
 # Short description of this release (required)
-description = ""
+description = "Portable test sandbox: CI-compatible bwrap flags (fix-forward for the unpublished v0.110.0)"
 # Optional context explaining why these changes were made
-context = ""
+context = """
+v0.110.0 was tagged and GitHub-released but never published to npm/PyPI: the
+publish workflow gates on CI, and CI was red because scripts/test.sh used the
+bubblewrap overlayfs options (--overlay-src/--tmp-overlay), which the stock apt
+bubblewrap on the CI runner is built without. This patch replaces the overlay
+with universally-supported bwrap flags (read-only download-cache + file://
+GOPROXY with a tmpfs GOMODCACHE for Go; a copy-on-write reflink clone of the uv
+cache), turning CI green so this release cycle ships to the registries.
+"""
 # Pre-release identifier: alpha, beta, rc, or stable
 # preid = ""
 # Set to true to generate a blog post for this release
