@@ -169,12 +169,18 @@ def _enforce_sandbox_threshold(count):
     )
 
 
+@pytest.hookimpl(trylast=True)
 def pytest_collection_modifyitems(config, items):
     """Layer 2: refuse a bare full-ish run outside the bwrap sandbox.
 
     Small targeted runs stay allowed bare so the inner development loop (run one
     file, a ``-k`` slice) is fast; the dangerous full-suite class -- real git,
     real subprocesses, thousands of fixtures -- is sandbox-only.
+
+    ``trylast`` so this runs AFTER pytest's own ``-k`` / ``-m`` deselection,
+    which mutates ``items`` in place -- the count then reflects the SELECTED
+    tests, so a ``-k`` slice of a big file stays under the threshold and runs
+    bare instead of being refused on the pre-deselection total.
 
     Enforcement is split by execution topology:
     - Single process (no xdist): ``items`` is the full set here -- enforce.
