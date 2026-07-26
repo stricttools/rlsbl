@@ -1,9 +1,21 @@
 # Version bump type: patch, minor, major, infra, or prerelease
-bump = ""
+bump = "minor"
 # Short description of this release (required)
-description = ""
+description = "Absorb/extract round-trip overhaul, mirror reconciler, commit-aware tag guards, infra bump type, CI service containers, dual-registry formalization, handler safety hardening"
 # Optional context explaining why these changes were made
-context = ""
+context = """
+This cycle hardens the release machinery along several fronts. The dry-run incident
+prompted prompt EOF handling, a push rehearsal step, and elimination of **_kwargs in
+handlers in favor of registry-enforced signatures. The bump-type rename (hotfix -> infra)
+came with a fleet archive migration; legacy bump values now hard-error rather than
+silently coerce. Absorb now rewrites history to the package prefix with tag import and
+changelog remap, eliminating the double-append class of bug. Extract gained tag
+translation, commit-map remap, and a self-commit so absorb/extract round-trips stay
+coherent. Monorepo mirror became a tool-owned plan/apply reconciler (force-with-lease
+with an exact tripwire). Tag push guards are now commit-aware (the silent-skip path is
+removed). CI service containers are declarative with an enforce check. Dual-registry
+support formalizes scan-depth pins and a mixed-scheme guard. record-gif was removed.
+"""
 # Pre-release identifier: alpha, beta, rc, or stable
 # preid = ""
 # Set to true to generate a blog post for this release
