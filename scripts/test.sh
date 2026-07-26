@@ -10,9 +10,18 @@
 #   - there is NO network (--unshare-net) -- a real push/clone/API call is
 #     physically impossible (ENETUNREACH), on top of the always-on Layer-1
 #     env floor and the push/chdir guards,
-#   - the Go module cache is bound READ-ONLY and safegit is (re)built offline
-#     from it via a file:// proxy; ~/.ssh and other credential paths are simply
+#   - the Go module DOWNLOAD cache is bound READ-ONLY and served to the offline
+#     safegit (re)build via a file:// GOPROXY, with GOMODCACHE pointed at a
+#     writable tmpfs so `go` extracts into the sandbox while the real cache stays
+#     immutable; the UV cache is a throwaway copy-on-write clone (uv insists on
+#     writing locks/markers and caching the local build), so the real dev cache
+#     is likewise never mutated; ~/.ssh and other credential paths are simply
 #     never bound, so they are unreachable.
+#
+# Portability: this sandbox uses only universally-supported bwrap options
+# (--ro-bind/--bind/--tmpfs/--proc/--dev/--symlink/--unshare-*/--die-with-parent/
+# --clearenv/--setenv/--chdir). It deliberately avoids --overlay-src/--tmp-overlay
+# (overlayfs), which the stock apt bubblewrap on CI runners is built without.
 #
 # The sandbox exports RLSBL_TEST_SANDBOX=1, which lifts conftest's bare-run
 # refusal (a bare full-suite `pytest` outside the sandbox is a hard error).
@@ -40,9 +49,9 @@ GO_BIN_DIR="$(go env GOPATH)/bin"
 # keep working under the throwaway HOME (mirrors Layer-1 PYTHONUSERBASE).
 USERBASE="${HOME}/.local"
 
-# overlay-src requires the lower dir to exist; ensure the caches are present
-# (a fresh CI runner may not have populated them yet).
-mkdir -p "${UV_CACHE}" "${GOMODCACHE}"
+# The read-only cache binds require their source dirs to exist; ensure the
+# caches are present (a fresh CI runner may not have populated them yet).
+mkdir -p "${UV_CACHE}" "${GO_DOWNLOAD_CACHE}"
 
 # Pinned safegit version -- MUST match rlsbl's declared SAFEGIT_MIN_VERSION so
 # the safegit_bin fixture's `go install ...@vX` is a cache hit offline.
@@ -63,8 +72,26 @@ fi
 # needs real git history). Exclude the venv (absolute paths break on move --
 # rebuilt offline inside via `uv sync`) and disposable caches. ---
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/rlsbl-sandbox-work.XXXXXX")"
-cleanup() { chmod -R u+w "${WORK}" 2>/dev/null || true; rm -rf "${WORK}"; }
+# --- writable throwaway clone of the uv cache. uv refuses to run fully
+# read-only even in offline + UV_LINK_MODE=copy mode: it touches a root `.lock`
+# and per-bucket `.git` markers, and it caches the freshly-built local `rlsbl`
+# wheel into `archive-v0` (verified: EROFS / cross-device rename against a
+# read-only cache). Overlayfs (which gave copy-on-write for free) is
+# unavailable on stock apt bubblewrap, so we clone the whole cache into a
+# throwaway dir and bind THAT writable at the real cache path. The clone uses
+# `cp --reflink=auto`, which is a near-instant copy-on-write clone on btrfs/xfs
+# and degrades to a plain copy on ext4 CI runners (where the cache holds only
+# this project's warmed deps and is small). It MUST be a sibling of the real
+# cache so it lands on the same filesystem -- a tmpfs target would defeat
+# reflink and force a full data copy into RAM. The real dev cache is never
+# mutated. ---
+UV_CACHE_COPY="$(mktemp -d "${UV_CACHE}.sandbox.XXXXXX")"
+cleanup() {
+  chmod -R u+w "${WORK}" "${UV_CACHE_COPY}" 2>/dev/null || true
+  rm -rf "${WORK}" "${UV_CACHE_COPY}"
+}
 trap cleanup EXIT
+cp -a --reflink=auto "${UV_CACHE}/." "${UV_CACHE_COPY}/"
 rsync -a \
   --exclude '.venv' \
   --exclude '__pycache__' \
@@ -131,12 +158,13 @@ BIND_ARGS=(
   --ro-bind "${REPO_ROOT}" "${REPO_ROOT}"
   --ro-bind "${UV_BIN}" "${UV_BIN}"
   --ro-bind "${UV_PY_DIR}" "${UV_PY_DIR}"
-  --overlay-src "${UV_CACHE}" --tmp-overlay "${UV_CACHE}"
-  --overlay-src "${GOMODCACHE}" --tmp-overlay "${GOMODCACHE}"
+  --bind "${UV_CACHE_COPY}" "${UV_CACHE}"
+  --ro-bind "${GO_DOWNLOAD_CACHE}" "${GO_DOWNLOAD_CACHE}"
   --bind "${WORK}" "${WORK}"
   --tmpfs /sandbox-home
   --tmpfs /sandbox-tmp
   --tmpfs /sandbox-gocache
+  --tmpfs /sandbox-gomodcache
 )
 for opt in "${USERBASE}/bin" "${USERBASE}/lib" "${GO_BIN_DIR}"; do
   [ -d "${opt}" ] && BIND_ARGS+=(--ro-bind "${opt}" "${opt}")
@@ -161,7 +189,7 @@ exec bwrap \
   --setenv UV_OFFLINE 1 \
   --setenv UV_LINK_MODE copy \
   --setenv PYTHONUSERBASE "${USERBASE}" \
-  --setenv GOMODCACHE "${GOMODCACHE}" \
+  --setenv GOMODCACHE /sandbox-gomodcache \
   --setenv GOCACHE /sandbox-gocache \
   --setenv GOPATH /sandbox-home/go \
   --setenv GOPROXY "file://${GO_DOWNLOAD_CACHE}" \
