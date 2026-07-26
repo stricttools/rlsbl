@@ -311,15 +311,17 @@ class TestComputeReleaseVersionReleasable:
         # target.monorepo_tag_format should NOT have been called
         mock_target.monorepo_tag_format.assert_not_called()
 
+    @patch("rlsbl.commands.release.tag_exists_locally", return_value=False)
     @patch("rlsbl.commands.release.run")
-    def test_no_releasable_tag_fmt_uses_target_tag(self, mock_run):
+    def test_no_releasable_tag_fmt_uses_target_tag(self, mock_run, _tag_local):
         """Without releasable_tag_fmt, falls back to target tag format."""
         from rlsbl.commands.release.validate import compute_release_version
 
         mock_target = MagicMock()
         mock_target.read_version.return_value = "1.0.0"
         mock_target.tag_format.return_value = "v1.0.0"
-        # First call: tag doesn't exist (first release)
+        # First release: the local tag does not exist yet (tag_exists_locally
+        # is mocked so this unit test does not depend on the process-cwd repo).
         mock_run.side_effect = ["", ""]
 
         _cur, _new, _bump, tag = compute_release_version(

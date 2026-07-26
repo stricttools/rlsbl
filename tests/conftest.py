@@ -34,6 +34,63 @@ import pytest
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
+def pytest_configure(config):
+    """Session guard: refuse to run if the temp root is inside the repository.
+
+    The Jul junk-commit incidents happened because a TMPDIR (or pytest
+    basetemp) pointed inside the repo: fixtures created non-git directories
+    there, and unanchored git commands walked UP into the real repo and
+    committed junk. Fail loudly at startup rather than let that recur.
+    """
+    config.addinivalue_line(
+        "markers",
+        "repo_cwd: opt a test OUT of the autouse tmp-cwd isolation. Reserved "
+        "for the irreducible CLI-wiring tests that dispatch commands through "
+        "app.test() and must resolve the real rlsbl project from the process "
+        "cwd (and record strictcli coverage into the App-construction repo).",
+    )
+    candidates = []
+    basetemp = getattr(config.option, "basetemp", None)
+    if basetemp:
+        candidates.append(Path(basetemp))
+    tmpdir = os.environ.get("TMPDIR")
+    if tmpdir:
+        candidates.append(Path(tmpdir))
+    for cand in candidates:
+        try:
+            resolved = cand.resolve()
+        except OSError:
+            continue
+        if resolved == _REPO_ROOT or _REPO_ROOT in resolved.parents:
+            raise pytest.UsageError(
+                f"TMPDIR/basetemp {resolved} is inside the repository "
+                f"{_REPO_ROOT} -- refusing. Fixture temp dirs inside the repo "
+                f"let unanchored git commands walk up into the real repo and "
+                f"commit junk (the Jul junk-commit incidents). Point TMPDIR at a "
+                f"location OUTSIDE the repository and re-run."
+            )
+
+
+@pytest.fixture(autouse=True)
+def _chdir_into_tmp(request, tmp_path, monkeypatch):
+    """Autouse: never let a test run with the process cwd at the real repo.
+
+    A test whose process cwd is the real repo can make every unanchored git
+    command (status/commit/push, changelog regeneration, release-file
+    scaffolding) operate on the dev repo. Chdir-ing each test into its own
+    ``tmp_path`` makes implicit repo-cwd reliance a visible failure instead of
+    silent real-repo pollution. Fixtures that chdir into their own tmp_path
+    (the same ``tmp_path`` object) compose cleanly -- they land in the same
+    directory. Tests that genuinely need the repo cwd must anchor explicitly, or
+    opt out with ``@pytest.mark.repo_cwd`` (the CLI-wiring tests).
+    """
+    if request.node.get_closest_marker("repo_cwd") is not None:
+        yield
+        return
+    monkeypatch.chdir(tmp_path)
+    yield
+
+
 def _remote_is_local(url: str | None) -> bool:
     """Classify a git remote URL/path as local (allowed) or non-local (blocked).
 

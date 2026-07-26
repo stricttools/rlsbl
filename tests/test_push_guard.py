@@ -114,3 +114,38 @@ class TestGuardKillsNonLocalPush:
             cwd=str(work), capture_output=True, text=True,
         )
         assert result.returncode == 0, result.stderr
+
+
+class TestTmpdirSessionGuard:
+    """conftest.pytest_configure refuses a temp root inside the repository
+    (the Jul junk-commit incidents)."""
+
+    def _fake_config(self):
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            option=SimpleNamespace(basetemp=None),
+            addinivalue_line=lambda *a, **k: None,
+        )
+
+    def test_basetemp_inside_repo_rejected(self, monkeypatch):
+        import conftest
+        monkeypatch.delenv("TMPDIR", raising=False)
+        cfg = self._fake_config()
+        cfg.option.basetemp = str(conftest._REPO_ROOT / "some" / "tmp")
+        with pytest.raises(pytest.UsageError, match="inside the repository"):
+            conftest.pytest_configure(cfg)
+
+    def test_tmpdir_env_inside_repo_rejected(self, monkeypatch):
+        import conftest
+        monkeypatch.setenv("TMPDIR", str(conftest._REPO_ROOT / "nested"))
+        cfg = self._fake_config()
+        with pytest.raises(pytest.UsageError, match="inside the repository"):
+            conftest.pytest_configure(cfg)
+
+    def test_tmpdir_outside_repo_accepted(self, monkeypatch, tmp_path):
+        import conftest
+        # tmp_path is under the pytest basetemp (outside the repo).
+        monkeypatch.setenv("TMPDIR", str(tmp_path))
+        cfg = self._fake_config()
+        # Must NOT raise.
+        conftest.pytest_configure(cfg)

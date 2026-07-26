@@ -27,6 +27,13 @@ import pytest
 
 import rlsbl
 
+# These tests dispatch real CLI commands through ``app.test()`` and rely on the
+# process cwd being the real rlsbl project: the pre-dispatch handler bodies
+# resolve the project root from cwd, and strictcli coverage is recorded into the
+# App-construction repo. They are the documented exception to the autouse
+# tmp-cwd isolation in conftest, so the whole module opts out.
+pytestmark = pytest.mark.repo_cwd
+
 app = rlsbl.app
 
 
@@ -182,10 +189,26 @@ class TestReleaseFlagSurface:
         def __init__(self, name):
             self.name = name
 
-    def test_release_run_quick_bump_flag_surface(self):
+    @staticmethod
+    def _clean_project(tmp_path, monkeypatch):
+        """Chdir into a minimal rlsbl project with NO release file.
+
+        The quick-bump path refuses when a release file exists; the real dev
+        repo carries an in-flight unreleased.toml during active development, so
+        these flag-surface tests must run against a clean project cwd. Coverage
+        still records into the App-construction repo regardless of chdir.
+        """
+        (tmp_path / ".rlsbl").mkdir()
+        (tmp_path / ".rlsbl" / "config.json").write_text(
+            '{"publish_mode": "ci", "targets": ["pypi"]}\n'
+        )
+        monkeypatch.chdir(tmp_path)
+
+    def test_release_run_quick_bump_flag_surface(self, tmp_path, monkeypatch):
         # --bump quick mode bypasses the release file. Patch detect_targets so
         # the flag surface is exercised deterministically regardless of what
         # this repo detects.
+        self._clean_project(tmp_path, monkeypatch)
         with patch("rlsbl.commands.release.run_cmd") as m, \
              patch("rlsbl.targets.detect_targets", return_value=[self._Target("pypi")]):
             result = app.test(
@@ -198,7 +221,8 @@ class TestReleaseFlagSurface:
         assert flags["watch"] is True
         assert flags["watch-async"] is False
 
-    def test_release_run_watch_async_flag_surface(self):
+    def test_release_run_watch_async_flag_surface(self, tmp_path, monkeypatch):
+        self._clean_project(tmp_path, monkeypatch)
         with patch("rlsbl.commands.release.run_cmd") as m, \
              patch("rlsbl.targets.detect_targets", return_value=[self._Target("pypi")]):
             result = app.test(

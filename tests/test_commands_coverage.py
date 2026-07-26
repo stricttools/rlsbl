@@ -897,8 +897,12 @@ class TestReleaseRunCmdExceptionHandling:
 class TestReleaseEnvFile:
     """Covers lines 128-131: env_file loading and CF_ACCOUNT_ID aliasing."""
 
-    def test_env_file_loads_and_aliases_cf(self, monkeypatch, tmp_path):
+    def test_env_file_loads_and_aliases_cf(self, monkeypatch, tmp_path, mock_git_repo):
         from rlsbl.commands.release import _run_cmd_inner
+
+        # mock_git_repo initializes a git repo at the process cwd so the release
+        # flow's ``git status --porcelain`` (run in the process cwd) succeeds
+        # under the autouse tmp-cwd isolation.
 
         # Create env file
         env_file = tmp_path / ".env"
