@@ -287,10 +287,22 @@ class TestUndoLocalTagDeleteFails:
 
 
 class TestUndoRevertException:
-    """Covers lines 202-204: git revert throws exception."""
+    """Covers lines 202-204: git revert throws exception.
+
+    Regression: this class previously mocked ``run``/``run_gh`` but NOT
+    ``push_if_needed``/``get_current_branch``. With ``flags={"yes": True}`` the
+    undo flow reaches the push step, so an unmocked ``push_if_needed`` executed
+    a REAL ``git push origin main`` from whatever repo the test process was in
+    (the real rlsbl dev repo). The push result was swallowed, so the test
+    passed either way and the pollution went unnoticed. The two missing patches
+    below (matching the neighboring classes) close the hole; the conftest
+    push-guard is the belt-and-braces backstop.
+    """
 
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
+    @patch(f"{MOD_UNDO}.push_if_needed")
+    @patch(f"{MOD_UNDO}.get_current_branch", return_value="main")
     @patch(f"{MOD_UNDO}.is_clean_tree", return_value=True)
     @patch(f"{MOD_UNDO}.check_gh_auth", return_value=True)
     @patch(f"{MOD_UNDO}.check_gh_installed", return_value=True)
@@ -310,6 +322,54 @@ class TestUndoRevertException:
             with patch("sys.stderr", new_callable=StringIO):
                 run_cmd("npm", [], {"yes": True}, ctx=_ctx())
         assert "FAILED" in out.getvalue()
+
+    @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
+    @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
+    @patch(f"{MOD_UNDO}.push_if_needed")
+    @patch(f"{MOD_UNDO}.get_current_branch", return_value="main")
+    @patch(f"{MOD_UNDO}.is_clean_tree", return_value=True)
+    @patch(f"{MOD_UNDO}.check_gh_auth", return_value=True)
+    @patch(f"{MOD_UNDO}.check_gh_installed", return_value=True)
+    @patch(f"{MOD_UNDO}.run_gh", return_value="")
+    @patch(f"{MOD_UNDO}.run")
+    def test_undo_spawns_no_push_subprocess(
+        self, mock_run, _run_gh, _clean, _branch, _push, *_,
+    ):
+        """The undo flow must never spawn a real ``git push`` subprocess.
+
+        Belt-and-braces with the conftest push-guard: even with the mocks in
+        place, assert that no ``git push`` reached the subprocess boundary. If
+        a future change reintroduces an unmocked push, this catches it directly
+        (rather than relying on the guard's non-local classification).
+        """
+        from rlsbl.commands.undo import run_cmd
+
+        mock_run.side_effect = [
+            "v1.0.0",
+            "",                                # git push origin :v1.0.0 (tag delete)
+            "",                                # git tag -d
+            "v1.0.0",                         # git log
+            "",                                # git revert -> OK
+        ]
+
+        real_popen = subprocess.Popen
+        pushes = []
+
+        def _spy_popen(cmd, *a, **kw):
+            if isinstance(cmd, (list, tuple)) and \
+                    os.path.basename(str(cmd[0])) == "git" and \
+                    "push" in [str(c) for c in cmd]:
+                pushes.append(list(cmd))
+            return real_popen(cmd, *a, **kw)
+
+        with patch("subprocess.Popen", side_effect=_spy_popen):
+            with patch("sys.stdout", new_callable=StringIO):
+                with patch("sys.stderr", new_callable=StringIO):
+                    run_cmd("npm", [], {"yes": True}, ctx=_ctx())
+
+        # push_if_needed is mocked, so it is invoked (belt) but spawns nothing.
+        assert _push.called, "expected the undo flow to reach the push step"
+        assert pushes == [], f"undo spawned real git push subprocess(es): {pushes}"
 
 
 class TestUndoChangelogRestoreFails:
