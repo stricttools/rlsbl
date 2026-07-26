@@ -2,6 +2,21 @@
 
 # Changelog
 
+## 0.110.2
+
+CI-portable hermetic test sandbox; ships the full 0.110 cycle to registries
+
+<details>
+<summary>Context</summary>
+
+v0.110.0/v0.110.1 were gate-blocked by red CI (the new sandbox needed runner portability work: bwrap 0.11 source build + AppArmor sysctl, pinned Go with GOTOOLCHAIN=local, pinned uv, git-filter-repo on the runner, fixture dependency + PEP-517 build-backend cache warming, checkout credential persistence disabled); this patch completes it -- the full suite now runs inside the read-only no-network sandbox on CI, and the publish gate certifies it.
+
+</details>
+
+### Infrastructure
+
+- CI-portable hermetic test sandbox; ships the full 0.110 cycle to registries
+
 ## 0.110.1
 
 Portable test sandbox: CI-compatible bwrap flags (fix-forward for the unpublished v0.110.0)
