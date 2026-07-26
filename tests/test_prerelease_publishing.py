@@ -438,11 +438,8 @@ class TestPrePushPrerelease:
 
     def test_repo_has_in_progress_release_detects_state_file(self, tmp_path):
         """repo_has_in_progress_release reflects the actual state file."""
-        from rlsbl.commands.release.release_state import (
-            get_state_path,
-            repo_has_in_progress_release,
-            save_release_state,
-        )
+        from rlsbl.release_file import repo_has_in_progress_release
+        from rlsbl.commands.release.release_state import get_state_path, save_release_state
 
         assert repo_has_in_progress_release(str(tmp_path)) is False
         save_release_state(get_state_path(str(tmp_path)), {"completed_steps": []})

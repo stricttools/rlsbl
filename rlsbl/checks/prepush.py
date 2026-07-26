@@ -173,7 +173,7 @@ def register_prepush_checks(app):
         if ctx.push_stdin is None:
             return reporter.skipped("not in push context")
 
-        from ..commands.release.release_state import repo_has_in_progress_release
+        from ..release_file import repo_has_in_progress_release
 
         stdin_lines = ctx.push_stdin.strip().splitlines()
         release_branches = _get_release_branches(ctx)

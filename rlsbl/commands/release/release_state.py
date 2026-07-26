@@ -232,33 +232,6 @@ def resolve_resume_source(workspace_root, cwd=".") -> tuple[str, str]:
     return project_dir, state_path
 
 
-def repo_has_in_progress_release(project_dir, workspace_root=None) -> bool:
-    """Return True if any in-progress release state file exists for this repo.
-
-    Used to tie the ``RLSBL_RELEASE_PUSH`` pre-push bypass to reality: the
-    bypass is honored only during an actual release (which writes
-    ``in-progress.json`` at the start of its mutating phase), never on the bare
-    presence of the env var. Checks every location the state file can live:
-
-    - Explicit-monorepo releasable state files under
-      ``<ws>/.rlsbl-monorepo/releasables/*/releases/in-progress.json``.
-    - The releasable-aware or implicit-package/standalone location resolved for
-      ``project_dir``.
-    - The legacy per-project ``<project_dir>/.rlsbl/releases/in-progress.json``.
-    """
-    if workspace_root is not None and find_releasable_state_files(workspace_root):
-        return True
-    rel_dir = (
-        resolve_releasable_dir(project_dir, workspace_root)
-        if workspace_root is not None else None
-    )
-    if os.path.isfile(get_state_path(project_dir, releasable_dir=rel_dir)):
-        return True
-    if os.path.isfile(get_state_path(project_dir)):
-        return True
-    return False
-
-
 def find_releasable_state_files(workspace_root) -> list[tuple[str, str]]:
     """Scan all releasables in a workspace for in-progress release state.
 
