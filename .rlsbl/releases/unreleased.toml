@@ -1,9 +1,16 @@
 # Version bump type: patch, minor, major, infra, or prerelease
-bump = ""
+bump = "infra"
 # Short description of this release (required)
-description = ""
+description = "CI-portable hermetic test sandbox; ships the full 0.110 cycle to registries"
 # Optional context explaining why these changes were made
-context = ""
+context = """
+v0.110.0/v0.110.1 were gate-blocked by red CI (the new sandbox needed runner \
+portability work: bwrap 0.11 source build + AppArmor sysctl, pinned Go with \
+GOTOOLCHAIN=local, pinned uv, git-filter-repo on the runner, fixture dependency \
++ PEP-517 build-backend cache warming, checkout credential persistence disabled); \
+this patch completes it -- the full suite now runs inside the read-only no-network \
+sandbox on CI, and the publish gate certifies it.
+"""
 # Pre-release identifier: alpha, beta, rc, or stable
 # preid = ""
 # Set to true to generate a blog post for this release
