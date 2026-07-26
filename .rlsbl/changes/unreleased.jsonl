@@ -61,3 +61,4 @@
 {"id":"18c5e780f6367fc5101ddcb7818a47e988d68a3992418405","commits":["603816712d7f9682f3eebb78c94b3620997f738b"],"user_facing":false}
 {"id":"18c5e780fe641a27e53e2ea35eb8445189cb4082d0785265","commits":["b051ce00c3b5b5a60dd73256c8313ce81667b171"],"user_facing":true,"description":"**Sandboxed test runner.** `scripts/test.sh` runs the suite inside a bwrap sandbox with the repo read-only, a throwaway writable copy, private tmpfs, and no network.","type":"feature"}
 {"id":"18c5e7d0a961c8321c50a3189c7e4953ba41c311aa715306","commits":["2c1fd2455bb0be6e2262334f02e00afee0d4ce06"],"user_facing":false}
+{"id":"18c5e7e9fc52f52e7a39ac2380ac41bf9288b853b25b37f7","commits":["a9648e8d6ff94be2f7342065ca54a7ec8f413852"],"user_facing":false}
