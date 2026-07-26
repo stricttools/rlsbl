@@ -26,7 +26,17 @@ jobs:
       UV_PYTHON: ${{ matrix.python-version }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          # Don't leave the authenticated token in .git/config. The suite runs
+          # git operations inside a throwaway copy of the tree; a persisted
+          # credential is a needless secret in the working copy (defense in
+          # depth regardless of the sandbox's --unshare-net).
+          persist-credentials: false
       - uses: astral-sh/setup-uv@v7
+        with:
+          # Pin uv (was unpinned-latest -- the least-controlled CI input). Keep
+          # in lockstep with the dev-box uv (`uv --version`). Bump deliberately.
+          version: "0.9.17"
       # Pin a Go >= safegit's go.mod floor (currently go 1.25.7). scripts/test.sh
       # runs with GOTOOLCHAIN=local (no toolchain auto-download), so the runner's
       # OWN Go must already satisfy that floor -- otherwise the offline
@@ -45,6 +55,48 @@ jobs:
         run: |
           GITLEAKS_VERSION=8.24.3
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar xz -C /usr/local/bin gitleaks
+      # git-filter-repo backs the monorepo extract/absorb flows. The apt package
+      # installs the `git-filter-repo` command into /usr (inside the sandbox's
+      # read-only /usr bind and on its PATH), so scripts/test.sh needs no change.
+      # rlsbl shells out to the command and the tests skip on
+      # shutil.which("git-filter-repo") -- so installing it here un-skips several
+      # @skip_no_filter_repo classes on CI for the first time (extract/absorb/
+      # migrate-releasable integration tests). That is desired coverage.
+      - name: Install git-filter-repo
+        run: sudo apt-get update && sudo apt-get install -y git-filter-repo
+      # Warm the uv cache for the FIXTURE projects' fresh dependency resolution.
+      # The `uv sync --locked` above warms rlsbl's own wheels from the lockfile,
+      # but a locked sync does NOT populate the simple-index METADATA buckets
+      # (simple-v*) that a *fresh* (lockfile-less) resolution needs. Several
+      # tests drive the real release flow, whose built-in test step runs
+      # `uv run python -m pytest` inside a throwaway fixture project that has no
+      # lockfile -- so uv must resolve from scratch, and under the sandbox's
+      # UV_OFFLINE that fails unless the metadata is already cached. We warm it
+      # by doing one throwaway fresh `uv lock && uv sync` (network) declaring the
+      # UNION of deps those fixtures introduce.
+      #
+      # Fixture-dep union (add here when a NEW uv-running fixture declares a dep
+      # NOT already in rlsbl's own dependency tree):
+      #   - pytest  -> tests/test_prerelease_integration.py (full-flow x2),
+      #                tests/test_release_hooks.py (release-flow hook tests)
+      # click/tomlkit/strictcli fixtures resolve fine because they ARE rlsbl
+      # runtime deps (their metadata is already in the cache); only pytest is a
+      # dev-only dep absent from a fresh index warm.
+      - name: Warm uv cache for fixture-project resolution
+        run: |
+          set -euo pipefail
+          WARM="$(mktemp -d)"
+          cat > "${WARM}/pyproject.toml" <<'EOF'
+          [project]
+          name = "rlsbl-fixture-cache-warm"
+          version = "0.0.0"
+          requires-python = ">=3.11"
+
+          [dependency-groups]
+          dev = ["pytest"]
+          EOF
+          uv lock --directory "${WARM}"
+          uv sync --directory "${WARM}"
       # Layer 3: run the suite inside the same bwrap sandbox as local dev
       # (scripts/test.sh) -- repo read-only, throwaway writable copy, no network.
       #
