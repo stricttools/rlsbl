@@ -2,6 +2,18 @@
 
 # Changelog
 
+## Unreleased
+
+### Breaking
+
+- **Release files now require a `format_version` field.** `.rlsbl/releases/unreleased.toml` must carry `format_version = 1`; `rlsbl release init` stamps it automatically. An in-flight release file created before this change is rejected until you re-run `rlsbl release init` to re-scaffold it.
+
+### Features
+
+- **npm launcher first-run download mode.** Launcher pipelines now take a required `download` key (`"first-run"` or `"postinstall"`). In `first-run` mode the npm wrapper does zero network I/O at install time and lazily downloads its checksum-verified binary on the first CLI invocation, caching it under a platform cache dir; `postinstall` keeps the install-time download. PyPI launchers may only use `first-run`.
+- **strictspec certificate deploy gate.** A new opt-in preflight check, `strictspec-certificate-gate`, consumes a strictspec `strictspec diff` certificate as a `format_version` deploy gate. Enable it by adding a `strictspec_gate` section (a `certificate` path, and optionally an `adjudication` file) to `.rlsbl/config.json`; projects without the section are unaffected. A `violated` claim blocks the release, `corpus-supported`/`proven` claims pass, and any otherwise-unsupported claim must be discharged by a committed adjudication file. A configured-but-missing or malformed certificate or adjudication file is a hard error.
+- **Release files are validated with strictspec.** `.rlsbl/releases/unreleased.toml` is now checked against a strictspec schema before parsing, so a malformed file, an invalid `bump`/`mode` enum value, an unknown key, or overlapping `include`/`exclude` targets is rejected with precise, field-level diagnostics.
+
 ## 0.110.2
 
 CI-portable hermetic test sandbox; ships the full 0.110 cycle to registries
