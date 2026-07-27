@@ -467,6 +467,7 @@ class TestSharedValidationViaPublicAPIs:
         # Single-project file
         single = tmp_path / "single.toml"
         single.write_text(
+            'format_version = 1\n'
             'bump = "minor"\n'
             'include = ["pypi", "npm"]\n'
             'exclude = ["go"]\n'
