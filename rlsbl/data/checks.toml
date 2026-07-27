@@ -589,3 +589,15 @@ fast = true
 pure = true
 needs_network = false
 depends_on = ["config-schema"]
+
+# strictspec certificate deploy gate: consumes a configured strictspec diff
+# certificate (format_version gate). Feature-flagged by config presence -- skips
+# when the project has no strictspec_gate section. Pure (parses committed JSON/
+# TOML, no subprocess or network). In "preflight" so it blocks a release.
+[checks.strictspec-certificate-gate]
+tags = ["project", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = ["config-schema"]

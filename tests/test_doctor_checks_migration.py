@@ -97,6 +97,8 @@ EXPECTED_CHECKS = [
     "mixed-tag-schemes",
     # Launcher pipeline checks
     "wrapper-producer",
+    # strictspec certificate deploy gate
+    "strictspec-certificate-gate",
 ]
 
 # ``cli-test-coverage`` is a strictcli framework BUILT-IN check provider,

@@ -250,6 +250,7 @@ def register_checks(app):
     from .workspace import register_workspace_checks
     from .quality import register_quality_checks
     from .prepush import register_prepush_checks
+    from .strictspec_gate import register_strictspec_gate_checks
 
     register_project_checks(app)
     register_release_checks(app)
@@ -257,3 +258,4 @@ def register_checks(app):
     register_workspace_checks(app)
     register_quality_checks(app)
     register_prepush_checks(app)
+    register_strictspec_gate_checks(app)

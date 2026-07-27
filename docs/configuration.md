@@ -24,8 +24,35 @@ Project-level configuration file created by `rlsbl config init` or `rlsbl scaffo
 | check_timeout | int | Timeout in seconds for check subprocesses (built-in tests, etc.). Default: 120. Overridable per-invocation via the `RLSBL_CHECK_TIMEOUT` env var (precedence: env > config > default). A declared budget, not a bypass — the check still hard-fails on a real hang. |
 | test | object | Per-target test-selection filters. See [test](#test) below. |
 | external_checks | array | Config-declared subprocess checks that run during `rlsbl check` and the release preflight. Each entry declares a `kind` (`structured` or `freeform`). See [external_checks](#external_checks) below. |
+| strictspec_gate | object | Opt-in [strictspec certificate deploy gate](#strictspec_gate). Consumes a `strictspec diff` certificate as a `format_version` gate. See below. |
 
 Configuration precedence for tagging: CLI flag (`--no-tag`) > project config > user config (`~/.rlsbl/config.json`) > default (true).
+
+### strictspec_gate
+
+The `strictspec_gate` object opts a project into the strictspec **certificate deploy gate**, a built-in preflight check (`strictspec-certificate-gate`) that consumes a [`strictspec diff`](https://github.com/smm-h/strictspec) certificate as a `format_version` deploy gate. Projects without this section are untouched — the check skips.
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `certificate` | string | Yes | Path (relative to the project root) to the strictspec diff certificate JSON. A missing or malformed file is a hard error. |
+| `adjudication` | string | No | Path to a committed adjudication file (a gated strictspec TOML document) that discharges unsupported claims for a no-corpus consumer. |
+
+The gate applies strictspec's evidence-grade rule (decision 25):
+
+- a claim graded `violated` (a corpus document IS the counterexample) **blocks** the release;
+- `corpus-supported` and `proven` are the **green light**;
+- any other (unsupported) claim must be discharged by a matching entry in the `adjudication` file — an unsupported, unadjudicated claim **blocks**. There is no bypass.
+
+The certificate itself is un-gated by design (it carries `certificate_format_version`, not a document `format_version`), so rlsbl parses it as plain JSON and inspects the claim grades. The adjudication file, by contrast, is a gated strictspec document and is validated against rlsbl's shipped adjudication schema.
+
+```json
+{
+  "strictspec_gate": {
+    "certificate": ".rlsbl/strictspec/certificate.json",
+    "adjudication": ".rlsbl/strictspec/adjudication.toml"
+  }
+}
+```
 
 ### batch_limits
 
