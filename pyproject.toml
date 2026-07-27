@@ -10,6 +10,7 @@ keywords = ["release", "npm", "pypi", "go", "goreleaser", "publish", "cli", "sca
 dependencies = [
     "ruamel-yaml",
     "strictcli",
+    "strictspec>=0.1.0",
     "tomlkit>=0.12",
     "tree-sitter>=0.24",
     "tree-sitter-go>=0.23",

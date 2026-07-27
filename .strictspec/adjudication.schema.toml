@@ -1,0 +1,73 @@
+# strictspec schema for a diff-certificate ADJUDICATION file consumed by
+# rlsbl's certificate deploy gate. Source of truth: strictspec
+# spec/appendix-certificates.md Part B. A no-corpus consumer commits this file
+# to discharge otherwise-unsupported claims. It is itself a gated strictspec
+# TOML document (it carries format_version).
+
+name = "rlsbl-strictspec-adjudication"
+meta_version = 1
+format_version = 1
+document_syntax = "toml"
+role = "schema"
+root = "Adjudication"
+targets = ["python"]
+description = "A committed adjudication file that discharges unsupported diff-certificate claims for a no-corpus consumer."
+
+[types.Adjudication]
+type = "record"
+
+[types.Adjudication.fields.schema_id]
+type = "string"
+required = true
+non_empty = true
+description = "The schema whose migration is being adjudicated."
+
+[types.Adjudication.fields.old_format_version]
+type = "integer"
+required = true
+description = "N."
+
+[types.Adjudication.fields.new_format_version]
+type = "integer"
+required = true
+description = "N+1."
+
+[types.Adjudication.fields.adjudications]
+type = "array"
+required = true
+min_len = 1
+description = "One entry per unsupported claim being discharged."
+[types.Adjudication.fields.adjudications.item]
+type = "AdjudicationEntry"
+
+[types.AdjudicationEntry]
+type = "record"
+
+[types.AdjudicationEntry.fields.claim_kind]
+type = "enum"
+required = true
+values = ["flip-scan", "migrate-round-trip-soundness", "migrate-round-trip-completeness", "down-taxonomy"]
+description = "Which claim is discharged (matches certificate claim kind)."
+
+[types.AdjudicationEntry.fields.scope]
+type = "string"
+required = true
+non_empty = true
+description = "The precise scope of the claim being discharged."
+
+[types.AdjudicationEntry.fields.justification]
+type = "string"
+required = true
+non_empty = true
+description = "The signed manual justification -- why this claim is safe absent corpus evidence."
+
+[types.AdjudicationEntry.fields.author]
+type = "string"
+required = true
+non_empty = true
+description = "Who adjudicated."
+
+[types.AdjudicationEntry.fields.date]
+type = "date"
+required = true
+description = "When (RFC 3339 full-date)."

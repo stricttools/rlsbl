@@ -1,0 +1,29 @@
+# strictspec manifest for rlsbl. Generation is file-driven: declare each schema
+# and its targets, then run `strictspec gen`. Generated validators land under
+# rlsbl/strictspec_gen/ (committed, read-only 0444). `strictspec check` verifies
+# schema authoring validity and generated-code freshness.
+format_version = 1
+
+[[schemas]]
+path = ".strictspec/release-file.schema.toml"
+
+  [[schemas.targets]]
+  lang    = "python"
+  output  = "rlsbl/strictspec_gen/release_file_validator.py"
+  package = "rlsbl.strictspec_gen"
+
+[[schemas]]
+path = ".strictspec/config.schema.toml"
+
+  [[schemas.targets]]
+  lang    = "python"
+  output  = "rlsbl/strictspec_gen/config_validator.py"
+  package = "rlsbl.strictspec_gen"
+
+[[schemas]]
+path = ".strictspec/adjudication.schema.toml"
+
+  [[schemas.targets]]
+  lang    = "python"
+  output  = "rlsbl/strictspec_gen/adjudication_validator.py"
+  package = "rlsbl.strictspec_gen"

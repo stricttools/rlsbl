@@ -1,0 +1,280 @@
+# strictspec schema for the rlsbl project config (.rlsbl/config.json).
+# Source of truth: rlsbl/config.py (validate_config_schema,
+# validate_pipelines_config, validate_pipeline_target_links) and
+# rlsbl/external_checks.py (validate_external_checks).
+#
+# SCOPE (honest subset): this schema models the CORE, well-understood document
+# shape -- publish_mode, targets, pipelines, external_checks, coverage_unit.
+# It is NOT wired into config reading yet: (1) the fleet's config.json files do
+# not carry the mandatory strictspec format_version gate, and (2) the full
+# config surface has additional sections (services, test_env, batch_limits,
+# deploy, test, ...) plus cross-layer merge semantics (config.merge_config,
+# releasable inheritance) that strictspec cannot see. Those remain native.
+# Full wiring lands with the fleet-wide format_version stamp.
+
+name = "rlsbl-config"
+meta_version = 1
+format_version = 1
+document_syntax = "json"
+role = "schema"
+root = "Config"
+targets = ["python"]
+description = "Per-project rlsbl configuration: publish mode, targets, publish pipelines, and config-declared external checks (core document shape)."
+
+[types.Config]
+type = "record"
+
+[types.Config.fields.publish_mode]
+type = "enum"
+required = true
+values = ["ci", "none"]
+description = "Required, no default (get_publish_mode raises when absent). \"ci\" publishes via CI; \"none\" suppresses."
+
+[types.Config.fields.targets]
+type = "array"
+required = false
+description = "Release targets. Each element is a bare string OR a {name,path} record. An empty list is additionally rejected natively."
+[types.Config.fields.targets.item]
+type = "TargetRef"
+
+[types.Config.fields.pipelines]
+type = "map"
+required = false
+key_pattern = "^[A-Za-z0-9_-]+$"
+description = "Publish pipelines keyed by pipeline name."
+[types.Config.fields.pipelines.value]
+type = "Pipeline"
+
+[types.Config.fields.external_checks]
+type = "array"
+required = false
+description = "Config-declared subprocess checks (a discriminated union per entry)."
+[types.Config.fields.external_checks.item]
+type = "ExternalCheck"
+
+[types.Config.fields.coverage_unit]
+type = "enum"
+required = false
+values = ["commit", "changeset-file"]
+description = "Changelog coverage mode."
+
+# external_check names unique across the list.
+[[types.Config.constraints]]
+form = "unique-by"
+collection = "external_checks"
+field = "name"
+normalization = "none"
+
+# --- named types ---
+
+# TargetRef -- a node-kind union: a bare string, or a {name,path} record.
+[types.TargetRef]
+type = "node-kind-union"
+description = "String form (target name) OR record form."
+[types.TargetRef.arms.string]
+type = "string"
+[types.TargetRef.arms.record]
+type = "TargetObject"
+
+[types.TargetObject]
+type = "record"
+[types.TargetObject.fields.name]
+type = "string"
+required = true
+non_empty = true
+[types.TargetObject.fields.path]
+type = "string"
+required = false
+
+# Pipeline -- mandatory type/local, mandatory target link, conditional keys.
+[types.Pipeline]
+type = "record"
+
+[types.Pipeline.fields.type]
+type = "enum"
+required = true
+values = ["cargo", "cloudflare-pages", "deno", "docker", "go", "hex", "maven", "maven-central", "npm", "pypi"]
+description = "Pipeline kind (PIPELINE_TYPES). Required."
+
+[types.Pipeline.fields.local]
+type = "boolean"
+required = true
+description = "Whether the pipeline runs locally. Required (no default)."
+
+[types.Pipeline.fields.target]
+type = "nullable"
+required = true
+description = "Target name (must resolve in Config.targets) or null (targetless publisher)."
+[types.Pipeline.fields.target.inner]
+type = "string"
+
+[types.Pipeline.fields.provenance]
+type = "boolean"
+required = false
+description = "npm provenance. Required WHEN type == \"npm\"."
+
+[types.Pipeline.fields.artifact]
+type = "enum"
+required = false
+values = ["binary", "library", "launcher"]
+description = "Artifact kind. Required WHEN type == \"go\". \"launcher\" wraps a sibling binary pipeline."
+
+[types.Pipeline.fields.wraps]
+type = "string"
+required = false
+description = "For a launcher: the sibling pipeline whose artifact is \"binary\". Required WHEN artifact == \"launcher\"."
+
+[types.Pipeline.fields.binary_source]
+type = "enum"
+required = false
+values = ["github-release"]
+description = "For a launcher: where the wrapped binary comes from. Required WHEN artifact == \"launcher\"."
+
+[types.Pipeline.fields.download]
+type = "enum"
+required = false
+values = ["first-run", "postinstall"]
+description = "For a launcher: how the wrapped binary is fetched. Required WHEN artifact == \"launcher\"."
+
+[types.Pipeline.fields.assets]
+type = "boolean"
+required = false
+
+[types.Pipeline.fields.max_asset_size_mb]
+type = "integer"
+required = false
+min = 1
+description = "Required WHEN assets == true OR custom_assets present."
+
+[types.Pipeline.fields.custom_assets]
+type = "array"
+required = false
+description = "Custom-built release assets."
+[types.Pipeline.fields.custom_assets.item]
+type = "CustomAsset"
+
+[types.CustomAsset]
+type = "record"
+[types.CustomAsset.fields.name]
+type = "string"
+required = true
+non_empty = true
+[types.CustomAsset.fields.build]
+type = "string"
+required = true
+non_empty = true
+
+# type == "npm" => provenance required
+[[types.Pipeline.constraints]]
+form = "conditional-required"
+field = "provenance"
+when = { field = "type", predicate = "equals", value = "npm" }
+
+# type == "go" => artifact required
+[[types.Pipeline.constraints]]
+form = "conditional-required"
+field = "artifact"
+when = { field = "type", predicate = "equals", value = "go" }
+
+# artifact == "launcher" => wraps + binary_source + download required
+[[types.Pipeline.constraints]]
+form = "conditional-required"
+field = "wraps"
+when = { field = "artifact", predicate = "equals", value = "launcher" }
+
+[[types.Pipeline.constraints]]
+form = "conditional-required"
+field = "binary_source"
+when = { field = "artifact", predicate = "equals", value = "launcher" }
+
+[[types.Pipeline.constraints]]
+form = "conditional-required"
+field = "download"
+when = { field = "artifact", predicate = "equals", value = "launcher" }
+
+# assets == true => max_asset_size_mb required
+[[types.Pipeline.constraints]]
+form = "conditional-required"
+field = "max_asset_size_mb"
+when = { field = "assets", predicate = "equals", value = true }
+
+# pipeline.target string must resolve to a Config.targets element.
+[[types.Pipeline.constraints]]
+form = "intra-document-references"
+reference = "target"
+resolves_into = "targets"
+resolves_by = "node-kind-union-key"
+description = "target names a configured release target."
+
+# ExternalCheck -- discriminated union on kind.
+[types.ExternalCheck]
+type = "discriminated-union"
+discriminator = "kind"
+description = "kind=\"structured\" (rlsbl-composed tool+paths) or kind=\"freeform\" (opaque shell command)."
+[types.ExternalCheck.arms.structured]
+type = "StructuredCheck"
+[types.ExternalCheck.arms.freeform]
+type = "FreeformCheck"
+
+[types.StructuredCheck]
+type = "record"
+[types.StructuredCheck.fields.kind]
+type = "literal"
+value = "structured"
+required = true
+[types.StructuredCheck.fields.name]
+type = "string"
+required = true
+non_empty = true
+regex = "^[a-z][a-z0-9-]*$"
+[types.StructuredCheck.fields.tag]
+type = "string"
+required = true
+non_empty = true
+[types.StructuredCheck.fields.tool]
+type = "enum"
+required = true
+values = ["mypy", "ruff-check", "ruff-format"]
+[types.StructuredCheck.fields.paths]
+type = "array"
+required = true
+min_len = 1
+[types.StructuredCheck.fields.paths.item]
+type = "string"
+[types.StructuredCheck.fields.depends_on]
+type = "array"
+required = false
+[types.StructuredCheck.fields.depends_on.item]
+type = "string"
+[types.StructuredCheck.fields.cwd]
+type = "string"
+required = false
+
+[types.FreeformCheck]
+type = "record"
+[types.FreeformCheck.fields.kind]
+type = "literal"
+value = "freeform"
+required = true
+[types.FreeformCheck.fields.name]
+type = "string"
+required = true
+non_empty = true
+regex = "^[a-z][a-z0-9-]*$"
+[types.FreeformCheck.fields.tag]
+type = "string"
+required = true
+non_empty = true
+[types.FreeformCheck.fields.command]
+type = "string"
+required = true
+non_empty = true
+description = "Opaque shell command. First-token binary existence is checked natively."
+[types.FreeformCheck.fields.depends_on]
+type = "array"
+required = false
+[types.FreeformCheck.fields.depends_on.item]
+type = "string"
+[types.FreeformCheck.fields.cwd]
+type = "string"
+required = false

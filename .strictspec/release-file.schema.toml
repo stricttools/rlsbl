@@ -1,0 +1,107 @@
+# strictspec schema for the rlsbl release file (.rlsbl/releases/unreleased.toml).
+# Source of truth: rlsbl/release_file.py (ReleaseConfig, _validate_release_config).
+# This validates the raw DOCUMENT SHAPE at read time; rlsbl keeps a small set of
+# consumer-native refinements (whitespace-only description, the flutter
+# required-mode gate) as native checks -- see rlsbl/release_file.py.
+
+name = "rlsbl-release-file"
+meta_version = 1
+format_version = 1
+document_syntax = "toml"
+role = "schema"
+root = "ReleaseConfig"
+targets = ["python"]
+description = "A single-project rlsbl release descriptor: bump type, target selection, and release prose."
+
+[types.ReleaseConfig]
+type = "record"
+
+[types.ReleaseConfig.fields.bump]
+type = "enum"
+required = true
+values = ["patch", "minor", "major", "infra", "prerelease"]
+description = "Version bump type (VALID_BUMP_TYPES)."
+
+[types.ReleaseConfig.fields.include]
+type = "array"
+required = true
+description = "Target names to release. May be empty; disjoint from exclude."
+[types.ReleaseConfig.fields.include.item]
+type = "string"
+
+[types.ReleaseConfig.fields.exclude]
+type = "array"
+required = true
+description = "Target names to skip. Disjoint from include."
+[types.ReleaseConfig.fields.exclude.item]
+type = "string"
+
+[types.ReleaseConfig.fields.targets]
+type = "map"
+required = false
+key_pattern = "^[a-z][a-z0-9-]*$"
+description = "Per-target configuration, keyed by target name. Each key must appear in include."
+[types.ReleaseConfig.fields.targets.value]
+type = "TargetConfig"
+
+[types.ReleaseConfig.fields.description]
+type = "string"
+required = true
+non_empty = true
+description = "Short summary of the release. Whitespace-only is additionally rejected natively."
+
+[types.ReleaseConfig.fields.context]
+type = "string"
+required = false
+description = "Optional multiline prose explaining why the changes were made."
+
+[types.ReleaseConfig.fields.preid]
+type = "enum"
+required = false
+values = ["alpha", "beta", "rc", "stable"]
+description = "Pre-release identifier (VALID_PREIDS). Coupled to bump (see constraints)."
+
+[types.ReleaseConfig.fields.blog]
+type = "boolean"
+required = false
+description = "Whether to generate a blog post for this release."
+
+# preid == "stable" requires bump == "prerelease".
+[[types.ReleaseConfig.constraints]]
+form = "conditional-value"
+field = "bump"
+equals_literal = "prerelease"
+when = { field = "preid", predicate = "equals", value = "stable" }
+description = "When preid == \"stable\", bump must equal \"prerelease\"."
+
+# bump == "infra" forbids preid (infra releases cannot be pre-releases).
+[[types.ReleaseConfig.constraints]]
+form = "forbidden-when"
+field = "preid"
+when = { field = "bump", predicate = "equals", value = "infra" }
+description = "infra releases cannot carry a preid."
+
+# Every key of targets must appear in include.
+[[types.ReleaseConfig.constraints]]
+form = "intra-document-references"
+reference = "targets"
+resolves_into = "include"
+resolves_by = "map-key"
+description = "A [targets.<name>] section is only valid when <name> is in include."
+
+# include and exclude must be element-disjoint.
+[[types.ReleaseConfig.constraints]]
+form = "collections-disjoint"
+left = "include"
+right = "exclude"
+normalization = "none"
+description = "No element appears in both include and exclude."
+
+# TargetConfig -- per-target overrides (only mode is recognized today).
+[types.TargetConfig]
+type = "record"
+[types.TargetConfig.fields.mode]
+type = "enum"
+required = false
+values = ["ota", "build"]
+description = "Flutter delivery mode (VALID_TARGET_MODES). The flutter required-mode gate is native."

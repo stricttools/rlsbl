@@ -214,6 +214,7 @@ source = { editable = "." }
 dependencies = [
     { name = "ruamel-yaml" },
     { name = "strictcli" },
+    { name = "strictspec" },
     { name = "tomlkit" },
     { name = "tree-sitter" },
     { name = "tree-sitter-go" },
@@ -240,6 +241,7 @@ requires-dist = [
     { name = "ruamel-yaml" },
     { name = "selfdoc-core", marker = "python_full_version >= '3.12' and extra == 'docs'" },
     { name = "strictcli" },
+    { name = "strictspec", specifier = ">=0.1.0" },
     { name = "tomlkit", specifier = ">=0.12" },
     { name = "tree-sitter", specifier = ">=0.24" },
     { name = "tree-sitter-go", specifier = ">=0.23" },
@@ -310,6 +312,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/a7/6f/0eb1ac1d526ee70cbf9edbf0ccae5650e2b9741a74cdc4fce91d36d33c74/strictcli-0.32.1.tar.gz", hash = "sha256:10644514f3c780ab601e24d64e2f25d62846948f96c5be2c2d96c97ce44d8759", size = 204878, upload-time = "2026-07-19T21:49:19.678Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ea/1a/7774bfbd522eeeb4dbdc085eeb318642ab33c0dcd178f90f5a8d6bf23ed4/strictcli-0.32.1-py3-none-any.whl", hash = "sha256:52419fc3c14da827b31f5badd00d639fb1d1c7486efc1b10231200fe2b0b0391", size = 75782, upload-time = "2026-07-19T21:49:18.289Z" },
+]
+
+[[package]]
+name = "strictspec"
+version = "0.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "tomlkit" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c9/0f/6dedf3247b60df0ccaeeeb95c16da564896843604f190b40caedf4e21b92/strictspec-0.1.0.tar.gz", hash = "sha256:d442eb93eed052b33ea52f339fed91b72f7efd244ce4c4c4bb73bb5bf9655bf2", size = 74389, upload-time = "2026-07-27T19:20:55.9Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/36/80/c9985e8a7ec573126b13e98479efe45c5a235f00727cfc19742572f848ca/strictspec-0.1.0-py3-none-any.whl", hash = "sha256:a8fcba764def9d8a02debe249f63a2289ec75a03786a3cce34e000289fb5ea42", size = 52393, upload-time = "2026-07-27T19:20:54.569Z" },
 ]
 
 [[package]]
