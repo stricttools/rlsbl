@@ -1,8 +1,7 @@
 ---
 title: rlsbl.checks.strictspec_gate
-description: "strictspec certificate deploy-gate check (tag: preflight)."
+description: "Preflight check that evaluates a configured strictspec diff certificate and blocks a release when its format_version claims are unmet."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 20
 ---
