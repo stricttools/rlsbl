@@ -109,7 +109,7 @@ def _setup_release_run_project(tmp_path):
     releases_dir = tmp_path / ".rlsbl" / "releases"
     releases_dir.mkdir(parents=True)
     (releases_dir / "unreleased.toml").write_text(
-        'bump = "patch"\ndescription = "Test release."\n'
+        'format_version = 1\nbump = "patch"\ndescription = "Test release."\n'
         'include = ["npm"]\nexclude = []\n'
     )
 
