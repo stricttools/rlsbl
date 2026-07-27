@@ -85,6 +85,7 @@ def _rc(description="test release"):
 
 
 _RELEASE_TOML = (
+    'format_version = 1\n'
     'bump = "patch"\n'
     'description = "test release"\n'
     'context = ""\n'

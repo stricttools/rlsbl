@@ -29,7 +29,7 @@ class TestGetReleaseFilePath:
 class TestReadReleaseFileValid:
     def test_minimal_file(self, tmp_path):
         f = tmp_path / "release.toml"
-        f.write_text('bump = "patch"\ninclude = ["pypi"]\nexclude = ["npm"]\ndescription = "test release"\n')
+        f.write_text('format_version = 1\nbump = "patch"\ninclude = ["pypi"]\nexclude = ["npm"]\ndescription = "test release"\n')
         cfg = read_release_file(str(f))
         assert cfg.bump == "patch"
         assert cfg.include == ["pypi"]
@@ -38,7 +38,7 @@ class TestReadReleaseFileValid:
 
     def test_empty_include_and_exclude(self, tmp_path):
         f = tmp_path / "release.toml"
-        f.write_text('bump = "minor"\ninclude = []\nexclude = []\ndescription = "test release"\n')
+        f.write_text('format_version = 1\nbump = "minor"\ninclude = []\nexclude = []\ndescription = "test release"\n')
         cfg = read_release_file(str(f))
         assert cfg.bump == "minor"
         assert cfg.include == []
@@ -48,7 +48,7 @@ class TestReadReleaseFileValid:
     def test_with_targets_section(self, tmp_path):
         f = tmp_path / "release.toml"
         f.write_text(
-            'bump = "minor"\n'
+            'format_version = 1\nbump = "minor"\n'
             'include = ["flutter"]\n'
             'exclude = ["npm"]\n'
             'description = "test release"\n'
@@ -66,14 +66,14 @@ class TestReadReleaseFileValid:
 
     def test_returns_dataclass(self, tmp_path):
         f = tmp_path / "release.toml"
-        f.write_text('bump = "major"\ninclude = []\nexclude = []\ndescription = "test release"\n')
+        f.write_text('format_version = 1\nbump = "major"\ninclude = []\nexclude = []\ndescription = "test release"\n')
         cfg = read_release_file(str(f))
         assert isinstance(cfg, ReleaseConfig)
 
     def test_all_bump_types(self, tmp_path):
         for bump in VALID_BUMP_TYPES:
             f = tmp_path / f"release_{bump}.toml"
-            f.write_text(f'bump = "{bump}"\ninclude = []\nexclude = []\ndescription = "test release"\n')
+            f.write_text(f'format_version = 1\nbump = "{bump}"\ninclude = []\nexclude = []\ndescription = "test release"\n')
             cfg = read_release_file(str(f))
             assert cfg.bump == bump
 
@@ -85,109 +85,111 @@ class TestReadReleaseFileErrors:
 
     def test_missing_bump(self, tmp_path):
         f = tmp_path / "release.toml"
-        f.write_text('include = ["pypi"]\nexclude = []\n')
+        f.write_text('format_version = 1\ninclude = ["pypi"]\nexclude = []\n')
         with pytest.raises(ReleaseFileError, match="bump"):
             read_release_file(str(f))
 
     def test_invalid_bump_value(self, tmp_path):
         f = tmp_path / "release.toml"
-        f.write_text('bump = "huge"\ninclude = []\nexclude = []\n')
+        f.write_text('format_version = 1\nbump = "huge"\ninclude = []\nexclude = []\n')
         with pytest.raises(ReleaseFileError, match="bump"):
             read_release_file(str(f))
 
     def test_missing_include(self, tmp_path):
         f = tmp_path / "release.toml"
-        f.write_text('bump = "patch"\nexclude = []\n')
+        f.write_text('format_version = 1\nbump = "patch"\nexclude = []\n')
         with pytest.raises(ReleaseFileError, match="include"):
             read_release_file(str(f))
 
     def test_missing_exclude(self, tmp_path):
         f = tmp_path / "release.toml"
-        f.write_text('bump = "patch"\ninclude = []\n')
+        f.write_text('format_version = 1\nbump = "patch"\ninclude = []\n')
         with pytest.raises(ReleaseFileError, match="exclude"):
             read_release_file(str(f))
 
     def test_include_not_list_of_strings(self, tmp_path):
         f = tmp_path / "release.toml"
-        f.write_text('bump = "patch"\ninclude = [1, 2]\nexclude = []\n')
+        f.write_text('format_version = 1\nbump = "patch"\ninclude = [1, 2]\nexclude = []\n')
         with pytest.raises(ReleaseFileError, match="include"):
             read_release_file(str(f))
 
     def test_exclude_not_list_of_strings(self, tmp_path):
         f = tmp_path / "release.toml"
-        f.write_text('bump = "patch"\ninclude = []\nexclude = [1]\n')
+        f.write_text('format_version = 1\nbump = "patch"\ninclude = []\nexclude = [1]\n')
         with pytest.raises(ReleaseFileError, match="exclude"):
             read_release_file(str(f))
 
     def test_target_in_both_include_and_exclude(self, tmp_path):
         f = tmp_path / "release.toml"
-        f.write_text('bump = "patch"\ninclude = ["pypi"]\nexclude = ["pypi"]\n')
-        with pytest.raises(ReleaseFileError, match="both include and exclude"):
+        f.write_text('format_version = 1\nbump = "patch"\ninclude = ["pypi"]\nexclude = ["pypi"]\ndescription = "x"\n')
+        with pytest.raises(ReleaseFileError, match="share no element"):
             read_release_file(str(f))
 
     def test_target_config_for_excluded_target(self, tmp_path):
         f = tmp_path / "release.toml"
         f.write_text(
-            'bump = "patch"\n'
+            'format_version = 1\nbump = "patch"\n'
             'include = ["pypi"]\n'
             'exclude = ["npm"]\n'
+            'description = "x"\n'
             "\n"
             "[targets.npm]\n"
             'mode = "ota"\n'
         )
-        with pytest.raises(ReleaseFileError, match="not in include"):
+        with pytest.raises(ReleaseFileError, match="does not resolve"):
             read_release_file(str(f))
 
     def test_target_config_for_unlisted_target(self, tmp_path):
         """A target in [targets] that isn't in include at all."""
         f = tmp_path / "release.toml"
         f.write_text(
-            'bump = "patch"\n'
+            'format_version = 1\nbump = "patch"\n'
             'include = ["pypi"]\n'
             'exclude = []\n'
+            'description = "x"\n'
             "\n"
             "[targets.flutter]\n"
             'mode = "ota"\n'
         )
-        with pytest.raises(ReleaseFileError, match="not in include"):
+        with pytest.raises(ReleaseFileError, match="does not resolve"):
             read_release_file(str(f))
 
     def test_invalid_target_mode(self, tmp_path):
         f = tmp_path / "release.toml"
         f.write_text(
-            'bump = "patch"\n'
+            'format_version = 1\nbump = "patch"\n'
             'include = ["flutter"]\n'
             'exclude = []\n'
             "\n"
             "[targets.flutter]\n"
             'mode = "deploy"\n'
         )
-        with pytest.raises(ReleaseFileError, match="invalid mode"):
+        with pytest.raises(ReleaseFileError, match="not one of"):
             read_release_file(str(f))
 
     def test_unknown_target_field(self, tmp_path):
         f = tmp_path / "release.toml"
         f.write_text(
-            'bump = "patch"\n'
+            'format_version = 1\nbump = "patch"\n'
             'include = ["flutter"]\n'
             'exclude = []\n'
             "\n"
             "[targets.flutter]\n"
             'flavor = "production"\n'
         )
-        with pytest.raises(ReleaseFileError, match="unknown field"):
+        with pytest.raises(ReleaseFileError, match="Unknown key"):
             read_release_file(str(f))
 
     def test_description_not_string(self, tmp_path):
         f = tmp_path / "release.toml"
-        f.write_text('bump = "patch"\ninclude = []\nexclude = []\ndescription = 42\n')
-        with pytest.raises(ReleaseFileError, match="description must be a string"):
+        f.write_text('format_version = 1\nbump = "patch"\ninclude = []\nexclude = []\ndescription = 42\n')
+        with pytest.raises(ReleaseFileError, match="description"):
             read_release_file(str(f))
 
     def test_context_not_string(self, tmp_path):
         f = tmp_path / "release.toml"
-        f.write_text('bump = "patch"\ninclude = []\nexclude = []\ndescription = "test release"\ncontext = true\n')
-        with pytest.raises(ReleaseFileError, match="context must be a string"):
+        f.write_text('format_version = 1\nbump = "patch"\ninclude = []\nexclude = []\ndescription = "test release"\ncontext = true\n')
+        with pytest.raises(ReleaseFileError, match="context"):
             read_release_file(str(f))
 
 
@@ -197,27 +199,27 @@ class TestReadReleaseFileDescriptionContext:
     def test_description_required(self, tmp_path):
         """Omitting description raises ReleaseFileError."""
         f = tmp_path / "release.toml"
-        f.write_text('bump = "patch"\ninclude = []\nexclude = []\n')
+        f.write_text('format_version = 1\nbump = "patch"\ninclude = []\nexclude = []\n')
         with pytest.raises(ReleaseFileError, match="description"):
             read_release_file(str(f))
 
     def test_empty_description_rejected(self, tmp_path):
         """An empty description string is rejected."""
         f = tmp_path / "release.toml"
-        f.write_text('bump = "patch"\ninclude = []\nexclude = []\ndescription = ""\n')
+        f.write_text('format_version = 1\nbump = "patch"\ninclude = []\nexclude = []\ndescription = ""\n')
         with pytest.raises(ReleaseFileError, match="description"):
             read_release_file(str(f))
 
     def test_context_defaults_empty(self, tmp_path):
         f = tmp_path / "release.toml"
-        f.write_text('bump = "patch"\ninclude = []\nexclude = []\ndescription = "test release"\n')
+        f.write_text('format_version = 1\nbump = "patch"\ninclude = []\nexclude = []\ndescription = "test release"\n')
         cfg = read_release_file(str(f))
         assert cfg.context == ""
 
     def test_description_read(self, tmp_path):
         f = tmp_path / "release.toml"
         f.write_text(
-            'bump = "patch"\ninclude = []\nexclude = []\n'
+            'format_version = 1\nbump = "patch"\ninclude = []\nexclude = []\n'
             'description = "Fix critical startup crash"\n'
         )
         cfg = read_release_file(str(f))
@@ -226,7 +228,7 @@ class TestReadReleaseFileDescriptionContext:
     def test_context_read(self, tmp_path):
         f = tmp_path / "release.toml"
         f.write_text(
-            'bump = "patch"\ninclude = []\nexclude = []\n'
+            'format_version = 1\nbump = "patch"\ninclude = []\nexclude = []\n'
             'description = "test release"\n'
             'context = "Users reported crash on iOS 17"\n'
         )
@@ -236,7 +238,7 @@ class TestReadReleaseFileDescriptionContext:
     def test_description_and_context_together(self, tmp_path):
         f = tmp_path / "release.toml"
         f.write_text(
-            'bump = "minor"\ninclude = ["pypi"]\nexclude = []\n'
+            'format_version = 1\nbump = "minor"\ninclude = ["pypi"]\nexclude = []\n'
             'description = "Add widget API"\n'
             'context = "Required for dashboard v2"\n'
         )
@@ -247,7 +249,7 @@ class TestReadReleaseFileDescriptionContext:
     def test_description_stripped(self, tmp_path):
         f = tmp_path / "release.toml"
         f.write_text(
-            'bump = "patch"\ninclude = []\nexclude = []\n'
+            'format_version = 1\nbump = "patch"\ninclude = []\nexclude = []\n'
             'description = "  whitespace around  "\n'
         )
         cfg = read_release_file(str(f))
@@ -256,7 +258,7 @@ class TestReadReleaseFileDescriptionContext:
     def test_context_stripped(self, tmp_path):
         f = tmp_path / "release.toml"
         f.write_text(
-            'bump = "patch"\ninclude = []\nexclude = []\n'
+            'format_version = 1\nbump = "patch"\ninclude = []\nexclude = []\n'
             'description = "test release"\n'
             'context = "  padded context  "\n'
         )
@@ -273,7 +275,7 @@ class TestUnfinalizeReleaseFile:
     """
 
     CONTENT = (
-        'bump = "minor"\n'
+        'format_version = 1\nbump = "minor"\n'
         'include = ["pypi"]\n'
         'exclude = []\n'
         'description = "my release"\n'
@@ -308,7 +310,7 @@ class TestUnfinalizeReleaseFile:
         """If unreleased.toml has user content that differs from the
         finalized file, it must not be deleted; warn and skip instead."""
         releases_dir, versioned, unreleased = self._finalized_state(tmp_path)
-        user_content = 'bump = "patch"\ndescription = "new work in progress"\n'
+        user_content = 'format_version = 1\nbump = "patch"\ndescription = "new work in progress"\n'
         unreleased.write_text(user_content)
 
         changed = unfinalize_release_file(str(releases_dir), "1.2.3")
@@ -365,7 +367,7 @@ class TestValidBumpTypesIncludesPrerelease:
 class TestReleaseFilePreid:
     """Tests for preid field in release file validation."""
 
-    BASE = 'bump = "{bump}"\ninclude = []\nexclude = []\ndescription = "test"\n'
+    BASE = 'format_version = 1\nbump = "{bump}"\ninclude = []\nexclude = []\ndescription = "test"\n'
 
     def test_preid_defaults_empty(self, tmp_path):
         f = tmp_path / "release.toml"
@@ -415,7 +417,7 @@ class TestReleaseFilePreid:
     def test_preid_not_string_rejected(self, tmp_path):
         f = tmp_path / "release.toml"
         f.write_text(self.BASE.format(bump="minor") + "preid = 42\n")
-        with pytest.raises(ReleaseFileError, match="preid must be a string"):
+        with pytest.raises(ReleaseFileError, match="preid"):
             read_release_file(str(f))
 
     def test_preid_with_infra_rejected(self, tmp_path):
@@ -455,3 +457,89 @@ class TestReleaseFilePreid:
         f.write_text(self.BASE.format(bump="patch") + 'preid = ""\n')
         cfg = read_release_file(str(f))
         assert cfg.preid == ""
+
+
+class TestStrictspecReleaseFileGate:
+    """strictspec document-shape validation for single-project release files.
+
+    These lock in the strictspec adoption: the format_version gate is required,
+    and every VALID_* enum / cross-field constraint the schema owns is caught
+    with a strictspec diagnostic rendered in rlsbl's error style.
+    """
+
+    def _write(self, tmp_path, body):
+        f = tmp_path / "release.toml"
+        f.write_text(body)
+        return str(f)
+
+    def test_missing_format_version_gate_rejected(self, tmp_path):
+        # A release file without the format_version gate is rejected.
+        p = self._write(
+            tmp_path,
+            'bump = "patch"\ninclude = []\nexclude = []\ndescription = "x"\n',
+        )
+        with pytest.raises(ReleaseFileError, match="format_version"):
+            read_release_file(p)
+
+    def test_format_version_present_accepts(self, tmp_path):
+        p = self._write(
+            tmp_path,
+            'format_version = 1\nbump = "patch"\ninclude = []\nexclude = []\n'
+            'description = "x"\n',
+        )
+        assert read_release_file(p).bump == "patch"
+
+    def test_every_invalid_bump_enum_value_caught(self, tmp_path):
+        p = self._write(
+            tmp_path,
+            'format_version = 1\nbump = "gigantic"\ninclude = []\nexclude = []\n'
+            'description = "x"\n',
+        )
+        with pytest.raises(ReleaseFileError, match="not one of"):
+            read_release_file(p)
+
+    def test_invalid_target_mode_enum_caught(self, tmp_path):
+        p = self._write(
+            tmp_path,
+            'format_version = 1\nbump = "patch"\ninclude = ["flutter"]\n'
+            'exclude = []\ndescription = "x"\n[targets.flutter]\nmode = "sideload"\n',
+        )
+        with pytest.raises(ReleaseFileError, match="not one of"):
+            read_release_file(p)
+
+    def test_include_exclude_disjoint_caught(self, tmp_path):
+        p = self._write(
+            tmp_path,
+            'format_version = 1\nbump = "patch"\ninclude = ["pypi"]\n'
+            'exclude = ["pypi"]\ndescription = "x"\n',
+        )
+        with pytest.raises(ReleaseFileError, match="share no element"):
+            read_release_file(p)
+
+    def test_unknown_top_level_key_caught(self, tmp_path):
+        p = self._write(
+            tmp_path,
+            'format_version = 1\nbump = "patch"\ninclude = []\nexclude = []\n'
+            'description = "x"\nbogus = 1\n',
+        )
+        with pytest.raises(ReleaseFileError, match="Unknown key"):
+            read_release_file(p)
+
+    def test_flutter_mode_gate_stays_native(self, tmp_path):
+        # 'flutter' in include with no [targets.flutter].mode -> native refinement.
+        p = self._write(
+            tmp_path,
+            'format_version = 1\nbump = "patch"\ninclude = ["flutter"]\n'
+            'exclude = []\ndescription = "x"\n',
+        )
+        with pytest.raises(ReleaseFileError, match="Flutter target"):
+            read_release_file(p)
+
+    def test_whitespace_only_description_stays_native(self, tmp_path):
+        p = self._write(
+            tmp_path,
+            'format_version = 1\nbump = "patch"\ninclude = []\nexclude = []\n'
+            'description = "   "\n',
+        )
+        with pytest.raises(ReleaseFileError, match="description must be set"):
+            read_release_file(p)

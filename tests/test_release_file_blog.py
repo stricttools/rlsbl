@@ -15,7 +15,7 @@ class TestBlogFieldValidation:
         """blog = true is accepted."""
         f = tmp_path / "release.toml"
         f.write_text(
-            'bump = "patch"\ninclude = []\nexclude = []\n'
+            'format_version = 1\nbump = "patch"\ninclude = []\nexclude = []\n'
             'description = "test release"\nblog = true\n'
         )
         cfg = read_release_file(str(f))
@@ -25,7 +25,7 @@ class TestBlogFieldValidation:
         """blog = false is accepted."""
         f = tmp_path / "release.toml"
         f.write_text(
-            'bump = "patch"\ninclude = []\nexclude = []\n'
+            'format_version = 1\nbump = "patch"\ninclude = []\nexclude = []\n'
             'description = "test release"\nblog = false\n'
         )
         cfg = read_release_file(str(f))
@@ -35,17 +35,17 @@ class TestBlogFieldValidation:
         """blog = "yes" (string, not bool) is rejected."""
         f = tmp_path / "release.toml"
         f.write_text(
-            'bump = "patch"\ninclude = []\nexclude = []\n'
+            'format_version = 1\nbump = "patch"\ninclude = []\nexclude = []\n'
             'description = "test release"\nblog = "yes"\n'
         )
-        with pytest.raises(ReleaseFileError, match="blog must be a boolean"):
+        with pytest.raises(ReleaseFileError, match="blog"):
             read_release_file(str(f))
 
     def test_blog_defaults_to_false(self, tmp_path):
         """Missing blog field defaults to False."""
         f = tmp_path / "release.toml"
         f.write_text(
-            'bump = "patch"\ninclude = []\nexclude = []\n'
+            'format_version = 1\nbump = "patch"\ninclude = []\nexclude = []\n'
             'description = "test release"\n'
         )
         cfg = read_release_file(str(f))

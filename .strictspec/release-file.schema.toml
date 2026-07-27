@@ -56,30 +56,19 @@ required = false
 description = "Optional multiline prose explaining why the changes were made."
 
 [types.ReleaseConfig.fields.preid]
-type = "enum"
+type = "string"
 required = false
-values = ["alpha", "beta", "rc", "stable"]
-description = "Pre-release identifier (VALID_PREIDS). Coupled to bump (see constraints)."
+description = "Pre-release identifier. strictspec owns only its string type; membership in VALID_PREIDS, the empty-string-means-unset semantics, and the infra/stable couplings are consumer-native (rlsbl treats preid = \"\" and whitespace as unset, which an enum cannot express)."
 
 [types.ReleaseConfig.fields.blog]
 type = "boolean"
 required = false
 description = "Whether to generate a blog post for this release."
 
-# preid == "stable" requires bump == "prerelease".
-[[types.ReleaseConfig.constraints]]
-form = "conditional-value"
-field = "bump"
-equals_literal = "prerelease"
-when = { field = "preid", predicate = "equals", value = "stable" }
-description = "When preid == \"stable\", bump must equal \"prerelease\"."
-
-# bump == "infra" forbids preid (infra releases cannot be pre-releases).
-[[types.ReleaseConfig.constraints]]
-form = "forbidden-when"
-field = "preid"
-when = { field = "bump", predicate = "equals", value = "infra" }
-description = "infra releases cannot carry a preid."
+# NOTE: the preid couplings (preid == "stable" requires bump == "prerelease";
+# bump == "infra" forbids preid) are consumer-native, not schema constraints:
+# rlsbl treats preid = "" / whitespace as UNSET, so a present-but-empty preid
+# must not trip forbidden-when. Enforced natively in _bind_release_config.
 
 # Every key of targets must appear in include.
 [[types.ReleaseConfig.constraints]]

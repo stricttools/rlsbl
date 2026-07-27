@@ -198,9 +198,10 @@ class TestReleaseFileFlutterMode:
     def test_flutter_target_requires_mode(self, tmp_path):
         f = tmp_path / "release.toml"
         f.write_text(
-            'bump = "patch"\n'
+            'format_version = 1\nbump = "patch"\n'
             'include = ["flutter"]\n'
             'exclude = []\n'
+            'description = "test release"\n'
         )
         with pytest.raises(ReleaseFileError, match="requires.*mode"):
             read_release_file(str(f))
@@ -208,7 +209,7 @@ class TestReleaseFileFlutterMode:
     def test_flutter_target_with_mode_ota(self, tmp_path):
         f = tmp_path / "release.toml"
         f.write_text(
-            'bump = "patch"\n'
+            'format_version = 1\nbump = "patch"\n'
             'include = ["flutter"]\n'
             'exclude = []\n'
             'description = "test release"\n'
@@ -222,7 +223,7 @@ class TestReleaseFileFlutterMode:
     def test_flutter_target_with_mode_build(self, tmp_path):
         f = tmp_path / "release.toml"
         f.write_text(
-            'bump = "minor"\n'
+            'format_version = 1\nbump = "minor"\n'
             'include = ["flutter"]\n'
             'exclude = []\n'
             'description = "test release"\n'
@@ -237,7 +238,7 @@ class TestReleaseFileFlutterMode:
         """Non-flutter targets do not require a mode field."""
         f = tmp_path / "release.toml"
         f.write_text(
-            'bump = "patch"\n'
+            'format_version = 1\nbump = "patch"\n'
             'include = ["pypi"]\n'
             'exclude = []\n'
             'description = "test release"\n'

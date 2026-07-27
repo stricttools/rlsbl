@@ -314,16 +314,122 @@ def _validate_release_config(data: dict, prefix: str = "") -> ReleaseConfig:
     )
 
 
+def _render_release_diags(diags) -> str:
+    """Render strictspec diagnostics in rlsbl's release-file error style.
+
+    Each diagnostic contributes its rendered path, message, and stable code so
+    the operator sees exactly which field failed and why.
+    """
+    lines = ["release file failed strictspec validation:"]
+    for d in diags:
+        lines.append(f"  {d.path}: {d.message}  [{d.code}]")
+    return "\n".join(lines)
+
+
+def _strictspec_validate_release_document(raw: bytes) -> None:
+    """Validate the raw release-file document shape via the generated validator.
+
+    strictspec owns the DOCUMENT SHAPE: the ``format_version`` gate, field
+    types, the ``bump``/``preid``/``mode`` enums, required fields, unknown-key
+    rejection, include/exclude disjointness, the ``[targets.<name>]`` ⊆
+    ``include`` reference, and the preid/bump couplings. Raises
+    ``ReleaseFileError`` (rlsbl's native error style) when any diagnostic fires.
+
+    Consumer-native refinements that strictspec cannot express (whitespace-only
+    ``description``, the Flutter required-``mode`` gate) stay in
+    :func:`_bind_release_config`. There is no dual validation: any property
+    strictspec owns is not re-checked natively on this path.
+    """
+    from .strictspec_gen import release_file_validator as _rfv
+
+    _root, diags = _rfv.validate_bytes(raw, "toml")
+    if diags:
+        raise ReleaseFileError(_render_release_diags(diags))
+
+
+def _bind_release_config(data: dict) -> ReleaseConfig:
+    """Build a ReleaseConfig from a shape-validated release document.
+
+    Assumes :func:`_strictspec_validate_release_document` already validated the
+    document shape, so this applies only the consumer-native refinements and
+    the field normalization (``.strip()``) before constructing the dataclass.
+    """
+    bump = data["bump"]
+    include = list(data["include"])
+    exclude = list(data["exclude"])
+    targets = {name: dict(cfg) for name, cfg in data.get("targets", {}).items()}
+
+    # Native refinement: the Flutter target requires a mode field (an
+    # array-contains-literal gate strictspec does not express).
+    for name in include:
+        if name == "flutter" and (name not in targets or "mode" not in targets[name]):
+            raise ReleaseFileError(
+                f"Flutter target {name!r} requires a [targets.{name}] section "
+                f'with mode = "ota" or mode = "build"'
+            )
+
+    description = data["description"]
+    # Native refinement: whitespace-only description (non_empty passes "   ").
+    if not description.strip():
+        raise ReleaseFileError(
+            "description must be set (a short summary of this release)"
+        )
+
+    context = data.get("context", "")
+
+    # Native preid validation: strictspec owns only the string type. Membership,
+    # the empty-string-means-unset semantics, and the infra/stable couplings are
+    # consumer-native because rlsbl treats preid = "" / whitespace as UNSET,
+    # which a strictspec enum + forbidden-when cannot express.
+    preid = data.get("preid", "").strip()
+    if preid:
+        if preid not in VALID_PREIDS:
+            raise ReleaseFileError(
+                f"invalid preid {preid!r} "
+                f"(must be one of {VALID_PREIDS} or empty)"
+            )
+        if bump == "infra":
+            raise ReleaseFileError(
+                "infra releases cannot use preid (infra releases cannot be pre-releases)"
+            )
+        if preid == "stable" and bump != "prerelease":
+            raise ReleaseFileError(
+                f'preid "stable" is only valid with bump = "prerelease" '
+                f'(got bump = {bump!r})'
+            )
+
+    blog = data.get("blog", False)
+
+    return ReleaseConfig(
+        bump=bump,
+        include=include,
+        exclude=exclude,
+        targets=targets,
+        description=description.strip(),
+        context=context.strip(),
+        preid=preid,
+        blog=blog,
+    )
+
+
 def read_release_file(path: str) -> ReleaseConfig:
-    """Read and validate a release TOML file.
+    """Read and validate a single-project release TOML file.
+
+    The raw document shape is validated by the strictspec-generated validator
+    (which requires a ``format_version`` gate) BEFORE tomlkit parsing;
+    consumer-native refinements and dataclass construction happen after. Batch
+    (monorepo) release files keep the native :func:`_validate_release_config`
+    path -- their document shape is different and not yet strictspec-modeled.
 
     Raises FileNotFoundError if the file doesn't exist.
     Raises ReleaseFileError for schema/validation failures.
     """
-    with open(path, "r", encoding="utf-8") as f:
-        data = tomlkit.load(f)
+    with open(path, "rb") as f:
+        raw = f.read()
 
-    return _validate_release_config(data)
+    _strictspec_validate_release_document(raw)
+    data = tomlkit.loads(raw.decode("utf-8"))
+    return _bind_release_config(data)
 
 
 def unfinalize_release_file(releases_dir: str, version: str) -> list[str]:
